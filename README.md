@@ -54,8 +54,9 @@ cp .env.example .env
 docker compose up --build          # timescaledb, keycloak, migrate, app, seed
 ```
 
-The `seed` service continuously inserts demo metrics and (once) creates a demo
-`demo` workspace source + dashboard. Open <http://localhost:3000>.
+The `seed` service continuously inserts demo metrics and (once) creates the demo
+`demo` workspace sources + dashboards. Open <http://localhost:3000>. See
+[Seeding demo data](#seeding-demo-data) for what it creates and how to tune it.
 
 Development (source mount, hot reload, dev auth on):
 
@@ -85,6 +86,51 @@ curl -c cookies.txt -X POST http://localhost:3000/api/auth/dev-login \
 ```
 
 Or use the in-app dev sign-in control (shown only when dev auth is enabled).
+
+## Seeding demo data
+
+`npm run seed` (`scripts/seed.ts`) is a long-running seeder that gives a fresh
+install something to show. It does two things:
+
+1. **Once (bootstrap):** registers two demo sources and a dashboard for each in
+   the `demo` workspace, if they don't already exist. Both sources point at the
+   `metrics` schema and share the read-only `TS_METRICS` secret reference — they
+   differ only in the tables they expose:
+
+   | Source id | Table | Demo dashboard |
+   | --- | --- | --- |
+   | `ts-metrics` | `metrics.http_requests` — per-request events | **Demo service health** (RPS, p95 latency, 5xx, requests by route) |
+   | `ts-system` | `metrics.system_metrics` — per-host infra metrics | **Demo infrastructure** (CPU/memory by host, disk %, CPU by region) |
+
+2. **Loop:** every `SEED_INTERVAL_MS` it inserts a fresh batch of synthetic rows
+   into both tables so the live dashboards stream. It connects with the
+   privileged metrics user and ensures the demo hypertables exist first, so it
+   also works against a database whose volume predates a table.
+
+### Run it
+
+```bash
+# Docker: the `seed` service runs automatically with `docker compose up`.
+# Local:
+npm run seed                       # requires DATABASE_URL and TIMESCALEDB_URL
+```
+
+Bootstrap writes the source/dashboard rows to `DATABASE_URL` (config DB); the
+metric inserts go to `TIMESCALEDB_URL` (falls back to `DATABASE_URL`). In the
+default single-instance setup these are the same TimescaleDB database.
+
+### Environment knobs
+
+| Var | Default | Effect |
+| --- | --- | --- |
+| `SEED_INTERVAL_MS` | `2000` | Delay between insert batches (Docker dev override: `1000`). |
+| `SEED_DEMO` | — | Set to `false` to skip the one-time source/dashboard bootstrap and only stream metrics. |
+| `TS_METRICS_HOST` / `TS_METRICS_PORT` | `localhost` / `5432` | Host/port written into the seeded source configs. |
+| `POSTGRES_DB` | `holotable` | Database name written into the seeded source configs. |
+
+> The seeder is for demos and local development. It uses a privileged connection
+> to insert data and create tables; the **app** only ever reads through the
+> read-only `TS_METRICS` role. Don't run the seeder against production data.
 
 ## Pages
 
