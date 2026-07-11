@@ -39,12 +39,13 @@ export function DeleteDashboardButton({
   }
 
   return (
-    <div className="flex flex-col items-end gap-1">
+    <div className="relative flex flex-col items-end">
       <Button
-        variant="danger"
+        variant="ghost"
         size="sm"
         onClick={onDelete}
         disabled={deleting}
+        className="text-muted hover:bg-danger/10 hover:text-danger"
       >
         {deleting ? (
           <Loader2 className="h-4 w-4 animate-spin" />
@@ -53,7 +54,11 @@ export function DeleteDashboardButton({
         )}
         Delete
       </Button>
-      {error && <span className="text-xs text-danger">{error}</span>}
+      {error && (
+        <span className="absolute top-full mt-1 text-xs text-danger">
+          {error}
+        </span>
+      )}
     </div>
   );
 }

@@ -1,11 +1,14 @@
 "use client";
 
 import * as React from "react";
+import { Pause, Play } from "lucide-react";
 import type { Dashboard } from "@/lib/ir";
 import type { PollerEvent } from "@/lib/poller/registry";
 import { DashboardGrid } from "@/components/dashboard/DashboardGrid";
 import { PanelView, type PanelState } from "@/components/dashboard/PanelView";
 import type { PanelData } from "@/components/charts/options";
+import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 
 /**
  * Live dashboard viewer.
@@ -21,12 +24,17 @@ export function LiveDashboard({
   dashboardId,
   spec,
   maxWindowPoints,
+  header,
+  actions,
 }: {
   dashboardId: string;
   spec: Dashboard;
   maxWindowPoints: number;
+  header?: React.ReactNode;
+  actions?: React.ReactNode;
 }) {
   const [states, setStates] = React.useState<Record<string, PanelState>>({});
+  const [live, setLive] = React.useState(true);
   const lastTickRef = React.useRef<number>(0);
 
   const applyEvent = React.useCallback(
@@ -65,6 +73,7 @@ export function LiveDashboard({
   );
 
   React.useEffect(() => {
+    if (!live) return;
     lastTickRef.current = Date.now();
     const es = new EventSource(`/api/dashboards/${dashboardId}/stream`);
     es.onmessage = (msg) => {
@@ -89,10 +98,11 @@ export function LiveDashboard({
       });
     };
     return () => es.close();
-  }, [dashboardId, applyEvent]);
+  }, [dashboardId, applyEvent, live]);
 
-  // Staleness watchdog.
+  // Staleness watchdog. Disabled while paused — a paused dashboard is not stale.
   React.useEffect(() => {
+    if (!live) return;
     const budget = Math.max(spec.refreshIntervalMs * 2, 6_000);
     const id = setInterval(() => {
       if (Date.now() - lastTickRef.current > budget) {
@@ -106,15 +116,45 @@ export function LiveDashboard({
       }
     }, budget);
     return () => clearInterval(id);
-  }, [spec.refreshIntervalMs]);
+  }, [spec.refreshIntervalMs, live]);
 
   return (
-    <DashboardGrid
-      panels={spec.panels}
-      renderPanel={(panel) => (
-        <PanelView panel={panel} state={states[panel.id]} />
-      )}
-    />
+    <div>
+      <div className="mb-4 flex items-center justify-between">
+        {header}
+        <div className="flex shrink-0 items-center gap-1">
+          <Button
+            variant="ghost"
+            size="sm"
+            aria-pressed={!live}
+            aria-label={live ? "Pause live updates" : "Resume live updates"}
+            className="text-muted hover:text-foreground"
+            onClick={() => setLive((v) => !v)}
+          >
+            <span
+              className={cn(
+                "h-2 w-2 rounded-full",
+                live ? "animate-pulse bg-success" : "bg-muted",
+              )}
+            />
+            {live ? "Live" : "Paused"}
+            {live ? (
+              <Pause className="h-4 w-4" />
+            ) : (
+              <Play className="h-4 w-4" />
+            )}
+          </Button>
+          {actions}
+        </div>
+      </div>
+
+      <DashboardGrid
+        panels={spec.panels}
+        renderPanel={(panel) => (
+          <PanelView panel={panel} state={states[panel.id]} paused={!live} />
+        )}
+      />
+    </div>
   );
 }
 

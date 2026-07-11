@@ -40,33 +40,41 @@ export default async function DashboardViewPage({
 
   return (
     <div>
-      <div className="mb-4 flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-semibold">{dashboard.spec.title}</h1>
-          <p className="text-xs text-muted">
-            {dashboard.workspaceId} · v{dashboard.version} · refresh{" "}
-            {Math.round(dashboard.spec.refreshIntervalMs / 1000)}s ·{" "}
-            {dashboard.spec.timeRange.from} → {dashboard.spec.timeRange.to}
-          </p>
-        </div>
-        <div className="flex items-start gap-2">
-          {canEdit && (
-            <Link href={`/dashboards/${id}/edit`}>
-              <Button variant="secondary" size="sm">
-                <Pencil className="h-4 w-4" /> Edit
-              </Button>
-            </Link>
-          )}
-          {canDelete && (
-            <DeleteDashboardButton dashboardId={id} title={dashboard.spec.title} />
-          )}
-        </div>
-      </div>
-
       <LiveDashboard
         dashboardId={id}
         spec={dashboard.spec}
         maxWindowPoints={config.maxWindowPoints}
+        header={
+          <div>
+            <h1 className="text-2xl font-semibold">{dashboard.spec.title}</h1>
+            <p className="text-xs text-muted">
+              {dashboard.workspaceId} · v{dashboard.version} · refresh{" "}
+              {Math.round(dashboard.spec.refreshIntervalMs / 1000)}s ·{" "}
+              {dashboard.spec.timeRange.from} → {dashboard.spec.timeRange.to}
+            </p>
+          </div>
+        }
+        actions={
+          <>
+            {canEdit && (
+              <Link href={`/dashboards/${id}/edit`}>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="text-muted hover:text-foreground"
+                >
+                  <Pencil className="h-4 w-4" /> Edit
+                </Button>
+              </Link>
+            )}
+            {canDelete && (
+              <DeleteDashboardButton
+                dashboardId={id}
+                title={dashboard.spec.title}
+              />
+            )}
+          </>
+        }
       />
 
       <DashboardChat dashboardId={id} dashboardTitle={dashboard.spec.title} />

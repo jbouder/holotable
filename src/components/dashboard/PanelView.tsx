@@ -24,19 +24,25 @@ export function PanelView({
   panel,
   state,
   onRetry,
+  paused = false,
 }: {
   panel: Panel;
   state?: PanelState;
   onRetry?: () => void;
+  paused?: boolean;
 }) {
   const data = state?.data ?? EMPTY;
   const status = state?.status ?? "loading";
+
+  // While paused, suppress the transient "live"/"loading" badges — they no
+  // longer reflect reality. Error/tombstoned states remain meaningful.
+  const showBadge = !(paused && (status === "live" || status === "loading"));
 
   return (
     <Card className={cn("flex h-full flex-col", status === "stale" && "opacity-60")}>
       <CardHeader>
         <CardTitle>{panel.title}</CardTitle>
-        <StatusBadge status={status} />
+        {showBadge && <StatusBadge status={status} />}
       </CardHeader>
       <CardContent className="flex-1 min-h-0">
         <PanelBody panel={panel} data={data} state={state} onRetry={onRetry} />
