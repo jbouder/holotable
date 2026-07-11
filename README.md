@@ -1,0 +1,2 @@
+# holotable
+Generative Dashboard Concept
