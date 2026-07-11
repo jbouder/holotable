@@ -20,8 +20,14 @@ const SQL_RULES = `SQL rules (STRICT):
 - Reference ONLY tables listed in the catalog for the given source.
 - Do NOT add any time filter, now()/today(), or WHERE on the time column: the
   server injects the dashboard time range automatically on 'query.timeField'.
-- For time-series (line/bar/heatmap), group by a time bucket aliased to a column
-  and set that column as 'query.timeField'. Always ORDER BY the time column ASC.
+- The server filters time on the OUTPUT column named by 'query.timeField', so
+  that name MUST be an alias present in your SELECT list — NEVER the raw catalog
+  time column. For time-series (line/bar/heatmap) bucket the time column, alias
+  it, and set that alias as 'query.timeField'. Always ORDER BY it ASC. Example:
+  SELECT time_bucket('1 minute', ts) AS minute, count(*) AS requests
+  FROM http_requests GROUP BY minute ORDER BY minute  ->  timeField "minute".
+- OMIT 'query.timeField' when the result has no time column (a 'stat' scalar or a
+  group-by-dimension breakdown). Never name a column that is not in the output.
 - Every panel's query.sourceId MUST equal the provided sourceId.
 - Keep result sets small; the server also enforces row limits.`;
 

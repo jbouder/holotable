@@ -165,6 +165,8 @@ export function validateSql(sql: string, source: SourceConfig): ValidationResult
 export interface ExecutablePlan {
   sql: string;
   params: unknown[];
+  /** The output column the server filters time on, if any. Used for diagnostics. */
+  timeField?: string;
 }
 
 /**
@@ -197,5 +199,5 @@ LIMIT ${limit}`;
     sql = `SELECT * FROM (${inner}) AS _holo LIMIT ${limit}`;
   }
 
-  return { sql, params };
+  return { sql, params, timeField: input.timeField };
 }

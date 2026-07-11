@@ -116,6 +116,9 @@ test("buildExecutablePlan injects server-owned time range on timeField", () => {
   assert.match(plan.sql, /_holo\.ts < \$2::timestamptz/);
   assert.match(plan.sql, /LIMIT \d+/);
   assert.deepEqual(plan.params, [from, to]);
+  // The plan carries the filtered column so the executor can translate a
+  // Postgres "column _holo.ts does not exist" (42703) into an actionable error.
+  assert.equal(plan.timeField, "ts");
 });
 
 test("buildExecutablePlan without timeField still bounds rows and omits time params", () => {

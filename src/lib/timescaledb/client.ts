@@ -23,6 +23,21 @@ export interface QueryResult {
   rows: Record<string, unknown>[];
 }
 
+/**
+ * The server wraps the validated query and filters time on `_holo.<timeField>`.
+ * If the declared `timeField` is not a column produced by the query, Postgres
+ * raises `42703` ("column _holo.<field> does not exist"). Turn that opaque
+ * failure into an actionable message: the panel must alias its time bucket to
+ * the declared `timeField` (or clear it for non-time results).
+ */
+function isMissingTimeFieldError(err: unknown, timeField?: string): boolean {
+  if (!timeField) return false;
+  const e = err as { code?: unknown; message?: unknown };
+  if (e?.code !== "42703") return false;
+  const message = typeof e.message === "string" ? e.message.toLowerCase() : "";
+  return message.includes(`_holo.${timeField.toLowerCase()}`);
+}
+
 /** Execute a guarded plan in a read-only transaction. */
 export async function executePlan(
   source: SourceRecord,
@@ -47,6 +62,16 @@ export async function executePlan(
       columns: result.fields.map((field) => field.name),
       rows,
     };
+  } catch (err) {
+    if (isMissingTimeFieldError(err, plan.timeField)) {
+      throw new Error(
+        `time column "${plan.timeField}" is not produced by this query. Set the ` +
+          `panel's timeField to the SELECT output alias of your time bucket ` +
+          `(e.g. time_bucket(...) AS ${plan.timeField}), or clear it when the ` +
+          `result has no time column.`,
+      );
+    }
+    throw err;
   } finally {
     if (transactionStarted) {
       await client.query("ROLLBACK").catch(() => undefined);
