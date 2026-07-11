@@ -46,7 +46,10 @@ ${SQL_RULES}
 Layout: a 12-column grid. By DEFAULT place two panels side by side (w=6 each),
 laid out left-to-right, top-to-bottom, without overlaps. Use a wider panel only
 when a request clearly calls for it. Choose viz types from: line, bar, stat,
-table, heatmap. Use 'format' (number|bytes|percent|ms) where meaningful.`;
+table, heatmap, pie, donut. Use 'pie'/'donut' for a proportional breakdown of a
+small set of categories (one label column + one numeric value column; OMIT
+'query.timeField' — these are not time-series). Use 'format'
+(number|bytes|percent|ms) where meaningful.`;
 }
 
 export function streamDashboard(input: { source: SourceRecord; prompt: string }) {
@@ -89,8 +92,10 @@ the query computes (describe intent only — never invent result values), use id
 Viz selection (IMPORTANT — default to text/tabular output):
 - Default to viz "table" and return the relevant rows/columns.
 - Use "stat" only when the question asks for a single scalar value.
-- Use a chart viz ("line", "bar", "heatmap") ONLY when the request explicitly
-  asks to chart/plot/graph/visualize the data or to see a trend over time.`,
+- Use a chart viz ("line", "bar", "heatmap", "pie", "donut") ONLY when the
+  request explicitly asks to chart/plot/graph/visualize the data or to see a
+  trend over time. Use "pie"/"donut" for share/proportion/breakdown questions
+  across a small set of categories.`,
   });
 }
 

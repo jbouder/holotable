@@ -9,7 +9,15 @@ import { z } from "zod";
  * against these schemas so the contract cannot drift.
  */
 
-export const VizType = z.enum(["line", "bar", "stat", "table", "heatmap"]);
+export const VizType = z.enum([
+  "line",
+  "bar",
+  "stat",
+  "table",
+  "heatmap",
+  "pie",
+  "donut",
+]);
 export type VizType = z.infer<typeof VizType>;
 
 export const ValueFormat = z.enum(["number", "bytes", "percent", "ms"]);

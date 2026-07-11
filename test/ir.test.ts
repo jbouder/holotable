@@ -65,7 +65,7 @@ test("rejects refresh interval below 1s", () => {
 });
 
 test("rejects invalid viz type", () => {
-  const res = Panel.safeParse({ ...validPanel, viz: "pie" });
+  const res = Panel.safeParse({ ...validPanel, viz: "scatter" });
   assert.equal(res.success, false);
 });
 

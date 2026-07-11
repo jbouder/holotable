@@ -32,7 +32,7 @@ const BASE: EChartsOption = {
 
 /**
  * Build an ECharts option from a panel spec + current (bounded) data. Only
- * line/bar/heatmap map to ECharts; stat/table are rendered as HTML.
+ * line/bar/heatmap/pie/donut map to ECharts; stat/table are rendered as HTML.
  */
 export function buildChartOption(panel: Panel, data: PanelData): EChartsOption {
   const x = xKey(panel, data);
@@ -41,6 +41,10 @@ export function buildChartOption(panel: Panel, data: PanelData): EChartsOption {
 
   if (panel.viz === "heatmap") {
     return buildHeatmap(panel, data);
+  }
+
+  if (panel.viz === "pie" || panel.viz === "donut") {
+    return buildPie(panel, data);
   }
 
   const type = panel.viz === "bar" ? "bar" : "line";
@@ -64,6 +68,38 @@ export function buildChartOption(panel: Panel, data: PanelData): EChartsOption {
       smooth: type === "line",
       data: data.rows.map((r) => Number(r[k])),
     })),
+  };
+}
+
+/**
+ * Pie / donut: a proportional breakdown of one categorical label column against
+ * one numeric value column. `donut` is a pie with an inner radius. The category
+ * is the panel's x key (timeField or first column); the value is the first
+ * numeric column that isn't the category.
+ */
+function buildPie(panel: Panel, data: PanelData): EChartsOption {
+  const x = xKey(panel, data);
+  const valueKey =
+    seriesKeys(panel, data)[0] ?? data.columns.find((c) => c !== x) ?? x;
+  const radius = panel.viz === "donut" ? ["48%", "72%"] : "72%";
+  return {
+    color: palette,
+    backgroundColor: "transparent",
+    tooltip: { trigger: "item" },
+    legend: { top: 0, textStyle: { color: "#9aa0aa" } },
+    series: [
+      {
+        type: "pie",
+        radius,
+        center: ["50%", "56%"],
+        data: data.rows.map((r) => ({
+          name: String(r[x]),
+          value: Number(r[valueKey]) || 0,
+        })),
+        label: { color: "#9aa0aa" },
+        labelLine: { lineStyle: { color: "#3a3f4b" } },
+      },
+    ],
   };
 }
 

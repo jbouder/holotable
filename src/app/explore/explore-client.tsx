@@ -27,7 +27,7 @@ interface Result {
   error?: string;
 }
 
-const CHART_VIZ = new Set(["line", "bar", "heatmap"]);
+const CHART_VIZ = new Set(["line", "bar", "heatmap", "pie", "donut"]);
 const MAX_TABLE_ROWS = 500;
 const EMPTY: PanelData = { columns: [], rows: [] };
 
