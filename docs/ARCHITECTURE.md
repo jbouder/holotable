@@ -103,7 +103,14 @@ model-specific data is baked into the code (`src/lib/ai/provider.ts`):
 - `AI_PROVIDER=gateway` — the bare `AI_MODEL` string is routed by the AI SDK
   Gateway (`AI_GATEWAY_API_KEY`).
 - `AI_PROVIDER=openai-compatible` — an OpenAI-compatible endpoint via
-  `OPENAI_BASE_URL` + `OPENAI_API_KEY`.
+  `OPENAI_BASE_URL` + `OPENAI_API_KEY`. Examples of compatible providers:
+  - **OpenRouter:** `OPENAI_BASE_URL=https://openrouter.ai/api/v1` with an
+    OpenRouter API key; use any OpenRouter model slug as `AI_MODEL`
+    (e.g. `openai/gpt-4o-mini`).
+  - **OpenCode Go:** set `OPENAI_BASE_URL` and `OPENAI_API_KEY` to the values
+    provided by OpenCode Go. Only models that expose an OpenAI-compatible
+    `/chat/completions` interface are supported via this path; not all OpenCode
+    Go models use that interface.
 
 Choosing the concrete provider/model is deliberately left to the deployment.
 `AI_MODEL` must be set; there is no default model.
