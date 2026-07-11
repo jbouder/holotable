@@ -125,7 +125,7 @@ export function EditDashboardClient({
   }
 
   return (
-    <div className="mx-auto max-w-7xl space-y-4">
+    <div className="space-y-4">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-semibold">Edit dashboard</h1>
         <div className="flex gap-2">
