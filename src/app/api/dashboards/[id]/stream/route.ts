@@ -28,7 +28,7 @@ export async function GET(req: Request, ctx: RouteContext<"/api/dashboards/[id]/
       workspaceId: dashboard.workspaceId,
     });
 
-    const poller = getPoller(id, dashboard.version, dashboard.spec);
+    const poller = getPoller(id, dashboard.version, dashboard.workspaceId, dashboard.spec);
     const encoder = new TextEncoder();
 
     const stream = new ReadableStream<Uint8Array>({

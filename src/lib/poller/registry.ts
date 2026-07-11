@@ -1,5 +1,6 @@
 import type { Dashboard, Panel } from "@/lib/ir";
 import { getSourceById } from "@/lib/db/repo";
+import type { SourceRecord } from "@/lib/registry";
 import { validateSql, buildExecutablePlan } from "@/lib/sql/safety";
 import { resolveTimeRange } from "@/lib/time";
 import { executePlan } from "@/lib/clickhouse/client";
@@ -68,69 +69,95 @@ export function computeDelta(
   return { fresh, cursor, mode: prevCursor ? "append" : "replace" };
 }
 
-/** Executes a single panel and returns the events to broadcast. */
+/**
+ * Executes a single panel and returns the events to broadcast.
+ *
+ * `dashboardWorkspaceId` is the trusted workspace identity resolved from the
+ * dashboard record at poller-creation time. Every execution MUST verify that
+ * the resolved source belongs to that workspace; a crafted jsonb spec that
+ * names a cross-workspace sourceId is surfaced as a tombstone (indistinguishable
+ * from a deleted source to prevent information disclosure).
+ */
 export type PanelExecutor = (
   panel: Panel,
   window: TimeWindow,
   cursors: Map<string, string>,
+  dashboardWorkspaceId: string,
 ) => Promise<PollerEvent[]>;
 
-export const defaultPanelExecutor: PanelExecutor = async (
-  panel,
-  window,
-  cursors,
-) => {
-  // Re-resolve + re-authorize the source on every execution.
-  const source = await getSourceById(panel.query.sourceId);
-  if (!source || source.tombstonedAt) {
-    return [
-      { type: "tombstone", panelId: panel.id, sourceId: panel.query.sourceId },
-    ];
-  }
+/**
+ * Factory that creates a PanelExecutor with an injectable source resolver.
+ * Pass a mock resolver in tests to exercise workspace-isolation logic without
+ * a live database.
+ */
+export function makePanelExecutor(
+  getSource: (id: string) => Promise<SourceRecord | null> = getSourceById,
+): PanelExecutor {
+  return async (panel, window, cursors, dashboardWorkspaceId) => {
+    // Re-resolve the source on every execution.
+    const source = await getSource(panel.query.sourceId);
 
-  const check = validateSql(panel.query.sql, source.config);
-  if (!check.ok) {
-    return [
-      { type: "panel-error", panelId: panel.id, error: check.error ?? "invalid sql" },
-    ];
-  }
+    // Tombstoned, missing, and cross-workspace sources all surface identically
+    // as tombstone events so callers cannot distinguish "deleted" from "not
+    // yours" — this is the single mandatory workspace-isolation enforcement
+    // point for the shared poller.
+    if (
+      !source ||
+      source.tombstonedAt ||
+      source.workspaceId !== dashboardWorkspaceId
+    ) {
+      return [
+        { type: "tombstone", panelId: panel.id, sourceId: panel.query.sourceId },
+      ];
+    }
 
-  const plan = buildExecutablePlan({
-    sql: panel.query.sql,
-    timeField: panel.query.timeField,
-    from: window.from,
-    to: window.to,
-  });
-  const result = await executePlan(source, plan);
+    const check = validateSql(panel.query.sql, source.config);
+    if (!check.ok) {
+      return [
+        { type: "panel-error", panelId: panel.id, error: check.error ?? "invalid sql" },
+      ];
+    }
 
-  if (panel.query.timeField) {
-    const delta = computeDelta(
-      result.rows,
-      panel.query.timeField,
-      cursors.get(panel.id),
-    );
-    if (delta.cursor !== undefined) cursors.set(panel.id, delta.cursor);
+    const plan = buildExecutablePlan({
+      sql: panel.query.sql,
+      timeField: panel.query.timeField,
+      from: window.from,
+      to: window.to,
+    });
+    const result = await executePlan(source, plan);
+
+    if (panel.query.timeField) {
+      const delta = computeDelta(
+        result.rows,
+        panel.query.timeField,
+        cursors.get(panel.id),
+      );
+      if (delta.cursor !== undefined) cursors.set(panel.id, delta.cursor);
+      return [
+        {
+          type: "panel",
+          panelId: panel.id,
+          mode: delta.mode,
+          columns: result.columns,
+          rows: delta.fresh,
+        },
+      ];
+    }
+
     return [
       {
         type: "panel",
         panelId: panel.id,
-        mode: delta.mode,
+        mode: "replace",
         columns: result.columns,
-        rows: delta.fresh,
+        rows: result.rows,
       },
     ];
-  }
+  };
+}
 
-  return [
-    {
-      type: "panel",
-      panelId: panel.id,
-      mode: "replace",
-      columns: result.columns,
-      rows: result.rows,
-    },
-  ];
-};
+/** Default executor used in production. */
+export const defaultPanelExecutor: PanelExecutor = makePanelExecutor();
 
 class DashboardPoller {
   private listeners = new Set<Listener>();
@@ -141,6 +168,7 @@ class DashboardPoller {
   constructor(
     readonly dashboardId: string,
     readonly version: number,
+    readonly dashboardWorkspaceId: string,
     private spec: Dashboard,
     private executor: PanelExecutor = defaultPanelExecutor,
   ) {}
@@ -203,7 +231,7 @@ class DashboardPoller {
     await Promise.all(
       this.spec.panels.map(async (p) => {
         try {
-          const events = await this.executor(p, window, this.cursors);
+          const events = await this.executor(p, window, this.cursors, this.dashboardWorkspaceId);
           for (const e of events) this.broadcast(e);
         } catch (err) {
           this.broadcast({
@@ -224,17 +252,23 @@ const registry = new Map<string, DashboardPoller>();
 /**
  * Get the shared poller for a dashboard, creating it if needed. If a poller
  * exists for an older version, it is replaced so the new spec takes effect.
+ *
+ * `workspaceId` is the trusted dashboard workspace identity resolved from the
+ * database record. It is stored on the poller and passed to every panel
+ * execution so sources are always validated against the dashboard workspace,
+ * regardless of subscriber identity.
  */
 export function getPoller(
   dashboardId: string,
   version: number,
+  workspaceId: string,
   spec: Dashboard,
   executor: PanelExecutor = defaultPanelExecutor,
 ): DashboardPoller {
   const existing = registry.get(dashboardId);
   if (existing && existing.version >= version) return existing;
   if (existing) existing.stop();
-  const poller = new DashboardPoller(dashboardId, version, spec, executor);
+  const poller = new DashboardPoller(dashboardId, version, workspaceId, spec, executor);
   registry.set(dashboardId, poller);
   return poller;
 }
