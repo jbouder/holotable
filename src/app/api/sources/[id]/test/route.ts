@@ -6,7 +6,7 @@ import {
 } from "@/lib/auth/authorize";
 import { json } from "@/lib/http";
 import { getSourceById } from "@/lib/db/repo";
-import { testSource } from "@/lib/clickhouse/client";
+import { testSource } from "@/lib/timescaledb/client";
 
 export const runtime = "nodejs";
 

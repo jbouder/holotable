@@ -3,7 +3,7 @@ import { getSourceById } from "@/lib/db/repo";
 import type { SourceRecord } from "@/lib/registry";
 import { validateSql, buildExecutablePlan } from "@/lib/sql/safety";
 import { resolveTimeRange } from "@/lib/time";
-import { executePlan } from "@/lib/clickhouse/client";
+import { executePlan } from "@/lib/timescaledb/client";
 import { config } from "@/lib/config";
 
 /**

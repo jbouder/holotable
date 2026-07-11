@@ -1,6 +1,6 @@
 import { streamObject } from "ai";
 import { getModel } from "@/lib/ai/provider";
-import { buildCatalogPrompt } from "@/lib/clickhouse/catalog";
+import { buildCatalogPrompt } from "@/lib/timescaledb/catalog";
 import { Dashboard, Panel } from "@/lib/ir";
 import { config } from "@/lib/config";
 import type { SourceRecord } from "@/lib/registry";
@@ -16,7 +16,7 @@ import type { SourceRecord } from "@/lib/registry";
  */
 
 const SQL_RULES = `SQL rules (STRICT):
-- Emit ClickHouse SELECT statements only. No INSERT/UPDATE/DDL, no semicolons, no comments.
+- Emit TimescaleDB/PostgreSQL SELECT statements only. No INSERT/UPDATE/DDL, no semicolons, no comments.
 - Reference ONLY tables listed in the catalog for the given source.
 - Do NOT add any time filter, now()/today(), or WHERE on the time column: the
   server injects the dashboard time range automatically on 'query.timeField'.
