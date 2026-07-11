@@ -44,3 +44,28 @@ SELECT add_retention_policy(
     drop_after => INTERVAL '7 days',
     if_not_exists => TRUE
 );
+
+-- Second demo source: per-host infrastructure/system metrics.
+CREATE TABLE IF NOT EXISTS metrics.system_metrics
+(
+    ts            TIMESTAMPTZ NOT NULL DEFAULT now(),
+    host          TEXT NOT NULL,
+    region        TEXT NOT NULL,
+    cpu_pct       DOUBLE PRECISION NOT NULL,
+    mem_pct       DOUBLE PRECISION NOT NULL,
+    disk_pct      DOUBLE PRECISION NOT NULL,
+    net_in_bytes  BIGINT NOT NULL,
+    net_out_bytes BIGINT NOT NULL
+);
+
+SELECT create_hypertable(
+    'metrics.system_metrics',
+    by_range('ts'),
+    if_not_exists => TRUE
+);
+
+SELECT add_retention_policy(
+    'metrics.system_metrics',
+    drop_after => INTERVAL '7 days',
+    if_not_exists => TRUE
+);
