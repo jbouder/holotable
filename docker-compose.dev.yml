@@ -1,0 +1,21 @@
+# Development override: run the app from source with hot reload and dev auth.
+# Usage: docker compose -f docker-compose.yml -f docker-compose.dev.yml up
+services:
+  app:
+    build:
+      context: .
+      target: build
+    command: ["npm", "run", "dev"]
+    environment:
+      NODE_ENV: development
+      DEV_AUTH_ENABLED: "true"
+      SESSION_SECRET: dev-insecure-session-secret-please-change-000
+    volumes:
+      - ./src:/app/src
+      - ./public:/app/public
+      - ./migrations:/app/migrations
+      - ./scripts:/app/scripts
+
+  seed:
+    environment:
+      SEED_INTERVAL_MS: "1000"
