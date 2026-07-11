@@ -35,7 +35,12 @@ export async function GET(req: Request) {
     const session = await signSessionToken(identity.sub, groups);
     await setSessionCookie(session);
 
-    return Response.redirect(new URL("/dashboards", url.origin), 302);
+    // Redirect relative to the browser's current origin. Deriving an absolute
+    // URL from url.origin is unsafe here: behind the container the server
+    // reports its bind host (0.0.0.0), so an absolute redirect would move the
+    // browser off the host the session cookie was just set on (localhost),
+    // dropping the cookie and bouncing back to login.
+    return new Response(null, { status: 302, headers: { Location: "/dashboards" } });
   } catch (err) {
     return errorResponse(err);
   }

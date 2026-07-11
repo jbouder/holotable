@@ -62,8 +62,16 @@ services:
       OIDC_CLIENT_SECRET: ${OIDC_CLIENT_SECRET:-}
       OIDC_JWKS_URL: ${OIDC_JWKS_URL:-}
       OIDC_GROUPS_CLAIM: ${OIDC_GROUPS_CLAIM:-groups}
+      OIDC_REDIRECT_URI: ${OIDC_REDIRECT_URI:-}
+      OIDC_SCOPE: ${OIDC_SCOPE:-openid profile}
+      OIDC_AUDIENCE: ${OIDC_AUDIENCE:-}
     ports:
       - "3000:3000"
+    # OIDC URLs use localhost:8080 (browser-facing). Map localhost to the host
+    # gateway so server-side JWKS/token fetches inside this container reach the
+    # published Keycloak port instead of the container's own loopback.
+    extra_hosts:
+      - "localhost:host-gateway"
     depends_on:
       postgres:
         condition: service_healthy
