@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { LayoutDashboard, Database, LogOut } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { ThemeToggle } from "@/components/theme-toggle";
 
 export function NavBar() {
   const router = useRouter();
@@ -34,9 +35,12 @@ export function NavBar() {
           <Database className="h-4 w-4" /> Data sources
         </Link>
       </nav>
-      <Button variant="ghost" size="sm" onClick={logout}>
-        <LogOut className="h-4 w-4" /> Sign out
-      </Button>
+      <div className="flex items-center gap-2">
+        <ThemeToggle />
+        <Button variant="ghost" size="sm" onClick={logout}>
+          <LogOut className="h-4 w-4" /> Sign out
+        </Button>
+      </div>
     </header>
   );
 }
