@@ -13,8 +13,9 @@ streams the results live.
   the API, persistence, and the client, so the spec cannot drift.
 
 See [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) for the full invariant list and
-the single-instance poller caveat, and [`docs/KEYCLOAK.md`](docs/KEYCLOAK.md) for
-the OIDC group-mapper setup.
+the single-instance poller caveat, [`docs/PANEL_LIFECYCLE.md`](docs/PANEL_LIFECYCLE.md)
+for how a panel is generated, stored, executed, and rendered end to end, and
+[`docs/KEYCLOAK.md`](docs/KEYCLOAK.md) for the OIDC group-mapper setup.
 
 ## How it works
 

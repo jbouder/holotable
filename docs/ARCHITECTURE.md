@@ -1,5 +1,9 @@
 # Holotable Architecture & Invariants
 
+> For a narrative walkthrough of a single panel — generation → validation →
+> storage → execution → rendering — see [`PANEL_LIFECYCLE.md`](./PANEL_LIFECYCLE.md).
+> This document is the invariant reference; that one follows one panel through them.
+
 Holotable turns a natural-language prompt into a live monitoring dashboard. A
 language model authors a **validated visualization spec** (SQL + chart config)
 — it never touches, produces, or sees metric data. The server executes the
