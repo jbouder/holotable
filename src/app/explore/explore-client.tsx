@@ -38,6 +38,16 @@ const TIME_PRESETS: { value: string; label: string }[] = [
   { value: "now-7d", label: "Last 7 days" },
 ];
 
+// One-click sample questions for quick testing. Chosen to exercise the seeded
+// http_requests catalog and a spread of viz types (line / table / stat).
+const EXAMPLE_PROMPTS: string[] = [
+  "Chart request volume per minute",
+  "Chart p95 latency over time",
+  "Which routes returned the most 5xx errors?",
+  "Top routes by request count",
+  "Total requests in this window",
+];
+
 export function ExploreClient({ sources }: { sources: SourceOption[] }) {
   const [sourceId, setSourceId] = React.useState<string | null>(
     sources[0]?.id ?? null,
@@ -158,11 +168,24 @@ export function ExploreClient({ sources }: { sources: SourceOption[] }) {
             </div>
           </div>
           <div>
-            <Label htmlFor="prompt">Ask a question</Label>
+            <Label htmlFor="prompt">Ask a question or try one below</Label>
+            <div className="mb-2 flex flex-wrap items-center gap-2">
+              {EXAMPLE_PROMPTS.map((example) => (
+                <button
+                  key={example}
+                  type="button"
+                  disabled={isLoading}
+                  onClick={() => setPrompt(example)}
+                  className="rounded-full border border-border bg-surface px-3 py-1 text-xs text-muted transition-colors hover:border-primary hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  {example}
+                </button>
+              ))}
+            </div>
             <Textarea
               id="prompt"
               rows={3}
-              placeholder="e.g. Which hosts had the most errors? (add “as a chart” to visualize)"
+              placeholder="e.g. Which routes had the most errors? (add “as a chart” to visualize)"
               value={prompt}
               onChange={(e) => setPrompt(e.target.value)}
             />
