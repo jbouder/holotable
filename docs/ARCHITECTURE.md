@@ -31,6 +31,7 @@ Viewer ─▶ SSE /stream ─▶ shared in-process poller ─▶ guarded SQL ─
 | SQL safety + time injection | `src/lib/sql/safety.ts` |
 | Metrics execution (read-only) | `src/lib/timescaledb/client.ts` |
 | LLM generation | `src/lib/ai/provider.ts`, `src/lib/ai/generate.ts` |
+| Dashboard chat (read-only, tool-calling) | `src/lib/ai/chat.ts`, `src/app/api/dashboards/[id]/chat/route.ts` |
 | Shared poller | `src/lib/poller/registry.ts` |
 | Charts (setOption merge) | `src/components/charts/*` |
 
@@ -60,7 +61,10 @@ Viewer ─▶ SSE /stream ─▶ shared in-process poller ─▶ guarded SQL ─
    query as a subquery and injects `from`/`to` on the declared `timeField` via
    **bound parameters**, plus a read-only transaction and execution-time and row
    limits. The
-   model cannot filter time or influence resource usage.
+   model cannot filter time or influence resource usage. Each execution also
+   pins `search_path` to the source's configured schema (a validated bare
+   identifier) plus `public`, so unqualified table names resolve only against
+   the allowlisted schema.
 9. **The catalog prompt is metadata only** — table and column names/types for a
    **single selected, authorized source per call**. No sample rows are sent.
 10. **One poller per dashboard** shared across independently authorized
@@ -78,6 +82,21 @@ Viewer ─▶ SSE /stream ─▶ shared in-process poller ─▶ guarded SQL ─
     re-resolved and re-authorized on **every** execution (including each poller
     tick). `can()` in `authorize.ts` is the only decision point and the only
     place the platform-admin bypass applies.
+15. **Dashboard chat is read-only and preserves every invariant above.**
+    `/api/dashboards/[id]/chat` authorizes `dashboard:view` and exposes the
+    model a single `runQuery` tool. The tool is scoped to the sources the
+    dashboard already references *and* the caller may use (each re-resolved and
+    re-authorized; unavailable ones are silently omitted, mirroring the poller's
+    tombstone handling), runs the same `validateSql` → `buildExecutablePlan` →
+    `executePlan` pipeline, injects the **dashboard's own** time range, caps rows
+    (`MAX_TOOL_ROWS`) and model↔tool steps, and cannot mutate the dashboard. The
+    model still authors SQL, never data.
+16. **Statement errors are actionable; infra errors are opaque.** `executePlan`
+    raises `QueryExecutionError` for Postgres statement-level failures (SQLSTATE
+    codes: bad column, syntax, type mismatch, timeout, missing `timeField`).
+    Routes translate it to a `400` with the real message so an editor can fix
+    and retry; connection/socket failures stay a generic `500` and are never
+    surfaced.
 
 ## Authorization model
 

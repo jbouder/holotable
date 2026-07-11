@@ -31,7 +31,7 @@ Panel = {
   id: string,                 // unique within the dashboard
   title: string,
   description?: string,       // intent only, populated for ad-hoc exploration
-  viz: "line" | "bar" | "stat" | "table" | "heatmap",
+  viz: "line" | "bar" | "stat" | "table" | "heatmap" | "pie" | "donut",
   query: {
     sourceId: string,         // opaque reference into the source registry
     sql: string,              // UNTRUSTED SELECT — validated before it ever runs
@@ -169,8 +169,9 @@ touching the database.
 ## 3. Execution — the server turns a spec into rows
 
 This is where real data enters the system — server-side only, from a stored
-spec. It happens in two places that share the same guard code: the live poller
-(§4) and the one-shot query route. The core is `buildExecutablePlan`
+spec. It happens in three places that share the same guard code: the live poller
+(§4), the one-shot query route, and the read-only dashboard chat's `runQuery`
+tool. The core is `buildExecutablePlan`
 (`src/lib/sql/safety.ts`), which runs **after** `validateSql` has passed.
 
 The server owns time. The validated query is wrapped as a subquery, and the
@@ -193,9 +194,19 @@ LIMIT <maxQueryRows>          -- default 5000
 
 `executePlan` (`src/lib/timescaledb/client.ts`) runs this in a **read-only
 transaction** as the source's read-only role, with a statement timeout
-(`QUERY_TIMEOUT_SECONDS`, default 20s). Credentials are resolved from the
-environment via the source's `secret_ref` — they are never stored in the spec
-and never leave the server.
+(`QUERY_TIMEOUT_SECONDS`, default 20s). Inside the transaction it first pins
+`SET LOCAL search_path` to the source's configured schema (validated as a bare
+identifier) plus `public`, so the catalog's bare table names resolve only
+against the allowlisted schema. Credentials are resolved from the environment
+via the source's `secret_ref` — they are never stored in the spec and never
+leave the server.
+
+When a statement fails, `executePlan` distinguishes *statement-level* errors
+(Postgres SQLSTATE codes — bad column, syntax, type mismatch, timeout, or a
+`timeField` that names no output column) from connection/infra errors. The
+former are wrapped as `QueryExecutionError`; the query route returns them as a
+`400` with the real message so an editor can correct and retry (the Explore and
+edit surfaces render a `RetryNotice`). Infra errors stay a generic `500`.
 
 Net effect: the model controls *what to compute*, but not the time window, not
 resource usage, and not which credentials or tables it can touch.
@@ -250,8 +261,11 @@ Events are broadcast to every subscriber's SSE stream. The event types are:
 
 - `stat` → the last numeric value, run through `formatValue` per `panel.format`.
 - `table` → an HTML table of the windowed rows.
-- `line` / `bar` / `heatmap` → `buildChartOption` (`src/components/charts/options.ts`)
-  builds an ECharts option, drawn by `EChart`.
+- `line` / `bar` / `heatmap` / `pie` / `donut` → `buildChartOption`
+  (`src/components/charts/options.ts`) builds an ECharts option, drawn by
+  `EChart`. `pie`/`donut` render a proportional breakdown of one categorical
+  label column against one numeric value column (donut is a pie with an inner
+  radius) and are not time-series, so their panels omit `timeField`.
 
 `EChart` is the invariant that keeps charts smooth: the ECharts instance is
 created **once** and every update is `setOption(option, { notMerge: false })`.
@@ -298,5 +312,6 @@ ever runs it.
 | Execution (read-only) | `src/lib/timescaledb/client.ts` |
 | Poller + deltas | `src/lib/poller/registry.ts` |
 | SSE stream | `src/app/api/dashboards/[id]/stream/route.ts` |
+| Dashboard chat (read-only + `runQuery`) | `src/lib/ai/chat.ts`, `src/app/api/dashboards/[id]/chat/route.ts` |
 | Live client | `src/components/dashboard/LiveDashboard.tsx`, `PanelView.tsx` |
 | Charts | `src/components/charts/EChart.tsx`, `options.ts`, `src/lib/color/oklch.ts` |

@@ -6,9 +6,9 @@ data itself — and Holotable executes the guarded SQL against TimescaleDB and
 streams the results live.
 
 - **Stack:** Next.js 16 (App Router) · TypeScript · Tailwind v4 · Base UI ·
-  ECharts · TimescaleDB/PostgreSQL (config + metrics) · Vercel AI SDK
-  (`streamObject` + `experimental_useObject`) · Keycloak OIDC (group-based auth) ·
-  Server-Sent Events.
+  ECharts (line/bar/stat/table/heatmap/pie/donut) · TimescaleDB/PostgreSQL
+  (config + metrics) · Vercel AI SDK (`streamObject` for specs, `streamText` +
+  tool calls for chat) · Keycloak OIDC (group-based auth) · Server-Sent Events.
 - **Contract:** one shared Zod IR (`src/lib/ir.ts`) is used by the LLM output,
   the API, persistence, and the client, so the spec cannot drift.
 
@@ -35,6 +35,16 @@ no time/non-deterministic functions, read-only settings, row/time limits, and a
 only a stable `sourceId`; the registry owns the safe connection config, the
 catalog, and a `secret_ref`. Credentials are resolved from the environment at
 execution time and never stored.
+
+The viewer can **pause** live updates (the Live/Pause toggle closes the
+`EventSource`; resuming reattaches to the shared poller) and includes a
+**read-only chat** assistant scoped to that dashboard. Chat reasons over the
+panel specs and may fetch fresh data through a guarded `runQuery` tool that runs
+the *same* validate → plan → execute pipeline as everything else — it cannot
+mutate the dashboard, supply a time filter, or reach any source the dashboard
+doesn't already reference. Statement-level query failures (bad column, syntax,
+timeout) surface as actionable messages with a one-click retry; connection and
+infrastructure errors stay generic.
 
 ## Quick start (Docker)
 
@@ -81,10 +91,10 @@ Or use the in-app dev sign-in control (shown only when dev auth is enabled).
 | Path | Purpose | Min role |
 | --- | --- | --- |
 | `/dashboards` | List dashboards in a workspace | viewer |
-| `/dashboards/new` | Prompt → preview → save | editor |
-| `/dashboards/[id]` | Live viewer (SSE) | viewer |
+| `/dashboards/new` | Prompt → preview → save, with one-click starter prompts | editor |
+| `/dashboards/[id]` | Live viewer (SSE) with a Live/Pause toggle and a read-only dashboard chat assistant | viewer |
 | `/dashboards/[id]/edit` | Panel CRUD/layout, single-panel NL edits, version save | editor |
-| `/explore` | Ad-hoc NL questions against editable sources; streams one panel spec, then runs it through guarded query preview | editor |
+| `/explore` | Ad-hoc NL questions against editable sources (with sample-question chips); streams one panel spec, then runs it through guarded query preview | editor |
 | `/data-sources` | Source CRUD / test / refresh | source-admin |
 
 ## API
@@ -96,6 +106,7 @@ Or use the in-app dev sign-in control (shown only when dev auth is enabled).
 | `/api/dashboards` | GET/POST | List / create |
 | `/api/dashboards/[id]` | GET/PUT/DELETE | Get / new version / delete |
 | `/api/dashboards/[id]/stream` | GET | SSE deltas (cookie auth) |
+| `/api/dashboards/[id]/chat` | POST | Read-only chat scoped to one dashboard; streams a UI message stream, may call a guarded `runQuery` tool |
 | `/api/sources` | GET/POST | List / create |
 | `/api/sources/[id]` | GET/PUT/DELETE | Get / update / delete (tombstone if referenced) |
 | `/api/sources/[id]/test` | POST | Connectivity test |
@@ -152,6 +163,8 @@ npm run seed     # looping metrics seeder
 - `test/authorize.test.ts` — `can()` for every action incl. admin bypass and owner delete.
 - `test/sql-safety.test.ts` — SQL denylist/allowlist + server time injection + time resolution.
 - `test/poller.test.ts` — delta cursors, poller identity/version replacement, subscriber ref-counting.
+- `test/layout.test.ts` — panel grid layout packing/normalization.
+- `test/dashboard-chat.test.ts` — chat `runQuery` guard: source scoping, SQL validation, server-owned time injection.
 
 ## Security notes
 
