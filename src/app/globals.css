@@ -1,0 +1,48 @@
+@import "tailwindcss";
+
+/*
+ * Design tokens expressed in OKLCH (Tailwind v4 @theme). Chart colors are
+ * resolved to sRGB hex at runtime by lib/color/oklch.ts before being handed to
+ * ECharts (canvas cannot consume oklch()/CSS vars).
+ */
+:root {
+  --background: oklch(0.16 0.02 265);
+  --surface: oklch(0.21 0.02 265);
+  --surface-2: oklch(0.26 0.02 265);
+  --foreground: oklch(0.96 0.01 265);
+  --muted: oklch(0.7 0.02 265);
+  --border: oklch(0.32 0.02 265);
+  --primary: oklch(0.62 0.19 259);
+  --primary-foreground: oklch(0.98 0.01 265);
+  --danger: oklch(0.65 0.22 20);
+  --success: oklch(0.7 0.16 160);
+  --radius: 0.625rem;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-foreground: var(--foreground);
+  --color-muted: var(--muted);
+  --color-border: var(--border);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-danger: var(--danger);
+  --color-success: var(--success);
+  --radius-lg: var(--radius);
+  --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto,
+    Helvetica, Arial, sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas,
+    "Liberation Mono", monospace;
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-sans);
+}
+
+* {
+  border-color: var(--border);
+}
