@@ -15,7 +15,7 @@ import type { SourceRecord } from "@/lib/registry";
  * the server injects the dashboard time range at execution.
  */
 
-const SQL_RULES = `SQL rules (STRICT):
+export const SQL_RULES = `SQL rules (STRICT):
 - Emit TimescaleDB/PostgreSQL SELECT statements only. No INSERT/UPDATE/DDL, no semicolons, no comments.
 - Reference ONLY tables listed in the catalog for the given source.
 - Do NOT add any time filter, now()/today(), or WHERE on the time column: the

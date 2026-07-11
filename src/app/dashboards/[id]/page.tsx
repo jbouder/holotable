@@ -7,6 +7,7 @@ import { getDashboardById } from "@/lib/db/repo";
 import { config } from "@/lib/config";
 import { SignIn } from "@/components/sign-in";
 import { LiveDashboard } from "@/components/dashboard/LiveDashboard";
+import { DashboardChat } from "@/components/dashboard/DashboardChat";
 import { DeleteDashboardButton } from "@/components/dashboard/delete-dashboard-button";
 import { Button } from "@/components/ui/button";
 
@@ -67,6 +68,8 @@ export default async function DashboardViewPage({
         spec={dashboard.spec}
         maxWindowPoints={config.maxWindowPoints}
       />
+
+      <DashboardChat dashboardId={id} dashboardTitle={dashboard.spec.title} />
     </div>
   );
 }
