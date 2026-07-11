@@ -47,8 +47,3 @@ export function resolveTimeRange(
   }
   return { from, to };
 }
-
-/** Format a Date as ClickHouse DateTime64(3) UTC string. */
-export function toClickHouseDateTime(d: Date): string {
-  return d.toISOString().replace("T", " ").replace("Z", "");
-}

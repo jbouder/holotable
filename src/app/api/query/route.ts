@@ -9,7 +9,7 @@ import { readJson, json } from "@/lib/http";
 import { getSourceById } from "@/lib/db/repo";
 import { validateSql, buildExecutablePlan } from "@/lib/sql/safety";
 import { resolveTimeRange } from "@/lib/time";
-import { executePlan } from "@/lib/clickhouse/client";
+import { executePlan } from "@/lib/timescaledb/client";
 import { TimeRange } from "@/lib/ir";
 
 export const runtime = "nodejs";

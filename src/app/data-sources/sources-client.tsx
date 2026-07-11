@@ -10,19 +10,20 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
 const CONFIG_TEMPLATE = JSON.stringify(
   {
-    protocol: "http",
-    host: "clickhouse",
-    port: 8123,
-    database: "metrics",
+    host: "postgres",
+    port: 5432,
+    database: "holotable",
+    schema: "metrics",
+    ssl: false,
     tables: [
       {
         name: "http_requests",
         description: "per-request events",
         timeField: "ts",
         columns: [
-          { name: "ts", type: "DateTime64(3)" },
-          { name: "status", type: "UInt16" },
-          { name: "duration_ms", type: "Float64" },
+          { name: "ts", type: "timestamp with time zone" },
+          { name: "status", type: "smallint" },
+          { name: "duration_ms", type: "double precision" },
         ],
       },
     ],
@@ -134,8 +135,8 @@ export function SourcesClient({ workspaces }: { workspaces: string[] }) {
                     )}
                   </div>
                   <div className="text-xs text-muted">
-                    {s.id} · {s.config.protocol}://{s.config.host}:{s.config.port}/
-                    {s.config.database} · secret_ref {s.secretRef} ·{" "}
+                    {s.id} · {s.config.host}:{s.config.port}/{s.config.database} ·{" "}
+                    schema {s.config.schema} · secret_ref {s.secretRef} ·{" "}
                     {s.config.tables.length} tables
                   </div>
                 </div>
@@ -181,7 +182,7 @@ function CreateSource({
 }) {
   const [id, setId] = React.useState("");
   const [name, setName] = React.useState("");
-  const [secretRef, setSecretRef] = React.useState("CH_METRICS");
+  const [secretRef, setSecretRef] = React.useState("TS_METRICS");
   const [configText, setConfigText] = React.useState(CONFIG_TEMPLATE);
   const [error, setError] = React.useState<string | null>(null);
   const [saving, setSaving] = React.useState(false);
@@ -223,7 +224,7 @@ function CreateSource({
           <div className="grid grid-cols-3 gap-3">
             <div>
               <Label htmlFor="s-id">Source id</Label>
-              <Input id="s-id" value={id} onChange={(e) => setId(e.target.value)} placeholder="ch-metrics" />
+              <Input id="s-id" value={id} onChange={(e) => setId(e.target.value)} placeholder="ts-metrics" />
             </div>
             <div>
               <Label htmlFor="s-name">Name</Label>

@@ -5,18 +5,19 @@ import { SourceConfig } from "@/lib/registry";
 import { resolveTimeRange, resolveTimeExpr } from "@/lib/time";
 
 const source = SourceConfig.parse({
-  protocol: "http",
-  host: "clickhouse",
-  port: 8123,
-  database: "metrics",
+  host: "postgres",
+  port: 5432,
+  database: "holotable",
+  schema: "metrics",
+  ssl: false,
   tables: [
     {
       name: "http_requests",
       timeField: "ts",
       columns: [
-        { name: "ts", type: "DateTime64(3)" },
-        { name: "status", type: "UInt16" },
-        { name: "duration_ms", type: "Float64" },
+        { name: "ts", type: "timestamp with time zone" },
+        { name: "status", type: "smallint" },
+        { name: "duration_ms", type: "double precision" },
       ],
     },
   ],
@@ -24,20 +25,20 @@ const source = SourceConfig.parse({
 
 test("accepts a plain SELECT against an allowlisted table", () => {
   const r = validateSql(
-    "SELECT ts, count() AS c FROM http_requests GROUP BY ts",
+    "SELECT ts, count(*) AS c FROM http_requests GROUP BY ts",
     source,
   );
   assert.equal(r.ok, true, r.error);
 });
 
 test("accepts schema-qualified allowlisted table", () => {
-  const r = validateSql("SELECT count() FROM metrics.http_requests", source);
+  const r = validateSql("SELECT count(*) FROM metrics.http_requests", source);
   assert.equal(r.ok, true, r.error);
 });
 
 test("accepts WITH ... SELECT", () => {
   const r = validateSql(
-    "WITH 1 AS one SELECT one, count() FROM http_requests",
+    "WITH one AS (SELECT 1) SELECT count(*) FROM http_requests",
     source,
   );
   assert.equal(r.ok, true, r.error);
@@ -91,37 +92,40 @@ test("rejects model-provided time / non-deterministic functions", () => {
     "SELECT * FROM http_requests WHERE ts > now()",
     "SELECT today() FROM http_requests",
     "SELECT rand() FROM http_requests",
+    "SELECT current_timestamp FROM http_requests",
   ]) {
     assert.equal(validateSql(sql, source).ok, false, sql);
   }
+});
+
+test("rejects server parameter references and privileged PostgreSQL functions", () => {
+  assert.equal(validateSql("SELECT $1 FROM http_requests", source).ok, false);
+  assert.equal(validateSql("SELECT pg_read_file('/etc/passwd') FROM http_requests", source).ok, false);
 });
 
 test("buildExecutablePlan injects server-owned time range on timeField", () => {
   const from = new Date("2024-01-01T00:00:00.000Z");
   const to = new Date("2024-01-01T01:00:00.000Z");
   const plan = buildExecutablePlan({
-    sql: "SELECT ts, count() FROM http_requests GROUP BY ts",
+    sql: "SELECT ts, count(*) FROM http_requests GROUP BY ts",
     timeField: "ts",
     from,
     to,
   });
-  assert.match(plan.sql, /_holo\.ts >= \{holo_from:DateTime64\(3\)\}/);
-  assert.match(plan.sql, /_holo\.ts < \{holo_to:DateTime64\(3\)\}/);
+  assert.match(plan.sql, /_holo\.ts >= \$1::timestamptz/);
+  assert.match(plan.sql, /_holo\.ts < \$2::timestamptz/);
   assert.match(plan.sql, /LIMIT \d+/);
-  assert.equal(plan.params.holo_from, "2024-01-01 00:00:00.000");
-  assert.equal(plan.params.holo_to, "2024-01-01 01:00:00.000");
-  assert.equal(plan.settings.readonly, "1");
+  assert.deepEqual(plan.params, [from, to]);
 });
 
 test("buildExecutablePlan without timeField still bounds rows and omits time params", () => {
   const plan = buildExecutablePlan({
-    sql: "SELECT count() FROM http_requests",
+    sql: "SELECT count(*) FROM http_requests",
     from: new Date(),
     to: new Date(),
   });
   assert.match(plan.sql, /LIMIT \d+/);
-  assert.equal(plan.params.holo_from, undefined);
-  assert.equal(plan.params.holo_to, undefined);
+  assert.deepEqual(plan.params, []);
 });
 
 test("buildExecutablePlan rejects an injection-shaped timeField", () => {

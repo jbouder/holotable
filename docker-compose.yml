@@ -1,40 +1,19 @@
 services:
   postgres:
-    image: postgres:16
+    image: timescale/timescaledb:2.17.2-pg16
     environment:
       POSTGRES_USER: holotable
       POSTGRES_PASSWORD: holotable
       POSTGRES_DB: holotable
+      TS_METRICS_USERNAME: ${TS_METRICS_USERNAME:-metrics_ro}
+      TS_METRICS_PASSWORD: ${TS_METRICS_PASSWORD:-readonly}
     ports:
       - "5432:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
+      - ./timescaledb/init:/docker-entrypoint-initdb.d:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U holotable"]
-      interval: 5s
-      timeout: 3s
-      retries: 20
-
-  clickhouse:
-    image: clickhouse/clickhouse-server:24.8
-    environment:
-      CLICKHOUSE_DB: metrics
-      CLICKHOUSE_USER: default
-      CLICKHOUSE_PASSWORD: ${CLICKHOUSE_PASSWORD:-changeme}
-      # Consumed by the read-only user init script.
-      CH_METRICS_USERNAME: ${CH_METRICS_USERNAME:-metrics_ro}
-      CH_METRICS_PASSWORD: ${CH_METRICS_PASSWORD:-readonly}
-    ports:
-      - "8123:8123"
-    volumes:
-      - chdata:/var/lib/clickhouse
-      - ./clickhouse/init:/docker-entrypoint-initdb.d:ro
-    ulimits:
-      nofile:
-        soft: 262144
-        hard: 262144
-    healthcheck:
-      test: ["CMD", "wget", "--spider", "-q", "http://localhost:8123/ping"]
       interval: 5s
       timeout: 3s
       retries: 20
@@ -68,9 +47,9 @@ services:
       DATABASE_URL: "postgresql://${POSTGRES_USER:-holotable}:${POSTGRES_PASSWORD:-holotable}@postgres:5432/holotable"
       SESSION_SECRET: ${SESSION_SECRET:?set a strong 32+ char SESSION_SECRET}
       DEV_AUTH_ENABLED: "false"
-      # Credentials the app resolves for the 'CH_METRICS' source secret_ref.
-      CH_METRICS_USERNAME: ${CH_METRICS_USERNAME:-metrics_ro}
-      CH_METRICS_PASSWORD: ${CH_METRICS_PASSWORD:-readonly}
+      # Credentials the app resolves for the 'TS_METRICS' source secret_ref.
+      TS_METRICS_USERNAME: ${TS_METRICS_USERNAME:-metrics_ro}
+      TS_METRICS_PASSWORD: ${TS_METRICS_PASSWORD:-readonly}
       # AI provider (see .env.example / docs).
       AI_PROVIDER: ${AI_PROVIDER:-openai-compatible}
       AI_MODEL: ${AI_MODEL:-}
@@ -88,8 +67,6 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
-      clickhouse:
-        condition: service_healthy
       migrate:
         condition: service_completed_successfully
 
@@ -99,18 +76,15 @@ services:
     command: ["node", "node_modules/.bin/tsx", "scripts/seed.ts"]
     environment:
       DATABASE_URL: "postgresql://${POSTGRES_USER:-holotable}:${POSTGRES_PASSWORD:-holotable}@postgres:5432/holotable"
-      CLICKHOUSE_URL: http://clickhouse:8123
-      CLICKHOUSE_USER: default
-      CLICKHOUSE_PASSWORD: ${CLICKHOUSE_PASSWORD:-changeme}
-      CH_METRICS_HOST: clickhouse
-      CH_METRICS_PORT: "8123"
+      TIMESCALEDB_URL: "postgresql://${POSTGRES_USER:-holotable}:${POSTGRES_PASSWORD:-holotable}@postgres:5432/holotable"
+      TS_METRICS_HOST: postgres
+      TS_METRICS_PORT: "5432"
       SEED_INTERVAL_MS: "2000"
     depends_on:
-      clickhouse:
+      postgres:
         condition: service_healthy
       migrate:
         condition: service_completed_successfully
 
 volumes:
   pgdata:
-  chdata:

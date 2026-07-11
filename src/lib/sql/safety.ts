@@ -10,7 +10,7 @@ import { allowedTables, type SourceConfig } from "@/lib/registry";
  *   - SELECT-only, single statement (no `;` chaining, no DDL/DML).
  *   - No comments (they can smuggle disallowed constructs).
  *   - No dangerous table functions (file/url/remote/s3/... exfiltration or
- *     allowlist bypass) and no access to `system.*`.
+ *     allowlist bypass) and no access to PostgreSQL system catalogs.
  *   - No time / non-deterministic functions: the model must NOT filter time.
  *   - Every referenced table must be in the catalog allowlist of the single
  *     selected source.
@@ -44,6 +44,11 @@ const FORBIDDEN_KEYWORDS = [
   "into",
   "outfile",
   "format",
+  "current_date",
+  "current_time",
+  "current_timestamp",
+  "localtime",
+  "localtimestamp",
 ];
 
 // Table functions / sources that could bypass the allowlist or exfiltrate data.
@@ -66,6 +71,12 @@ const FORBIDDEN_FUNCTIONS = [
   "input",
   "executable",
   "dictionary",
+  "dblink",
+  "dblink_connect",
+  "lo_import",
+  "pg_read_file",
+  "pg_read_binary_file",
+  "pg_ls_dir",
 ];
 
 // Non-deterministic / time functions: the model must not filter or branch on time.
@@ -110,6 +121,9 @@ export function validateSql(sql: string, source: SourceConfig): ValidationResult
   if (!/^(select|with)\b/i.test(trimmed)) {
     return { ok: false, error: "only SELECT/WITH queries are allowed" };
   }
+  if (/\$\d+/.test(trimmed)) {
+    return { ok: false, error: "query parameters are reserved by the server" };
+  }
 
   for (const kw of FORBIDDEN_KEYWORDS) {
     if (hasWord(trimmed, kw)) {
@@ -150,19 +164,8 @@ export function validateSql(sql: string, source: SourceConfig): ValidationResult
 
 export interface ExecutablePlan {
   sql: string;
-  params: Record<string, unknown>;
-  settings: Record<string, string>;
+  params: unknown[];
 }
-
-const SETTINGS_READONLY: Record<string, string> = {
-  readonly: "1",
-  allow_ddl: "0",
-  max_execution_time: String(config.queryTimeoutSeconds),
-  max_result_rows: String(config.maxQueryRows),
-  result_overflow_mode: "break",
-  max_rows_to_read: String(config.maxQueryRows * 200),
-  read_overflow_mode: "throw",
-};
 
 /**
  * Build the final, guarded executable plan. Assumes `validateSql` already
@@ -178,27 +181,21 @@ export function buildExecutablePlan(input: {
   const inner = input.sql.trim().replace(/;\s*$/, "");
   const limit = config.maxQueryRows;
 
-  const params: Record<string, unknown> = {};
-  const settings = { ...SETTINGS_READONLY };
+  const params: unknown[] = [];
 
   let sql: string;
   if (input.timeField) {
     if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(input.timeField)) {
       throw new Error(`invalid timeField: ${input.timeField}`);
     }
-    params.holo_from = formatCh(input.from);
-    params.holo_to = formatCh(input.to);
+    params.push(input.from, input.to);
     sql = `SELECT * FROM (${inner}) AS _holo
-WHERE _holo.${input.timeField} >= {holo_from:DateTime64(3)}
-  AND _holo.${input.timeField} < {holo_to:DateTime64(3)}
+WHERE _holo.${input.timeField} >= $1::timestamptz
+  AND _holo.${input.timeField} < $2::timestamptz
 LIMIT ${limit}`;
   } else {
     sql = `SELECT * FROM (${inner}) AS _holo LIMIT ${limit}`;
   }
 
-  return { sql, params, settings };
-}
-
-function formatCh(d: Date): string {
-  return d.toISOString().replace("T", " ").replace("Z", "");
+  return { sql, params };
 }

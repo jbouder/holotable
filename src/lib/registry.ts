@@ -30,10 +30,11 @@ export type CatalogTable = z.infer<typeof CatalogTable>;
 
 export const SourceConfig = z
   .object({
-    protocol: z.enum(["http", "https"]).default("http"),
     host: z.string().min(1).max(255),
     port: z.number().int().min(1).max(65535),
     database: z.string().min(1).max(128),
+    schema: z.string().min(1).max(128).default("public"),
+    ssl: z.boolean().default(false),
     /** The table allowlist. Only these tables may be referenced by any SQL. */
     tables: z.array(CatalogTable).min(1).max(200),
   })
@@ -60,7 +61,7 @@ export interface SourceCredentials {
 
 /**
  * Resolve credentials for a source from the environment using its secret_ref.
- * `secret_ref` "CH_METRICS" resolves CH_METRICS_USERNAME / CH_METRICS_PASSWORD.
+ * `secret_ref` "TS_METRICS" resolves TS_METRICS_USERNAME / TS_METRICS_PASSWORD.
  *
  * The read-only user is expected here; execution never uses a privileged user.
  */
@@ -83,7 +84,7 @@ export function allowedTables(cfg: SourceConfig): Set<string> {
   const set = new Set<string>();
   for (const t of cfg.tables) {
     set.add(t.name.toLowerCase());
-    set.add(`${cfg.database}.${t.name}`.toLowerCase());
+    set.add(`${cfg.schema}.${t.name}`.toLowerCase());
   }
   return set;
 }

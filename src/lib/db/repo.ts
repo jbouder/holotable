@@ -73,7 +73,7 @@ export async function createSource(input: {
       input.id,
       input.workspaceId,
       input.name,
-      input.kind ?? "clickhouse",
+      input.kind ?? "timescaledb",
       JSON.stringify(input.config),
       input.secretRef,
       input.createdBy,

@@ -12,7 +12,7 @@ const validPanel = {
   id: "p1",
   title: "Requests",
   viz: "line" as const,
-  query: { sourceId: "src-1", sql: "SELECT ts, count() AS c FROM http_requests GROUP BY ts", timeField: "ts" },
+  query: { sourceId: "src-1", sql: "SELECT ts, count(*) AS c FROM http_requests GROUP BY ts", timeField: "ts" },
   format: "number" as const,
   layout: { x: 0, y: 0, w: 6, h: 4 },
 };

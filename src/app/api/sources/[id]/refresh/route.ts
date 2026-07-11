@@ -6,7 +6,7 @@ import {
 } from "@/lib/auth/authorize";
 import { json } from "@/lib/http";
 import { getSourceById, updateSource } from "@/lib/db/repo";
-import { refreshCatalog } from "@/lib/clickhouse/catalog";
+import { refreshCatalog } from "@/lib/timescaledb/catalog";
 
 export const runtime = "nodejs";
 export const maxDuration = 30;
