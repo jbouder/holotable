@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { experimental_useObject as useObject } from "@ai-sdk/react";
 import { Loader2, Sparkles, Save } from "lucide-react";
 import { Dashboard, safeParseDashboard } from "@/lib/ir";
+import { autoLayoutPanels, DEFAULT_COLUMNS } from "@/lib/layout";
 import { Button } from "@/components/ui/button";
 import { Textarea, Label } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
@@ -31,7 +32,13 @@ export function NewDashboardClient({ sources }: { sources: SourceOption[] }) {
     api: "/api/generate",
     schema: Dashboard,
     onFinish({ object }) {
-      if (object) setFinalSpec(object);
+      if (!object) return;
+      // Arrange panels two-up by default; the model's raw {x,y,w,h} guesses
+      // often overlap. Users can rearrange in the editor.
+      setFinalSpec({
+        ...object,
+        panels: autoLayoutPanels(object.panels, DEFAULT_COLUMNS),
+      });
     },
   });
 

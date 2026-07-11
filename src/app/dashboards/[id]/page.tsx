@@ -7,6 +7,7 @@ import { getDashboardById } from "@/lib/db/repo";
 import { config } from "@/lib/config";
 import { SignIn } from "@/components/sign-in";
 import { LiveDashboard } from "@/components/dashboard/LiveDashboard";
+import { DeleteDashboardButton } from "@/components/dashboard/delete-dashboard-button";
 import { Button } from "@/components/ui/button";
 
 export const dynamic = "force-dynamic";
@@ -31,6 +32,11 @@ export default async function DashboardViewPage({
     workspaceId: dashboard.workspaceId,
   });
 
+  const canDelete = can(identity, "dashboard:delete", {
+    workspaceId: dashboard.workspaceId,
+    ownerSub: dashboard.createdBy,
+  });
+
   return (
     <div>
       <div className="mb-4 flex items-center justify-between">
@@ -42,13 +48,18 @@ export default async function DashboardViewPage({
             {dashboard.spec.timeRange.from} → {dashboard.spec.timeRange.to}
           </p>
         </div>
-        {canEdit && (
-          <Link href={`/dashboards/${id}/edit`}>
-            <Button variant="secondary" size="sm">
-              <Pencil className="h-4 w-4" /> Edit
-            </Button>
-          </Link>
-        )}
+        <div className="flex items-start gap-2">
+          {canEdit && (
+            <Link href={`/dashboards/${id}/edit`}>
+              <Button variant="secondary" size="sm">
+                <Pencil className="h-4 w-4" /> Edit
+              </Button>
+            </Link>
+          )}
+          {canDelete && (
+            <DeleteDashboardButton dashboardId={id} title={dashboard.spec.title} />
+          )}
+        </div>
       </div>
 
       <LiveDashboard

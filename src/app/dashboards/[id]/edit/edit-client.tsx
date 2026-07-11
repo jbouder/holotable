@@ -3,8 +3,9 @@
 import * as React from "react";
 import { useRouter } from "next/navigation";
 import { experimental_useObject as useObject } from "@ai-sdk/react";
-import { Plus, Trash2, Save, Sparkles, Loader2, Eye } from "lucide-react";
+import { Plus, Trash2, Save, Sparkles, Loader2, Eye, LayoutGrid } from "lucide-react";
 import { Dashboard, Panel, VizType, ValueFormat, safeParseDashboard } from "@/lib/ir";
+import { autoLayoutPanels, COLUMN_PRESETS } from "@/lib/layout";
 import { Button } from "@/components/ui/button";
 import { Input, Textarea, Label } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
@@ -18,6 +19,12 @@ interface SourceOption {
 }
 
 const VIZ_OPTIONS = VizType.options.map((v) => ({ value: v, label: v }));
+const WIDTH_PRESETS = [
+  { value: "12", label: "Full width" },
+  { value: "6", label: "Half (2-up)" },
+  { value: "4", label: "Third (3-up)" },
+  { value: "3", label: "Quarter (4-up)" },
+];
 const FORMAT_OPTIONS = [
   { value: "", label: "none" },
   ...ValueFormat.options.map((f) => ({ value: f, label: f })),
@@ -55,6 +62,10 @@ export function EditDashboardClient({
 
   function updateSpec(patch: Partial<Dashboard>) {
     setSpec((s) => ({ ...s, ...patch }));
+  }
+
+  function arrangeColumns(columns: number) {
+    setSpec((s) => ({ ...s, panels: autoLayoutPanels(s.panels, columns) }));
   }
 
   function updatePanel(id: string, fn: (p: Panel) => Panel) {
@@ -170,7 +181,23 @@ export function EditDashboardClient({
               <Plus className="h-4 w-4" /> Add
             </Button>
           </CardHeader>
-          <CardContent className="space-y-1">
+          <CardContent className="space-y-3">
+            <div className="flex flex-wrap items-center gap-1.5 border-b border-border pb-3 text-xs">
+              <LayoutGrid className="h-3.5 w-3.5 text-muted" />
+              <span className="mr-1 text-muted">Arrange:</span>
+              {COLUMN_PRESETS.map((n) => (
+                <Button
+                  key={n}
+                  variant="secondary"
+                  size="sm"
+                  className="h-6 px-2 text-xs"
+                  onClick={() => arrangeColumns(n)}
+                >
+                  {n}-up
+                </Button>
+              ))}
+            </div>
+            <div className="space-y-1">
             {spec.panels.map((p) => (
               <button
                 key={p.id}
@@ -189,6 +216,7 @@ export function EditDashboardClient({
                 />
               </button>
             ))}
+            </div>
           </CardContent>
         </Card>
 
@@ -291,6 +319,27 @@ function PanelEditor({
           value={panel.query.sql}
           onChange={(e) => onChange((p) => ({ ...p, query: { ...p.query, sql: e.target.value } }))}
         />
+      </div>
+
+      <div>
+        <Label>Width</Label>
+        <Select
+          value={String(panel.layout.w)}
+          onValueChange={(v) =>
+            onChange((p) => ({ ...p, layout: { ...p.layout, w: Number(v) } }))
+          }
+          options={
+            WIDTH_PRESETS.some((o) => o.value === String(panel.layout.w))
+              ? WIDTH_PRESETS
+              : [
+                  ...WIDTH_PRESETS,
+                  { value: String(panel.layout.w), label: `Custom (${panel.layout.w}/12)` },
+                ]
+          }
+        />
+        <p className="mt-1 text-xs text-muted">
+          Column span on the 12-col grid. Fine-tune exact position below.
+        </p>
       </div>
 
       <div className="grid grid-cols-5 gap-2">

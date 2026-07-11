@@ -37,9 +37,10 @@ ${buildCatalogPrompt(source)}
 
 ${SQL_RULES}
 
-Layout: a 12-column grid. Give each panel a sensible {x,y,w,h}. Choose viz types
-from: line, bar, stat, table, heatmap. Use 'format' (number|bytes|percent|ms)
-where meaningful.`;
+Layout: a 12-column grid. By DEFAULT place two panels side by side (w=6 each),
+laid out left-to-right, top-to-bottom, without overlaps. Use a wider panel only
+when a request clearly calls for it. Choose viz types from: line, bar, stat,
+table, heatmap. Use 'format' (number|bytes|percent|ms) where meaningful.`;
 }
 
 export function streamDashboard(input: { source: SourceRecord; prompt: string }) {
