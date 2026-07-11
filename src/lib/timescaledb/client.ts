@@ -38,6 +38,22 @@ function isMissingTimeFieldError(err: unknown, timeField?: string): boolean {
   return message.includes(`_holo.${timeField.toLowerCase()}`);
 }
 
+/**
+ * Pin the session `search_path` to the source's configured schema (where the
+ * allowlisted tables live) plus `public` (where the TimescaleDB extension
+ * installs functions like `time_bucket`). The catalog advertises bare table
+ * names, so unqualified references must resolve against the configured schema.
+ * Table access stays gated by the allowlist in `validateSql`, independent of
+ * `search_path`. `schema` is admin-configured; reject anything that is not a
+ * plain identifier rather than interpolate it unquoted.
+ */
+function searchPathStatement(schema: string): string {
+  if (!/^[A-Za-z_][A-Za-z0-9_$]*$/.test(schema)) {
+    throw new Error(`invalid source schema: ${schema}`);
+  }
+  return `SET LOCAL search_path TO "${schema}", public`;
+}
+
 /** Execute a guarded plan in a read-only transaction. */
 export async function executePlan(
   source: SourceRecord,
@@ -49,6 +65,7 @@ export async function executePlan(
     await client.connect();
     await client.query("BEGIN TRANSACTION READ ONLY");
     transactionStarted = true;
+    await client.query(searchPathStatement(source.config.schema));
     const result = await client.query(plan.sql, plan.params);
     const rows = result.rows.map((row) =>
       Object.fromEntries(
