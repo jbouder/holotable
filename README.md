@@ -83,14 +83,15 @@ Or use the in-app dev sign-in control (shown only when dev auth is enabled).
 | `/dashboards/new` | Prompt → preview → save | editor |
 | `/dashboards/[id]` | Live viewer (SSE) | viewer |
 | `/dashboards/[id]/edit` | Panel CRUD/layout, single-panel NL edits, version save | editor |
+| `/explore` | Ad-hoc NL questions against editable sources; streams one panel spec, then runs it through guarded query preview | editor |
 | `/data-sources` | Source CRUD / test / refresh | source-admin |
 
 ## API
 
 | Route | Method | Notes |
 | --- | --- | --- |
-| `/api/generate` | POST | LLM streams a validated IR spec |
-| `/api/query` | POST | One-shot guarded query (preview) |
+| `/api/generate` | POST | LLM streams a validated dashboard, panel, or explore-panel IR spec |
+| `/api/query` | POST | One-shot guarded query (preview and Explore results) |
 | `/api/dashboards` | GET/POST | List / create |
 | `/api/dashboards/[id]` | GET/PUT/DELETE | Get / new version / delete |
 | `/api/dashboards/[id]/stream` | GET | SSE deltas (cookie auth) |
