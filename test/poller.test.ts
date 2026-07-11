@@ -126,13 +126,14 @@ test("makePanelExecutor emits tombstone for a cross-workspace source (never exec
     id: "src-cross",
     workspaceId: OTHER_WORKSPACE,
     name: "Attacker Source",
-    kind: "clickhouse",
+    kind: "timescaledb",
     config: {
-      protocol: "http",
       host: "internal-host",
-      port: 8123,
+      port: 5432,
       database: "secret_db",
-      tables: [{ name: "secrets", columns: [{ name: "data", type: "String" }] }],
+      schema: "metrics",
+      ssl: false,
+      tables: [{ name: "secrets", columns: [{ name: "data", type: "text" }] }],
     },
     secretRef: "ATTACKER_CREDS",
     createdBy: "attacker",
@@ -179,13 +180,14 @@ test("makePanelExecutor allows execution when source workspace matches dashboard
     id: "src-same",
     workspaceId: WORKSPACE,
     name: "Same WS Source",
-    kind: "clickhouse",
+    kind: "timescaledb",
     config: {
-      protocol: "http",
       host: "localhost",
-      port: 8123,
-      database: "metrics",
-      tables: [{ name: "events", columns: [{ name: "ts", type: "DateTime" }] }],
+      port: 5432,
+      database: "holotable",
+      schema: "metrics",
+      ssl: false,
+      tables: [{ name: "events", columns: [{ name: "ts", type: "timestamp with time zone" }] }],
     },
     secretRef: "METRICS_CREDS",
     createdBy: "owner",
@@ -215,7 +217,7 @@ test("makePanelExecutor allows execution when source workspace matches dashboard
       WORKSPACE,
     );
   } catch {
-    // Expected: no live ClickHouse. The important thing is it didn't return
+    // Expected: no live TimescaleDB. The important thing is it didn't return
     // a tombstone without attempting execution.
     reachedQuery = true;
   }

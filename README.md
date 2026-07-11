@@ -2,11 +2,11 @@
 
 Natural-language monitoring dashboards. Describe what you want to see; a language
 model authors a **validated visualization spec** (SQL + chart config) — never the
-data itself — and Holotable executes the guarded SQL against ClickHouse and
+data itself — and Holotable executes the guarded SQL against TimescaleDB and
 streams the results live.
 
 - **Stack:** Next.js 16 (App Router) · TypeScript · Tailwind v4 · Base UI ·
-  ECharts · PostgreSQL (config) · ClickHouse (metrics) · Vercel AI SDK
+  ECharts · TimescaleDB/PostgreSQL (config + metrics) · Vercel AI SDK
   (`streamObject` + `experimental_useObject`) · Keycloak OIDC (group-based auth) ·
   Server-Sent Events.
 - **Contract:** one shared Zod IR (`src/lib/ir.ts`) is used by the LLM output,
@@ -40,7 +40,7 @@ execution time and never stored.
 ```bash
 cp .env.example .env
 # set a strong SESSION_SECRET and your AI_PROVIDER/AI_MODEL (+ keys)
-docker compose up --build          # postgres, clickhouse, keycloak, migrate, app, seed
+docker compose up --build          # timescaledb, keycloak, migrate, app, seed
 ```
 
 The `seed` service continuously inserts demo metrics and (once) creates a demo
@@ -54,11 +54,12 @@ docker compose -f docker-compose.yml -f docker-compose.dev.yml up --build
 
 ## Quick start (local)
 
-Requirements: Node 22+, a PostgreSQL, and a ClickHouse.
+Requirements: Node 22+ and a TimescaleDB instance.
 
 ```bash
 npm install
-cp .env.example .env               # edit DATABASE_URL, CLICKHOUSE_*, secrets, AI_*
+cp .env.example .env               # edit DATABASE_URL, TIMESCALEDB_URL, secrets, AI_*
+psql "$DATABASE_URL" -f timescaledb/init/001_schema.sql
 npm run migrate                    # apply Postgres migrations
 npm run seed                       # looping metrics seeder (+ demo source/dashboard)
 npm run dev                        # http://localhost:3000
@@ -102,9 +103,9 @@ Or use the in-app dev sign-in control (shown only when dev auth is enabled).
 ## Source secret references
 
 A source stores a `secret_ref` (an uppercase env-var family), never credentials.
-`resolveCredentials("CH_METRICS")` reads `CH_METRICS_USERNAME` /
-`CH_METRICS_PASSWORD` from the environment at execution time. Point a
-`secret_ref` at your **read-only** ClickHouse user; the app never connects with a
+`resolveCredentials("TS_METRICS")` reads `TS_METRICS_USERNAME` /
+`TS_METRICS_PASSWORD` from the environment at execution time. Point a
+`secret_ref` at your **read-only** TimescaleDB role; the app never connects with a
 privileged user. See `src/lib/registry.ts`.
 
 ## Configuration

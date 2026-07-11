@@ -3,13 +3,13 @@
 Holotable turns a natural-language prompt into a live monitoring dashboard. A
 language model authors a **validated visualization spec** (SQL + chart config)
 — it never touches, produces, or sees metric data. The server executes the
-guarded SQL against ClickHouse and streams deltas to the browser.
+guarded SQL against TimescaleDB and streams deltas to the browser.
 
 ```
 Prompt ─▶ /api/generate ─▶ LLM (streamObject) ─▶ Zod IR spec (validated)
                                                      │ save
-                                             Postgres (immutable versions)
-Viewer ─▶ SSE /stream ─▶ shared in-process poller ─▶ guarded SQL ─▶ ClickHouse
+                                             TimescaleDB (immutable versions)
+Viewer ─▶ SSE /stream ─▶ shared in-process poller ─▶ guarded SQL ─▶ TimescaleDB
                                                      └─▶ deltas ─▶ ECharts merge
 ```
 
@@ -23,9 +23,9 @@ Viewer ─▶ SSE /stream ─▶ shared in-process poller ─▶ guarded SQL ─
 | Session token (JWKS RS256 / dev HS256) | `src/lib/auth/session.ts` |
 | Config store (Postgres) | `src/lib/db/pg.ts`, `src/lib/db/repo.ts` |
 | Source registry (safe config + secret_ref) | `src/lib/registry.ts` |
-| Catalog (metadata-only prompt) | `src/lib/clickhouse/catalog.ts` |
+| Catalog (metadata-only prompt) | `src/lib/timescaledb/catalog.ts` |
 | SQL safety + time injection | `src/lib/sql/safety.ts` |
-| Metrics execution (read-only) | `src/lib/clickhouse/client.ts` |
+| Metrics execution (read-only) | `src/lib/timescaledb/client.ts` |
 | LLM generation | `src/lib/ai/provider.ts`, `src/lib/ai/generate.ts` |
 | Shared poller | `src/lib/poller/registry.ts` |
 | Charts (setOption merge) | `src/components/charts/*` |
@@ -43,9 +43,9 @@ Viewer ─▶ SSE /stream ─▶ shared in-process poller ─▶ guarded SQL ─
    credentials live in a panel. The registry owns the safe connection config,
    the catalog (table/column allowlist), and a `secret_ref`.
 5. **Credentials resolve from the environment** via `secret_ref`
-   (`CH_METRICS` → `CH_METRICS_USERNAME` / `CH_METRICS_PASSWORD`). They are
+   (`TS_METRICS` → `TS_METRICS_USERNAME` / `TS_METRICS_PASSWORD`). They are
    never stored in the database and never leave the server. The resolved user is
-   the read-only ClickHouse user.
+   the read-only TimescaleDB role.
 6. **Referenced sources are tombstoned, not hard-deleted.** Deleting a source
    that is referenced by any panel sets `tombstoned_at`; panels then surface a
    tombstone state instead of silently breaking.
@@ -54,7 +54,8 @@ Viewer ─▶ SSE /stream ─▶ shared in-process poller ─▶ guarded SQL ─
    catalog-table allowlist, and a ban on time / non-deterministic functions.
 8. **The server owns the time range.** `buildExecutablePlan` wraps the validated
    query as a subquery and injects `from`/`to` on the declared `timeField` via
-   **bound parameters**, plus `readonly=1`, execution-time and row limits. The
+   **bound parameters**, plus a read-only transaction and execution-time and row
+   limits. The
    model cannot filter time or influence resource usage.
 9. **The catalog prompt is metadata only** — table and column names/types for a
    **single selected, authorized source per call**. No sample rows are sent.
@@ -112,7 +113,7 @@ Choosing the concrete provider/model is deliberately left to the deployment.
 The poller lives in the Node process (`src/lib/poller/registry.ts`). It is
 correct and efficient for a **single app instance**: one poller per dashboard,
 shared by all subscribers on that instance. Running multiple app replicas would
-create one poller per replica (duplicated ClickHouse polling; no cross-instance
+create one poller per replica (duplicated TimescaleDB polling; no cross-instance
 delta sharing). To scale horizontally, move the poller behind a shared runtime
 (e.g. a dedicated poller service or a pub/sub fan-out such as Redis) and have
 web instances subscribe to it rather than poll directly. The delta-cursor and
@@ -126,9 +127,11 @@ to make that extraction straightforward.
 - `dashboards` — `workspace_id`, `title`, `created_by`, `deleted_at`.
 - `dashboard_versions` — append-only: `dashboard_id`, `version`, `spec` (jsonb).
 
-## Metrics model (ClickHouse)
+## Metrics model (TimescaleDB)
 
-- `http_requests` — raw request events (see `clickhouse/init/001_schema.sql`).
-- An `AggregatingMergeTree` materialized view pre-aggregates per-minute stats.
-- A **read-only** user is created by `clickhouse/init/002_readonly_user.sh`; the
+- `metrics.http_requests` is a hypertable containing raw request events (see
+  `timescaledb/init/001_schema.sql`).
+- A continuous aggregate pre-aggregates per-minute request, error, duration, and
+  byte statistics; a seven-day retention policy removes old raw chunks.
+- A **read-only** role is created by `timescaledb/init/002_readonly_user.sh`; the
   app only ever connects as this user via the source `secret_ref`.
