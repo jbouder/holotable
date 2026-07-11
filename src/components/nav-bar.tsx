@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { LayoutDashboard, Database, LogOut } from "lucide-react";
+import { LayoutDashboard, Database, Compass, LogOut } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ThemeToggle } from "@/components/theme-toggle";
 
@@ -27,6 +27,12 @@ export function NavBar() {
           className="flex items-center gap-1.5 text-sm text-muted hover:text-foreground"
         >
           <LayoutDashboard className="h-4 w-4" /> Dashboards
+        </Link>
+        <Link
+          href="/explore"
+          className="flex items-center gap-1.5 text-sm text-muted hover:text-foreground"
+        >
+          <Compass className="h-4 w-4" /> Explore
         </Link>
         <Link
           href="/data-sources"

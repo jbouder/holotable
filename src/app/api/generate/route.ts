@@ -7,7 +7,7 @@ import {
 } from "@/lib/auth/authorize";
 import { readJson } from "@/lib/http";
 import { getSourceById } from "@/lib/db/repo";
-import { streamDashboard, streamPanel } from "@/lib/ai/generate";
+import { streamDashboard, streamPanel, streamExplorePanel } from "@/lib/ai/generate";
 import { Panel } from "@/lib/ir";
 
 export const runtime = "nodejs";
@@ -24,6 +24,11 @@ const Body = z.discriminatedUnion("mode", [
     sourceId: z.string().min(1),
     prompt: z.string().min(1).max(4000),
     current: Panel,
+  }),
+  z.object({
+    mode: z.literal("explore"),
+    sourceId: z.string().min(1),
+    prompt: z.string().min(1).max(4000),
   }),
 ]);
 
@@ -46,10 +51,14 @@ export async function POST(req: Request) {
       workspaceId: source.workspaceId,
     });
 
-    const result =
-      body.mode === "dashboard"
-        ? streamDashboard({ source, prompt: body.prompt })
-        : streamPanel({ source, prompt: body.prompt, current: body.current });
+    let result;
+    if (body.mode === "dashboard") {
+      result = streamDashboard({ source, prompt: body.prompt });
+    } else if (body.mode === "explore") {
+      result = streamExplorePanel({ source, prompt: body.prompt });
+    } else {
+      result = streamPanel({ source, prompt: body.prompt, current: body.current });
+    }
 
     return result.toTextStreamResponse();
   } catch (err) {

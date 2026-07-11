@@ -67,6 +67,11 @@ export const Panel = z
   .object({
     id: z.string().min(1).max(64),
     title: z.string().min(1).max(200),
+    /**
+     * Optional human-readable summary of WHAT this panel computes (intent, not
+     * data values). Populated for ad-hoc exploration; safe to omit elsewhere.
+     */
+    description: z.string().max(500).optional(),
     viz: VizType,
     query: PanelQuery,
     format: ValueFormat.optional(),

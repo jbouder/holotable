@@ -56,6 +56,38 @@ Use refreshIntervalMs=${config.defaultRefreshIntervalMs} and timeRange {from:"${
   });
 }
 
+/**
+ * Ad-hoc exploration: generate a SINGLE panel spec that best answers a plain
+ * natural-language question against the given source. Same invariants as every
+ * other generation path — the model emits only a validated Panel (SQL + viz),
+ * never data, and never a time filter (the server injects the range).
+ */
+export function streamExplorePanel(input: {
+  source: SourceRecord;
+  prompt: string;
+}) {
+  const { source, prompt } = input;
+  return streamObject({
+    model: getModel(),
+    schema: Panel,
+    schemaName: "Panel",
+    schemaDescription: "A single panel specification (viz spec, not data).",
+    system: baseSystem(source),
+    prompt: `Answer this question with a SINGLE panel:
+"""${prompt}"""
+
+Return one Panel. Give it a concise title, a one-sentence "description" of WHAT
+the query computes (describe intent only — never invent result values), use id
+"explore", and set layout to {"x":0,"y":0,"w":12,"h":8}.
+
+Viz selection (IMPORTANT — default to text/tabular output):
+- Default to viz "table" and return the relevant rows/columns.
+- Use "stat" only when the question asks for a single scalar value.
+- Use a chart viz ("line", "bar", "heatmap") ONLY when the request explicitly
+  asks to chart/plot/graph/visualize the data or to see a trend over time.`,
+  });
+}
+
 export function streamPanel(input: {
   source: SourceRecord;
   prompt: string;
