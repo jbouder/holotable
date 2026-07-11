@@ -119,6 +119,20 @@ documented defaults:
 - **Limits:** `MAX_QUERY_ROWS`, `QUERY_TIMEOUT_SECONDS`, `MAX_WINDOW_POINTS`.
 - **AI:** `AI_PROVIDER` (`gateway` | `openai-compatible`) + `AI_MODEL` — no model
   is baked in; this is a deliberate open decision (see architecture doc).
+  Any OpenAI-compatible endpoint (including [OpenRouter](https://openrouter.ai))
+  works via the `openai-compatible` path — see below.
+
+### Using OpenRouter
+
+OpenRouter is supported through the existing `openai-compatible` path — no
+separate provider implementation is required. Set these variables in your `.env`:
+
+```dotenv
+AI_PROVIDER=openai-compatible
+OPENAI_BASE_URL=https://openrouter.ai/api/v1
+OPENAI_API_KEY=<your-openrouter-api-key>
+AI_MODEL=<openrouter-model-id>   # e.g. openai/gpt-4o-mini
+```
 
 See [`.env.example`](.env.example) for the complete list.
 

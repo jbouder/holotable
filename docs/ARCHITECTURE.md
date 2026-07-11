@@ -103,7 +103,9 @@ model-specific data is baked into the code (`src/lib/ai/provider.ts`):
 - `AI_PROVIDER=gateway` — the bare `AI_MODEL` string is routed by the AI SDK
   Gateway (`AI_GATEWAY_API_KEY`).
 - `AI_PROVIDER=openai-compatible` — an OpenAI-compatible endpoint via
-  `OPENAI_BASE_URL` + `OPENAI_API_KEY`.
+  `OPENAI_BASE_URL` + `OPENAI_API_KEY`. Any OpenAI-compatible API works,
+  including [OpenRouter](https://openrouter.ai) (`OPENAI_BASE_URL=https://openrouter.ai/api/v1`).
+  No separate provider implementation is required for OpenRouter.
 
 Choosing the concrete provider/model is deliberately left to the deployment.
 `AI_MODEL` must be set; there is no default model.
