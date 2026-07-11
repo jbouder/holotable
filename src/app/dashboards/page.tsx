@@ -47,9 +47,9 @@ export default async function DashboardsPage() {
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
           {dashboards.map((d) => (
             <Link key={d.id} href={`/dashboards/${d.id}`} className="group">
-              <Card className="h-full transition-colors group-hover:border-primary">
+              <Card className="h-full transition-colors group-hover:border-foreground/40">
                 <CardContent className="flex h-full flex-col gap-2">
-                  <div className="font-medium leading-snug group-hover:text-primary">
+                  <div className="font-medium leading-snug">
                     {d.title}
                   </div>
                   <div className="mt-auto flex flex-col gap-0.5 text-xs text-muted">
