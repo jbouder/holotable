@@ -1,4 +1,3 @@
-import { createClient } from "@clickhouse/client";
 import { Client } from "pg";
 
 /**
@@ -6,23 +5,20 @@ import { Client } from "pg";
  *
  * 1. (once) ensures a demo workspace source + dashboard exist in Postgres so the
  *    app has something to show.
- * 2. (loop) continuously inserts synthetic http_requests rows into ClickHouse
+ * 2. (loop) continuously inserts synthetic http_requests rows into TimescaleDB
  *    so the live dashboard streams fresh data.
  *
- * Uses a privileged ClickHouse user (CLICKHOUSE_* env) for inserts — distinct
+ * Uses the privileged TimescaleDB connection for inserts — distinct
  * from the app's read-only query user.
  */
 
 const SERVICES = ["api", "web", "worker"];
 const ROUTES = ["/login", "/checkout", "/search", "/profile", "/health"];
 
-function ch() {
-  return createClient({
-    url: process.env.CLICKHOUSE_URL || "http://localhost:8123",
-    username: process.env.CLICKHOUSE_USER || "default",
-    password: process.env.CLICKHOUSE_PASSWORD || "",
-    database: "metrics",
-  });
+function metricsClient() {
+  const connectionString = process.env.TIMESCALEDB_URL || process.env.DATABASE_URL;
+  if (!connectionString) throw new Error("TIMESCALEDB_URL or DATABASE_URL is not set");
+  return new Client({ connectionString });
 }
 
 async function ensureDemo() {
@@ -32,30 +28,33 @@ async function ensureDemo() {
   await pg.connect();
   try {
     const config = {
-      protocol: "http",
-      host: process.env.CH_METRICS_HOST || "clickhouse",
-      port: Number(process.env.CH_METRICS_PORT || 8123),
-      database: "metrics",
+      host: process.env.TS_METRICS_HOST || "localhost",
+      port: Number(process.env.TS_METRICS_PORT || 5432),
+      database: process.env.POSTGRES_DB || "holotable",
+      schema: "metrics",
+      ssl: false,
       tables: [
         {
           name: "http_requests",
           description: "per-request events",
           timeField: "ts",
           columns: [
-            { name: "ts", type: "DateTime64(3)" },
-            { name: "service", type: "LowCardinality(String)" },
-            { name: "route", type: "LowCardinality(String)" },
-            { name: "status", type: "UInt16" },
-            { name: "duration_ms", type: "Float64" },
-            { name: "bytes", type: "UInt64" },
+            { name: "ts", type: "timestamp with time zone" },
+            { name: "service", type: "text" },
+            { name: "route", type: "text" },
+            { name: "status", type: "smallint" },
+            { name: "duration_ms", type: "double precision" },
+            { name: "bytes", type: "bigint" },
           ],
         },
       ],
     };
     await pg.query(
       `INSERT INTO sources (id, workspace_id, name, kind, config, secret_ref, created_by)
-       VALUES ('ch-metrics', 'demo', 'Demo ClickHouse metrics', 'clickhouse', $1, 'CH_METRICS', 'seed')
-       ON CONFLICT (id) DO UPDATE SET config = EXCLUDED.config, tombstoned_at = NULL`,
+       VALUES ('ts-metrics', 'demo', 'Demo TimescaleDB metrics', 'timescaledb', $1, 'TS_METRICS', 'seed')
+       ON CONFLICT (id) DO UPDATE
+         SET name = EXCLUDED.name, kind = EXCLUDED.kind, config = EXCLUDED.config,
+             secret_ref = EXCLUDED.secret_ref, tombstoned_at = NULL`,
       [JSON.stringify(config)],
     );
 
@@ -96,9 +95,9 @@ function demoSpec() {
         title: "Requests / min",
         viz: "line",
         query: {
-          sourceId: "ch-metrics",
+          sourceId: "ts-metrics",
           timeField: "minute",
-          sql: "SELECT toStartOfMinute(ts) AS minute, count() AS requests FROM http_requests GROUP BY minute ORDER BY minute",
+          sql: "SELECT time_bucket('1 minute', ts) AS minute, count(*) AS requests FROM http_requests GROUP BY minute ORDER BY minute",
         },
         format: "number",
         layout: { x: 0, y: 0, w: 6, h: 3 },
@@ -108,9 +107,9 @@ function demoSpec() {
         title: "p95 latency (ms)",
         viz: "line",
         query: {
-          sourceId: "ch-metrics",
+          sourceId: "ts-metrics",
           timeField: "minute",
-          sql: "SELECT toStartOfMinute(ts) AS minute, quantile(0.95)(duration_ms) AS p95 FROM http_requests GROUP BY minute ORDER BY minute",
+          sql: "SELECT time_bucket('1 minute', ts) AS minute, percentile_cont(0.95) WITHIN GROUP (ORDER BY duration_ms) AS p95 FROM http_requests GROUP BY minute ORDER BY minute",
         },
         format: "ms",
         layout: { x: 6, y: 0, w: 6, h: 3 },
@@ -120,9 +119,9 @@ function demoSpec() {
         title: "Errors (5xx) total",
         viz: "stat",
         query: {
-          sourceId: "ch-metrics",
+          sourceId: "ts-metrics",
           timeField: "minute",
-          sql: "SELECT toStartOfMinute(ts) AS minute, countIf(status >= 500) AS errors FROM http_requests GROUP BY minute ORDER BY minute",
+          sql: "SELECT time_bucket('1 minute', ts) AS minute, count(*) FILTER (WHERE status >= 500) AS errors FROM http_requests GROUP BY minute ORDER BY minute",
         },
         format: "number",
         layout: { x: 0, y: 3, w: 3, h: 2 },
@@ -132,8 +131,8 @@ function demoSpec() {
         title: "Requests by route",
         viz: "table",
         query: {
-          sourceId: "ch-metrics",
-          sql: "SELECT route, count() AS requests FROM http_requests GROUP BY route ORDER BY requests DESC",
+          sourceId: "ts-metrics",
+          sql: "SELECT route, count(*) AS requests FROM http_requests GROUP BY route ORDER BY requests DESC",
         },
         layout: { x: 3, y: 3, w: 9, h: 2 },
       },
@@ -141,13 +140,13 @@ function demoSpec() {
   };
 }
 
-async function insertBatch(client: ReturnType<typeof createClient>) {
+async function insertBatch(client: Client) {
   const now = Date.now();
   const rows = Array.from({ length: 50 }, () => {
     const roll = Math.random();
     const status = roll < 0.9 ? 200 : roll < 0.97 ? 404 : 500;
     return {
-      ts: new Date(now - Math.floor(Math.random() * 1000)).toISOString().replace("T", " ").replace("Z", ""),
+      ts: new Date(now - Math.floor(Math.random() * 1000)),
       service: SERVICES[Math.floor(Math.random() * SERVICES.length)],
       route: ROUTES[Math.floor(Math.random() * ROUTES.length)],
       status,
@@ -155,14 +154,34 @@ async function insertBatch(client: ReturnType<typeof createClient>) {
       bytes: Math.floor(200 + Math.random() * 20000),
     };
   });
-  await client.insert({ table: "http_requests", values: rows, format: "JSONEachRow" });
+  const values = rows.flatMap((row) => [
+    row.ts,
+    row.service,
+    row.route,
+    row.status,
+    row.duration_ms,
+    row.bytes,
+  ]);
+  const placeholders = rows
+    .map((_, index) => {
+      const first = index * 6 + 1;
+      return `($${first}, $${first + 1}, $${first + 2}, $${first + 3}, $${first + 4}, $${first + 5})`;
+    })
+    .join(", ");
+  await client.query(
+    `INSERT INTO metrics.http_requests
+       (ts, service, route, status, duration_ms, bytes)
+     VALUES ${placeholders}`,
+    values,
+  );
 }
 
 async function main() {
   await ensureDemo().catch((e) => console.warn("demo seed skipped:", e.message));
 
   const intervalMs = Number(process.env.SEED_INTERVAL_MS || 2000);
-  const client = ch();
+  const client = metricsClient();
+  await client.connect();
   console.log(`seeding metrics every ${intervalMs}ms — Ctrl+C to stop`);
   for (;;) {
     try {

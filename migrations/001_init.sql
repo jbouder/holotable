@@ -17,11 +17,11 @@ CREATE TABLE IF NOT EXISTS sources (
   id            TEXT PRIMARY KEY,
   workspace_id  TEXT NOT NULL,
   name          TEXT NOT NULL,
-  kind          TEXT NOT NULL DEFAULT 'clickhouse',
+  kind          TEXT NOT NULL DEFAULT 'timescaledb',
   -- Non-secret connection config + catalog allowlist (see lib/db/repo.ts).
   config        JSONB NOT NULL,
-  -- Names the env-var family holding credentials, e.g. 'CH_METRICS' resolves
-  -- CH_METRICS_USERNAME / CH_METRICS_PASSWORD.
+  -- Names the env-var family holding credentials, e.g. 'TS_METRICS' resolves
+  -- TS_METRICS_USERNAME / TS_METRICS_PASSWORD.
   secret_ref    TEXT NOT NULL,
   created_by    TEXT NOT NULL,
   created_at    TIMESTAMPTZ NOT NULL DEFAULT now(),
