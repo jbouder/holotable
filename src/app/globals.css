@@ -6,6 +6,7 @@
  * ECharts (canvas cannot consume oklch()/CSS vars).
  */
 :root {
+  color-scheme: dark;
   --background: oklch(0.16 0.02 265);
   --surface: oklch(0.21 0.02 265);
   --surface-2: oklch(0.26 0.02 265);
@@ -17,6 +18,20 @@
   --danger: oklch(0.65 0.22 20);
   --success: oklch(0.7 0.16 160);
   --radius: 0.625rem;
+}
+
+[data-theme="light"] {
+  color-scheme: light;
+  --background: oklch(0.98 0.005 265);
+  --surface: oklch(1 0 0);
+  --surface-2: oklch(0.94 0.01 265);
+  --foreground: oklch(0.2 0.02 265);
+  --muted: oklch(0.5 0.02 265);
+  --border: oklch(0.84 0.02 265);
+  --primary: oklch(0.55 0.2 259);
+  --primary-foreground: oklch(0.98 0.01 265);
+  --danger: oklch(0.58 0.22 20);
+  --success: oklch(0.55 0.16 160);
 }
 
 @theme inline {
