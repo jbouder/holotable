@@ -1,11 +1,19 @@
 "use client";
 
 import * as React from "react";
+import { Moon, Sun, Monitor } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 type Theme = "dark" | "light" | "system";
 
 const STORAGE_KEY = "theme";
 const THEMES: Theme[] = ["dark", "light", "system"];
+
+const OPTIONS: { value: Theme; label: string; Icon: typeof Sun }[] = [
+  { value: "light", label: "Light", Icon: Sun },
+  { value: "dark", label: "Dark", Icon: Moon },
+  { value: "system", label: "System", Icon: Monitor },
+];
 
 function isTheme(value: string | null): value is Theme {
   return THEMES.includes(value as Theme);
@@ -47,10 +55,7 @@ export function ThemeToggle() {
     return () => media.removeEventListener("change", handleChange);
   }, [theme]);
 
-  function updateTheme(event: React.ChangeEvent<HTMLSelectElement>) {
-    const value = event.target.value;
-    if (!isTheme(value)) return;
-
+  function updateTheme(value: Theme) {
     setTheme(value);
     applyTheme(value);
     try {
@@ -61,18 +66,34 @@ export function ThemeToggle() {
   }
 
   return (
-    <label>
-      <span className="sr-only">Theme</span>
-      <select
-        value={theme}
-        onChange={updateTheme}
-        suppressHydrationWarning
-        className="h-8 rounded-lg border border-border bg-surface-2 px-2 text-sm text-foreground focus-visible:outline-2 focus-visible:outline-primary"
-      >
-        <option value="dark">Dark</option>
-        <option value="light">Light</option>
-        <option value="system">System</option>
-      </select>
-    </label>
+    <div
+      role="radiogroup"
+      aria-label="Theme"
+      suppressHydrationWarning
+      className="inline-flex items-center gap-0.5 rounded-lg border border-border bg-surface-2 p-0.5"
+    >
+      {OPTIONS.map(({ value, label, Icon }) => {
+        const active = theme === value;
+        return (
+          <button
+            key={value}
+            type="button"
+            role="radio"
+            aria-checked={active}
+            aria-label={label}
+            title={label}
+            onClick={() => updateTheme(value)}
+            className={cn(
+              "flex h-7 w-7 items-center justify-center rounded-md transition-colors cursor-pointer focus-visible:outline-2 focus-visible:outline-primary",
+              active
+                ? "bg-primary text-primary-foreground"
+                : "text-muted hover:bg-surface hover:text-foreground",
+            )}
+          >
+            <Icon className="h-4 w-4" />
+          </button>
+        );
+      })}
+    </div>
   );
 }

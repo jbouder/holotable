@@ -32,7 +32,7 @@ export default async function DashboardViewPage({
   });
 
   return (
-    <div className="mx-auto max-w-7xl">
+    <div>
       <div className="mb-4 flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-semibold">{dashboard.spec.title}</h1>

@@ -22,7 +22,7 @@ export default async function DashboardsPage() {
     workspaces.some((w) => hasWorkspaceRole(identity, w, "editor"));
 
   return (
-    <div className="mx-auto max-w-5xl">
+    <div>
       <div className="mb-6 flex items-center justify-between">
         <h1 className="text-2xl font-semibold">Dashboards</h1>
         {canCreate && (
@@ -44,17 +44,19 @@ export default async function DashboardsPage() {
           </CardContent>
         </Card>
       ) : (
-        <div className="grid gap-3">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
           {dashboards.map((d) => (
-            <Link key={d.id} href={`/dashboards/${d.id}`}>
-              <Card className="transition-colors hover:border-primary">
-                <CardContent className="flex items-center justify-between">
-                  <div>
-                    <div className="font-medium">{d.title}</div>
-                    <div className="text-xs text-muted">
-                      {d.workspaceId} · v{d.version} · updated{" "}
-                      {new Date(d.updatedAt).toLocaleString()}
-                    </div>
+            <Link key={d.id} href={`/dashboards/${d.id}`} className="group">
+              <Card className="h-full transition-colors group-hover:border-primary">
+                <CardContent className="flex h-full flex-col gap-2">
+                  <div className="font-medium leading-snug group-hover:text-primary">
+                    {d.title}
+                  </div>
+                  <div className="mt-auto flex flex-col gap-0.5 text-xs text-muted">
+                    <span>
+                      {d.workspaceId} · v{d.version}
+                    </span>
+                    <span>updated {new Date(d.updatedAt).toLocaleString()}</span>
                   </div>
                 </CardContent>
               </Card>
