@@ -119,6 +119,13 @@ documented defaults:
 - **Limits:** `MAX_QUERY_ROWS`, `QUERY_TIMEOUT_SECONDS`, `MAX_WINDOW_POINTS`.
 - **AI:** `AI_PROVIDER` (`gateway` | `openai-compatible`) + `AI_MODEL` — no model
   is baked in; this is a deliberate open decision (see architecture doc).
+  The `openai-compatible` path works with any OpenAI-compatible endpoint:
+  - **OpenRouter:** set `OPENAI_BASE_URL=https://openrouter.ai/api/v1`,
+    `OPENAI_API_KEY` to your OpenRouter key, and `AI_MODEL` to any OpenRouter
+    model slug (e.g. `openai/gpt-4o-mini`).
+  - **OpenCode Go:** set `OPENAI_BASE_URL` and `OPENAI_API_KEY` to the values
+    provided by OpenCode Go. Only models that expose an OpenAI-compatible
+    `/chat/completions` interface are supported via this path.
 
 See [`.env.example`](.env.example) for the complete list.
 
