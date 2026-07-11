@@ -18,6 +18,15 @@ interface SourceOption {
   workspaceId: string;
 }
 
+/** Starter prompts to seed the textarea with one click. */
+const PROMPT_PRESETS = [
+  "Request rate and error ratio over the last hour",
+  "p95 and p99 latency trends over time",
+  "HTTP status code breakdown over time",
+  "Slowest endpoints by p95 latency",
+  "Total requests and error count as stat panels",
+];
+
 export function NewDashboardClient({ sources }: { sources: SourceOption[] }) {
   const router = useRouter();
   const [sourceId, setSourceId] = React.useState<string | null>(
@@ -89,7 +98,7 @@ export function NewDashboardClient({ sources }: { sources: SourceOption[] }) {
   }
 
   return (
-    <div className="mx-auto max-w-7xl space-y-6">
+    <div className="space-y-6">
       <h1 className="text-2xl font-semibold">New dashboard</h1>
 
       <Card>
@@ -109,7 +118,20 @@ export function NewDashboardClient({ sources }: { sources: SourceOption[] }) {
             </div>
           </div>
           <div>
-            <Label htmlFor="prompt">Describe the dashboard</Label>
+            <Label htmlFor="prompt">Describe the dashboard or try one below</Label>
+            <div className="mb-2 flex flex-wrap items-center gap-2">
+              {PROMPT_PRESETS.map((preset) => (
+                <button
+                  key={preset}
+                  type="button"
+                  disabled={isLoading}
+                  onClick={() => setPrompt(preset)}
+                  className="rounded-full border border-border bg-surface px-3 py-1 text-xs text-muted transition-colors hover:border-primary hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  {preset}
+                </button>
+              ))}
+            </div>
             <Textarea
               id="prompt"
               rows={3}
