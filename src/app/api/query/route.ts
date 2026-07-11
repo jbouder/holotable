@@ -9,7 +9,7 @@ import { readJson, json } from "@/lib/http";
 import { getSourceById } from "@/lib/db/repo";
 import { validateSql, buildExecutablePlan } from "@/lib/sql/safety";
 import { resolveTimeRange } from "@/lib/time";
-import { executePlan } from "@/lib/timescaledb/client";
+import { executePlan, QueryExecutionError } from "@/lib/timescaledb/client";
 import { TimeRange } from "@/lib/ir";
 
 export const runtime = "nodejs";
@@ -53,6 +53,11 @@ export async function POST(req: Request) {
     const result = await executePlan(source, plan);
     return json(result);
   } catch (err) {
+    // A failed statement is the user's query to fix — surface it as a 400 with
+    // the real message so the client can show it and offer a retry.
+    if (err instanceof QueryExecutionError) {
+      return json({ error: err.message }, { status: 400 });
+    }
     return errorResponse(err);
   }
 }

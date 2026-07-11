@@ -11,6 +11,7 @@ import { Textarea, Label } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { Card, CardContent } from "@/components/ui/card";
 import { PreviewDashboard } from "@/components/dashboard/PreviewDashboard";
+import { RetryNotice } from "@/components/dashboard/RetryNotice";
 
 interface SourceOption {
   id: string;
@@ -161,7 +162,11 @@ export function NewDashboardClient({ sources }: { sources: SourceOption[] }) {
             )}
           </div>
           {error && (
-            <p className="text-sm text-danger">Generation failed: {error.message}</p>
+            <RetryNotice
+              message={`Generation failed: ${error.message}`}
+              onRetry={generate}
+              disabled={isLoading}
+            />
           )}
           {saveError && <p className="text-sm text-danger">{saveError}</p>}
         </CardContent>

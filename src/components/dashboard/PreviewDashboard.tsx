@@ -71,7 +71,13 @@ export function PreviewDashboard({ spec }: { spec: Dashboard }) {
   return (
     <DashboardGrid
       panels={spec.panels}
-      renderPanel={(panel) => <PanelView panel={panel} state={states[panel.id]} />}
+      renderPanel={(panel) => (
+        <PanelView
+          panel={panel}
+          state={states[panel.id]}
+          onRetry={() => void runPanel(panel, spec.timeRange)}
+        />
+      )}
     />
   );
 }

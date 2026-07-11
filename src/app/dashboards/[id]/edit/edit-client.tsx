@@ -11,6 +11,7 @@ import { Input, Textarea, Label } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { PreviewDashboard } from "@/components/dashboard/PreviewDashboard";
+import { RetryNotice } from "@/components/dashboard/RetryNotice";
 
 interface SourceOption {
   id: string;
@@ -52,7 +53,7 @@ export function EditDashboardClient({
 
   const selected = spec.panels.find((p) => p.id === selectedId) ?? null;
 
-  const { submit, isLoading } = useObject({
+  const { submit, isLoading, error: genError } = useObject({
     api: "/api/generate",
     schema: Panel,
     onFinish({ object }) {
@@ -246,6 +247,13 @@ export function EditDashboardClient({
                   {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
                   Apply NL edit
                 </Button>
+                {genError && (
+                  <RetryNotice
+                    message={`Edit failed: ${genError.message}`}
+                    onRetry={runNlEdit}
+                    disabled={isLoading}
+                  />
+                )}
               </div>
             )}
           </CardContent>

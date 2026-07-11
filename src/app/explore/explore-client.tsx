@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { experimental_useObject as useObject } from "@ai-sdk/react";
-import { Loader2, Sparkles, Compass, AlertTriangle } from "lucide-react";
+import { Loader2, Sparkles, Compass, AlertTriangle, RefreshCw } from "lucide-react";
 import { Panel, TimeRange } from "@/lib/ir";
 import { Button } from "@/components/ui/button";
 import { Textarea, Label } from "@/components/ui/input";
@@ -10,6 +10,7 @@ import { Select } from "@/components/ui/select";
 import { Card, CardContent } from "@/components/ui/card";
 import { EChart } from "@/components/charts/EChart";
 import { buildChartOption, type PanelData } from "@/components/charts/options";
+import { RetryNotice } from "@/components/dashboard/RetryNotice";
 import { formatValue } from "@/lib/format";
 
 interface SourceOption {
@@ -206,7 +207,11 @@ export function ExploreClient({ sources }: { sources: SourceOption[] }) {
             )}
           </div>
           {error && (
-            <p className="text-sm text-danger">Generation failed: {error.message}</p>
+            <RetryNotice
+              message={`Generation failed: ${error.message}`}
+              onRetry={generate}
+              disabled={isLoading}
+            />
           )}
         </CardContent>
       </Card>
@@ -217,6 +222,7 @@ export function ExploreClient({ sources }: { sources: SourceOption[] }) {
           result={result}
           sourceName={sourceName ?? ""}
           rangeLabel={rangeLabel}
+          onRetry={() => void runQuery(panel, { from, to: "now" })}
         />
       ) : (
         streaming && (
@@ -234,11 +240,13 @@ function ResultView({
   result,
   sourceName,
   rangeLabel,
+  onRetry,
 }: {
   panel: Panel;
   result: Result | null;
   sourceName: string;
   rangeLabel: string;
+  onRetry: () => void;
 }) {
   const data = result?.data ?? EMPTY;
   const rowCount = data.rows.length;
@@ -257,7 +265,7 @@ function ResultView({
         </p>
       </div>
 
-      <ResultBody panel={panel} result={result} data={data} />
+      <ResultBody panel={panel} result={result} data={data} onRetry={onRetry} />
 
       <details className="rounded-lg border border-border bg-surface">
         <summary className="cursor-pointer px-4 py-2 text-sm text-muted">
@@ -275,10 +283,12 @@ function ResultBody({
   panel,
   result,
   data,
+  onRetry,
 }: {
   panel: Panel;
   result: Result | null;
   data: PanelData;
+  onRetry: () => void;
 }) {
   if (!result || result.status === "loading") {
     return (
@@ -289,8 +299,13 @@ function ResultBody({
   }
   if (result.status === "error") {
     return (
-      <div className="flex items-center gap-2 text-sm text-danger">
-        <AlertTriangle className="h-4 w-4" /> {result.error ?? "Query failed"}
+      <div className="flex flex-col items-start gap-2">
+        <div className="flex items-center gap-2 text-sm text-danger">
+          <AlertTriangle className="h-4 w-4" /> {result.error ?? "Query failed"}
+        </div>
+        <Button variant="secondary" size="sm" onClick={onRetry}>
+          <RefreshCw className="h-3.5 w-3.5" /> Retry
+        </Button>
       </div>
     );
   }

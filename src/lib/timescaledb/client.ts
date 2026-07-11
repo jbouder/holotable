@@ -24,6 +24,30 @@ export interface QueryResult {
 }
 
 /**
+ * A SQL statement failed at execution time (as opposed to a connection or
+ * infrastructure failure). The message is safe to surface to an authorized
+ * editor — it is the same information the live poller already forwards — and
+ * routes translate it into a 400 so the user can correct the query and retry.
+ */
+export class QueryExecutionError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "QueryExecutionError";
+  }
+}
+
+/**
+ * Postgres tags statement-level failures (syntax, unknown column, type
+ * mismatch, timeouts, …) with a 5-character SQLSTATE `code`. Connection and
+ * socket failures surface Node error codes like `ECONNREFUSED` instead, which
+ * we deliberately do NOT surface to the client.
+ */
+function isPostgresStatementError(err: unknown): err is { code: string; message: string } {
+  const e = err as { code?: unknown };
+  return typeof e?.code === "string" && /^[0-9A-Z]{5}$/.test(e.code);
+}
+
+/**
  * The server wraps the validated query and filters time on `_holo.<timeField>`.
  * If the declared `timeField` is not a column produced by the query, Postgres
  * raises `42703` ("column _holo.<field> does not exist"). Turn that opaque
@@ -81,12 +105,17 @@ export async function executePlan(
     };
   } catch (err) {
     if (isMissingTimeFieldError(err, plan.timeField)) {
-      throw new Error(
+      throw new QueryExecutionError(
         `time column "${plan.timeField}" is not produced by this query. Set the ` +
           `panel's timeField to the SELECT output alias of your time bucket ` +
           `(e.g. time_bucket(...) AS ${plan.timeField}), or clear it when the ` +
           `result has no time column.`,
       );
+    }
+    // Surface statement-level SQL failures (bad column, syntax, timeout) so the
+    // user can fix the query; leave connection/infra errors to a generic 500.
+    if (isPostgresStatementError(err)) {
+      throw new QueryExecutionError(err.message);
     }
     throw err;
   } finally {

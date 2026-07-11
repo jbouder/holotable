@@ -1,8 +1,9 @@
 "use client";
 
 import * as React from "react";
-import { AlertTriangle, DatabaseZap, Loader2 } from "lucide-react";
+import { AlertTriangle, DatabaseZap, Loader2, RefreshCw } from "lucide-react";
 import type { Panel } from "@/lib/ir";
+import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { EChart } from "@/components/charts/EChart";
 import { buildChartOption, type PanelData } from "@/components/charts/options";
@@ -22,9 +23,11 @@ const EMPTY: PanelData = { columns: [], rows: [] };
 export function PanelView({
   panel,
   state,
+  onRetry,
 }: {
   panel: Panel;
   state?: PanelState;
+  onRetry?: () => void;
 }) {
   const data = state?.data ?? EMPTY;
   const status = state?.status ?? "loading";
@@ -36,7 +39,7 @@ export function PanelView({
         <StatusBadge status={status} />
       </CardHeader>
       <CardContent className="flex-1 min-h-0">
-        <PanelBody panel={panel} data={data} state={state} />
+        <PanelBody panel={panel} data={data} state={state} onRetry={onRetry} />
       </CardContent>
     </Card>
   );
@@ -46,10 +49,12 @@ function PanelBody({
   panel,
   data,
   state,
+  onRetry,
 }: {
   panel: Panel;
   data: PanelData;
   state?: PanelState;
+  onRetry?: () => void;
 }) {
   if (state?.status === "tombstoned") {
     return (
@@ -61,7 +66,12 @@ function PanelBody({
   if (state?.status === "error") {
     return (
       <Message icon={<AlertTriangle className="h-5 w-5 text-danger" />}>
-        {state.error ?? "Query failed"}
+        <span>{state.error ?? "Query failed"}</span>
+        {onRetry && (
+          <Button variant="secondary" size="sm" className="mt-1" onClick={onRetry}>
+            <RefreshCw className="h-3.5 w-3.5" /> Retry
+          </Button>
+        )}
       </Message>
     );
   }
@@ -135,7 +145,7 @@ function Message({
   return (
     <div className="flex h-full flex-col items-center justify-center gap-2 text-center text-sm text-muted">
       {icon}
-      <span>{children}</span>
+      {children}
     </div>
   );
 }
