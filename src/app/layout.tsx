@@ -1,6 +1,20 @@
 import type { Metadata } from "next";
+import { Chakra_Petch, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
 import { NavBar } from "@/components/nav-bar";
+
+const fontSans = Chakra_Petch({
+  subsets: ["latin"],
+  weight: ["300", "400", "500", "600", "700"],
+  display: "swap",
+  variable: "--font-chakra-petch",
+});
+
+const fontMono = JetBrains_Mono({
+  subsets: ["latin"],
+  display: "swap",
+  variable: "--font-jetbrains-mono",
+});
 
 export const metadata: Metadata = {
   title: "Holotable",
@@ -13,7 +27,7 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className="h-full antialiased"
+      className={`h-full antialiased ${fontSans.variable} ${fontMono.variable}`}
       data-theme="dark"
       suppressHydrationWarning
     >

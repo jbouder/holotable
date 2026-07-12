@@ -17,6 +17,17 @@ the single-instance poller caveat, [`docs/PANEL_LIFECYCLE.md`](docs/PANEL_LIFECY
 for how a panel is generated, stored, executed, and rendered end to end, and
 [`docs/KEYCLOAK.md`](docs/KEYCLOAK.md) for the OIDC group-mapper setup.
 
+## Screenshots
+
+Describe the dashboard you want in plain English; the model authors a validated
+spec (never the data):
+
+![New dashboard — natural-language authoring with starter prompts](docs/images/dashboard-new.png)
+
+Holotable executes the guarded SQL and streams results into a live dashboard:
+
+![Live dashboard view — request rate, p95 latency, 5xx count, and requests by route](docs/images/dashboard-view.png)
+
 ## How it works
 
 1. **Author** — `/api/generate` runs the LLM exactly once (only on create/edit).
