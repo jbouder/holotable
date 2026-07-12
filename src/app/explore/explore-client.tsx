@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Textarea, Label } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { Card, CardContent } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 import { EChart } from "@/components/charts/EChart";
 import { buildChartOption, type PanelData } from "@/components/charts/options";
 import { RetryNotice } from "@/components/dashboard/RetryNotice";
@@ -49,7 +50,13 @@ const EXAMPLE_PROMPTS: string[] = [
   "Total requests in this window",
 ];
 
-export function ExploreClient({ sources }: { sources: SourceOption[] }) {
+export function ExploreClient({
+  sources,
+  model,
+}: {
+  sources: SourceOption[];
+  model: string;
+}) {
   const [sourceId, setSourceId] = React.useState<string | null>(
     sources[0]?.id ?? null,
   );
@@ -135,8 +142,11 @@ export function ExploreClient({ sources }: { sources: SourceOption[] }) {
   return (
     <div className="w-full space-y-6">
       <div>
-        <h1 className="text-2xl font-semibold">Explore</h1>
-        <p className="text-sm text-muted">
+        <div className="flex flex-wrap items-center gap-3">
+          <h1 className="text-2xl font-semibold">Explore</h1>
+          {model && <Badge title="Generation model">{model}</Badge>}
+        </div>
+        <p className="mt-1 text-sm text-muted">
           Ask a question in plain English. Results come back as text and tables;
           ask to &ldquo;chart&rdquo;, &ldquo;plot&rdquo;, or &ldquo;graph&rdquo;
           something to get a visualization.

@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Textarea, Label } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 import { PreviewDashboard } from "@/components/dashboard/PreviewDashboard";
 import { RetryNotice } from "@/components/dashboard/RetryNotice";
 
@@ -28,7 +29,13 @@ const PROMPT_PRESETS = [
   "Request rate and error ratio over the last hour",
 ];
 
-export function NewDashboardClient({ sources }: { sources: SourceOption[] }) {
+export function NewDashboardClient({
+  sources,
+  model,
+}: {
+  sources: SourceOption[];
+  model: string;
+}) {
   const router = useRouter();
   const [activeTab, setActiveTab] = React.useState<"chat" | "preview">("chat");
   const [sourceId, setSourceId] = React.useState<string | null>(
@@ -102,31 +109,42 @@ export function NewDashboardClient({ sources }: { sources: SourceOption[] }) {
 
   return (
     <div className="space-y-6">
-      <h1 className="text-2xl font-semibold">New dashboard</h1>
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <div className="flex flex-wrap items-center gap-3">
+            <h1 className="text-2xl font-semibold">New dashboard</h1>
+            {model && <Badge title="Generation model">{model}</Badge>}
+          </div>
+          <p className="mt-1 text-sm text-muted">
+            Describe the dashboard you want in plain English. The model generates
+            a validated spec, then preview and save it as live panels.
+          </p>
+        </div>
 
-      <div
-        className="flex w-fit rounded-lg border border-border bg-surface p-1"
-        role="tablist"
-        aria-label="Dashboard workspace"
-      >
-        {(["chat", "preview"] as const).map((tab) => (
-          <button
-            key={tab}
-            type="button"
-            role="tab"
-            aria-selected={activeTab === tab}
-            aria-controls={`new-dashboard-${tab}-panel`}
-            id={`new-dashboard-${tab}-tab`}
-            onClick={() => setActiveTab(tab)}
-            className={`rounded-md px-3 py-1.5 text-sm font-medium capitalize transition-colors ${
-              activeTab === tab
-                ? "bg-surface-2 text-foreground"
-                : "text-muted hover:text-foreground"
-            }`}
-          >
-            {tab}
-          </button>
-        ))}
+        <div
+          className="flex w-fit rounded-lg border border-border bg-surface p-1"
+          role="tablist"
+          aria-label="Dashboard workspace"
+        >
+          {(["chat", "preview"] as const).map((tab) => (
+            <button
+              key={tab}
+              type="button"
+              role="tab"
+              aria-selected={activeTab === tab}
+              aria-controls={`new-dashboard-${tab}-panel`}
+              id={`new-dashboard-${tab}-tab`}
+              onClick={() => setActiveTab(tab)}
+              className={`rounded-md px-3 py-1.5 text-sm font-medium capitalize transition-colors ${
+                activeTab === tab
+                  ? "bg-surface-2 text-foreground"
+                  : "text-muted hover:text-foreground"
+              }`}
+            >
+              {tab}
+            </button>
+          ))}
+        </div>
       </div>
 
       {activeTab === "chat" ? (

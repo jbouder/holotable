@@ -47,6 +47,14 @@ export const config = {
   /** Statement timeout (seconds) applied to every metrics query. */
   queryTimeoutSeconds: num("QUERY_TIMEOUT_SECONDS", 20),
 
+  /**
+   * The AI model id used for generation, surfaced read-only to the UI so users
+   * can see which model produced their specs. Empty when unconfigured. This is
+   * a display label only — actual provider/model resolution lives in
+   * src/lib/ai/provider.ts.
+   */
+  aiModel: str("AI_MODEL", ""),
+
   /** Cookie name used for the session JWT. */
   sessionCookieName: str("SESSION_COOKIE_NAME", "holotable_session"),
 

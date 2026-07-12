@@ -114,20 +114,38 @@ export function SourcesClient({ workspaces }: { workspaces: string[] }) {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-semibold">Data sources</h1>
+      <div className="flex items-start justify-between gap-3">
         <div>
-          <Label htmlFor="ws">Workspace</Label>
-          <Select
-            id="ws"
-            value={workspaceId}
-            onValueChange={(ws) => {
-              setEditing(null);
-              setCreating(false);
-              setWorkspaceId(ws);
-            }}
-            options={workspaces.map((w) => ({ value: w, label: w }))}
-          />
+          <h1 className="text-2xl font-semibold">Data sources</h1>
+          <p className="mt-1 text-sm text-muted">
+            Manage the connections that dashboards and Explore query against.
+            Sources are scoped to a workspace and referenced by stable IDs.
+          </p>
+        </div>
+        <div className="flex items-end gap-3">
+          <div>
+            <Label htmlFor="ws">Workspace</Label>
+            <Select
+              id="ws"
+              value={workspaceId}
+              onValueChange={(ws) => {
+                setEditing(null);
+                setCreating(false);
+                setWorkspaceId(ws);
+              }}
+              options={workspaces.map((w) => ({ value: w, label: w }))}
+            />
+          </div>
+          {sources !== null && (
+            <Button
+              onClick={() => {
+                setNotice(null);
+                setCreating(true);
+              }}
+            >
+              <Plus className="h-4 w-4" /> Add source
+            </Button>
+          )}
         </div>
       </div>
 
@@ -141,16 +159,6 @@ export function SourcesClient({ workspaces }: { workspaces: string[] }) {
         <p className="text-sm text-muted">Loading…</p>
       ) : (
         <>
-          <div className="flex justify-end">
-            <Button
-              onClick={() => {
-                setNotice(null);
-                setCreating(true);
-              }}
-            >
-              <Plus className="h-4 w-4" /> Add source
-            </Button>
-          </div>
           {sources.length === 0 ? (
             <p className="text-sm text-muted">No sources in this workspace yet.</p>
           ) : (

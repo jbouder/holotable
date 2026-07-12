@@ -23,5 +23,5 @@ export default async function ExplorePage() {
     workspaceId: s.workspaceId,
   }));
 
-  return <ExploreClient sources={sources} />;
+  return <ExploreClient sources={sources} model={config.aiModel} />;
 }

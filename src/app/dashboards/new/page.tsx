@@ -22,5 +22,5 @@ export default async function NewDashboardPage() {
     workspaceId: s.workspaceId,
   }));
 
-  return <NewDashboardClient sources={sources} />;
+  return <NewDashboardClient sources={sources} model={config.aiModel} />;
 }
