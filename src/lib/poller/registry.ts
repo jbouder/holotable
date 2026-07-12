@@ -201,8 +201,11 @@ class DashboardPoller {
       clearTimeout(this.timer);
       this.timer = null;
     }
-    if (registry.get(this.dashboardId) === this) {
-      registry.delete(this.dashboardId);
+    for (const [key, poller] of registry) {
+      if (poller === this) {
+        registry.delete(key);
+        break;
+      }
     }
   }
 
@@ -250,8 +253,9 @@ class DashboardPoller {
 const registry = new Map<string, DashboardPoller>();
 
 /**
- * Get the shared poller for a dashboard, creating it if needed. If a poller
- * exists for an older version, it is replaced so the new spec takes effect.
+ * Get the shared poller for a dashboard and time range, creating it if needed.
+ * If a poller exists for an older version, it is replaced so the new spec takes
+ * effect. Distinct viewer-selected ranges are isolated from each other.
  *
  * `workspaceId` is the trusted dashboard workspace identity resolved from the
  * database record. It is stored on the poller and passed to every panel
@@ -265,17 +269,20 @@ export function getPoller(
   spec: Dashboard,
   executor: PanelExecutor = defaultPanelExecutor,
 ): DashboardPoller {
-  const existing = registry.get(dashboardId);
+  const key = JSON.stringify([dashboardId, spec.timeRange.from, spec.timeRange.to]);
+  const existing = registry.get(key);
   if (existing && existing.version >= version) return existing;
   if (existing) existing.stop();
   const poller = new DashboardPoller(dashboardId, version, workspaceId, spec, executor);
-  registry.set(dashboardId, poller);
+  registry.set(key, poller);
   return poller;
 }
 
 /** Drop a poller (e.g. after a new version is saved). */
 export function invalidatePoller(dashboardId: string): void {
-  registry.get(dashboardId)?.stop();
+  for (const poller of registry.values()) {
+    if (poller.dashboardId === dashboardId) poller.stop();
+  }
 }
 
 /** Test/introspection helper. */

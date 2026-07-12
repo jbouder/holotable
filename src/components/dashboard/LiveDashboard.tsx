@@ -2,12 +2,13 @@
 
 import * as React from "react";
 import { Pause, Play } from "lucide-react";
-import type { Dashboard } from "@/lib/ir";
+import type { Dashboard, TimeRange } from "@/lib/ir";
 import type { PollerEvent } from "@/lib/poller/registry";
 import { DashboardGrid } from "@/components/dashboard/DashboardGrid";
 import { PanelView, type PanelState } from "@/components/dashboard/PanelView";
 import type { PanelData } from "@/components/charts/options";
 import { Button } from "@/components/ui/button";
+import { TimeRangeFilter } from "@/components/dashboard/TimeRangeFilter";
 import { cn } from "@/lib/utils";
 
 /**
@@ -35,7 +36,12 @@ export function LiveDashboard({
 }) {
   const [states, setStates] = React.useState<Record<string, PanelState>>({});
   const [live, setLive] = React.useState(true);
+  const [timeRange, setTimeRange] = React.useState<TimeRange>(spec.timeRange);
   const lastTickRef = React.useRef<number>(0);
+  const streamUrl = React.useMemo(() => {
+    const params = new URLSearchParams(timeRange);
+    return `/api/dashboards/${dashboardId}/stream?${params.toString()}`;
+  }, [dashboardId, timeRange]);
 
   const applyEvent = React.useCallback(
     (event: PollerEvent) => {
@@ -74,8 +80,9 @@ export function LiveDashboard({
 
   React.useEffect(() => {
     if (!live) return;
+    setStates({});
     lastTickRef.current = Date.now();
-    const es = new EventSource(`/api/dashboards/${dashboardId}/stream`);
+    const es = new EventSource(streamUrl);
     es.onmessage = (msg) => {
       try {
         const event = JSON.parse(msg.data) as PollerEvent;
@@ -98,7 +105,7 @@ export function LiveDashboard({
       });
     };
     return () => es.close();
-  }, [dashboardId, applyEvent, live]);
+  }, [applyEvent, live, streamUrl]);
 
   // Staleness watchdog. Disabled while paused — a paused dashboard is not stale.
   React.useEffect(() => {
@@ -120,9 +127,10 @@ export function LiveDashboard({
 
   return (
     <div>
-      <div className="mb-4 flex items-center justify-between">
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
         {header}
-        <div className="flex shrink-0 items-center gap-1">
+        <div className="flex shrink-0 flex-wrap items-center gap-1">
+          <TimeRangeFilter value={timeRange} onChange={setTimeRange} />
           <Button
             variant="ghost"
             size="sm"

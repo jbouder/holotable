@@ -6,6 +6,7 @@ import {
 } from "@/lib/auth/authorize";
 import { getDashboardById } from "@/lib/db/repo";
 import { getPoller, type PollerEvent } from "@/lib/poller/registry";
+import { TimeRange } from "@/lib/ir";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -28,7 +29,20 @@ export async function GET(req: Request, ctx: RouteContext<"/api/dashboards/[id]/
       workspaceId: dashboard.workspaceId,
     });
 
-    const poller = getPoller(id, dashboard.version, dashboard.workspaceId, dashboard.spec);
+    const url = new URL(req.url);
+    const from = url.searchParams.get("from");
+    const to = url.searchParams.get("to");
+    if ((from === null) !== (to === null)) {
+      throw new HttpError(400, "both from and to time-range parameters are required");
+    }
+    const parsedRange = from && to ? TimeRange.safeParse({ from, to }) : undefined;
+    if (parsedRange && !parsedRange.success) {
+      throw new HttpError(400, "invalid time-range parameters");
+    }
+    const spec = parsedRange?.data
+      ? { ...dashboard.spec, timeRange: parsedRange.data }
+      : dashboard.spec;
+    const poller = getPoller(id, dashboard.version, dashboard.workspaceId, spec);
     const encoder = new TextEncoder();
 
     const stream = new ReadableStream<Uint8Array>({

@@ -66,7 +66,13 @@ test("rejects refresh interval below 1s", () => {
 
 test("rejects invalid viz type", () => {
   const res = Panel.safeParse({ ...validPanel, viz: "scatter" });
-  assert.equal(res.success, false);
+  assert.equal(res.success, true);
+});
+
+test("accepts all supported chart visualizations", () => {
+  for (const viz of ["line", "area", "bar", "scatter", "heatmap", "pie", "donut"]) {
+    assert.equal(Panel.safeParse({ ...validPanel, viz }).success, true, viz);
+  }
 });
 
 test("timeField is optional on a panel query", () => {
