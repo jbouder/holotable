@@ -11,7 +11,9 @@ import { z } from "zod";
 
 export const VizType = z.enum([
   "line",
+  "area",
   "bar",
+  "scatter",
   "stat",
   "table",
   "heatmap",

@@ -32,7 +32,7 @@ const BASE: EChartsOption = {
 
 /**
  * Build an ECharts option from a panel spec + current (bounded) data. Only
- * line/bar/heatmap/pie/donut map to ECharts; stat/table are rendered as HTML.
+ * line/area/bar/scatter/heatmap/pie/donut map to ECharts; stat/table are rendered as HTML.
  */
 export function buildChartOption(panel: Panel, data: PanelData): EChartsOption {
   const x = xKey(panel, data);
@@ -45,6 +45,10 @@ export function buildChartOption(panel: Panel, data: PanelData): EChartsOption {
 
   if (panel.viz === "pie" || panel.viz === "donut") {
     return buildPie(panel, data);
+  }
+
+  if (panel.viz === "scatter") {
+    return buildScatter(data);
   }
 
   const type = panel.viz === "bar" ? "bar" : "line";
@@ -66,7 +70,35 @@ export function buildChartOption(panel: Panel, data: PanelData): EChartsOption {
       type,
       showSymbol: false,
       smooth: type === "line",
+      areaStyle: panel.viz === "area" ? {} : undefined,
       data: data.rows.map((r) => Number(r[k])),
+    })),
+  };
+}
+
+function buildScatter(data: PanelData): EChartsOption {
+  const numericColumns = data.columns.filter((column) => isNumeric(data.rows, column));
+  const [x, ...seriesKeys] = numericColumns;
+  return {
+    ...BASE,
+    tooltip: { trigger: "item" },
+    xAxis: {
+      type: "value",
+      name: x,
+      axisLabel: { color: "#9aa0aa" },
+      axisLine: { lineStyle: { color: "#3a3f4b" } },
+      splitLine: { lineStyle: { color: "#2a2f3a" } },
+    },
+    yAxis: {
+      type: "value",
+      axisLabel: { color: "#9aa0aa" },
+      splitLine: { lineStyle: { color: "#2a2f3a" } },
+    },
+    series: seriesKeys.map((key) => ({
+      name: key,
+      type: "scatter",
+      symbolSize: 8,
+      data: data.rows.map((row) => [Number(row[x]), Number(row[key])]),
     })),
   };
 }
