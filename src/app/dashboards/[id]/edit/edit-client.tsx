@@ -3,7 +3,7 @@
 import * as React from "react";
 import { useRouter } from "next/navigation";
 import { experimental_useObject as useObject } from "@ai-sdk/react";
-import { Plus, Trash2, Save, Sparkles, Loader2, Eye, LayoutGrid } from "lucide-react";
+import { Plus, Trash2, Save, Sparkles, Loader2, LayoutGrid } from "lucide-react";
 import { Dashboard, Panel, VizType, ValueFormat, safeParseDashboard } from "@/lib/ir";
 import { autoLayoutPanels, COLUMN_PRESETS } from "@/lib/layout";
 import { Button } from "@/components/ui/button";
@@ -46,7 +46,7 @@ export function EditDashboardClient({
   const [selectedId, setSelectedId] = React.useState<string | null>(
     initialSpec.panels[0]?.id ?? null,
   );
-  const [showPreview, setShowPreview] = React.useState(false);
+  const [activeTab, setActiveTab] = React.useState<"editor" | "preview">("editor");
   const [saving, setSaving] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
   const [nlPrompt, setNlPrompt] = React.useState("");
@@ -85,7 +85,7 @@ export function EditDashboardClient({
       title: "New panel",
       viz: "line",
       query: { sourceId: sources[0].id, sql: "SELECT 1 AS value", timeField: undefined },
-      layout: { x: 0, y: maxY, w: 6, h: 3 },
+      layout: { x: 0, y: maxY, w: 6, h: 4 },
     };
     setSpec((s) => ({ ...s, panels: [...s.panels, panel] }));
     setSelectedId(id);
@@ -128,53 +128,79 @@ export function EditDashboardClient({
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-semibold">Edit dashboard</h1>
-        <div className="flex gap-2">
-          <Button variant="ghost" size="sm" onClick={() => setShowPreview((v) => !v)}>
-            <Eye className="h-4 w-4" /> {showPreview ? "Hide" : "Preview"}
-          </Button>
-          <Button onClick={save} disabled={saving}>
-            {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
-            Save version
-          </Button>
-        </div>
+        <Button onClick={save} disabled={saving}>
+          {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+          Save version
+        </Button>
       </div>
       {error && <p className="text-sm text-danger">{error}</p>}
 
-      <Card>
-        <CardContent className="grid grid-cols-1 gap-4 md:grid-cols-4">
-          <div>
-            <Label htmlFor="title">Title</Label>
-            <Input id="title" value={spec.title} onChange={(e) => updateSpec({ title: e.target.value })} />
-          </div>
-          <div>
-            <Label htmlFor="refresh">Refresh (ms)</Label>
-            <Input
-              id="refresh"
-              type="number"
-              value={spec.refreshIntervalMs}
-              onChange={(e) => updateSpec({ refreshIntervalMs: Number(e.target.value) })}
-            />
-          </div>
-          <div>
-            <Label htmlFor="from">Time from</Label>
-            <Input
-              id="from"
-              value={spec.timeRange.from}
-              onChange={(e) => updateSpec({ timeRange: { ...spec.timeRange, from: e.target.value } })}
-            />
-          </div>
-          <div>
-            <Label htmlFor="to">Time to</Label>
-            <Input
-              id="to"
-              value={spec.timeRange.to}
-              onChange={(e) => updateSpec({ timeRange: { ...spec.timeRange, to: e.target.value } })}
-            />
-          </div>
-        </CardContent>
-      </Card>
+      <div
+        className="flex w-fit rounded-lg border border-border bg-surface p-1"
+        role="tablist"
+        aria-label="Dashboard workspace"
+      >
+        {(["editor", "preview"] as const).map((tab) => (
+          <button
+            key={tab}
+            type="button"
+            role="tab"
+            aria-selected={activeTab === tab}
+            aria-controls={`edit-dashboard-${tab}-panel`}
+            id={`edit-dashboard-${tab}-tab`}
+            onClick={() => setActiveTab(tab)}
+            className={`rounded-md px-3 py-1.5 text-sm font-medium capitalize transition-colors ${
+              activeTab === tab
+                ? "bg-surface-2 text-foreground"
+                : "text-muted hover:text-foreground"
+            }`}
+          >
+            {tab}
+          </button>
+        ))}
+      </div>
 
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
+      {activeTab === "editor" ? (
+        <>
+          <Card
+            role="tabpanel"
+            id="edit-dashboard-editor-panel"
+            aria-labelledby="edit-dashboard-editor-tab"
+          >
+            <CardContent className="grid grid-cols-1 gap-4 md:grid-cols-4">
+              <div>
+                <Label htmlFor="title">Title</Label>
+                <Input id="title" value={spec.title} onChange={(e) => updateSpec({ title: e.target.value })} />
+              </div>
+              <div>
+                <Label htmlFor="refresh">Refresh (ms)</Label>
+                <Input
+                  id="refresh"
+                  type="number"
+                  value={spec.refreshIntervalMs}
+                  onChange={(e) => updateSpec({ refreshIntervalMs: Number(e.target.value) })}
+                />
+              </div>
+              <div>
+                <Label htmlFor="from">Time from</Label>
+                <Input
+                  id="from"
+                  value={spec.timeRange.from}
+                  onChange={(e) => updateSpec({ timeRange: { ...spec.timeRange, from: e.target.value } })}
+                />
+              </div>
+              <div>
+                <Label htmlFor="to">Time to</Label>
+                <Input
+                  id="to"
+                  value={spec.timeRange.to}
+                  onChange={(e) => updateSpec({ timeRange: { ...spec.timeRange, to: e.target.value } })}
+                />
+              </div>
+            </CardContent>
+          </Card>
+
+          <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
         <Card className="lg:col-span-1">
           <CardHeader>
             <CardTitle>Panels</CardTitle>
@@ -258,11 +284,14 @@ export function EditDashboardClient({
             )}
           </CardContent>
         </Card>
-      </div>
-
-      {showPreview && (
-        <section>
-          <h2 className="mb-3 text-lg font-medium">Preview</h2>
+          </div>
+        </>
+      ) : (
+        <section
+          role="tabpanel"
+          id="edit-dashboard-preview-panel"
+          aria-labelledby="edit-dashboard-preview-tab"
+        >
           <PreviewDashboard spec={spec} />
         </section>
       )}
