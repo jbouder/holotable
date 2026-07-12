@@ -80,9 +80,9 @@ export function LiveDashboard({
 
   React.useEffect(() => {
     if (!live) return;
-    setStates({});
     lastTickRef.current = Date.now();
     const es = new EventSource(streamUrl);
+    es.onopen = () => setStates({});
     es.onmessage = (msg) => {
       try {
         const event = JSON.parse(msg.data) as PollerEvent;
