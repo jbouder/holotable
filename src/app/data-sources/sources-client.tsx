@@ -6,7 +6,16 @@ import type { SourceRecord } from "@/lib/registry";
 import { Button } from "@/components/ui/button";
 import { Input, Textarea, Label } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
+import { Dialog } from "@/components/ui/dialog";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 
 const CONFIG_TEMPLATE = JSON.stringify(
   {
@@ -39,6 +48,7 @@ export function SourcesClient({ workspaces }: { workspaces: string[] }) {
   const [sources, setSources] = React.useState<SourceRecord[] | null>(null);
   const [busy, setBusy] = React.useState<string | null>(null);
   const [editing, setEditing] = React.useState<string | null>(null);
+  const [creating, setCreating] = React.useState(false);
   const [notice, setNotice] = React.useState<string | null>(null);
 
   const load = React.useCallback(async (ws: string) => {
@@ -100,6 +110,8 @@ export function SourcesClient({ workspaces }: { workspaces: string[] }) {
     );
   }
 
+  const sourceBeingEdited = sources?.find((source) => source.id === editing);
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -111,6 +123,7 @@ export function SourcesClient({ workspaces }: { workspaces: string[] }) {
             value={workspaceId}
             onValueChange={(ws) => {
               setEditing(null);
+              setCreating(false);
               setWorkspaceId(ws);
             }}
             options={workspaces.map((w) => ({ value: w, label: w }))}
@@ -127,101 +140,139 @@ export function SourcesClient({ workspaces }: { workspaces: string[] }) {
       {sources === null ? (
         <p className="text-sm text-muted">Loading…</p>
       ) : (
-        <div className="grid gap-3">
-          {sources.map((s) =>
-            editing === s.id ? (
-              <SourceForm
-                key={s.id}
-                mode="edit"
-                title={`Edit ${s.name}`}
-                initial={{
-                  name: s.name,
-                  secretRef: s.secretRef,
-                  configText: JSON.stringify(s.config, null, 2),
-                }}
-                submitLabel="Save changes"
-                onSubmit={async ({ name, secretRef, config }) => {
-                  const res = await fetch(`/api/sources/${s.id}`, {
-                    method: "PUT",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ name, secretRef, config }),
-                  });
-                  const body = await res.json();
-                  if (!res.ok) return body.error ?? "update failed";
-                  setEditing(null);
-                  setNotice(`${s.id}: updated`);
-                  if (workspaceId) void load(workspaceId);
-                  return null;
-                }}
-                onCancel={() => setEditing(null)}
-              />
-            ) : (
-              <Card key={s.id}>
-                <CardContent className="flex items-center justify-between">
-                  <div>
-                    <div className="font-medium">
-                      {s.name}{" "}
-                      {s.tombstonedAt && (
-                        <span className="text-xs text-danger">(tombstoned)</span>
-                      )}
-                    </div>
-                    <div className="text-xs text-muted">
-                      {s.id} · {s.config.host}:{s.config.port}/{s.config.database} ·{" "}
-                      schema {s.config.schema} · secret_ref {s.secretRef} ·{" "}
-                      {s.config.tables.length} tables
-                    </div>
-                  </div>
-                  <div className="flex gap-1">
-                    <Button variant="ghost" size="sm" disabled={busy === s.id} onClick={() => test(s.id)}>
-                      <Plug className="h-4 w-4" /> Test
-                    </Button>
-                    <Button variant="ghost" size="sm" disabled={busy === s.id} onClick={() => refresh(s.id)}>
-                      <RefreshCw className="h-4 w-4" /> Refresh
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      disabled={busy === s.id || !!s.tombstonedAt}
-                      onClick={() => {
-                        setNotice(null);
-                        setEditing(s.id);
-                      }}
-                    >
-                      <Pencil className="h-4 w-4" /> Edit
-                    </Button>
-                    <Button variant="ghost" size="sm" disabled={busy === s.id} onClick={() => remove(s.id)}>
-                      <Trash2 className="h-4 w-4 text-danger" />
-                    </Button>
-                  </div>
-                </CardContent>
-              </Card>
-            ),
-          )}
-          {sources.length === 0 && (
+        <>
+          <div className="flex justify-end">
+            <Button
+              onClick={() => {
+                setNotice(null);
+                setCreating(true);
+              }}
+            >
+              <Plus className="h-4 w-4" /> Add source
+            </Button>
+          </div>
+          {sources.length === 0 ? (
             <p className="text-sm text-muted">No sources in this workspace yet.</p>
+          ) : (
+            <Table>
+              <TableHead>
+                <TableRow>
+                  <TableHeader>Name</TableHeader>
+                  <TableHeader>Endpoint</TableHeader>
+                  <TableHeader>Schema</TableHeader>
+                  <TableHeader>Tables</TableHeader>
+                  <TableHeader>Status</TableHeader>
+                  <TableHeader className="text-right">Actions</TableHeader>
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {sources.map((source) => (
+                  <TableRow key={source.id}>
+                    <TableCell>
+                      <div className="font-medium">{source.name}</div>
+                      <div className="text-xs text-muted">{source.id}</div>
+                    </TableCell>
+                    <TableCell className="whitespace-nowrap">
+                      {source.config.host}:{source.config.port}/
+                      {source.config.database}
+                    </TableCell>
+                    <TableCell>{source.config.schema}</TableCell>
+                    <TableCell>{source.config.tables.length}</TableCell>
+                    <TableCell>
+                      {source.tombstonedAt ? (
+                        <span className="text-danger">Tombstoned</span>
+                      ) : (
+                        "Active"
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex justify-end gap-1">
+                        <Button variant="ghost" size="sm" disabled={busy === source.id} onClick={() => test(source.id)}>
+                          <Plug className="h-4 w-4" /> Test
+                        </Button>
+                        <Button variant="ghost" size="sm" disabled={busy === source.id} onClick={() => refresh(source.id)}>
+                          <RefreshCw className="h-4 w-4" /> Refresh
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          disabled={busy === source.id || !!source.tombstonedAt}
+                          onClick={() => {
+                            setNotice(null);
+                            setEditing(source.id);
+                          }}
+                        >
+                          <Pencil className="h-4 w-4" /> Edit
+                        </Button>
+                        <Button variant="ghost" size="sm" disabled={busy === source.id} onClick={() => remove(source.id)}>
+                          <Trash2 className="h-4 w-4 text-danger" />
+                        </Button>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
           )}
-        </div>
+        </>
       )}
 
       {workspaceId && (
-        <SourceForm
-          key={`create-${workspaceId}`}
-          mode="create"
-          title="Add source"
-          submitLabel="Create source"
-          onSubmit={async ({ id, name, secretRef, config }) => {
-            const res = await fetch("/api/sources", {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ workspaceId, id, name, secretRef, config }),
-            });
-            const body = await res.json();
-            if (!res.ok) return body.error ?? "create failed";
-            setNotice("source created");
-            void load(workspaceId);
-            return null;
+        <Dialog open={creating} onOpenChange={setCreating} title="Add source">
+          <SourceForm
+            key={`create-${workspaceId}`}
+            mode="create"
+            submitLabel="Create source"
+            onSubmit={async ({ id, name, secretRef, config }) => {
+              const res = await fetch("/api/sources", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ workspaceId, id, name, secretRef, config }),
+              });
+              const body = await res.json();
+              if (!res.ok) return body.error ?? "create failed";
+              setCreating(false);
+              setNotice("source created");
+              void load(workspaceId);
+              return null;
+            }}
+            onCancel={() => setCreating(false)}
+          />
+        </Dialog>
+      )}
+
+      {sourceBeingEdited && (
+        <Dialog
+          open
+          onOpenChange={(open) => {
+            if (!open) setEditing(null);
           }}
-        />
+          title={`Edit ${sourceBeingEdited.name}`}
+        >
+          <SourceForm
+            mode="edit"
+            initial={{
+              name: sourceBeingEdited.name,
+              secretRef: sourceBeingEdited.secretRef,
+              configText: JSON.stringify(sourceBeingEdited.config, null, 2),
+            }}
+            submitLabel="Save changes"
+            onSubmit={async ({ name, secretRef, config }) => {
+              const res = await fetch(`/api/sources/${sourceBeingEdited.id}`, {
+                method: "PUT",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ name, secretRef, config }),
+              });
+              const body = await res.json();
+              if (!res.ok) return body.error ?? "update failed";
+              setEditing(null);
+              setNotice(`${sourceBeingEdited.id}: updated`);
+              if (workspaceId) void load(workspaceId);
+              return null;
+            }}
+            onCancel={() => setEditing(null)}
+          />
+        </Dialog>
       )}
     </div>
   );
@@ -234,21 +285,14 @@ interface SourceFormValues {
   config: unknown;
 }
 
-/**
- * Shared create/edit form for a data source. `mode="edit"` omits the immutable
- * source-id field and shows a Cancel action. `onSubmit` returns an error string
- * to display, or null on success (the parent then closes/reloads).
- */
 function SourceForm({
   mode,
-  title,
   submitLabel,
   initial,
   onSubmit,
   onCancel,
 }: {
   mode: "create" | "edit";
-  title: string;
   submitLabel: string;
   initial?: { name: string; secretRef: string; configText: string };
   onSubmit: (values: SourceFormValues) => Promise<string | null>;
@@ -287,58 +331,51 @@ function SourceForm({
   }
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>{title}</CardTitle>
-      </CardHeader>
-      <CardContent>
-        <form onSubmit={submit} className="space-y-3">
-          <div className="grid grid-cols-3 gap-3">
-            {mode === "create" && (
-              <div>
-                <Label htmlFor="s-id">Source id</Label>
-                <Input id="s-id" value={id} onChange={(e) => setId(e.target.value)} placeholder="ts-metrics" />
-              </div>
-            )}
-            <div>
-              <Label htmlFor="s-name">Name</Label>
-              <Input id="s-name" value={name} onChange={(e) => setName(e.target.value)} placeholder="Metrics" />
-            </div>
-            <div>
-              <Label htmlFor="s-secret">secret_ref (env family)</Label>
-              <Input id="s-secret" value={secretRef} onChange={(e) => setSecretRef(e.target.value)} />
-            </div>
-          </div>
+    <form onSubmit={submit} className="space-y-3">
+      <div className="grid gap-3 sm:grid-cols-3">
+        {mode === "create" && (
           <div>
-            <Label htmlFor="s-config">Connection + catalog (JSON)</Label>
-            <Textarea
-              id="s-config"
-              rows={12}
-              className="font-mono text-xs"
-              value={configText}
-              onChange={(e) => setConfigText(e.target.value)}
-            />
+            <Label htmlFor="s-id">Source id</Label>
+            <Input id="s-id" value={id} onChange={(e) => setId(e.target.value)} placeholder="ts-metrics" />
           </div>
-          {error && <p className="text-sm text-danger">{error}</p>}
-          <div className="flex gap-2">
-            <Button type="submit" disabled={saving}>
-              {saving ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : mode === "create" ? (
-                <Plus className="h-4 w-4" />
-              ) : (
-                <Pencil className="h-4 w-4" />
-              )}
-              {submitLabel}
-            </Button>
-            {onCancel && (
-              <Button type="button" variant="secondary" disabled={saving} onClick={onCancel}>
-                <X className="h-4 w-4" /> Cancel
-              </Button>
-            )}
-          </div>
-        </form>
-      </CardContent>
-    </Card>
+        )}
+        <div>
+          <Label htmlFor="s-name">Name</Label>
+          <Input id="s-name" value={name} onChange={(e) => setName(e.target.value)} placeholder="Metrics" />
+        </div>
+        <div>
+          <Label htmlFor="s-secret">secret_ref (env family)</Label>
+          <Input id="s-secret" value={secretRef} onChange={(e) => setSecretRef(e.target.value)} />
+        </div>
+      </div>
+      <div>
+        <Label htmlFor="s-config">Connection + catalog (JSON)</Label>
+        <Textarea
+          id="s-config"
+          rows={12}
+          className="font-mono text-xs"
+          value={configText}
+          onChange={(e) => setConfigText(e.target.value)}
+        />
+      </div>
+      {error && <p className="text-sm text-danger">{error}</p>}
+      <div className="flex gap-2">
+        <Button type="submit" disabled={saving}>
+          {saving ? (
+            <Loader2 className="h-4 w-4 animate-spin" />
+          ) : mode === "create" ? (
+            <Plus className="h-4 w-4" />
+          ) : (
+            <Pencil className="h-4 w-4" />
+          )}
+          {submitLabel}
+        </Button>
+        {onCancel && (
+          <Button type="button" variant="secondary" disabled={saving} onClick={onCancel}>
+            <X className="h-4 w-4" /> Cancel
+          </Button>
+        )}
+      </div>
+    </form>
   );
 }
