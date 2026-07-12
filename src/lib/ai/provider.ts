@@ -38,6 +38,16 @@ export function getModel(): LanguageModel {
       baseURL: process.env.OPENAI_BASE_URL || undefined,
       apiKey: process.env.OPENAI_API_KEY,
     });
+    // Two OpenAI-compatible surfaces exist and they are NOT interchangeable:
+    //   - Responses API  (`/responses`)         -> SDK default, `openai(id)`
+    //   - Chat Completions (`/chat/completions`) -> `openai.chat(id)`
+    // OpenRouter works with the SDK default (Responses); forcing Chat
+    // Completions breaks it. OpenCode Go/Zen only exposes Chat Completions.
+    // Default to the SDK's Responses path (old behavior) and let deployments
+    // opt into Chat Completions with OPENAI_API=chat.
+    if (process.env.OPENAI_API === "chat") {
+      return openai.chat(modelId);
+    }
     return openai(modelId);
   }
 

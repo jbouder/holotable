@@ -126,14 +126,22 @@ model-specific data is baked into the code (`src/lib/ai/provider.ts`):
 - `AI_PROVIDER=gateway` — the bare `AI_MODEL` string is routed by the AI SDK
   Gateway (`AI_GATEWAY_API_KEY`).
 - `AI_PROVIDER=openai-compatible` — an OpenAI-compatible endpoint via
-  `OPENAI_BASE_URL` + `OPENAI_API_KEY`. Examples of compatible providers:
+  `OPENAI_BASE_URL` + `OPENAI_API_KEY`. Defaults to the Responses API
+  (`/responses`); set `OPENAI_API=chat` to use the Chat Completions API
+  (`/chat/completions`) for providers that only expose that surface. Examples
+  of compatible providers:
   - **OpenRouter:** `OPENAI_BASE_URL=https://openrouter.ai/api/v1` with an
     OpenRouter API key; use any OpenRouter model slug as `AI_MODEL`
-    (e.g. `openai/gpt-4o-mini`).
-  - **OpenCode Go:** set `OPENAI_BASE_URL` and `OPENAI_API_KEY` to the values
-    provided by OpenCode Go. Only models that expose an OpenAI-compatible
-    `/chat/completions` interface are supported via this path; not all OpenCode
-    Go models use that interface.
+    (e.g. `openai/gpt-4o-mini`). Uses the default Responses API — do **not**
+    set `OPENAI_API=chat`, which breaks OpenRouter.
+  - **OpenCode Zen / Go:** e.g. `OPENAI_BASE_URL=https://opencode.ai/zen/go/v1`
+    with the key provided by OpenCode, plus `OPENAI_API=chat`. Use a **bare**
+    model id as `AI_MODEL` (e.g. `kimi-k2.7-code`) — OpenCode does **not** use
+    `vendor/model` slugs like OpenRouter, so a prefixed id such as
+    `opencode-go/kimi-k2.7-code` is rejected with `ModelError: Model ... is not
+    supported`. Query `GET <base-url>/models` for the exact ids. Only models
+    that expose an OpenAI-compatible `/chat/completions` interface are supported
+    via this path.
 
 Choosing the concrete provider/model is deliberately left to the deployment.
 `AI_MODEL` must be set; there is no default model.

@@ -178,13 +178,20 @@ documented defaults:
 - **Limits:** `MAX_QUERY_ROWS`, `QUERY_TIMEOUT_SECONDS`, `MAX_WINDOW_POINTS`.
 - **AI:** `AI_PROVIDER` (`gateway` | `openai-compatible`) + `AI_MODEL` — no model
   is baked in; this is a deliberate open decision (see architecture doc).
-  The `openai-compatible` path works with any OpenAI-compatible endpoint:
+  The `openai-compatible` path works with any OpenAI-compatible endpoint. It
+  defaults to the Responses API; set `OPENAI_API=chat` for providers that only
+  expose Chat Completions (`/chat/completions`):
   - **OpenRouter:** set `OPENAI_BASE_URL=https://openrouter.ai/api/v1`,
     `OPENAI_API_KEY` to your OpenRouter key, and `AI_MODEL` to any OpenRouter
-    model slug (e.g. `openai/gpt-4o-mini`).
-  - **OpenCode Go:** set `OPENAI_BASE_URL` and `OPENAI_API_KEY` to the values
-    provided by OpenCode Go. Only models that expose an OpenAI-compatible
-    `/chat/completions` interface are supported via this path.
+    model slug (e.g. `openai/gpt-4o-mini`). Leave `OPENAI_API` unset — forcing
+    `chat` breaks OpenRouter.
+  - **OpenCode Zen / Go:** set `OPENAI_BASE_URL` (e.g.
+    `https://opencode.ai/zen/go/v1`) and `OPENAI_API_KEY` to the values provided
+    by OpenCode, `OPENAI_API=chat`, and `AI_MODEL` to a **bare** model id (e.g.
+    `kimi-k2.7-code`) — OpenCode does not use `vendor/model` slugs like
+    OpenRouter. Query `GET <base-url>/models` for valid ids. Only models that
+    expose an OpenAI-compatible `/chat/completions` interface are supported via
+    this path.
 
 See [`.env.example`](.env.example) for the complete list.
 
