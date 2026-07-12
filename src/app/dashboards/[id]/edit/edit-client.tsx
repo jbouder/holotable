@@ -3,7 +3,7 @@
 import * as React from "react";
 import { useRouter } from "next/navigation";
 import { experimental_useObject as useObject } from "@ai-sdk/react";
-import { Plus, Trash2, Save, Sparkles, Loader2, LayoutGrid } from "lucide-react";
+import { Plus, Trash2, Save, SendHorizontal, Loader2, LayoutGrid } from "lucide-react";
 import { Dashboard, Panel, VizType, ValueFormat, safeParseDashboard } from "@/lib/ir";
 import { autoLayoutPanels, COLUMN_PRESETS } from "@/lib/layout";
 import { Button } from "@/components/ui/button";
@@ -53,13 +53,15 @@ export function EditDashboardClient({
 
   const selected = spec.panels.find((p) => p.id === selectedId) ?? null;
 
-  const { submit, isLoading, error: genError } = useObject({
+  const { object, submit, isLoading, error: genError } = useObject({
     api: "/api/generate",
     schema: Panel,
     onFinish({ object }) {
       if (object) updatePanel(object.id, () => object);
     },
   });
+
+  const showStreaming = isLoading || object !== undefined;
 
   function updateSpec(patch: Partial<Dashboard>) {
     setSpec((s) => ({ ...s, ...patch }));
@@ -128,10 +130,19 @@ export function EditDashboardClient({
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-semibold">Edit dashboard</h1>
-        <Button onClick={save} disabled={saving}>
-          {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
-          Save version
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button
+            variant="secondary"
+            onClick={() => router.push(`/dashboards/${dashboardId}`)}
+            disabled={saving}
+          >
+            Cancel
+          </Button>
+          <Button onClick={save} disabled={saving}>
+            {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+            Save version
+          </Button>
+        </div>
       </div>
       {error && <p className="text-sm text-danger">{error}</p>}
 
@@ -262,23 +273,53 @@ export function EditDashboardClient({
             {selected && (
               <div className="space-y-2 border-t border-border pt-4">
                 <Label htmlFor="nl">Natural-language edit (runs the model once)</Label>
-                <Textarea
-                  id="nl"
-                  rows={2}
-                  placeholder="e.g. change to a bar chart grouped by status code"
-                  value={nlPrompt}
-                  onChange={(e) => setNlPrompt(e.target.value)}
-                />
-                <Button size="sm" onClick={runNlEdit} disabled={isLoading || !nlPrompt.trim()}>
-                  {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
-                  Apply NL edit
-                </Button>
+                <div className="relative">
+                  <Textarea
+                    id="nl"
+                    rows={2}
+                    className="pr-14"
+                    placeholder="e.g. change to a bar chart grouped by status code"
+                    value={nlPrompt}
+                    onChange={(e) => setNlPrompt(e.target.value)}
+                  />
+                  <Button
+                    size="icon"
+                    onClick={runNlEdit}
+                    disabled={isLoading || !nlPrompt.trim()}
+                    aria-label="Apply NL edit"
+                    title="Apply NL edit"
+                    className="absolute bottom-4 right-2"
+                  >
+                    {isLoading ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <SendHorizontal className="h-4 w-4" />
+                    )}
+                  </Button>
+                </div>
                 {genError && (
                   <RetryNotice
                     message={`Edit failed: ${genError.message}`}
                     onRetry={runNlEdit}
                     disabled={isLoading}
                   />
+                )}
+                {showStreaming && (
+                  <div className="space-y-1.5">
+                    <Label className="flex items-center gap-2">
+                      {isLoading ? (
+                        <>
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                          <span className="animate-pulse">Generating config…</span>
+                        </>
+                      ) : (
+                        "Generated config"
+                      )}
+                    </Label>
+                    <pre className="max-h-96 overflow-auto rounded-lg border border-border bg-surface p-4 text-xs text-muted">
+                      {JSON.stringify(object, null, 2)}
+                    </pre>
+                  </div>
                 )}
               </div>
             )}

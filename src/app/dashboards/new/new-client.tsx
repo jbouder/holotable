@@ -3,13 +3,13 @@
 import * as React from "react";
 import { useRouter } from "next/navigation";
 import { experimental_useObject as useObject } from "@ai-sdk/react";
-import { Loader2, Sparkles, Save } from "lucide-react";
+import { Loader2, SendHorizontal, Save } from "lucide-react";
 import { Dashboard, safeParseDashboard } from "@/lib/ir";
 import { autoLayoutPanels, DEFAULT_COLUMNS } from "@/lib/layout";
 import { Button } from "@/components/ui/button";
 import { Textarea, Label } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
-import { Card, CardContent } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { PreviewDashboard } from "@/components/dashboard/PreviewDashboard";
 import { RetryNotice } from "@/components/dashboard/RetryNotice";
 
@@ -21,11 +21,11 @@ interface SourceOption {
 
 /** Starter prompts to seed the textarea with one click. */
 const PROMPT_PRESETS = [
-  "Request rate and error ratio over the last hour",
   "p95 and p99 latency trends over time",
   "HTTP status code breakdown over time",
   "Slowest endpoints by p95 latency",
   "Total requests and error count as stat panels",
+  "Request rate and error ratio over the last hour",
 ];
 
 export function NewDashboardClient({ sources }: { sources: SourceOption[] }) {
@@ -130,11 +130,13 @@ export function NewDashboardClient({ sources }: { sources: SourceOption[] }) {
       </div>
 
       {activeTab === "chat" ? (
-        <Card
+        <div
           role="tabpanel"
           id="new-dashboard-chat-panel"
           aria-labelledby="new-dashboard-chat-tab"
+          className="space-y-4"
         >
+        <Card>
           <CardContent className="space-y-4">
             <div className="flex flex-wrap items-end gap-4">
               <div>
@@ -165,34 +167,51 @@ export function NewDashboardClient({ sources }: { sources: SourceOption[] }) {
                   </button>
                 ))}
               </div>
-              <Textarea
-                id="prompt"
-                rows={3}
-                placeholder="e.g. Show request rate, p95 latency, and error ratio over the last hour"
-                value={prompt}
-                onChange={(e) => setPrompt(e.target.value)}
-              />
+              <div className="relative">
+                <Textarea
+                  id="prompt"
+                  rows={3}
+                  className="pr-14"
+                  placeholder="e.g. Show request rate, p95 latency, and error ratio over the last hour"
+                  value={prompt}
+                  onChange={(e) => setPrompt(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && !e.shiftKey) {
+                      e.preventDefault();
+                      if (!isLoading && prompt.trim()) generate();
+                    }
+                  }}
+                />
+                <Button
+                  size="icon"
+                  onClick={generate}
+                  disabled={isLoading || !prompt.trim()}
+                  aria-label="Generate"
+                  title="Generate"
+                  className="absolute bottom-4 right-2"
+                >
+                  {isLoading ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <SendHorizontal className="h-4 w-4" />
+                  )}
+                </Button>
+              </div>
             </div>
-            <div className="flex items-center gap-3">
-              <Button onClick={generate} disabled={isLoading || !prompt.trim()}>
-                {isLoading ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                ) : (
-                  <Sparkles className="h-4 w-4" />
+            {(isLoading || finalSpec) && (
+              <div className="flex items-center gap-3">
+                {isLoading && (
+                  <Button variant="ghost" size="sm" onClick={() => stop()}>
+                    Stop
+                  </Button>
                 )}
-                Generate
-              </Button>
-              {isLoading && (
-                <Button variant="ghost" size="sm" onClick={() => stop()}>
-                  Stop
-                </Button>
-              )}
-              {finalSpec && (
-                <Button variant="secondary" onClick={save} disabled={saving}>
-                  <Save className="h-4 w-4" /> Save
-                </Button>
-              )}
-            </div>
+                {finalSpec && (
+                  <Button variant="secondary" onClick={save} disabled={saving}>
+                    <Save className="h-4 w-4" /> Save
+                  </Button>
+                )}
+              </div>
+            )}
             {error && (
               <RetryNotice
                 message={`Generation failed: ${error.message}`}
@@ -203,6 +222,29 @@ export function NewDashboardClient({ sources }: { sources: SourceOption[] }) {
             {saveError && <p className="text-sm text-danger">{saveError}</p>}
           </CardContent>
         </Card>
+
+        {showStreaming && (
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                {isLoading ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    <span className="animate-pulse">Generating config…</span>
+                  </>
+                ) : (
+                  "Generated config"
+                )}
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <pre className="max-h-96 overflow-auto rounded-lg border border-border bg-surface p-4 text-xs text-muted">
+                {JSON.stringify(object, null, 2)}
+              </pre>
+            </CardContent>
+          </Card>
+        )}
+        </div>
       ) : (
         <section
           role="tabpanel"
@@ -211,10 +253,6 @@ export function NewDashboardClient({ sources }: { sources: SourceOption[] }) {
         >
           {finalSpec ? (
             <PreviewDashboard spec={finalSpec} />
-          ) : showStreaming ? (
-            <pre className="max-h-96 overflow-auto rounded-lg border border-border bg-surface p-4 text-xs text-muted">
-              {JSON.stringify(object, null, 2)}
-            </pre>
           ) : (
             <Card>
               <CardContent className="text-sm text-muted">

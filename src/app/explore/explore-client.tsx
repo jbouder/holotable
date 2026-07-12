@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { experimental_useObject as useObject } from "@ai-sdk/react";
-import { Loader2, Sparkles, Compass, AlertTriangle, RefreshCw } from "lucide-react";
+import { Loader2, SendHorizontal, Compass, AlertTriangle, RefreshCw } from "lucide-react";
 import { Panel, TimeRange } from "@/lib/ir";
 import { Button } from "@/components/ui/button";
 import { Textarea, Label } from "@/components/ui/input";
@@ -42,8 +42,8 @@ const TIME_PRESETS: { value: string; label: string }[] = [
 // One-click sample questions for quick testing. Chosen to exercise the seeded
 // http_requests catalog and a spread of viz types (line / table / stat).
 const EXAMPLE_PROMPTS: string[] = [
+  "How many rows are in this data source?",
   "Chart request volume per minute",
-  "Chart p95 latency over time",
   "Which routes returned the most 5xx errors?",
   "Top routes by request count",
   "Total requests in this window",
@@ -53,7 +53,7 @@ export function ExploreClient({ sources }: { sources: SourceOption[] }) {
   const [sourceId, setSourceId] = React.useState<string | null>(
     sources[0]?.id ?? null,
   );
-  const [from, setFrom] = React.useState("now-1h");
+  const [from, setFrom] = React.useState("now-24h");
   const [prompt, setPrompt] = React.useState("");
   const [panel, setPanel] = React.useState<Panel | null>(null);
   const [result, setResult] = React.useState<Result | null>(null);
@@ -183,29 +183,44 @@ export function ExploreClient({ sources }: { sources: SourceOption[] }) {
                 </button>
               ))}
             </div>
-            <Textarea
-              id="prompt"
-              rows={3}
-              placeholder="e.g. Which routes had the most errors? (add “as a chart” to visualize)"
-              value={prompt}
-              onChange={(e) => setPrompt(e.target.value)}
-            />
+            <div className="relative">
+              <Textarea
+                id="prompt"
+                rows={3}
+                className="pr-14"
+                placeholder="e.g. Which routes had the most errors? (add “as a chart” to visualize)"
+                value={prompt}
+                onChange={(e) => setPrompt(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && !e.shiftKey) {
+                    e.preventDefault();
+                    if (!isLoading && prompt.trim()) generate();
+                  }
+                }}
+              />
+              <Button
+                size="icon"
+                onClick={generate}
+                disabled={isLoading || !prompt.trim()}
+                aria-label="Explore"
+                title="Explore"
+                className="absolute bottom-4 right-2"
+              >
+                {isLoading ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <SendHorizontal className="h-4 w-4" />
+                )}
+              </Button>
+            </div>
           </div>
-          <div className="flex items-center gap-3">
-            <Button onClick={generate} disabled={isLoading || !prompt.trim()}>
-              {isLoading ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : (
-                <Sparkles className="h-4 w-4" />
-              )}
-              Explore
-            </Button>
-            {isLoading && (
+          {isLoading && (
+            <div className="flex items-center gap-3">
               <Button variant="ghost" size="sm" onClick={() => stop()}>
                 Stop
               </Button>
-            )}
-          </div>
+            </div>
+          )}
           {error && (
             <RetryNotice
               message={`Generation failed: ${error.message}`}

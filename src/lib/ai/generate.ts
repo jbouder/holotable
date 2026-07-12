@@ -43,9 +43,10 @@ ${buildCatalogPrompt(source)}
 
 ${SQL_RULES}
 
-Layout: a 12-column grid. By DEFAULT place two panels side by side (w=6 each),
-laid out left-to-right, top-to-bottom, without overlaps. Use a wider panel only
-when a request clearly calls for it. Choose viz types from: line, area, bar,
+Layout: a 12-column grid. By DEFAULT place two panels side by side (w=6 each)
+and 4 rows tall (h=4), laid out left-to-right, top-to-bottom, without overlaps.
+Use a wider or taller panel only when a request clearly calls for it. Choose viz
+types from: line, area, bar,
 scatter, stat, table, heatmap, pie, donut. Use 'area' for a filled time series
 and 'scatter' for relationships between two numeric dimensions. Use
 'pie'/'donut' for a proportional breakdown of a
@@ -89,7 +90,7 @@ export function streamExplorePanel(input: {
 
 Return one Panel. Give it a concise title, a one-sentence "description" of WHAT
 the query computes (describe intent only — never invent result values), use id
-"explore", and set layout to {"x":0,"y":0,"w":12,"h":8}.
+"explore", and set layout to {"x":0,"y":0,"w":12,"h":4}.
 
 Viz selection (IMPORTANT — default to text/tabular output):
 - Default to viz "table" and return the relevant rows/columns.

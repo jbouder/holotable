@@ -35,9 +35,9 @@ export const config = {
 
   /**
    * Default relative time range applied to new dashboards. Documented default:
-   * last 1 hour ("now-1h" .. "now").
+   * last 24 hours ("now-24h" .. "now").
    */
-  defaultTimeFrom: str("DEFAULT_TIME_FROM", "now-1h"),
+  defaultTimeFrom: str("DEFAULT_TIME_FROM", "now-24h"),
   defaultTimeTo: str("DEFAULT_TIME_TO", "now"),
 
   /** Hard cap on rows returned by any query executed against the metrics store. */
