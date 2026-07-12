@@ -30,6 +30,7 @@ const PROMPT_PRESETS = [
 
 export function NewDashboardClient({ sources }: { sources: SourceOption[] }) {
   const router = useRouter();
+  const [activeTab, setActiveTab] = React.useState<"chat" | "preview">("chat");
   const [sourceId, setSourceId] = React.useState<string | null>(
     sources[0]?.id ?? null,
   );
@@ -49,6 +50,7 @@ export function NewDashboardClient({ sources }: { sources: SourceOption[] }) {
         ...object,
         panels: autoLayoutPanels(object.panels, DEFAULT_COLUMNS),
       });
+      setActiveTab("preview");
     },
   });
 
@@ -102,87 +104,123 @@ export function NewDashboardClient({ sources }: { sources: SourceOption[] }) {
     <div className="space-y-6">
       <h1 className="text-2xl font-semibold">New dashboard</h1>
 
-      <Card>
-        <CardContent className="space-y-4">
-          <div className="flex flex-wrap items-end gap-4">
+      <div
+        className="flex w-fit rounded-lg border border-border bg-surface p-1"
+        role="tablist"
+        aria-label="Dashboard workspace"
+      >
+        {(["chat", "preview"] as const).map((tab) => (
+          <button
+            key={tab}
+            type="button"
+            role="tab"
+            aria-selected={activeTab === tab}
+            aria-controls={`new-dashboard-${tab}-panel`}
+            id={`new-dashboard-${tab}-tab`}
+            onClick={() => setActiveTab(tab)}
+            className={`rounded-md px-3 py-1.5 text-sm font-medium capitalize transition-colors ${
+              activeTab === tab
+                ? "bg-surface-2 text-foreground"
+                : "text-muted hover:text-foreground"
+            }`}
+          >
+            {tab}
+          </button>
+        ))}
+      </div>
+
+      {activeTab === "chat" ? (
+        <Card
+          role="tabpanel"
+          id="new-dashboard-chat-panel"
+          aria-labelledby="new-dashboard-chat-tab"
+        >
+          <CardContent className="space-y-4">
+            <div className="flex flex-wrap items-end gap-4">
+              <div>
+                <Label htmlFor="source">Data source</Label>
+                <Select
+                  id="source"
+                  value={sourceId}
+                  onValueChange={setSourceId}
+                  options={sources.map((s) => ({
+                    value: s.id,
+                    label: `${s.name} (${s.workspaceId})`,
+                  }))}
+                />
+              </div>
+            </div>
             <div>
-              <Label htmlFor="source">Data source</Label>
-              <Select
-                id="source"
-                value={sourceId}
-                onValueChange={setSourceId}
-                options={sources.map((s) => ({
-                  value: s.id,
-                  label: `${s.name} (${s.workspaceId})`,
-                }))}
+              <Label htmlFor="prompt">Describe the dashboard or try one below</Label>
+              <div className="mb-2 flex flex-wrap items-center gap-2">
+                {PROMPT_PRESETS.map((preset) => (
+                  <button
+                    key={preset}
+                    type="button"
+                    disabled={isLoading}
+                    onClick={() => setPrompt(preset)}
+                    className="rounded-full border border-border bg-surface px-3 py-1 text-xs text-muted transition-colors hover:border-primary hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    {preset}
+                  </button>
+                ))}
+              </div>
+              <Textarea
+                id="prompt"
+                rows={3}
+                placeholder="e.g. Show request rate, p95 latency, and error ratio over the last hour"
+                value={prompt}
+                onChange={(e) => setPrompt(e.target.value)}
               />
             </div>
-          </div>
-          <div>
-            <Label htmlFor="prompt">Describe the dashboard or try one below</Label>
-            <div className="mb-2 flex flex-wrap items-center gap-2">
-              {PROMPT_PRESETS.map((preset) => (
-                <button
-                  key={preset}
-                  type="button"
-                  disabled={isLoading}
-                  onClick={() => setPrompt(preset)}
-                  className="rounded-full border border-border bg-surface px-3 py-1 text-xs text-muted transition-colors hover:border-primary hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50"
-                >
-                  {preset}
-                </button>
-              ))}
-            </div>
-            <Textarea
-              id="prompt"
-              rows={3}
-              placeholder="e.g. Show request rate, p95 latency, and error ratio over the last hour"
-              value={prompt}
-              onChange={(e) => setPrompt(e.target.value)}
-            />
-          </div>
-          <div className="flex items-center gap-3">
-            <Button onClick={generate} disabled={isLoading || !prompt.trim()}>
-              {isLoading ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : (
-                <Sparkles className="h-4 w-4" />
+            <div className="flex items-center gap-3">
+              <Button onClick={generate} disabled={isLoading || !prompt.trim()}>
+                {isLoading ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Sparkles className="h-4 w-4" />
+                )}
+                Generate
+              </Button>
+              {isLoading && (
+                <Button variant="ghost" size="sm" onClick={() => stop()}>
+                  Stop
+                </Button>
               )}
-              Generate
-            </Button>
-            {isLoading && (
-              <Button variant="ghost" size="sm" onClick={() => stop()}>
-                Stop
-              </Button>
+              {finalSpec && (
+                <Button variant="secondary" onClick={save} disabled={saving}>
+                  <Save className="h-4 w-4" /> Save
+                </Button>
+              )}
+            </div>
+            {error && (
+              <RetryNotice
+                message={`Generation failed: ${error.message}`}
+                onRetry={generate}
+                disabled={isLoading}
+              />
             )}
-            {finalSpec && (
-              <Button variant="secondary" onClick={save} disabled={saving}>
-                <Save className="h-4 w-4" /> Save
-              </Button>
-            )}
-          </div>
-          {error && (
-            <RetryNotice
-              message={`Generation failed: ${error.message}`}
-              onRetry={generate}
-              disabled={isLoading}
-            />
-          )}
-          {saveError && <p className="text-sm text-danger">{saveError}</p>}
-        </CardContent>
-      </Card>
-
-      {(finalSpec || showStreaming) && (
-        <section>
-          <h2 className="mb-3 text-lg font-medium">
-            {finalSpec ? "Preview" : "Generating…"}
-          </h2>
+            {saveError && <p className="text-sm text-danger">{saveError}</p>}
+          </CardContent>
+        </Card>
+      ) : (
+        <section
+          role="tabpanel"
+          id="new-dashboard-preview-panel"
+          aria-labelledby="new-dashboard-preview-tab"
+        >
           {finalSpec ? (
             <PreviewDashboard spec={finalSpec} />
-          ) : (
+          ) : showStreaming ? (
             <pre className="max-h-96 overflow-auto rounded-lg border border-border bg-surface p-4 text-xs text-muted">
               {JSON.stringify(object, null, 2)}
             </pre>
+          ) : (
+            <Card>
+              <CardContent className="text-sm text-muted">
+                Generate a dashboard in the Chat tab to preview it.
+              </CardContent>
+            </Card>
           )}
         </section>
       )}
