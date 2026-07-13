@@ -1,7 +1,6 @@
 import { notFound } from "next/navigation";
 import { getIdentity, can } from "@/lib/auth/authorize";
 import { getDashboardById, listSources } from "@/lib/db/repo";
-import { config } from "@/lib/config";
 import { SignIn } from "@/components/sign-in";
 import { EditDashboardClient } from "./edit-client";
 
@@ -13,7 +12,7 @@ export default async function EditDashboardPage({
   params: Promise<{ id: string }>;
 }) {
   const identity = await getIdentity();
-  if (!identity) return <SignIn devAuthEnabled={config.devAuthEnabled} />;
+  if (!identity) return <SignIn />;
 
   const { id } = await params;
   const dashboard = await getDashboardById(id);

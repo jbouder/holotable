@@ -18,12 +18,6 @@ function str(name: string, fallback: string): string {
   return raw === undefined || raw === "" ? fallback : raw;
 }
 
-function bool(name: string, fallback: boolean): boolean {
-  const raw = process.env[name];
-  if (raw === undefined || raw === "") return fallback;
-  return raw === "1" || raw.toLowerCase() === "true";
-}
-
 export const config = {
   /**
    * Default dashboard refresh cadence. A dashboard may override this per its
@@ -57,9 +51,6 @@ export const config = {
 
   /** Cookie name used for the session JWT. */
   sessionCookieName: str("SESSION_COOKIE_NAME", "holotable_session"),
-
-  /** Whether dev-only local login is enabled. Must be false in production. */
-  devAuthEnabled: bool("DEV_AUTH_ENABLED", process.env.NODE_ENV !== "production"),
 
   isProduction: process.env.NODE_ENV === "production",
 } as const;

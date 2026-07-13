@@ -74,16 +74,3 @@ it contains:
   "groups": ["/workspaces/acme/editor", "/platform-admins"]
 }
 ```
-
-## Development without Keycloak
-
-When `DEV_AUTH_ENABLED=true` (default outside production), `POST /api/auth/dev-login`
-mints a signed session for an arbitrary `sub` + `groups`, so you can exercise
-every role locally. This route is hard-disabled when `NODE_ENV=production` or
-`DEV_AUTH_ENABLED` is false, so it can never bypass OIDC in a real deployment.
-
-```bash
-curl -c cookies.txt -X POST http://localhost:3000/api/auth/dev-login \
-  -H 'content-type: application/json' \
-  -d '{"sub":"dev","groups":["/workspaces/demo/source-admin","/platform-admins"]}'
-```

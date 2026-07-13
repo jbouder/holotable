@@ -19,7 +19,7 @@ export default async function DashboardViewPage({
   params: Promise<{ id: string }>;
 }) {
   const identity = await getIdentity();
-  if (!identity) return <SignIn devAuthEnabled={config.devAuthEnabled} />;
+  if (!identity) return <SignIn />;
 
   const { id } = await params;
   const dashboard = await getDashboardById(id);

@@ -69,12 +69,6 @@ The `seed` service continuously inserts demo metrics and (once) creates the demo
 `demo` workspace sources + dashboards. Open <http://localhost:3000>. See
 [Seeding demo data](#seeding-demo-data) for what it creates and how to tune it.
 
-Development (source mount, hot reload, dev auth on):
-
-```bash
-docker compose -f docker-compose.yml -f docker-compose.dev.yml up --build
-```
-
 ## Quick start (local)
 
 Requirements: Node 22+ and a TimescaleDB instance.
@@ -87,16 +81,6 @@ npm run migrate                    # apply Postgres migrations
 npm run seed                       # looping metrics seeder (+ demo source/dashboard)
 npm run dev                        # http://localhost:3000
 ```
-
-Sign in locally without Keycloak (dev only, `DEV_AUTH_ENABLED=true`):
-
-```bash
-curl -c cookies.txt -X POST http://localhost:3000/api/auth/dev-login \
-  -H 'content-type: application/json' \
-  -d '{"sub":"dev","groups":["/workspaces/demo/source-admin","/platform-admins"]}'
-```
-
-Or use the in-app dev sign-in control (shown only when dev auth is enabled).
 
 ## Seeding demo data
 
@@ -168,7 +152,7 @@ default single-instance setup these are the same TimescaleDB database.
 | `/api/sources/[id]` | GET/PUT/DELETE | Get / update / delete (tombstone if referenced) |
 | `/api/sources/[id]/test` | POST | Connectivity test |
 | `/api/sources/[id]/refresh` | POST | Re-introspect catalog |
-| `/api/auth/login` · `/callback` · `/logout` · `/dev-login` | | OIDC + dev session |
+| `/api/auth/login` · `/callback` · `/logout` | | OIDC session |
 
 ## Source secret references
 

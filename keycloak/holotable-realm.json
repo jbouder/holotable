@@ -1,7 +1,7 @@
 {
   "realm": "holotable",
   "enabled": true,
-  "sslRequired": "external",
+  "sslRequired": "none",
   "loginTheme": "keycloak",
   "clients": [
     {

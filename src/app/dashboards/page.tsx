@@ -3,7 +3,6 @@ import { Plus } from "lucide-react";
 import { getIdentity } from "@/lib/auth/authorize";
 import { accessibleWorkspaces, hasWorkspaceRole } from "@/lib/auth/claims";
 import { listDashboards } from "@/lib/db/repo";
-import { config } from "@/lib/config";
 import { SignIn } from "@/components/sign-in";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -12,7 +11,7 @@ export const dynamic = "force-dynamic";
 
 export default async function DashboardsPage() {
   const identity = await getIdentity();
-  if (!identity) return <SignIn devAuthEnabled={config.devAuthEnabled} />;
+  if (!identity) return <SignIn />;
 
   const workspaces = accessibleWorkspaces(identity);
   const lists = await Promise.all(workspaces.map((w) => listDashboards(w)));

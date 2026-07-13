@@ -46,7 +46,6 @@ services:
       NODE_ENV: production
       DATABASE_URL: "postgresql://${POSTGRES_USER:-holotable}:${POSTGRES_PASSWORD:-holotable}@postgres:5432/holotable"
       SESSION_SECRET: ${SESSION_SECRET:?set a strong 32+ char SESSION_SECRET}
-      DEV_AUTH_ENABLED: "false"
       # Credentials the app resolves for the 'TS_METRICS' source secret_ref.
       TS_METRICS_USERNAME: ${TS_METRICS_USERNAME:-metrics_ro}
       TS_METRICS_PASSWORD: ${TS_METRICS_PASSWORD:-readonly}

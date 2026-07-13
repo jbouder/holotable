@@ -9,7 +9,7 @@ export const dynamic = "force-dynamic";
 
 export default async function NewDashboardPage() {
   const identity = await getIdentity();
-  if (!identity) return <SignIn devAuthEnabled={config.devAuthEnabled} />;
+  if (!identity) return <SignIn />;
 
   // Sources from every workspace the caller can edit in.
   const workspaces = accessibleWorkspaces(identity).filter(
