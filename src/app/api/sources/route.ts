@@ -7,7 +7,7 @@ import {
 } from "@/lib/auth/authorize";
 import { readJson, json } from "@/lib/http";
 import { listSources, createSource } from "@/lib/db/repo";
-import { SourceConfig } from "@/lib/registry";
+import { SourceDraft } from "@/lib/registry";
 
 export const runtime = "nodejs";
 
@@ -30,12 +30,10 @@ export async function GET(req: Request) {
   }
 }
 
-const CreateBody = z.object({
+// The create body IS a drafted source plus the target workspace, so the
+// natural-language draft schema and the create contract stay in lockstep.
+const CreateBody = SourceDraft.extend({
   workspaceId: z.string().min(1).max(128),
-  id: z.string().min(1).max(128).regex(/^[a-z0-9][a-z0-9._-]*$/i, "invalid source id"),
-  name: z.string().min(1).max(200),
-  config: SourceConfig,
-  secretRef: z.string().regex(/^[A-Z][A-Z0-9_]*$/, "secretRef must be an UPPER_SNAKE env family"),
 });
 
 /** Create a source (source-admin on the target workspace). */

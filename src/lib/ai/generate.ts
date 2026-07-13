@@ -3,7 +3,7 @@ import { getModel } from "@/lib/ai/provider";
 import { buildCatalogPrompt } from "@/lib/timescaledb/catalog";
 import { Dashboard, Panel } from "@/lib/ir";
 import { config } from "@/lib/config";
-import type { SourceRecord } from "@/lib/registry";
+import { SourceDraft, type SourceRecord } from "@/lib/registry";
 
 /**
  * LLM generation.
@@ -99,6 +99,51 @@ Viz selection (IMPORTANT — default to text/tabular output):
   request explicitly asks to chart/plot/graph/visualize the data or to see a
   trend over time. Use "pie"/"donut" for share/proportion/breakdown questions
   across a small set of categories.`,
+  });
+}
+
+/**
+ * Draft a data-source registration from a plain-English description. The model
+ * emits ONLY a validated SourceDraft — the safe connection config and a
+ * best-effort table catalog — never credentials and never live data. The user
+ * reviews the draft, then Tests connectivity and Refreshes the catalog against
+ * the live database (which is the source of truth for real columns) before it
+ * is persisted. There is no source to authorize against yet, so unlike the
+ * dashboard paths this prompt carries no catalog metadata.
+ */
+export function streamSourceDraft(input: { prompt: string }) {
+  const { prompt } = input;
+  return streamObject({
+    model: getModel(),
+    schema: SourceDraft,
+    schemaName: "SourceDraft",
+    schemaDescription:
+      "A TimescaleDB/PostgreSQL data source registration: safe connection config plus a table catalog. Never contains credentials.",
+    system: `You draft TimescaleDB/PostgreSQL data-source registrations for a
+monitoring dashboard tool, from a plain-English description.
+
+You emit ONLY a JSON spec describing how to CONNECT and WHAT tables exist. You
+NEVER emit data rows.
+
+CRITICAL security rules:
+- NEVER include a username, password, or connection string. Credentials are
+  resolved at runtime from an environment variable family named by 'secretRef'.
+  Choose a sensible UPPER_SNAKE 'secretRef' (e.g. "TS_METRICS"); do not invent
+  any credential value.
+- If the description contains a password or secret, ignore it entirely.
+
+Field rules:
+- 'id': lowercase slug, e.g. "ts-metrics". Derive it from the name/purpose.
+- 'name': a short human-readable label.
+- 'config.host'/'config.port'/'config.database': from the description; default
+  port to 5432 and, when unstated, use a clearly-placeholder host the user will
+  correct. 'config.schema' defaults to "public"; 'config.ssl' defaults to false.
+- 'config.tables': list the tables the user describes. For each, include its
+  columns with a reasonable PostgreSQL 'type', and set 'timeField' to the time
+  column when there is one (used for server-injected time filtering). If the
+  user names no tables/columns, emit a single reasonable placeholder table so
+  the draft validates — the user will Refresh it against the live database.`,
+    prompt: `Draft a data source for this description:\n"""${prompt}"""`,
   });
 }
 

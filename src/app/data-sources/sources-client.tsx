@@ -1,8 +1,18 @@
 "use client";
 
 import * as React from "react";
-import { Plus, Trash2, RefreshCw, Plug, Loader2, Pencil, X } from "lucide-react";
-import type { SourceRecord } from "@/lib/registry";
+import { experimental_useObject as useObject } from "@ai-sdk/react";
+import {
+  Plus,
+  Trash2,
+  RefreshCw,
+  Plug,
+  Loader2,
+  Pencil,
+  X,
+  SendHorizontal,
+} from "lucide-react";
+import { SourceDraft, type SourceRecord } from "@/lib/registry";
 import { Button } from "@/components/ui/button";
 import { Input, Textarea, Label } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
@@ -16,6 +26,13 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+
+/** Starter descriptions to seed the natural-language drafter with one click. */
+const SOURCE_PROMPT_PRESETS = [
+  "TimescaleDB at metrics-db:5432, database prod, schema metrics. Track http_requests (ts, status, duration_ms) and cpu_usage (ts, host, pct).",
+  "Postgres at localhost:5432, database app, public schema. Track an events table with a created_at timestamp, an event_type, and a user_id.",
+  "TimescaleDB hypertable of IoT readings: a sensor_readings table keyed on time, with device_id, temperature, and humidity columns.",
+];
 
 const CONFIG_TEMPLATE = JSON.stringify(
   {
@@ -227,22 +244,13 @@ export function SourcesClient({ workspaces }: { workspaces: string[] }) {
 
       {workspaceId && (
         <Dialog open={creating} onOpenChange={setCreating} title="Add source">
-          <SourceForm
+          <CreateSourcePanel
             key={`create-${workspaceId}`}
-            mode="create"
-            submitLabel="Create source"
-            onSubmit={async ({ id, name, secretRef, config }) => {
-              const res = await fetch("/api/sources", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ workspaceId, id, name, secretRef, config }),
-              });
-              const body = await res.json();
-              if (!res.ok) return body.error ?? "create failed";
+            workspaceId={workspaceId}
+            onCreated={() => {
               setCreating(false);
               setNotice("source created");
               void load(workspaceId);
-              return null;
             }}
             onCancel={() => setCreating(false)}
           />
@@ -286,6 +294,180 @@ export function SourcesClient({ workspaces }: { workspaces: string[] }) {
   );
 }
 
+/**
+ * The "Add source" body: an optional natural-language drafter that seeds the
+ * manual form below it. The model only ever drafts the safe config for review —
+ * creation still goes through the same guarded POST /api/sources.
+ */
+function CreateSourcePanel({
+  workspaceId,
+  onCreated,
+  onCancel,
+}: {
+  workspaceId: string;
+  onCreated: () => void;
+  onCancel: () => void;
+}) {
+  const [seed, setSeed] = React.useState<{
+    id: string;
+    name: string;
+    secretRef: string;
+    configText: string;
+  }>();
+  // Bumped on each draft so the form remounts and re-seeds from the new values.
+  const [seedSeq, setSeedSeq] = React.useState(0);
+  // The configuration form stays hidden until the drafter returns a result;
+  // an explicit opt-in lets users skip the model and fill it in by hand.
+  const [manual, setManual] = React.useState(false);
+  const showForm = seed !== undefined || manual;
+
+  return (
+    <div className="space-y-4">
+      <NaturalLanguageDrafter
+        workspaceId={workspaceId}
+        onDraft={(draft) => {
+          setSeed({
+            id: draft.id,
+            name: draft.name,
+            secretRef: draft.secretRef,
+            configText: JSON.stringify(draft.config, null, 2),
+          });
+          setSeedSeq((n) => n + 1);
+        }}
+      />
+      {showForm ? (
+        <div className="border-t border-border pt-4">
+          <SourceForm
+            key={seedSeq}
+            mode="create"
+            submitLabel="Create source"
+            initial={seed}
+            onSubmit={async ({ id, name, secretRef, config }) => {
+              const res = await fetch("/api/sources", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ workspaceId, id, name, secretRef, config }),
+              });
+              const body = await res.json();
+              if (!res.ok) return body.error ?? "create failed";
+              onCreated();
+              return null;
+            }}
+            onCancel={onCancel}
+          />
+        </div>
+      ) : (
+        <div className="border-t border-border pt-4">
+          <button
+            type="button"
+            onClick={() => setManual(true)}
+            className="text-sm text-muted underline-offset-4 hover:text-foreground hover:underline"
+          >
+            or enter configuration manually
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/**
+ * Draft a source from plain English. Streams a validated SourceDraft (safe
+ * config + catalog, never credentials) and hands the finished draft to the
+ * caller to seed the review form.
+ */
+function NaturalLanguageDrafter({
+  workspaceId,
+  onDraft,
+}: {
+  workspaceId: string;
+  onDraft: (draft: SourceDraft) => void;
+}) {
+  const [description, setDescription] = React.useState("");
+  const { object, submit, isLoading, error, stop } = useObject({
+    api: "/api/sources/generate",
+    schema: SourceDraft,
+    onFinish({ object }) {
+      if (object) onDraft(object);
+    },
+  });
+
+  function draft() {
+    if (isLoading || !description.trim()) return;
+    submit({ workspaceId, prompt: description });
+  }
+
+  return (
+    <div className="space-y-2">
+      <Label htmlFor="nl-source">Describe the source</Label>
+      <p className="text-xs text-muted">
+        Draft the connection and table catalog from plain English. Never include
+        passwords — credentials come from the <code>secret_ref</code> environment
+        family. Review the generated config below, then Test and Refresh to pull
+        live columns.
+      </p>
+      <div className="flex flex-wrap items-center gap-2">
+        {SOURCE_PROMPT_PRESETS.map((preset, i) => (
+          <button
+            key={i}
+            type="button"
+            disabled={isLoading}
+            onClick={() => setDescription(preset)}
+            title={preset}
+            className="max-w-full truncate rounded-full border border-border bg-surface px-3 py-1 text-xs text-muted transition-colors hover:border-primary hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            {preset}
+          </button>
+        ))}
+      </div>
+      <div className="relative">
+        <Textarea
+          id="nl-source"
+          rows={3}
+          className="pr-14"
+          placeholder="e.g. TimescaleDB at metrics-db:5432, database prod, schema metrics. Track http_requests (ts, status, duration_ms) and cpu_usage (ts, host, pct)."
+          value={description}
+          onChange={(e) => setDescription(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" && !e.shiftKey) {
+              e.preventDefault();
+              draft();
+            }
+          }}
+        />
+        <Button
+          type="button"
+          size="icon"
+          onClick={draft}
+          disabled={isLoading || !description.trim()}
+          aria-label="Generate"
+          title="Generate"
+          className="absolute bottom-4 right-2"
+        >
+          {isLoading ? (
+            <Loader2 className="h-4 w-4 animate-spin" />
+          ) : (
+            <SendHorizontal className="h-4 w-4" />
+          )}
+        </Button>
+      </div>
+      {isLoading && (
+        <Button type="button" variant="ghost" size="sm" onClick={() => stop()}>
+          Stop
+        </Button>
+      )}
+      {error && (
+        <p className="text-sm text-danger">Draft failed: {error.message}</p>
+      )}
+      {isLoading && object && (
+        <pre className="max-h-40 overflow-auto rounded-lg border border-border bg-surface p-3 text-xs text-muted">
+          {JSON.stringify(object, null, 2)}
+        </pre>
+      )}
+    </div>
+  );
+}
+
 interface SourceFormValues {
   id: string;
   name: string;
@@ -302,11 +484,11 @@ function SourceForm({
 }: {
   mode: "create" | "edit";
   submitLabel: string;
-  initial?: { name: string; secretRef: string; configText: string };
+  initial?: { id?: string; name: string; secretRef: string; configText: string };
   onSubmit: (values: SourceFormValues) => Promise<string | null>;
   onCancel?: () => void;
 }) {
-  const [id, setId] = React.useState("");
+  const [id, setId] = React.useState(initial?.id ?? "");
   const [name, setName] = React.useState(initial?.name ?? "");
   const [secretRef, setSecretRef] = React.useState(initial?.secretRef ?? "TS_METRICS");
   const [configText, setConfigText] = React.useState(

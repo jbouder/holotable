@@ -41,6 +41,30 @@ export const SourceConfig = z
   .strict();
 export type SourceConfig = z.infer<typeof SourceConfig>;
 
+/**
+ * A drafted source: the full create payload minus the workspace (which is
+ * supplied and authorized by the server, not the model). This is the contract
+ * for the natural-language "draft a source" flow AND the base for the create
+ * API body, so the two can never drift. The model emits ONLY this safe shape —
+ * connection config + table catalog + the secret_ref *name*. It never emits
+ * credentials; those are resolved from the environment via `secretRef`.
+ */
+export const SourceDraft = z
+  .object({
+    id: z
+      .string()
+      .min(1)
+      .max(128)
+      .regex(/^[a-z0-9][a-z0-9._-]*$/i, "invalid source id"),
+    name: z.string().min(1).max(200),
+    secretRef: z
+      .string()
+      .regex(/^[A-Z][A-Z0-9_]*$/, "secretRef must be an UPPER_SNAKE env family"),
+    config: SourceConfig,
+  })
+  .strict();
+export type SourceDraft = z.infer<typeof SourceDraft>;
+
 export interface SourceRecord {
   id: string;
   workspaceId: string;

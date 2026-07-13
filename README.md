@@ -136,7 +136,7 @@ default single-instance setup these are the same TimescaleDB database.
 | `/dashboards/[id]` | Live viewer (SSE) with a Live/Pause toggle and a read-only dashboard chat assistant | viewer |
 | `/dashboards/[id]/edit` | Panel CRUD/layout, single-panel NL edits, version save | editor |
 | `/explore` | Ad-hoc NL questions against editable sources (with sample-question chips); streams one panel spec, then runs it through guarded query preview | editor |
-| `/data-sources` | Source CRUD / test / refresh | source-admin |
+| `/data-sources` | Source CRUD / test / refresh, plus a natural-language drafter that seeds the create form from a plain-English description | source-admin |
 
 ## API
 
@@ -149,6 +149,7 @@ default single-instance setup these are the same TimescaleDB database.
 | `/api/dashboards/[id]/stream` | GET | SSE deltas (cookie auth) |
 | `/api/dashboards/[id]/chat` | POST | Read-only chat scoped to one dashboard; streams a UI message stream, may call a guarded `runQuery` tool |
 | `/api/sources` | GET/POST | List / create |
+| `/api/sources/generate` | POST | LLM streams a validated source draft (safe connection config + catalog, never credentials) for review before create |
 | `/api/sources/[id]` | GET/PUT/DELETE | Get / update / delete (tombstone if referenced) |
 | `/api/sources/[id]/test` | POST | Connectivity test |
 | `/api/sources/[id]/refresh` | POST | Re-introspect catalog |
@@ -161,6 +162,15 @@ A source stores a `secret_ref` (an uppercase env-var family), never credentials.
 `TS_METRICS_PASSWORD` from the environment at execution time. Point a
 `secret_ref` at your **read-only** TimescaleDB role; the app never connects with a
 privileged user. See `src/lib/registry.ts`.
+
+This is also why the natural-language source drafter (`/api/sources/generate`)
+only ever emits the safe `SourceDraft` shape — connection config, table catalog,
+and the `secret_ref` *name* — and is prompted to ignore any password in the
+description. Credentials must already exist in the server environment for the
+named `secret_ref`; a drafted or hand-created source whose `secret_ref` is
+unconfigured saves fine but fails on **Test** until those env vars are set. The
+draft is a starting point: run **Test** and **Refresh** to pull the live column
+catalog before relying on it.
 
 ## Configuration
 
