@@ -15,7 +15,6 @@ import {
 import { SourceDraft, type SourceRecord } from "@/lib/registry";
 import { Button } from "@/components/ui/button";
 import { Input, Textarea, Label } from "@/components/ui/input";
-import { Select } from "@/components/ui/select";
 import { Card, CardContent } from "@/components/ui/card";
 import { Dialog } from "@/components/ui/dialog";
 import {
@@ -59,9 +58,8 @@ const CONFIG_TEMPLATE = JSON.stringify(
 );
 
 export function SourcesClient({ workspaces }: { workspaces: string[] }) {
-  const [workspaceId, setWorkspaceId] = React.useState<string | null>(
-    workspaces[0] ?? null,
-  );
+  // Workspace switching is hidden for now; pin to the first accessible workspace.
+  const [workspaceId] = React.useState<string | null>(workspaces[0] ?? null);
   const [sources, setSources] = React.useState<SourceRecord[] | null>(null);
   const [busy, setBusy] = React.useState<string | null>(null);
   const [editing, setEditing] = React.useState<string | null>(null);
@@ -140,19 +138,8 @@ export function SourcesClient({ workspaces }: { workspaces: string[] }) {
           </p>
         </div>
         <div className="flex items-end gap-3">
-          <div>
-            <Label htmlFor="ws">Workspace</Label>
-            <Select
-              id="ws"
-              value={workspaceId}
-              onValueChange={(ws) => {
-                setEditing(null);
-                setCreating(false);
-                setWorkspaceId(ws);
-              }}
-              options={workspaces.map((w) => ({ value: w, label: w }))}
-            />
-          </div>
+          {/* Workspace selector hidden for now; defaults to the first
+              accessible workspace. Restore this to switch workspaces. */}
           {sources !== null && (
             <Button
               onClick={() => {
