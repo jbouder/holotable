@@ -29,32 +29,48 @@ See [Data model](/architecture/data-model/).
 ## The SQL guard
 
 `validateSql` (`src/lib/sql/safety.ts`) is the trust boundary for
-model-authored SQL. It rejects anything that is not a single read-only statement
+model-authored SQL. It parses the statement with the real PostgreSQL grammar
+(`libpg_query`, compiled to WebAssembly, wrapped in `src/lib/sql/ast.ts`) and
+walks the tree. It rejects anything that is not a single read-only statement
 against allowlisted tables:
 
-- Must start with `SELECT`/`WITH`; a single statement, no `;` chaining.
-- **No comments** (`--`, `/* */`, `#`) — they can smuggle disallowed constructs.
-- **Forbidden keywords**: all DML and DDL (`insert`, `update`, `drop`, `alter`, …),
-  plus `into`/`outfile`, `set`, `system`, and the SQL time functions
-  (`current_date`, `current_timestamp`, `localtime`, …).
-- **Forbidden table functions**: anything that could exfiltrate data or bypass
-  the allowlist — `file`, `url`, `remote`, `s3`, `postgresql`, `dblink`,
-  `pg_read_file`, and friends.
-- **Forbidden non-deterministic and time functions**: `now`, `today`, `rand`, …
-  The model must not filter or branch on time.
-- **`$N` placeholders are reserved** for the server's bound parameters.
-- **Table allowlist**: every `FROM`/`JOIN` target must appear in the selected
-  source's catalog. Subqueries (`FROM (…)`) are allowed.
+- **Exactly one statement, and it is a `SELECT`.** Anything the parser cannot
+  parse is rejected. Any other statement type anywhere in the tree — `INSERT`
+  inside a CTE, `EXPLAIN`, `COPY`, `MERGE`, `SET` — is rejected by type, not by
+  keyword.
+- **Only allowlisted node types.** The walker knows the constructs a read-only
+  SELECT is built from; a construct it has not been told about is rejected by
+  name. `SELECT INTO`, row locking (`FOR UPDATE`/`FOR SHARE`) and `$N`
+  placeholders — reserved for the server's bound parameters — get their own
+  errors.
+- **No comments.** The lexer decides, so `'--'` inside a string literal is fine.
+- **Forbidden functions**: anything that could exfiltrate data or bypass the
+  allowlist — `file`, `url`, `remote`, `s3`, `dblink`, `pg_read_file`, the
+  `*_to_xml` family that executes a query string — plus server-side sleeps,
+  session state, server identity, advisory locks and backend signals. Matched
+  by unqualified name against every call in the tree, in any position, so
+  `pg_catalog.pg_sleep(1)` is caught.
+- **Forbidden time and non-deterministic values**: `now()` and every synonym,
+  `random()`, the parenless keywords (`current_timestamp`, `current_user`, …)
+  and the date/time input words (`'now'`, `'today'`, `'yesterday'`) that
+  PostgreSQL reads as the clock. The model must not filter or branch on time.
+- **Table allowlist**: every relation the tree reads must appear in the selected
+  source's catalog — in the top-level `FROM`, a nested CTE, a lateral subquery,
+  a set-operation arm, or a `LIMIT` expression alike. CTE names are resolved
+  with PostgreSQL's scoping rules first, so `FROM b` after `WITH b AS (…)` is
+  the CTE, while a name a later or sibling CTE defines is a real table.
+
+The function denylists also run over the raw text after the parse-tree pass, as
+a cheap second layer that does not depend on the parser.
 
 If any check fails, the save — or a later tick — reports a clear error instead
 of touching the database.
 
 :::caution[This is the whole security boundary]
-`validateSql` is currently regex-based. String matching over SQL cannot see
-through dollar-quoting, unicode escapes, or constructs it does not tokenize the
-way Postgres does. Replacing it with AST validation is tracked as
-[#10](https://github.com/jbouder/holotable/issues/10), with fuzzing in
-[#11](https://github.com/jbouder/holotable/issues/11).
+Statement shape and table access are decided from the parse tree. Which
+*functions* may be called is still decided by name against a list, and a list
+can only block what it has been told about. Generative testing of the guard is
+tracked in [#11](https://github.com/jbouder/holotable/issues/11).
 :::
 
 ## The server owns time

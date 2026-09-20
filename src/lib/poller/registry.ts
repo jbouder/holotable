@@ -103,7 +103,7 @@ export function makePanelExecutor(
       return [{ type: "tombstone", panelId: panel.id, sourceId: panel.query.sourceId }];
     }
 
-    const check = validateSql(panel.query.sql, source.config);
+    const check = await validateSql(panel.query.sql, source.config);
     if (!check.ok) {
       return [
         { type: "panel-error", panelId: panel.id, error: check.error ?? "invalid sql" },

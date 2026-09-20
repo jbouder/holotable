@@ -32,54 +32,58 @@ const source = SourceConfig.parse({
   ],
 });
 
-function rejects(sql: string) {
-  const r = validateSql(sql, source);
+async function rejects(sql: string) {
+  const r = await validateSql(sql, source);
   assert.equal(r.ok, false, `expected rejection, got ok for: ${sql}`);
   return r.error;
 }
 
-function accepts(sql: string) {
-  const r = validateSql(sql, source);
+async function accepts(sql: string) {
+  const r = await validateSql(sql, source);
   assert.equal(r.ok, true, `expected acceptance, got "${r.error}" for: ${sql}`);
 }
 
-test("rejects INSERT smuggled through a CTE", () => {
-  rejects(
+test("rejects INSERT smuggled through a CTE", async () => {
+  await rejects(
     "WITH x AS (INSERT INTO metrics.http_requests VALUES (1) RETURNING *) SELECT * FROM x",
   );
 });
 
-test("rejects UPDATE smuggled through a CTE", () => {
-  rejects(
+test("rejects UPDATE smuggled through a CTE", async () => {
+  await rejects(
     "WITH x AS (UPDATE metrics.http_requests SET status = 1 RETURNING *) SELECT * FROM x",
   );
 });
 
-test("rejects DELETE smuggled through a CTE", () => {
-  rejects("WITH x AS (DELETE FROM metrics.http_requests RETURNING *) SELECT * FROM x");
+test("rejects DELETE smuggled through a CTE", async () => {
+  await rejects(
+    "WITH x AS (DELETE FROM metrics.http_requests RETURNING *) SELECT * FROM x",
+  );
 });
 
-test("rejects a write inside WITH RECURSIVE", () => {
-  rejects(
+test("rejects a write inside WITH RECURSIVE", async () => {
+  await rejects(
     "WITH RECURSIVE x AS (INSERT INTO metrics.http_requests VALUES (1) RETURNING *) SELECT * FROM x",
   );
 });
 
-test("rejects a write nested two CTE levels deep", () => {
-  rejects(
+test("rejects a write nested two CTE levels deep", async () => {
+  await rejects(
     "WITH a AS (WITH b AS (INSERT INTO metrics.http_requests VALUES (1) RETURNING *) SELECT * FROM b) SELECT * FROM a",
   );
 });
 
-test("rejects MERGE and TRUNCATE smuggled through a CTE", () => {
-  rejects("WITH x AS (TRUNCATE metrics.http_requests RETURNING *) SELECT * FROM x");
-  rejects("WITH x AS (CREATE TABLE evil AS SELECT 1 RETURNING *) SELECT * FROM x");
+test("rejects MERGE and TRUNCATE smuggled through a CTE", async () => {
+  await rejects("WITH x AS (TRUNCATE metrics.http_requests RETURNING *) SELECT * FROM x");
+  await rejects("WITH x AS (CREATE TABLE evil AS SELECT 1 RETURNING *) SELECT * FROM x");
 });
 
-test("positive control: a plain subquery is still accepted", () => {
-  accepts("SELECT * FROM (SELECT 1) t");
+test("positive control: a plain subquery is still accepted", async () => {
+  await accepts("SELECT * FROM (SELECT 1) t");
 });
 
-test("positive control: a CTE over an allowlisted table is accepted", () => {
-  accepts("WITH b AS (SELECT ts FROM http_requests) SELECT count(*) FROM http_requests");
+test("positive control: a CTE over an allowlisted table is accepted", async () => {
+  await accepts(
+    "WITH b AS (SELECT ts FROM http_requests) SELECT count(*) FROM http_requests",
+  );
 });

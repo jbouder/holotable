@@ -66,6 +66,7 @@ Important files:
 
 - `src/lib/ir.ts` — the canonical shared dashboard IR schema
 - `src/lib/sql/safety.ts` — the SQL guard every generated query passes through
+- `src/lib/sql/ast.ts` — the PostgreSQL parse-tree walk the guard is built on
 - `src/lib/auth/authorize.ts` — the central `can()` check
 - `src/lib/time.ts` — server-side time expression/range resolution
 - `src/lib/registry.ts` — source registry: safe connection config and
