@@ -23,28 +23,28 @@ const source = SourceConfig.parse({
   ],
 });
 
-test("accepts a plain SELECT against an allowlisted table", () => {
-  const r = validateSql(
+test("accepts a plain SELECT against an allowlisted table", async () => {
+  const r = await validateSql(
     "SELECT ts, count(*) AS c FROM http_requests GROUP BY ts",
     source,
   );
   assert.equal(r.ok, true, r.error);
 });
 
-test("accepts schema-qualified allowlisted table", () => {
-  const r = validateSql("SELECT count(*) FROM metrics.http_requests", source);
+test("accepts schema-qualified allowlisted table", async () => {
+  const r = await validateSql("SELECT count(*) FROM metrics.http_requests", source);
   assert.equal(r.ok, true, r.error);
 });
 
-test("accepts WITH ... SELECT", () => {
-  const r = validateSql(
+test("accepts WITH ... SELECT", async () => {
+  const r = await validateSql(
     "WITH one AS (SELECT 1) SELECT count(*) FROM http_requests",
     source,
   );
   assert.equal(r.ok, true, r.error);
 });
 
-test("rejects non-SELECT statements", () => {
+test("rejects non-SELECT statements", async () => {
   for (const sql of [
     "INSERT INTO http_requests VALUES (1)",
     "UPDATE http_requests SET status = 1",
@@ -52,25 +52,28 @@ test("rejects non-SELECT statements", () => {
     "DROP TABLE http_requests",
     "ALTER TABLE http_requests ADD COLUMN x Int",
   ]) {
-    assert.equal(validateSql(sql, source).ok, false, sql);
+    assert.equal((await validateSql(sql, source)).ok, false, sql);
   }
 });
 
-test("rejects multiple statements", () => {
-  const r = validateSql(
+test("rejects multiple statements", async () => {
+  const r = await validateSql(
     "SELECT 1 FROM http_requests; SELECT 2 FROM http_requests",
     source,
   );
   assert.equal(r.ok, false);
 });
 
-test("rejects comments", () => {
-  assert.equal(validateSql("SELECT 1 FROM http_requests -- x", source).ok, false);
-  assert.equal(validateSql("SELECT 1 /* x */ FROM http_requests", source).ok, false);
-  assert.equal(validateSql("SELECT 1 FROM http_requests # x", source).ok, false);
+test("rejects comments", async () => {
+  assert.equal((await validateSql("SELECT 1 FROM http_requests -- x", source)).ok, false);
+  assert.equal(
+    (await validateSql("SELECT 1 /* x */ FROM http_requests", source)).ok,
+    false,
+  );
+  assert.equal((await validateSql("SELECT 1 FROM http_requests # x", source)).ok, false);
 });
 
-test("rejects dangerous table functions", () => {
+test("rejects dangerous table functions", async () => {
   for (const sql of [
     "SELECT * FROM file('/etc/passwd')",
     "SELECT * FROM url('http://evil', CSV)",
@@ -78,30 +81,31 @@ test("rejects dangerous table functions", () => {
     "SELECT * FROM s3('http://x', CSV)",
     "SELECT * FROM mysql('h', 'd', 't', 'u', 'p')",
   ]) {
-    assert.equal(validateSql(sql, source).ok, false, sql);
+    assert.equal((await validateSql(sql, source)).ok, false, sql);
   }
 });
 
-test("rejects access to system tables / disallowed tables", () => {
-  assert.equal(validateSql("SELECT * FROM system.tables", source).ok, false);
-  assert.equal(validateSql("SELECT * FROM secret_table", source).ok, false);
+test("rejects access to system tables / disallowed tables", async () => {
+  assert.equal((await validateSql("SELECT * FROM system.tables", source)).ok, false);
+  assert.equal((await validateSql("SELECT * FROM secret_table", source)).ok, false);
 });
 
-test("rejects model-provided time / non-deterministic functions", () => {
+test("rejects model-provided time / non-deterministic functions", async () => {
   for (const sql of [
     "SELECT * FROM http_requests WHERE ts > now()",
     "SELECT today() FROM http_requests",
     "SELECT rand() FROM http_requests",
     "SELECT current_timestamp FROM http_requests",
   ]) {
-    assert.equal(validateSql(sql, source).ok, false, sql);
+    assert.equal((await validateSql(sql, source)).ok, false, sql);
   }
 });
 
-test("rejects server parameter references and privileged PostgreSQL functions", () => {
-  assert.equal(validateSql("SELECT $1 FROM http_requests", source).ok, false);
+test("rejects server parameter references and privileged PostgreSQL functions", async () => {
+  assert.equal((await validateSql("SELECT $1 FROM http_requests", source)).ok, false);
   assert.equal(
-    validateSql("SELECT pg_read_file('/etc/passwd') FROM http_requests", source).ok,
+    (await validateSql("SELECT pg_read_file('/etc/passwd') FROM http_requests", source))
+      .ok,
     false,
   );
 });

@@ -43,8 +43,8 @@ const dashboard = {
   panels: [],
 } as unknown as Dashboard;
 
-test("rejects a source not available on the dashboard", () => {
-  const r = buildChatQueryPlan({
+test("rejects a source not available on the dashboard", async () => {
+  const r = await buildChatQueryPlan({
     dashboard,
     sources: [source],
     args: { sourceId: "src-other", sql: "SELECT count(*) FROM http_requests" },
@@ -53,8 +53,8 @@ test("rejects a source not available on the dashboard", () => {
   if (!r.ok) assert.match(r.error, /src-metrics/);
 });
 
-test("rejects non-SELECT SQL", () => {
-  const r = buildChatQueryPlan({
+test("rejects non-SELECT SQL", async () => {
+  const r = await buildChatQueryPlan({
     dashboard,
     sources: [source],
     args: { sourceId: "src-metrics", sql: "DELETE FROM http_requests" },
@@ -62,8 +62,8 @@ test("rejects non-SELECT SQL", () => {
   assert.equal(r.ok, false);
 });
 
-test("rejects a table not in the source allowlist", () => {
-  const r = buildChatQueryPlan({
+test("rejects a table not in the source allowlist", async () => {
+  const r = await buildChatQueryPlan({
     dashboard,
     sources: [source],
     args: { sourceId: "src-metrics", sql: "SELECT * FROM secrets" },
@@ -72,9 +72,9 @@ test("rejects a table not in the source allowlist", () => {
   if (!r.ok) assert.match(r.error, /allowlist/);
 });
 
-test("builds a guarded plan with server-injected time range for time-series", () => {
+test("builds a guarded plan with server-injected time range for time-series", async () => {
   const now = new Date("2026-07-11T12:00:00.000Z");
-  const r = buildChatQueryPlan({
+  const r = await buildChatQueryPlan({
     dashboard,
     sources: [source],
     args: {
@@ -95,8 +95,8 @@ test("builds a guarded plan with server-injected time range for time-series", ()
   }
 });
 
-test("builds a plan with no time filter when timeField is omitted (scalar)", () => {
-  const r = buildChatQueryPlan({
+test("builds a plan with no time filter when timeField is omitted (scalar)", async () => {
+  const r = await buildChatQueryPlan({
     dashboard,
     sources: [source],
     args: {

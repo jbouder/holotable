@@ -42,12 +42,15 @@ surface a tombstone state instead of silently breaking.
 
 ## 7. All model SQL is untrusted
 
-`validateSql` enforces SELECT/WITH-only, a single statement, no comments, a
-keyword and table-function denylist, a catalog-table allowlist, and a ban on
-time and non-deterministic functions. See
+`validateSql` parses every statement with the real PostgreSQL grammar and
+walks the tree: exactly one SELECT, built only from allowlisted node types, no
+other statement anywhere in the tree, no `SELECT INTO`, no row locking, no
+comments. Every relation the tree reads is checked against the catalog
+allowlist, every function it calls against a denylist, and time and
+non-deterministic functions, keywords and literals are banned. See
 [Executing a panel](/concepts/executing-a-panel/).
 
-The denylist spans dialects on purpose. Entries in ClickHouse vocabulary cost
+The function denylist spans dialects on purpose. Entries in ClickHouse vocabulary cost
 nothing against a PostgreSQL target and mean a future driver inherits them, but
 the PostgreSQL entries are the ones doing work today. Two groups matter most:
 
@@ -58,11 +61,14 @@ the PostgreSQL entries are the ones doing work today. Two groups matter most:
   allowlist bypass rather than an information leak.
 - **Every synonym for the current time**, not just `now()` — see invariant 8.
 
-A denylist over raw text is a floor, not a ceiling. It over-rejects (`FROM`
-inside `extract()`, a CTE alias, a keyword inside a string literal) and it can
-only block what it has been told about. `test/sql-safety-postgres.test.ts`
-pins both sides — what is blocked and what is wrongly blocked — so the move to
-AST validation has a characterization to work against.
+Statement shape and table access are decided from the parse tree, so the
+guard sees through dollar-quoting, unicode escapes, nested CTEs and
+subqueries in any position, and it recognises a CTE alias, `FROM` inside
+`extract()`, and a keyword inside a string literal for what they are. The
+function check is still a list of names, and a list can only block what it
+has been told about. `test/sql-safety-postgres.test.ts` and
+`test/sql-safety-ast.test.ts` pin both sides — what is blocked, and what the
+regex guard used to block wrongly.
 
 ## 8. The server owns the time range
 

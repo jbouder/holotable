@@ -40,7 +40,7 @@ export async function POST(req: Request) {
       workspaceId: source.workspaceId,
     });
 
-    const check = validateSql(body.sql, source.config);
+    const check = await validateSql(body.sql, source.config);
     if (!check.ok) throw new HttpError(400, check.error ?? "invalid sql");
 
     const range = resolveTimeRange(body.timeRange);

@@ -1,5 +1,6 @@
 import { config } from "@/lib/config";
 import { allowedTables, type SourceConfig } from "@/lib/registry";
+import { analyzeSelect, containsComment } from "@/lib/sql/ast";
 
 /**
  * SQL safety guard.
@@ -7,59 +8,35 @@ import { allowedTables, type SourceConfig } from "@/lib/registry";
  * ALL model-authored SQL is untrusted. Before any statement reaches the metrics
  * store it must pass these checks:
  *
- *   - SELECT-only, single statement (no `;` chaining, no DDL/DML).
- *   - No comments (they can smuggle disallowed constructs).
- *   - No dangerous table functions (file/url/remote/s3/... exfiltration or
- *     allowlist bypass) and no access to PostgreSQL system catalogs.
- *   - No time / non-deterministic functions: the model must NOT filter time.
- *   - Every referenced table must be in the catalog allowlist of the single
- *     selected source.
+ *   - It parses, with the real PostgreSQL grammar, as exactly one SELECT built
+ *     only from allowlisted constructs (`src/lib/sql/ast.ts`). No other
+ *     statement type anywhere in the tree — including inside a CTE — no
+ *     `SELECT INTO`, no row locking, no `$N` parameters.
+ *   - No comments (they can swallow the wrapper `buildExecutablePlan` adds).
+ *   - No dangerous functions: file/url/remote exfiltration, functions that
+ *     execute a query string, server-side sleeps, session state, and server
+ *     identity. Checked by name on every call the parser found, in any position.
+ *   - No time / non-deterministic functions, keywords or literals: the model
+ *     must NOT filter time, and a spec must produce the same query on every tick.
+ *   - Every relation the statement reads must be in the catalog allowlist of the
+ *     single selected source. Relations are taken from the parse tree, so a
+ *     reference in a nested CTE, a lateral subquery, a set-operation arm or a
+ *     LIMIT expression is checked the same as one in the top-level FROM, and a
+ *     CTE alias is recognised as the CTE it names.
  *
  * At execution the server wraps the validated query and injects the dashboard
  * time range on the declared `timeField` using bound query parameters, plus
  * read-only settings and row/time limits. This guarantees the model controls
  * neither the time window nor resource usage.
+ *
+ * Denylists over raw text remain as a second layer after the parse-tree pass.
+ * They are cheap, they do not depend on the parser, and the only thing they
+ * over-reject is a string literal that happens to contain a forbidden call.
  */
 
-const FORBIDDEN_KEYWORDS = [
-  "insert",
-  "update",
-  "delete",
-  "drop",
-  "alter",
-  "create",
-  "truncate",
-  "grant",
-  "revoke",
-  "attach",
-  "detach",
-  "rename",
-  "optimize",
-  "system",
-  "set",
-  "use",
-  "kill",
-  "exchange",
-  "freeze",
-  "into",
-  "outfile",
-  "format",
-  "current_date",
-  "current_time",
-  "current_timestamp",
-  "localtime",
-  "localtimestamp",
-  // Parenless server/session identity. PostgreSQL accepts these as bare
-  // keywords, so hasFunctionCall() never sees them.
-  "current_catalog",
-  "current_role",
-  "current_schema",
-  "current_user",
-  "session_user",
-  "system_user",
-];
-
-// Table functions / sources that could bypass the allowlist or exfiltrate data.
+// Functions that could bypass the allowlist, exfiltrate data, or hurt the
+// server. Matched against the unqualified, lowercased name of every call in the
+// parse tree, so `pg_catalog.pg_sleep(1)` and `"PG_SLEEP"(1)` are both caught.
 //
 // The list is deliberately over-broad and spans dialects: the entries below in
 // ClickHouse vocabulary cost nothing on a PostgreSQL target, and a source
@@ -86,11 +63,15 @@ const FORBIDDEN_FUNCTIONS = [
   "executable",
   "dictionary",
 
-  // PostgreSQL: cross-database and filesystem access.
+  // PostgreSQL: cross-database, filesystem and large-object access.
   "dblink",
   "dblink_connect",
   "lo_import",
   "lo_export",
+  "lo_get",
+  "lo_put",
+  "lo_create",
+  "lo_unlink",
   "pg_read_file",
   "pg_read_binary_file",
   "pg_stat_file",
@@ -132,6 +113,31 @@ const FORBIDDEN_FUNCTIONS = [
   "pg_sleep",
   "pg_sleep_for",
   "pg_sleep_until",
+
+  // PostgreSQL: side effects an unprivileged role can still cause from inside a
+  // read-only transaction — advisory locks that outlive the statement timeout's
+  // protection, signals to the application's own other backends, NOTIFY, and
+  // sequence advancement.
+  "pg_advisory_lock",
+  "pg_advisory_lock_shared",
+  "pg_advisory_xact_lock",
+  "pg_advisory_xact_lock_shared",
+  "pg_try_advisory_lock",
+  "pg_try_advisory_lock_shared",
+  "pg_try_advisory_xact_lock",
+  "pg_try_advisory_xact_lock_shared",
+  "pg_advisory_unlock",
+  "pg_advisory_unlock_all",
+  "pg_advisory_unlock_shared",
+  "pg_terminate_backend",
+  "pg_cancel_backend",
+  "pg_reload_conf",
+  "pg_rotate_logfile",
+  "pg_notify",
+  "pg_logical_emit_message",
+  "pg_export_snapshot",
+  "nextval",
+  "setval",
 ];
 
 // Non-deterministic / time functions: the model must not filter or branch on
@@ -152,8 +158,9 @@ const FORBIDDEN_TIME_FUNCTIONS = [
   "randcanonical",
 
   // PostgreSQL time. `current_timestamp`, `current_date`, `current_time`,
-  // `localtime` and `localtimestamp` take no parentheses and are covered by
-  // FORBIDDEN_KEYWORDS above; these are the call-syntax ones.
+  // `localtime` and `localtimestamp` take no parentheses; the parser reports
+  // them as value keywords and they are rejected below. These are the
+  // call-syntax ones.
   "clock_timestamp",
   "statement_timestamp",
   "transaction_timestamp",
@@ -168,84 +175,93 @@ const FORBIDDEN_TIME_FUNCTIONS = [
   "uuid_generate_v4",
 ];
 
-const IDENTIFIER_RE = /^[A-Za-z_][A-Za-z0-9_]*(\.[A-Za-z_][A-Za-z0-9_]*)?$/;
+// PostgreSQL's date/time input accepts these words as *values*: `'now'`,
+// `'today'::date` and `WHERE ts > 'yesterday'` all read the clock at plan time,
+// with no function call for a denylist to see. Matched case-insensitively
+// after trimming, exactly as the datetime parser does.
+const TIME_INPUT_LITERALS = new Set(["now", "today", "tomorrow", "yesterday"]);
+
+const FORBIDDEN_FUNCTION_SET = new Set(FORBIDDEN_FUNCTIONS);
+const FORBIDDEN_TIME_FUNCTION_SET = new Set(FORBIDDEN_TIME_FUNCTIONS);
+
+const TIME_ERROR_SUFFIX =
+  "the server owns the time range, and a spec must produce the same query on every tick";
 
 export interface ValidationResult {
   ok: boolean;
   error?: string;
 }
 
-function hasWord(haystack: string, word: string): boolean {
-  return new RegExp(`\\b${word}\\b`, "i").test(haystack);
-}
-
 function hasFunctionCall(haystack: string, fn: string): boolean {
   return new RegExp(`\\b${fn}\\s*\\(`, "i").test(haystack);
+}
+
+function timeFunctionError(fn: string): ValidationResult {
+  return { ok: false, error: `disallowed function ${fn}(): ${TIME_ERROR_SUFFIX}` };
 }
 
 /**
  * Validate an untrusted SELECT against the selected source's catalog.
  */
-export function validateSql(sql: string, source: SourceConfig): ValidationResult {
+export async function validateSql(
+  sql: string,
+  source: SourceConfig,
+): Promise<ValidationResult> {
   const trimmed = sql.trim().replace(/;\s*$/, "");
-
   if (trimmed.length === 0) return { ok: false, error: "empty SQL" };
-  if (trimmed.includes(";")) {
-    return { ok: false, error: "multiple statements are not allowed" };
-  }
-  if (trimmed.includes("--") || trimmed.includes("/*") || trimmed.includes("#")) {
+
+  // The parse-tree pass: one SELECT, allowlisted constructs only, and a full
+  // account of the relations, functions, keywords and literals it contains.
+  const analyzed = await analyzeSelect(trimmed);
+  if (!analyzed.ok) return { ok: false, error: analyzed.error };
+  if (await containsComment(trimmed)) {
     return { ok: false, error: "comments are not allowed" };
   }
-  if (!/^(select|with)\b/i.test(trimmed)) {
-    return { ok: false, error: "only SELECT/WITH queries are allowed" };
-  }
-  if (/\$\d+/.test(trimmed)) {
-    return { ok: false, error: "query parameters are reserved by the server" };
+  const { tables, functions, keywords, strings } = analyzed.analysis;
+
+  // Every parenless value keyword the grammar knows is either a clock reading
+  // (`current_timestamp`, `localtime`, …) or server identity (`current_user`,
+  // `session_user`, `current_schema`, …). None has a place in a spec.
+  if (keywords.length > 0) {
+    return { ok: false, error: `disallowed keyword: ${keywords[0]}` };
   }
 
-  for (const kw of FORBIDDEN_KEYWORDS) {
-    if (hasWord(trimmed, kw)) {
-      return { ok: false, error: `disallowed keyword: ${kw}` };
+  for (const fn of functions) {
+    if (FORBIDDEN_FUNCTION_SET.has(fn.name)) {
+      return { ok: false, error: `disallowed table function: ${fn.name}()` };
+    }
+    if (FORBIDDEN_TIME_FUNCTION_SET.has(fn.name)) return timeFunctionError(fn.name);
+  }
+
+  for (const literal of strings) {
+    if (TIME_INPUT_LITERALS.has(literal.trim().toLowerCase())) {
+      return {
+        ok: false,
+        error: `disallowed time literal '${literal}': ${TIME_ERROR_SUFFIX}`,
+      };
     }
   }
+
+  // Every relation the statement reads must be in the allowlist. CTE names are
+  // already resolved away by the analysis; what is left is what the server
+  // will look up.
+  const allow = allowedTables(source);
+  for (const table of tables) {
+    const ref = table.schema ? `${table.schema}.${table.name}` : table.name;
+    if (!allow.has(ref.toLowerCase())) {
+      return { ok: false, error: `table not in catalog allowlist: ${ref}` };
+    }
+  }
+
+  // Second layer: the same function denylists over the raw text, independent
+  // of the parser.
   for (const fn of FORBIDDEN_FUNCTIONS) {
     if (hasFunctionCall(trimmed, fn)) {
       return { ok: false, error: `disallowed table function: ${fn}()` };
     }
   }
   for (const fn of FORBIDDEN_TIME_FUNCTIONS) {
-    if (hasFunctionCall(trimmed, fn)) {
-      return {
-        ok: false,
-        error:
-          `disallowed function ${fn}(): the server owns the time range, and a ` +
-          `spec must produce the same query on every tick`,
-      };
-    }
-  }
-
-  // Referenced tables must all be in the allowlist. `FROM (subquery)` does not
-  // match at all, because the character class cannot start on `(`.
-  //
-  // `)` is excluded from the class so that a reference which ends a CTE body —
-  // `WITH b AS (SELECT ts FROM http_requests) SELECT ...` — is read as
-  // `http_requests` and not `http_requests)`. Without that, every CTE over a
-  // real table was rejected as an invalid table reference.
-  const allow = allowedTables(source);
-  const refRe = /\b(?:from|join)\s+([^\s(),;]+)/gi;
-  for (
-    let m: RegExpExecArray | null = refRe.exec(trimmed);
-    m !== null;
-    m = refRe.exec(trimmed)
-  ) {
-    const ref = m[1].replace(/[`"]/g, "");
-    if (ref.startsWith("(")) continue; // subquery
-    if (!IDENTIFIER_RE.test(ref)) {
-      return { ok: false, error: `invalid table reference: ${m[1]}` };
-    }
-    if (!allow.has(ref.toLowerCase())) {
-      return { ok: false, error: `table not in catalog allowlist: ${ref}` };
-    }
+    if (hasFunctionCall(trimmed, fn)) return timeFunctionError(fn);
   }
 
   return { ok: true };

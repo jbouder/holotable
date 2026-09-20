@@ -58,10 +58,13 @@ says what is trusted and what is not; that document says where it is enforced.
 **Model output — specifications and SQL alike.** The model produces a spec, never
 data. Generated specs are re-parsed against the shared Zod IR (`src/lib/ir.ts`)
 before anything reads them. Generated SQL goes through `validateSql`
-(`src/lib/sql/safety.ts`): single statement, `SELECT`/`WITH` only, no comments,
-a keyword and table-function denylist, a ban on time and non-deterministic
-functions, and an allowlist check that every referenced table appears in the
-selected source's catalog. It is then wrapped by `buildExecutablePlan` as a
+(`src/lib/sql/safety.ts`): it is parsed with the real PostgreSQL grammar
+(`src/lib/sql/ast.ts`) and must be exactly one `SELECT` built only from
+allowlisted constructs — no other statement type anywhere in the tree, no
+`SELECT INTO`, no row locking, no comments — with a function denylist applied
+to every call in the tree, a ban on time and non-deterministic functions,
+keywords and literals, and an allowlist check that every relation the tree
+reads appears in the selected source's catalog. It is then wrapped by `buildExecutablePlan` as a
 subquery, so the validated text cannot escape the wrapper.
 
 **User prompts.** A prompt reaches the model, and the model's output is
@@ -108,14 +111,13 @@ to be read-only in the database itself.
 These are real and currently unmitigated. They are listed because a reader
 deciding whether to run Holotable deserves to know them up front.
 
-- **SQL validation is regex-based, not a parser.** `validateSql` matches keywords
-  and function calls with regular expressions. That is a denylist, and denylists
-  built on pattern matching are weaker than a parser working on an abstract
-  syntax tree. The execution-side defenses — read-only transaction, bound
+- **The function denylist is still a denylist.** Statement shape and table
+  access are decided from the parse tree, but which *functions* a query may
+  call is decided by name against a list. A function this project has not
+  heard of — including any function an operator defines in the metrics schema
+  — can be called. The execution-side defenses — read-only transaction, bound
   parameters, pinned `search_path`, row cap, statement timeout, and a read-only
-  database role — are what the design actually relies on to contain a bypass.
-  Replacing the denylist with AST validation is
-  [#10](https://github.com/jbouder/holotable/issues/10).
+  database role — are what contain a call the list misses.
 
   Note what the read-only role does and does not bound: it is granted `SELECT`
   on *all* tables in the metrics schema, not only the tables in a source's

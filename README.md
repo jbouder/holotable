@@ -229,7 +229,9 @@ npm run seed     # looping metrics seeder
 - `test/ir.test.ts` — shared IR schema (strict mode, duplicate panels, time expr).
 - `test/claims.test.ts` — group parsing (highest role wins, fail-closed).
 - `test/authorize.test.ts` — `can()` for every action incl. admin bypass and owner delete.
-- `test/sql-safety.test.ts` — SQL denylist/allowlist + server time injection + time resolution.
+- `test/sql-safety.test.ts` — SQL guard verdicts + server time injection + time resolution.
+- `test/sql-safety-ast.test.ts` — parse-tree properties: table references in every position, CTE scoping, literals and identifiers as the server reads them, fail-closed on unknown constructs.
+- `test/sql-safety-postgres.test.ts`, `test/sql-safety-cte.test.ts` — PostgreSQL time synonyms and privileged functions; writes smuggled through CTEs.
 - `test/poller.test.ts` — delta cursors, poller identity/version replacement, subscriber ref-counting.
 - `test/layout.test.ts` — panel grid layout packing/normalization.
 - `test/dashboard-chat.test.ts` — chat `runQuery` guard: source scoping, SQL validation, server-owned time injection.

@@ -53,11 +53,11 @@ export type ChatQueryPlan =
  * untrusted SQL, and injects the dashboard's server-owned time range. Does NOT
  * touch the database — the caller runs the returned plan. Exported for testing.
  */
-export function buildChatQueryPlan(input: {
+export async function buildChatQueryPlan(input: {
   dashboard: Dashboard;
   sources: SourceRecord[];
   args: ChatQueryArgs;
-}): ChatQueryPlan {
+}): Promise<ChatQueryPlan> {
   const { dashboard, sources, args } = input;
 
   const source = sources.find((s) => s.id === args.sourceId);
@@ -70,7 +70,7 @@ export function buildChatQueryPlan(input: {
     };
   }
 
-  const check = validateSql(args.sql, source.config);
+  const check = await validateSql(args.sql, source.config);
   if (!check.ok) return { ok: false, error: check.error ?? "invalid sql" };
 
   // The server is the sole authority on the window: use the dashboard's own
@@ -177,7 +177,7 @@ export async function streamDashboardChat(input: {
             ),
         }),
         execute: async (args) => {
-          const built = buildChatQueryPlan({ dashboard, sources, args });
+          const built = await buildChatQueryPlan({ dashboard, sources, args });
           if (!built.ok) return { error: built.error };
           try {
             const result = await executePlan(built.source, built.plan);

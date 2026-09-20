@@ -41,7 +41,7 @@ export async function resolveAndValidateDashboard(
       );
     }
 
-    const check = validateSql(panel.query.sql, source.config);
+    const check = await validateSql(panel.query.sql, source.config);
     if (!check.ok) {
       throw new HttpError(400, `panel "${panel.id}": ${check.error}`);
     }
