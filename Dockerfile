@@ -23,6 +23,11 @@ RUN groupadd --system --gid 1001 nodejs \
 # Standalone server + static assets + migrations/seeder for one-shot jobs.
 COPY --from=build /app/.next/standalone ./
 COPY --from=build /app/.next/static ./.next/static
+# `public/` is empty today — the favicon is an App Router route file at
+# src/app/favicon.ico — and git does not track empty directories, so it is held
+# open by public/.gitkeep. Do not delete that file: without it this COPY fails
+# the image build on a fresh checkout while `next build` still succeeds, so the
+# breakage only shows up here.
 COPY --from=build /app/public ./public
 COPY --from=build /app/migrations ./migrations
 COPY --from=build /app/scripts ./scripts
