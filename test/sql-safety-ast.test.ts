@@ -178,9 +178,58 @@ test("a unicode-escaped identifier resolves to the table it names", async () => 
 });
 
 test("a quoted or differently-cased reference is compared as the server resolves it", async () => {
+  // Unquoted identifiers fold to lowercase, whatever the case they were written in.
   await accepts("SELECT * FROM Http_Requests");
+  await accepts("SELECT * FROM HTTP_REQUESTS");
   await accepts("SELECT * FROM METRICS.HTTP_REQUESTS");
+  // A quoted identifier keeps its case, so it must match the catalog exactly.
   await accepts('SELECT * FROM "http_requests"');
+  await accepts('SELECT * FROM "metrics"."http_requests"');
+});
+
+test("a quoted identifier that differs from the catalog only by case is a different table", async () => {
+  // PostgreSQL would look up a relation literally named HTTP_REQUESTS, which
+  // the catalog does not declare. Lowercasing before the comparison let it
+  // through as http_requests.
+  await rejects('SELECT * FROM "HTTP_REQUESTS"', /allowlist: HTTP_REQUESTS/);
+  await rejects('SELECT * FROM "Http_Requests"', /allowlist: Http_Requests/);
+  await rejects(
+    'SELECT * FROM metrics."HTTP_REQUESTS"',
+    /allowlist: metrics\.HTTP_REQUESTS/,
+  );
+  await rejects(
+    'SELECT * FROM "METRICS".http_requests',
+    /allowlist: METRICS\.http_requests/,
+  );
+  await rejects('SELECT ts FROM U&"\\0048TTP_REQUESTS"', /allowlist: HTTP_REQUESTS/);
+});
+
+test("a mixed-case catalog table is reachable only by its exact quoted name", async () => {
+  const mixed = SourceConfig.parse({
+    ...source,
+    tables: [
+      {
+        name: "CpuUsage",
+        timeField: "ts",
+        columns: [{ name: "ts", type: "timestamp with time zone" }],
+      },
+    ],
+  });
+  const ok = await validateSql('SELECT * FROM "CpuUsage"', mixed);
+  assert.equal(ok.ok, true, ok.error);
+  const qualified = await validateSql('SELECT * FROM metrics."CpuUsage"', mixed);
+  assert.equal(qualified.ok, true, qualified.error);
+  // Unquoted, the server folds this to cpuusage, which is not the table.
+  for (const sql of [
+    "SELECT * FROM CpuUsage",
+    "SELECT * FROM cpuusage",
+    'SELECT * FROM "cpuusage"',
+    'SELECT * FROM "CPUUSAGE"',
+  ]) {
+    const r = await validateSql(sql, mixed);
+    assert.equal(r.ok, false, `expected rejection for: ${sql}`);
+    assert.match(r.error ?? "", /table not in catalog allowlist/, sql);
+  }
 });
 
 test("a semicolon or comment marker inside a literal is not a statement boundary or comment", async () => {

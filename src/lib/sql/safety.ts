@@ -254,11 +254,14 @@ export async function validateSql(
 
   // Every relation the statement reads must be in the allowlist. CTE names are
   // already resolved away by the analysis; what is left is what the server
-  // will look up.
+  // will look up, spelled the way the server will look it up: the parser has
+  // folded unquoted identifiers to lowercase and kept quoted ones as written,
+  // so the comparison is exact. Lowercasing here would let `"HTTP_REQUESTS"`
+  // pass as `http_requests`, and those are two different relations.
   const allow = allowedTables(source);
   for (const table of tables) {
     const ref = table.schema ? `${table.schema}.${table.name}` : table.name;
-    if (!allow.has(ref.toLowerCase())) {
+    if (!allow.has(ref)) {
       return { ok: false, error: `table not in catalog allowlist: ${ref}` };
     }
   }

@@ -128,13 +128,6 @@ deciding whether to run Holotable deserves to know them up front.
   `test/sql-safety-postgres.test.ts` pins the ones that are known and blocked,
   and `test/sql-safety.fuzz.test.ts` searches for ones that are not, from a
   fixed seed on every test run and from a fresh seed in CI.
-- **Quoted identifiers are compared case-insensitively.** The guard lowercases
-  every relation name before checking the allowlist, but PostgreSQL preserves
-  the case of a quoted identifier, so `"HTTP_REQUESTS"` names a different
-  relation from `http_requests` and the guard treats them as the same. Only a
-  table whose name differs from a catalog table's solely by case, created
-  quoted, is reachable this way. Found while writing the fuzz suite; the fix
-  belongs with the catalog, which lowercases on its side too.
 - **No rate limiting or cost budget on the LLM routes.** An authenticated user
   can drive generation and chat as fast as the provider will answer. There is no
   per-workspace token or spend cap. Tracked as

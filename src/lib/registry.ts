@@ -103,12 +103,22 @@ export function resolveCredentials(secretRef: string): SourceCredentials {
   return { username, password };
 }
 
-/** The set of allowed (schema-qualified) table names for a source. */
+/**
+ * The set of allowed table names for a source, bare and schema-qualified,
+ * exactly as the catalog spells them.
+ *
+ * Names are compared character for character, never case-folded. PostgreSQL
+ * folds an *unquoted* identifier to lowercase and preserves the case of a
+ * *quoted* one, so `"HTTP_REQUESTS"` is a different relation from
+ * `http_requests`. The parser applies the same folding before the guard sees
+ * a name, so an exact comparison here is exactly the server's resolution;
+ * lowercasing on either side would collapse the two into one.
+ */
 export function allowedTables(cfg: SourceConfig): Set<string> {
   const set = new Set<string>();
   for (const t of cfg.tables) {
-    set.add(t.name.toLowerCase());
-    set.add(`${cfg.schema}.${t.name}`.toLowerCase());
+    set.add(t.name);
+    set.add(`${cfg.schema}.${t.name}`);
   }
   return set;
 }
