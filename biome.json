@@ -4,9 +4,9 @@
   "files": {
     "includes": [
       "**",
-      "!.next/**",
+      "!.next",
       "!next-env.d.ts",
-      "!docs/**",
+      "!docs",
       "!keycloak/*-realm.json",
       "!package-lock.json"
     ]
@@ -36,5 +36,17 @@
       "nursery": { "noFloatingPromises": "error" }
     }
   },
-  "assist": { "actions": { "source": { "organizeImports": "off" } } }
+  "assist": { "actions": { "source": { "organizeImports": "off" } } },
+  "overrides": [
+    {
+      "includes": ["scripts/**"],
+      "linter": {
+        "rules": {
+          "suspicious": {
+            "noConsole": "off"
+          }
+        }
+      }
+    }
+  ]
 }

@@ -75,6 +75,10 @@ export function ThemeToggle() {
       {OPTIONS.map(({ value, label, Icon }) => {
         const active = theme === value;
         return (
+          // The WAI-ARIA radio group pattern: a role="radiogroup" container of
+          // role="radio" buttons. Real <input type="radio"> elements cannot
+          // carry the icon-button styling this control needs.
+          // biome-ignore lint/a11y/useSemanticElements: APG radio group pattern
           <button
             key={value}
             type="button"

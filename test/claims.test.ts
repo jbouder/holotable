@@ -30,8 +30,8 @@ test("highest role wins within a workspace", () => {
 test("role order is independent of group order", () => {
   const a = parseGroups("u", ["/workspaces/w/source-admin", "/workspaces/w/viewer"]);
   const b = parseGroups("u", ["/workspaces/w/viewer", "/workspaces/w/source-admin"]);
-  assert.equal(a.workspaces["w"], "source-admin");
-  assert.equal(b.workspaces["w"], "source-admin");
+  assert.equal(a.workspaces.w, "source-admin");
+  assert.equal(b.workspaces.w, "source-admin");
 });
 
 test("detects the platform admin group", () => {
@@ -41,7 +41,7 @@ test("detects the platform admin group", () => {
 
 test("tolerates missing leading slash", () => {
   const id = parseGroups("u", ["workspaces/w/editor", "platform-admins"]);
-  assert.equal(id.workspaces["w"], "editor");
+  assert.equal(id.workspaces.w, "editor");
   assert.equal(id.platformAdmin, true);
 });
 

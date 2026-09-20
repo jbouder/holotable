@@ -138,7 +138,7 @@ function buildPie(panel: Panel, data: PanelData): EChartsOption {
   };
 }
 
-function buildHeatmap(panel: Panel, data: PanelData): EChartsOption {
+function buildHeatmap(_panel: Panel, data: PanelData): EChartsOption {
   const [xk, yk, vk] = data.columns;
   const xs = [...new Set(data.rows.map((r) => String(r[xk])))];
   const ys = [...new Set(data.rows.map((r) => String(r[yk])))];

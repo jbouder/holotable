@@ -4,7 +4,13 @@ import * as React from "react";
 import { useRouter } from "next/navigation";
 import { experimental_useObject as useObject } from "@ai-sdk/react";
 import { Plus, Trash2, Save, SendHorizontal, Loader2, LayoutGrid } from "lucide-react";
-import { Dashboard, Panel, VizType, ValueFormat, safeParseDashboard } from "@/lib/ir";
+import {
+  type Dashboard,
+  Panel,
+  VizType,
+  ValueFormat,
+  safeParseDashboard,
+} from "@/lib/ir";
 import { autoLayoutPanels, COLUMN_PRESETS } from "@/lib/layout";
 import { Button } from "@/components/ui/button";
 import { Input, Textarea, Label } from "@/components/ui/input";
@@ -263,6 +269,7 @@ export function EditDashboardClient({
                   {spec.panels.map((p) => (
                     <button
                       key={p.id}
+                      type="button"
                       onClick={() => setSelectedId(p.id)}
                       className={`flex w-full items-center justify-between rounded px-2 py-1.5 text-left text-sm ${
                         p.id === selectedId ? "bg-surface-2" : "hover:bg-surface-2"

@@ -14,7 +14,7 @@ function clamp01(x: number): number {
 }
 
 function linearToSrgb(c: number): number {
-  const v = c <= 0.0031308 ? 12.92 * c : 1.055 * Math.pow(c, 1 / 2.4) - 0.055;
+  const v = c <= 0.0031308 ? 12.92 * c : 1.055 * c ** (1 / 2.4) - 0.055;
   return clamp01(v);
 }
 

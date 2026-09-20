@@ -1,6 +1,6 @@
 "use client";
 
-import * as React from "react";
+import type * as React from "react";
 import { AlertTriangle, DatabaseZap, Loader2, RefreshCw } from "lucide-react";
 import type { Panel } from "@/lib/ir";
 import { Button } from "@/components/ui/button";
@@ -128,6 +128,9 @@ function TableView({ data }: { data: PanelData }) {
         </thead>
         <tbody>
           {data.rows.slice(-100).map((r, i) => (
+            // Query result rows carry no stable identity, and the table is
+            // render-only — nothing is reordered, edited or keyed off state.
+            // biome-ignore lint/suspicious/noArrayIndexKey: result rows have no id
             <tr key={i} className="border-t border-border">
               {data.columns.map((c) => (
                 <td key={c} className="px-2 py-1 tabular-nums">

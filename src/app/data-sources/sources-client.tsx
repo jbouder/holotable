@@ -161,86 +161,82 @@ export function SourcesClient({ workspaces }: { workspaces: string[] }) {
 
       {sources === null ? (
         <p className="text-sm text-muted">Loading…</p>
+      ) : sources.length === 0 ? (
+        <p className="text-sm text-muted">No sources in this workspace yet.</p>
       ) : (
-        <>
-          {sources.length === 0 ? (
-            <p className="text-sm text-muted">No sources in this workspace yet.</p>
-          ) : (
-            <Table>
-              <TableHead>
-                <TableRow>
-                  <TableHeader>Name</TableHeader>
-                  <TableHeader>Endpoint</TableHeader>
-                  <TableHeader>Schema</TableHeader>
-                  <TableHeader>Tables</TableHeader>
-                  <TableHeader>Status</TableHeader>
-                  <TableHeader className="text-right">Actions</TableHeader>
-                </TableRow>
-              </TableHead>
-              <TableBody>
-                {sources.map((source) => (
-                  <TableRow key={source.id}>
-                    <TableCell>
-                      <div className="font-medium">{source.name}</div>
-                      <div className="text-xs text-muted">{source.id}</div>
-                    </TableCell>
-                    <TableCell className="whitespace-nowrap">
-                      {source.config.host}:{source.config.port}/{source.config.database}
-                    </TableCell>
-                    <TableCell>{source.config.schema}</TableCell>
-                    <TableCell>{source.config.tables.length}</TableCell>
-                    <TableCell>
-                      {source.tombstonedAt ? (
-                        <span className="text-danger">Tombstoned</span>
-                      ) : (
-                        "Active"
-                      )}
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex justify-end gap-1">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          disabled={busy === source.id}
-                          onClick={() => test(source.id)}
-                        >
-                          <Plug className="h-4 w-4" /> Test
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          disabled={busy === source.id}
-                          onClick={() => refresh(source.id)}
-                        >
-                          <RefreshCw className="h-4 w-4" /> Refresh
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          disabled={busy === source.id || !!source.tombstonedAt}
-                          onClick={() => {
-                            setNotice(null);
-                            setEditing(source.id);
-                          }}
-                        >
-                          <Pencil className="h-4 w-4" /> Edit
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          disabled={busy === source.id}
-                          onClick={() => remove(source.id)}
-                        >
-                          <Trash2 className="h-4 w-4 text-danger" />
-                        </Button>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          )}
-        </>
+        <Table>
+          <TableHead>
+            <TableRow>
+              <TableHeader>Name</TableHeader>
+              <TableHeader>Endpoint</TableHeader>
+              <TableHeader>Schema</TableHeader>
+              <TableHeader>Tables</TableHeader>
+              <TableHeader>Status</TableHeader>
+              <TableHeader className="text-right">Actions</TableHeader>
+            </TableRow>
+          </TableHead>
+          <TableBody>
+            {sources.map((source) => (
+              <TableRow key={source.id}>
+                <TableCell>
+                  <div className="font-medium">{source.name}</div>
+                  <div className="text-xs text-muted">{source.id}</div>
+                </TableCell>
+                <TableCell className="whitespace-nowrap">
+                  {source.config.host}:{source.config.port}/{source.config.database}
+                </TableCell>
+                <TableCell>{source.config.schema}</TableCell>
+                <TableCell>{source.config.tables.length}</TableCell>
+                <TableCell>
+                  {source.tombstonedAt ? (
+                    <span className="text-danger">Tombstoned</span>
+                  ) : (
+                    "Active"
+                  )}
+                </TableCell>
+                <TableCell>
+                  <div className="flex justify-end gap-1">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      disabled={busy === source.id}
+                      onClick={() => test(source.id)}
+                    >
+                      <Plug className="h-4 w-4" /> Test
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      disabled={busy === source.id}
+                      onClick={() => refresh(source.id)}
+                    >
+                      <RefreshCw className="h-4 w-4" /> Refresh
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      disabled={busy === source.id || !!source.tombstonedAt}
+                      onClick={() => {
+                        setNotice(null);
+                        setEditing(source.id);
+                      }}
+                    >
+                      <Pencil className="h-4 w-4" /> Edit
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      disabled={busy === source.id}
+                      onClick={() => remove(source.id)}
+                    >
+                      <Trash2 className="h-4 w-4 text-danger" />
+                    </Button>
+                  </div>
+                </TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
       )}
 
       {workspaceId && (
@@ -407,9 +403,9 @@ function NaturalLanguageDrafter({
         generated config below, then Test and Refresh to pull live columns.
       </p>
       <div className="flex flex-wrap items-center gap-2">
-        {SOURCE_PROMPT_PRESETS.map((preset, i) => (
+        {SOURCE_PROMPT_PRESETS.map((preset) => (
           <button
-            key={i}
+            key={preset}
             type="button"
             disabled={isLoading}
             onClick={() => setDescription(preset)}

@@ -3,7 +3,7 @@
 import * as React from "react";
 import { experimental_useObject as useObject } from "@ai-sdk/react";
 import { Loader2, SendHorizontal, Compass, AlertTriangle, RefreshCw } from "lucide-react";
-import { Panel, TimeRange } from "@/lib/ir";
+import { Panel, type TimeRange } from "@/lib/ir";
 import { Button } from "@/components/ui/button";
 import { Textarea, Label } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
@@ -376,6 +376,9 @@ function ResultTable({ panel, data }: { panel: Panel; data: PanelData }) {
           </thead>
           <tbody>
             {rows.map((r, i) => (
+              // Query result rows carry no stable identity, and the table is
+              // render-only — nothing is reordered, edited or keyed off state.
+              // biome-ignore lint/suspicious/noArrayIndexKey: result rows have no id
               <tr key={i} className="border-t border-border">
                 {data.columns.map((c) => (
                   <td key={c} className="px-3 py-1.5 tabular-nums">

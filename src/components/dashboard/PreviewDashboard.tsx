@@ -63,10 +63,15 @@ export function PreviewDashboard({ spec }: { spec: Dashboard }) {
     [],
   );
 
+  // `spec` is a fresh object on every render, so depending on it directly would
+  // re-run the preview on every render. The serialized spec is the real
+  // dependency: it changes exactly when the generated content changes.
+  // `runPanel` is a useCallback with no dependencies and is stable.
+  const specKey = JSON.stringify(spec);
+  // biome-ignore lint/correctness/useExhaustiveDependencies: keyed on the serialized spec on purpose
   React.useEffect(() => {
     for (const panel of spec.panels) void runPanel(panel, spec.timeRange);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [JSON.stringify(spec)]);
+  }, [specKey]);
 
   return (
     <DashboardGrid

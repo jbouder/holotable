@@ -1,4 +1,4 @@
-import { z } from "zod";
+import type { z } from "zod";
 import { HttpError } from "@/lib/auth/authorize";
 
 /** Parse and validate a JSON request body against a Zod schema, or throw 400. */

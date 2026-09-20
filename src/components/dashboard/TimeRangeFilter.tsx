@@ -20,9 +20,8 @@ export function TimeRangeFilter({
   onChange: (range: TimeRange) => void;
 }) {
   return (
-    <div
+    <fieldset
       className="flex items-center rounded-lg border border-border bg-surface p-1"
-      role="group"
       aria-label="Dashboard time range"
     >
       {PRESETS.map((preset) => {
@@ -43,6 +42,6 @@ export function TimeRangeFilter({
           </Button>
         );
       })}
-    </div>
+    </fieldset>
   );
 }

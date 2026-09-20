@@ -12,7 +12,6 @@ export function formatValue(value: unknown, format?: ValueFormat): string {
       return `${round(n, 2)}%`;
     case "ms":
       return `${round(n, 1)} ms`;
-    case "number":
     default:
       return formatNumber(n);
   }
