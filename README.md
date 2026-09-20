@@ -236,3 +236,8 @@ npm run seed     # looping metrics seeder
 - Keycloak tokens are verified with RS256 via JWKS (`OIDC_JWKS_URL`).
 - Authorization is centralized in `can()` and never derived from a request's
   workspace field; the source is re-authorized on every execution.
+
+## License
+
+Holotable is licensed under the [Apache License 2.0](LICENSE). See
+[`NOTICE`](NOTICE) for attribution requirements.
