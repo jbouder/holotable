@@ -1,0 +1,129 @@
+name: CI
+
+# Deliberately unfiltered by `paths`. The lint/typecheck/test/build jobs are
+# required status checks on `main`, and a required check that is skipped by a
+# path filter never reports a conclusion — GitHub then blocks the pull request
+# forever waiting for a run that will not happen. docs.yml can filter by path
+# precisely because none of its jobs are required.
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: package-lock.json
+
+      - name: Install
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+  typecheck:
+    name: Typecheck
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: package-lock.json
+
+      - name: Install
+        run: npm ci
+
+      # `npm run typecheck` is `next typegen && tsc --noEmit`. The typegen step
+      # is not optional: Next 16 writes the global route helpers (RouteContext,
+      # PageProps, LayoutProps) into .next/types, which tsconfig.json includes.
+      # On a cold checkout there is no .next, so a bare `tsc --noEmit` fails
+      # with "Cannot find name 'RouteContext'" across every dynamic route
+      # handler. `next typegen` generates those types without a full build.
+      - name: Typecheck
+        run: npm run typecheck
+
+  test:
+    name: Test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: package-lock.json
+
+      - name: Install
+        run: npm ci
+
+      # Covers the SQL guardrails, the IR schema, authorization and time
+      # resolution — the invariants the product rests on.
+      - name: Test
+        run: npm test
+
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: package-lock.json
+
+      - name: Install
+        run: npm ci
+
+      # No environment is provided on purpose: every value in src/lib/config.ts
+      # has a fallback, so a production build must succeed with no .env at all.
+      # If this job ever starts needing a secret to build, that is the bug.
+      - name: Build
+        run: npm run build
+        env:
+          NEXT_TELEMETRY_DISABLED: 1
+
+  docker:
+    name: Docker build
+    # The image runs `npm run build` inside the build stage, so a broken build
+    # would fail here too. Waiting for `build` reports that failure once,
+    # against the faster job, instead of burning a second runner on it.
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/setup-buildx-action@v3
+
+      # Build only — never pushed. This job exists to prove the Dockerfile
+      # still produces a working standalone image, not to publish one.
+      # Releasing the image is #97.
+      - name: Build image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: false
+          load: false
+          tags: holotable:ci
+          cache-from: type=gha
+          cache-to: type=gha,mode=max

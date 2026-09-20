@@ -8,6 +8,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
+    "typecheck": "next typegen && tsc --noEmit",
     "test": "node --test --import tsx \"test/**/*.test.ts\"",
     "migrate": "tsx scripts/migrate.ts",
     "seed": "tsx scripts/seed.ts"
