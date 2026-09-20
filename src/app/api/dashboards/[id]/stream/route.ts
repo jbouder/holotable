@@ -18,7 +18,10 @@ export const dynamic = "force-dynamic";
  * same-origin requests). Each subscriber is independently authorized here, then
  * attaches to the ONE shared in-process poller for this dashboard.
  */
-export async function GET(req: Request, ctx: RouteContext<"/api/dashboards/[id]/stream">) {
+export async function GET(
+  req: Request,
+  ctx: RouteContext<"/api/dashboards/[id]/stream">,
+) {
   try {
     const identity = await requireIdentity();
     const { id } = await ctx.params;

@@ -1,9 +1,5 @@
 import { z } from "zod";
-import {
-  requireIdentity,
-  assertAuthorized,
-  errorResponse,
-} from "@/lib/auth/authorize";
+import { requireIdentity, assertAuthorized, errorResponse } from "@/lib/auth/authorize";
 import { accessibleWorkspaces } from "@/lib/auth/claims";
 import { readJson, json } from "@/lib/http";
 import { listDashboards, createDashboard } from "@/lib/db/repo";

@@ -51,14 +51,14 @@ export async function POST(req: Request) {
       workspaceId: source.workspaceId,
     });
 
-    let result;
-    if (body.mode === "dashboard") {
-      result = streamDashboard({ source, prompt: body.prompt });
-    } else if (body.mode === "explore") {
-      result = streamExplorePanel({ source, prompt: body.prompt });
-    } else {
-      result = streamPanel({ source, prompt: body.prompt, current: body.current });
-    }
+    // A ternary rather than `let result` + if/else: the latter gives `result`
+    // an implicit `any`, which loses the streamObject result type here.
+    const result =
+      body.mode === "dashboard"
+        ? streamDashboard({ source, prompt: body.prompt })
+        : body.mode === "explore"
+          ? streamExplorePanel({ source, prompt: body.prompt })
+          : streamPanel({ source, prompt: body.prompt, current: body.current });
 
     return result.toTextStreamResponse();
   } catch (err) {

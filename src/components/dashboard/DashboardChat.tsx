@@ -46,6 +46,9 @@ export function DashboardChat({
     setInput("");
   }
 
+  // `messages` and `status` are not read in the body: they are here so the list
+  // scrolls to the bottom whenever a message arrives or streaming state changes.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: deliberate re-run triggers, not reads
   React.useEffect(() => {
     if (open) {
       listRef.current?.scrollTo({ top: listRef.current.scrollHeight });
@@ -55,7 +58,9 @@ export function DashboardChat({
   function submit() {
     const text = input.trim();
     if (!text || busy) return;
-    sendMessage({ text });
+    // Fire and forget: useChat surfaces a failed send through `error`, which is
+    // rendered below, so awaiting the promise here would handle it twice.
+    void sendMessage({ text });
     setInput("");
   }
 
@@ -116,7 +121,7 @@ export function DashboardChat({
           <EmptyState
             onPick={(text) => {
               if (busy) return;
-              sendMessage({ text });
+              void sendMessage({ text });
             }}
           />
         ) : (
@@ -155,12 +160,7 @@ export function DashboardChat({
             className="max-h-28 min-h-[2.5rem] resize-none"
           />
           {busy ? (
-            <Button
-              variant="ghost"
-              size="icon"
-              aria-label="Stop"
-              onClick={() => stop()}
-            >
+            <Button variant="ghost" size="icon" aria-label="Stop" onClick={() => stop()}>
               <Loader2 className="h-4 w-4 animate-spin" />
             </Button>
           ) : (
@@ -190,8 +190,8 @@ function EmptyState({ onPick }: { onPick: (text: string) => void }) {
   return (
     <div className="flex h-full flex-col justify-center gap-3 text-center">
       <p className="text-sm text-muted">
-        Ask questions about this dashboard&rsquo;s panels and data. I can fetch
-        fresh numbers with read-only queries.
+        Ask questions about this dashboard&rsquo;s panels and data. I can fetch fresh
+        numbers with read-only queries.
       </p>
       <div className="flex flex-col gap-2">
         {EXAMPLE_PROMPTS.map((prompt) => (
@@ -219,7 +219,9 @@ function MessageBubble({ message }: { message: ChatMessage }) {
         if (part.type === "text") {
           if (!part.text) return null;
           return (
+            // Parts are append-only within a message and never reordered.
             <div
+              // biome-ignore lint/suspicious/noArrayIndexKey: append-only stream parts
               key={i}
               className={cn(
                 "max-w-[85%] whitespace-pre-wrap rounded-lg px-3 py-2 text-sm",
@@ -236,10 +238,8 @@ function MessageBubble({ message }: { message: ChatMessage }) {
           const running =
             part.state === "input-streaming" || part.state === "input-available";
           return (
-            <div
-              key={i}
-              className="flex items-center gap-1.5 text-xs text-muted"
-            >
+            // biome-ignore lint/suspicious/noArrayIndexKey: append-only stream parts
+            <div key={i} className="flex items-center gap-1.5 text-xs text-muted">
               {running ? (
                 <Loader2 className="h-3 w-3 animate-spin" />
               ) : (

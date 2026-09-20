@@ -1,4 +1,10 @@
-import { streamText, tool, convertToModelMessages, stepCountIs, type UIMessage } from "ai";
+import {
+  streamText,
+  tool,
+  convertToModelMessages,
+  stepCountIs,
+  type UIMessage,
+} from "ai";
 import { z } from "zod";
 import { getModel } from "@/lib/ai/provider";
 import { buildCatalogPrompt } from "@/lib/timescaledb/catalog";

@@ -12,7 +12,6 @@ export function formatValue(value: unknown, format?: ValueFormat): string {
       return `${round(n, 2)}%`;
     case "ms":
       return `${round(n, 1)} ms`;
-    case "number":
     default:
       return formatNumber(n);
   }
@@ -24,7 +23,8 @@ function round(n: number, digits: number): number {
 }
 
 function formatNumber(n: number): string {
-  if (Math.abs(n) >= 1000) return n.toLocaleString(undefined, { maximumFractionDigits: 2 });
+  if (Math.abs(n) >= 1000)
+    return n.toLocaleString(undefined, { maximumFractionDigits: 2 });
   return String(round(n, 3));
 }
 

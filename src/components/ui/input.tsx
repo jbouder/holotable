@@ -40,6 +40,9 @@ export function Label({
   ...props
 }: React.LabelHTMLAttributes<HTMLLabelElement>) {
   return (
+    // A styling primitive, not a labelled control: callers pass `htmlFor` (or
+    // nest the input) through `props`, which is where the association belongs.
+    // biome-ignore lint/a11y/noLabelWithoutControl: association is the caller's
     <label
       className={cn("mb-1 block text-sm font-medium text-muted", className)}
       {...props}

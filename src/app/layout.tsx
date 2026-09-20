@@ -32,7 +32,15 @@ export default function RootLayout({
       suppressHydrationWarning
     >
       <head>
+        {/*
+          Sets the theme before first paint so the page does not flash light
+          then dark. It has to be inline and synchronous in <head> — next/script
+          with beforeInteractive still runs after the first paint — and the
+          content is a hard-coded literal with no interpolation, so there is no
+          injection surface.
+        */}
         <script
+          // biome-ignore lint/security/noDangerouslySetInnerHtml: static literal, must run before first paint
           dangerouslySetInnerHTML={{
             __html:
               '(function(){try{var p=localStorage.getItem("theme");if(p!=="dark"&&p!=="light"&&p!=="system")p="dark";var t=p==="system"?(matchMedia("(prefers-color-scheme: dark)").matches?"dark":"light"):p;document.documentElement.dataset.theme=t;document.documentElement.style.colorScheme=t}catch(e){}})()',

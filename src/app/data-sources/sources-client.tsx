@@ -117,8 +117,8 @@ export function SourcesClient({ workspaces }: { workspaces: string[] }) {
       <div className="mx-auto max-w-2xl">
         <Card>
           <CardContent className="text-sm text-muted">
-            You need the <code>source-admin</code> role in a workspace to manage
-            data sources.
+            You need the <code>source-admin</code> role in a workspace to manage data
+            sources.
           </CardContent>
         </Card>
       </div>
@@ -133,8 +133,8 @@ export function SourcesClient({ workspaces }: { workspaces: string[] }) {
         <div>
           <h1 className="text-2xl font-semibold">Data sources</h1>
           <p className="mt-1 text-sm text-muted">
-            Manage the connections that dashboards and Explore query against.
-            Sources are scoped to a workspace and referenced by stable IDs.
+            Manage the connections that dashboards and Explore query against. Sources are
+            scoped to a workspace and referenced by stable IDs.
           </p>
         </div>
         <div className="flex items-end gap-3">
@@ -161,72 +161,82 @@ export function SourcesClient({ workspaces }: { workspaces: string[] }) {
 
       {sources === null ? (
         <p className="text-sm text-muted">Loading…</p>
+      ) : sources.length === 0 ? (
+        <p className="text-sm text-muted">No sources in this workspace yet.</p>
       ) : (
-        <>
-          {sources.length === 0 ? (
-            <p className="text-sm text-muted">No sources in this workspace yet.</p>
-          ) : (
-            <Table>
-              <TableHead>
-                <TableRow>
-                  <TableHeader>Name</TableHeader>
-                  <TableHeader>Endpoint</TableHeader>
-                  <TableHeader>Schema</TableHeader>
-                  <TableHeader>Tables</TableHeader>
-                  <TableHeader>Status</TableHeader>
-                  <TableHeader className="text-right">Actions</TableHeader>
-                </TableRow>
-              </TableHead>
-              <TableBody>
-                {sources.map((source) => (
-                  <TableRow key={source.id}>
-                    <TableCell>
-                      <div className="font-medium">{source.name}</div>
-                      <div className="text-xs text-muted">{source.id}</div>
-                    </TableCell>
-                    <TableCell className="whitespace-nowrap">
-                      {source.config.host}:{source.config.port}/
-                      {source.config.database}
-                    </TableCell>
-                    <TableCell>{source.config.schema}</TableCell>
-                    <TableCell>{source.config.tables.length}</TableCell>
-                    <TableCell>
-                      {source.tombstonedAt ? (
-                        <span className="text-danger">Tombstoned</span>
-                      ) : (
-                        "Active"
-                      )}
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex justify-end gap-1">
-                        <Button variant="ghost" size="sm" disabled={busy === source.id} onClick={() => test(source.id)}>
-                          <Plug className="h-4 w-4" /> Test
-                        </Button>
-                        <Button variant="ghost" size="sm" disabled={busy === source.id} onClick={() => refresh(source.id)}>
-                          <RefreshCw className="h-4 w-4" /> Refresh
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          disabled={busy === source.id || !!source.tombstonedAt}
-                          onClick={() => {
-                            setNotice(null);
-                            setEditing(source.id);
-                          }}
-                        >
-                          <Pencil className="h-4 w-4" /> Edit
-                        </Button>
-                        <Button variant="ghost" size="sm" disabled={busy === source.id} onClick={() => remove(source.id)}>
-                          <Trash2 className="h-4 w-4 text-danger" />
-                        </Button>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          )}
-        </>
+        <Table>
+          <TableHead>
+            <TableRow>
+              <TableHeader>Name</TableHeader>
+              <TableHeader>Endpoint</TableHeader>
+              <TableHeader>Schema</TableHeader>
+              <TableHeader>Tables</TableHeader>
+              <TableHeader>Status</TableHeader>
+              <TableHeader className="text-right">Actions</TableHeader>
+            </TableRow>
+          </TableHead>
+          <TableBody>
+            {sources.map((source) => (
+              <TableRow key={source.id}>
+                <TableCell>
+                  <div className="font-medium">{source.name}</div>
+                  <div className="text-xs text-muted">{source.id}</div>
+                </TableCell>
+                <TableCell className="whitespace-nowrap">
+                  {source.config.host}:{source.config.port}/{source.config.database}
+                </TableCell>
+                <TableCell>{source.config.schema}</TableCell>
+                <TableCell>{source.config.tables.length}</TableCell>
+                <TableCell>
+                  {source.tombstonedAt ? (
+                    <span className="text-danger">Tombstoned</span>
+                  ) : (
+                    "Active"
+                  )}
+                </TableCell>
+                <TableCell>
+                  <div className="flex justify-end gap-1">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      disabled={busy === source.id}
+                      onClick={() => test(source.id)}
+                    >
+                      <Plug className="h-4 w-4" /> Test
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      disabled={busy === source.id}
+                      onClick={() => refresh(source.id)}
+                    >
+                      <RefreshCw className="h-4 w-4" /> Refresh
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      disabled={busy === source.id || !!source.tombstonedAt}
+                      onClick={() => {
+                        setNotice(null);
+                        setEditing(source.id);
+                      }}
+                    >
+                      <Pencil className="h-4 w-4" /> Edit
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      disabled={busy === source.id}
+                      onClick={() => remove(source.id)}
+                    >
+                      <Trash2 className="h-4 w-4 text-danger" />
+                    </Button>
+                  </div>
+                </TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
       )}
 
       {workspaceId && (
@@ -388,15 +398,14 @@ function NaturalLanguageDrafter({
     <div className="space-y-2">
       <Label htmlFor="nl-source">Describe the source</Label>
       <p className="text-xs text-muted">
-        Draft the connection and table catalog from plain English. Never include
-        passwords — credentials come from the <code>secret_ref</code> environment
-        family. Review the generated config below, then Test and Refresh to pull
-        live columns.
+        Draft the connection and table catalog from plain English. Never include passwords
+        — credentials come from the <code>secret_ref</code> environment family. Review the
+        generated config below, then Test and Refresh to pull live columns.
       </p>
       <div className="flex flex-wrap items-center gap-2">
-        {SOURCE_PROMPT_PRESETS.map((preset, i) => (
+        {SOURCE_PROMPT_PRESETS.map((preset) => (
           <button
-            key={i}
+            key={preset}
             type="button"
             disabled={isLoading}
             onClick={() => setDescription(preset)}
@@ -443,9 +452,7 @@ function NaturalLanguageDrafter({
           Stop
         </Button>
       )}
-      {error && (
-        <p className="text-sm text-danger">Draft failed: {error.message}</p>
-      )}
+      {error && <p className="text-sm text-danger">Draft failed: {error.message}</p>}
       {isLoading && object && (
         <pre className="max-h-40 overflow-auto rounded-lg border border-border bg-surface p-3 text-xs text-muted">
           {JSON.stringify(object, null, 2)}
@@ -513,16 +520,30 @@ function SourceForm({
         {mode === "create" && (
           <div>
             <Label htmlFor="s-id">Source id</Label>
-            <Input id="s-id" value={id} onChange={(e) => setId(e.target.value)} placeholder="ts-metrics" />
+            <Input
+              id="s-id"
+              value={id}
+              onChange={(e) => setId(e.target.value)}
+              placeholder="ts-metrics"
+            />
           </div>
         )}
         <div>
           <Label htmlFor="s-name">Name</Label>
-          <Input id="s-name" value={name} onChange={(e) => setName(e.target.value)} placeholder="Metrics" />
+          <Input
+            id="s-name"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            placeholder="Metrics"
+          />
         </div>
         <div>
           <Label htmlFor="s-secret">secret_ref (env family)</Label>
-          <Input id="s-secret" value={secretRef} onChange={(e) => setSecretRef(e.target.value)} />
+          <Input
+            id="s-secret"
+            value={secretRef}
+            onChange={(e) => setSecretRef(e.target.value)}
+          />
         </div>
       </div>
       <div>

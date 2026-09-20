@@ -3,7 +3,7 @@
 import * as React from "react";
 import { experimental_useObject as useObject } from "@ai-sdk/react";
 import { Loader2, SendHorizontal, Compass, AlertTriangle, RefreshCw } from "lucide-react";
-import { Panel, TimeRange } from "@/lib/ir";
+import { Panel, type TimeRange } from "@/lib/ir";
 import { Button } from "@/components/ui/button";
 import { Textarea, Label } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
@@ -57,44 +57,39 @@ export function ExploreClient({
   sources: SourceOption[];
   model: string;
 }) {
-  const [sourceId, setSourceId] = React.useState<string | null>(
-    sources[0]?.id ?? null,
-  );
+  const [sourceId, setSourceId] = React.useState<string | null>(sources[0]?.id ?? null);
   const [from, setFrom] = React.useState("now-24h");
   const [prompt, setPrompt] = React.useState("");
   const [panel, setPanel] = React.useState<Panel | null>(null);
   const [result, setResult] = React.useState<Result | null>(null);
 
-  const runQuery = React.useCallback(
-    async (p: Panel, timeRange: TimeRange) => {
-      setResult({ data: EMPTY, status: "loading" });
-      try {
-        const res = await fetch("/api/query", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            sourceId: p.query.sourceId,
-            sql: p.query.sql,
-            timeField: p.query.timeField,
-            timeRange,
-          }),
-        });
-        const body = await res.json();
-        if (!res.ok) {
-          setResult({ data: EMPTY, status: "error", error: body.error ?? "query failed" });
-          return;
-        }
-        setResult({ data: { columns: body.columns, rows: body.rows }, status: "done" });
-      } catch (err) {
-        setResult({
-          data: EMPTY,
-          status: "error",
-          error: err instanceof Error ? err.message : "query failed",
-        });
+  const runQuery = React.useCallback(async (p: Panel, timeRange: TimeRange) => {
+    setResult({ data: EMPTY, status: "loading" });
+    try {
+      const res = await fetch("/api/query", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          sourceId: p.query.sourceId,
+          sql: p.query.sql,
+          timeField: p.query.timeField,
+          timeRange,
+        }),
+      });
+      const body = await res.json();
+      if (!res.ok) {
+        setResult({ data: EMPTY, status: "error", error: body.error ?? "query failed" });
+        return;
       }
-    },
-    [],
-  );
+      setResult({ data: { columns: body.columns, rows: body.rows }, status: "done" });
+    } catch (err) {
+      setResult({
+        data: EMPTY,
+        status: "error",
+        error: err instanceof Error ? err.message : "query failed",
+      });
+    }
+  }, []);
 
   const { object, submit, isLoading, error, stop } = useObject({
     api: "/api/generate",
@@ -132,8 +127,7 @@ export function ExploreClient({
     return (
       <Card>
         <CardContent className="text-sm text-muted">
-          You have no data sources to explore. Create one under Data sources
-          first.
+          You have no data sources to explore. Create one under Data sources first.
         </CardContent>
       </Card>
     );
@@ -147,9 +141,9 @@ export function ExploreClient({
           {model && <Badge title="Generation model">{model}</Badge>}
         </div>
         <p className="mt-1 text-sm text-muted">
-          Ask a question in plain English. Results come back as text and tables;
-          ask to &ldquo;chart&rdquo;, &ldquo;plot&rdquo;, or &ldquo;graph&rdquo;
-          something to get a visualization.
+          Ask a question in plain English. Results come back as text and tables; ask to
+          &ldquo;chart&rdquo;, &ldquo;plot&rdquo;, or &ldquo;graph&rdquo; something to get
+          a visualization.
         </p>
       </div>
 
@@ -280,13 +274,10 @@ function ResultView({
     <section className="space-y-4">
       <div className="space-y-1">
         <h2 className="text-lg font-medium">{panel.title}</h2>
-        {panel.description && (
-          <p className="text-sm text-muted">{panel.description}</p>
-        )}
+        {panel.description && <p className="text-sm text-muted">{panel.description}</p>}
         <p className="text-xs text-muted">
           {sourceName} · {rangeLabel}
-          {result?.status === "done" &&
-            ` · ${rowCount} row${rowCount === 1 ? "" : "s"}`}
+          {result?.status === "done" && ` · ${rowCount} row${rowCount === 1 ? "" : "s"}`}
         </p>
       </div>
 
@@ -385,10 +376,16 @@ function ResultTable({ panel, data }: { panel: Panel; data: PanelData }) {
           </thead>
           <tbody>
             {rows.map((r, i) => (
+              // Query result rows carry no stable identity, and the table is
+              // render-only — nothing is reordered, edited or keyed off state.
+              // biome-ignore lint/suspicious/noArrayIndexKey: result rows have no id
               <tr key={i} className="border-t border-border">
                 {data.columns.map((c) => (
                   <td key={c} className="px-3 py-1.5 tabular-nums">
-                    {formatCell(r[c], c === panel.query.timeField ? undefined : panel.format)}
+                    {formatCell(
+                      r[c],
+                      c === panel.query.timeField ? undefined : panel.format,
+                    )}
                   </td>
                 ))}
               </tr>

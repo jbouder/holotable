@@ -100,7 +100,10 @@ test("rejects model-provided time / non-deterministic functions", () => {
 
 test("rejects server parameter references and privileged PostgreSQL functions", () => {
   assert.equal(validateSql("SELECT $1 FROM http_requests", source).ok, false);
-  assert.equal(validateSql("SELECT pg_read_file('/etc/passwd') FROM http_requests", source).ok, false);
+  assert.equal(
+    validateSql("SELECT pg_read_file('/etc/passwd') FROM http_requests", source).ok,
+    false,
+  );
 });
 
 test("buildExecutablePlan injects server-owned time range on timeField", () => {
@@ -145,14 +148,8 @@ test("buildExecutablePlan rejects an injection-shaped timeField", () => {
 test("resolveTimeExpr resolves relative expressions against a fixed now", () => {
   const now = new Date("2024-01-01T12:00:00.000Z");
   assert.equal(resolveTimeExpr("now", now).toISOString(), now.toISOString());
-  assert.equal(
-    resolveTimeExpr("now-1h", now).toISOString(),
-    "2024-01-01T11:00:00.000Z",
-  );
-  assert.equal(
-    resolveTimeExpr("now-15m", now).toISOString(),
-    "2024-01-01T11:45:00.000Z",
-  );
+  assert.equal(resolveTimeExpr("now-1h", now).toISOString(), "2024-01-01T11:00:00.000Z");
+  assert.equal(resolveTimeExpr("now-15m", now).toISOString(), "2024-01-01T11:45:00.000Z");
 });
 
 test("resolveTimeRange requires from < to", () => {

@@ -68,10 +68,7 @@ export default async function DashboardViewPage({
               </Link>
             )}
             {canDelete && (
-              <DeleteDashboardButton
-                dashboardId={id}
-                title={dashboard.spec.title}
-              />
+              <DeleteDashboardButton dashboardId={id} title={dashboard.spec.title} />
             )}
           </>
         }

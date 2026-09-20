@@ -74,10 +74,7 @@ Use refreshIntervalMs=${config.defaultRefreshIntervalMs} and timeRange {from:"${
  * other generation path — the model emits only a validated Panel (SQL + viz),
  * never data, and never a time filter (the server injects the range).
  */
-export function streamExplorePanel(input: {
-  source: SourceRecord;
-  prompt: string;
-}) {
+export function streamExplorePanel(input: { source: SourceRecord; prompt: string }) {
   const { source, prompt } = input;
   return streamObject({
     model: getModel(),

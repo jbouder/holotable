@@ -59,9 +59,7 @@ export function computeDelta(
   cursor: string | undefined;
   mode: "append" | "replace";
 } {
-  const fresh = prevCursor
-    ? rows.filter((r) => String(r[timeField]) > prevCursor)
-    : rows;
+  const fresh = prevCursor ? rows.filter((r) => String(r[timeField]) > prevCursor) : rows;
   const cursor = rows.reduce<string | undefined>((acc, r) => {
     const v = String(r[timeField]);
     return acc === undefined || v > acc ? v : acc;
@@ -101,14 +99,8 @@ export function makePanelExecutor(
     // as tombstone events so callers cannot distinguish "deleted" from "not
     // yours" — this is the single mandatory workspace-isolation enforcement
     // point for the shared poller.
-    if (
-      !source ||
-      source.tombstonedAt ||
-      source.workspaceId !== dashboardWorkspaceId
-    ) {
-      return [
-        { type: "tombstone", panelId: panel.id, sourceId: panel.query.sourceId },
-      ];
+    if (!source || source.tombstonedAt || source.workspaceId !== dashboardWorkspaceId) {
+      return [{ type: "tombstone", panelId: panel.id, sourceId: panel.query.sourceId }];
     }
 
     const check = validateSql(panel.query.sql, source.config);
@@ -221,10 +213,7 @@ class DashboardPoller {
 
   private scheduleNext() {
     if (!this.running || this.listeners.size === 0) return;
-    const interval = Math.max(
-      config.minRefreshIntervalMs,
-      this.spec.refreshIntervalMs,
-    );
+    const interval = Math.max(config.minRefreshIntervalMs, this.spec.refreshIntervalMs);
     this.timer = setTimeout(() => void this.tick(), interval);
   }
 
@@ -234,7 +223,12 @@ class DashboardPoller {
     await Promise.all(
       this.spec.panels.map(async (p) => {
         try {
-          const events = await this.executor(p, window, this.cursors, this.dashboardWorkspaceId);
+          const events = await this.executor(
+            p,
+            window,
+            this.cursors,
+            this.dashboardWorkspaceId,
+          );
           for (const e of events) this.broadcast(e);
         } catch (err) {
           this.broadcast({

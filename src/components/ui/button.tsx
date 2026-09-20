@@ -8,8 +8,7 @@ type Variant = "primary" | "secondary" | "ghost" | "danger";
 type Size = "sm" | "md" | "icon";
 
 const VARIANTS: Record<Variant, string> = {
-  primary:
-    "bg-primary text-primary-foreground hover:opacity-90 disabled:opacity-50",
+  primary: "bg-primary text-primary-foreground hover:opacity-90 disabled:opacity-50",
   secondary:
     "bg-surface-2 text-foreground hover:bg-surface border border-border disabled:opacity-50",
   ghost: "bg-transparent text-foreground hover:bg-surface-2 disabled:opacity-50",
@@ -22,8 +21,7 @@ const SIZES: Record<Size, string> = {
   icon: "h-9 w-9 p-0",
 };
 
-export interface ButtonProps
-  extends React.ComponentPropsWithoutRef<typeof BaseButton> {
+export interface ButtonProps extends React.ComponentPropsWithoutRef<typeof BaseButton> {
   variant?: Variant;
   size?: Size;
 }

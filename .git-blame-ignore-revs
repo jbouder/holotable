@@ -1,0 +1,10 @@
+# Revisions to skip when running `git blame`.
+#
+# Enable locally once with:
+#   git config blame.ignoreRevsFile .git-blame-ignore-revs
+#
+# GitHub reads this file automatically. Only add commits that are purely
+# mechanical — a formatting sweep, a rename — never one that changes behavior.
+
+# style: format the repository with Biome
+8973e4a1c627aa04752a9ac9e03df630067e0e3e

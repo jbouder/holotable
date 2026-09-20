@@ -147,8 +147,11 @@ export function validateSql(sql: string, source: SourceConfig): ValidationResult
   // Referenced tables must all be in the allowlist. Subqueries `FROM (` are ok.
   const allow = allowedTables(source);
   const refRe = /\b(?:from|join)\s+([^\s(,;]+)/gi;
-  let m: RegExpExecArray | null;
-  while ((m = refRe.exec(trimmed)) !== null) {
+  for (
+    let m: RegExpExecArray | null = refRe.exec(trimmed);
+    m !== null;
+    m = refRe.exec(trimmed)
+  ) {
     const ref = m[1].replace(/[`"]/g, "");
     if (ref.startsWith("(")) continue; // subquery
     if (!IDENTIFIER_RE.test(ref)) {

@@ -1,4 +1,4 @@
-import { type TimeRange } from "@/lib/ir";
+import type { TimeRange } from "@/lib/ir";
 
 /**
  * Resolve an IR {@link TimeRange} (relative like `now-1h` or absolute ISO) into
