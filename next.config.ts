@@ -1,4 +1,5 @@
 import type { NextConfig } from "next";
+import { staticSecurityHeaders } from "./src/lib/security-headers";
 
 const nextConfig: NextConfig = {
   output: "standalone",
@@ -6,6 +7,21 @@ const nextConfig: NextConfig = {
   // SQL guard; it loads its WebAssembly binary from disk next to its own
   // entrypoint, which only resolves when Node requires it from node_modules.
   serverExternalPackages: ["pg", "libpg-query"],
+  // The per-response headers that do not vary by request. The
+  // Content-Security-Policy needs a fresh nonce each time and is set by
+  // src/proxy.ts. `next build` runs with NODE_ENV=production, so a production
+  // build carries HSTS and `next dev` does not; this only adds headers, so the
+  // SSE stream under /api/dashboards/[id]/stream is not buffered or altered.
+  async headers() {
+    return [
+      {
+        source: "/:path*",
+        headers: staticSecurityHeaders({
+          production: process.env.NODE_ENV === "production",
+        }),
+      },
+    ];
+  },
 };
 
 export default nextConfig;

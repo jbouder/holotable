@@ -21,6 +21,12 @@ function str(name: string, fallback: string): string {
   return raw === undefined || raw === "" ? fallback : raw;
 }
 
+function bool(name: string, fallback: boolean): boolean {
+  const raw = process.env[name];
+  if (raw === undefined || raw === "") return fallback;
+  return raw === "true";
+}
+
 export const config = {
   /**
    * Default dashboard refresh cadence. A dashboard may override this per its
@@ -55,6 +61,13 @@ export const config = {
 
   /** Cookie name used for the session JWT. */
   sessionCookieName: str("SESSION_COOKIE_NAME", "holotable_session"),
+
+  /**
+   * Send the Content-Security-Policy as `Content-Security-Policy-Report-Only`,
+   * so the browser logs violations without blocking anything. For rolling the
+   * policy out against a deployment; leave `false` once the console is clean.
+   */
+  cspReportOnly: bool("CSP_REPORT_ONLY", false),
 
   isProduction: process.env.NODE_ENV === "production",
 } as const;
@@ -158,6 +171,9 @@ const EnvSchema = z.object({
     z
       .string()
       .regex(/^[A-Za-z0-9_-]+$/, "must be a valid cookie name (letters, digits, _ or -)"),
+  ),
+  CSP_REPORT_ONLY: blank(
+    z.enum(["true", "false"], { error: 'must be "true" or "false"' }),
   ),
 
   AI_PROVIDER: blank(
@@ -263,6 +279,16 @@ export function validateConfig(
     error(
       "SESSION_SECRET",
       `uses fewer than ${MIN_SESSION_SECRET_DISTINCT_CHARS} distinct characters and is guessable. Generate one with \`openssl rand -base64 32\`.`,
+    );
+  }
+
+  // --- Security headers ---------------------------------------------------
+  // Report-only is a rollout tool. In production it means the policy that
+  // protects users is being logged, not enforced, so say so at every boot.
+  if (production && values.CSP_REPORT_ONLY === "true") {
+    warning(
+      "CSP_REPORT_ONLY",
+      "is true; the Content-Security-Policy is reported, not enforced. Set it to false once the browser console shows no violations.",
     );
   }
 

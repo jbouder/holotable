@@ -70,6 +70,7 @@ export default defineConfig({
             { label: "Source secret references", slug: "operations/secret-references" },
             { label: "AI provider", slug: "operations/ai-provider" },
             { label: "Startup validation", slug: "operations/startup-validation" },
+            { label: "Security headers", slug: "operations/security-headers" },
           ],
         },
         {

@@ -64,8 +64,11 @@ production deployment cannot boot without:
 | `OIDC_ISSUER`, `OIDC_CLIENT_ID`, `OIDC_CLIENT_SECRET`, `OIDC_JWKS_URL` | All set: Keycloak is the only way to sign in, and the [client is confidential](/operations/keycloak/). `OIDC_REDIRECT_URI` is derived from the request origin when unset. |
 
 Every numeric knob (`MAX_QUERY_ROWS`, `QUERY_TIMEOUT_SECONDS`, …) must be a
-positive integer when set, and `DEFAULT_TIME_FROM`/`DEFAULT_TIME_TO` must be
-time expressions the server can resolve. The full list of variables is in
+positive integer when set, `DEFAULT_TIME_FROM`/`DEFAULT_TIME_TO` must be
+time expressions the server can resolve, and `CSP_REPORT_ONLY` must be `true`
+or `false`. Setting it to `true` in production is a **warning** on every boot:
+the [Content-Security-Policy](/operations/security-headers/) is then logged,
+not enforced. The full list of variables is in
 [Configuration](/reference/configuration/).
 
 ## Source credentials
