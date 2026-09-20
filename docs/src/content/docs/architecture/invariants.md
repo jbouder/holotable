@@ -47,7 +47,31 @@ keyword and table-function denylist, a catalog-table allowlist, and a ban on
 time and non-deterministic functions. See
 [Executing a panel](/concepts/executing-a-panel/).
 
+The denylist spans dialects on purpose. Entries in ClickHouse vocabulary cost
+nothing against a PostgreSQL target and mean a future driver inherits them, but
+the PostgreSQL entries are the ones doing work today. Two groups matter most:
+
+- **Functions that take a query string and execute it** — `query_to_xml` and
+  the rest of the `*_to_xml` family. The catalog allowlist never sees the
+  tables these reach, and the application's read-only role holds `SELECT` on
+  the whole metrics schema rather than only the catalog tables, so this is an
+  allowlist bypass rather than an information leak.
+- **Every synonym for the current time**, not just `now()` — see invariant 8.
+
+A denylist over raw text is a floor, not a ceiling. It over-rejects (`FROM`
+inside `extract()`, a CTE alias, a keyword inside a string literal) and it can
+only block what it has been told about. `test/sql-safety-postgres.test.ts`
+pins both sides — what is blocked and what is wrongly blocked — so the move to
+AST validation has a characterization to work against.
+
 ## 8. The server owns the time range
+
+Blocking `now()` and `current_timestamp` is not sufficient on PostgreSQL:
+`clock_timestamp()`, `statement_timestamp()`, `transaction_timestamp()` and
+`timeofday()` all return a clock reading, and the first is not even stable
+within a single statement. All of them are denied, alongside the
+non-deterministic value functions (`random()`, `gen_random_uuid()`) that would
+let the same spec produce a different query on each poller tick.
 
 `buildExecutablePlan` wraps the validated query as a subquery and injects
 `from`/`to` on the declared `timeField` via **bound parameters**, plus a

@@ -116,6 +116,14 @@ deciding whether to run Holotable deserves to know them up front.
   database role — are what the design actually relies on to contain a bypass.
   Replacing the denylist with AST validation is
   [#10](https://github.com/jbouder/holotable/issues/10).
+
+  Note what the read-only role does and does not bound: it is granted `SELECT`
+  on *all* tables in the metrics schema, not only the tables in a source's
+  catalog. The role stops writes and reaches outside the schema; it is the
+  catalog allowlist, and nothing else, that confines a query to the tables a
+  source declares. A construct that evades the allowlist — a function taking a
+  query string, for instance — therefore reaches real data within that schema.
+  `test/sql-safety-postgres.test.ts` pins the ones that are known and blocked.
 - **No rate limiting or cost budget on the LLM routes.** An authenticated user
   can drive generation and chat as fast as the provider will answer. There is no
   per-workspace token or spend cap. Tracked as
