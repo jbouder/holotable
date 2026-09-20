@@ -218,6 +218,7 @@ npm run lint     # biome check (lint + format, no writes)
 npm run lint:fix # biome check --write
 npm run format   # biome format --write
 npm test         # node --test (schema, auth, SQL safety, poller)
+npm run test:fuzz # property-based SQL guard suite alone; FUZZ_RUNS / FUZZ_SEED tune it
 npm run migrate  # apply Postgres migrations
 npm run seed     # looping metrics seeder
 ```
@@ -232,6 +233,7 @@ npm run seed     # looping metrics seeder
 - `test/sql-safety.test.ts` — SQL guard verdicts + server time injection + time resolution.
 - `test/sql-safety-ast.test.ts` — parse-tree properties: table references in every position, CTE scoping, literals and identifiers as the server reads them, fail-closed on unknown constructs.
 - `test/sql-safety-postgres.test.ts`, `test/sql-safety-cte.test.ts` — PostgreSQL time synonyms and privileged functions; writes smuggled through CTEs.
+- `test/sql-safety.fuzz.test.ts` — property-based (`fast-check`): generated statements built from adversarial shapes. Anything containing a forbidden construct is rejected; anything accepted satisfies an independent parse-tree oracle; anything benign is accepted; the wrapped executable plan still parses as one SELECT. `npm test` runs it with a fixed seed; CI's non-required "Fuzz" job runs it longer with a fresh seed. A failure prints the statement and a `FUZZ_SEED=… FUZZ_PATH=…` replay line; promote it into `test/fixtures/sql-fuzz-corpus.ts` and a named test.
 - `test/poller.test.ts` — delta cursors, poller identity/version replacement, subscriber ref-counting.
 - `test/layout.test.ts` — panel grid layout packing/normalization.
 - `test/dashboard-chat.test.ts` — chat `runQuery` guard: source scoping, SQL validation, server-owned time injection.

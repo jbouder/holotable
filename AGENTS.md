@@ -81,6 +81,14 @@ The five files with a `CODEOWNERS` entry (`src/lib/sql/`, `src/lib/auth/`,
 `ir.ts`, `time.ts`, `registry.ts`) are the ones where a quiet regression stops
 being a bug and becomes a vulnerability. Changes there need a test.
 
+For `src/lib/sql/` that test is often already written for you:
+`test/sql-safety.fuzz.test.ts` generates statements from adversarial shapes and
+checks that poisoned ones are rejected, benign ones accepted, and accepted ones
+satisfy an independent parse-tree oracle. Run `npm run test:fuzz` after any
+guard change; a failure prints the statement and a replay line. Promote the
+counterexample into `test/fixtures/sql-fuzz-corpus.ts` and a named test rather
+than adjusting the generator to avoid it.
+
 ---
 
 ## Core architectural rules
@@ -242,6 +250,7 @@ npm run lint:fix   # biome check --write
 npm run format     # biome format --write
 npm run typecheck  # next typegen && tsc --noEmit
 npm test           # node --test via tsx
+npm run test:fuzz  # property-based SQL guard suite alone (FUZZ_RUNS, FUZZ_SEED)
 npm run migrate    # apply Postgres migrations
 npm run seed       # looping metrics seeder
 ```

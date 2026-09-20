@@ -13,6 +13,7 @@
     "format:check": "biome format",
     "typecheck": "next typegen && tsc --noEmit",
     "test": "node --test --import tsx \"test/**/*.test.ts\"",
+    "test:fuzz": "node --test --import tsx test/sql-safety.fuzz.test.ts",
     "migrate": "tsx scripts/migrate.ts",
     "seed": "tsx scripts/seed.ts"
   },
@@ -40,6 +41,7 @@
     "@types/pg": "8.15.6",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "fast-check": "4.10.2",
     "tailwindcss": "4.3.2",
     "tsx": "4.23.0",
     "typescript": "^5"

@@ -84,6 +84,34 @@ jobs:
       - name: Test
         run: npm test
 
+  fuzz:
+    name: Fuzz the SQL guard
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: package-lock.json
+
+      - name: Install
+        run: npm ci
+
+      # `npm test` already runs test/sql-safety.fuzz.test.ts with a fixed seed
+      # and a small iteration count, so the required Test job is deterministic.
+      # This job is the long run: many more iterations, and a fresh seed on
+      # every run so it keeps exploring new inputs. It is deliberately not a
+      # required check — a failure here is a real finding against main, not
+      # necessarily against the pull request. The failure output prints the
+      # exact statement and a FUZZ_SEED/FUZZ_PATH line to replay it locally.
+      - name: Fuzz
+        run: npm run test:fuzz
+        env:
+          FUZZ_RUNS: 20000
+          FUZZ_SEED: ${{ github.run_id }}
+
   build:
     name: Build
     runs-on: ubuntu-latest

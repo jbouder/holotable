@@ -192,6 +192,16 @@ export interface ValidationResult {
   error?: string;
 }
 
+/**
+ * Trim the statement and drop every trailing terminator. PostgreSQL accepts
+ * `SELECT 1;;` as one statement, but the validated text is later spliced into
+ * `SELECT * FROM (…) AS _holo`, where a leftover `;` is a syntax error. Found by
+ * the fuzz suite; pinned in `test/sql-safety.test.ts`.
+ */
+function stripTerminators(sql: string): string {
+  return sql.replace(/[\s;]+$/, "").trim();
+}
+
 function hasFunctionCall(haystack: string, fn: string): boolean {
   return new RegExp(`\\b${fn}\\s*\\(`, "i").test(haystack);
 }
@@ -207,7 +217,7 @@ export async function validateSql(
   sql: string,
   source: SourceConfig,
 ): Promise<ValidationResult> {
-  const trimmed = sql.trim().replace(/;\s*$/, "");
+  const trimmed = stripTerminators(sql);
   if (trimmed.length === 0) return { ok: false, error: "empty SQL" };
 
   // The parse-tree pass: one SELECT, allowlisted constructs only, and a full
@@ -285,7 +295,7 @@ export function buildExecutablePlan(input: {
   from: Date;
   to: Date;
 }): ExecutablePlan {
-  const inner = input.sql.trim().replace(/;\s*$/, "");
+  const inner = stripTerminators(input.sql);
   const limit = config.maxQueryRows;
 
   const params: unknown[] = [];

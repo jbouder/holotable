@@ -149,6 +149,29 @@ test("buildExecutablePlan rejects an injection-shaped timeField", () => {
   );
 });
 
+test("every trailing terminator is stripped before the query is wrapped", async () => {
+  // Found by test/sql-safety.fuzz.test.ts. PostgreSQL reads `SELECT 1;;` as one
+  // statement, so the guard accepted it, but only one `;` was stripped and the
+  // wrapped plan `SELECT * FROM (SELECT 1 FROM http_requests;) AS _holo …` was a
+  // syntax error at execution time.
+  for (const sql of [
+    "SELECT 1 FROM http_requests;;",
+    "SELECT 1 FROM http_requests ; ;\n",
+    "SELECT 1 FROM http_requests;\n;\t",
+  ]) {
+    const r = await validateSql(sql, source);
+    assert.equal(r.ok, true, r.error);
+    const plan = buildExecutablePlan({
+      sql,
+      timeField: "ts",
+      from: new Date(0),
+      to: new Date(1),
+    });
+    assert.doesNotMatch(plan.sql, /;\)/, plan.sql);
+    assert.match(plan.sql, /\(SELECT 1 FROM http_requests\) AS _holo/);
+  }
+});
+
 test("resolveTimeExpr resolves relative expressions against a fixed now", () => {
   const now = new Date("2024-01-01T12:00:00.000Z");
   assert.equal(resolveTimeExpr("now", now).toISOString(), now.toISOString());
