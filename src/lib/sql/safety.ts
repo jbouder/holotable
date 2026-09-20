@@ -49,10 +49,24 @@ const FORBIDDEN_KEYWORDS = [
   "current_timestamp",
   "localtime",
   "localtimestamp",
+  // Parenless server/session identity. PostgreSQL accepts these as bare
+  // keywords, so hasFunctionCall() never sees them.
+  "current_catalog",
+  "current_role",
+  "current_schema",
+  "current_user",
+  "session_user",
+  "system_user",
 ];
 
 // Table functions / sources that could bypass the allowlist or exfiltrate data.
+//
+// The list is deliberately over-broad and spans dialects: the entries below in
+// ClickHouse vocabulary cost nothing on a PostgreSQL target, and a source
+// driver for another engine inherits them for free. The PostgreSQL entries are
+// the ones that matter today.
 const FORBIDDEN_FUNCTIONS = [
+  // ClickHouse table functions.
   "file",
   "url",
   "remote",
@@ -71,16 +85,64 @@ const FORBIDDEN_FUNCTIONS = [
   "input",
   "executable",
   "dictionary",
+
+  // PostgreSQL: cross-database and filesystem access.
   "dblink",
   "dblink_connect",
   "lo_import",
+  "lo_export",
   "pg_read_file",
   "pg_read_binary_file",
+  "pg_stat_file",
   "pg_ls_dir",
+  "pg_ls_logdir",
+  "pg_ls_waldir",
+  "pg_ls_tmpdir",
+  "pg_ls_archive_statusdir",
+
+  // PostgreSQL: these take a *query string* and execute it, which walks
+  // straight around the catalog allowlist. The application's read-only role
+  // holds SELECT on the whole metrics schema, not just the catalog tables, so
+  // this is a real bypass and not merely an information leak.
+  "query_to_xml",
+  "query_to_xmlschema",
+  "query_to_xml_and_xmlschema",
+  "table_to_xml",
+  "table_to_xmlschema",
+  "table_to_xml_and_xmlschema",
+  "cursor_to_xml",
+  "cursor_to_xmlschema",
+
+  // PostgreSQL: server configuration and session state.
+  "current_setting",
+  "set_config",
+  "pg_settings_get_flags",
+
+  // PostgreSQL: server and connection identity.
+  "version",
+  "inet_server_addr",
+  "inet_server_port",
+  "inet_client_addr",
+  "inet_client_port",
+  "pg_backend_pid",
+
+  // PostgreSQL: unbounded server-side delay. The statement timeout caps a
+  // single call, but a poller tick that always burns its full timeout ties up a
+  // connection on every tick, for every subscriber.
+  "pg_sleep",
+  "pg_sleep_for",
+  "pg_sleep_until",
 ];
 
-// Non-deterministic / time functions: the model must not filter or branch on time.
+// Non-deterministic / time functions: the model must not filter or branch on
+// time, and must not introduce a value that changes between two ticks of the
+// same spec.
+//
+// `now()` and `current_timestamp` alone do not enforce that: PostgreSQL has
+// several exact synonyms and several non-transactional variants, and every one
+// of them has to be here or the server does not in fact own the time range.
 const FORBIDDEN_TIME_FUNCTIONS = [
+  // ClickHouse.
   "now",
   "now64",
   "today",
@@ -88,6 +150,22 @@ const FORBIDDEN_TIME_FUNCTIONS = [
   "currentdatabase",
   "rand",
   "randcanonical",
+
+  // PostgreSQL time. `current_timestamp`, `current_date`, `current_time`,
+  // `localtime` and `localtimestamp` take no parentheses and are covered by
+  // FORBIDDEN_KEYWORDS above; these are the call-syntax ones.
+  "clock_timestamp",
+  "statement_timestamp",
+  "transaction_timestamp",
+  "timeofday",
+  "age",
+
+  // PostgreSQL non-determinism.
+  "random",
+  "random_normal",
+  "gen_random_uuid",
+  "uuid_generate_v1",
+  "uuid_generate_v4",
 ];
 
 const IDENTIFIER_RE = /^[A-Za-z_][A-Za-z0-9_]*(\.[A-Za-z_][A-Za-z0-9_]*)?$/;
@@ -139,14 +217,22 @@ export function validateSql(sql: string, source: SourceConfig): ValidationResult
     if (hasFunctionCall(trimmed, fn)) {
       return {
         ok: false,
-        error: `disallowed function ${fn}(): the server owns the time range`,
+        error:
+          `disallowed function ${fn}(): the server owns the time range, and a ` +
+          `spec must produce the same query on every tick`,
       };
     }
   }
 
-  // Referenced tables must all be in the allowlist. Subqueries `FROM (` are ok.
+  // Referenced tables must all be in the allowlist. `FROM (subquery)` does not
+  // match at all, because the character class cannot start on `(`.
+  //
+  // `)` is excluded from the class so that a reference which ends a CTE body —
+  // `WITH b AS (SELECT ts FROM http_requests) SELECT ...` — is read as
+  // `http_requests` and not `http_requests)`. Without that, every CTE over a
+  // real table was rejected as an invalid table reference.
   const allow = allowedTables(source);
-  const refRe = /\b(?:from|join)\s+([^\s(,;]+)/gi;
+  const refRe = /\b(?:from|join)\s+([^\s(),;]+)/gi;
   for (
     let m: RegExpExecArray | null = refRe.exec(trimmed);
     m !== null;
