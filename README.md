@@ -1,5 +1,7 @@
 # Holotable
 
+[![CI](https://github.com/jbouder/holotable/actions/workflows/ci.yml/badge.svg)](https://github.com/jbouder/holotable/actions/workflows/ci.yml)
+
 Natural-language monitoring dashboards. Describe what you want to see; a language
 model authors a **validated visualization spec** (SQL + chart config) — never the
 data itself — and Holotable executes the guarded SQL against TimescaleDB and
