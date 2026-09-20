@@ -69,6 +69,14 @@ npm test             # node --test (IR, auth, SQL safety, poller, layout, chat)
 npm run build        # production build
 ```
 
+`npm run test:fuzz` runs the property-based SQL guard suite on its own.
+`npm test` includes it with a fixed seed and a small iteration count, so it is
+deterministic; CI also runs it longer with a fresh seed in a job that is not
+required to merge. If it fails, the output has the exact statement and a
+`FUZZ_SEED=… FUZZ_PATH=…` line that replays that one case. Add the statement to
+`test/fixtures/sql-fuzz-corpus.ts` with the verdict it should have, and a named
+test explaining why.
+
 Three notes on the less obvious ones:
 
 - `npm run lint` is [Biome](https://biomejs.dev) — linter *and* formatter in one

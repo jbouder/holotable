@@ -68,7 +68,13 @@ subqueries in any position, and it recognises a CTE alias, `FROM` inside
 function check is still a list of names, and a list can only block what it
 has been told about. `test/sql-safety-postgres.test.ts` and
 `test/sql-safety-ast.test.ts` pin both sides — what is blocked, and what the
-regex guard used to block wrongly.
+regex guard used to block wrongly. `test/sql-safety.fuzz.test.ts` goes past the
+cases anyone wrote down: it generates statements from a grammar of adversarial
+shapes — every spelling of a forbidden function, every quoting of a time word,
+tables in every position a relation can appear, writes inside CTEs, scoping
+tricks, comments, casing, whitespace — and checks that everything poisoned is
+rejected, everything benign is accepted, and everything accepted satisfies an
+independent walk of the parse tree.
 
 ## 8. The server owns the time range
 
