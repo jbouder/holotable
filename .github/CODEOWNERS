@@ -31,7 +31,6 @@
 # Security policy, contributor expectations, and the license.
 /SECURITY.md                    @jbouder
 /CONTRIBUTING.md                @jbouder
-/CODE_OF_CONDUCT.md             @jbouder
 /LICENSE                        @jbouder
 /NOTICE                         @jbouder
 

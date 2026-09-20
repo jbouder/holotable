@@ -10,8 +10,10 @@ long diff.
   the SQL guard, or authorization.
 - **Security issue?** Do not open an issue. Follow [SECURITY.md](SECURITY.md).
 
-Everyone participating is expected to follow the
-[Code of Conduct](CODE_OF_CONDUCT.md).
+Be decent to the people you are talking to. There is no formal code of conduct
+yet because there is no private inbox to report a violation to, and a policy
+with no working reporting channel is worse than none. Until there is one, raise
+a problem with [@jbouder](https://github.com/jbouder) directly.
 
 ## Local setup
 

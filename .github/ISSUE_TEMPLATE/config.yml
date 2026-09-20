@@ -6,11 +6,6 @@ contact_links:
       Please do not open a public issue for a security report. Use GitHub's
       private vulnerability reporting — see SECURITY.md for the trust model and
       response targets.
-  - name: Code of Conduct report
-    url: https://github.com/jbouder/holotable/security/advisories/new
-    about: >
-      Conduct reports go through the same private channel. Title it "Code of
-      Conduct report" so it is routed correctly.
   - name: Documentation
     url: https://github.com/jbouder/holotable/tree/main/docs
     about: >
