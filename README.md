@@ -243,6 +243,13 @@ The full trust model — what is trusted, what is not, and the known
 limitations — is in [SECURITY.md](SECURITY.md), along with how to report a
 vulnerability privately.
 
+## Contributing
+
+[`CONTRIBUTING.md`](CONTRIBUTING.md) covers local setup, the check sequence CI
+enforces, commit and pull-request conventions, and — most importantly — the
+architectural invariants a change must not break. Participation is governed by
+the [Code of Conduct](CODE_OF_CONDUCT.md).
+
 ## License
 
 Holotable is licensed under the [Apache License 2.0](LICENSE). See

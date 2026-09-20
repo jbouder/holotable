@@ -1,0 +1,92 @@
+name: Bug report
+description: Something in Holotable does not work the way it should.
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for the report.
+
+        **If this is a security vulnerability, stop here** and follow
+        [SECURITY.md](https://github.com/jbouder/holotable/blob/main/SECURITY.md)
+        instead — a public issue discloses the problem to everyone at once.
+
+  - type: textarea
+    id: summary
+    attributes:
+      label: What happened
+      description: What went wrong, and what you expected instead.
+      placeholder: |
+        Saving a dashboard with a heatmap panel returns 500.
+        I expected it to save a new version like every other panel type.
+    validations:
+      required: true
+
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Steps to reproduce
+      description: |
+        The smallest sequence that produces the problem. If a dashboard or panel
+        spec triggers it, paste the spec — with any connection details removed.
+      placeholder: |
+        1. Go to /dashboards/new
+        2. Prompt: "heatmap of request latency by route"
+        3. Click Save
+        4. See the error
+    validations:
+      required: true
+
+  - type: input
+    id: version
+    attributes:
+      label: Version
+      description: >
+        The commit SHA you are running (`git rev-parse --short HEAD`). Holotable
+        is pre-1.0 and has no tagged releases yet, so the SHA is the version.
+      placeholder: 402c4a5
+    validations:
+      required: true
+
+  - type: dropdown
+    id: deployment
+    attributes:
+      label: How are you running it?
+      options:
+        - Docker Compose (docker compose up)
+        - Local (npm run dev)
+        - Local production build (npm run build && npm run start)
+        - Self-hosted / other
+    validations:
+      required: true
+
+  - type: input
+    id: ai-provider
+    attributes:
+      label: AI provider and model
+      description: >
+        Your `AI_PROVIDER` and `AI_MODEL` — never a key. Leave blank if the bug
+        has nothing to do with generation.
+      placeholder: openai-compatible · openai/gpt-4o-mini
+    validations:
+      required: false
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs
+      description: >
+        Relevant server output and browser console errors. **Redact
+        credentials, tokens, connection strings, and anything from your data.**
+        This is pasted as a code block, so no backticks needed.
+      render: shell
+    validations:
+      required: false
+
+  - type: textarea
+    id: context
+    attributes:
+      label: Anything else
+      description: Screenshots, a guess at the cause, related issues.
+    validations:
+      required: false
