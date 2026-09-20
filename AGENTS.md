@@ -251,6 +251,7 @@ npm run format     # biome format --write
 npm run typecheck  # next typegen && tsc --noEmit
 npm test           # node --test via tsx
 npm run test:fuzz  # property-based SQL guard suite alone (FUZZ_RUNS, FUZZ_SEED)
+npm run config:check # validate the environment as the server does at startup (exit 1 = would not boot)
 npm run migrate    # apply Postgres migrations
 npm run seed       # looping metrics seeder
 ```
@@ -276,7 +277,15 @@ enforce that are easy to break accidentally:
   fails without them.
 - `build` must succeed with **no** `.env` at all. Every value in
   `src/lib/config.ts` has a fallback. If a change makes the build require a
-  secret, the change is wrong.
+  secret, the change is wrong. Startup validation (`validateConfig` in
+  `src/lib/config.ts`, run from `src/instrumentation.ts`) is a runtime concern
+  and is skipped during the build phase on purpose.
+- The server refuses to boot on an invalid configuration. When a change reads a
+  new environment variable, add it to `EnvSchema`/`validateConfig` with a
+  message that names the variable and what to do, keep a *missing* value a
+  warning in development and an error in production, and cover it in
+  `test/config.test.ts`. `npm run config:check` must still exit 0 on
+  `.env.example` in development mode; CI checks that.
 
 Four Biome rules are errors deliberately: `noFloatingPromises`,
 `useExhaustiveDependencies`, `noExplicitAny` (which matches the TypeScript rule

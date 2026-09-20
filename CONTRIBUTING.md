@@ -69,6 +69,12 @@ npm test             # node --test (IR, auth, SQL safety, poller, layout, chat)
 npm run build        # production build
 ```
 
+`npm run config:check` validates your `.env` the way the server does at startup
+and exits 1 on anything that would refuse to boot; `NODE_ENV=production` applies
+the production rules. Missing values are warnings in development and errors in
+production, so `.env.example` always starts the dev server. The rules and how to
+add one are in `docs/src/content/docs/operations/startup-validation.md`.
+
 `npm run test:fuzz` runs the property-based SQL guard suite on its own.
 `npm test` includes it with a fixed seed and a small iteration count, so it is
 deterministic; CI also runs it longer with a fresh seed in a job that is not
