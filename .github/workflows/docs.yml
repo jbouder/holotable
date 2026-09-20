@@ -78,9 +78,41 @@ jobs:
         working-directory: docs
         run: npm run build
 
+      # `versions upload` (the preview path) requires the Worker to already
+      # exist, and the Worker is only created by the first `deploy` on main.
+      # Look it up so the first pull request skips the preview instead of
+      # failing on that chicken-and-egg.
+      - name: Check whether the Worker exists
+        id: worker
+        env:
+          CF_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CF_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          set -euo pipefail
+          name=$(grep -oE '"name"[[:space:]]*:[[:space:]]*"[^"]+"' docs/wrangler.jsonc \
+                 | head -1 | sed 's/.*"\([^"]*\)"$/\1/')
+          echo "worker name: $name"
+          code=$(curl -sS -o /dev/null -w '%{http_code}' \
+            "https://api.cloudflare.com/client/v4/accounts/${CF_ACCOUNT_ID}/workers/services/${name}" \
+            -H "Authorization: Bearer ${CF_API_TOKEN}")
+          echo "lookup returned HTTP $code"
+          if [ "$code" = "200" ]; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Skip preview (Worker not created yet)
+        if: github.event_name == 'pull_request' && steps.worker.outputs.exists != 'true'
+        run: |
+          echo "::notice::Worker does not exist yet, so there is no version to \
+          upload. It is created by the first deploy on main; preview deployments \
+          work from the next pull request onward."
+
       # main -> the live site. Pull requests -> an immutable preview URL,
       # uploaded as a new version without shifting production traffic.
       - name: Deploy
+        if: github.event_name == 'push' || steps.worker.outputs.exists == 'true'
         uses: cloudflare/wrangler-action@v3
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
