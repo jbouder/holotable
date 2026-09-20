@@ -57,7 +57,8 @@ Key locations:
 - `src/lib/` — shared domain logic, schemas, formatting, utilities
 - `scripts/` — migration and seeding scripts
 - `test/` — Node test runner tests
-- `docs/` — architecture and integration notes
+- `docs/` — the Astro + Starlight documentation site (its own `package.json`;
+  content under `docs/src/content/docs/`)
 - `timescaledb/` — database bootstrap/schema assets
 
 Important files:
@@ -299,8 +300,8 @@ If a requested change appears to conflict with the architecture, prefer:
 Consult:
 
 - `README.md`
-- `docs/ARCHITECTURE.md`
-- `docs/KEYCLOAK.md`
+- `docs/src/content/docs/architecture/invariants.md`
+- `docs/src/content/docs/operations/keycloak.md`
 - `src/lib/ir.ts`
 
 before making invasive changes.

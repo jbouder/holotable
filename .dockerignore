@@ -1,0 +1,13 @@
+# The docs site is a separate Astro project; it is never part of the app image.
+docs
+
+node_modules
+.next
+.git
+.github
+.env
+.env.*
+!.env.example
+test
+*.md
+!README.md

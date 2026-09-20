@@ -1,0 +1,23 @@
+{
+  "name": "holotable-docs",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "generate": "node scripts/generate-reference.mjs",
+    "dev": "npm run generate && astro dev",
+    "build": "npm run generate && astro build",
+    "preview": "astro preview",
+    "check": "npm run generate && astro check",
+    "deploy": "npm run build && wrangler deploy"
+  },
+  "dependencies": {
+    "@astrojs/starlight": "0.42.2",
+    "astro": "7.3.3",
+    "sharp": "0.35.4",
+    "starlight-links-validator": "0.26.0"
+  },
+  "devDependencies": {
+    "wrangler": "4.135.0"
+  }
+}

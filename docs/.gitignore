@@ -1,0 +1,9 @@
+dist/
+node_modules/
+.astro/
+.wrangler/
+
+# Reference pages are generated from the app source at build time
+# (scripts/generate-reference.mjs). Never edit them by hand.
+src/content/docs/reference/configuration.md
+src/content/docs/reference/visualization-types.md

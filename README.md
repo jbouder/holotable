@@ -6,27 +6,33 @@ data itself — and Holotable executes the guarded SQL against TimescaleDB and
 streams the results live.
 
 - **Stack:** Next.js 16 (App Router) · TypeScript · Tailwind v4 · Base UI ·
-  ECharts (line/bar/stat/table/heatmap/pie/donut) · TimescaleDB/PostgreSQL
+  ECharts (line/area/bar/scatter/stat/table/heatmap/pie/donut) · TimescaleDB/PostgreSQL
   (config + metrics) · Vercel AI SDK (`streamObject` for specs, `streamText` +
   tool calls for chat) · Keycloak OIDC (group-based auth) · Server-Sent Events.
 - **Contract:** one shared Zod IR (`src/lib/ir.ts`) is used by the LLM output,
   the API, persistence, and the client, so the spec cannot drift.
 
-See [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) for the full invariant list and
-the single-instance poller caveat, [`docs/PANEL_LIFECYCLE.md`](docs/PANEL_LIFECYCLE.md)
-for how a panel is generated, stored, executed, and rendered end to end, and
-[`docs/KEYCLOAK.md`](docs/KEYCLOAK.md) for the OIDC group-mapper setup.
+## Documentation
+
+Full documentation lives in [`docs/`](docs/) as an Astro + Starlight site
+(`cd docs && npm install && npm run dev`). Start with:
+
+- [Invariants](docs/src/content/docs/architecture/invariants.md) — the guarantees the design rests on,
+  and [Scaling](docs/src/content/docs/architecture/scaling.md) for the single-instance poller caveat.
+- [How it works](docs/src/content/docs/concepts/how-it-works.md) — a panel from prompt to live chart.
+- [Keycloak setup](docs/src/content/docs/operations/keycloak.md) — the OIDC group-mapper setup.
+- [Configuration](docs/src/content/docs/reference/configuration.md) — generated from `src/lib/config.ts` at build time.
 
 ## Screenshots
 
 Describe the dashboard you want in plain English; the model authors a validated
 spec (never the data):
 
-![New dashboard — natural-language authoring with starter prompts](docs/images/dashboard-new.png)
+![New dashboard — natural-language authoring with starter prompts](docs/public/images/dashboard-new.png)
 
 Holotable executes the guarded SQL and streams results into a live dashboard:
 
-![Live dashboard view — request rate, p95 latency, 5xx count, and requests by route](docs/images/dashboard-view.png)
+![Live dashboard view — request rate, p95 latency, 5xx count, and requests by route](docs/public/images/dashboard-view.png)
 
 ## How it works
 
