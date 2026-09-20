@@ -219,6 +219,7 @@ npm run lint:fix # biome check --write
 npm run format   # biome format --write
 npm test         # node --test (schema, auth, SQL safety, poller)
 npm run test:fuzz # property-based SQL guard suite alone; FUZZ_RUNS / FUZZ_SEED tune it
+npm run config:check # validate .env the way the server does at startup; exits 1 if it would refuse to boot
 npm run migrate  # apply Postgres migrations
 npm run seed     # looping metrics seeder
 ```

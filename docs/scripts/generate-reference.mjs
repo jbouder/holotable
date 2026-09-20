@@ -127,6 +127,9 @@ const configPage =
 All tunable behaviour is environment-driven and centralized in
 [\`src/lib/config.ts\`](https://github.com/jbouder/holotable/blob/main/src/lib/config.ts).
 This table is generated from that file, so it cannot drift from the code.
+Every variable below and in the next table is validated at server startup;
+[Startup validation](/operations/startup-validation/) lists which are required
+in production and what \`npm run config:check\` reports.
 
 | Variable | Type | Default | Purpose |
 | --- | --- | --- | --- |

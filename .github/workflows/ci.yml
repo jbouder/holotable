@@ -84,6 +84,13 @@ jobs:
       - name: Test
         run: npm test
 
+      # The server refuses to boot on an invalid configuration. This proves the
+      # example file still starts a fresh checkout: in development mode missing
+      # values are warnings, so a non-zero exit here means .env.example or the
+      # validation rules changed in a way that would stop `npm run dev`.
+      - name: Validate .env.example
+        run: cp .env.example .env && npm run config:check
+
   fuzz:
     name: Fuzz the SQL guard
     runs-on: ubuntu-latest

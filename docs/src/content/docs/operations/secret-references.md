@@ -36,7 +36,10 @@ unconfigured **saves fine but fails on Test**, with:
 credentials for secret_ref "X" are not configured in the environment
 ```
 
-There is currently no indication of this before you press Test —
+The server checks every registered source's `secret_ref` at startup and logs a
+warning naming the missing variable (see
+[Startup validation](/operations/startup-validation/)); in the UI there is no
+indication before you press Test until
 [#124](https://github.com/jbouder/holotable/issues/124) adds a readiness
 indicator.
 
