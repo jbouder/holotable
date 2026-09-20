@@ -63,20 +63,33 @@ Run these before you push. CI runs the same four on every pull request, plus a
 Docker image build, and they are required to merge.
 
 ```bash
-npm run lint         # eslint (flat config)
+npm run lint         # biome check (lint + format, no writes)
 npm run typecheck    # next typegen && tsc --noEmit
 npm test             # node --test (IR, auth, SQL safety, poller, layout, chat)
 npm run build        # production build
 ```
 
-Two notes on the less obvious ones:
+Three notes on the less obvious ones:
 
+- `npm run lint` is [Biome](https://biomejs.dev) — linter *and* formatter in one
+  tool, configured entirely in `biome.json`. `biome check` only reports;
+  `npm run lint:fix` applies the safe fixes and `npm run format` reformats.
+  Unformatted code fails CI, so run one of those before pushing. There are no
+  git hooks: install the [Biome editor extension](https://biomejs.dev/guides/editors/first-party-extensions/)
+  and format on save instead.
 - `npm run typecheck` starts with `next typegen` deliberately. Next 16 writes
   the route helper types into `.next/types`, and a bare `tsc --noEmit` on a cold
   checkout fails without them.
 - `npm run build` must succeed with **no** `.env` at all. Every value in
   `src/lib/config.ts` has a fallback; if the build starts needing a secret, that
   is a bug in the change, not in CI.
+
+Four lint rules are errors on purpose and are worth knowing before you hit them:
+`noFloatingPromises` (mark a deliberate fire-and-forget with `void`, so the
+intent is visible), `useExhaustiveDependencies`, `noExplicitAny`, and
+`noConsole` (`console.warn` and `console.error` are allowed until structured
+logging lands). Fix a violation rather than suppressing it; if a suppression is
+genuinely right, use a scoped `// biome-ignore` with a reason on the line.
 
 If you touch database code, consider whether `npm run migrate` or `npm run seed`
 behavior changes too. Migrations should be additive and safe to apply to an

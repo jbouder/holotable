@@ -214,7 +214,9 @@ See [`.env.example`](.env.example) for the complete list.
 npm run dev      # dev server
 npm run build    # production build
 npm run start    # run the production build
-npm run lint     # eslint (flat config)
+npm run lint     # biome check (lint + format, no writes)
+npm run lint:fix # biome check --write
+npm run format   # biome format --write
 npm test         # node --test (schema, auth, SQL safety, poller)
 npm run migrate  # apply Postgres migrations
 npm run seed     # looping metrics seeder

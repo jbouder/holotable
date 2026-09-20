@@ -33,8 +33,12 @@ jobs:
       - name: Install
         run: npm ci
 
-      - name: Lint
-        run: npm run lint
+      # `biome ci` is the non-writing variant: it checks formatting and lint in
+      # one pass and never applies a fix, so an unformatted file fails the build
+      # rather than being silently rewritten. `npm run lint` (`biome check`) is
+      # the same checks for local use.
+      - name: Lint and format
+        run: npx biome ci
 
   typecheck:
     name: Typecheck

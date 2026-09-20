@@ -236,7 +236,9 @@ Use the existing package scripts:
 npm run dev        # dev server
 npm run build      # production build
 npm run start      # run the production build
-npm run lint       # eslint (flat config)
+npm run lint       # biome check (lint + format, no writes)
+npm run lint:fix   # biome check --write
+npm run format     # biome format --write
 npm run typecheck  # next typegen && tsc --noEmit
 npm test           # node --test via tsx
 npm run migrate    # apply Postgres migrations
@@ -251,9 +253,13 @@ Before finalizing code changes, run the checks relevant to your change:
 - `npm run build` for framework/build-sensitive changes
 
 CI (`.github/workflows/ci.yml`) runs all four on every pull request, plus a
-Docker image build, and they are required to merge. Two constraints they
+Docker image build, and they are required to merge. Three constraints they
 enforce that are easy to break accidentally:
 
+- `lint` is **Biome**, linter and formatter in one tool, configured entirely in
+  `biome.json`. CI runs `biome ci`, which never writes, so an unformatted file
+  fails the build. Run `npm run lint:fix` (safe fixes) or `npm run format`
+  before finishing. There is no ESLint and no Prettier; do not add either.
 - `typecheck` runs `next typegen` first on purpose. Next 16 writes the route
   helper types (`RouteContext`, `PageProps`, `LayoutProps`) into `.next/types`,
   which `tsconfig.json` includes; a bare `tsc --noEmit` on a cold checkout
@@ -261,6 +267,14 @@ enforce that are easy to break accidentally:
 - `build` must succeed with **no** `.env` at all. Every value in
   `src/lib/config.ts` has a fallback. If a change makes the build require a
   secret, the change is wrong.
+
+Four Biome rules are errors deliberately: `noFloatingPromises`,
+`useExhaustiveDependencies`, `noExplicitAny` (which matches the TypeScript rule
+below), and `noConsole` with `warn`/`error` allowed until structured logging
+lands. Fix violations rather than suppressing them. A deliberate
+fire-and-forget promise is marked with the `void` operator — that is the
+sanctioned opt-out and it makes the intent visible at the call site; a bare
+`// biome-ignore` needs a reason and should be rare.
 
 If changing database-related code, also consider whether `migrate` or `seed`
 behavior is impacted.
