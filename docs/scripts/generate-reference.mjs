@@ -55,14 +55,14 @@ function parseConfig() {
       continue;
     }
 
-    // key: num("ENV_NAME", 1_000)  |  key: str("ENV_NAME", "default")
-    const m = line.match(/^(\w+):\s*(num|str)\(\s*"([A-Z0-9_]+)"\s*,\s*(.+?)\s*\),?$/);
+    // key: num("ENV_NAME", 1_000)  |  key: str("ENV_NAME", "default")  |  key: bool("ENV_NAME", false)
+    const m = line.match(/^(\w+):\s*(num|str|bool)\(\s*"([A-Z0-9_]+)"\s*,\s*(.+?)\s*\),?$/);
     if (m) {
       const [, key, kind, env, rawDefault] = m;
       entries.push({
         key,
         env,
-        type: kind === "num" ? "number" : "string",
+        type: { num: "number", str: "string", bool: "boolean" }[kind],
         // Numeric literals may carry `_` separators (15_000); string
         // defaults must keep any underscores they contain.
         default:

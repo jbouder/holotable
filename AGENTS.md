@@ -71,6 +71,9 @@ Important files:
 - `src/lib/time.ts` — server-side time expression/range resolution
 - `src/lib/registry.ts` — source registry: safe connection config and
   `secret_ref` resolution
+- `src/lib/security-headers.ts` and `src/proxy.ts` — the header baseline and
+  the per-request Content-Security-Policy nonce; an inline `<script>` or
+  `<style>` needs the nonce or the browser blocks it
 - `src/app/globals.css` — design tokens and Tailwind v4 theme setup
 - `next.config.ts` — standalone output, `pg` externalization
 - `package.json` — authoritative scripts/tooling

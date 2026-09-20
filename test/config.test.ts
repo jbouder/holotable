@@ -52,6 +52,38 @@ test("a complete production configuration has no problems", () => {
   assert.deepEqual(validateConfig(VALID_PRODUCTION, { production: true }), []);
 });
 
+test("CSP_REPORT_ONLY must be a boolean literal", () => {
+  const bad = validateConfig(
+    { ...VALID_PRODUCTION, CSP_REPORT_ONLY: "yes" },
+    { production: true },
+  );
+  assert.deepEqual(variables(errors(bad)), ["CSP_REPORT_ONLY"]);
+  assert.match(bad[0].message, /"true" or "false"/);
+  for (const value of ["true", "false", ""]) {
+    const ok = validateConfig(
+      { ...VALID_PRODUCTION, CSP_REPORT_ONLY: value },
+      { production: true },
+    );
+    assert.deepEqual(errors(ok), []);
+  }
+});
+
+test("a report-only CSP in production boots with a warning that names the risk", () => {
+  const problems = validateConfig(
+    { ...VALID_PRODUCTION, CSP_REPORT_ONLY: "true" },
+    { production: true },
+  );
+  assert.deepEqual(errors(problems), []);
+  assert.deepEqual(variables(warnings(problems)), ["CSP_REPORT_ONLY"]);
+  assert.match(problems[0].message, /reported, not enforced/);
+  // In development report-only is a deliberate rollout step, not a problem.
+  const dev = validateConfig(
+    { ...VALID_PRODUCTION, CSP_REPORT_ONLY: "true" },
+    { production: false },
+  );
+  assert.ok(!variables(dev).includes("CSP_REPORT_ONLY"));
+});
+
 test("development defaults: .env.example boots with warnings only", () => {
   const problems = validateConfig(EXAMPLE_ENV, { production: false });
   assert.deepEqual(errors(problems), [], formatConfigProblems(problems));

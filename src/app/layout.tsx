@@ -1,7 +1,9 @@
 import type { Metadata } from "next";
 import { Chakra_Petch, JetBrains_Mono } from "next/font/google";
+import { headers } from "next/headers";
 import "./globals.css";
 import { NavBar } from "@/components/nav-bar";
+import { NONCE_REQUEST_HEADER } from "@/lib/security-headers";
 
 const fontSans = Chakra_Petch({
   subsets: ["latin"],
@@ -21,9 +23,13 @@ export const metadata: Metadata = {
   description: "Natural-language monitoring dashboards",
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
+  // src/proxy.ts mints a nonce per request and puts it in this header. Next
+  // stamps its own scripts with it; the hand-written script below is ours to
+  // stamp. Absent only when the proxy did not run for this request.
+  const nonce = (await headers()).get(NONCE_REQUEST_HEADER) ?? undefined;
   return (
     <html
       lang="en"
@@ -37,9 +43,15 @@ export default function RootLayout({
           then dark. It has to be inline and synchronous in <head> — next/script
           with beforeInteractive still runs after the first paint — and the
           content is a hard-coded literal with no interpolation, so there is no
-          injection surface.
+          injection surface. The nonce is what lets it run under the
+          Content-Security-Policy; without it the browser blocks the script
+          and the page flashes. Browsers hide the nonce from the DOM (the
+          attribute reads as "" after parsing), so React would report a
+          mismatch on hydration; that is expected, not a bug.
         */}
         <script
+          nonce={nonce}
+          suppressHydrationWarning
           // biome-ignore lint/security/noDangerouslySetInnerHtml: static literal, must run before first paint
           dangerouslySetInnerHTML={{
             __html:

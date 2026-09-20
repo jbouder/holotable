@@ -87,7 +87,12 @@ expression, injects `from`/`to` as **bound parameters** on the declared
 inside a `READ ONLY` transaction with `search_path` pinned to the source's
 configured schema. Authorization is never derived from a workspace id in a
 request body — it comes from the identity, and the source is re-resolved and
-re-authorized on **every** execution, including each poller tick.
+re-authorized on **every** execution, including each poller tick. Every page
+carries a nonce-based `Content-Security-Policy` (`src/proxy.ts`): no inline
+script runs without the request's nonce, nothing loads from another origin,
+and the page cannot be framed, so a rendering bug in model-authored text stops
+at a console error. See
+[Security headers](docs/src/content/docs/operations/security-headers.md).
 
 ### Trusted
 
