@@ -3,14 +3,12 @@ import type { UIMessage } from "ai";
 import {
   requireIdentity,
   assertAuthorized,
-  can,
   errorResponse,
   HttpError,
 } from "@/lib/auth/authorize";
 import { readJson } from "@/lib/http";
 import { getDashboardById, getSourceById } from "@/lib/db/repo";
-import { streamDashboardChat } from "@/lib/ai/chat";
-import type { SourceRecord } from "@/lib/registry";
+import { resolveChatSources, streamDashboardChat } from "@/lib/ai/chat";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -26,8 +24,8 @@ const Body = z.object({
  * Read-only chat scoped to a single dashboard. Authorization: viewer on the
  * dashboard's workspace. The model may fetch fresh data only from the sources
  * this dashboard already references AND that the caller may use — each is
- * re-resolved and re-authorized here; unavailable ones are silently omitted
- * (never surfaced), mirroring the poller's tombstone handling.
+ * re-resolved and re-authorized in `resolveChatSources`; unavailable ones are
+ * silently omitted (never surfaced), mirroring the poller's tombstone handling.
  */
 export async function POST(
   req: Request,
@@ -44,16 +42,11 @@ export async function POST(
       workspaceId: dashboard.workspaceId,
     });
 
-    const sourceIds = [...new Set(dashboard.spec.panels.map((p) => p.query.sourceId))];
-    const sources: SourceRecord[] = [];
-    for (const sourceId of sourceIds) {
-      const source = await getSourceById(sourceId);
-      if (!source || source.tombstonedAt) continue;
-      if (!can(identity, "source:use", { workspaceId: source.workspaceId })) {
-        continue;
-      }
-      sources.push(source);
-    }
+    const sources = await resolveChatSources({
+      identity,
+      dashboard: dashboard.spec,
+      getSource: getSourceById,
+    });
 
     const result = await streamDashboardChat({
       dashboard: dashboard.spec,
