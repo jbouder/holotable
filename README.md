@@ -234,10 +234,14 @@ npm run seed     # looping metrics seeder
 
 ## Security notes
 
-- Dev login is hard-disabled in production and cannot bypass OIDC.
+- OIDC is the only way to authenticate; there is no local or dev login path.
 - Keycloak tokens are verified with RS256 via JWKS (`OIDC_JWKS_URL`).
 - Authorization is centralized in `can()` and never derived from a request's
   workspace field; the source is re-authorized on every execution.
+
+The full trust model — what is trusted, what is not, and the known
+limitations — is in [SECURITY.md](SECURITY.md), along with how to report a
+vulnerability privately.
 
 ## License
 

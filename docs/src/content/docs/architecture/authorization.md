@@ -55,7 +55,7 @@ verification strategies are selected by environment:
    (RS256) with issuer and audience checks. Enabled when `OIDC_JWKS_URL` and
    `OIDC_ISSUER` are configured.
 2. **Locally-signed session tokens** (HS256 via `SESSION_SECRET`): used by the
-   OIDC callback to mint a first-party session, and by dev-only login.
+   OIDC callback to mint a first-party session.
 
 Either way, only the validated `sub` and `groups` claims are ever trusted.
 
@@ -63,6 +63,6 @@ The session cookie is `httpOnly`, `Secure` in production, `SameSite=Lax`,
 path `/`, with an 8-hour lifetime.
 
 :::note
-Dev login is hard-disabled in production and cannot bypass OIDC. Setup for the
-Keycloak side is in [Keycloak setup](/operations/keycloak/).
+OIDC is the only way to authenticate; there is no local or development login
+path. Setup for the Keycloak side is in [Keycloak setup](/operations/keycloak/).
 :::
