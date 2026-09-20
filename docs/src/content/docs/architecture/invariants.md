@@ -61,6 +61,12 @@ the PostgreSQL entries are the ones doing work today. Two groups matter most:
   allowlist bypass rather than an information leak.
 - **Every synonym for the current time**, not just `now()` — see invariant 8.
 
+Relation names are compared against the catalog exactly, character for
+character, as the parser reports them: an unquoted identifier is already
+folded to lowercase, a quoted one keeps its case. `HTTP_REQUESTS` is the
+catalog table `http_requests`; `"HTTP_REQUESTS"` is a different relation and
+is rejected.
+
 Statement shape and table access are decided from the parse tree, so the
 guard sees through dollar-quoting, unicode escapes, nested CTEs and
 subqueries in any position, and it recognises a CTE alias, `FROM` inside

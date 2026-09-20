@@ -82,6 +82,26 @@ export const CORPUS: CorpusEntry[] = [
     note: "a quoted identifier with a trailing space is a different relation",
   },
   {
+    sql: 'SELECT * FROM "HTTP_REQUESTS"',
+    verdict: "reject",
+    note: "a quoted identifier keeps its case, so this names a relation the catalog does not declare (#151)",
+  },
+  {
+    sql: 'SELECT * FROM metrics."Http_Requests"',
+    verdict: "reject",
+    note: "as above, schema-qualified",
+  },
+  {
+    sql: 'SELECT * FROM "METRICS".http_requests',
+    verdict: "reject",
+    note: "the schema part is compared the same way",
+  },
+  {
+    sql: "SELECT * FROM METRICS.HTTP_REQUESTS",
+    verdict: "accept",
+    note: "unquoted identifiers fold to lowercase whatever their case",
+  },
+  {
     sql: "SELECT 1 /* a /* nested */ b */ FROM http_requests",
     verdict: "reject",
     note: "PostgreSQL block comments nest",

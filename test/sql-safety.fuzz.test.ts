@@ -149,7 +149,10 @@ function uescaped(name: string): string {
 
 interface Rel {
   toks: string[];
-  /** The name the server resolves, lowercased; `schema.name` when qualified. */
+  /**
+   * The name the server resolves: unquoted parts folded to lowercase, quoted
+   * parts as written; `schema.name` when qualified.
+   */
   resolved: string;
   qualified: boolean;
 }
@@ -175,6 +178,35 @@ function relSpellings(name: string, schema = "metrics"): Rel[] {
   ];
 }
 
+/**
+ * Quoted spellings of an allowlisted name that differ from it only by case.
+ * PostgreSQL preserves the case of a quoted identifier, so each of these names
+ * a relation the catalog does not declare.
+ */
+function quotedRecasings(name: string, schema = "metrics"): Rel[] {
+  const upper = name.toUpperCase();
+  const title = name.charAt(0).toUpperCase() + name.slice(1);
+  const hex = upper.charCodeAt(0).toString(16).padStart(4, "0");
+  const plain = (toks: string[], resolved: string): Rel => ({
+    toks,
+    resolved,
+    qualified: false,
+  });
+  const qual = (toks: string[], resolved: string): Rel => ({
+    toks,
+    resolved,
+    qualified: true,
+  });
+  return [
+    plain([`"${upper}"`], upper),
+    plain([`"${title}"`], title),
+    plain([`U&"\\${hex}${upper.slice(1)}"`], upper),
+    qual([`${schema}."${upper}"`], `${schema}.${upper}`),
+    qual([`"${schema.toUpperCase()}".${name}`], `${schema.toUpperCase()}.${name}`),
+    qual([`"${schema}"."${title}"`], `${schema}.${title}`),
+  ];
+}
+
 const ALLOWED_RELS: Rel[] = [
   ...relSpellings("http_requests"),
   ...relSpellings("cpu_usage"),
@@ -183,6 +215,9 @@ const ALLOWED_RELS: Rel[] = [
 const FORBIDDEN_RELS: Rel[] = [
   ...relSpellings("secret"),
   ...relSpellings("pg_shadow", "pg_catalog"),
+  // Allowlisted names, quoted in a case the catalog does not declare.
+  ...quotedRecasings("http_requests"),
+  ...quotedRecasings("cpu_usage"),
   { toks: ["pg_authid"], resolved: "pg_authid", qualified: false },
   {
     toks: ["information_schema.tables"],
@@ -916,12 +951,14 @@ async function oracle(
           relname?: string;
         };
         if (rv.catalogname) problems.push(`catalog-qualified ${rv.relname}`);
+        // The parser has already folded unquoted parts and kept quoted parts
+        // as written; compare exactly, the way the server would look them up.
         const ref = rv.schemaname ? `${rv.schemaname}.${rv.relname}` : (rv.relname ?? "");
-        tables.push({ ref: ref.toLowerCase(), qualified: Boolean(rv.schemaname) });
+        tables.push({ ref, qualified: Boolean(rv.schemaname) });
       }
       if (key === "CommonTableExpr") {
         const cte = field as { ctename?: string };
-        if (cte.ctename) ctes.add(cte.ctename.toLowerCase());
+        if (cte.ctename) ctes.add(cte.ctename);
       }
       if (key === "FuncCall") {
         const fn = field as { funcname?: Array<{ String?: { sval?: string } }> };
