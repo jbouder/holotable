@@ -1,0 +1,43 @@
+---
+title: Holotable
+description: Natural-language monitoring dashboards. A language model authors a validated visualization spec; the server executes the guarded SQL.
+template: splash
+hero:
+  tagline: Describe the dashboard you want. A language model authors a validated spec — never the data — and Holotable executes the guarded SQL against TimescaleDB and streams the results live.
+  image:
+    file: ../../../public/images/dashboard-view.png
+  actions:
+    - text: Quick start
+      link: /getting-started/quick-start/
+      icon: right-arrow
+    - text: View on GitHub
+      link: https://github.com/jbouder/holotable
+      icon: external
+      variant: minimal
+---
+
+import { Card, CardGrid } from '@astrojs/starlight/components';
+
+<CardGrid stagger>
+  <Card title="The model writes specs, not data" icon="pencil">
+    Generation is bound to a shared Zod schema, so the model emits a
+    visualization specification — SQL plus chart configuration. Real metric
+    values are only ever produced by the server executing guarded SQL.
+    [How it works](/concepts/how-it-works/)
+  </Card>
+  <Card title="All model SQL is untrusted" icon="approve-check">
+    SELECT-only, single statement, catalog allowlist, no comments, no
+    time or non-deterministic functions — re-validated on every save and every
+    execution. [Invariants](/architecture/invariants/)
+  </Card>
+  <Card title="The server owns time" icon="setting">
+    The IR carries relative expressions like `now-15m`, but the server resolves
+    them and injects the bounds as bound parameters. The model cannot choose
+    the window or the row limit. [Executing a panel](/concepts/executing-a-panel/)
+  </Card>
+  <Card title="Panels carry only an opaque id" icon="seti:lock">
+    No host, port, database, or credential ever lives in a spec. The registry
+    owns the connection config and a `secret_ref` resolved from the server
+    environment. [Secret references](/operations/secret-references/)
+  </Card>
+</CardGrid>

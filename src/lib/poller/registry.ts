@@ -22,8 +22,8 @@ import { config } from "@/lib/config";
  * so referenced-but-removed sources surface as tombstone events.
  *
  * CAVEAT: this poller is per-process. Running multiple app instances would
- * create one poller per instance. See docs/ARCHITECTURE.md (single-instance
- * poller caveat) for the horizontal-scaling note.
+ * create one poller per instance. See
+ * docs/src/content/docs/architecture/scaling.md for the horizontal-scaling note.
  */
 
 export type PollerEvent =

@@ -32,6 +32,7 @@ export const config = {
    * last 24 hours ("now-24h" .. "now").
    */
   defaultTimeFrom: str("DEFAULT_TIME_FROM", "now-24h"),
+  /** Upper bound of the default range. `now` keeps new dashboards live. */
   defaultTimeTo: str("DEFAULT_TIME_TO", "now"),
 
   /** Hard cap on rows returned by any query executed against the metrics store. */

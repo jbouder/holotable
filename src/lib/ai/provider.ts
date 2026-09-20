@@ -14,8 +14,8 @@ import type { LanguageModel } from "ai";
  *                                     OPENAI_BASE_URL + OPENAI_API_KEY.
  *
  * OPEN DECISION: which concrete provider/model to run is deliberately left to
- * deployment (see docs/ARCHITECTURE.md). `AI_MODEL` selects it; there is no
- * baked-in default model.
+ * deployment (see docs/src/content/docs/operations/ai-provider.md). `AI_MODEL`
+ * selects it; there is no baked-in default model.
  */
 
 export function getModel(): LanguageModel {

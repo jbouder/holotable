@@ -1,0 +1,12 @@
+{
+  // Holotable documentation site — static assets on Cloudflare Workers.
+  // The site is prerendered by Astro; there is no Worker script, no binding,
+  // and no secret. `npm run deploy` builds and uploads ./dist.
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "holotable-docs",
+  "compatibility_date": "2026-09-01",
+  "assets": {
+    "directory": "./dist",
+    "not_found_handling": "404-page"
+  }
+}

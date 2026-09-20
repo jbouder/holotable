@@ -12,6 +12,8 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // The docs site is a separate Astro project with its own toolchain.
+    "docs/**",
   ]),
 ]);
 
