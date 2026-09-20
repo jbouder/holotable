@@ -1,0 +1,69 @@
+name: Feature request
+description: Suggest a capability or a change to how Holotable behaves.
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Please open one of these **before** writing the code, especially for
+        anything touching the shared IR, the SQL guard, or authorization. It is
+        much cheaper to agree on the shape first than to rework a finished diff.
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: The problem
+      description: >
+        What are you trying to do that Holotable makes hard or impossible? Lead
+        with the problem rather than the solution — it often has more than one.
+      placeholder: >
+        I want a panel to show the same metric across two time windows side by
+        side, and there is no way to express a second range in the IR.
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed change
+      description: What you think should happen, concretely.
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      description: Other approaches you weighed, and why you set them aside.
+    validations:
+      required: false
+
+  - type: checkboxes
+    id: invariants
+    attributes:
+      label: Architectural impact
+      description: >
+        Check anything this would touch. Checking a box is not a problem — it
+        just tells the maintainers the change needs a closer design conversation.
+        See [Invariants](https://github.com/jbouder/holotable/blob/main/docs/src/content/docs/architecture/invariants.md).
+      options:
+        - label: Changes the shared Zod IR (`src/lib/ir.ts`)
+        - label: Changes what the model is allowed to generate
+        - label: Changes SQL validation or query execution (`src/lib/sql/`)
+        - label: Changes how time ranges are resolved or injected (`src/lib/time.ts`)
+        - label: Changes authentication or authorization (`src/lib/auth/`)
+        - label: Changes how sources or credentials are stored or resolved
+        - label: None of the above — it is additive UI, docs, or tooling
+    validations:
+      required: false
+
+  - type: dropdown
+    id: contributing
+    attributes:
+      label: Would you be willing to implement this?
+      options:
+        - "Yes, if the approach is agreed"
+        - "Maybe, with guidance"
+        - "No — suggesting it only"
+    validations:
+      required: false

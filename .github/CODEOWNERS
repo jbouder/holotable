@@ -1,0 +1,38 @@
+# Code owners for Holotable.
+#
+# Listed paths require a review from the owner before merge. The point is not
+# process for its own sake: these are the files where a quiet regression stops
+# being a bug and starts being a vulnerability. See SECURITY.md and
+# docs/src/content/docs/architecture/invariants.md.
+
+# Default owner for anything not matched below.
+*                               @jbouder
+
+# The SQL guard. Everything the model emits passes through here: SELECT-only,
+# catalog allowlist, denylist, row and time limits, read-only execution.
+/src/lib/sql/                   @jbouder
+
+# Authentication and authorization. OIDC session handling, claim parsing
+# (highest role wins, fail-closed), and the central can() check.
+/src/lib/auth/                  @jbouder
+
+# The shared IR — the contract between model output, API validation,
+# persistence, and the client. A change here changes all four.
+/src/lib/ir.ts                  @jbouder
+
+# Server-side time resolution and range injection. The server, not the client
+# or the model, decides what window a panel actually queries.
+/src/lib/time.ts                @jbouder
+
+# The source registry: safe connection config, catalog, and secret_ref
+# resolution. Credentials come from the environment here and are never stored.
+/src/lib/registry.ts            @jbouder
+
+# Security policy, contributor expectations, and the license.
+/SECURITY.md                    @jbouder
+/CONTRIBUTING.md                @jbouder
+/LICENSE                        @jbouder
+/NOTICE                         @jbouder
+
+# CI and repository automation.
+/.github/                       @jbouder

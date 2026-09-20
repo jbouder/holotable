@@ -60,14 +60,25 @@ Key locations:
 - `docs/` — the Astro + Starlight documentation site (its own `package.json`;
   content under `docs/src/content/docs/`)
 - `timescaledb/` — database bootstrap/schema assets
+- `.github/` — CI workflows, issue forms, the pull request template, `CODEOWNERS`
 
 Important files:
 
 - `src/lib/ir.ts` — the canonical shared dashboard IR schema
+- `src/lib/sql/safety.ts` — the SQL guard every generated query passes through
+- `src/lib/auth/authorize.ts` — the central `can()` check
 - `src/lib/time.ts` — server-side time expression/range resolution
+- `src/lib/registry.ts` — source registry: safe connection config and
+  `secret_ref` resolution
 - `src/app/globals.css` — design tokens and Tailwind v4 theme setup
 - `next.config.ts` — standalone output, `pg` externalization
 - `package.json` — authoritative scripts/tooling
+- `SECURITY.md` — the trust model and the disclosure process
+- `CONTRIBUTING.md` — the human-facing version of this file
+
+The five files with a `CODEOWNERS` entry (`src/lib/sql/`, `src/lib/auth/`,
+`ir.ts`, `time.ts`, `registry.ts`) are the ones where a quiet regression stops
+being a bug and becomes a vulnerability. Changes there need a test.
 
 ---
 
@@ -196,15 +207,24 @@ Prefer additive, migration-safe changes.
 
 ### Auth
 
-The README indicates Keycloak OIDC with group-based auth plus a local dev-login
-path.
+Keycloak OIDC is the **only** way to authenticate. There is no local login, no
+dev-login bypass, and no seeded user — `src/app/api/auth/` has exactly three
+routes (`login`, `callback`, `logout`), and running the app locally still needs
+a realm. Do not add a development-only authentication path; make the local
+Keycloak work instead.
+
+Authorization is derived exclusively from the validated identity token's
+`groups` claim and is centralized in `can()` (`src/lib/auth/authorize.ts`).
+Group paths map to per-workspace roles, highest role wins, and parsing fails
+closed (`src/lib/auth/claims.ts`).
 
 When touching auth:
 
 - preserve secure defaults
 - do not broaden access implicitly
+- never derive authorization from a workspace id supplied in a request
+- re-authorize the source on every execution, not just at the route boundary
 - do not hardcode secrets
-- keep dev-only auth paths clearly separated from production behavior
 
 ---
 
@@ -213,22 +233,41 @@ When touching auth:
 Use the existing package scripts:
 
 ```bash
-npm run dev
-npm run build
-npm run lint
-npm run test
-npm run migrate
-npm run seed
+npm run dev        # dev server
+npm run build      # production build
+npm run start      # run the production build
+npm run lint       # eslint (flat config)
+npm run typecheck  # next typegen && tsc --noEmit
+npm test           # node --test via tsx
+npm run migrate    # apply Postgres migrations
+npm run seed       # looping metrics seeder
 ```
 
 Before finalizing code changes, run the checks relevant to your change:
 
 - `npm run lint`
-- `npm run test`
+- `npm run typecheck`
+- `npm test`
 - `npm run build` for framework/build-sensitive changes
+
+CI (`.github/workflows/ci.yml`) runs all four on every pull request, plus a
+Docker image build, and they are required to merge. Two constraints they
+enforce that are easy to break accidentally:
+
+- `typecheck` runs `next typegen` first on purpose. Next 16 writes the route
+  helper types (`RouteContext`, `PageProps`, `LayoutProps`) into `.next/types`,
+  which `tsconfig.json` includes; a bare `tsc --noEmit` on a cold checkout
+  fails without them.
+- `build` must succeed with **no** `.env` at all. Every value in
+  `src/lib/config.ts` has a fallback. If a change makes the build require a
+  secret, the change is wrong.
 
 If changing database-related code, also consider whether `migrate` or `seed`
 behavior is impacted.
+
+`CONTRIBUTING.md` says the same things for human contributors, including the
+branch and Conventional Commit conventions and the pull request template's
+invariants checklist. Keep the two in step.
 
 ---
 
@@ -300,6 +339,8 @@ If a requested change appears to conflict with the architecture, prefer:
 Consult:
 
 - `README.md`
+- `CONTRIBUTING.md`
+- `SECURITY.md` — the same boundaries stated as a trust model
 - `docs/src/content/docs/architecture/invariants.md`
 - `docs/src/content/docs/operations/keycloak.md`
 - `src/lib/ir.ts`
