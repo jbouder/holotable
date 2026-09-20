@@ -25,10 +25,7 @@ test("defaults to two panels side by side (w=6)", () => {
 });
 
 test("wraps to the next row after the column count", () => {
-  const out = autoLayoutPanels(
-    [panel("a"), panel("b"), panel("c")],
-    2,
-  );
+  const out = autoLayoutPanels([panel("a"), panel("b"), panel("c")], 2);
   // third panel starts a new row below the first row's height
   assert.deepEqual(out[2].layout, { x: 0, y: 4, w: 6, h: 4 });
 });
@@ -42,7 +39,10 @@ test("preserves order and each panel's height; never mutates input", () => {
   const input = [panel("a", 3), panel("b", 5)];
   const snapshot = JSON.parse(JSON.stringify(input));
   const out = autoLayoutPanels(input, 3);
-  assert.deepEqual(out.map((p) => p.id), ["a", "b"]);
+  assert.deepEqual(
+    out.map((p) => p.id),
+    ["a", "b"],
+  );
   assert.equal(out[0].layout.w, 4); // 12/3
   assert.equal(out[0].layout.h, 3);
   assert.equal(out[1].layout.h, 5);

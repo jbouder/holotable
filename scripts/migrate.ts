@@ -12,7 +12,9 @@ async function main() {
   if (!url) throw new Error("DATABASE_URL is not set");
 
   const dir = join(dirname(fileURLToPath(import.meta.url)), "..", "migrations");
-  const files = readdirSync(dir).filter((f) => f.endsWith(".sql")).sort();
+  const files = readdirSync(dir)
+    .filter((f) => f.endsWith(".sql"))
+    .sort();
 
   const client = new Client({ connectionString: url });
   await client.connect();
@@ -24,10 +26,9 @@ async function main() {
        )`,
     );
     for (const file of files) {
-      const done = await client.query(
-        "SELECT 1 FROM schema_migrations WHERE name = $1",
-        [file],
-      );
+      const done = await client.query("SELECT 1 FROM schema_migrations WHERE name = $1", [
+        file,
+      ]);
       if (done.rowCount) {
         console.log(`skip   ${file}`);
         continue;

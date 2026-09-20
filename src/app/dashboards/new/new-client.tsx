@@ -38,9 +38,7 @@ export function NewDashboardClient({
 }) {
   const router = useRouter();
   const [activeTab, setActiveTab] = React.useState<"chat" | "preview">("chat");
-  const [sourceId, setSourceId] = React.useState<string | null>(
-    sources[0]?.id ?? null,
-  );
+  const [sourceId, setSourceId] = React.useState<string | null>(sources[0]?.id ?? null);
   const [prompt, setPrompt] = React.useState("");
   const [finalSpec, setFinalSpec] = React.useState<Dashboard | null>(null);
   const [saveError, setSaveError] = React.useState<string | null>(null);
@@ -99,8 +97,7 @@ export function NewDashboardClient({
       <div className="mx-auto max-w-2xl">
         <Card>
           <CardContent className="text-sm text-muted">
-            You have no data sources to build from. Create one under Data
-            sources first.
+            You have no data sources to build from. Create one under Data sources first.
           </CardContent>
         </Card>
       </div>
@@ -116,8 +113,8 @@ export function NewDashboardClient({
             {model && <Badge title="Generation model">{model}</Badge>}
           </div>
           <p className="mt-1 text-sm text-muted">
-            Describe the dashboard you want in plain English. The model generates
-            a validated spec, then preview and save it as live panels.
+            Describe the dashboard you want in plain English. The model generates a
+            validated spec, then preview and save it as live panels.
           </p>
         </div>
 
@@ -154,114 +151,114 @@ export function NewDashboardClient({
           aria-labelledby="new-dashboard-chat-tab"
           className="space-y-4"
         >
-        <Card>
-          <CardContent className="space-y-4">
-            <div className="flex flex-wrap items-end gap-4">
-              <div>
-                <Label htmlFor="source">Data source</Label>
-                <Select
-                  id="source"
-                  value={sourceId}
-                  onValueChange={setSourceId}
-                  options={sources.map((s) => ({
-                    value: s.id,
-                    label: `${s.name} (${s.workspaceId})`,
-                  }))}
-                />
-              </div>
-            </div>
-            <div>
-              <Label htmlFor="prompt">Describe the dashboard or try one below</Label>
-              <div className="mb-2 flex flex-wrap items-center gap-2">
-                {PROMPT_PRESETS.map((preset) => (
-                  <button
-                    key={preset}
-                    type="button"
-                    disabled={isLoading}
-                    onClick={() => setPrompt(preset)}
-                    className="rounded-full border border-border bg-surface px-3 py-1 text-xs text-muted transition-colors hover:border-primary hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50"
-                  >
-                    {preset}
-                  </button>
-                ))}
-              </div>
-              <div className="relative">
-                <Textarea
-                  id="prompt"
-                  rows={3}
-                  className="pr-14"
-                  placeholder="e.g. Show request rate, p95 latency, and error ratio over the last hour"
-                  value={prompt}
-                  onChange={(e) => setPrompt(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter" && !e.shiftKey) {
-                      e.preventDefault();
-                      if (!isLoading && prompt.trim()) generate();
-                    }
-                  }}
-                />
-                <Button
-                  size="icon"
-                  onClick={generate}
-                  disabled={isLoading || !prompt.trim()}
-                  aria-label="Generate"
-                  title="Generate"
-                  className="absolute bottom-4 right-2"
-                >
-                  {isLoading ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                  ) : (
-                    <SendHorizontal className="h-4 w-4" />
-                  )}
-                </Button>
-              </div>
-            </div>
-            {(isLoading || finalSpec) && (
-              <div className="flex items-center gap-3">
-                {isLoading && (
-                  <Button variant="ghost" size="sm" onClick={() => stop()}>
-                    Stop
-                  </Button>
-                )}
-                {finalSpec && (
-                  <Button variant="secondary" onClick={save} disabled={saving}>
-                    <Save className="h-4 w-4" /> Save
-                  </Button>
-                )}
-              </div>
-            )}
-            {error && (
-              <RetryNotice
-                message={`Generation failed: ${error.message}`}
-                onRetry={generate}
-                disabled={isLoading}
-              />
-            )}
-            {saveError && <p className="text-sm text-danger">{saveError}</p>}
-          </CardContent>
-        </Card>
-
-        {showStreaming && (
           <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                {isLoading ? (
-                  <>
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                    <span className="animate-pulse">Generating config…</span>
-                  </>
-                ) : (
-                  "Generated config"
-                )}
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <pre className="max-h-96 overflow-auto rounded-lg border border-border bg-surface p-4 text-xs text-muted">
-                {JSON.stringify(object, null, 2)}
-              </pre>
+            <CardContent className="space-y-4">
+              <div className="flex flex-wrap items-end gap-4">
+                <div>
+                  <Label htmlFor="source">Data source</Label>
+                  <Select
+                    id="source"
+                    value={sourceId}
+                    onValueChange={setSourceId}
+                    options={sources.map((s) => ({
+                      value: s.id,
+                      label: `${s.name} (${s.workspaceId})`,
+                    }))}
+                  />
+                </div>
+              </div>
+              <div>
+                <Label htmlFor="prompt">Describe the dashboard or try one below</Label>
+                <div className="mb-2 flex flex-wrap items-center gap-2">
+                  {PROMPT_PRESETS.map((preset) => (
+                    <button
+                      key={preset}
+                      type="button"
+                      disabled={isLoading}
+                      onClick={() => setPrompt(preset)}
+                      className="rounded-full border border-border bg-surface px-3 py-1 text-xs text-muted transition-colors hover:border-primary hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      {preset}
+                    </button>
+                  ))}
+                </div>
+                <div className="relative">
+                  <Textarea
+                    id="prompt"
+                    rows={3}
+                    className="pr-14"
+                    placeholder="e.g. Show request rate, p95 latency, and error ratio over the last hour"
+                    value={prompt}
+                    onChange={(e) => setPrompt(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" && !e.shiftKey) {
+                        e.preventDefault();
+                        if (!isLoading && prompt.trim()) generate();
+                      }
+                    }}
+                  />
+                  <Button
+                    size="icon"
+                    onClick={generate}
+                    disabled={isLoading || !prompt.trim()}
+                    aria-label="Generate"
+                    title="Generate"
+                    className="absolute bottom-4 right-2"
+                  >
+                    {isLoading ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <SendHorizontal className="h-4 w-4" />
+                    )}
+                  </Button>
+                </div>
+              </div>
+              {(isLoading || finalSpec) && (
+                <div className="flex items-center gap-3">
+                  {isLoading && (
+                    <Button variant="ghost" size="sm" onClick={() => stop()}>
+                      Stop
+                    </Button>
+                  )}
+                  {finalSpec && (
+                    <Button variant="secondary" onClick={save} disabled={saving}>
+                      <Save className="h-4 w-4" /> Save
+                    </Button>
+                  )}
+                </div>
+              )}
+              {error && (
+                <RetryNotice
+                  message={`Generation failed: ${error.message}`}
+                  onRetry={generate}
+                  disabled={isLoading}
+                />
+              )}
+              {saveError && <p className="text-sm text-danger">{saveError}</p>}
             </CardContent>
           </Card>
-        )}
+
+          {showStreaming && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  {isLoading ? (
+                    <>
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      <span className="animate-pulse">Generating config…</span>
+                    </>
+                  ) : (
+                    "Generated config"
+                  )}
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <pre className="max-h-96 overflow-auto rounded-lg border border-border bg-surface p-4 text-xs text-muted">
+                  {JSON.stringify(object, null, 2)}
+                </pre>
+              </CardContent>
+            </Card>
+          )}
         </div>
       ) : (
         <section

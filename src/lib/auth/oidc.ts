@@ -20,7 +20,9 @@ export async function discover(): Promise<Endpoints> {
   if (cached) return cached;
   const issuer = process.env.OIDC_ISSUER;
   if (!issuer) throw new Error("OIDC_ISSUER is not configured");
-  const res = await fetch(`${issuer.replace(/\/$/, "")}/.well-known/openid-configuration`);
+  const res = await fetch(
+    `${issuer.replace(/\/$/, "")}/.well-known/openid-configuration`,
+  );
   if (!res.ok) throw new Error(`OIDC discovery failed: ${res.status}`);
   cached = (await res.json()) as Endpoints;
   return cached;
@@ -43,7 +45,10 @@ export async function buildAuthorizeUrl(origin: string, state: string, nonce: st
   return `${ep.authorization_endpoint}?${params.toString()}`;
 }
 
-export async function exchangeCode(origin: string, code: string): Promise<{ id_token: string }> {
+export async function exchangeCode(
+  origin: string,
+  code: string,
+): Promise<{ id_token: string }> {
   const ep = await discover();
   const body = new URLSearchParams({
     grant_type: "authorization_code",

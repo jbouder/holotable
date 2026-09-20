@@ -66,10 +66,7 @@ export async function PUT(req: Request, ctx: RouteContext<"/api/dashboards/[id]"
 }
 
 /** Delete a dashboard (owner, workspace source-admin, or platform admin). */
-export async function DELETE(
-  _req: Request,
-  ctx: RouteContext<"/api/dashboards/[id]">,
-) {
+export async function DELETE(_req: Request, ctx: RouteContext<"/api/dashboards/[id]">) {
   try {
     const identity = await requireIdentity();
     const { id } = await ctx.params;

@@ -1,8 +1,5 @@
 import { query, withTransaction } from "@/lib/db/pg";
-import {
-  SourceConfig,
-  type SourceRecord,
-} from "@/lib/registry";
+import { SourceConfig, type SourceRecord } from "@/lib/registry";
 import { type Dashboard, parseDashboard } from "@/lib/ir";
 
 /* -------------------------------------------------------------------------- */
@@ -20,7 +17,7 @@ type SourceRow = {
   created_at: string;
   updated_at: string;
   tombstoned_at: string | null;
-}
+};
 
 function mapSource(row: SourceRow): SourceRecord {
   return {
@@ -167,11 +164,9 @@ type DashboardJoinRow = {
   updated_at: string;
   version: number | null;
   spec: unknown;
-}
+};
 
-export async function listDashboards(
-  workspaceId: string,
-): Promise<DashboardSummary[]> {
+export async function listDashboards(workspaceId: string): Promise<DashboardSummary[]> {
   const rows = await query<DashboardJoinRow>(
     `SELECT d.id, d.workspace_id, d.title, d.created_by, d.updated_at, dv.version
      FROM dashboards d
@@ -191,9 +186,7 @@ export async function listDashboards(
 }
 
 /** Fetch a dashboard with its current spec (no workspace scoping for authz). */
-export async function getDashboardById(
-  id: string,
-): Promise<DashboardRecord | null> {
+export async function getDashboardById(id: string): Promise<DashboardRecord | null> {
   const rows = await query<DashboardJoinRow>(
     `SELECT d.id, d.workspace_id, d.title, d.created_by, d.updated_at,
             dv.version, dv.spec

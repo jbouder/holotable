@@ -71,9 +71,6 @@ test("platform admin satisfies any workspace role", () => {
 });
 
 test("accessibleWorkspaces lists sorted workspace ids", () => {
-  const id = parseGroups("u", [
-    "/workspaces/b/viewer",
-    "/workspaces/a/editor",
-  ]);
+  const id = parseGroups("u", ["/workspaces/b/viewer", "/workspaces/a/editor"]);
   assert.deepEqual(accessibleWorkspaces(id), ["a", "b"]);
 });

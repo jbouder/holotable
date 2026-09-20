@@ -44,9 +44,7 @@ export async function POST(
       workspaceId: dashboard.workspaceId,
     });
 
-    const sourceIds = [
-      ...new Set(dashboard.spec.panels.map((p) => p.query.sourceId)),
-    ];
+    const sourceIds = [...new Set(dashboard.spec.panels.map((p) => p.query.sourceId))];
     const sources: SourceRecord[] = [];
     for (const sourceId of sourceIds) {
       const source = await getSourceById(sourceId);

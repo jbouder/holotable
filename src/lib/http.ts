@@ -11,7 +11,10 @@ export async function readJson<T>(req: Request, schema: z.ZodType<T>): Promise<T
   }
   const parsed = schema.safeParse(body);
   if (!parsed.success) {
-    throw new HttpError(400, `invalid request: ${parsed.error.issues[0]?.message ?? "validation failed"}`);
+    throw new HttpError(
+      400,
+      `invalid request: ${parsed.error.issues[0]?.message ?? "validation failed"}`,
+    );
   }
   return parsed.data;
 }

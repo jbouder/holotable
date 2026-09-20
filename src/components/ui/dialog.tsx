@@ -29,9 +29,7 @@ export function Dialog({
           )}
         >
           <div className="mb-4 flex items-center justify-between gap-4">
-            <BaseDialog.Title className="text-lg font-semibold">
-              {title}
-            </BaseDialog.Title>
+            <BaseDialog.Title className="text-lg font-semibold">{title}</BaseDialog.Title>
             <BaseDialog.Close
               aria-label="Close dialog"
               className="inline-flex h-9 w-9 cursor-pointer items-center justify-center rounded-lg text-foreground transition-colors hover:bg-surface-2 focus-visible:outline-2 focus-visible:outline-primary"

@@ -100,8 +100,9 @@ function PanelBody({
 function StatView({ panel, data }: { panel: Panel; data: PanelData }) {
   const last = data.rows[data.rows.length - 1];
   const valueKey =
-    data.columns.find((c) => c !== panel.query.timeField && typeof last?.[c] === "number") ??
-    data.columns[data.columns.length - 1];
+    data.columns.find(
+      (c) => c !== panel.query.timeField && typeof last?.[c] === "number",
+    ) ?? data.columns[data.columns.length - 1];
   const value = last?.[valueKey];
   return (
     <div className="flex h-full items-center justify-center">

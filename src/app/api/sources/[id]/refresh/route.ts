@@ -12,7 +12,10 @@ export const runtime = "nodejs";
 export const maxDuration = 30;
 
 /** Refresh a source's catalog by introspecting the live schema (source-admin). */
-export async function POST(_req: Request, ctx: RouteContext<"/api/sources/[id]/refresh">) {
+export async function POST(
+  _req: Request,
+  ctx: RouteContext<"/api/sources/[id]/refresh">,
+) {
   try {
     const identity = await requireIdentity();
     const { id } = await ctx.params;

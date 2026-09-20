@@ -34,7 +34,10 @@ export function TableRow({
 }: React.HTMLAttributes<HTMLTableRowElement>) {
   return (
     <tr
-      className={cn("border-b border-border last:border-b-0 hover:bg-surface-2/50", className)}
+      className={cn(
+        "border-b border-border last:border-b-0 hover:bg-surface-2/50",
+        className,
+      )}
       {...props}
     />
   );
@@ -46,7 +49,10 @@ export function TableHeader({
 }: React.ThHTMLAttributes<HTMLTableCellElement>) {
   return (
     <th
-      className={cn("whitespace-nowrap px-4 py-3 text-left text-xs font-medium text-muted", className)}
+      className={cn(
+        "whitespace-nowrap px-4 py-3 text-left text-xs font-medium text-muted",
+        className,
+      )}
       {...props}
     />
   );

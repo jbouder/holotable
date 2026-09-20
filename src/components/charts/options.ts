@@ -10,7 +10,11 @@ export interface PanelData {
 const palette = chartPalette();
 
 function isNumeric(rows: Record<string, unknown>[], key: string): boolean {
-  return rows.some((r) => typeof r[key] === "number" || (r[key] !== null && r[key] !== "" && Number.isFinite(Number(r[key]))));
+  return rows.some(
+    (r) =>
+      typeof r[key] === "number" ||
+      (r[key] !== null && r[key] !== "" && Number.isFinite(Number(r[key]))),
+  );
 }
 
 function xKey(panel: Panel, data: PanelData): string {
@@ -111,8 +115,7 @@ function buildScatter(data: PanelData): EChartsOption {
  */
 function buildPie(panel: Panel, data: PanelData): EChartsOption {
   const x = xKey(panel, data);
-  const valueKey =
-    seriesKeys(panel, data)[0] ?? data.columns.find((c) => c !== x) ?? x;
+  const valueKey = seriesKeys(panel, data)[0] ?? data.columns.find((c) => c !== x) ?? x;
   const radius = panel.viz === "donut" ? ["48%", "72%"] : "72%";
   return {
     color: palette,

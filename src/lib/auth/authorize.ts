@@ -42,11 +42,7 @@ export class HttpError extends Error {
  * Pure authorization decision. Exported for unit testing. Platform admins are
  * globally authorized (the single sanctioned bypass).
  */
-export function can(
-  identity: Identity,
-  action: Action,
-  ctx: AuthzContext,
-): boolean {
+export function can(identity: Identity, action: Action, ctx: AuthzContext): boolean {
   if (identity.platformAdmin) return true;
   const { workspaceId, ownerSub } = ctx;
 

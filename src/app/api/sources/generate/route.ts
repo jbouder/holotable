@@ -1,9 +1,5 @@
 import { z } from "zod";
-import {
-  requireIdentity,
-  assertAuthorized,
-  errorResponse,
-} from "@/lib/auth/authorize";
+import { requireIdentity, assertAuthorized, errorResponse } from "@/lib/auth/authorize";
 import { readJson } from "@/lib/http";
 import { streamSourceDraft } from "@/lib/ai/generate";
 

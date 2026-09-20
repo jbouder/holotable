@@ -1,18 +1,16 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import {
-  Dashboard,
-  Panel,
-  TimeExpr,
-  safeParseDashboard,
-  parseDashboard,
-} from "@/lib/ir";
+import { Dashboard, Panel, TimeExpr, safeParseDashboard, parseDashboard } from "@/lib/ir";
 
 const validPanel = {
   id: "p1",
   title: "Requests",
   viz: "line" as const,
-  query: { sourceId: "src-1", sql: "SELECT ts, count(*) AS c FROM http_requests GROUP BY ts", timeField: "ts" },
+  query: {
+    sourceId: "src-1",
+    sql: "SELECT ts, count(*) AS c FROM http_requests GROUP BY ts",
+    timeField: "ts",
+  },
   format: "number" as const,
   layout: { x: 0, y: 0, w: 6, h: 4 },
 };
@@ -84,7 +82,14 @@ test("timeField is optional on a panel query", () => {
 });
 
 test("TimeExpr accepts relative and ISO forms", () => {
-  for (const good of ["now", "now-15m", "now-1h", "now-24h", "now-7d", "2024-01-02T03:04:05Z"]) {
+  for (const good of [
+    "now",
+    "now-15m",
+    "now-1h",
+    "now-24h",
+    "now-7d",
+    "2024-01-02T03:04:05Z",
+  ]) {
     assert.equal(TimeExpr.safeParse(good).success, true, good);
   }
 });

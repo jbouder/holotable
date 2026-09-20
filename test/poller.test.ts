@@ -32,7 +32,11 @@ function spec(overrides: Partial<Dashboard> = {}): Dashboard {
 const noopExecutor: PanelExecutor = async () => [];
 
 test("computeDelta replaces on first fetch and reports the max cursor", () => {
-  const rows = [{ ts: "2024-01-01 00:00:01" }, { ts: "2024-01-01 00:00:03" }, { ts: "2024-01-01 00:00:02" }];
+  const rows = [
+    { ts: "2024-01-01 00:00:01" },
+    { ts: "2024-01-01 00:00:03" },
+    { ts: "2024-01-01 00:00:02" },
+  ];
   const d = computeDelta(rows, "ts", undefined);
   assert.equal(d.mode, "replace");
   assert.equal(d.fresh.length, 3);
@@ -165,9 +169,17 @@ test("makePanelExecutor emits tombstone for a cross-workspace source (never exec
     DASHBOARD_WORKSPACE,
   );
 
-  assert.equal(queryExecuted, false, "executePlan must never be called for cross-workspace source");
+  assert.equal(
+    queryExecuted,
+    false,
+    "executePlan must never be called for cross-workspace source",
+  );
   assert.equal(events.length, 1);
-  assert.equal(events[0].type, "tombstone", "cross-workspace source must surface as tombstone");
+  assert.equal(
+    events[0].type,
+    "tombstone",
+    "cross-workspace source must surface as tombstone",
+  );
   const tombstone = events[0] as { type: "tombstone"; panelId: string; sourceId: string };
   assert.equal(tombstone.sourceId, "src-cross");
   assert.equal(tombstone.panelId, "p-cross");
@@ -187,7 +199,9 @@ test("makePanelExecutor allows execution when source workspace matches dashboard
       database: "holotable",
       schema: "metrics",
       ssl: false,
-      tables: [{ name: "events", columns: [{ name: "ts", type: "timestamp with time zone" }] }],
+      tables: [
+        { name: "events", columns: [{ name: "ts", type: "timestamp with time zone" }] },
+      ],
     },
     secretRef: "METRICS_CREDS",
     createdBy: "owner",
@@ -222,5 +236,9 @@ test("makePanelExecutor allows execution when source workspace matches dashboard
     reachedQuery = true;
   }
 
-  assert.equal(reachedQuery, true, "executor must attempt query execution for same-workspace source");
+  assert.equal(
+    reachedQuery,
+    true,
+    "executor must attempt query execution for same-workspace source",
+  );
 });

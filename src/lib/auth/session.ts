@@ -1,9 +1,4 @@
-import {
-  SignJWT,
-  jwtVerify,
-  createRemoteJWKSet,
-  type JWTPayload,
-} from "jose";
+import { SignJWT, jwtVerify, createRemoteJWKSet, type JWTPayload } from "jose";
 import { config } from "@/lib/config";
 import { parseGroups, type Identity } from "@/lib/auth/claims";
 
@@ -42,7 +37,7 @@ function sessionSecret(): Uint8Array {
     }
     // Dev-only deterministic fallback so local runs work out of the box.
     return new TextEncoder().encode(
-      (secret ?? "dev-insecure-session-secret") .padEnd(32, "0"),
+      (secret ?? "dev-insecure-session-secret").padEnd(32, "0"),
     );
   }
   return new TextEncoder().encode(secret);

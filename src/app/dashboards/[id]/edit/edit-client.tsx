@@ -53,7 +53,12 @@ export function EditDashboardClient({
 
   const selected = spec.panels.find((p) => p.id === selectedId) ?? null;
 
-  const { object, submit, isLoading, error: genError } = useObject({
+  const {
+    object,
+    submit,
+    isLoading,
+    error: genError,
+  } = useObject({
     api: "/api/generate",
     schema: Panel,
     onFinish({ object }) {
@@ -100,7 +105,12 @@ export function EditDashboardClient({
 
   function runNlEdit() {
     if (!selected || !nlPrompt.trim()) return;
-    submit({ mode: "panel", sourceId: selected.query.sourceId, prompt: nlPrompt, current: selected });
+    submit({
+      mode: "panel",
+      sourceId: selected.query.sourceId,
+      prompt: nlPrompt,
+      current: selected,
+    });
   }
 
   async function save() {
@@ -139,7 +149,11 @@ export function EditDashboardClient({
             Cancel
           </Button>
           <Button onClick={save} disabled={saving}>
-            {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+            {saving ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <Save className="h-4 w-4" />
+            )}
             Save version
           </Button>
         </div>
@@ -181,7 +195,11 @@ export function EditDashboardClient({
             <CardContent className="grid grid-cols-1 gap-4 md:grid-cols-4">
               <div>
                 <Label htmlFor="title">Title</Label>
-                <Input id="title" value={spec.title} onChange={(e) => updateSpec({ title: e.target.value })} />
+                <Input
+                  id="title"
+                  value={spec.title}
+                  onChange={(e) => updateSpec({ title: e.target.value })}
+                />
               </div>
               <div>
                 <Label htmlFor="refresh">Refresh (ms)</Label>
@@ -189,7 +207,9 @@ export function EditDashboardClient({
                   id="refresh"
                   type="number"
                   value={spec.refreshIntervalMs}
-                  onChange={(e) => updateSpec({ refreshIntervalMs: Number(e.target.value) })}
+                  onChange={(e) =>
+                    updateSpec({ refreshIntervalMs: Number(e.target.value) })
+                  }
                 />
               </div>
               <div>
@@ -197,7 +217,9 @@ export function EditDashboardClient({
                 <Input
                   id="from"
                   value={spec.timeRange.from}
-                  onChange={(e) => updateSpec({ timeRange: { ...spec.timeRange, from: e.target.value } })}
+                  onChange={(e) =>
+                    updateSpec({ timeRange: { ...spec.timeRange, from: e.target.value } })
+                  }
                 />
               </div>
               <div>
@@ -205,126 +227,130 @@ export function EditDashboardClient({
                 <Input
                   id="to"
                   value={spec.timeRange.to}
-                  onChange={(e) => updateSpec({ timeRange: { ...spec.timeRange, to: e.target.value } })}
+                  onChange={(e) =>
+                    updateSpec({ timeRange: { ...spec.timeRange, to: e.target.value } })
+                  }
                 />
               </div>
             </CardContent>
           </Card>
 
           <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
-        <Card className="lg:col-span-1">
-          <CardHeader>
-            <CardTitle>Panels</CardTitle>
-            <Button variant="secondary" size="sm" onClick={addPanel}>
-              <Plus className="h-4 w-4" /> Add
-            </Button>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            <div className="flex flex-wrap items-center gap-1.5 border-b border-border pb-3 text-xs">
-              <LayoutGrid className="h-3.5 w-3.5 text-muted" />
-              <span className="mr-1 text-muted">Arrange:</span>
-              {COLUMN_PRESETS.map((n) => (
-                <Button
-                  key={n}
-                  variant="secondary"
-                  size="sm"
-                  className="h-6 px-2 text-xs"
-                  onClick={() => arrangeColumns(n)}
-                >
-                  {n}-up
+            <Card className="lg:col-span-1">
+              <CardHeader>
+                <CardTitle>Panels</CardTitle>
+                <Button variant="secondary" size="sm" onClick={addPanel}>
+                  <Plus className="h-4 w-4" /> Add
                 </Button>
-              ))}
-            </div>
-            <div className="space-y-1">
-            {spec.panels.map((p) => (
-              <button
-                key={p.id}
-                onClick={() => setSelectedId(p.id)}
-                className={`flex w-full items-center justify-between rounded px-2 py-1.5 text-left text-sm ${
-                  p.id === selectedId ? "bg-surface-2" : "hover:bg-surface-2"
-                }`}
-              >
-                <span className="truncate">{p.title}</span>
-                <Trash2
-                  className="h-4 w-4 shrink-0 text-muted hover:text-danger"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    removePanel(p.id);
-                  }}
-                />
-              </button>
-            ))}
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="lg:col-span-2">
-          <CardHeader>
-            <CardTitle>{selected ? "Panel editor" : "No panel selected"}</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            {selected && (
-              <PanelEditor
-                panel={selected}
-                sources={sources}
-                onChange={(fn) => updatePanel(selected.id, fn)}
-              />
-            )}
-            {selected && (
-              <div className="space-y-2 border-t border-border pt-4">
-                <Label htmlFor="nl">Natural-language edit (runs the model once)</Label>
-                <div className="relative">
-                  <Textarea
-                    id="nl"
-                    rows={2}
-                    className="pr-14"
-                    placeholder="e.g. change to a bar chart grouped by status code"
-                    value={nlPrompt}
-                    onChange={(e) => setNlPrompt(e.target.value)}
-                  />
-                  <Button
-                    size="icon"
-                    onClick={runNlEdit}
-                    disabled={isLoading || !nlPrompt.trim()}
-                    aria-label="Apply NL edit"
-                    title="Apply NL edit"
-                    className="absolute bottom-4 right-2"
-                  >
-                    {isLoading ? (
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                    ) : (
-                      <SendHorizontal className="h-4 w-4" />
-                    )}
-                  </Button>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <div className="flex flex-wrap items-center gap-1.5 border-b border-border pb-3 text-xs">
+                  <LayoutGrid className="h-3.5 w-3.5 text-muted" />
+                  <span className="mr-1 text-muted">Arrange:</span>
+                  {COLUMN_PRESETS.map((n) => (
+                    <Button
+                      key={n}
+                      variant="secondary"
+                      size="sm"
+                      className="h-6 px-2 text-xs"
+                      onClick={() => arrangeColumns(n)}
+                    >
+                      {n}-up
+                    </Button>
+                  ))}
                 </div>
-                {genError && (
-                  <RetryNotice
-                    message={`Edit failed: ${genError.message}`}
-                    onRetry={runNlEdit}
-                    disabled={isLoading}
+                <div className="space-y-1">
+                  {spec.panels.map((p) => (
+                    <button
+                      key={p.id}
+                      onClick={() => setSelectedId(p.id)}
+                      className={`flex w-full items-center justify-between rounded px-2 py-1.5 text-left text-sm ${
+                        p.id === selectedId ? "bg-surface-2" : "hover:bg-surface-2"
+                      }`}
+                    >
+                      <span className="truncate">{p.title}</span>
+                      <Trash2
+                        className="h-4 w-4 shrink-0 text-muted hover:text-danger"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          removePanel(p.id);
+                        }}
+                      />
+                    </button>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card className="lg:col-span-2">
+              <CardHeader>
+                <CardTitle>{selected ? "Panel editor" : "No panel selected"}</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {selected && (
+                  <PanelEditor
+                    panel={selected}
+                    sources={sources}
+                    onChange={(fn) => updatePanel(selected.id, fn)}
                   />
                 )}
-                {showStreaming && (
-                  <div className="space-y-1.5">
-                    <Label className="flex items-center gap-2">
-                      {isLoading ? (
-                        <>
-                          <Loader2 className="h-4 w-4 animate-spin" />
-                          <span className="animate-pulse">Generating config…</span>
-                        </>
-                      ) : (
-                        "Generated config"
-                      )}
+                {selected && (
+                  <div className="space-y-2 border-t border-border pt-4">
+                    <Label htmlFor="nl">
+                      Natural-language edit (runs the model once)
                     </Label>
-                    <pre className="max-h-96 overflow-auto rounded-lg border border-border bg-surface p-4 text-xs text-muted">
-                      {JSON.stringify(object, null, 2)}
-                    </pre>
+                    <div className="relative">
+                      <Textarea
+                        id="nl"
+                        rows={2}
+                        className="pr-14"
+                        placeholder="e.g. change to a bar chart grouped by status code"
+                        value={nlPrompt}
+                        onChange={(e) => setNlPrompt(e.target.value)}
+                      />
+                      <Button
+                        size="icon"
+                        onClick={runNlEdit}
+                        disabled={isLoading || !nlPrompt.trim()}
+                        aria-label="Apply NL edit"
+                        title="Apply NL edit"
+                        className="absolute bottom-4 right-2"
+                      >
+                        {isLoading ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                          <SendHorizontal className="h-4 w-4" />
+                        )}
+                      </Button>
+                    </div>
+                    {genError && (
+                      <RetryNotice
+                        message={`Edit failed: ${genError.message}`}
+                        onRetry={runNlEdit}
+                        disabled={isLoading}
+                      />
+                    )}
+                    {showStreaming && (
+                      <div className="space-y-1.5">
+                        <Label className="flex items-center gap-2">
+                          {isLoading ? (
+                            <>
+                              <Loader2 className="h-4 w-4 animate-spin" />
+                              <span className="animate-pulse">Generating config…</span>
+                            </>
+                          ) : (
+                            "Generated config"
+                          )}
+                        </Label>
+                        <pre className="max-h-96 overflow-auto rounded-lg border border-border bg-surface p-4 text-xs text-muted">
+                          {JSON.stringify(object, null, 2)}
+                        </pre>
+                      </div>
+                    )}
                   </div>
                 )}
-              </div>
-            )}
-          </CardContent>
-        </Card>
+              </CardContent>
+            </Card>
           </div>
         </>
       ) : (
@@ -364,7 +390,9 @@ function PanelEditor({
           <Label>Source</Label>
           <Select
             value={panel.query.sourceId}
-            onValueChange={(v) => onChange((p) => ({ ...p, query: { ...p.query, sourceId: v } }))}
+            onValueChange={(v) =>
+              onChange((p) => ({ ...p, query: { ...p.query, sourceId: v } }))
+            }
             options={sources.map((s) => ({ value: s.id, label: s.name }))}
           />
         </div>
@@ -389,13 +417,17 @@ function PanelEditor({
       </div>
 
       <div>
-        <Label htmlFor="p-sql">SQL (SELECT only; no time filter — the server injects it)</Label>
+        <Label htmlFor="p-sql">
+          SQL (SELECT only; no time filter — the server injects it)
+        </Label>
         <Textarea
           id="p-sql"
           rows={4}
           className="font-mono"
           value={panel.query.sql}
-          onChange={(e) => onChange((p) => ({ ...p, query: { ...p.query, sql: e.target.value } }))}
+          onChange={(e) =>
+            onChange((p) => ({ ...p, query: { ...p.query, sql: e.target.value } }))
+          }
         />
       </div>
 
@@ -411,7 +443,10 @@ function PanelEditor({
               ? WIDTH_PRESETS
               : [
                   ...WIDTH_PRESETS,
-                  { value: String(panel.layout.w), label: `Custom (${panel.layout.w}/12)` },
+                  {
+                    value: String(panel.layout.w),
+                    label: `Custom (${panel.layout.w}/12)`,
+                  },
                 ]
           }
         />

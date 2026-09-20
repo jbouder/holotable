@@ -42,7 +42,9 @@ export class QueryExecutionError extends Error {
  * socket failures surface Node error codes like `ECONNREFUSED` instead, which
  * we deliberately do NOT surface to the client.
  */
-function isPostgresStatementError(err: unknown): err is { code: string; message: string } {
+function isPostgresStatementError(
+  err: unknown,
+): err is { code: string; message: string } {
   const e = err as { code?: unknown };
   return typeof e?.code === "string" && /^[0-9A-Z]{5}$/.test(e.code);
 }

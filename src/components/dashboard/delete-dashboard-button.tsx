@@ -55,9 +55,7 @@ export function DeleteDashboardButton({
         Delete
       </Button>
       {error && (
-        <span className="absolute top-full mt-1 text-xs text-danger">
-          {error}
-        </span>
+        <span className="absolute top-full mt-1 text-xs text-danger">{error}</span>
       )}
     </div>
   );

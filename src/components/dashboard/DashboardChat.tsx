@@ -155,12 +155,7 @@ export function DashboardChat({
             className="max-h-28 min-h-[2.5rem] resize-none"
           />
           {busy ? (
-            <Button
-              variant="ghost"
-              size="icon"
-              aria-label="Stop"
-              onClick={() => stop()}
-            >
+            <Button variant="ghost" size="icon" aria-label="Stop" onClick={() => stop()}>
               <Loader2 className="h-4 w-4 animate-spin" />
             </Button>
           ) : (
@@ -190,8 +185,8 @@ function EmptyState({ onPick }: { onPick: (text: string) => void }) {
   return (
     <div className="flex h-full flex-col justify-center gap-3 text-center">
       <p className="text-sm text-muted">
-        Ask questions about this dashboard&rsquo;s panels and data. I can fetch
-        fresh numbers with read-only queries.
+        Ask questions about this dashboard&rsquo;s panels and data. I can fetch fresh
+        numbers with read-only queries.
       </p>
       <div className="flex flex-col gap-2">
         {EXAMPLE_PROMPTS.map((prompt) => (
@@ -236,10 +231,7 @@ function MessageBubble({ message }: { message: ChatMessage }) {
           const running =
             part.state === "input-streaming" || part.state === "input-available";
           return (
-            <div
-              key={i}
-              className="flex items-center gap-1.5 text-xs text-muted"
-            >
+            <div key={i} className="flex items-center gap-1.5 text-xs text-muted">
               {running ? (
                 <Loader2 className="h-3 w-3 animate-spin" />
               ) : (

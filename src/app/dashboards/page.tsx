@@ -48,9 +48,7 @@ export default async function DashboardsPage() {
             <Link key={d.id} href={`/dashboards/${d.id}`} className="group">
               <Card className="h-full transition-colors group-hover:border-foreground/40">
                 <CardContent className="flex h-full flex-col gap-2">
-                  <div className="font-medium leading-snug">
-                    {d.title}
-                  </div>
+                  <div className="font-medium leading-snug">{d.title}</div>
                   <div className="mt-auto flex flex-col gap-0.5 text-xs text-muted">
                     <span>
                       {d.workspaceId} · v{d.version}
