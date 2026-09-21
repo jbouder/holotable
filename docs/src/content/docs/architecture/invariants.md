@@ -99,10 +99,24 @@ neither the time window nor resource usage. Each execution also pins
 plus `public`, so unqualified table names resolve only against the allowlisted
 schema.
 
-## 9. The catalog prompt is metadata only
+## 9. The catalog prompt is metadata only, and that metadata is untrusted
 
 Table and column names and types for a **single selected, authorized source per
 call**. No sample rows are sent.
+
+The names come from `information_schema.columns` of a database the operator may
+not control, and a column called `-- ignore previous instructions` is a prompt
+injection aimed at every generation path. So the catalog enters a prompt only
+through `renderCatalog` and `fenceUntrustedBlock` (`src/lib/ai/untrusted.ts`):
+every field is flattened onto one line, stripped of control characters and
+clamped to its registry-schema maximum, and the whole block sits between
+markers carrying a random per-call token, preceded by a standing rule that the
+contents are data. The body is scrubbed of the token, so no name or
+description can close the block or open a fake one. The dashboard chat prompt
+treats the stored panel specs (titles, descriptions, SQL written by an earlier
+model run) the same way. This is a second line of defence: the model's output
+is untrusted regardless (invariant 7), which is what actually contains a
+successful injection.
 
 ## 10. One poller per dashboard
 
