@@ -210,6 +210,7 @@ test("malformed values are errors regardless of environment", () => {
     OPENAI_API: "completions",
     OIDC_SCOPE: "profile email",
     MAX_QUERY_ROWS: "lots",
+    MAX_RESULT_BYTES: "0",
     QUERY_TIMEOUT_SECONDS: "-5",
     DEFAULT_TIME_FROM: "yesterday-ish",
     SESSION_COOKIE_NAME: "has space",

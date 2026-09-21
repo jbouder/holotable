@@ -95,7 +95,11 @@ LIMIT <maxQueryRows>          -- default 5000
   supplies a time value; it only named the column.
 - `timeField` is re-checked against a strict identifier regex before
   interpolation — it is an identifier, so it cannot be a bound parameter.
-- A hard `LIMIT` caps rows regardless of what the query does.
+- A hard `LIMIT` caps rows regardless of what the query does, and
+  `MAX_RESULT_BYTES` (default 4 MiB) caps the serialized size of the result:
+  `executePlan` measures rows as they stream in from Postgres and stops
+  keeping them the moment the cap is crossed, so a wide-row result fails with
+  an actionable message naming the limit instead of being buffered whole.
 
 ## Read-only execution
 
