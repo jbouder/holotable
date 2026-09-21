@@ -32,7 +32,7 @@ services:
   migrate:
     build:
       context: .
-    command: ["node", "node_modules/.bin/tsx", "scripts/migrate.ts"]
+      target: migrate
     environment:
       DATABASE_URL: "postgresql://${POSTGRES_USER:-holotable}:${POSTGRES_PASSWORD:-holotable}@postgres:5432/holotable"
     depends_on:
@@ -80,6 +80,7 @@ services:
   seed:
     build:
       context: .
+      target: migrate
     command: ["node", "node_modules/.bin/tsx", "scripts/seed.ts"]
     environment:
       DATABASE_URL: "postgresql://${POSTGRES_USER:-holotable}:${POSTGRES_PASSWORD:-holotable}@postgres:5432/holotable"

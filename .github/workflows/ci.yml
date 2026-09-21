@@ -166,3 +166,17 @@ jobs:
           tags: holotable:ci
           cache-from: type=gha
           cache-to: type=gha,mode=max
+
+      # The job image `docker compose` runs migrate and seed from. It shares
+      # the `deps` stage with the build above, so this is mostly a cache hit;
+      # it is here so a change to `scripts/` or `migrations/` that breaks the
+      # target fails CI instead of the next `docker compose up`.
+      - name: Build migrate image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          target: migrate
+          push: false
+          load: false
+          tags: holotable:ci-migrate
+          cache-from: type=gha
