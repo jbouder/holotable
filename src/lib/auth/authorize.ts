@@ -32,6 +32,8 @@ export class HttpError extends Error {
   constructor(
     public status: number,
     message: string,
+    /** Extra response headers, e.g. `Retry-After` on a 429. */
+    public headers: Record<string, string> = {},
   ) {
     super(message);
     this.name = "HttpError";
@@ -109,7 +111,10 @@ export function assertAuthorized(
 /** Convert a thrown HttpError (or unknown error) into a JSON Response. */
 export function errorResponse(err: unknown): Response {
   if (err instanceof HttpError) {
-    return Response.json({ error: err.message }, { status: err.status });
+    return Response.json(
+      { error: err.message },
+      { status: err.status, headers: err.headers },
+    );
   }
   console.error("Unhandled error:", err);
   return Response.json({ error: "internal error" }, { status: 500 });

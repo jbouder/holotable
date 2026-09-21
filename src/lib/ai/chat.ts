@@ -3,6 +3,7 @@ import {
   tool,
   convertToModelMessages,
   stepCountIs,
+  type LanguageModelUsage,
   type UIMessage,
 } from "ai";
 import { z } from "zod";
@@ -206,8 +207,10 @@ export async function streamDashboardChat(input: {
   dashboard: Dashboard;
   sources: SourceRecord[];
   messages: UIMessage[];
+  /** Receives the usage summed over every step of the turn. */
+  onUsage?: (usage: LanguageModelUsage) => void;
 }) {
-  const { dashboard, sources, messages } = input;
+  const { dashboard, sources, messages, onUsage } = input;
   const modelMessages = await convertToModelMessages(messages);
 
   return streamText({
@@ -215,6 +218,7 @@ export async function streamDashboardChat(input: {
     system: buildSystemPrompt(dashboard, sources),
     messages: modelMessages,
     stopWhen: stepCountIs(MAX_STEPS),
+    onFinish: ({ usage }) => onUsage?.(usage),
     tools: {
       runQuery: tool({
         description:

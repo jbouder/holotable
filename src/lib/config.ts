@@ -59,6 +59,20 @@ export const config = {
    */
   aiModel: str("AI_MODEL", ""),
 
+  /**
+   * Model requests per minute allowed per user in a workspace, on every
+   * LLM-backed route (generate, source draft, dashboard chat). A token bucket:
+   * this is both the sustained rate and the burst size. `0` disables the
+   * limit. Overridable per workspace in the `workspace_limits` table.
+   */
+  llmRatePerMinute: num("LLM_RATE_PER_MINUTE", 20),
+  /**
+   * Input plus output tokens a workspace may spend per UTC day across every
+   * LLM-backed route. Requests over budget get a 429 until midnight UTC. `0`
+   * disables the limit. Overridable per workspace in `workspace_limits`.
+   */
+  llmDailyTokenBudget: num("LLM_DAILY_TOKEN_BUDGET", 2_000_000),
+
   /** Cookie name used for the session JWT. */
   sessionCookieName: str("SESSION_COOKIE_NAME", "holotable_session"),
 
@@ -141,6 +155,11 @@ const positiveInt = z.coerce
   .int("must be a positive integer")
   .positive("must be a positive integer");
 
+const nonNegativeInt = z.coerce
+  .number({ error: "must be a non-negative integer (0 disables the limit)" })
+  .int("must be a non-negative integer (0 disables the limit)")
+  .nonnegative("must be a non-negative integer (0 disables the limit)");
+
 const timeExpr = z.string().refine(
   (v) => {
     try {
@@ -192,6 +211,8 @@ const EnvSchema = z.object({
   ),
   OPENAI_API_KEY: blank(z.string()),
   AI_GATEWAY_API_KEY: blank(z.string()),
+  LLM_RATE_PER_MINUTE: blank(nonNegativeInt),
+  LLM_DAILY_TOKEN_BUDGET: blank(nonNegativeInt),
 
   OIDC_ISSUER: blank(
     httpUrl("the realm issuer, e.g. https://kc.example.com/realms/holotable"),
@@ -314,6 +335,22 @@ export function validateConfig(
   }
   if (provider === "gateway" && values.OPENAI_API) {
     warning("OPENAI_API", "is ignored when AI_PROVIDER is gateway.");
+  }
+
+  // --- LLM limits ---------------------------------------------------------
+  // A disabled ceiling is a choice, but in production it is one worth seeing
+  // at every boot: an authenticated user can then spend without bound.
+  if (production && values.LLM_RATE_PER_MINUTE === 0) {
+    warning(
+      "LLM_RATE_PER_MINUTE",
+      "is 0; model requests are not rate limited. Set a per-user requests-per-minute ceiling.",
+    );
+  }
+  if (production && values.LLM_DAILY_TOKEN_BUDGET === 0) {
+    warning(
+      "LLM_DAILY_TOKEN_BUDGET",
+      "is 0; workspaces have no daily token budget and provider spend is unbounded. Set a per-workspace tokens-per-day ceiling.",
+    );
   }
 
   // --- OIDC ---------------------------------------------------------------

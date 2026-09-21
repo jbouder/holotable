@@ -137,10 +137,11 @@ deciding whether to run Holotable deserves to know them up front.
   `test/sql-safety-postgres.test.ts` pins the ones that are known and blocked,
   and `test/sql-safety.fuzz.test.ts` searches for ones that are not, from a
   fixed seed on every test run and from a fresh seed in CI.
-- **No rate limiting or cost budget on the LLM routes.** An authenticated user
-  can drive generation and chat as fast as the provider will answer. There is no
-  per-workspace token or spend cap. Tracked as
-  [#18](https://github.com/jbouder/holotable/issues/18).
+- **The LLM rate limiter is per instance.** The per-user token bucket lives in
+  process memory, so N replicas allow N times `LLM_RATE_PER_MINUTE`. The
+  per-workspace daily token budget is in Postgres and is shared, and it gates
+  admission rather than metering the stream: a day can overshoot by the calls
+  already in flight when it fills.
 - **The poller is single-instance.** Running more than one replica means more
   than one poller per dashboard, multiplying query load against the metrics
   store. Holotable does not yet coordinate pollers across instances.

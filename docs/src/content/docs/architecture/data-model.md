@@ -44,6 +44,19 @@ Stored specs are parsed against the **current** schema, and every IR object is
 change would invalidate every saved dashboard on read.
 :::
 
+### `llm_usage`
+
+Token counters per `(workspace_id, day, route, model)`: `input_tokens`,
+`output_tokens`, `requests`. Each finished model call adds to its row. Never
+prompts, specs, or output. Read before every model request to enforce the
+daily budget; see [LLM rate limits and budgets](/operations/llm-limits/).
+
+### `workspace_limits`
+
+Optional per-workspace overrides of `LLM_RATE_PER_MINUTE` and
+`LLM_DAILY_TOKEN_BUDGET`: `rate_per_minute`, `daily_token_budget`. A `NULL`
+column inherits the environment; `0` disables that limit.
+
 ## Metrics store (TimescaleDB)
 
 - `metrics.http_requests` is a hypertable containing raw request events (see

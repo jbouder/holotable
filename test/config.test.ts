@@ -341,3 +341,42 @@ test("startup checks: a malformed DATABASE_URL skips the source query", async ()
   assert.equal(called, false);
   assert.equal(result.ok, false);
 });
+
+test("LLM limits must be non-negative integers", () => {
+  const bad = validateConfig(
+    { ...VALID_PRODUCTION, LLM_RATE_PER_MINUTE: "-1", LLM_DAILY_TOKEN_BUDGET: "lots" },
+    { production: true },
+  );
+  assert.deepEqual(variables(errors(bad)).sort(), [
+    "LLM_DAILY_TOKEN_BUDGET",
+    "LLM_RATE_PER_MINUTE",
+  ]);
+  for (const p of errors(bad)) assert.match(p.message, /0 disables the limit/);
+  assert.deepEqual(
+    validateConfig(
+      {
+        ...VALID_PRODUCTION,
+        LLM_RATE_PER_MINUTE: "30",
+        LLM_DAILY_TOKEN_BUDGET: "500000",
+      },
+      { production: true },
+    ),
+    [],
+  );
+});
+
+test("a disabled LLM limit is a warning in production only", () => {
+  const off = {
+    ...VALID_PRODUCTION,
+    LLM_RATE_PER_MINUTE: "0",
+    LLM_DAILY_TOKEN_BUDGET: "0",
+  };
+  const prod = validateConfig(off, { production: true });
+  assert.deepEqual(errors(prod), []);
+  assert.deepEqual(variables(warnings(prod)).sort(), [
+    "LLM_DAILY_TOKEN_BUDGET",
+    "LLM_RATE_PER_MINUTE",
+  ]);
+  for (const p of warnings(prod)) assert.match(p.message, /is 0;/);
+  assert.deepEqual(validateConfig(off, { production: false }), []);
+});

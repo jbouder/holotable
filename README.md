@@ -189,6 +189,10 @@ documented defaults:
   `MIN_REFRESH_INTERVAL_MS=2000`.
 - **Time range:** `DEFAULT_TIME_FROM=now-1h` .. `DEFAULT_TIME_TO=now`.
 - **Limits:** `MAX_QUERY_ROWS`, `QUERY_TIMEOUT_SECONDS`, `MAX_WINDOW_POINTS`.
+- **LLM limits:** `LLM_RATE_PER_MINUTE=20` per user per workspace and
+  `LLM_DAILY_TOKEN_BUDGET=2000000` per workspace per UTC day, on every
+  model-backed route; `0` disables, and `workspace_limits` overrides per
+  workspace. Over either is a `429` with `Retry-After`.
 - **AI:** `AI_PROVIDER` (`gateway` | `openai-compatible`) + `AI_MODEL` — no model
   is baked in; this is a deliberate open decision (see architecture doc).
   The `openai-compatible` path works with any OpenAI-compatible endpoint. It
