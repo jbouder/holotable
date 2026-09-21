@@ -77,8 +77,12 @@ row limit, because none of those are model-controlled.
 the live schema through `information_schema.columns`, and the resulting table
 and column names are sent to the model as prompt context. Names in someone
 else's database are attacker-influenced text entering a prompt. Only names and
-types are sent — never sample rows (invariant 9) — and the model's output is
-untrusted anyway, which is what contains this.
+types are sent — never sample rows (invariant 9). Each value is flattened to
+one line, stripped of control characters and clamped to its schema maximum,
+and the catalog is fenced between markers that carry a random per-call token
+(`src/lib/ai/untrusted.ts`), so a name cannot break out of the data block; the
+stored panel specs in the dashboard chat prompt get the same treatment. The
+model's output is untrusted anyway, which is what ultimately contains this.
 
 **The browser, and every request payload.** The client is a rendering surface,
 not an authority. The server resolves the concrete time range from the relative

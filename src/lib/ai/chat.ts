@@ -7,12 +7,13 @@ import {
 } from "ai";
 import { z } from "zod";
 import { getModel } from "@/lib/ai/provider";
-import { buildCatalogPrompt } from "@/lib/timescaledb/catalog";
+import { renderCatalog } from "@/lib/timescaledb/catalog";
+import { fenceUntrustedBlock, sanitizePromptField } from "@/lib/ai/untrusted";
 import { SQL_RULES } from "@/lib/ai/generate";
 import { validateSql, buildExecutablePlan, type ExecutablePlan } from "@/lib/sql/safety";
 import { resolveTimeRange } from "@/lib/time";
 import { executePlan, QueryExecutionError } from "@/lib/timescaledb/client";
-import type { Dashboard } from "@/lib/ir";
+import { Dashboard, Panel } from "@/lib/ir";
 import type { SourceRecord } from "@/lib/registry";
 import { can } from "@/lib/auth/authorize";
 import type { Identity } from "@/lib/auth/claims";
@@ -116,22 +117,48 @@ export async function buildChatQueryPlan(input: {
   }
 }
 
-/** The system prompt for one dashboard. Exported for testing. */
-export function buildSystemPrompt(dashboard: Dashboard, sources: SourceRecord[]): string {
-  const panels = dashboard.panels
+// Prompt clamps for stored panel fields: the IR schema's own maxima, read from
+// the schema so a spec can never grow in the prompt.
+const PANEL_MAX = {
+  id: Panel.shape.id.maxLength ?? 64,
+  title: Panel.shape.title.maxLength ?? 200,
+  description: Panel.shape.description.unwrap().maxLength ?? 500,
+  sourceId: Panel.shape.query.shape.sourceId.maxLength ?? 128,
+  sql: Panel.shape.query.shape.sql.maxLength ?? 8_000,
+  timeField: Panel.shape.query.shape.timeField.unwrap().maxLength ?? 128,
+  dashboardTitle: Dashboard.shape.title.maxLength ?? 200,
+} as const;
+
+/**
+ * The stored panel specs as prompt lines. A spec was written by an earlier
+ * model run from a user prompt, so its titles, descriptions and SQL are
+ * untrusted text in this prompt exactly like catalog metadata: every field is
+ * flattened onto one line and clamped. Exported for testing.
+ */
+export function renderPanels(dashboard: Dashboard): string {
+  const f = sanitizePromptField;
+  return dashboard.panels
     .map((p) => {
       const lines = [
-        `- panel "${p.id}" — ${p.title} (viz: ${p.viz}, source: ${p.query.sourceId})`,
+        `- panel "${f(p.id, PANEL_MAX.id)}" — ${f(p.title, PANEL_MAX.title)} (viz: ${p.viz}, source: ${f(p.query.sourceId, PANEL_MAX.sourceId)})`,
       ];
-      if (p.description) lines.push(`    intent: ${p.description}`);
-      if (p.query.timeField) lines.push(`    timeField: ${p.query.timeField}`);
-      lines.push(`    sql: ${p.query.sql}`);
+      if (p.description)
+        lines.push(`    intent: ${f(p.description, PANEL_MAX.description)}`);
+      if (p.query.timeField) {
+        lines.push(`    timeField: ${f(p.query.timeField, PANEL_MAX.timeField)}`);
+      }
+      lines.push(`    sql: ${f(p.query.sql, PANEL_MAX.sql)}`);
       return lines.join("\n");
     })
     .join("\n");
+}
+
+/** The system prompt for one dashboard. Exported for testing. */
+export function buildSystemPrompt(dashboard: Dashboard, sources: SourceRecord[]): string {
+  const panels = fenceUntrustedBlock("PANELS", renderPanels(dashboard));
 
   const catalogs = sources.length
-    ? sources.map((s) => buildCatalogPrompt(s)).join("\n\n")
+    ? fenceUntrustedBlock("CATALOG", sources.map((s) => renderCatalog(s)).join("\n\n"))
     : "(no queryable sources are available to you on this dashboard)";
 
   return `You are a data assistant embedded in a live monitoring dashboard. You help the
@@ -139,7 +166,7 @@ user understand THIS dashboard and the data behind it. You are READ-ONLY: you
 answer questions and explain data, but you cannot modify the dashboard, add
 panels, or change its settings.
 
-Dashboard: "${dashboard.title}"
+Dashboard: "${sanitizePromptField(dashboard.title, PANEL_MAX.dashboardTitle)}"
 Time range (fixed by the server): ${dashboard.timeRange.from} -> ${dashboard.timeRange.to}
 Refresh interval: ${dashboard.refreshIntervalMs}ms
 
