@@ -3,7 +3,7 @@
 import * as React from "react";
 import { experimental_useObject as useObject } from "@ai-sdk/react";
 import { Loader2, SendHorizontal, Compass, AlertTriangle, RefreshCw } from "lucide-react";
-import { Panel, type TimeRange } from "@/lib/ir";
+import { Panel, VizType, type TimeRange } from "@/lib/ir";
 import { Button } from "@/components/ui/button";
 import { Textarea, Label } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
@@ -28,7 +28,9 @@ interface Result {
   error?: string;
 }
 
-const CHART_VIZ = new Set(["line", "bar", "heatmap", "pie", "donut"]);
+const CHART_VIZ = new Set<VizType>(
+  VizType.options.filter((viz) => viz !== "stat" && viz !== "table"),
+);
 const MAX_TABLE_ROWS = 500;
 const EMPTY: PanelData = { columns: [], rows: [] };
 
