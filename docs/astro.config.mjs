@@ -71,6 +71,7 @@ export default defineConfig({
             { label: "AI provider", slug: "operations/ai-provider" },
             { label: "Startup validation", slug: "operations/startup-validation" },
             { label: "Security headers", slug: "operations/security-headers" },
+            { label: "LLM rate limits and budgets", slug: "operations/llm-limits" },
           ],
         },
         {

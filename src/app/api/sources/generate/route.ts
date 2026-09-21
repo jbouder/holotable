@@ -2,6 +2,7 @@ import { z } from "zod";
 import { requireIdentity, assertAuthorized, errorResponse } from "@/lib/auth/authorize";
 import { readJson } from "@/lib/http";
 import { streamSourceDraft } from "@/lib/ai/generate";
+import { enforceLlmLimits } from "@/lib/limits/llm";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -18,6 +19,8 @@ const Body = z.object({
  *
  * Authorization mirrors source creation: source:manage on the target workspace,
  * which is taken from the request but validated against the caller's identity.
+ * The workspace's rate limit and token budget are enforced after that check,
+ * so the limits are keyed by a workspace the caller is already authorized in.
  */
 export async function POST(req: Request) {
   try {
@@ -28,7 +31,13 @@ export async function POST(req: Request) {
       workspaceId: body.workspaceId,
     });
 
-    const result = streamSourceDraft({ prompt: body.prompt });
+    const usage = await enforceLlmLimits({
+      identity,
+      workspaceId: body.workspaceId,
+      route: "source-draft",
+    });
+
+    const result = streamSourceDraft({ prompt: body.prompt, onUsage: usage.record });
     return result.toTextStreamResponse();
   } catch (err) {
     return errorResponse(err);

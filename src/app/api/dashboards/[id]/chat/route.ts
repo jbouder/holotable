@@ -9,6 +9,7 @@ import {
 import { readJson } from "@/lib/http";
 import { getDashboardById, getSourceById } from "@/lib/db/repo";
 import { resolveChatSources, streamDashboardChat } from "@/lib/ai/chat";
+import { enforceLlmLimits } from "@/lib/limits/llm";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -26,6 +27,8 @@ const Body = z.object({
  * this dashboard already references AND that the caller may use — each is
  * re-resolved and re-authorized in `resolveChatSources`; unavailable ones are
  * silently omitted (never surfaced), mirroring the poller's tombstone handling.
+ * A turn may take several model round trips; the rate limit counts the turn
+ * once and the budget records the usage summed over every step.
  */
 export async function POST(
   req: Request,
@@ -41,6 +44,11 @@ export async function POST(
     assertAuthorized(identity, "dashboard:view", {
       workspaceId: dashboard.workspaceId,
     });
+    const usage = await enforceLlmLimits({
+      identity,
+      workspaceId: dashboard.workspaceId,
+      route: "chat",
+    });
 
     const sources = await resolveChatSources({
       identity,
@@ -52,6 +60,7 @@ export async function POST(
       dashboard: dashboard.spec,
       sources,
       messages: body.messages as UIMessage[],
+      onUsage: usage.record,
     });
 
     return result.toUIMessageStreamResponse();

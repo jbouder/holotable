@@ -1,6 +1,8 @@
 import { query, withTransaction } from "@/lib/db/pg";
 import { SourceConfig, type SourceRecord } from "@/lib/registry";
 import { type Dashboard, parseDashboard } from "@/lib/ir";
+import type { BudgetStore } from "@/lib/limits/budget";
+import type { WorkspaceLimits } from "@/lib/limits/llm";
 
 /* -------------------------------------------------------------------------- */
 /* Source registry repository                                                 */
@@ -290,3 +292,64 @@ export async function softDeleteDashboard(id: string): Promise<boolean> {
   );
   return rows.length > 0;
 }
+
+/* -------------------------------------------------------------------------- */
+/* LLM limits and usage (#18)                                                 */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * Per-workspace overrides of the global LLM ceilings, or `null` when the
+ * workspace has no `workspace_limits` row. A `null` column inherits the
+ * environment value; `0` disables that limit for the workspace.
+ */
+export async function getWorkspaceLimits(
+  workspaceId: string,
+): Promise<WorkspaceLimits | null> {
+  const rows = await query<{
+    rate_per_minute: number | null;
+    daily_token_budget: string | null;
+  }>(
+    "SELECT rate_per_minute, daily_token_budget FROM workspace_limits WHERE workspace_id = $1",
+    [workspaceId],
+  );
+  const row = rows[0];
+  if (!row) return null;
+  return {
+    ratePerMinute: row.rate_per_minute,
+    // BIGINT arrives as a string from pg.
+    dailyTokenBudget:
+      row.daily_token_budget === null ? null : Number(row.daily_token_budget),
+  };
+}
+
+/** The `llm_usage` table as a {@link BudgetStore}. */
+export const pgBudgetStore: BudgetStore = {
+  async tokensUsed(workspaceId, day) {
+    const rows = await query<{ used: string }>(
+      `SELECT COALESCE(SUM(input_tokens + output_tokens), 0)::text AS used
+         FROM llm_usage
+        WHERE workspace_id = $1 AND day = $2`,
+      [workspaceId, day],
+    );
+    return Number(rows[0]?.used ?? 0);
+  },
+  async record(delta) {
+    await query(
+      `INSERT INTO llm_usage (workspace_id, day, route, model, input_tokens, output_tokens, requests)
+       VALUES ($1, $2, $3, $4, $5, $6, 1)
+       ON CONFLICT (workspace_id, day, route, model) DO UPDATE SET
+         input_tokens  = llm_usage.input_tokens  + EXCLUDED.input_tokens,
+         output_tokens = llm_usage.output_tokens + EXCLUDED.output_tokens,
+         requests      = llm_usage.requests + 1,
+         updated_at    = now()`,
+      [
+        delta.workspaceId,
+        delta.day,
+        delta.route,
+        delta.model,
+        delta.inputTokens,
+        delta.outputTokens,
+      ],
+    );
+  },
+};

@@ -19,13 +19,13 @@ All routes run on the Node runtime. Every one resolves identity with
 | `/api/dashboards/[id]` | PUT | editor | Appends a **new immutable version** |
 | `/api/dashboards/[id]` | DELETE | owner / source-admin | Soft delete |
 | `/api/dashboards/[id]/stream` | GET | viewer | SSE deltas, cookie-authenticated |
-| `/api/dashboards/[id]/chat` | POST | viewer | Read-only chat with a guarded `runQuery` tool |
+| `/api/dashboards/[id]/chat` | POST | viewer | Read-only chat with a guarded `runQuery` tool. Rate limited and budgeted |
 
 ## Generation and query
 
 | Route | Method | Min role | Notes |
 | --- | --- | --- | --- |
-| `/api/generate` | POST | editor | Streams a validated dashboard, panel, or explore-panel spec. Authorized against the workspace owning the selected **source** |
+| `/api/generate` | POST | editor | Streams a validated dashboard, panel, or explore-panel spec. Authorized against the workspace owning the selected **source**. Rate limited and budgeted |
 | `/api/query` | POST | editor | One-shot guarded query for preview and Explore |
 
 ## Sources
@@ -34,7 +34,7 @@ All routes run on the Node runtime. Every one resolves identity with
 | --- | --- | --- | --- |
 | `/api/sources` | GET | viewer | List sources in a workspace |
 | `/api/sources` | POST | source-admin | Create |
-| `/api/sources/generate` | POST | editor | Streams a validated `SourceDraft` — never credentials |
+| `/api/sources/generate` | POST | editor | Streams a validated `SourceDraft` — never credentials. Rate limited and budgeted |
 | `/api/sources/[id]` | GET/PUT/DELETE | source-admin | Delete tombstones when referenced |
 | `/api/sources/[id]/test` | POST | source-admin | Connectivity test |
 | `/api/sources/[id]/refresh` | POST | source-admin | Re-introspect the catalog |
@@ -61,4 +61,5 @@ can correct and retry. Connection and infrastructure failures return a generic
 | 403 | Authenticated but not authorized for the action |
 | 404 | Resource not found |
 | 409 | Source is tombstoned |
+| 429 | A model-backed route hit the workspace's rate limit or token budget; the message says which and when it resets, and `Retry-After` is set. See [LLM rate limits and budgets](/operations/llm-limits/) |
 | 500 | Infrastructure failure — deliberately opaque |

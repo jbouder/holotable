@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { can, type Action } from "@/lib/auth/authorize";
+import { can, errorResponse, HttpError, type Action } from "@/lib/auth/authorize";
 import { parseGroups, type Identity } from "@/lib/auth/claims";
 
 function identity(groups: string[], sub = "u1"): Identity {
@@ -89,4 +89,13 @@ test("authorization is scoped to the passed workspace, not any owned one", () =>
   const id = identity(["/workspaces/w1/source-admin"]);
   assert.equal(can(id, "source:manage", { workspaceId: "w1" }), true);
   assert.equal(can(id, "source:manage", { workspaceId: "w2" }), false);
+});
+
+test("errorResponse sends an HttpError's status, message, and extra headers", async () => {
+  const res = errorResponse(new HttpError(429, "slow down", { "Retry-After": "7" }));
+  assert.equal(res.status, 429);
+  assert.equal(res.headers.get("Retry-After"), "7");
+  assert.deepEqual(await res.json(), { error: "slow down" });
+  const plain = errorResponse(new HttpError(403, "no"));
+  assert.equal(plain.headers.get("Retry-After"), null);
 });

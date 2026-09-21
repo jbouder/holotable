@@ -1,4 +1,4 @@
-import { streamObject } from "ai";
+import { type LanguageModelUsage, streamObject } from "ai";
 import { getModel } from "@/lib/ai/provider";
 import { buildCatalogPrompt } from "@/lib/timescaledb/catalog";
 import { Dashboard, Panel } from "@/lib/ir";
@@ -14,6 +14,12 @@ import { SourceDraft, type SourceRecord } from "@/lib/registry";
  * selected, already-authorized source. The model must not write time filters;
  * the server injects the dashboard time range at execution.
  */
+
+/**
+ * Reports the finished call's token usage. The routes pass the recorder from
+ * `enforceLlmLimits` so every call lands in the workspace's budget.
+ */
+export type OnUsage = (usage: LanguageModelUsage) => void;
 
 export const SQL_RULES = `SQL rules (STRICT):
 - Emit TimescaleDB/PostgreSQL SELECT statements only. No INSERT/UPDATE/DDL, no semicolons, no comments.
@@ -55,10 +61,15 @@ small set of categories (one label column + one numeric value column; OMIT
 (number|bytes|percent|ms) where meaningful.`;
 }
 
-export function streamDashboard(input: { source: SourceRecord; prompt: string }) {
-  const { source, prompt } = input;
+export function streamDashboard(input: {
+  source: SourceRecord;
+  prompt: string;
+  onUsage?: OnUsage;
+}) {
+  const { source, prompt, onUsage } = input;
   return streamObject({
     model: getModel(),
+    onFinish: ({ usage }) => onUsage?.(usage),
     schema: Dashboard,
     schemaName: "Dashboard",
     schemaDescription: "A monitoring dashboard specification (viz spec, not data).",
@@ -74,10 +85,15 @@ Use refreshIntervalMs=${config.defaultRefreshIntervalMs} and timeRange {from:"${
  * other generation path — the model emits only a validated Panel (SQL + viz),
  * never data, and never a time filter (the server injects the range).
  */
-export function streamExplorePanel(input: { source: SourceRecord; prompt: string }) {
-  const { source, prompt } = input;
+export function streamExplorePanel(input: {
+  source: SourceRecord;
+  prompt: string;
+  onUsage?: OnUsage;
+}) {
+  const { source, prompt, onUsage } = input;
   return streamObject({
     model: getModel(),
+    onFinish: ({ usage }) => onUsage?.(usage),
     schema: Panel,
     schemaName: "Panel",
     schemaDescription: "A single panel specification (viz spec, not data).",
@@ -108,10 +124,11 @@ Viz selection (IMPORTANT — default to text/tabular output):
  * is persisted. There is no source to authorize against yet, so unlike the
  * dashboard paths this prompt carries no catalog metadata.
  */
-export function streamSourceDraft(input: { prompt: string }) {
-  const { prompt } = input;
+export function streamSourceDraft(input: { prompt: string; onUsage?: OnUsage }) {
+  const { prompt, onUsage } = input;
   return streamObject({
     model: getModel(),
+    onFinish: ({ usage }) => onUsage?.(usage),
     schema: SourceDraft,
     schemaName: "SourceDraft",
     schemaDescription:
@@ -148,10 +165,12 @@ export function streamPanel(input: {
   source: SourceRecord;
   prompt: string;
   current: Panel;
+  onUsage?: OnUsage;
 }) {
-  const { source, prompt, current } = input;
+  const { source, prompt, current, onUsage } = input;
   return streamObject({
     model: getModel(),
+    onFinish: ({ usage }) => onUsage?.(usage),
     schema: Panel,
     schemaName: "Panel",
     schemaDescription: "A single dashboard panel specification (viz spec, not data).",

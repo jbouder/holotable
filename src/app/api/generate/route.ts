@@ -8,6 +8,7 @@ import {
 import { readJson } from "@/lib/http";
 import { getSourceById } from "@/lib/db/repo";
 import { streamDashboard, streamPanel, streamExplorePanel } from "@/lib/ai/generate";
+import { enforceLlmLimits } from "@/lib/limits/llm";
 import { Panel } from "@/lib/ir";
 
 export const runtime = "nodejs";
@@ -36,6 +37,8 @@ const Body = z.discriminatedUnion("mode", [
  * Generate a dashboard/panel spec via the LLM. Runs the model exactly once.
  * Authorization: editor on the workspace that OWNS the selected source (the
  * workspace is derived from the trusted source record, never from the request).
+ * Then the workspace's rate limit and token budget are enforced; over either,
+ * the request is refused with 429 before the model is called.
  */
 export async function POST(req: Request) {
   try {
@@ -50,15 +53,21 @@ export async function POST(req: Request) {
     assertAuthorized(identity, "dashboard:generate", {
       workspaceId: source.workspaceId,
     });
+    const usage = await enforceLlmLimits({
+      identity,
+      workspaceId: source.workspaceId,
+      route: "generate",
+    });
+    const onUsage = usage.record;
 
     // A ternary rather than `let result` + if/else: the latter gives `result`
     // an implicit `any`, which loses the streamObject result type here.
     const result =
       body.mode === "dashboard"
-        ? streamDashboard({ source, prompt: body.prompt })
+        ? streamDashboard({ source, prompt: body.prompt, onUsage })
         : body.mode === "explore"
-          ? streamExplorePanel({ source, prompt: body.prompt })
-          : streamPanel({ source, prompt: body.prompt, current: body.current });
+          ? streamExplorePanel({ source, prompt: body.prompt, onUsage })
+          : streamPanel({ source, prompt: body.prompt, current: body.current, onUsage });
 
     return result.toTextStreamResponse();
   } catch (err) {

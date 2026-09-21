@@ -160,3 +160,13 @@ dashboard.
 — bad column, syntax, type mismatch, timeout, missing `timeField`. Routes
 translate it to a `400` with the real message so an editor can fix and retry;
 connection and socket failures stay a generic `500` and are never surfaced.
+
+## 17. Every model call is rate limited and budgeted, server-side
+
+The three routes that call the model run `enforceLlmLimits`
+(`src/lib/limits/llm.ts`) right after `assertAuthorized`: a per-user token
+bucket, then a per-workspace daily token budget read back from `llm_usage`.
+Over either, the request is a `429` naming the limit and its reset before the
+model is invoked. Keys come from the validated identity and a trusted record,
+never the request body, and platform admins are not exempt. See
+[LLM rate limits and budgets](/operations/llm-limits/).
