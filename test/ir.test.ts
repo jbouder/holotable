@@ -1,6 +1,14 @@
+import { readFileSync } from "node:fs";
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { Dashboard, Panel, TimeExpr, safeParseDashboard, parseDashboard } from "@/lib/ir";
+import {
+  Dashboard,
+  Panel,
+  TimeExpr,
+  VizType,
+  safeParseDashboard,
+  parseDashboard,
+} from "@/lib/ir";
 
 const validPanel = {
   id: "p1",
@@ -68,9 +76,19 @@ test("rejects invalid viz type", () => {
 });
 
 test("accepts all supported chart visualizations", () => {
-  for (const viz of ["line", "area", "bar", "scatter", "heatmap", "pie", "donut"]) {
+  for (const viz of VizType.options.filter(
+    (value) => value !== "stat" && value !== "table",
+  )) {
     assert.equal(Panel.safeParse({ ...validPanel, viz }).success, true, viz);
   }
+});
+
+test("README visualization list matches the shared IR enum", () => {
+  const readme = readFileSync(new URL("../README.md", import.meta.url), "utf8");
+  const match = readme.match(/ECharts \(([^)]+)\)/);
+
+  assert.ok(match, "README should document ECharts visualization types");
+  assert.deepEqual(match[1].split("/"), VizType.options);
 });
 
 test("timeField is optional on a panel query", () => {

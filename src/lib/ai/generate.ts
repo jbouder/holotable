@@ -1,7 +1,7 @@
 import { type LanguageModelUsage, streamObject } from "ai";
 import { getModel } from "@/lib/ai/provider";
 import { buildCatalogPrompt } from "@/lib/timescaledb/catalog";
-import { Dashboard, Panel } from "@/lib/ir";
+import { Dashboard, Panel, VizType } from "@/lib/ir";
 import { config } from "@/lib/config";
 import { SourceDraft, type SourceRecord } from "@/lib/registry";
 
@@ -37,6 +37,10 @@ export const SQL_RULES = `SQL rules (STRICT):
 - Every panel's query.sourceId MUST equal the provided sourceId.
 - Keep result sets small; the server also enforces row limits.`;
 
+const CHART_VIZ_TYPES = VizType.options.filter(
+  (viz) => viz !== "stat" && viz !== "table",
+);
+
 function baseSystem(source: SourceRecord): string {
   return `You design monitoring dashboards as a strict JSON spec.
 You NEVER return data rows — only a viz specification (SQL + layout).
@@ -52,8 +56,7 @@ ${SQL_RULES}
 Layout: a 12-column grid. By DEFAULT place two panels side by side (w=6 each)
 and 4 rows tall (h=4), laid out left-to-right, top-to-bottom, without overlaps.
 Use a wider or taller panel only when a request clearly calls for it. Choose viz
-types from: line, area, bar,
-scatter, stat, table, heatmap, pie, donut. Use 'area' for a filled time series
+types from: ${VizType.options.join(", ")}. Use 'area' for a filled time series
 and 'scatter' for relationships between two numeric dimensions. Use
 'pie'/'donut' for a proportional breakdown of a
 small set of categories (one label column + one numeric value column; OMIT
@@ -108,7 +111,7 @@ the query computes (describe intent only — never invent result values), use id
 Viz selection (IMPORTANT — default to text/tabular output):
 - Default to viz "table" and return the relevant rows/columns.
 - Use "stat" only when the question asks for a single scalar value.
-- Use a chart viz ("line", "area", "bar", "scatter", "heatmap", "pie", "donut") ONLY when the
+- Use a chart viz (${CHART_VIZ_TYPES.map((viz) => `"${viz}"`).join(", ")}) ONLY when the
   request explicitly asks to chart/plot/graph/visualize the data or to see a
   trend over time. Use "pie"/"donut" for share/proportion/breakdown questions
   across a small set of categories.`,
