@@ -87,11 +87,11 @@ model's output is untrusted anyway, which is what ultimately contains this.
 **The browser, and every request payload.** The client is a rendering surface,
 not an authority. The server resolves the concrete time range from the relative
 expression, injects `from`/`to` as **bound parameters** on the declared
-`timeField`, applies the row cap and statement timeout, and runs every query
-inside a `READ ONLY` transaction with `search_path` pinned to the source's
-configured schema. Authorization is never derived from a workspace id in a
-request body — it comes from the identity, and the source is re-resolved and
-re-authorized on **every** execution, including each poller tick. Every page
+`timeField`, applies the row cap, result-byte cap, and statement timeout, and
+runs every query inside a `READ ONLY` transaction with `search_path` pinned to
+the source's configured schema. Authorization is never derived from a workspace
+id in a request body — it comes from the identity, and the source is re-resolved
+and re-authorized on **every** execution, including each poller tick. Every page
 carries a nonce-based `Content-Security-Policy` (`src/proxy.ts`): no inline
 script runs without the request's nonce, nothing loads from another origin,
 and the page cannot be framed, so a rendering bug in model-authored text stops
@@ -125,8 +125,8 @@ deciding whether to run Holotable deserves to know them up front.
   call is decided by name against a list. A function this project has not
   heard of — including any function an operator defines in the metrics schema
   — can be called. The execution-side defenses — read-only transaction, bound
-  parameters, pinned `search_path`, row cap, statement timeout, and a read-only
-  database role — are what contain a call the list misses.
+  parameters, pinned `search_path`, row and result-byte caps, statement timeout,
+  and a read-only database role — are what contain a call the list misses.
 
   Note what the read-only role does and does not bound: it is granted `SELECT`
   on *all* tables in the metrics schema, not only the tables in a source's

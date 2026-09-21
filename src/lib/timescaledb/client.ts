@@ -1,7 +1,8 @@
-import { Client } from "pg";
+import { Client, Query } from "pg";
 import { resolveCredentials, type SourceRecord } from "@/lib/registry";
 import { config } from "@/lib/config";
 import type { ExecutablePlan } from "@/lib/sql/safety";
+import { ResultCollector } from "@/lib/timescaledb/result-cap";
 
 function clientFor(source: SourceRecord): Client {
   const credentials = resolveCredentials(source.secretRef);
@@ -80,6 +81,50 @@ function searchPathStatement(schema: string): string {
   return `SET LOCAL search_path TO "${schema}", public`;
 }
 
+/** Postgres returns `Date` for timestamps; the client receives ISO strings. */
+function serializableRow(row: Record<string, unknown>): Record<string, unknown> {
+  return Object.fromEntries(
+    Object.entries(row).map(([key, value]) => [
+      key,
+      value instanceof Date ? value.toISOString() : value,
+    ]),
+  );
+}
+
+/**
+ * Run the statement and collect its rows one at a time, bounded by
+ * `maxBytes` of serialized output. Attaching a `row` listener stops `pg` from
+ * buffering the full result itself, so the collector's cap — not the row
+ * `LIMIT` — is what bounds memory: once it is crossed, further rows are
+ * dropped as they arrive and the statement fails with a message naming the
+ * limit instead of an oversized payload (or an out-of-memory crash) later on.
+ */
+function collectResult(
+  client: Client,
+  plan: ExecutablePlan,
+  maxBytes: number,
+): Promise<QueryResult> {
+  return new Promise((resolve, reject) => {
+    const collector = new ResultCollector(maxBytes);
+    const query = new Query<Record<string, unknown>>(plan.sql, plan.params);
+    query.on("row", (row) => {
+      collector.push(serializableRow(row));
+    });
+    query.on("error", reject);
+    query.on("end", (result) => {
+      if (collector.exceeded) {
+        reject(new QueryExecutionError(collector.exceededMessage()));
+        return;
+      }
+      resolve({
+        columns: result.fields.map((field) => field.name),
+        rows: collector.rows,
+      });
+    });
+    client.query(query);
+  });
+}
+
 /** Execute a guarded plan in a read-only transaction. */
 export async function executePlan(
   source: SourceRecord,
@@ -92,19 +137,7 @@ export async function executePlan(
     await client.query("BEGIN TRANSACTION READ ONLY");
     transactionStarted = true;
     await client.query(searchPathStatement(source.config.schema));
-    const result = await client.query(plan.sql, plan.params);
-    const rows = result.rows.map((row) =>
-      Object.fromEntries(
-        Object.entries(row).map(([key, value]) => [
-          key,
-          value instanceof Date ? value.toISOString() : value,
-        ]),
-      ),
-    );
-    return {
-      columns: result.fields.map((field) => field.name),
-      rows,
-    };
+    return await collectResult(client, plan, config.maxResultBytes);
   } catch (err) {
     if (isMissingTimeFieldError(err, plan.timeField)) {
       throw new QueryExecutionError(

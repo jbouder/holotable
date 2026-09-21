@@ -63,7 +63,7 @@ production deployment cannot boot without:
 | `AI_GATEWAY_API_KEY` | Set when `AI_PROVIDER` is `gateway`. |
 | `OIDC_ISSUER`, `OIDC_CLIENT_ID`, `OIDC_CLIENT_SECRET`, `OIDC_JWKS_URL` | All set: Keycloak is the only way to sign in, and the [client is confidential](/operations/keycloak/). `OIDC_REDIRECT_URI` is derived from the request origin when unset. |
 
-Every numeric knob (`MAX_QUERY_ROWS`, `QUERY_TIMEOUT_SECONDS`, …) must be a
+Every numeric knob (`MAX_QUERY_ROWS`, `MAX_RESULT_BYTES`, `QUERY_TIMEOUT_SECONDS`, …) must be a
 positive integer when set, `LLM_RATE_PER_MINUTE` and `LLM_DAILY_TOKEN_BUDGET`
 a non-negative integer (`0` disables that limit, which in production is a
 **warning** on every boot), `DEFAULT_TIME_FROM`/`DEFAULT_TIME_TO` must be

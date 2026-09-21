@@ -46,6 +46,12 @@ export const config = {
 
   /** Hard cap on rows returned by any query executed against the metrics store. */
   maxQueryRows: num("MAX_QUERY_ROWS", 5_000),
+  /**
+   * Hard cap on the serialized size (bytes of JSON) of any query result. Rows
+   * are a poor proxy for memory; a result over this fails with a 400 naming
+   * the limit before it is fully buffered. Default 4 MiB.
+   */
+  maxResultBytes: num("MAX_RESULT_BYTES", 4 * 1024 * 1024),
   /** Max points retained per series in the browser rolling window. */
   maxWindowPoints: num("MAX_WINDOW_POINTS", 720),
   /** Statement timeout (seconds) applied to every metrics query. */
@@ -237,6 +243,7 @@ const EnvSchema = z.object({
   DEFAULT_TIME_FROM: blank(timeExpr),
   DEFAULT_TIME_TO: blank(timeExpr),
   MAX_QUERY_ROWS: blank(positiveInt),
+  MAX_RESULT_BYTES: blank(positiveInt),
   MAX_WINDOW_POINTS: blank(positiveInt),
   QUERY_TIMEOUT_SECONDS: blank(positiveInt),
 });

@@ -93,8 +93,8 @@ let the same spec produce a different query on each poller tick.
 
 `buildExecutablePlan` wraps the validated query as a subquery and injects
 `from`/`to` on the declared `timeField` via **bound parameters**, plus a
-read-only transaction and execution-time and row limits. The model controls
-neither the time window nor resource usage. Each execution also pins
+read-only transaction and execution-time, row, and result-byte limits. The
+model controls neither the time window nor resource usage. Each execution also pins
 `search_path` to the source's configured schema — a validated bare identifier —
 plus `public`, so unqualified table names resolve only against the allowlisted
 schema.
@@ -157,7 +157,8 @@ dashboard.
 ## 16. Statement errors are actionable; infrastructure errors are opaque
 
 `executePlan` raises `QueryExecutionError` for Postgres statement-level failures
-— bad column, syntax, type mismatch, timeout, missing `timeField`. Routes
+— bad column, syntax, type mismatch, timeout, missing `timeField`, a result
+over `MAX_RESULT_BYTES`. Routes
 translate it to a `400` with the real message so an editor can fix and retry;
 connection and socket failures stay a generic `500` and are never surfaced.
 

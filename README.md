@@ -188,7 +188,9 @@ documented defaults:
 - **Refresh cadence:** `DEFAULT_REFRESH_INTERVAL_MS=15000` (15s), floored by
   `MIN_REFRESH_INTERVAL_MS=2000`.
 - **Time range:** `DEFAULT_TIME_FROM=now-1h` .. `DEFAULT_TIME_TO=now`.
-- **Limits:** `MAX_QUERY_ROWS`, `QUERY_TIMEOUT_SECONDS`, `MAX_WINDOW_POINTS`.
+- **Limits:** `MAX_QUERY_ROWS=5000` rows and `MAX_RESULT_BYTES=4194304` (4 MiB
+  of serialized JSON) per query result, `QUERY_TIMEOUT_SECONDS`,
+  `MAX_WINDOW_POINTS`. A result over either cap is a `400` naming the limit.
 - **LLM limits:** `LLM_RATE_PER_MINUTE=20` per user per workspace and
   `LLM_DAILY_TOKEN_BUDGET=2000000` per workspace per UTC day, on every
   model-backed route; `0` disables, and `workspace_limits` overrides per
