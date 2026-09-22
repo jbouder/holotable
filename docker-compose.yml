@@ -68,6 +68,9 @@ services:
       OIDC_REDIRECT_URI: ${OIDC_REDIRECT_URI:-}
       OIDC_SCOPE: ${OIDC_SCOPE:-openid profile}
       OIDC_AUDIENCE: ${OIDC_AUDIENCE:-}
+      # Prometheus scrape gate. /api/metrics answers 404 until one is set.
+      METRICS_TOKEN: ${METRICS_TOKEN:-}
+      METRICS_ALLOWED_CIDRS: ${METRICS_ALLOWED_CIDRS:-}
     ports:
       - "3000:3000"
     # `docker compose stop` sends SIGTERM and waits this long before SIGKILL.
@@ -115,6 +118,39 @@ services:
         condition: service_healthy
       migrate:
         condition: service_completed_successfully
+
+  # Scrapes the app's /api/metrics. Off by default — start it with
+  # `docker compose --profile metrics up -d prometheus` and set METRICS_TOKEN
+  # in .env first, or the scrape is refused and every target shows as down.
+  prometheus:
+    image: prom/prometheus:v3.1.0
+    profiles: ["metrics"]
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.retention.time=6h
+    ports:
+      - "9090:9090"
+    configs:
+      - source: prometheus_config
+        target: /etc/prometheus/prometheus.yml
+    depends_on:
+      app:
+        condition: service_healthy
+
+# Inline so the bearer token comes from the same .env as the app's, instead of
+# living in a second checked-in file that would have to hold it in clear text.
+configs:
+  prometheus_config:
+    content: |
+      global:
+        scrape_interval: 15s
+      scrape_configs:
+        - job_name: holotable
+          metrics_path: /api/metrics
+          authorization:
+            credentials: "${METRICS_TOKEN:-unset}"
+          static_configs:
+            - targets: ["app:3000"]
 
 volumes:
   pgdata:

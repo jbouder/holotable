@@ -3,6 +3,7 @@ import { resolveCredentials, type SourceRecord } from "@/lib/registry";
 import { config } from "@/lib/config";
 import type { ExecutablePlan } from "@/lib/sql/safety";
 import { ResultCollector } from "@/lib/timescaledb/result-cap";
+import { observeQuery } from "@/lib/metrics";
 import { trackInFlight } from "@/lib/shutdown";
 
 function clientFor(source: SourceRecord): Client {
@@ -132,12 +133,36 @@ function collectResult(
  * Counted as in flight so graceful shutdown (#47) waits for it: each execution
  * opens its own short-lived `Client`, so there is no pool whose `end()` would
  * do the waiting for us.
+ *
+ * Timed for `/api/metrics` (#51). The measurement spans connect, the
+ * read-only transaction and the rollback, not just the statement, because
+ * that is the latency a panel actually waits out. The source id is the only
+ * label; the statement and the error message never become one.
  */
 export function executePlan(
   source: SourceRecord,
   plan: ExecutablePlan,
 ): Promise<QueryResult> {
-  return trackInFlight(() => runPlan(source, plan));
+  return trackInFlight(async () => {
+    const startedAt = performance.now();
+    try {
+      const result = await runPlan(source, plan);
+      observeQuery({
+        sourceId: source.id,
+        seconds: (performance.now() - startedAt) / 1000,
+        ok: true,
+        rows: result.rows.length,
+      });
+      return result;
+    } catch (err) {
+      observeQuery({
+        sourceId: source.id,
+        seconds: (performance.now() - startedAt) / 1000,
+        ok: false,
+      });
+      throw err;
+    }
+  });
 }
 
 async function runPlan(source: SourceRecord, plan: ExecutablePlan): Promise<QueryResult> {

@@ -47,6 +47,17 @@ All routes run on the Node runtime. Every one resolves identity with
 | `/api/auth/callback` | GET | Verifies the token, mints the session cookie |
 | `/api/auth/logout` | GET | Clears the session cookie |
 
+## Operations
+
+These three are outside the session: a probe and a scraper do not hold a
+cookie.
+
+| Route | Method | Access | Notes |
+| --- | --- | --- | --- |
+| `/api/health` | GET | open | Liveness. Always `200` while the process serves; carries the build identity |
+| `/api/ready` | GET | open | Readiness. Does I/O and fails while draining. See [Health and readiness](/operations/health-checks/) |
+| `/api/metrics` | GET | token and/or CIDR | Prometheus exposition format. `404` until configured. See [Prometheus metrics](/operations/metrics/) |
+
 ## Error contract
 
 Statement-level SQL failures return **400** with the real message so an editor

@@ -28,6 +28,11 @@
 # resolution. Credentials come from the environment here and are never stored.
 /src/lib/registry.ts            @jbouder
 
+# The /api/metrics gate. A scrape names dashboards and sources, per-workspace
+# model spend, and what the SQL guard is rejecting, and it sits outside the
+# session cookie — so loosening this file is a disclosure, not a config change.
+/src/lib/metrics-access.ts      @jbouder
+
 # Security policy, contributor expectations, and the license.
 /SECURITY.md                    @jbouder
 /CONTRIBUTING.md                @jbouder

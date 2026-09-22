@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { parseCidr } from "@/lib/cidr";
 import { resolveTimeExpr, resolveTimeRange } from "@/lib/time";
 
 /**
@@ -154,6 +155,8 @@ const PLACEHOLDER_SESSION_SECRETS = new Set([
 const MIN_SESSION_SECRET_LENGTH = 32;
 /** A 32+ char secret drawn from fewer than this many distinct characters is a keyboard mash, not a key. */
 const MIN_SESSION_SECRET_DISTINCT_CHARS = 8;
+/** Below this, a scrape token is guessable. A warning, not a refusal: it guards metrics, not data. */
+const MIN_METRICS_TOKEN_LENGTH = 24;
 
 /** Treat an empty string as unset, the way `num()`/`str()` above do. */
 const blank = <T extends z.ZodType>(schema: T) =>
@@ -211,6 +214,21 @@ const EnvSchema = z.object({
   ),
   CSP_REPORT_ONLY: blank(
     z.enum(["true", "false"], { error: 'must be "true" or "false"' }),
+  ),
+
+  METRICS_TOKEN: blank(z.string()),
+  METRICS_ALLOWED_CIDRS: blank(
+    z.string().refine(
+      (v) =>
+        v
+          .split(/[,\s]+/)
+          .filter(Boolean)
+          .every((e) => parseCidr(e) !== null),
+      {
+        error:
+          "must be a comma-separated list of IPv4/IPv6 addresses or CIDR ranges, e.g. 10.0.0.0/8,::1",
+      },
+    ),
   ),
 
   AI_PROVIDER: blank(
@@ -330,6 +348,26 @@ export function validateConfig(
     warning(
       "CSP_REPORT_ONLY",
       "is true; the Content-Security-Policy is reported, not enforced. Set it to false once the browser console shows no violations.",
+    );
+  }
+
+  // --- Metrics endpoint ---------------------------------------------------
+  // `/api/metrics` is closed until one of these is set, so an unset pair is
+  // not a problem — it is the default. What is worth saying at boot is that a
+  // CIDR allowlist on its own trusts a header, and a short bearer token is
+  // not much of a secret.
+  const metricsToken = values.METRICS_TOKEN;
+  const metricsCidrs = values.METRICS_ALLOWED_CIDRS;
+  if (production && metricsCidrs && !metricsToken) {
+    warning(
+      "METRICS_ALLOWED_CIDRS",
+      "is set without METRICS_TOKEN; the address check reads X-Forwarded-For and is only meaningful behind a proxy that sets it. Set METRICS_TOKEN unless this app is never reachable directly.",
+    );
+  }
+  if (production && metricsToken && metricsToken.length < MIN_METRICS_TOKEN_LENGTH) {
+    warning(
+      "METRICS_TOKEN",
+      `is ${metricsToken.length} characters; a scrape token should be at least ${MIN_METRICS_TOKEN_LENGTH}. Generate one with \`openssl rand -hex 32\`.`,
     );
   }
 

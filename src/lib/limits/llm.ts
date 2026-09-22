@@ -16,6 +16,12 @@
  *
  * On success it returns a recorder; the route hands the recorder to the
  * stream's finish callback so the call's usage lands in `llm_usage`.
+ *
+ * It is also the one place every model call passes through, so it is where
+ * `/api/metrics` (#51) counts requests and tokens. The gate's own verdict is
+ * the counter's `outcome`: what happens to an admitted call afterwards is the
+ * provider's business, and the tokens it spent are counted when the recorder
+ * fires.
  */
 
 import type { LanguageModelUsage } from "ai";
@@ -31,6 +37,7 @@ import {
   utcDay,
 } from "@/lib/limits/budget";
 import { MemoryRateLimitStore, type RateLimitStore } from "@/lib/limits/rate";
+import { recordLlmRequest, recordLlmTokens } from "@/lib/metrics";
 
 export type { LlmRoute } from "@/lib/limits/budget";
 
@@ -116,6 +123,7 @@ export async function enforceLlmLimits(
     now.getTime(),
   );
   if (!rate.allowed) {
+    recordLlmRequest(route, "rate_limited");
     const seconds = Math.max(1, Math.ceil(rate.retryAfterMs / 1000));
     const resetAt = new Date(now.getTime() + rate.retryAfterMs);
     throw new HttpError(
@@ -133,6 +141,7 @@ export async function enforceLlmLimits(
     now,
   );
   if (!budget.allowed) {
+    recordLlmRequest(route, "over_budget");
     const seconds = Math.max(
       1,
       Math.ceil((budget.resetAt.getTime() - now.getTime()) / 1000),
@@ -145,9 +154,11 @@ export async function enforceLlmLimits(
   }
 
   const model = deps.model();
+  recordLlmRequest(route, "admitted");
   return {
     record(usage) {
       const tokens = tokensFromUsage(usage);
+      recordLlmTokens({ workspaceId, model, ...tokens });
       void deps.budgetStore
         .record({ workspaceId, day: utcDay(deps.now()), route, model, ...tokens })
         .catch((err: unknown) => {
