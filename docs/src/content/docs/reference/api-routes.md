@@ -18,6 +18,8 @@ All routes run on the Node runtime. Every one resolves identity with
 | `/api/dashboards/[id]` | GET | viewer | Current version with its spec |
 | `/api/dashboards/[id]` | PUT | editor | Appends a **new immutable version** |
 | `/api/dashboards/[id]` | DELETE | owner / source-admin | Soft delete |
+| `/api/dashboards/[id]/export` | GET | viewer | Downloads the current spec as a JSON file (`Content-Disposition: attachment`). Carries source **ids** only — no workspace, author, or connection detail |
+| `/api/dashboards/import` | POST | editor | Creates a dashboard at version 1 from an exported file. The target workspace is a request field re-checked by `can()`; source ids are re-pointed by an **explicit** mapping and any still unresolved refuse the whole import |
 | `/api/dashboards/[id]/stream` | GET | viewer | SSE deltas, cookie-authenticated |
 | `/api/dashboards/[id]/chat` | POST | viewer | Read-only chat with a guarded `runQuery` tool. Rate limited and budgeted |
 

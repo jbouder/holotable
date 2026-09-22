@@ -2,12 +2,34 @@ import type { z } from "zod";
 import { HttpError, errorResponse } from "@/lib/auth/authorize";
 import { log, newRequestContext, runWithRequest } from "@/lib/log";
 
+export interface ReadJsonOptions {
+  /**
+   * Refuse a body larger than this, before it is buffered in full.
+   *
+   * Every other route's body is written by our own client and bounded by the
+   * schema it parses into; a route that accepts an uploaded FILE has neither
+   * property, and `req.json()` would buffer whatever arrives before Zod ever
+   * sees it. A cap here turns "an enormous spec" into a 400 rather than an
+   * allocation the process may not survive.
+   */
+  maxBytes?: number;
+}
+
 /** Parse and validate a JSON request body against a Zod schema, or throw 400. */
-export async function readJson<T>(req: Request, schema: z.ZodType<T>): Promise<T> {
+export async function readJson<T>(
+  req: Request,
+  schema: z.ZodType<T>,
+  opts: ReadJsonOptions = {},
+): Promise<T> {
   let body: unknown;
   try {
-    body = await req.json();
-  } catch {
+    const text =
+      opts.maxBytes === undefined
+        ? await req.text()
+        : await readCappedText(req, opts.maxBytes);
+    body = JSON.parse(text);
+  } catch (err) {
+    if (err instanceof HttpError) throw err;
     throw new HttpError(400, "invalid JSON body");
   }
   const parsed = schema.safeParse(body);
@@ -18,6 +40,47 @@ export async function readJson<T>(req: Request, schema: z.ZodType<T>): Promise<T
     );
   }
   return parsed.data;
+}
+
+/**
+ * Read the body as text, stopping as soon as more than `maxBytes` has arrived.
+ *
+ * `Content-Length` is checked first so an honest oversized upload is refused
+ * without transferring it, but it is a hint and not a bound — a chunked body
+ * declares no length — so the running total is what actually enforces the cap.
+ * The status is a 400 rather than a 413: the body of an over-large request is
+ * still a malformed request to this API, and the message names the limit.
+ */
+async function readCappedText(req: Request, maxBytes: number): Promise<string> {
+  const tooLarge = () =>
+    new HttpError(400, `request body exceeds the ${maxBytes} byte limit`);
+
+  const declared = Number(req.headers.get("content-length"));
+  if (Number.isFinite(declared) && declared > maxBytes) throw tooLarge();
+
+  const reader = req.body?.getReader();
+  if (!reader) return "";
+
+  const chunks: Uint8Array[] = [];
+  let total = 0;
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    total += value.byteLength;
+    if (total > maxBytes) {
+      await reader.cancel();
+      throw tooLarge();
+    }
+    chunks.push(value);
+  }
+
+  const joined = new Uint8Array(total);
+  let offset = 0;
+  for (const chunk of chunks) {
+    joined.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
+  return new TextDecoder().decode(joined);
 }
 
 export function json(data: unknown, init?: ResponseInit): Response {

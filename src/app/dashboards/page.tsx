@@ -2,8 +2,10 @@ import Link from "next/link";
 import { Plus } from "lucide-react";
 import { getIdentity } from "@/lib/auth/authorize";
 import { accessibleWorkspaces, hasWorkspaceRole } from "@/lib/auth/claims";
-import { listDashboards } from "@/lib/db/repo";
+import { listDashboards, listSources } from "@/lib/db/repo";
+import type { ImportTarget } from "@/lib/dashboard-export";
 import { SignIn } from "@/components/sign-in";
+import { ImportDashboard } from "./import-dashboard";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 
@@ -16,20 +18,35 @@ export default async function DashboardsPage() {
   const workspaces = accessibleWorkspaces(identity);
   const lists = await Promise.all(workspaces.map((w) => listDashboards(w)));
   const dashboards = lists.flat();
-  const canCreate =
-    identity.platformAdmin ||
-    workspaces.some((w) => hasWorkspaceRole(identity, w, "editor"));
+  const editable = workspaces.filter(
+    (w) => identity.platformAdmin || hasWorkspaceRole(identity, w, "editor"),
+  );
+  const canCreate = editable.length > 0;
+
+  // The import dialog needs to know which sources each workspace offers, and
+  // it needs it before the user picks a workspace. Projecting to an id and a
+  // name here is what keeps `listSources` — which returns hosts, ports and the
+  // whole catalog — from reaching the browser.
+  const importTargets: ImportTarget[] = await Promise.all(
+    editable.map(async (workspaceId) => ({
+      workspaceId,
+      sources: (await listSources(workspaceId)).map((s) => ({ id: s.id, name: s.name })),
+    })),
+  );
 
   return (
     <div>
       <div className="mb-6 flex items-center justify-between">
         <h1 className="text-2xl font-semibold">Dashboards</h1>
         {canCreate && (
-          <Link href="/dashboards/new">
-            <Button>
-              <Plus className="h-4 w-4" /> New dashboard
-            </Button>
-          </Link>
+          <div className="flex items-center gap-2">
+            <ImportDashboard targets={importTargets} />
+            <Link href="/dashboards/new">
+              <Button>
+                <Plus className="h-4 w-4" /> New dashboard
+              </Button>
+            </Link>
+          </div>
         )}
       </div>
 
