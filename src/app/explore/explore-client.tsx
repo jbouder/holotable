@@ -12,7 +12,8 @@ import { Badge } from "@/components/ui/badge";
 import { EChart } from "@/components/charts/EChart";
 import { buildChartOption, type PanelData } from "@/components/charts/options";
 import { ErrorDisplay } from "@/components/ui/error-display";
-import { type ApiError, apiErrorFromThrown, readApiError } from "@/lib/errors";
+import { type ApiError, apiErrorFromThrown } from "@/lib/errors";
+import { EMPTY_ROWS, runPanelQuery } from "@/lib/panel-query";
 import { formatValue } from "@/lib/format";
 
 interface SourceOption {
@@ -31,8 +32,6 @@ interface Result {
 
 const CHART_VIZ = new Set(["line", "bar", "heatmap", "pie", "donut"]);
 const MAX_TABLE_ROWS = 500;
-const EMPTY: PanelData = { columns: [], rows: [] };
-
 const TIME_PRESETS: { value: string; label: string }[] = [
   { value: "now-15m", label: "Last 15 minutes" },
   { value: "now-1h", label: "Last 1 hour" },
@@ -65,27 +64,13 @@ export function ExploreClient({
   const [result, setResult] = React.useState<Result | null>(null);
 
   const runQuery = React.useCallback(async (p: Panel, timeRange: TimeRange) => {
-    setResult({ data: EMPTY, status: "loading" });
-    try {
-      const res = await fetch("/api/query", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          sourceId: p.query.sourceId,
-          sql: p.query.sql,
-          timeField: p.query.timeField,
-          timeRange,
-        }),
-      });
-      if (!res.ok) {
-        setResult({ data: EMPTY, status: "error", error: await readApiError(res) });
-        return;
-      }
-      const body = await res.json();
-      setResult({ data: { columns: body.columns, rows: body.rows }, status: "done" });
-    } catch (err) {
-      setResult({ data: EMPTY, status: "error", error: apiErrorFromThrown(err) });
-    }
+    setResult({ data: EMPTY_ROWS, status: "loading" });
+    const outcome = await runPanelQuery(p.query, timeRange);
+    setResult(
+      outcome.ok
+        ? { data: outcome.rows, status: "done" }
+        : { data: EMPTY_ROWS, status: "error", error: outcome.error },
+    );
   }, []);
 
   const { object, submit, isLoading, error, stop } = useObject({
@@ -265,7 +250,7 @@ function ResultView({
   rangeLabel: string;
   onRetry: () => void;
 }) {
-  const data = result?.data ?? EMPTY;
+  const data = result?.data ?? EMPTY_ROWS;
   const rowCount = data.rows.length;
 
   return (

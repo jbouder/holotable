@@ -17,6 +17,7 @@ import { Input, Textarea, Label } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { PreviewDashboard } from "@/components/dashboard/PreviewDashboard";
+import { PanelPreview, usePanelPreview } from "@/components/dashboard/PanelPreview";
 import { ErrorDisplay } from "@/components/ui/error-display";
 import { type ApiError, apiErrorFromThrown, readApiError } from "@/lib/errors";
 
@@ -309,8 +310,12 @@ export function EditDashboardClient({
               <CardContent className="space-y-4">
                 {selected && (
                   <PanelEditor
+                    // Remounting on selection drops the previous panel's
+                    // preview rather than showing it under a different panel.
+                    key={selected.id}
                     panel={selected}
                     sources={sources}
+                    timeRange={spec.timeRange}
                     onChange={(fn) => updatePanel(selected.id, fn)}
                   />
                 )}
@@ -390,12 +395,16 @@ export function EditDashboardClient({
 function PanelEditor({
   panel,
   sources,
+  timeRange,
   onChange,
 }: {
   panel: Panel;
   sources: SourceOption[];
+  timeRange: Dashboard["timeRange"];
   onChange: (fn: (p: Panel) => Panel) => void;
 }) {
+  const preview = usePanelPreview(panel, timeRange);
+
   return (
     <div className="space-y-3">
       <div className="grid grid-cols-2 gap-3">
@@ -437,7 +446,7 @@ function PanelEditor({
         </div>
       </div>
 
-      <div>
+      <div className="space-y-2">
         <Label htmlFor="p-sql">
           SQL (SELECT only; no time filter — the server injects it)
         </Label>
@@ -449,7 +458,14 @@ function PanelEditor({
           onChange={(e) =>
             onChange((p) => ({ ...p, query: { ...p.query, sql: e.target.value } }))
           }
+          onKeyDown={(e) => {
+            if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
+              e.preventDefault();
+              if (preview.busy === null) preview.run();
+            }
+          }}
         />
+        <PanelPreview panel={panel} preview={preview} />
       </div>
 
       <div>

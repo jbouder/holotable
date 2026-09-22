@@ -27,6 +27,7 @@ All routes run on the Node runtime. Every one resolves identity with
 | --- | --- | --- | --- |
 | `/api/generate` | POST | editor | Streams a validated dashboard, panel, or explore-panel spec. Authorized against the workspace owning the selected **source**. Rate limited and budgeted |
 | `/api/query` | POST | editor | One-shot guarded query for preview and Explore |
+| `/api/sql/validate` | POST | editor | Runs the SQL guard against a source's catalog without executing. Always `200`; the verdict is `{ ok, error? }` |
 
 ## Sources
 
