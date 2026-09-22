@@ -56,7 +56,8 @@ Key locations:
 - `src/components/` — UI and feature components
 - `src/lib/` — shared domain logic, schemas, formatting, utilities
 - `scripts/` — migration and seeding scripts
-- `test/` — Node test runner tests
+- `test/` — Node test runner tests (`*.test.ts`; `*.test.tsx` for the few that
+  need a real render, via the jsdom harness in `test/support/dom.tsx`)
 - `docs/` — the Astro + Starlight documentation site (its own `package.json`;
   content under `docs/src/content/docs/`)
 - `timescaledb/` — database bootstrap/schema assets
@@ -100,6 +101,13 @@ satisfy an independent parse-tree oracle. Run `npm run test:fuzz` after any
 guard change; a failure prints the statement and a replay line. Promote the
 counterexample into `test/fixtures/sql-fuzz-corpus.ts` and a named test rather
 than adjusting the generator to avoid it.
+
+Component tests are deliberately rare. `react-dom/server` does not run error
+boundaries — a throwing child propagates straight out of `renderToStaticMarkup`
+— so anything that depends on a real React unwind mounts through
+`test/support/dom.tsx` (jsdom, devDependency only) and is named `*.test.tsx`.
+Prefer extracting the logic into `src/lib/` and testing it as a function; reach
+for a render only when there is nothing to extract.
 
 ---
 

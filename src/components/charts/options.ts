@@ -9,11 +9,63 @@ export interface PanelData {
 
 const palette = chartPalette();
 
+const EMPTY: PanelData = { columns: [], rows: [] };
+
+/**
+ * Rows reach this module from an SSE frame that is `JSON.parse`d and merged,
+ * never re-validated against the IR, so a malformed frame or a driver that
+ * hands back something unexpected lands here as-is. Nothing below should throw
+ * on a shape it did not expect: `PanelErrorBoundary` is the backstop, but a
+ * panel that degrades to an empty chart beats one that degrades to a card.
+ */
+function normalize(data: PanelData | undefined): PanelData {
+  if (!data) return EMPTY;
+  return {
+    columns: Array.isArray(data.columns)
+      ? data.columns.filter((c): c is string => typeof c === "string")
+      : [],
+    rows: Array.isArray(data.rows)
+      ? data.rows.filter(
+          (r): r is Record<string, unknown> => typeof r === "object" && r !== null,
+        )
+      : [],
+  };
+}
+
+/** `String(v)` throws on a symbol and stringifies objects unhelpfully. */
+function toText(value: unknown): string {
+  if (value === null || value === undefined) return "";
+  switch (typeof value) {
+    case "string":
+      return value;
+    case "number":
+    case "boolean":
+    case "bigint":
+      return String(value);
+    case "symbol":
+    case "function":
+      return "";
+    default:
+      try {
+        return JSON.stringify(value) ?? "";
+      } catch {
+        return "";
+      }
+  }
+}
+
+/** `Number(v)` throws on a symbol; everything else here becomes NaN or a number. */
+function toNumber(value: unknown): number {
+  if (typeof value === "symbol" || typeof value === "function") return Number.NaN;
+  const n = Number(value);
+  return Number.isFinite(n) ? n : Number.NaN;
+}
+
 function isNumeric(rows: Record<string, unknown>[], key: string): boolean {
   return rows.some(
     (r) =>
       typeof r[key] === "number" ||
-      (r[key] !== null && r[key] !== "" && Number.isFinite(Number(r[key]))),
+      (r[key] !== null && r[key] !== "" && Number.isFinite(toNumber(r[key]))),
   );
 }
 
@@ -38,10 +90,11 @@ const BASE: EChartsOption = {
  * Build an ECharts option from a panel spec + current (bounded) data. Only
  * line/area/bar/scatter/heatmap/pie/donut map to ECharts; stat/table are rendered as HTML.
  */
-export function buildChartOption(panel: Panel, data: PanelData): EChartsOption {
+export function buildChartOption(panel: Panel, raw: PanelData): EChartsOption {
+  const data = normalize(raw);
   const x = xKey(panel, data);
   const keys = seriesKeys(panel, data);
-  const categories = data.rows.map((r) => String(r[x]));
+  const categories = data.rows.map((r) => toText(r[x]));
 
   if (panel.viz === "heatmap") {
     return buildHeatmap(panel, data);
@@ -75,7 +128,7 @@ export function buildChartOption(panel: Panel, data: PanelData): EChartsOption {
       showSymbol: false,
       smooth: type === "line",
       areaStyle: panel.viz === "area" ? {} : undefined,
-      data: data.rows.map((r) => Number(r[k])),
+      data: data.rows.map((r) => toNumber(r[k])),
     })),
   };
 }
@@ -102,7 +155,7 @@ function buildScatter(data: PanelData): EChartsOption {
       name: key,
       type: "scatter",
       symbolSize: 8,
-      data: data.rows.map((row) => [Number(row[x]), Number(row[key])]),
+      data: data.rows.map((row) => [toNumber(row[x]), toNumber(row[key])]),
     })),
   };
 }
@@ -128,8 +181,8 @@ function buildPie(panel: Panel, data: PanelData): EChartsOption {
         radius,
         center: ["50%", "56%"],
         data: data.rows.map((r) => ({
-          name: String(r[x]),
-          value: Number(r[valueKey]) || 0,
+          name: toText(r[x]),
+          value: toNumber(r[valueKey]) || 0,
         })),
         label: { color: "#9aa0aa" },
         labelLine: { lineStyle: { color: "#3a3f4b" } },
@@ -140,12 +193,12 @@ function buildPie(panel: Panel, data: PanelData): EChartsOption {
 
 function buildHeatmap(_panel: Panel, data: PanelData): EChartsOption {
   const [xk, yk, vk] = data.columns;
-  const xs = [...new Set(data.rows.map((r) => String(r[xk])))];
-  const ys = [...new Set(data.rows.map((r) => String(r[yk])))];
+  const xs = [...new Set(data.rows.map((r) => toText(r[xk])))];
+  const ys = [...new Set(data.rows.map((r) => toText(r[yk])))];
   const values = data.rows.map((r) => [
-    xs.indexOf(String(r[xk])),
-    ys.indexOf(String(r[yk])),
-    Number(r[vk]) || 0,
+    xs.indexOf(toText(r[xk])),
+    ys.indexOf(toText(r[yk])),
+    toNumber(r[vk]) || 0,
   ]);
   const max = Math.max(1, ...values.map((v) => v[2]));
   return {
