@@ -53,6 +53,10 @@ g.MouseEvent = dom.window.MouseEvent;
 g.KeyboardEvent = dom.window.KeyboardEvent;
 g.requestAnimationFrame = dom.window.requestAnimationFrame.bind(dom.window);
 g.cancelAnimationFrame = dom.window.cancelAnimationFrame.bind(dom.window);
+// Base UI positions a popup against its trigger, and reads the trigger's
+// computed style to do it — asynchronously, so a missing global surfaces as an
+// unhandled rejection after the test has already passed.
+g.getComputedStyle = dom.window.getComputedStyle.bind(dom.window);
 // ECharts and the chart wrapper observe their container; jsdom has no
 // ResizeObserver and the panels under test never need a real one.
 g.ResizeObserver = class {

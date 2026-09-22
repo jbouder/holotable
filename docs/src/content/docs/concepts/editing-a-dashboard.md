@@ -36,11 +36,51 @@ A failed save leaves you exactly where you were, with the error and every
 change still in the editor. Nothing about a failure is recoverable by retrying
 from a different place, so the editor does not send you to one.
 
+## The panel list
+
+The list on the left is the dashboard's panel *order*, which is what the
+`Arrange: N-up` presets flow onto the grid. Each row has an overflow menu with
+the actions that change it:
+
+- **Duplicate** copies the panel with a fresh id, `" (copy)"` on the title, and
+  the row directly below the original; anything already there is pushed down
+  rather than covered. The copy is selected, because the point of duplicating is
+  to then change it.
+- **Move up / down / to top / to bottom** move the panel through the order.
+  Dragging a row's handle does the same thing.
+
+Reordering touches the order and nothing else. A panel's position on the grid
+lives in its `layout`, so a dashboard you have arranged by hand survives a
+reorder unchanged — the new order reaches the grid only when you apply an
+`Arrange` preset. That is also why the actions are on the list and the dragging
+is on the grid: the two are different questions.
+
+Deleting is undoable, so it asks first only when there is work to lose — when
+the panel's SQL is no longer the starter the editor wrote for it.
+
+## New panels
+
+A new panel starts from a query built out of the selected source's own catalog
+(`src/lib/panel-starter.ts`): the first allowlisted table with a time column,
+counted per minute, as a line chart. A source whose tables have no time column
+gets a plain `count(*)` as a stat instead, and a source with no usable table at
+all falls back to `SELECT 1 AS value`.
+
+Because every name in it comes from the source's allowlist, the starter is
+guaranteed to pass the SQL guard against that source — and it never filters time
+itself, because the server owns the range.
+
+**Describe** adds the same starter and puts the cursor in the
+natural-language box, so the first thing you do with the panel is say what it
+should be. That runs the model once and lands as a reviewable diff, exactly like
+any other natural-language edit.
+
 ## Undo and redo
 
-Every change to the spec — adding, deleting or editing a panel, arranging the
-grid, applying a template, accepting a natural-language edit, re-pointing panels
-off a removed source — is one entry on a bounded history stack
+Every change to the spec — adding, duplicating, reordering, deleting or editing
+a panel, arranging the grid, applying a template, accepting a natural-language
+edit, re-pointing panels off a removed source — is one entry on a bounded
+history stack
 (`src/lib/editor/use-history.ts`). Undo and redo walk it; a new change after an
 undo abandons the redo branch.
 
@@ -98,6 +138,7 @@ do not fire while you are typing in a field.
 | `⌘⇧Z` / `Ctrl+Shift+Z` | Redo |
 | `⌘Enter` / `Ctrl+Enter` | Apply the natural-language edit; run the preview in the SQL box |
 | `N` | Add a panel |
+| `D` | Duplicate the selected panel |
 | `/` | Focus the natural-language prompt |
 | `Esc` | Dismiss the generated panel under review |
 | `?` | Show the shortcut list |

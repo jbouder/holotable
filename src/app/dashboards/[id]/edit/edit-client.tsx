@@ -5,13 +5,13 @@ import { useRouter } from "next/navigation";
 import { experimental_useObject as useObject } from "@ai-sdk/react";
 import {
   Plus,
-  Trash2,
   Save,
   SendHorizontal,
   Loader2,
   LayoutGrid,
   LayoutTemplate,
   Keyboard,
+  Sparkles,
   Redo2,
   Undo2,
   Unplug,
@@ -24,6 +24,14 @@ import {
   safeParseDashboard,
 } from "@/lib/ir";
 import { autoLayoutPanels, COLUMN_PRESETS } from "@/lib/layout";
+import {
+  canMove,
+  duplicatePanel,
+  movePanel,
+  type PanelMove,
+  reorderPanels,
+} from "@/lib/panel-list";
+import { isStarterSql, starterPanel } from "@/lib/panel-starter";
 import { clampLayout } from "@/lib/grid-layout";
 import { Button } from "@/components/ui/button";
 import { Input, Textarea, Label } from "@/components/ui/input";
@@ -31,6 +39,7 @@ import { Select } from "@/components/ui/select";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { PreviewDashboard } from "@/components/dashboard/PreviewDashboard";
 import { PanelLayoutGrid } from "@/components/dashboard/PanelLayoutGrid";
+import { PanelList } from "@/components/dashboard/PanelList";
 import { SqlEditor } from "@/components/sql/SqlEditor";
 import { TimeFieldPicker } from "@/components/sql/TimeFieldPicker";
 import type { SourceCatalog } from "@/lib/registry";
@@ -45,6 +54,7 @@ import { appendTemplate, type Template } from "@/lib/templates";
 import { SaveAsTemplate } from "@/components/templates/SaveAsTemplate";
 import { TemplatePicker } from "@/components/templates/TemplatePicker";
 import { DraftBanner } from "@/components/editor/DraftBanner";
+import { Dialog } from "@/components/ui/dialog";
 import { LeaveGuardDialog } from "@/components/editor/LeaveGuardDialog";
 import { ShortcutsDialog } from "@/components/editor/ShortcutsDialog";
 import { useHistory } from "@/lib/editor/use-history";
@@ -173,6 +183,9 @@ export function EditDashboardClient({
     panelIds: string[];
   } | null>(null);
   const [picking, setPicking] = React.useState(false);
+  // A panel whose deletion is waiting on an answer. Only panels that have been
+  // worked on get this far; see `removePanel`.
+  const [confirmDelete, setConfirmDelete] = React.useState<Panel | null>(null);
 
   // Wall clock for the relative timestamps, resolved after mount: rendering
   // "2 minutes ago" on the server would be a hydration mismatch by definition.
@@ -309,21 +322,72 @@ export function EditDashboardClient({
     );
   }
 
-  function addPanel() {
+  /**
+   * Add a panel at the bottom of the grid, starting from a query built out of
+   * the selected source's own catalog (#112) rather than `SELECT 1 AS value`.
+   *
+   * `describe` focuses the natural-language box instead of the SQL: the panel
+   * still lands as a starter, but the author's next act is to say what they
+   * want and review it as a diff, which is the same flow as any other
+   * natural-language edit (#111).
+   */
+  function addPanel(describe = false) {
     if (sources.length === 0) return;
     const id = `panel-${Date.now().toString(36)}`;
     const maxY = spec.panels.reduce((m, p) => Math.max(m, p.layout.y + p.layout.h), 0);
-    const panel: Panel = {
-      id,
-      title: "New panel",
-      viz: "line",
-      query: { sourceId: sources[0].id, sql: "SELECT 1 AS value", timeField: undefined },
-      layout: { x: 0, y: maxY, w: 6, h: 4 },
-    };
+    const source = sources[0];
+    const panel = starterPanel(id, source.id, source.catalog, {
+      x: 0,
+      y: maxY,
+      w: 6,
+      h: 4,
+    });
     history.set((s) => ({ ...s, panels: [...s.panels, panel] }), {
       action: "add panel",
     });
     setSelectedId(id);
+    if (describe) {
+      // After the render that mounts the editor for the new panel.
+      requestAnimationFrame(() => document.getElementById("nl")?.focus());
+    }
+  }
+
+  /* --- Panel list actions (#113). Each one is a single history entry. ----- */
+
+  function duplicate(id: string) {
+    const next = duplicatePanel(spec.panels, id);
+    if (!next) return;
+    history.set((s) => ({ ...s, panels: next.panels }), { action: "duplicate panel" });
+    selectPanel(next.id);
+  }
+
+  function move(id: string, to: PanelMove) {
+    if (!canMove(spec.panels, id, to)) return;
+    history.set((s) => ({ ...s, panels: movePanel(s.panels, id, to) }), {
+      action: `move panel ${to}`,
+    });
+  }
+
+  function reorder(id: string, to: number) {
+    history.set((s) => ({ ...s, panels: reorderPanels(s.panels, id, to) }), {
+      action: "reorder panels",
+    });
+  }
+
+  /**
+   * Delete, asking first when there is work to lose.
+   *
+   * Deleting is undoable, so a confirmation on every panel would be noise. It
+   * is worth one once the SQL is no longer the starter the editor wrote —
+   * which is the same question `isStarterSql` answers for the source the panel
+   * actually points at, not the first one in the list.
+   */
+  function removePanel(id: string) {
+    const panel = spec.panels.find((p) => p.id === id);
+    if (!panel) return;
+    const catalog = sources.find((s) => s.id === panel.query.sourceId)?.catalog ?? null;
+    if (isStarterSql(panel.query.sql, catalog)) deletePanel(id);
+    else setConfirmDelete(panel);
   }
 
   /**
@@ -339,7 +403,8 @@ export function EditDashboardClient({
     setPicking(false);
   }
 
-  function removePanel(id: string) {
+  function deletePanel(id: string) {
+    setConfirmDelete(null);
     history.set((s) => ({ ...s, panels: s.panels.filter((p) => p.id !== id) }), {
       action: "delete panel",
     });
@@ -586,8 +651,18 @@ export function EditDashboardClient({
       key: "n",
       group: "Editing",
       description: "Add a panel",
-      run: addPanel,
+      run: () => addPanel(),
       disabled: sources.length === 0,
+    },
+    {
+      id: "duplicate-panel",
+      key: "d",
+      group: "Editing",
+      description: "Duplicate the selected panel",
+      run: () => {
+        if (selectedId) duplicate(selectedId);
+      },
+      disabled: selectedId === null,
     },
     {
       id: "run",
@@ -914,7 +989,17 @@ export function EditDashboardClient({
                   <Button
                     variant="secondary"
                     size="sm"
-                    onClick={addPanel}
+                    onClick={() => addPanel(true)}
+                    disabled={sources.length === 0}
+                    title="Add a panel and describe it to the model"
+                  >
+                    <Sparkles className="h-4 w-4" /> Describe
+                  </Button>
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    onClick={() => addPanel()}
+                    disabled={sources.length === 0}
                     title={`Add a panel${hint("new-panel")}`}
                   >
                     <Plus className="h-4 w-4" /> Add
@@ -922,27 +1007,21 @@ export function EditDashboardClient({
                 </div>
               </CardHeader>
               <CardContent className="space-y-3">
-                <div className="space-y-1">
-                  {spec.panels.map((p) => (
-                    <button
-                      key={p.id}
-                      type="button"
-                      onClick={() => selectPanel(p.id)}
-                      className={`flex w-full items-center justify-between rounded px-2 py-1.5 text-left text-sm ${
-                        p.id === selectedId ? "bg-surface-2" : "hover:bg-surface-2"
-                      }`}
-                    >
-                      <span className="truncate">{p.title}</span>
-                      <Trash2
-                        className="h-4 w-4 shrink-0 text-muted hover:text-danger"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          removePanel(p.id);
-                        }}
-                      />
-                    </button>
-                  ))}
-                </div>
+                <PanelList
+                  panels={spec.panels}
+                  selectedId={selectedId}
+                  onSelect={selectPanel}
+                  onMove={move}
+                  onReorder={reorder}
+                  onDuplicate={duplicate}
+                  onDelete={removePanel}
+                />
+                {spec.panels.length > 1 && (
+                  <p className="text-xs text-muted">
+                    Reordering changes the list only. Use Arrange above to flow the new
+                    order onto the grid.
+                  </p>
+                )}
               </CardContent>
             </Card>
 
@@ -1063,6 +1142,35 @@ export function EditDashboardClient({
           onClose={() => setRepointing(null)}
         />
       )}
+
+      <Dialog
+        open={confirmDelete !== null}
+        onOpenChange={(open) => {
+          if (!open) setConfirmDelete(null);
+        }}
+        title="Delete this panel?"
+        className="max-w-md"
+      >
+        <div className="space-y-4">
+          <p className="text-sm text-muted">
+            <span className="text-foreground">{confirmDelete?.title}</span> has a query of
+            its own. Deleting it is one undo away, and nothing is written until you save.
+          </p>
+          <div className="flex justify-end gap-2">
+            <Button variant="secondary" onClick={() => setConfirmDelete(null)}>
+              Cancel
+            </Button>
+            <Button
+              variant="danger"
+              onClick={() => {
+                if (confirmDelete) deletePanel(confirmDelete.id);
+              }}
+            >
+              Delete panel
+            </Button>
+          </div>
+        </div>
+      </Dialog>
 
       <ShortcutsDialog
         shortcuts={bindings}
