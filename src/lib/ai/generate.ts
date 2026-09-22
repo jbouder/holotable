@@ -8,9 +8,9 @@ import { SourceDraft, type SourceRecord } from "@/lib/registry";
 /**
  * LLM generation.
  *
- * The model runs EXACTLY ONCE per author action (create / full edit / single
- * panel NL edit) and only ever emits a validated spec conforming to the shared
- * Zod IR — never data. The prompt contains catalog METADATA for the single
+ * The model runs EXACTLY ONCE per author action (create / refine a turn / full
+ * edit / single panel NL edit) and only ever emits a validated spec conforming
+ * to the shared Zod IR — never data. The prompt contains catalog METADATA for the single
  * selected, already-authorized source. The model must not write time filters;
  * the server injects the dashboard time range at execution.
  */
@@ -180,5 +180,38 @@ ${JSON.stringify(current, null, 2)}
 
 Apply this change and return the full updated panel (keep the same "id"):
 """${prompt}"""`,
+  });
+}
+
+/**
+ * Conversational refinement of a dashboard that has not been saved yet. Mirrors
+ * {@link streamPanel} one level up: the current full spec plus a follow-up
+ * instruction, returning the complete updated dashboard. It is still one model
+ * call per author action — a turn, not a chat loop — and the model still emits
+ * only a validated spec, never data.
+ */
+export function streamDashboardRefinement(input: {
+  source: SourceRecord;
+  prompt: string;
+  current: Dashboard;
+  onUsage?: OnUsage;
+}) {
+  const { source, prompt, current, onUsage } = input;
+  return streamObject({
+    model: getModel(),
+    onFinish: ({ usage }) => onUsage?.(usage),
+    schema: Dashboard,
+    schemaName: "Dashboard",
+    schemaDescription: "A monitoring dashboard specification (viz spec, not data).",
+    system: baseSystem(source),
+    prompt: `Here is the current dashboard spec:
+${JSON.stringify(current, null, 2)}
+
+Apply this change and return the FULL updated dashboard:
+"""${prompt}"""
+
+Carry over every panel the request does not mention, unchanged and with the same
+"id". Keep "title", "timeRange" and "refreshIntervalMs" unless the request asks
+to change them.`,
   });
 }

@@ -7,11 +7,12 @@ sidebar:
 
 Entry point: `POST /api/generate` (`src/app/api/generate/route.ts`).
 
-The request body is a discriminated union over three modes:
+The request body is a discriminated union over four modes:
 
 | Mode | Produces | Used by |
 | --- | --- | --- |
 | `dashboard` | a full `Dashboard` (1–50 panels) | new-dashboard flow |
+| `dashboard-refine` | a full `Dashboard` from a current spec + follow-up | refinement before the first save |
 | `panel` | one updated `Panel` from a current panel + NL edit | per-panel "edit with AI" |
 | `explore` | one `Panel` answering an ad-hoc question | the Explore tool |
 
@@ -71,6 +72,23 @@ omitted entirely.
 `streamObject` streams the partial object to the client so the UI can render the
 spec as it forms. **The model runs exactly once per author action** — never on
 view, never on a refresh tick.
+
+## Refining before the first save
+
+Generation on `/dashboards/new` is not one-shot. After the first turn, a
+follow-up ("make the third one a bar chart", "add p99 latency") sends the
+**current spec** back as context and returns the whole updated dashboard, the
+way a single panel's NL edit already does one level down. Each follow-up is one
+author action and therefore **one model call**, and it counts against the
+workspace's rate limit and token budget like any other.
+
+The turn history is client-side and unsaved (`src/lib/dashboard-turns.ts`): each
+turn keeps the prompt and the layout-normalized spec, an earlier turn can be
+restored before saving, and refining from a restored turn drops the turns that
+followed it. **Nothing is persisted until Save** — that is still the ordinary
+`POST /api/dashboards`. The data source is locked once the first turn lands,
+because every panel's `query.sourceId` must match the source the spec was
+generated against.
 
 ## Keeping an Explore answer
 
