@@ -9,6 +9,13 @@ type Theme = "dark" | "light" | "system";
 const STORAGE_KEY = "theme";
 const THEMES: Theme[] = ["dark", "light", "system"];
 
+/**
+ * What the server renders and what the client hydrates with. The inline
+ * bootstrap script in the root layout falls back to the same value, so the two
+ * have to stay in step.
+ */
+const DEFAULT_THEME: Theme = "dark";
+
 const OPTIONS: { value: Theme; label: string; Icon: typeof Sun }[] = [
   { value: "light", label: "Light", Icon: Sun },
   { value: "dark", label: "Dark", Icon: Moon },
@@ -20,13 +27,11 @@ function isTheme(value: string | null): value is Theme {
 }
 
 function savedTheme(): Theme {
-  if (typeof window === "undefined") return "dark";
-
   try {
     const value = window.localStorage.getItem(STORAGE_KEY);
-    return isTheme(value) ? value : "dark";
+    return isTheme(value) ? value : DEFAULT_THEME;
   } catch {
-    return "dark";
+    return DEFAULT_THEME;
   }
 }
 
@@ -43,11 +48,27 @@ function applyTheme(theme: Theme) {
 }
 
 export function ThemeToggle() {
-  const [theme, setTheme] = React.useState<Theme>(savedTheme);
+  // Not savedTheme(): the server has no localStorage, so the first client
+  // render has to agree with what the server sent or hydration mismatches, and
+  // React does not patch up the attributes it disagrees on -- the toggle would
+  // keep the wrong button `aria-checked` and highlighted until something else
+  // re-rendered it.
+  const [theme, setTheme] = React.useState<Theme>(DEFAULT_THEME);
 
+  // Adopt the stored preference once, after hydration. Applying it here is
+  // all but redundant -- the layout's bootstrap script resolved the same value
+  // before first paint -- but it keeps <html> correct if that script was
+  // blocked, and it cannot flash, because it applies the stored theme rather
+  // than the DEFAULT_THEME the state still holds.
   React.useEffect(() => {
-    applyTheme(theme);
+    const stored = savedTheme();
+    setTheme(stored);
+    applyTheme(stored);
+  }, []);
 
+  // Follow the OS only while "system" is selected. Every other transition is
+  // applied by updateTheme at the click.
+  React.useEffect(() => {
     if (theme !== "system") return;
     const media = window.matchMedia("(prefers-color-scheme: dark)");
     const handleChange = () => applyTheme("system");
@@ -69,7 +90,6 @@ export function ThemeToggle() {
     <div
       role="radiogroup"
       aria-label="Theme"
-      suppressHydrationWarning
       className="inline-flex items-center gap-0.5 rounded-lg border border-border bg-surface-2 p-0.5"
     >
       {OPTIONS.map(({ value, label, Icon }) => {
