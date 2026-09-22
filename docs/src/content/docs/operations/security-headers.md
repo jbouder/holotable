@@ -82,6 +82,17 @@ nonce. Read it the way the layout does and pass it as the `nonce` prop, or use
 `next/script`, which Next stamps for you. Do not add `'unsafe-inline'` to
 `script-src`; a nonce in the same directive makes browsers ignore it anyway.
 
+**Adding a library that injects styles at runtime.** Same rule, and the failure
+looks different: nothing errors, the feature simply renders unstyled. A library
+that mounts a `<style>` element itself needs to be handed the nonce — the SQL
+editor does this through `EditorView.cspNonce`. The nonce comes from
+`documentNonce()` (`src/lib/csp-nonce.ts`), which reads it off an element
+already in the page rather than taking it as a prop: a client-side navigation
+carries a fresh nonce in its response, but the policy in force is still the one
+the document arrived with, so only the document's own nonce works. Browsers
+blank the attribute after parsing and keep the `nonce` IDL property readable to
+same-origin script, which is what that helper reads.
+
 ## Rolling out with report-only
 
 Set `CSP_REPORT_ONLY=true` and the same policy is sent as

@@ -92,6 +92,52 @@ Neither action touches the dashboard or writes a version, and neither is a way
 around the guard: the preview is an ordinary guarded execution, and the save
 re-validates every panel regardless of what was checked here.
 
+## Writing the query — the catalog-aware editor
+
+The SQL field is a CodeMirror editor (`src/components/sql/SqlEditor.tsx`),
+loaded on demand so that nothing in a dashboard *viewer's* bundle carries an
+editor. Until the chunk arrives — or if it never does — the same field renders
+as a plain textarea with the same value, so the editor is an improvement on the
+control, never a prerequisite for it.
+
+What it knows comes from the selected source's catalog, projected for the
+browser by `sourceCatalog` (`src/lib/registry.ts`): the schema name, the
+allowlisted tables and their columns, and nothing that says how to reach the
+database. The host, port, database, TLS setting and `secret_ref` stay on the
+server.
+
+- **Completion** offers exactly the allowlisted tables and their columns, with
+  each column's type as the detail line. What completes is what the guard
+  accepts, so taking a suggestion cannot produce a catalog rejection. It
+  reconfigures in place when the panel's source changes.
+- **Hints** underline the guard's most common refusals while typing —
+  a comment, a second statement, a table outside the allowlist, `now()`,
+  `current_timestamp`, `'today'`. They come from a lexical scan
+  (`src/lib/sql/hints.ts`), *not* a second copy of the guard, and the two are
+  asymmetric on purpose: a hint is only raised when a scan can be certain the
+  server will refuse. Anything less certain stays silent, because underlining
+  a valid query teaches authors to ignore the underlines. A statement with no
+  hints has not been accepted — it has only not been convicted; `Validate`
+  above is the answer.
+- **`timeField`** is a picker rather than free text. It offers the query's own
+  output columns first (read off the SELECT list) and the catalog's timestamp
+  columns after — which *are* the output columns when the query selects `*` —
+  and warns when the declared field is not among the outputs. That is the
+  missing-`timeField` error at the bottom of this page, said before the query
+  runs instead of after. Free text stays available for the cases the scan
+  cannot name.
+
+`Ctrl`/`⌘` + `Enter` runs the preview from the editor. `Escape` moves focus to
+the editor's wrapper so `Tab` continues into the rest of the form; `Tab` itself
+is left alone rather than bound to indentation, so the editor is never a
+keyboard trap.
+
+One operational detail: the page's Content-Security-Policy has no
+`'unsafe-inline'` for styles, and CodeMirror builds its stylesheet at runtime.
+The editor reads this document's nonce back out of the DOM
+(`src/lib/csp-nonce.ts`) and hands it to `EditorView.cspNonce`; without it the
+browser drops the stylesheet and the editor renders as unstyled text.
+
 ## The server owns time
 
 Real data enters the system only here — server-side, from a stored spec. Three

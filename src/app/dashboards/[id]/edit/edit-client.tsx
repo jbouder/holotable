@@ -17,6 +17,9 @@ import { Input, Textarea, Label } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { PreviewDashboard } from "@/components/dashboard/PreviewDashboard";
+import { SqlEditor } from "@/components/sql/SqlEditor";
+import { TimeFieldPicker } from "@/components/sql/TimeFieldPicker";
+import type { SourceCatalog } from "@/lib/registry";
 import { PanelPreview, usePanelPreview } from "@/components/dashboard/PanelPreview";
 import { ErrorDisplay } from "@/components/ui/error-display";
 import { type ApiError, apiErrorFromThrown, readApiError } from "@/lib/errors";
@@ -25,6 +28,8 @@ interface SourceOption {
   id: string;
   name: string;
   workspaceId: string;
+  /** Tables and columns, for completion and the editor's allowlist hint. */
+  catalog: SourceCatalog;
 }
 
 const VIZ_OPTIONS = VizType.options.map((v) => ({ value: v, label: v }));
@@ -409,6 +414,7 @@ function PanelEditor({
   onChange: (fn: (p: Panel) => Panel) => void;
 }) {
   const preview = usePanelPreview(panel, timeRange);
+  const catalog = sources.find((s) => s.id === panel.query.sourceId)?.catalog ?? null;
 
   return (
     <div className="space-y-3">
@@ -455,20 +461,15 @@ function PanelEditor({
         <Label htmlFor="p-sql">
           SQL (SELECT only; no time filter — the server injects it)
         </Label>
-        <Textarea
+        <SqlEditor
           id="p-sql"
-          rows={4}
-          className="font-mono"
           value={panel.query.sql}
-          onChange={(e) =>
-            onChange((p) => ({ ...p, query: { ...p.query, sql: e.target.value } }))
-          }
-          onKeyDown={(e) => {
-            if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
-              e.preventDefault();
-              if (preview.busy === null) preview.run();
-            }
+          catalog={catalog}
+          onChange={(sql) => onChange((p) => ({ ...p, query: { ...p.query, sql } }))}
+          onRun={() => {
+            if (preview.busy === null) preview.run();
           }}
+          placeholder="SELECT …"
         />
         <PanelPreview panel={panel} preview={preview} />
       </div>
@@ -497,20 +498,17 @@ function PanelEditor({
         </p>
       </div>
 
-      <div className="grid grid-cols-5 gap-2">
-        <div>
-          <Label htmlFor="p-tf">timeField</Label>
-          <Input
-            id="p-tf"
-            value={panel.query.timeField ?? ""}
-            onChange={(e) =>
-              onChange((p) => ({
-                ...p,
-                query: { ...p.query, timeField: e.target.value || undefined },
-              }))
-            }
-          />
-        </div>
+      <TimeFieldPicker
+        id="p-tf"
+        value={panel.query.timeField}
+        sql={panel.query.sql}
+        catalog={catalog}
+        onChange={(timeField) =>
+          onChange((p) => ({ ...p, query: { ...p.query, timeField } }))
+        }
+      />
+
+      <div className="grid grid-cols-4 gap-2">
         {(["x", "y", "w", "h"] as const).map((k) => (
           <div key={k}>
             <Label htmlFor={`p-${k}`}>{k}</Label>
