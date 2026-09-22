@@ -37,6 +37,7 @@ All routes run on the Node runtime. Every one resolves identity with
 | `/api/sources` | POST | source-admin | Create |
 | `/api/sources/generate` | POST | editor | Streams a validated `SourceDraft` — never credentials. Rate limited and budgeted |
 | `/api/sources/[id]` | GET/PUT/DELETE | source-admin | Delete tombstones when referenced |
+| `/api/sources/[id]/impact` | GET | source-admin | Dashboards and panels currently referencing the source, scoped to its workspace |
 | `/api/sources/[id]/test` | POST | source-admin | Connectivity test |
 | `/api/sources/[id]/refresh` | POST | source-admin | Re-introspect the catalog |
 
