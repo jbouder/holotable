@@ -327,3 +327,57 @@ jobs:
           load: false
           tags: holotable:ci-migrate
           cache-from: type=gha
+
+  smoke:
+    name: Self-monitoring smoke test
+    # The whole compose stack has to build, so this waits for the cheaper jobs
+    # to have their say first: a type error or a failing unit test should not
+    # cost a stack bring-up to discover.
+    needs: [test, build]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # The app refuses to boot on an invalid configuration, and in production
+      # mode a missing OIDC client or model id is an error rather than a
+      # warning. None of it is exercised by this job — nothing logs in and no
+      # model is called — but the values have to be there for the server to
+      # start at all. The secret is generated per run; there is nothing to
+      # keep.
+      - name: Write a compose environment
+        run: |
+          cat > .env <<EOF
+          SESSION_SECRET=$(openssl rand -hex 32)
+          METRICS_TOKEN=$(openssl rand -hex 32)
+          OIDC_ISSUER=http://localhost:8080/realms/holotable
+          OIDC_CLIENT_ID=holotable
+          OIDC_CLIENT_SECRET=$(openssl rand -hex 16)
+          OIDC_JWKS_URL=http://localhost:8080/realms/holotable/protocol/openid-connect/certs
+          AI_PROVIDER=openai-compatible
+          AI_MODEL=gpt-4o-mini
+          OPENAI_BASE_URL=http://127.0.0.1:1/v1
+          OPENAI_API_KEY=unused-in-ci
+          # Four scrapes a minute is the shipped default; CI has no time for it.
+          SELF_METRICS_INTERVAL_MS=5000
+          SMOKE_TIMEOUT_MS=240000
+          EOF
+
+      # `--wait` holds until the app reports healthy, which is its own
+      # liveness probe, so a server that exited on a bad configuration fails
+      # here with its logs rather than 4 minutes later as a smoke timeout.
+      - name: Bring the stack up
+        run: docker compose up -d --build --wait app seed self-metrics
+
+      # The assertion: the seeded dashboard answers with rows the collector
+      # scraped out of the running app, through the same guard and executor
+      # POST /api/query uses.
+      - name: Smoke
+        run: docker compose --profile smoke run --rm smoke
+
+      - name: Logs
+        if: failure()
+        run: docker compose logs --no-color --tail 200
+
+      - name: Tear down
+        if: always()
+        run: docker compose down --volumes --remove-orphans

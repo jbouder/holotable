@@ -36,6 +36,14 @@ Holotable executes the guarded SQL and streams results into a live dashboard:
 
 ![Live dashboard view — request rate, p95 latency, 5xx count, and requests by route](docs/public/images/dashboard-view.png)
 
+`docker compose up` also ships **Holotable self-monitoring**: the app scraped
+through its own `/api/metrics`, landed in TimescaleDB, and read back as an
+ordinary source. It is the honest demo — every panel below is guarded SQL over
+data the app produced about itself — and it doubles as the end-to-end smoke
+test (`docker compose --profile smoke run --rm smoke`).
+
+![Holotable self-monitoring — poller tick p95, query latency by source, resident memory, live viewers, active pollers, model tokens, and SQL guard rejections](docs/public/images/dashboard-self-monitoring.png)
+
 ## How it works
 
 1. **Author** — `/api/generate` runs the LLM exactly once (only on create/edit).
@@ -116,8 +124,8 @@ and the [chart README](deploy/helm/holotable/README.md).
 `npm run seed` (`scripts/seed.ts`) is a long-running seeder that gives a fresh
 install something to show. It does two things:
 
-1. **Once (bootstrap):** registers two demo sources and a dashboard for each in
-   the `demo` workspace, if they don't already exist. Both sources point at the
+1. **Once (bootstrap):** registers three demo sources and a dashboard for each in
+   the `demo` workspace, if they don't already exist. All three point at the
    `metrics` schema and share the read-only `TS_METRICS` secret reference — they
    differ only in the tables they expose:
 
@@ -125,6 +133,14 @@ install something to show. It does two things:
    | --- | --- | --- |
    | `ts-metrics` | `metrics.http_requests` — per-request events | **Demo service health** (RPS, p95 latency, 5xx, requests by route) |
    | `ts-system` | `metrics.system_metrics` — per-host infra metrics | **Demo infrastructure** (CPU/memory by host, disk %, CPU by region) |
+   | `holotable-self` | `metrics.holotable_self` — the app's own Prometheus instruments | **Holotable self-monitoring** (tick p95, query latency by source, memory, viewers, pollers, model tokens, guard rejections) |
+
+   The first two carry synthetic rows. The third is real: `scripts/self-metrics.ts`
+   scrapes the app's own `/api/metrics` into `metrics.holotable_self`, so the
+   dashboard is Holotable reading guarded SQL over data it produced itself. Its
+   spec is committed in `src/lib/self-monitoring/dashboard.ts` rather than
+   written inline here, which is what lets `npm test` validate it against the IR
+   and run every panel through the SQL guard.
 
 2. **Loop:** every `SEED_INTERVAL_MS` it inserts a fresh batch of synthetic rows
    into both tables so the live dashboards stream. It connects with the
@@ -151,6 +167,9 @@ default single-instance setup these are the same TimescaleDB database.
 | `SEED_DEMO` | — | Set to `false` to skip the one-time source/dashboard bootstrap and only stream metrics. |
 | `TS_METRICS_HOST` / `TS_METRICS_PORT` | `localhost` / `5432` | Host/port written into the seeded source configs. |
 | `POSTGRES_DB` | `holotable` | Database name written into the seeded source configs. |
+| `SELF_METRICS_INTERVAL_MS` | `15000` | `scripts/self-metrics.ts` only: delay between scrapes of `/api/metrics`. |
+| `METRICS_URL` | `http://app:3000/api/metrics` | `scripts/self-metrics.ts` only: what to scrape. |
+| `SMOKE_TIMEOUT_MS` | `180000` | `scripts/smoke.ts` only: how long to wait for the first panel with rows. |
 
 > The seeder is for demos and local development. It uses a privileged connection
 > to insert data and create tables; the **app** only ever reads through the
@@ -259,6 +278,8 @@ npm run test:fuzz # property-based SQL guard suite alone; FUZZ_RUNS / FUZZ_SEED 
 npm run config:check # validate .env the way the server does at startup; exits 1 if it would refuse to boot
 npm run migrate  # apply Postgres migrations
 npm run seed     # looping metrics seeder
+npm run self-metrics # scrape the app's own /api/metrics into metrics.holotable_self
+npm run smoke    # end-to-end check of the self-monitoring dashboard
 ```
 
 ## Tests

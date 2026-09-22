@@ -116,6 +116,20 @@ docker compose --profile metrics up -d prometheus
 Prometheus is then on `http://localhost:9090`, scraping `app:3000/api/metrics`
 every 15s with 6 hours of retention.
 
+If `METRICS_TOKEN` is unset, compose falls back to a checked-in local default so
+that the self-monitoring collector below still works out of the box. That
+default guards a scrape on the compose network and nothing else; set a real one
+for anything reachable from outside it.
+
+## Holotable watching itself
+
+The default `docker compose up` also runs `self-metrics`, which scrapes this
+endpoint into a TimescaleDB hypertable and registers it as an ordinary source,
+so the shipped **Holotable self-monitoring** dashboard is guarded SQL over the
+metrics above. It does not go through Prometheus — Holotable reads SQL, not
+PromQL. See [Demo data](/getting-started/demo-data/) for the collector, the
+table, and the end-to-end smoke test built on it.
+
 A Kubernetes deployment scrapes the same endpoint; put the token in a Secret
 and reference it from the `ServiceMonitor`'s `bearerTokenSecret`, or restrict
 the port and use `METRICS_ALLOWED_CIDRS` instead.

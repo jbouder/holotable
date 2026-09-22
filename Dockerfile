@@ -29,7 +29,8 @@ COPY . .
 RUN npm run build
 
 # ---- migrate ----
-# One-shot job image: `docker compose` runs `migrate` and `seed` from it.
+# One-shot job image: `docker compose` runs `migrate`, `seed`, the
+# self-monitoring collector and the smoke test from it.
 # The scripts are TypeScript run through `tsx`, a devDependency, so this
 # stage takes the full lockfile-resolved `node_modules` from `deps` rather
 # than a `--omit=dev` install plus an unlocked `tsx`. It is a job image that
@@ -40,6 +41,12 @@ COPY --from=deps /app/node_modules ./node_modules
 COPY package.json ./package.json
 COPY migrations ./migrations
 COPY scripts ./scripts
+# The scripts share code with the app rather than restating it: the seeder
+# writes the committed self-monitoring spec, and the smoke test runs a panel
+# through the same guard and executor `POST /api/query` uses. `tsconfig.json`
+# comes with it because that is where tsx reads the `@/*` alias from.
+COPY tsconfig.json ./tsconfig.json
+COPY src ./src
 
 USER nextjs
 CMD ["node", "node_modules/.bin/tsx", "scripts/migrate.ts"]

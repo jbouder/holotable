@@ -1,4 +1,9 @@
 import { Client } from "pg";
+import {
+  SELF_SOURCE_ID,
+  selfMonitoringConfig,
+  selfMonitoringSpec,
+} from "@/lib/self-monitoring/dashboard";
 
 /**
  * Looping seeder.
@@ -24,78 +29,106 @@ function metricsClient() {
   return new Client({ connectionString });
 }
 
+/** The connection every demo source shares: the seeder's own database. */
+function demoConnection() {
+  return {
+    host: process.env.TS_METRICS_HOST || "localhost",
+    port: Number(process.env.TS_METRICS_PORT || 5432),
+    database: process.env.POSTGRES_DB || "holotable",
+    schema: "metrics",
+    ssl: false,
+  };
+}
+
+/**
+ * Register (or re-register) one demo source.
+ *
+ * `catalog_refreshed_at` is stamped because #107 gates generation on it: a
+ * source that has never been introspected is refused before the model is
+ * called, and a seeded catalog written from this file has, in the only sense
+ * that matters, just been introspected.
+ */
+async function upsertSource(
+  pg: Client,
+  source: { id: string; name: string; config: unknown },
+) {
+  await pg.query(
+    `INSERT INTO sources (id, workspace_id, name, kind, config, secret_ref, created_by, catalog_refreshed_at)
+     VALUES ($1, 'demo', $2, 'timescaledb', $3, 'TS_METRICS', 'seed', now())
+     ON CONFLICT (id) DO UPDATE
+       SET name = EXCLUDED.name, kind = EXCLUDED.kind, config = EXCLUDED.config,
+           secret_ref = EXCLUDED.secret_ref, tombstoned_at = NULL,
+           catalog_refreshed_at = now(), catalog_missing_tables = '{}'`,
+    [source.id, source.name, JSON.stringify(source.config)],
+  );
+}
+
 async function ensureDemo() {
   const url = process.env.DATABASE_URL;
   if (!url || process.env.SEED_DEMO === "false") return;
   const pg = new Client({ connectionString: url });
   await pg.connect();
   try {
-    const config = {
-      host: process.env.TS_METRICS_HOST || "localhost",
-      port: Number(process.env.TS_METRICS_PORT || 5432),
-      database: process.env.POSTGRES_DB || "holotable",
-      schema: "metrics",
-      ssl: false,
-      tables: [
-        {
-          name: "http_requests",
-          description: "per-request events",
-          timeField: "ts",
-          columns: [
-            { name: "ts", type: "timestamp with time zone" },
-            { name: "service", type: "text" },
-            { name: "route", type: "text" },
-            { name: "status", type: "smallint" },
-            { name: "duration_ms", type: "double precision" },
-            { name: "bytes", type: "bigint" },
-          ],
-        },
-      ],
-    };
-    await pg.query(
-      `INSERT INTO sources (id, workspace_id, name, kind, config, secret_ref, created_by)
-       VALUES ('ts-metrics', 'demo', 'Demo TimescaleDB metrics', 'timescaledb', $1, 'TS_METRICS', 'seed')
-       ON CONFLICT (id) DO UPDATE
-         SET name = EXCLUDED.name, kind = EXCLUDED.kind, config = EXCLUDED.config,
-             secret_ref = EXCLUDED.secret_ref, tombstoned_at = NULL`,
-      [JSON.stringify(config)],
-    );
+    await upsertSource(pg, {
+      id: "ts-metrics",
+      name: "Demo TimescaleDB metrics",
+      config: {
+        ...demoConnection(),
+        tables: [
+          {
+            name: "http_requests",
+            description: "per-request events",
+            timeField: "ts",
+            columns: [
+              { name: "ts", type: "timestamp with time zone" },
+              { name: "service", type: "text" },
+              { name: "route", type: "text" },
+              { name: "status", type: "smallint" },
+              { name: "duration_ms", type: "double precision" },
+              { name: "bytes", type: "bigint" },
+            ],
+          },
+        ],
+      },
+    });
 
-    const systemConfig = {
-      host: process.env.TS_METRICS_HOST || "localhost",
-      port: Number(process.env.TS_METRICS_PORT || 5432),
-      database: process.env.POSTGRES_DB || "holotable",
-      schema: "metrics",
-      ssl: false,
-      tables: [
-        {
-          name: "system_metrics",
-          description: "per-host infrastructure metrics",
-          timeField: "ts",
-          columns: [
-            { name: "ts", type: "timestamp with time zone" },
-            { name: "host", type: "text" },
-            { name: "region", type: "text" },
-            { name: "cpu_pct", type: "double precision" },
-            { name: "mem_pct", type: "double precision" },
-            { name: "disk_pct", type: "double precision" },
-            { name: "net_in_bytes", type: "bigint" },
-            { name: "net_out_bytes", type: "bigint" },
-          ],
-        },
-      ],
-    };
-    await pg.query(
-      `INSERT INTO sources (id, workspace_id, name, kind, config, secret_ref, created_by)
-       VALUES ('ts-system', 'demo', 'Demo TimescaleDB system', 'timescaledb', $1, 'TS_METRICS', 'seed')
-       ON CONFLICT (id) DO UPDATE
-         SET name = EXCLUDED.name, kind = EXCLUDED.kind, config = EXCLUDED.config,
-             secret_ref = EXCLUDED.secret_ref, tombstoned_at = NULL`,
-      [JSON.stringify(systemConfig)],
-    );
+    await upsertSource(pg, {
+      id: "ts-system",
+      name: "Demo TimescaleDB system",
+      config: {
+        ...demoConnection(),
+        tables: [
+          {
+            name: "system_metrics",
+            description: "per-host infrastructure metrics",
+            timeField: "ts",
+            columns: [
+              { name: "ts", type: "timestamp with time zone" },
+              { name: "host", type: "text" },
+              { name: "region", type: "text" },
+              { name: "cpu_pct", type: "double precision" },
+              { name: "mem_pct", type: "double precision" },
+              { name: "disk_pct", type: "double precision" },
+              { name: "net_in_bytes", type: "bigint" },
+              { name: "net_out_bytes", type: "bigint" },
+            ],
+          },
+        ],
+      },
+    });
+
+    // Holotable's own instruments, landed by scripts/self-metrics.ts. Seeded
+    // whether or not the collector is running: an empty table is a dashboard
+    // with empty panels, while a missing source is a broken one.
+    await upsertSource(pg, {
+      id: SELF_SOURCE_ID,
+      name: "Holotable self-monitoring",
+      config: selfMonitoringConfig(demoConnection()),
+    });
 
     await ensureDashboard(pg, demoSpec());
     await ensureDashboard(pg, systemSpec());
+    await ensureDashboard(pg, selfMonitoringSpec());
   } finally {
     await pg.end();
   }

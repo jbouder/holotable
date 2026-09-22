@@ -1,3 +1,11 @@
+# The scrape token the local stack uses. GET /api/metrics is closed until one
+# of METRICS_TOKEN / METRICS_ALLOWED_CIDRS is set (src/lib/metrics-access.ts),
+# and the self-monitoring collector below has to get in, so this file carries a
+# default the way it already carries the `holotable` Postgres password: it
+# guards a scrape on the compose network and nothing else. Set METRICS_TOKEN in
+# .env — `openssl rand -hex 32` — for anything reachable from anywhere else.
+x-metrics-token: &metrics-token ${METRICS_TOKEN:-holotable-local-demo-scrape}
+
 services:
   postgres:
     image: timescale/timescaledb:2.17.2-pg16
@@ -69,7 +77,7 @@ services:
       OIDC_SCOPE: ${OIDC_SCOPE:-openid profile}
       OIDC_AUDIENCE: ${OIDC_AUDIENCE:-}
       # Prometheus scrape gate. /api/metrics answers 404 until one is set.
-      METRICS_TOKEN: ${METRICS_TOKEN:-}
+      METRICS_TOKEN: *metrics-token
       METRICS_ALLOWED_CIDRS: ${METRICS_ALLOWED_CIDRS:-}
     ports:
       - "3000:3000"
@@ -119,9 +127,57 @@ services:
       migrate:
         condition: service_completed_successfully
 
+  # The self-monitoring demo (#54). Scrapes the app's own /api/metrics and
+  # lands the samples in metrics.holotable_self, which `seed` registers as the
+  # `holotable-self` source — so the shipped demo is Holotable reading guarded
+  # SQL over data it produced itself. Prometheus below is not in this path;
+  # Holotable reads SQL, not PromQL, so something has to land the samples in a
+  # table, and a ~100-line collector is the smaller honest answer.
+  self-metrics:
+    build:
+      context: .
+      target: migrate
+    command: ["node", "node_modules/.bin/tsx", "scripts/self-metrics.ts"]
+    environment:
+      DATABASE_URL: "postgresql://${POSTGRES_USER:-holotable}:${POSTGRES_PASSWORD:-holotable}@postgres:5432/holotable"
+      TIMESCALEDB_URL: "postgresql://${POSTGRES_USER:-holotable}:${POSTGRES_PASSWORD:-holotable}@postgres:5432/holotable"
+      METRICS_URL: http://app:3000/api/metrics
+      METRICS_TOKEN: *metrics-token
+      SELF_METRICS_INTERVAL_MS: ${SELF_METRICS_INTERVAL_MS:-15000}
+    restart: unless-stopped
+    depends_on:
+      app:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+
+  # End-to-end check, off by default:
+  #   docker compose --profile smoke run --rm smoke
+  # Waits for the self-monitoring dashboard to answer with real rows through
+  # the same guard and executor POST /api/query uses, and fails otherwise.
+  smoke:
+    profiles: ["smoke"]
+    build:
+      context: .
+      target: migrate
+    command: ["node", "node_modules/.bin/tsx", "scripts/smoke.ts"]
+    environment:
+      DATABASE_URL: "postgresql://${POSTGRES_USER:-holotable}:${POSTGRES_PASSWORD:-holotable}@postgres:5432/holotable"
+      # Resolved for the `TS_METRICS` secret_ref, exactly as the app resolves it.
+      TS_METRICS_USERNAME: ${TS_METRICS_USERNAME:-metrics_ro}
+      TS_METRICS_PASSWORD: ${TS_METRICS_PASSWORD:-readonly}
+      SMOKE_TIMEOUT_MS: ${SMOKE_TIMEOUT_MS:-180000}
+      LOG_LEVEL: ${LOG_LEVEL:-warn}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+
   # Scrapes the app's /api/metrics. Off by default — start it with
-  # `docker compose --profile metrics up -d prometheus` and set METRICS_TOKEN
-  # in .env first, or the scrape is refused and every target shows as down.
+  # `docker compose --profile metrics up -d prometheus`. Not part of the
+  # self-monitoring demo above, which reads SQL rather than PromQL; this is
+  # here for anyone who wants the real scraper and its alerting.
   prometheus:
     image: prom/prometheus:v3.1.0
     profiles: ["metrics"]
@@ -148,7 +204,7 @@ configs:
         - job_name: holotable
           metrics_path: /api/metrics
           authorization:
-            credentials: "${METRICS_TOKEN:-unset}"
+            credentials: "${METRICS_TOKEN:-holotable-local-demo-scrape}"
           static_configs:
             - targets: ["app:3000"]
 

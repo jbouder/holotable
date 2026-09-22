@@ -1,0 +1,244 @@
+# A real scrape of GET /api/metrics, captured from the compose stack on an
+# idle app (no dashboard open, no model call), so the instruments that only
+# gain a series once they are used declare a TYPE and expose no samples. That
+# is exactly the state test/self-monitoring.test.ts needs: it asserts every
+# family in COLLECTED_FAMILIES is one this endpoint really exports, which is
+# the only way to catch a name that was never exposed.
+# HELP holotable_process_cpu_user_seconds_total Total user CPU time spent in seconds.
+# TYPE holotable_process_cpu_user_seconds_total counter
+holotable_process_cpu_user_seconds_total 0.89284
+
+# HELP holotable_process_cpu_system_seconds_total Total system CPU time spent in seconds.
+# TYPE holotable_process_cpu_system_seconds_total counter
+holotable_process_cpu_system_seconds_total 0.088057
+
+# HELP holotable_process_cpu_seconds_total Total user and system CPU time spent in seconds.
+# TYPE holotable_process_cpu_seconds_total counter
+holotable_process_cpu_seconds_total 0.9808969999999999
+
+# HELP holotable_process_start_time_seconds Start time of the process since unix epoch in seconds.
+# TYPE holotable_process_start_time_seconds gauge
+holotable_process_start_time_seconds 1790102242
+
+# HELP holotable_process_resident_memory_bytes Resident memory size in bytes.
+# TYPE holotable_process_resident_memory_bytes gauge
+holotable_process_resident_memory_bytes 126820352
+
+# HELP holotable_process_virtual_memory_bytes Virtual memory size in bytes.
+# TYPE holotable_process_virtual_memory_bytes gauge
+holotable_process_virtual_memory_bytes 22604414976
+
+# HELP holotable_process_heap_bytes Process heap size in bytes.
+# TYPE holotable_process_heap_bytes gauge
+holotable_process_heap_bytes 290766848
+
+# HELP holotable_process_open_fds Number of open file descriptors.
+# TYPE holotable_process_open_fds gauge
+holotable_process_open_fds 21
+
+# HELP holotable_process_max_fds Maximum number of open file descriptors.
+# TYPE holotable_process_max_fds gauge
+holotable_process_max_fds 1048576
+
+# HELP holotable_nodejs_eventloop_lag_seconds Lag of event loop in seconds.
+# TYPE holotable_nodejs_eventloop_lag_seconds gauge
+holotable_nodejs_eventloop_lag_seconds 0.002922333
+
+# HELP holotable_nodejs_eventloop_lag_min_seconds The minimum recorded event loop delay.
+# TYPE holotable_nodejs_eventloop_lag_min_seconds gauge
+holotable_nodejs_eventloop_lag_min_seconds 0.009117696
+
+# HELP holotable_nodejs_eventloop_lag_max_seconds The maximum recorded event loop delay.
+# TYPE holotable_nodejs_eventloop_lag_max_seconds gauge
+holotable_nodejs_eventloop_lag_max_seconds 0.015491071
+
+# HELP holotable_nodejs_eventloop_lag_mean_seconds The mean of the recorded event loop delays.
+# TYPE holotable_nodejs_eventloop_lag_mean_seconds gauge
+holotable_nodejs_eventloop_lag_mean_seconds 0.01246219702857143
+
+# HELP holotable_nodejs_eventloop_lag_stddev_seconds The standard deviation of the recorded event loop delays.
+# TYPE holotable_nodejs_eventloop_lag_stddev_seconds gauge
+holotable_nodejs_eventloop_lag_stddev_seconds 0.001796614276582984
+
+# HELP holotable_nodejs_eventloop_lag_p50_seconds The 50th percentile of the recorded event loop delays.
+# TYPE holotable_nodejs_eventloop_lag_p50_seconds gauge
+holotable_nodejs_eventloop_lag_p50_seconds 0.012058623
+
+# HELP holotable_nodejs_eventloop_lag_p90_seconds The 90th percentile of the recorded event loop delays.
+# TYPE holotable_nodejs_eventloop_lag_p90_seconds gauge
+holotable_nodejs_eventloop_lag_p90_seconds 0.015130623
+
+# HELP holotable_nodejs_eventloop_lag_p99_seconds The 99th percentile of the recorded event loop delays.
+# TYPE holotable_nodejs_eventloop_lag_p99_seconds gauge
+holotable_nodejs_eventloop_lag_p99_seconds 0.015212543
+
+# HELP holotable_nodejs_eventloop_utilization_summary Ratio of time the event loop is not idling in the event provider to the total time the event loop is running.
+# TYPE holotable_nodejs_eventloop_utilization_summary summary
+holotable_nodejs_eventloop_utilization_summary{quantile="0.01"} 0.0017626000775315567
+holotable_nodejs_eventloop_utilization_summary{quantile="0.05"} 0.0022298970790061304
+holotable_nodejs_eventloop_utilization_summary{quantile="0.5"} 0.005281163366910467
+holotable_nodejs_eventloop_utilization_summary{quantile="0.9"} 0.006664050054591584
+holotable_nodejs_eventloop_utilization_summary{quantile="0.95"} 0.007540875809198134
+holotable_nodejs_eventloop_utilization_summary{quantile="0.99"} 0.03793590151104493
+holotable_nodejs_eventloop_utilization_summary{quantile="0.999"} 0.13271276963518486
+holotable_nodejs_eventloop_utilization_summary_sum 6.030502671328948
+holotable_nodejs_eventloop_utilization_summary_count 904
+
+# HELP holotable_nodejs_eventloop_utilization_histogram Ratio of time the event loop is not idling in the event provider to the total time the event loop is running.
+# TYPE holotable_nodejs_eventloop_utilization_histogram histogram
+holotable_nodejs_eventloop_utilization_histogram_bucket{le="0.01"} 872
+holotable_nodejs_eventloop_utilization_histogram_bucket{le="0.05"} 897
+holotable_nodejs_eventloop_utilization_histogram_bucket{le="0.1"} 899
+holotable_nodejs_eventloop_utilization_histogram_bucket{le="0.25"} 904
+holotable_nodejs_eventloop_utilization_histogram_bucket{le="0.5"} 904
+holotable_nodejs_eventloop_utilization_histogram_bucket{le="0.6"} 904
+holotable_nodejs_eventloop_utilization_histogram_bucket{le="0.7"} 904
+holotable_nodejs_eventloop_utilization_histogram_bucket{le="0.75"} 904
+holotable_nodejs_eventloop_utilization_histogram_bucket{le="0.8"} 904
+holotable_nodejs_eventloop_utilization_histogram_bucket{le="0.9"} 904
+holotable_nodejs_eventloop_utilization_histogram_bucket{le="0.95"} 904
+holotable_nodejs_eventloop_utilization_histogram_bucket{le="0.99"} 904
+holotable_nodejs_eventloop_utilization_histogram_bucket{le="1"} 904
+holotable_nodejs_eventloop_utilization_histogram_bucket{le="+Inf"} 904
+holotable_nodejs_eventloop_utilization_histogram_sum 6.030502671328948
+holotable_nodejs_eventloop_utilization_histogram_count 904
+
+# HELP holotable_nodejs_active_resources Number of active resources that are currently keeping the event loop alive, grouped by async resource type.
+# TYPE holotable_nodejs_active_resources gauge
+holotable_nodejs_active_resources{type="PipeWrap"} 2
+holotable_nodejs_active_resources{type="TCPServerWrap"} 1
+holotable_nodejs_active_resources{type="TCPSocketWrap"} 2
+holotable_nodejs_active_resources{type="Immediate"} 1
+
+# HELP holotable_nodejs_active_resources_total Total number of active resources.
+# TYPE holotable_nodejs_active_resources_total gauge
+holotable_nodejs_active_resources_total 6
+
+# HELP holotable_nodejs_active_handles Number of active libuv handles grouped by handle type. Every handle type is C++ class name.
+# TYPE holotable_nodejs_active_handles gauge
+holotable_nodejs_active_handles{type="Socket"} 4
+holotable_nodejs_active_handles{type="Server"} 1
+
+# HELP holotable_nodejs_active_handles_total Total number of active handles.
+# TYPE holotable_nodejs_active_handles_total gauge
+holotable_nodejs_active_handles_total 5
+
+# HELP holotable_nodejs_active_requests Number of active libuv requests grouped by request type. Every request type is C++ class name.
+# TYPE holotable_nodejs_active_requests gauge
+
+# HELP holotable_nodejs_active_requests_total Total number of active requests.
+# TYPE holotable_nodejs_active_requests_total gauge
+holotable_nodejs_active_requests_total 0
+
+# HELP holotable_nodejs_heap_size_total_bytes Process heap size from Node.js in bytes.
+# TYPE holotable_nodejs_heap_size_total_bytes gauge
+holotable_nodejs_heap_size_total_bytes 50491392
+
+# HELP holotable_nodejs_heap_size_used_bytes Process heap size used from Node.js in bytes.
+# TYPE holotable_nodejs_heap_size_used_bytes gauge
+holotable_nodejs_heap_size_used_bytes 47982088
+
+# HELP holotable_nodejs_external_memory_bytes Node.js external memory size in bytes.
+# TYPE holotable_nodejs_external_memory_bytes gauge
+holotable_nodejs_external_memory_bytes 138167132
+
+# HELP holotable_nodejs_heap_space_size_total_bytes Process heap space size total from Node.js in bytes.
+# TYPE holotable_nodejs_heap_space_size_total_bytes gauge
+holotable_nodejs_heap_space_size_total_bytes{space="read_only"} 0
+holotable_nodejs_heap_space_size_total_bytes{space="new"} 1048576
+holotable_nodejs_heap_space_size_total_bytes{space="old"} 35139584
+holotable_nodejs_heap_space_size_total_bytes{space="code"} 2621440
+holotable_nodejs_heap_space_size_total_bytes{space="shared"} 0
+holotable_nodejs_heap_space_size_total_bytes{space="trusted"} 4038656
+holotable_nodejs_heap_space_size_total_bytes{space="new_large_object"} 0
+holotable_nodejs_heap_space_size_total_bytes{space="large_object"} 7475200
+holotable_nodejs_heap_space_size_total_bytes{space="code_large_object"} 167936
+holotable_nodejs_heap_space_size_total_bytes{space="shared_large_object"} 0
+holotable_nodejs_heap_space_size_total_bytes{space="trusted_large_object"} 0
+
+# HELP holotable_nodejs_heap_space_size_used_bytes Process heap space size used from Node.js in bytes.
+# TYPE holotable_nodejs_heap_space_size_used_bytes gauge
+holotable_nodejs_heap_space_size_used_bytes{space="read_only"} 0
+holotable_nodejs_heap_space_size_used_bytes{space="new"} 390488
+holotable_nodejs_heap_space_size_used_bytes{space="old"} 34044072
+holotable_nodejs_heap_space_size_used_bytes{space="code"} 2280224
+holotable_nodejs_heap_space_size_used_bytes{space="shared"} 0
+holotable_nodejs_heap_space_size_used_bytes{space="trusted"} 3753256
+holotable_nodejs_heap_space_size_used_bytes{space="new_large_object"} 0
+holotable_nodejs_heap_space_size_used_bytes{space="large_object"} 7368400
+holotable_nodejs_heap_space_size_used_bytes{space="code_large_object"} 151488
+holotable_nodejs_heap_space_size_used_bytes{space="shared_large_object"} 0
+holotable_nodejs_heap_space_size_used_bytes{space="trusted_large_object"} 0
+
+# HELP holotable_nodejs_heap_space_size_available_bytes Process heap space size available from Node.js in bytes.
+# TYPE holotable_nodejs_heap_space_size_available_bytes gauge
+holotable_nodejs_heap_space_size_available_bytes{space="read_only"} 0
+holotable_nodejs_heap_space_size_available_bytes{space="new"} 640424
+holotable_nodejs_heap_space_size_available_bytes{space="old"} 366032
+holotable_nodejs_heap_space_size_available_bytes{space="code"} 177376
+holotable_nodejs_heap_space_size_available_bytes{space="shared"} 0
+holotable_nodejs_heap_space_size_available_bytes{space="trusted"} 214656
+holotable_nodejs_heap_space_size_available_bytes{space="new_large_object"} 1048576
+holotable_nodejs_heap_space_size_available_bytes{space="large_object"} 0
+holotable_nodejs_heap_space_size_available_bytes{space="code_large_object"} 0
+holotable_nodejs_heap_space_size_available_bytes{space="shared_large_object"} 0
+holotable_nodejs_heap_space_size_available_bytes{space="trusted_large_object"} 0
+
+# HELP holotable_nodejs_version_info Node.js version info.
+# TYPE holotable_nodejs_version_info gauge
+holotable_nodejs_version_info{version="v22.23.2",major="22",minor="23",patch="2"} 1
+
+# HELP holotable_nodejs_gc_duration_seconds Garbage collection duration by kind, one of major, minor, incremental or weakcb.
+# TYPE holotable_nodejs_gc_duration_seconds histogram
+holotable_nodejs_gc_duration_seconds_bucket{le="0.001",kind="incremental"} 1
+holotable_nodejs_gc_duration_seconds_bucket{le="0.01",kind="incremental"} 2
+holotable_nodejs_gc_duration_seconds_bucket{le="0.1",kind="incremental"} 2
+holotable_nodejs_gc_duration_seconds_bucket{le="1",kind="incremental"} 2
+holotable_nodejs_gc_duration_seconds_bucket{le="2",kind="incremental"} 2
+holotable_nodejs_gc_duration_seconds_bucket{le="5",kind="incremental"} 2
+holotable_nodejs_gc_duration_seconds_bucket{le="+Inf",kind="incremental"} 2
+holotable_nodejs_gc_duration_seconds_sum{kind="incremental"} 0.0019830000400543214
+holotable_nodejs_gc_duration_seconds_count{kind="incremental"} 2
+holotable_nodejs_gc_duration_seconds_bucket{le="0.001",kind="major"} 0
+holotable_nodejs_gc_duration_seconds_bucket{le="0.01",kind="major"} 2
+holotable_nodejs_gc_duration_seconds_bucket{le="0.1",kind="major"} 2
+holotable_nodejs_gc_duration_seconds_bucket{le="1",kind="major"} 2
+holotable_nodejs_gc_duration_seconds_bucket{le="2",kind="major"} 2
+holotable_nodejs_gc_duration_seconds_bucket{le="5",kind="major"} 2
+holotable_nodejs_gc_duration_seconds_bucket{le="+Inf",kind="major"} 2
+holotable_nodejs_gc_duration_seconds_sum{kind="major"} 0.007644541025161743
+holotable_nodejs_gc_duration_seconds_count{kind="major"} 2
+holotable_nodejs_gc_duration_seconds_bucket{le="0.001",kind="minor"} 16
+holotable_nodejs_gc_duration_seconds_bucket{le="0.01",kind="minor"} 19
+holotable_nodejs_gc_duration_seconds_bucket{le="0.1",kind="minor"} 19
+holotable_nodejs_gc_duration_seconds_bucket{le="1",kind="minor"} 19
+holotable_nodejs_gc_duration_seconds_bucket{le="2",kind="minor"} 19
+holotable_nodejs_gc_duration_seconds_bucket{le="5",kind="minor"} 19
+holotable_nodejs_gc_duration_seconds_bucket{le="+Inf",kind="minor"} 19
+holotable_nodejs_gc_duration_seconds_sum{kind="minor"} 0.011396376848220823
+holotable_nodejs_gc_duration_seconds_count{kind="minor"} 19
+
+# HELP holotable_poller_tick_duration_seconds Wall time of one dashboard poller tick, across all of its panels.
+# TYPE holotable_poller_tick_duration_seconds histogram
+
+# HELP holotable_query_duration_seconds Wall time of one guarded query against a metrics source, including connect and rollback.
+# TYPE holotable_query_duration_seconds histogram
+
+# HELP holotable_query_rows Rows returned by one guarded query. Bounded by MAX_QUERY_ROWS.
+# TYPE holotable_query_rows histogram
+
+# HELP holotable_sse_subscribers Browsers currently attached to a dashboard's event stream on this instance.
+# TYPE holotable_sse_subscribers gauge
+
+# HELP holotable_pollers_active Dashboard pollers running on this instance.
+# TYPE holotable_pollers_active gauge
+holotable_pollers_active 0
+
+# HELP holotable_llm_tokens_total Model tokens billed to a workspace, by model and direction.
+# TYPE holotable_llm_tokens_total counter
+
+# HELP holotable_llm_requests_total Model requests seen by the admission gate, by route and what the gate decided.
+# TYPE holotable_llm_requests_total counter
+
+# HELP holotable_sql_validation_rejections_total Statements refused by the SQL guard, by the kind of rule that refused them.
+# TYPE holotable_sql_validation_rejections_total counter
