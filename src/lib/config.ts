@@ -191,6 +191,9 @@ const EnvSchema = z.object({
   ),
   PG_POOL_MAX: blank(positiveInt),
 
+  APP_VERSION: blank(z.string()),
+  GIT_COMMIT: blank(z.string()),
+
   SESSION_SECRET: blank(z.string()),
   SESSION_COOKIE_NAME: blank(
     z

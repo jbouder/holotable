@@ -42,8 +42,12 @@ services:
   app:
     build:
       context: .
+      args:
+        # Stamped into GET /api/health. Optional; reads "unknown" when unset.
+        GIT_COMMIT: ${GIT_COMMIT:-}
     environment:
       NODE_ENV: production
+      APP_VERSION: ${APP_VERSION:-}
       DATABASE_URL: "postgresql://${POSTGRES_USER:-holotable}:${POSTGRES_PASSWORD:-holotable}@postgres:5432/holotable"
       SESSION_SECRET: ${SESSION_SECRET:?set a strong 32+ char SESSION_SECRET}
       # Credentials the app resolves for the 'TS_METRICS' source secret_ref.
@@ -66,6 +70,21 @@ services:
       OIDC_AUDIENCE: ${OIDC_AUDIENCE:-}
     ports:
       - "3000:3000"
+    # Liveness, the same probe the image's own HEALTHCHECK runs, restated on a
+    # shorter cadence so `docker compose up` reaches a healthy app quickly.
+    # Readiness (/api/ready) is an orchestrator concern: it fails whenever the
+    # database is away, and compose should not call the container unhealthy for
+    # that.
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - -e
+        - "fetch('http://127.0.0.1:3000/api/health').then((r) => process.exit(r.ok ? 0 : 1), () => process.exit(1))"
+      interval: 10s
+      timeout: 5s
+      start_period: 20s
+      retries: 5
     # OIDC URLs use localhost:8080 (browser-facing). Map localhost to the host
     # gateway so server-side JWKS/token fetches inside this container reach the
     # published Keycloak port instead of the container's own loopback.
