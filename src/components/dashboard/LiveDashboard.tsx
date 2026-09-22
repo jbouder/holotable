@@ -10,6 +10,19 @@ import type { PanelData } from "@/components/charts/options";
 import { Button } from "@/components/ui/button";
 import { TimeRangeFilter } from "@/components/dashboard/TimeRangeFilter";
 import { cn } from "@/lib/utils";
+import { DRAIN_EVENT } from "@/lib/sse";
+
+/**
+ * A panel that was live is now only as fresh as its last frame. Used on a
+ * transport error, on the server's drain frame, and by the watchdog.
+ */
+function markStale(prev: Record<string, PanelState>): Record<string, PanelState> {
+  const out: Record<string, PanelState> = {};
+  for (const [k, v] of Object.entries(prev)) {
+    out[k] = v.status === "live" ? { ...v, status: "stale" } : v;
+  }
+  return out;
+}
 
 /**
  * Live dashboard viewer.
@@ -96,15 +109,18 @@ export function LiveDashboard({
     };
     es.onerror = () => {
       // Mark everything stale on transport error; EventSource auto-reconnects.
-      setStates((prev) => {
-        const out: Record<string, PanelState> = {};
-        for (const [k, v] of Object.entries(prev)) {
-          out[k] = v.status === "live" ? { ...v, status: "stale" } : v;
-        }
-        return out;
-      });
+      setStates(markStale);
     };
-    return () => es.close();
+    // The server sends this just before it stops, along with an SSE `retry:`
+    // hint that EventSource honours: the reconnect lands on a healthy instance
+    // after a spread-out delay, so say "stale" now rather than wait out the
+    // watchdog.
+    const onDraining = () => setStates(markStale);
+    es.addEventListener(DRAIN_EVENT, onDraining);
+    return () => {
+      es.removeEventListener(DRAIN_EVENT, onDraining);
+      es.close();
+    };
   }, [applyEvent, live, streamUrl]);
 
   // Staleness watchdog. Disabled while paused — a paused dashboard is not stale.
@@ -113,13 +129,7 @@ export function LiveDashboard({
     const budget = Math.max(spec.refreshIntervalMs * 2, 6_000);
     const id = setInterval(() => {
       if (Date.now() - lastTickRef.current > budget) {
-        setStates((prev) => {
-          const out: Record<string, PanelState> = {};
-          for (const [k, v] of Object.entries(prev)) {
-            out[k] = v.status === "live" ? { ...v, status: "stale" } : v;
-          }
-          return out;
-        });
+        setStates(markStale);
       }
     }, budget);
     return () => clearInterval(id);

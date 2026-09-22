@@ -7,6 +7,8 @@ import {
 import { getDashboardById } from "@/lib/db/repo";
 import { getPoller, type PollerEvent } from "@/lib/poller/registry";
 import { TimeRange } from "@/lib/ir";
+import { drainFrame } from "@/lib/sse";
+import { onDrain } from "@/lib/shutdown";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -62,14 +64,32 @@ export async function GET(
 
         const unsubscribe = poller.subscribe(send);
 
+        // Graceful shutdown (#47): hand the browser a reconnect delay before
+        // the socket goes away, so it comes back to a healthy instance on a
+        // spread-out timer instead of retrying into this one immediately. The
+        // hook is unregistered on close, or the set would grow by one entry
+        // for every connection the instance ever served.
+        let unregisterDrain = () => {};
+
         const close = () => {
           unsubscribe();
+          unregisterDrain();
           try {
             controller.close();
           } catch {
             /* already closed */
           }
         };
+
+        unregisterDrain = onDrain(() => {
+          try {
+            controller.enqueue(encoder.encode(drainFrame()));
+          } catch {
+            /* controller closed */
+          }
+          close();
+        });
+
         req.signal.addEventListener("abort", close);
       },
     });

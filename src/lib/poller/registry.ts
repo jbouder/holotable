@@ -279,6 +279,17 @@ export function invalidatePoller(dashboardId: string): void {
   }
 }
 
+/**
+ * Stop every poller. Graceful shutdown (#47) calls this once the drain flag is
+ * set, so no new metric query is issued while the process waits out the ones
+ * already running. Subscribers are closed separately, by the stream route's
+ * drain hook.
+ */
+export function stopAllPollers(): void {
+  // `stop()` removes the poller from the registry, so iterate a snapshot.
+  for (const poller of [...registry.values()]) poller.stop();
+}
+
 /** Test/introspection helper. */
 export function activePollerCount(): number {
   return registry.size;

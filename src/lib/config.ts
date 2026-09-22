@@ -58,6 +58,15 @@ export const config = {
   queryTimeoutSeconds: num("QUERY_TIMEOUT_SECONDS", 20),
 
   /**
+   * How long the server may take to drain after SIGTERM: pollers stop, SSE
+   * subscribers are handed a reconnect hint, in-flight queries are awaited,
+   * and the pools are closed. Keep it below the orchestrator's own kill
+   * timeout (`terminationGracePeriodSeconds`, `stop_grace_period`) or the
+   * process is killed mid-drain. Documented default: 10s.
+   */
+  shutdownGraceMs: num("SHUTDOWN_GRACE_MS", 10_000),
+
+  /**
    * The AI model id used for generation, surfaced read-only to the UI so users
    * can see which model produced their specs. Empty when unconfigured. This is
    * a display label only — actual provider/model resolution lives in
@@ -249,6 +258,7 @@ const EnvSchema = z.object({
   MAX_RESULT_BYTES: blank(positiveInt),
   MAX_WINDOW_POINTS: blank(positiveInt),
   QUERY_TIMEOUT_SECONDS: blank(positiveInt),
+  SHUTDOWN_GRACE_MS: blank(positiveInt),
 });
 
 type Env = z.infer<typeof EnvSchema>;

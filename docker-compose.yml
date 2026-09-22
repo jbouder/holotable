@@ -70,6 +70,9 @@ services:
       OIDC_AUDIENCE: ${OIDC_AUDIENCE:-}
     ports:
       - "3000:3000"
+    # `docker compose stop` sends SIGTERM and waits this long before SIGKILL.
+    # Must exceed SHUTDOWN_GRACE_MS (default 10s) or the drain is cut short.
+    stop_grace_period: 20s
     # Liveness, the same probe the image's own HEALTHCHECK runs, restated on a
     # shorter cadence so `docker compose up` reaches a healthy app quickly.
     # Readiness (/api/ready) is an orchestrator concern: it fails whenever the
