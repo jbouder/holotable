@@ -59,6 +59,14 @@ export const config = {
   queryTimeoutSeconds: num("QUERY_TIMEOUT_SECONDS", 20),
 
   /**
+   * How long a source's catalog may go without being checked against the live
+   * database before it is reported as stale. Stale is a warning, not a refusal
+   * — a catalog nobody has refreshed *at all* is what blocks generation. `0`
+   * disables the age check entirely. Documented default: 30 days.
+   */
+  catalogStaleAfterDays: num("CATALOG_STALE_AFTER_DAYS", 30),
+
+  /**
    * How long the server may take to drain after SIGTERM: pollers stop, SSE
    * subscribers are handed a reconnect hint, in-flight queries are awaited,
    * and the pools are closed. Keep it below the orchestrator's own kill
@@ -290,6 +298,7 @@ const EnvSchema = z.object({
   MAX_RESULT_BYTES: blank(positiveInt),
   MAX_WINDOW_POINTS: blank(positiveInt),
   QUERY_TIMEOUT_SECONDS: blank(positiveInt),
+  CATALOG_STALE_AFTER_DAYS: blank(nonNegativeInt),
   SHUTDOWN_GRACE_MS: blank(positiveInt),
 });
 

@@ -49,6 +49,33 @@ source: table and column names and types from `buildCatalogPrompt(source)`. No
 sample rows are ever sent to the model. It designs against a schema, not against
 data.
 
+## The catalog has to be true before any of that matters
+
+A catalog nobody has checked is a schema the model designs against and the
+database does not have, and the author meets it as a broken panel rather than
+as an error. `catalogHealth()` in `src/lib/catalog/health.ts` is the single
+judgement about that, and `/api/generate` refuses before the model is called —
+before the rate limit is even spent — when it is one of the two states that
+cannot produce working SQL:
+
+| State | Meaning | Generation |
+| --- | --- | --- |
+| `ok` | Refreshed, and everything it names still exists | proceeds |
+| `never_refreshed` | Nothing has ever checked this catalog against the database — the state a model-drafted source starts in | **refused** |
+| `empty` | No table it names still exists | **refused** |
+| `drifted` | Some allowlisted tables no longer exist | proceeds, with a warning |
+| `stale` | Last refreshed over `CATALOG_STALE_AFTER_DAYS` ago | proceeds, with a warning |
+
+A refusal names the source and the fix, and the fix is always the same one the
+source list and both pickers put one click away: refresh the catalog.
+
+Refreshing re-reads `information_schema` for the tables already in the
+allowlist. It never adds a table, and it never removes one either — a dropped
+table and a revoked grant look identical from there, and only one of them
+should cost an author their configuration. A table it cannot find is recorded
+on the source instead, which is what makes the source read `drifted`, and its
+last known columns stop being rendered into the prompt.
+
 ## The SQL rules are a courtesy, not the enforcement
 
 The `SQL_RULES` block in the prompt tells the model the house rules: SELECT-only,

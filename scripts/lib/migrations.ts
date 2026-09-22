@@ -239,11 +239,20 @@ type SchemaRow = Record<string, unknown>;
  * schema_migrations is excluded on purpose: it is bookkeeping created before
  * the first migration and its contents change with every step, so including it
  * would make every comparison differ for reasons that are not schema drift.
+ *
+ * Column order is compared as a *rank*, not as `ordinal_position`, which is
+ * PostgreSQL's `attnum` and is never reused: dropping a column and adding it
+ * back leaves a permanent gap, so an `ADD COLUMN` migration with a perfectly
+ * correct `DROP COLUMN` rollback would fail this comparison for a reason that
+ * is invisible in every query the application makes. The rank still catches a
+ * down path that reorders or loses a column.
  */
 export async function schemaDigest(client: Client): Promise<string> {
   const columns = await client.query<SchemaRow>(
-    `SELECT table_name, column_name, ordinal_position, data_type,
-            is_nullable, column_default
+    `SELECT table_name, column_name, data_type, is_nullable, column_default,
+            row_number() OVER (
+              PARTITION BY table_name ORDER BY ordinal_position
+            ) AS column_rank
        FROM information_schema.columns
       WHERE table_schema = 'public' AND table_name <> 'schema_migrations'
       ORDER BY table_name, column_name`,

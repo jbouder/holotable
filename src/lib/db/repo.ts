@@ -16,6 +16,8 @@ type SourceRow = {
   kind: string;
   config: unknown;
   secret_ref: string;
+  catalog_refreshed_at: string | null;
+  catalog_missing_tables: string[] | null;
   created_by: string;
   created_at: string;
   updated_at: string;
@@ -30,6 +32,8 @@ function mapSource(row: SourceRow): SourceRecord {
     kind: row.kind,
     config: SourceConfig.parse(row.config),
     secretRef: row.secret_ref,
+    catalogRefreshedAt: row.catalog_refreshed_at,
+    catalogMissingTables: row.catalog_missing_tables ?? [],
     createdBy: row.created_by,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
@@ -85,13 +89,22 @@ export async function createSource(input: {
 export async function updateSource(
   workspaceId: string,
   id: string,
-  patch: { name?: string; config?: SourceConfig; secretRef?: string },
+  patch: {
+    name?: string;
+    config?: SourceConfig;
+    secretRef?: string;
+    /** Set together by the refresh route; a null column leaves both alone. */
+    catalogRefreshedAt?: Date;
+    catalogMissingTables?: string[];
+  },
 ): Promise<SourceRecord | null> {
   const rows = await query<SourceRow>(
     `UPDATE sources
      SET name = COALESCE($3, name),
          config = COALESCE($4, config),
          secret_ref = COALESCE($5, secret_ref),
+         catalog_refreshed_at = COALESCE($6::timestamptz, catalog_refreshed_at),
+         catalog_missing_tables = COALESCE($7::text[], catalog_missing_tables),
          updated_at = now()
      WHERE id = $1 AND workspace_id = $2 AND tombstoned_at IS NULL
      RETURNING *`,
@@ -101,6 +114,8 @@ export async function updateSource(
       patch.name ?? null,
       patch.config ? JSON.stringify(patch.config) : null,
       patch.secretRef ?? null,
+      patch.catalogRefreshedAt ?? null,
+      patch.catalogMissingTables ?? null,
     ],
   );
   return rows[0] ? mapSource(rows[0]) : null;

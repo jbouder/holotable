@@ -1,6 +1,7 @@
-import { getIdentity } from "@/lib/auth/authorize";
+import { can, getIdentity } from "@/lib/auth/authorize";
 import { accessibleWorkspaces, hasWorkspaceRole } from "@/lib/auth/claims";
 import { listSources } from "@/lib/db/repo";
+import { catalogHealth } from "@/lib/catalog/health";
 import { config } from "@/lib/config";
 import { SignIn } from "@/components/sign-in";
 import { ExploreClient } from "./explore-client";
@@ -21,6 +22,10 @@ export default async function ExplorePage() {
     id: s.id,
     name: s.name,
     workspaceId: s.workspaceId,
+    // Decided here, not in the browser: the staleness threshold is an
+    // environment setting, and `/api/generate` refuses on this same call.
+    catalog: catalogHealth(s),
+    canRefresh: can(identity, "source:manage", { workspaceId: s.workspaceId }),
   }));
 
   return (

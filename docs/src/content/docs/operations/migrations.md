@@ -103,7 +103,11 @@ each claim above:
   down. After each rollback the schema must match a fingerprint of exactly what
   the previous migration left — columns, constraints and indexes from the
   catalog — and re-applying must return it to where it was. A down path that
-  forgets to drop one table fails here.
+  forgets to drop one table fails here. Column *order* is compared as a rank
+  rather than as `ordinal_position`, because PostgreSQL never reuses an
+  `attnum`: dropping a column and adding it back leaves a permanent gap, and an
+  `ADD COLUMN` migration with a correct rollback would otherwise fail on a
+  difference no query can see.
 - Re-running the full set against an already-migrated database is a no-op, both
   as a runner decision and at the SQL level, which is why
   `CREATE ... IF NOT EXISTS` is the house style.
