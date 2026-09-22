@@ -32,3 +32,10 @@ CREATE TABLE IF NOT EXISTS workspace_limits (
   daily_token_budget BIGINT CHECK (daily_token_budget >= 0),
   updated_at         TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+
+-- rollback:
+-- Both tables are counters and ceilings, not source data: dropping them loses
+-- the current day's usage tallies and any per-workspace overrides, and the
+-- limits fall back to the global values from the environment.
+DROP TABLE IF EXISTS workspace_limits;
+DROP TABLE IF EXISTS llm_usage;

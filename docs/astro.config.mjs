@@ -75,6 +75,7 @@ export default defineConfig({
             { label: "Health, readiness, and shutdown", slug: "operations/health-checks" },
             { label: "Prometheus metrics", slug: "operations/metrics" },
             { label: "Structured logging", slug: "operations/logging" },
+            { label: "Database migrations", slug: "operations/migrations" },
           ],
         },
         {
