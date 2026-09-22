@@ -166,6 +166,13 @@ issue and make the case first, rather than arriving with it already written.
   touching the SQL guard, the IR schema, authorization, time resolution, or the
   poller should come with a test; those are the areas where a silent regression
   is most expensive.
+- **Component tests** are the exception to "pure logic only", and live in
+  `*.test.tsx` beside the rest. `test/support/dom.tsx` mounts a component in
+  jsdom (a devDependency; it never reaches the build) and flushes with `act`.
+  Reach for it only when a behaviour genuinely cannot be tested without a
+  render — an error boundary, for instance, since `react-dom/server` does not
+  run boundaries at all. Everything else still belongs in `src/lib/` as a
+  function with a plain test.
 - **Draft PRs** are fine and encouraged for work you want early eyes on.
 
 Files under `src/lib/sql/`, `src/lib/auth/`, `src/lib/ir.ts`, and

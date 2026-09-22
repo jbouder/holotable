@@ -2,19 +2,29 @@
 
 import type * as React from "react";
 import type { Panel } from "@/lib/ir";
+import {
+  PanelErrorBoundary,
+  type PanelErrorReport,
+} from "@/components/dashboard/PanelErrorBoundary";
 
 /**
  * 12-column dashboard grid. Panels are positioned from their IR layout
  * ({x,y,w,h}); row height is fixed so h maps to vertical span.
+ *
+ * Every panel is wrapped in a {@link PanelErrorBoundary} here rather than at
+ * each call site, so the live viewer, the preview and any future surface get
+ * the same isolation without having to remember to ask for it.
  */
 export function DashboardGrid({
   panels,
   renderPanel,
   rowHeight = 84,
+  onPanelError,
 }: {
   panels: Panel[];
   renderPanel: (panel: Panel) => React.ReactNode;
   rowHeight?: number;
+  onPanelError?: (report: PanelErrorReport) => void;
 }) {
   return (
     <div
@@ -33,7 +43,9 @@ export function DashboardGrid({
           }}
           className="min-h-0"
         >
-          {renderPanel(p)}
+          <PanelErrorBoundary panel={p} onError={onPanelError}>
+            {renderPanel(p)}
+          </PanelErrorBoundary>
         </div>
       ))}
     </div>
