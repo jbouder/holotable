@@ -73,6 +73,25 @@ can only block what it has been told about. Generative testing of the guard is
 tracked in [#11](https://github.com/jbouder/holotable/issues/11).
 :::
 
+## Checking a query before saving
+
+The panel editor does not make an author discover a rejection at save time.
+
+- **Validate** posts the statement to `/api/sql/validate`, which resolves and
+  authorizes the source exactly as `/api/query` does and calls the same
+  `validateSql`. Nothing is planned and nothing connects to the database, so
+  the check is instant — and because it is the same call the save makes, the
+  verdict cannot drift from it. A rejection is a `200` carrying
+  `{ ok: false, error }`: the request succeeded, and the verdict is the payload.
+- **Run preview** posts the panel's `sourceId`, SQL, `timeField` and the
+  dashboard's current time range to `/api/query` and renders the rows through
+  the same `PanelView` the dashboard uses, with the panel's own viz and format.
+  `Ctrl`/`⌘` + `Enter` in the SQL field runs it.
+
+Neither action touches the dashboard or writes a version, and neither is a way
+around the guard: the preview is an ordinary guarded execution, and the save
+re-validates every panel regardless of what was checked here.
+
 ## The server owns time
 
 Real data enters the system only here — server-side, from a stored spec. Three

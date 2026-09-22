@@ -4,7 +4,7 @@ import * as React from "react";
 import type { Dashboard, Panel } from "@/lib/ir";
 import { DashboardGrid } from "@/components/dashboard/DashboardGrid";
 import { PanelView, type PanelState } from "@/components/dashboard/PanelView";
-import { apiErrorFromThrown, readApiError } from "@/lib/errors";
+import { EMPTY_ROWS, runPanelQuery } from "@/lib/panel-query";
 
 /**
  * One-shot preview: runs each panel's guarded query once via /api/query and
@@ -16,48 +16,14 @@ export function PreviewDashboard({ spec }: { spec: Dashboard }) {
 
   const runPanel = React.useCallback(
     async (panel: Panel, timeRange: Dashboard["timeRange"]) => {
+      setStates((s) => ({ ...s, [panel.id]: { data: EMPTY_ROWS, status: "loading" } }));
+      const outcome = await runPanelQuery(panel.query, timeRange);
       setStates((s) => ({
         ...s,
-        [panel.id]: { data: { columns: [], rows: [] }, status: "loading" },
+        [panel.id]: outcome.ok
+          ? { data: outcome.rows, status: "live", updatedAt: Date.now() }
+          : { data: EMPTY_ROWS, status: "error", error: outcome.error },
       }));
-      try {
-        const res = await fetch("/api/query", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            sourceId: panel.query.sourceId,
-            sql: panel.query.sql,
-            timeField: panel.query.timeField,
-            timeRange,
-          }),
-        });
-        if (!res.ok) {
-          const error = await readApiError(res);
-          setStates((s) => ({
-            ...s,
-            [panel.id]: { data: { columns: [], rows: [] }, status: "error", error },
-          }));
-          return;
-        }
-        const body = await res.json();
-        setStates((s) => ({
-          ...s,
-          [panel.id]: {
-            data: { columns: body.columns, rows: body.rows },
-            status: "live",
-            updatedAt: Date.now(),
-          },
-        }));
-      } catch (err) {
-        setStates((s) => ({
-          ...s,
-          [panel.id]: {
-            data: { columns: [], rows: [] },
-            status: "error",
-            error: apiErrorFromThrown(err),
-          },
-        }));
-      }
     },
     [],
   );
