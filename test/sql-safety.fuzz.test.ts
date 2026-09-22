@@ -2,7 +2,8 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import fc from "fast-check";
 import { parse, scan } from "libpg-query";
-import { allowedTables, SourceConfig } from "@/lib/registry";
+import { allowedTables, SourceConfig, sourceCatalog } from "@/lib/registry";
+import { sqlHints } from "@/lib/sql/hints";
 import { buildExecutablePlan, validateSql } from "@/lib/sql/safety";
 import { CORPUS } from "./fixtures/sql-fuzz-corpus";
 
@@ -1046,6 +1047,25 @@ test("fuzz: a benign statement is always accepted", async () => {
         r.ok,
         true,
         `rejected a benign statement with "${r.error}": ${JSON.stringify(sql)}`,
+      );
+    }),
+  );
+});
+
+test("fuzz: the editor's hints never fire on a benign statement", async () => {
+  const catalog = sourceCatalog(source);
+  await run(
+    fc.asyncProperty(benign, async ({ sql }) => {
+      const hints = sqlHints(sql, catalog);
+      assert.deepEqual(
+        hints.map((h) => h.message),
+        [],
+        // The editor's lexical hint layer (`src/lib/sql/hints.ts`) is allowed
+        // to miss things the guard catches; it is never allowed to underline a
+        // statement the guard accepts. The benign generator is the best source
+        // of "valid but unusual" there is, so the invariant is checked here
+        // rather than only on hand-written examples.
+        `the editor would underline a statement the guard accepts: ${JSON.stringify(sql)}`,
       );
     }),
   );

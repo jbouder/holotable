@@ -65,6 +65,23 @@ export const SourceDraft = z
   .strict();
 export type SourceDraft = z.infer<typeof SourceDraft>;
 
+/**
+ * The part of a source that may be sent to a browser: the schema name and the
+ * table allowlist with its columns, and nothing else.
+ *
+ * The editor needs the catalog to complete table and column names and to warn
+ * about a table the guard will refuse. It does not need — and invariant 5 says
+ * it must not receive — the host, port, database, TLS setting or `secret_ref`
+ * that sit beside the catalog in {@link SourceConfig}. Projecting through
+ * {@link sourceCatalog} rather than spreading the config is what keeps a field
+ * added to `SourceConfig` later from reaching the client by default.
+ */
+export type SourceCatalog = Pick<SourceConfig, "schema" | "tables">;
+
+export function sourceCatalog(cfg: SourceConfig): SourceCatalog {
+  return { schema: cfg.schema, tables: cfg.tables };
+}
+
 export interface SourceRecord {
   id: string;
   workspaceId: string;
@@ -114,7 +131,7 @@ export function resolveCredentials(secretRef: string): SourceCredentials {
  * a name, so an exact comparison here is exactly the server's resolution;
  * lowercasing on either side would collapse the two into one.
  */
-export function allowedTables(cfg: SourceConfig): Set<string> {
+export function allowedTables(cfg: SourceCatalog): Set<string> {
   const set = new Set<string>();
   for (const t of cfg.tables) {
     set.add(t.name);
