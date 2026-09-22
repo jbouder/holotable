@@ -27,6 +27,7 @@ import {
 import { ErrorDisplay } from "@/components/ui/error-display";
 import { apiErrorFromThrown, readApiError } from "@/lib/errors";
 import { SourceForm } from "./source-form";
+import { SecretRefBadge, useSecretRefReadinessMap } from "./secret-ref-status";
 
 /** Starter descriptions to seed the natural-language drafter with one click. */
 const SOURCE_PROMPT_PRESETS = [
@@ -90,6 +91,14 @@ export function SourcesClient({ workspaces }: { workspaces: string[] }) {
     if (workspaceId) void load(workspaceId);
   }
 
+  // Readiness for the refs the listed sources name, so a source whose
+  // credentials have gone missing is visible here rather than the next time
+  // someone opens a dashboard that depends on it.
+  const readiness = useSecretRefReadinessMap(
+    workspaceId,
+    (sources ?? []).map((source) => source.secretRef),
+  );
+
   if (workspaces.length === 0) {
     return (
       <div className="mx-auto max-w-2xl">
@@ -149,6 +158,7 @@ export function SourcesClient({ workspaces }: { workspaces: string[] }) {
               <TableHeader>Endpoint</TableHeader>
               <TableHeader>Schema</TableHeader>
               <TableHeader>Tables</TableHeader>
+              <TableHeader>Credentials</TableHeader>
               <TableHeader>Status</TableHeader>
               <TableHeader className="text-right">Actions</TableHeader>
             </TableRow>
@@ -165,6 +175,11 @@ export function SourcesClient({ workspaces }: { workspaces: string[] }) {
                 </TableCell>
                 <TableCell>{source.config.schema}</TableCell>
                 <TableCell>{source.config.tables.length}</TableCell>
+                <TableCell>
+                  <SecretRefBadge
+                    readiness={readiness[source.secretRef] ?? { state: "checking" }}
+                  />
+                </TableCell>
                 <TableCell>
                   {source.tombstonedAt ? (
                     <span className="text-danger">Tombstoned</span>

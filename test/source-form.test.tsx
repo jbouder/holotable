@@ -37,7 +37,9 @@ afterEach(() => {
 function stubDiscovery(body: unknown): { bodies: unknown[] } {
   const bodies: unknown[] = [];
   globalThis.fetch = (async (_input: string, init?: RequestInit) => {
-    bodies.push(JSON.parse(String(init?.body)));
+    // The form also checks `secret_ref` readiness; only a posted body is a
+    // discovery, and only those are what these tests are counting.
+    if (init?.body !== undefined) bodies.push(JSON.parse(String(init.body)));
     return new Response(JSON.stringify(body), {
       status: 200,
       headers: { "content-type": "application/json" },

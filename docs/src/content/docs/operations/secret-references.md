@@ -26,22 +26,35 @@ safe `SourceDraft` shape — connection config, table catalog, and the
 `secret_ref` *name* — and is explicitly prompted to ignore any password present
 in the description.
 
-## The confusing failure mode
+## Readiness, before you press Test
 
 Credentials must already exist in the server environment for the named
-`secret_ref`. A drafted or hand-created source whose `secret_ref` is
-unconfigured **saves fine but fails on Test**, with:
+`secret_ref`. A source whose `secret_ref` is unconfigured **saves fine but
+fails on Test**, with:
 
 ```
 credentials for secret_ref "X" are not configured in the environment
 ```
 
-The server checks every registered source's `secret_ref` at startup and logs a
-warning naming the missing variable (see
-[Startup validation](/operations/startup-validation/)); in the UI there is no
-indication before you press Test until
-[#124](https://github.com/jbouder/holotable/issues/124) adds a readiness
-indicator.
+So the UI says so first. The source form checks readiness as you type the
+`secret_ref`, and the source list shows it per row:
+
+- a green check — the server holds credentials for this family;
+- a warning naming the two variables to set (`X_USERNAME`, `X_PASSWORD`) —
+  it does not.
+
+Saving with an unconfigured ref is still allowed: the variables are yours to
+set, and they may well land after the source does.
+
+Behind it is `GET /api/secret-refs/[ref]/status`, which requires
+`source:manage` in the named workspace, accepts only an `UPPER_SNAKE` ref, is
+rate limited per caller, and answers `{ ref, configured }` — a boolean, and
+nothing derived from a credential. It reports what `resolveCredentials` would
+do, by calling it, so the indicator and execution can never disagree.
+
+The server also checks every registered source's `secret_ref` at startup and
+logs a warning naming the missing variable (see
+[Startup validation](/operations/startup-validation/)).
 
 ## Treat a draft as a starting point
 
