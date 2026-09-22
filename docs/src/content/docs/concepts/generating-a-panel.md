@@ -72,6 +72,22 @@ omitted entirely.
 spec as it forms. **The model runs exactly once per author action** — never on
 view, never on a refresh tick.
 
+## Keeping an Explore answer
+
+An explore panel is a spec like any other, so Explore can pin it to a dashboard
+instead of discarding it. **Save as panel** offers the dashboards in the
+*source's* workspace that the caller may update (`GET
+/api/dashboards?workspaceId=…&editable=true`), plus a new dashboard.
+
+The placement is pure arithmetic over the spec (`src/lib/explore-save.ts`): the
+fixed `explore` id becomes a slug of the panel title, disambiguated against the
+ids already in that dashboard, and the panel lands at the bottom of the grid.
+The save itself is the ordinary `PUT /api/dashboards/[id]` (which appends a new
+immutable version) or `POST /api/dashboards`, so the workspace is still derived
+from the trusted source records and every statement is re-validated on the way
+in. A dashboard created this way opens in the editor with `?panel=<id>`
+selected.
+
 ## Drafting a data source
 
 `/api/sources/generate` applies the same shape to source registration: the model

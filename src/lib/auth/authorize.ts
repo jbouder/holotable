@@ -1,6 +1,6 @@
 import { cookies } from "next/headers";
 import { config } from "@/lib/config";
-import { hasWorkspaceRole, type Identity } from "@/lib/auth/claims";
+import { accessibleWorkspaces, hasWorkspaceRole, type Identity } from "@/lib/auth/claims";
 import { verifySessionToken } from "@/lib/auth/session";
 import { type ErrorKind, kindFromStatus, OPAQUE_MESSAGE } from "@/lib/errors";
 import { amendRequest, currentRequest, log } from "@/lib/log";
@@ -81,6 +81,28 @@ export function can(identity: Identity, action: Action, ctx: AuthzContext): bool
     default:
       return false;
   }
+}
+
+/**
+ * The workspaces an identity may perform `action` in, optionally narrowed to a
+ * single id.
+ *
+ * `only` is what a caller asked to see — a query-string filter — and it is a
+ * FILTER, never a grant: the candidates come from the identity's own claims
+ * and each survivor is still decided by {@link can}. An unknown or
+ * unauthorized id therefore narrows the answer to nothing instead of widening
+ * it, which is the shape a list endpoint needs (no membership is disclosed).
+ */
+export function authorizedWorkspaces(
+  identity: Identity,
+  action: Action,
+  only?: string | null,
+): string[] {
+  return accessibleWorkspaces(identity).filter(
+    (w) =>
+      (only === undefined || only === null || w === only) &&
+      can(identity, action, { workspaceId: w }),
+  );
 }
 
 /** Read + verify the session cookie, returning the identity or null. */

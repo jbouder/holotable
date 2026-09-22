@@ -1,8 +1,9 @@
 "use client";
 
 import * as React from "react";
+import Link from "next/link";
 import { experimental_useObject as useObject } from "@ai-sdk/react";
-import { Loader2, SendHorizontal, Compass } from "lucide-react";
+import { Loader2, SendHorizontal, Compass, Save, ArrowUpRight } from "lucide-react";
 import { Panel, type TimeRange } from "@/lib/ir";
 import { Button } from "@/components/ui/button";
 import { Textarea, Label } from "@/components/ui/input";
@@ -15,6 +16,7 @@ import { ErrorDisplay } from "@/components/ui/error-display";
 import { type ApiError, apiErrorFromThrown } from "@/lib/errors";
 import { EMPTY_ROWS, runPanelQuery } from "@/lib/panel-query";
 import { formatValue } from "@/lib/format";
+import { SavePanelDialog, type SavedPanel } from "./save-panel-dialog";
 
 interface SourceOption {
   id: string;
@@ -53,15 +55,22 @@ const EXAMPLE_PROMPTS: string[] = [
 export function ExploreClient({
   sources,
   model,
+  defaultTimeRange,
+  defaultRefreshIntervalMs,
 }: {
   sources: SourceOption[];
   model: string;
+  /** Server-configured defaults, used when Explore creates a dashboard. */
+  defaultTimeRange: TimeRange;
+  defaultRefreshIntervalMs: number;
 }) {
   const [sourceId, setSourceId] = React.useState<string | null>(sources[0]?.id ?? null);
   const [from, setFrom] = React.useState("now-24h");
   const [prompt, setPrompt] = React.useState("");
   const [panel, setPanel] = React.useState<Panel | null>(null);
   const [result, setResult] = React.useState<Result | null>(null);
+  const [saveOpen, setSaveOpen] = React.useState(false);
+  const [saved, setSaved] = React.useState<SavedPanel | null>(null);
 
   const runQuery = React.useCallback(async (p: Panel, timeRange: TimeRange) => {
     setResult({ data: EMPTY_ROWS, status: "loading" });
@@ -92,6 +101,7 @@ export function ExploreClient({
     if (!sourceId || !prompt.trim()) return;
     setPanel(null);
     setResult(null);
+    setSaved(null);
     submit({ mode: "explore", sourceId, prompt });
   }
 
@@ -103,7 +113,8 @@ export function ExploreClient({
 
   const streaming = isLoading || object !== undefined;
   const rangeLabel = TIME_PRESETS.find((p) => p.value === from)?.label ?? from;
-  const sourceName = sources.find((s) => s.id === sourceId)?.name ?? sourceId;
+  const source = sources.find((s) => s.id === sourceId);
+  const sourceName = source?.name ?? sourceId;
 
   if (sources.length === 0) {
     return (
@@ -219,13 +230,29 @@ export function ExploreClient({
       </Card>
 
       {panel ? (
-        <ResultView
-          panel={panel}
-          result={result}
-          sourceName={sourceName ?? ""}
-          rangeLabel={rangeLabel}
-          onRetry={() => void runQuery(panel, { from, to: "now" })}
-        />
+        <>
+          <ResultView
+            panel={panel}
+            result={result}
+            sourceName={sourceName ?? ""}
+            rangeLabel={rangeLabel}
+            saved={saved}
+            canSave={result?.status === "done" && source !== undefined}
+            onSave={() => setSaveOpen(true)}
+            onRetry={() => void runQuery(panel, { from, to: "now" })}
+          />
+          {source && (
+            <SavePanelDialog
+              open={saveOpen}
+              onOpenChange={setSaveOpen}
+              panel={panel}
+              workspaceId={source.workspaceId}
+              defaultTimeRange={defaultTimeRange}
+              defaultRefreshIntervalMs={defaultRefreshIntervalMs}
+              onSaved={setSaved}
+            />
+          )}
+        </>
       ) : (
         streaming && (
           <div className="flex items-center gap-2 text-sm text-muted">
@@ -242,12 +269,18 @@ function ResultView({
   result,
   sourceName,
   rangeLabel,
+  saved,
+  canSave,
+  onSave,
   onRetry,
 }: {
   panel: Panel;
   result: Result | null;
   sourceName: string;
   rangeLabel: string;
+  saved: SavedPanel | null;
+  canSave: boolean;
+  onSave: () => void;
   onRetry: () => void;
 }) {
   const data = result?.data ?? EMPTY_ROWS;
@@ -255,14 +288,32 @@ function ResultView({
 
   return (
     <section className="space-y-4">
-      <div className="space-y-1">
-        <h2 className="text-lg font-medium">{panel.title}</h2>
-        {panel.description && <p className="text-sm text-muted">{panel.description}</p>}
-        <p className="text-xs text-muted">
-          {sourceName} · {rangeLabel}
-          {result?.status === "done" && ` · ${rowCount} row${rowCount === 1 ? "" : "s"}`}
-        </p>
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="space-y-1">
+          <h2 className="text-lg font-medium">{panel.title}</h2>
+          {panel.description && <p className="text-sm text-muted">{panel.description}</p>}
+          <p className="text-xs text-muted">
+            {sourceName} · {rangeLabel}
+            {result?.status === "done" &&
+              ` · ${rowCount} row${rowCount === 1 ? "" : "s"}`}
+          </p>
+        </div>
+        <Button variant="secondary" onClick={onSave} disabled={!canSave}>
+          <Save className="h-4 w-4" /> Save as panel
+        </Button>
       </div>
+
+      {saved && (
+        <p className="flex flex-wrap items-center gap-1 rounded-lg border border-border bg-surface px-4 py-2 text-sm text-muted">
+          Saved as a panel.
+          <Link
+            href={`/dashboards/${saved.dashboardId}`}
+            className="inline-flex items-center gap-1 text-primary hover:underline"
+          >
+            Open the dashboard <ArrowUpRight className="h-3.5 w-3.5" />
+          </Link>
+        </p>
+      )}
 
       <ResultBody panel={panel} result={result} data={data} onRetry={onRetry} />
 

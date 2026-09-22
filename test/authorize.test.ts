@@ -1,6 +1,12 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { can, errorResponse, HttpError, type Action } from "@/lib/auth/authorize";
+import {
+  authorizedWorkspaces,
+  can,
+  errorResponse,
+  HttpError,
+  type Action,
+} from "@/lib/auth/authorize";
 import { parseGroups, type Identity } from "@/lib/auth/claims";
 
 function identity(groups: string[], sub = "u1"): Identity {
@@ -107,4 +113,33 @@ test("errorResponse takes an explicit kind over the one the status implies", asy
   // knows which, so the query route says so.
   const res = errorResponse(new HttpError(400, "bad column", {}, "statement"));
   assert.deepEqual(await res.json(), { error: "bad column", kind: "statement" });
+});
+
+/* -------------------------------------------------------------------------- */
+/* authorizedWorkspaces — the list filter                                     */
+/* -------------------------------------------------------------------------- */
+
+test("authorizedWorkspaces keeps only the workspaces the action is allowed in", () => {
+  const id = identity(["/workspaces/a/viewer", "/workspaces/b/editor"]);
+  assert.deepEqual(authorizedWorkspaces(id, "dashboard:view"), ["a", "b"]);
+  assert.deepEqual(authorizedWorkspaces(id, "dashboard:update"), ["b"]);
+});
+
+test("a requested workspace id narrows the answer and never widens it", () => {
+  const id = identity(["/workspaces/a/editor"]);
+  assert.deepEqual(authorizedWorkspaces(id, "dashboard:update", "a"), ["a"]);
+  // Not a member: the id in the request grants nothing, and the answer is
+  // empty rather than a 403 that would confirm the workspace exists.
+  assert.deepEqual(authorizedWorkspaces(id, "dashboard:update", "other"), []);
+});
+
+test("a viewer asking for editable dashboards gets nothing", () => {
+  const id = identity(["/workspaces/a/viewer"]);
+  assert.deepEqual(authorizedWorkspaces(id, "dashboard:update", "a"), []);
+});
+
+test("a platform admin is still limited to the workspaces in their claims", () => {
+  const id = identity(["/platform-admins", "/workspaces/a/viewer"]);
+  assert.equal(id.platformAdmin, true);
+  assert.deepEqual(authorizedWorkspaces(id, "dashboard:update"), ["a"]);
 });

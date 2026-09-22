@@ -42,17 +42,22 @@ const FORMAT_OPTIONS = [
 export function EditDashboardClient({
   dashboardId,
   initialSpec,
+  initialPanelId,
   sources,
 }: {
   dashboardId: string;
   initialSpec: Dashboard;
+  /** Panel to open selected; ignored when it is not in the spec. */
+  initialPanelId?: string;
   version: number;
   sources: SourceOption[];
 }) {
   const router = useRouter();
   const [spec, setSpec] = React.useState<Dashboard>(initialSpec);
   const [selectedId, setSelectedId] = React.useState<string | null>(
-    initialSpec.panels[0]?.id ?? null,
+    initialSpec.panels.find((p) => p.id === initialPanelId)?.id ??
+      initialSpec.panels[0]?.id ??
+      null,
   );
   const [activeTab, setActiveTab] = React.useState<"editor" | "preview">("editor");
   const [saving, setSaving] = React.useState(false);

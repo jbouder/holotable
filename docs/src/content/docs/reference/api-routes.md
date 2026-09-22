@@ -13,7 +13,7 @@ All routes run on the Node runtime. Every one resolves identity with
 
 | Route | Method | Min role | Notes |
 | --- | --- | --- | --- |
-| `/api/dashboards` | GET | viewer | List dashboards in a workspace |
+| `/api/dashboards` | GET | viewer | List dashboards. `?workspaceId=` and `?editable=true` only **narrow** the caller's own workspaces — the candidates come from the claims and each is re-checked with `can()` |
 | `/api/dashboards` | POST | editor | Create; validates the spec and derives the workspace from trusted sources |
 | `/api/dashboards/[id]` | GET | viewer | Current version with its spec |
 | `/api/dashboards/[id]` | PUT | editor | Appends a **new immutable version** |
