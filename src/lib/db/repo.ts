@@ -327,6 +327,8 @@ export async function saveDashboardVersion(input: {
   dashboardId: string;
   createdBy: string;
   spec: Dashboard;
+  /** The author's one-line "what changed", or null when they wrote none. */
+  note?: string | null;
 }): Promise<DashboardRecord> {
   const spec = parseDashboard(input.spec);
   return withTransaction(async (client) => {
@@ -337,9 +339,15 @@ export async function saveDashboardVersion(input: {
     );
     const version = cur.rows[0].next;
     const v = await client.query<{ id: string; created_at: string }>(
-      `INSERT INTO dashboard_versions (dashboard_id, version, spec, created_by)
-       VALUES ($1,$2,$3,$4) RETURNING id, created_at`,
-      [input.dashboardId, version, JSON.stringify(spec), input.createdBy],
+      `INSERT INTO dashboard_versions (dashboard_id, version, spec, created_by, note)
+       VALUES ($1,$2,$3,$4,$5) RETURNING id, created_at`,
+      [
+        input.dashboardId,
+        version,
+        JSON.stringify(spec),
+        input.createdBy,
+        input.note ?? null,
+      ],
     );
     const d = await client.query<{ workspace_id: string; created_by: string }>(
       `UPDATE dashboards

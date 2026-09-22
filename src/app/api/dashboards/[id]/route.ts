@@ -9,6 +9,7 @@ import {
 import { resolveAndValidateDashboard } from "@/lib/dashboard-service";
 import { invalidatePoller } from "@/lib/poller/registry";
 import { Dashboard } from "@/lib/ir";
+import { VERSION_NOTE_MAX } from "@/lib/editor/session";
 
 export const runtime = "nodejs";
 
@@ -27,7 +28,15 @@ export const GET = route(
   },
 );
 
-const UpdateBody = z.object({ spec: Dashboard });
+/**
+ * `note` is the author's own "what changed" for the version row (#117). It is
+ * optional, bounded, and never interpreted: it is stored and displayed, and
+ * nothing in execution or authorization reads it.
+ */
+const UpdateBody = z.object({
+  spec: Dashboard,
+  note: z.string().max(VERSION_NOTE_MAX).optional(),
+});
 
 /** Save a new immutable version of the dashboard (editor). */
 export const PUT = route(
@@ -38,7 +47,7 @@ export const PUT = route(
     const existing = await getDashboardById(id);
     if (!existing) throw new HttpError(404, "dashboard not found");
 
-    const { spec } = await readJson(req, UpdateBody);
+    const { spec, note } = await readJson(req, UpdateBody);
     const { workspaceId } = await resolveAndValidateDashboard(spec);
 
     // Authorize against BOTH the existing dashboard workspace and the resolved
@@ -52,6 +61,7 @@ export const PUT = route(
       dashboardId: id,
       createdBy: identity.sub,
       spec,
+      note: note?.trim() || null,
     });
     invalidatePoller(id);
     return json({ dashboard: record });
