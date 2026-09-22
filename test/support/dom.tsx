@@ -18,6 +18,8 @@ export interface Mounted {
   render(ui: React.ReactNode): void;
   /** Dispatch a click and flush the resulting render. */
   click(el: Element): void;
+  /** Dispatch a keydown and flush the resulting render. */
+  key(el: Element, key: string, init?: { shiftKey?: boolean }): void;
   unmount(): void;
   text(): string;
 }
@@ -48,6 +50,7 @@ g.Element = dom.window.Element;
 g.Node = dom.window.Node;
 g.Event = dom.window.Event;
 g.MouseEvent = dom.window.MouseEvent;
+g.KeyboardEvent = dom.window.KeyboardEvent;
 g.requestAnimationFrame = dom.window.requestAnimationFrame.bind(dom.window);
 g.cancelAnimationFrame = dom.window.cancelAnimationFrame.bind(dom.window);
 // ECharts and the chart wrapper observe their container; jsdom has no
@@ -89,6 +92,18 @@ export async function mount(): Promise<Harness> {
       void act(() => {
         el.dispatchEvent(
           new dom.window.MouseEvent("click", { bubbles: true, cancelable: true }),
+        );
+      });
+    },
+    key(el, key, init) {
+      void act(() => {
+        el.dispatchEvent(
+          new dom.window.KeyboardEvent("keydown", {
+            key,
+            bubbles: true,
+            cancelable: true,
+            ...init,
+          }),
         );
       });
     },

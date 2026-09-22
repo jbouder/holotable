@@ -12,11 +12,13 @@ import {
   safeParseDashboard,
 } from "@/lib/ir";
 import { autoLayoutPanels, COLUMN_PRESETS } from "@/lib/layout";
+import { clampLayout } from "@/lib/grid-layout";
 import { Button } from "@/components/ui/button";
 import { Input, Textarea, Label } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { PreviewDashboard } from "@/components/dashboard/PreviewDashboard";
+import { PanelLayoutGrid } from "@/components/dashboard/PanelLayoutGrid";
 import { SqlEditor } from "@/components/sql/SqlEditor";
 import { TimeFieldPicker } from "@/components/sql/TimeFieldPicker";
 import type { SourceCatalog } from "@/lib/registry";
@@ -107,6 +109,11 @@ export function EditDashboardClient({
 
   function arrangeColumns(columns: number) {
     setSpec((s) => ({ ...s, panels: autoLayoutPanels(s.panels, columns) }));
+  }
+
+  /** One drag, resize or nudge from the arranger: one change to the spec. */
+  function setPanels(panels: Panel[]) {
+    setSpec((s) => ({ ...s, panels }));
   }
 
   function updatePanel(id: string, fn: (p: Panel) => Panel) {
@@ -326,6 +333,39 @@ export function EditDashboardClient({
             </CardContent>
           </Card>
 
+          <Card>
+            <CardHeader>
+              <CardTitle>Layout</CardTitle>
+              <div className="flex flex-wrap items-center gap-1.5 text-xs">
+                <LayoutGrid className="h-3.5 w-3.5 text-muted" />
+                <span className="mr-1 text-muted">Arrange:</span>
+                {COLUMN_PRESETS.map((n) => (
+                  <Button
+                    key={n}
+                    variant="secondary"
+                    size="sm"
+                    className="h-6 px-2 text-xs"
+                    onClick={() => arrangeColumns(n)}
+                  >
+                    {n}-up
+                  </Button>
+                ))}
+              </div>
+            </CardHeader>
+            <CardContent>
+              <p className="mb-3 text-xs text-muted">
+                Drag a panel to move it, drag its corner to resize. Arrow keys move the
+                focused panel; hold Shift to resize.
+              </p>
+              <PanelLayoutGrid
+                panels={spec.panels}
+                selectedId={selectedId}
+                onSelect={selectPanel}
+                onChange={setPanels}
+              />
+            </CardContent>
+          </Card>
+
           <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
             <Card className="lg:col-span-1">
               <CardHeader>
@@ -335,21 +375,6 @@ export function EditDashboardClient({
                 </Button>
               </CardHeader>
               <CardContent className="space-y-3">
-                <div className="flex flex-wrap items-center gap-1.5 border-b border-border pb-3 text-xs">
-                  <LayoutGrid className="h-3.5 w-3.5 text-muted" />
-                  <span className="mr-1 text-muted">Arrange:</span>
-                  {COLUMN_PRESETS.map((n) => (
-                    <Button
-                      key={n}
-                      variant="secondary"
-                      size="sm"
-                      className="h-6 px-2 text-xs"
-                      onClick={() => arrangeColumns(n)}
-                    >
-                      {n}-up
-                    </Button>
-                  ))}
-                </div>
                 <div className="space-y-1">
                   {spec.panels.map((p) => (
                     <button
@@ -534,7 +559,10 @@ function PanelEditor({
         <Select
           value={String(panel.layout.w)}
           onValueChange={(v) =>
-            onChange((p) => ({ ...p, layout: { ...p.layout, w: Number(v) } }))
+            onChange((p) => ({
+              ...p,
+              layout: clampLayout({ ...p.layout, w: Number(v) }),
+            }))
           }
           options={
             WIDTH_PRESETS.some((o) => o.value === String(panel.layout.w))
@@ -574,7 +602,7 @@ function PanelEditor({
               onChange={(e) =>
                 onChange((p) => ({
                   ...p,
-                  layout: { ...p.layout, [k]: Number(e.target.value) },
+                  layout: clampLayout({ ...p.layout, [k]: Number(e.target.value) }),
                 }))
               }
             />
