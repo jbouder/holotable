@@ -3,6 +3,7 @@ import { SourceConfig, type SourceRecord } from "@/lib/registry";
 import { type Dashboard, parseDashboard } from "@/lib/ir";
 import type { BudgetStore } from "@/lib/limits/budget";
 import type { WorkspaceLimits } from "@/lib/limits/llm";
+import type { ImpactDashboard, SourceImpact } from "@/lib/source-impact";
 
 /* -------------------------------------------------------------------------- */
 /* Source registry repository                                                 */
@@ -116,6 +117,63 @@ export async function isSourceReferenced(id: string): Promise<boolean> {
     [id],
   );
   return rows[0]?.referenced ?? false;
+}
+
+/**
+ * Which dashboards and panels currently point at this source.
+ *
+ * Deliberately narrower than {@link isSourceReferenced}: that one looks at
+ * EVERY stored version, because a source named by any version must keep
+ * resolving to a tombstone rather than vanish, while impact answers "what
+ * stops working if this goes away" — and that is the *current* version of each
+ * live dashboard. A source referenced only by superseded history is reported
+ * as having no impact and is still tombstoned rather than deleted.
+ *
+ * Scoped to `workspaceId`, which the caller takes from the source record
+ * itself, so the result can never describe a dashboard in another workspace.
+ */
+export async function sourceImpact(
+  workspaceId: string,
+  sourceId: string,
+): Promise<SourceImpact> {
+  const rows = await query<{
+    dashboard_id: string;
+    dashboard_title: string;
+    panel_id: string | null;
+    panel_title: string | null;
+  }>(
+    `SELECT d.id AS dashboard_id, d.title AS dashboard_title,
+            panel->>'id' AS panel_id, panel->>'title' AS panel_title
+     FROM dashboards d
+     JOIN dashboard_versions dv ON dv.id = d.current_version_id
+     CROSS JOIN LATERAL jsonb_array_elements(dv.spec->'panels')
+       WITH ORDINALITY AS t(panel, ord)
+     WHERE d.workspace_id = $1
+       AND d.deleted_at IS NULL
+       AND panel->'query'->>'sourceId' = $2
+     ORDER BY d.title, d.id, t.ord`,
+    [workspaceId, sourceId],
+  );
+
+  const dashboards: ImpactDashboard[] = [];
+  for (const row of rows) {
+    let dashboard = dashboards.find((d) => d.id === row.dashboard_id);
+    if (!dashboard) {
+      dashboard = { id: row.dashboard_id, title: row.dashboard_title, panels: [] };
+      dashboards.push(dashboard);
+    }
+    dashboard.panels.push({
+      id: row.panel_id ?? "",
+      title: row.panel_title ?? row.panel_id ?? "",
+    });
+  }
+  return {
+    sourceId,
+    dashboards,
+    // The tombstone decision looks wider than the impact list does, so the
+    // confirmation can say which of the two outcomes a delete will produce.
+    referencedByAnyVersion: await isSourceReferenced(sourceId),
+  };
 }
 
 /**

@@ -28,6 +28,12 @@ import { ErrorDisplay } from "@/components/ui/error-display";
 import { apiErrorFromThrown, readApiError } from "@/lib/errors";
 import { SourceForm } from "./source-form";
 import { SecretRefBadge, useSecretRefReadinessMap } from "./secret-ref-status";
+import {
+  DeleteSourceDialog,
+  ImpactCell,
+  SourceImpactDialog,
+  useSourceImpactMap,
+} from "./source-impact";
 
 /** Starter descriptions to seed the natural-language drafter with one click. */
 const SOURCE_PROMPT_PRESETS = [
@@ -44,6 +50,10 @@ export function SourcesClient({ workspaces }: { workspaces: string[] }) {
   const [editing, setEditing] = React.useState<string | null>(null);
   const [creating, setCreating] = React.useState(false);
   const [notice, setNotice] = React.useState<string | null>(null);
+  // The source whose impact is on screen, and the one awaiting a delete
+  // confirmation; both are ids so a reload cannot leave a stale copy open.
+  const [showingImpact, setShowingImpact] = React.useState<string | null>(null);
+  const [confirmingDelete, setConfirmingDelete] = React.useState<string | null>(null);
 
   const load = React.useCallback(async (ws: string) => {
     const res = await fetch(`/api/sources?workspaceId=${encodeURIComponent(ws)}`);
@@ -88,6 +98,7 @@ export function SourcesClient({ workspaces }: { workspaces: string[] }) {
     const body = await res.json();
     setNotice(res.ok ? `${id}: ${body.outcome}` : `${id}: delete failed`);
     setBusy(null);
+    setConfirmingDelete(null);
     if (workspaceId) void load(workspaceId);
   }
 
@@ -98,6 +109,10 @@ export function SourcesClient({ workspaces }: { workspaces: string[] }) {
     workspaceId,
     (sources ?? []).map((source) => source.secretRef),
   );
+
+  // What each source is used by, so the count is in the row before anyone
+  // presses Delete rather than in an error after.
+  const impact = useSourceImpactMap((sources ?? []).map((source) => source.id));
 
   if (workspaces.length === 0) {
     return (
@@ -113,6 +128,8 @@ export function SourcesClient({ workspaces }: { workspaces: string[] }) {
   }
 
   const sourceBeingEdited = sources?.find((source) => source.id === editing);
+  const sourceShowingImpact = sources?.find((source) => source.id === showingImpact);
+  const sourceBeingDeleted = sources?.find((source) => source.id === confirmingDelete);
 
   return (
     <div className="space-y-6">
@@ -158,6 +175,7 @@ export function SourcesClient({ workspaces }: { workspaces: string[] }) {
               <TableHeader>Endpoint</TableHeader>
               <TableHeader>Schema</TableHeader>
               <TableHeader>Tables</TableHeader>
+              <TableHeader>Used by</TableHeader>
               <TableHeader>Credentials</TableHeader>
               <TableHeader>Status</TableHeader>
               <TableHeader className="text-right">Actions</TableHeader>
@@ -175,6 +193,12 @@ export function SourcesClient({ workspaces }: { workspaces: string[] }) {
                 </TableCell>
                 <TableCell>{source.config.schema}</TableCell>
                 <TableCell>{source.config.tables.length}</TableCell>
+                <TableCell>
+                  <ImpactCell
+                    state={impact[source.id]}
+                    onOpen={() => setShowingImpact(source.id)}
+                  />
+                </TableCell>
                 <TableCell>
                   <SecretRefBadge
                     readiness={readiness[source.secretRef] ?? { state: "checking" }}
@@ -220,7 +244,10 @@ export function SourcesClient({ workspaces }: { workspaces: string[] }) {
                       variant="ghost"
                       size="sm"
                       disabled={busy === source.id}
-                      onClick={() => remove(source.id)}
+                      onClick={() => {
+                        setNotice(null);
+                        setConfirmingDelete(source.id);
+                      }}
                     >
                       <Trash2 className="h-4 w-4 text-danger" />
                     </Button>
@@ -230,6 +257,24 @@ export function SourcesClient({ workspaces }: { workspaces: string[] }) {
             ))}
           </TableBody>
         </Table>
+      )}
+
+      {sourceShowingImpact && (
+        <SourceImpactDialog
+          name={sourceShowingImpact.name}
+          state={impact[sourceShowingImpact.id]}
+          onClose={() => setShowingImpact(null)}
+        />
+      )}
+
+      {sourceBeingDeleted && (
+        <DeleteSourceDialog
+          name={sourceBeingDeleted.name}
+          state={impact[sourceBeingDeleted.id]}
+          busy={busy === sourceBeingDeleted.id}
+          onConfirm={() => void remove(sourceBeingDeleted.id)}
+          onCancel={() => setConfirmingDelete(null)}
+        />
       )}
 
       {workspaceId && (

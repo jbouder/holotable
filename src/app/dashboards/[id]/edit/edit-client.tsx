@@ -3,7 +3,15 @@
 import * as React from "react";
 import { useRouter } from "next/navigation";
 import { experimental_useObject as useObject } from "@ai-sdk/react";
-import { Plus, Trash2, Save, SendHorizontal, Loader2, LayoutGrid } from "lucide-react";
+import {
+  Plus,
+  Trash2,
+  Save,
+  SendHorizontal,
+  Loader2,
+  LayoutGrid,
+  Unplug,
+} from "lucide-react";
 import {
   type Dashboard,
   Panel,
@@ -25,6 +33,8 @@ import type { SourceCatalog } from "@/lib/registry";
 import { PanelPreview, usePanelPreview } from "@/components/dashboard/PanelPreview";
 import { PanelDiffView } from "@/components/dashboard/PanelDiffView";
 import { acceptedPanel, diffPanels, type PanelDraft } from "@/lib/panel-diff";
+import { missingSourceIds, panelsUsingSource, repointPanels } from "@/lib/panel-repoint";
+import { RepointPanelsDialog } from "@/components/dashboard/RepointPanelsDialog";
 import { ErrorDisplay } from "@/components/ui/error-display";
 import { type ApiError, apiErrorFromThrown, readApiError } from "@/lib/errors";
 
@@ -81,8 +91,25 @@ export function EditDashboardClient({
     prompt: string;
     panel: Panel | null;
   } | null>(null);
+  // A re-point under review: the removed source it moves off, and the panels
+  // it covers. One panel for the editor's own call to action, every panel on
+  // that source for the bulk fix in the banner.
+  const [repointing, setRepointing] = React.useState<{
+    sourceId: string;
+    panelIds: string[];
+  } | null>(null);
 
   const selected = spec.panels.find((p) => p.id === selectedId) ?? null;
+  // Sources a panel names that the page did not load: tombstoned, deleted, or
+  // in another workspace. All three fail the save the same way, and all three
+  // are fixed by re-pointing the panels off them.
+  const missingSources = missingSourceIds(
+    spec.panels,
+    sources.map((s) => s.id),
+  );
+  const repointPanelSet = repointing
+    ? spec.panels.filter((p) => repointing.panelIds.includes(p.id))
+    : [];
   const proposalBase = proposal
     ? (spec.panels.find((p) => p.id === proposal.panelId) ?? null)
     : null;
@@ -190,6 +217,17 @@ export function EditDashboardClient({
     setNlPrompt("");
   }
 
+  /**
+   * Move the reviewed panels onto their new source. One `setSpec`, so a bulk
+   * re-point is one step to undo (#81) rather than one per panel — and nothing
+   * is written here: the change is saved by the existing Save version, which
+   * appends a version and re-validates every statement server-side.
+   */
+  function applyRepoint(input: { sourceId: string; panelIds: string[] }) {
+    setSpec((s) => ({ ...s, panels: repointPanels(s.panels, input) }));
+    setRepointing(null);
+  }
+
   async function save() {
     setSaving(true);
     setError(null);
@@ -257,6 +295,36 @@ export function EditDashboardClient({
           disabled={saving}
         />
       )}
+
+      {missingSources.map((sourceId) => {
+        const affected = panelsUsingSource(spec.panels, sourceId);
+        return (
+          <div
+            key={sourceId}
+            className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-warning/40 bg-warning/10 px-3 py-2 text-sm"
+          >
+            <p className="flex items-start gap-2">
+              <Unplug className="mt-0.5 h-4 w-4 shrink-0 text-warning" />
+              <span>
+                {affected.length}{" "}
+                {affected.length === 1 ? "panel points" : "panels point"} at{" "}
+                <code>{sourceId}</code>, which is no longer available. This dashboard
+                cannot be saved until {affected.length === 1 ? "it is" : "they are"}{" "}
+                re-pointed at another source.
+              </span>
+            </p>
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={() =>
+                setRepointing({ sourceId, panelIds: affected.map((p) => p.id) })
+              }
+            >
+              Re-point {affected.length === 1 ? "panel" : `all ${affected.length}`}
+            </Button>
+          </div>
+        );
+      })}
 
       <div
         className="flex w-fit rounded-lg border border-border bg-surface p-1"
@@ -412,6 +480,13 @@ export function EditDashboardClient({
                     panel={selected}
                     sources={sources}
                     timeRange={spec.timeRange}
+                    sourceMissing={missingSources.includes(selected.query.sourceId)}
+                    onRepoint={() =>
+                      setRepointing({
+                        sourceId: selected.query.sourceId,
+                        panelIds: [selected.id],
+                      })
+                    }
                     onChange={(fn) => updatePanel(selected.id, fn)}
                   />
                 )}
@@ -478,6 +553,16 @@ export function EditDashboardClient({
           <PreviewDashboard spec={spec} />
         </section>
       )}
+
+      {repointing && repointPanelSet.length > 0 && (
+        <RepointPanelsDialog
+          deadSourceId={repointing.sourceId}
+          panels={repointPanelSet}
+          sources={sources}
+          onApply={applyRepoint}
+          onClose={() => setRepointing(null)}
+        />
+      )}
     </div>
   );
 }
@@ -486,18 +571,40 @@ function PanelEditor({
   panel,
   sources,
   timeRange,
+  sourceMissing,
+  onRepoint,
   onChange,
 }: {
   panel: Panel;
   sources: SourceOption[];
   timeRange: Dashboard["timeRange"];
+  /** This panel's source is not among the workspace's live sources. */
+  sourceMissing: boolean;
+  onRepoint: () => void;
   onChange: (fn: (p: Panel) => Panel) => void;
 }) {
   const preview = usePanelPreview(panel, timeRange);
   const catalog = sources.find((s) => s.id === panel.query.sourceId)?.catalog ?? null;
+  // A removed source is still what the panel names, so it stays in the list
+  // rather than making the control read as some other source's panel.
+  const sourceOptions = sources.map((s) => ({ value: s.id, label: s.name }));
+  if (sourceMissing) {
+    sourceOptions.unshift({
+      value: panel.query.sourceId,
+      label: `${panel.query.sourceId} (removed)`,
+    });
+  }
 
   return (
     <div className="space-y-3">
+      {sourceMissing && (
+        <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-warning/40 bg-warning/10 px-3 py-2 text-sm">
+          <span>This panel&rsquo;s data source has been removed.</span>
+          <Button variant="secondary" size="sm" onClick={onRepoint}>
+            Re-point to another source
+          </Button>
+        </div>
+      )}
       <div className="grid grid-cols-2 gap-3">
         <div>
           <Label htmlFor="p-title">Title</Label>
@@ -514,7 +621,7 @@ function PanelEditor({
             onValueChange={(v) =>
               onChange((p) => ({ ...p, query: { ...p.query, sourceId: v } }))
             }
-            options={sources.map((s) => ({ value: s.id, label: s.name }))}
+            options={sourceOptions}
           />
         </div>
         <div>
