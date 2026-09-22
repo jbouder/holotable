@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { CheckCircle2, Loader2, Play, ShieldCheck } from "lucide-react";
+import { CheckCircle2, FileCode2, Loader2, Play, ShieldCheck } from "lucide-react";
 import type { Panel, TimeRange } from "@/lib/ir";
 import {
   type PanelQueryOutcome,
@@ -13,9 +13,11 @@ import {
   summarizeResult,
   validatePanelSql,
 } from "@/lib/panel-query";
+import { fetchQueryPlan, type PlanOutcome } from "@/lib/query-plan";
 import { Button } from "@/components/ui/button";
 import { ErrorDisplay } from "@/components/ui/error-display";
 import { PanelView, type PanelState } from "@/components/dashboard/PanelView";
+import { QueryPlanView } from "@/components/sql/QueryPlanView";
 
 /**
  * Check a panel's SQL, and run it, without saving anything.
@@ -32,15 +34,19 @@ import { PanelView, type PanelState } from "@/components/dashboard/PanelView";
  * and marks a stale result `stale`, the state `PanelView` already dims.
  */
 
-type Busy = "validate" | "run" | null;
+type Busy = "validate" | "run" | "plan" | null;
 
 export interface PanelPreviewController {
   busy: Busy;
   /** The last check, or `null` when there is none for the current statement. */
   check: SqlCheck | null;
   result: { outcome: PanelQueryOutcome; stale: boolean; at: number } | null;
+  /** The executable plan, once asked for (#110). */
+  plan: { outcome: PlanOutcome; stale: boolean } | null;
   validate: () => void;
   run: () => void;
+  /** Ask the server what it would run; nothing executes. */
+  explain: () => void;
 }
 
 export function usePanelPreview(panel: Panel, timeRange: TimeRange) {
@@ -53,6 +59,9 @@ export function usePanelPreview(panel: Panel, timeRange: TimeRange) {
     outcome: PanelQueryOutcome;
     at: number;
   } | null>(null);
+  const [plan, setPlan] = React.useState<{ key: string; outcome: PlanOutcome } | null>(
+    null,
+  );
 
   // Two presses in flight at once must not let the slower one win.
   const generation = React.useRef(0);
@@ -80,6 +89,18 @@ export function usePanelPreview(panel: Panel, timeRange: TimeRange) {
     });
   }, [query, runKey, timeRange]);
 
+  // A plan answers the same question a run does — this statement, this time
+  // field, this window — so it goes stale on exactly the same key.
+  const explain = React.useCallback(() => {
+    const seq = ++generation.current;
+    setBusy("plan");
+    void fetchQueryPlan(query, timeRange).then((outcome) => {
+      if (seq !== generation.current) return;
+      setPlan({ key: runKey, outcome });
+      setBusy(null);
+    });
+  }, [query, runKey, timeRange]);
+
   const controller: PanelPreviewController = {
     busy,
     check: check && check.key === checkKey ? check.result : null,
@@ -88,8 +109,10 @@ export function usePanelPreview(panel: Panel, timeRange: TimeRange) {
       stale: result.key !== runKey,
       at: result.at,
     },
+    plan: plan && { outcome: plan.outcome, stale: plan.key !== runKey },
     validate,
     run,
+    explain,
   };
   return controller;
 }
@@ -101,7 +124,7 @@ export function PanelPreview({
   panel: Panel;
   preview: PanelPreviewController;
 }) {
-  const { busy, check, result } = preview;
+  const { busy, check, plan, result } = preview;
 
   return (
     <div className="space-y-2">
@@ -133,8 +156,22 @@ export function PanelPreview({
           )}
           Run preview
         </Button>
+        <Button
+          variant="secondary"
+          size="sm"
+          onClick={preview.explain}
+          disabled={busy !== null}
+          title="Show the statement the server would send"
+        >
+          {busy === "plan" ? (
+            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+          ) : (
+            <FileCode2 className="h-3.5 w-3.5" />
+          )}
+          What runs
+        </Button>
         <span className="text-xs text-muted">
-          Neither saves the dashboard. Ctrl/⌘ + Enter runs the preview.
+          None of these saves the dashboard. Ctrl/⌘ + Enter runs the preview.
         </span>
       </div>
 
@@ -149,6 +186,16 @@ export function PanelPreview({
           error={check.error}
           onRetry={preview.validate}
           retryLabel="Validate again"
+          disabled={busy !== null}
+        />
+      )}
+
+      {plan?.outcome.ok && <QueryPlanView plan={plan.outcome.plan} stale={plan.stale} />}
+      {plan && !plan.outcome.ok && (
+        <ErrorDisplay
+          error={plan.outcome.error}
+          onRetry={preview.explain}
+          retryLabel="Try again"
           disabled={busy !== null}
         />
       )}

@@ -87,8 +87,10 @@ The panel editor does not make an author discover a rejection at save time.
   dashboard's current time range to `/api/query` and renders the rows through
   the same `PanelView` the dashboard uses, with the panel's own viz and format.
   `Ctrl`/`⌘` + `Enter` in the SQL field runs it.
+- **What runs** posts the same request to `/api/sql/plan` — see
+  [Seeing what actually runs](#seeing-what-actually-runs) below.
 
-Neither action touches the dashboard or writes a version, and neither is a way
+None of them touches the dashboard or writes a version, and none is a way
 around the guard: the preview is an ordinary guarded execution, and the save
 re-validates every panel regardless of what was checked here.
 
@@ -179,6 +181,42 @@ the server.
 
 Net effect: the model controls *what to compute*, but not the time window, not
 resource usage, and not which credentials or tables it can touch.
+
+## Seeing what actually runs
+
+Everything above happens to a statement after its author has stopped looking at
+it. `POST /api/sql/plan` shows the result, for one panel, without running it:
+
+- the wrapped statement as the server would send it, `LIMIT` and all;
+- the bound parameters, with the relative expression each was resolved from
+  (`$1 = 2026-09-22T11:00:00Z`, resolved from `now-1h`) and labelled as
+  server-supplied;
+- the row, time and byte limits in force;
+- the session statements the query runs inside — the read-only transaction and
+  the pinned `search_path`.
+
+It is the same route as `/api/query` with the execution removed: the same
+`validateSql`, `resolveTimeRange`, `buildExecutablePlan` and
+`sessionStatements`. Re-deriving any of them for display would let the
+explanation drift from the behaviour it explains, which is the whole point of
+showing it. Nothing connects to the source's database and nothing is written.
+
+A statement the guard refuses is a `400` with the guard's own message. Unlike
+`/api/sql/validate` there is no `{ok:false}` verdict to return, because a
+refused statement has no plan.
+
+Authorization is `/api/sql/validate`'s — `dashboard:generate` on the source's
+workspace — for the same reason: the request body carries arbitrary SQL and a
+rejection names the table or function the guard refused, so answering is the
+same catalog disclosure that previewing a query is.
+
+The response shape is an explicit allowlist (`src/lib/query-plan.ts`), like
+`panelDetails()`: a source is named by its opaque id, and no host, database,
+user or `secret_ref` has a field to travel in.
+
+It is reachable from the panel editor (**What runs**) and from the viewer's
+generated-SQL dialog, which is where a reader who did not write the panel can
+check that the window really is the server's.
 
 ## Actionable errors versus opaque ones
 

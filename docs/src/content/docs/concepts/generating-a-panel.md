@@ -94,6 +94,23 @@ time column — a `stat` scalar or a categorical breakdown — `timeField` is
 omitted entirely.
 :::
 
+## Every panel says what it computes
+
+Alongside `SQL_RULES`, the shared system prompt carries `DESCRIPTION_RULE`:
+every panel must come back with a one-sentence `description` of **what the
+query computes** — the measure, the grouping and the unit — phrased as intent.
+
+The rule is explicit that the model must never state, estimate or invent a
+result value, a threshold or a trend. It has not seen the data, and a
+description that quoted a number would be the model reporting data, which is
+the one thing it must not do.
+
+`Panel.description` has always been in the IR and is still optional, so panels
+saved before this rule existed load and render unchanged. The viewer shows the
+description behind an info control on the panel header, and the panel editor
+has a field for correcting it — a human's correction of the model's sentence is
+an ordinary spec edit.
+
 ## Streaming and the once-per-action rule
 
 `streamObject` streams the partial object to the client so the UI can render the

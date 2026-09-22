@@ -237,7 +237,12 @@ export function LiveDashboard({
         panels={spec.panels}
         empty={empty}
         renderPanel={(panel) => (
-          <PanelView panel={panel} state={states[panel.id]} paused={!live} />
+          <PanelView
+            panel={panel}
+            state={states[panel.id]}
+            paused={!live}
+            timeRange={timeRange}
+          />
         )}
       />
     </div>

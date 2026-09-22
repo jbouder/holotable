@@ -46,6 +46,7 @@ export function PreviewDashboard({ spec }: { spec: Dashboard }) {
           panel={panel}
           state={states[panel.id]}
           onRetry={() => void runPanel(panel, spec.timeRange)}
+          timeRange={spec.timeRange}
         />
       )}
     />
