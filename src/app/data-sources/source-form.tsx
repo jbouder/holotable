@@ -30,6 +30,7 @@ import {
   toggleTable,
   updateTable,
 } from "@/lib/source-form";
+import { SecretRefReadinessLine, useSecretRefReadiness } from "./secret-ref-status";
 
 /**
  * The source form: connection fields, a discovered table picker, and the JSON
@@ -94,6 +95,10 @@ export function SourceForm({
 
   const [menu, setMenu] = React.useState<TableMenu>(emptyMenu);
   const [discovering, setDiscovering] = React.useState(false);
+
+  // Readiness is reported, never enforced: an unconfigured ref still saves,
+  // because the variables are the operator's to set and may land later.
+  const readiness = useSecretRefReadiness(workspaceId, secretRef);
 
   /** Clear one field's error as soon as it is edited. */
   function edit<T>(setter: (value: T) => void, field: string) {
@@ -245,6 +250,7 @@ export function SourceForm({
             onChange={(e) => edit(setSecretRef, "secretRef")(e.target.value)}
             {...fieldAria("s-secret", errors.secretRef)}
           />
+          <SecretRefReadinessLine readiness={readiness} />
         </Field>
       </div>
 

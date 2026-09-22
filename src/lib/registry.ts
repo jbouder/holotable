@@ -1,4 +1,9 @@
 import { z } from "zod";
+import {
+  SECRET_REF_MESSAGE,
+  SECRET_REF_PATTERN,
+  secretRefEnvVars,
+} from "@/lib/secret-refs";
 
 /**
  * Source registry types.
@@ -88,9 +93,7 @@ export const SourceDraft = z
       .max(128)
       .regex(/^[a-z0-9][a-z0-9._-]*$/i, "invalid source id"),
     name: z.string().min(1).max(200),
-    secretRef: z
-      .string()
-      .regex(/^[A-Z][A-Z0-9_]*$/, "secretRef must be an UPPER_SNAKE env family"),
+    secretRef: z.string().regex(SECRET_REF_PATTERN, SECRET_REF_MESSAGE),
     config: SourceConfig,
   })
   .strict();
@@ -138,17 +141,34 @@ export interface SourceCredentials {
  * The read-only user is expected here; execution never uses a privileged user.
  */
 export function resolveCredentials(secretRef: string): SourceCredentials {
-  if (!/^[A-Z][A-Z0-9_]*$/.test(secretRef)) {
+  if (!SECRET_REF_PATTERN.test(secretRef)) {
     throw new Error(`invalid secret_ref "${secretRef}"`);
   }
-  const username = process.env[`${secretRef}_USERNAME`];
-  const password = process.env[`${secretRef}_PASSWORD`];
+  const env = secretRefEnvVars(secretRef);
+  const username = process.env[env.username];
+  const password = process.env[env.password];
   if (!username || password === undefined) {
     throw new Error(
       `credentials for secret_ref "${secretRef}" are not configured in the environment`,
     );
   }
   return { username, password };
+}
+
+/**
+ * Whether the server holds credentials for `secretRef` — a boolean, and only a
+ * boolean. This is what the readiness indicator reports, so it is deliberately
+ * the *same* call an execution makes rather than a second opinion about the
+ * environment: whatever would make `resolveCredentials` throw is exactly what
+ * makes this answer false, and no future divergence is possible.
+ */
+export function hasCredentials(secretRef: string): boolean {
+  try {
+    resolveCredentials(secretRef);
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 /**

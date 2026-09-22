@@ -183,6 +183,7 @@ default single-instance setup these are the same TimescaleDB database.
 | `/api/sources/[id]/test` | POST | Connectivity test |
 | `/api/sources/[id]/refresh` | POST | Re-introspect catalog |
 | `/api/sources/discover` | POST | List the tables and columns a prospective source's read-only user can see, to pick an allowlist from (nothing is persisted) |
+| `/api/secret-refs/[ref]/status` | GET | Whether the server holds credentials for a `secret_ref`; a boolean only (`source:manage`) |
 | `/api/auth/login` · `/callback` · `/logout` | | OIDC session |
 | `/api/health` · `/api/ready` | GET | Liveness and readiness probes (no auth) |
 | `/api/metrics` | GET | Prometheus scrape; `404` until `METRICS_TOKEN` or `METRICS_ALLOWED_CIDRS` is set |
@@ -201,8 +202,11 @@ and the `secret_ref` *name* — and is prompted to ignore any password in the
 description. Credentials must already exist in the server environment for the
 named `secret_ref`; a drafted or hand-created source whose `secret_ref` is
 unconfigured saves fine but fails on **Test** until those env vars are set. The
-draft is a starting point: run **Test** and **Refresh** to pull the live column
-catalog before relying on it.
+source form and the source list show that readiness up front — a check when the
+server holds credentials, a warning naming the two variables to set when it does
+not — so the gap is visible before Test. Saving anyway is allowed. The draft is
+a starting point: run **Test** and **Refresh** to pull the live column catalog
+before relying on it.
 
 ## Configuration
 
