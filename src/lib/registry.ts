@@ -123,6 +123,19 @@ export interface SourceRecord {
   kind: string;
   config: SourceConfig;
   secretRef: string;
+  /**
+   * When the catalog was last introspected against the live database, or null
+   * if it never has been. A drafted or hand-written catalog starts here, and
+   * `src/lib/catalog/health.ts` is what turns that null into a refusal.
+   */
+  catalogRefreshedAt: string | null;
+  /**
+   * Allowlisted tables the last refresh could not find in the database. The
+   * allowlist itself is the author's and a refresh never edits it, so drift is
+   * recorded here instead of silently dropping the table or keeping its
+   * columns as if they were still true.
+   */
+  catalogMissingTables: string[];
   createdBy: string;
   createdAt: string;
   updatedAt: string;

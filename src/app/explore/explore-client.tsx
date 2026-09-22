@@ -15,6 +15,11 @@ import { buildChartOption, type PanelData } from "@/components/charts/options";
 import { ErrorDisplay } from "@/components/ui/error-display";
 import { type ApiError, apiErrorFromThrown } from "@/lib/errors";
 import { EMPTY_ROWS, runPanelQuery } from "@/lib/panel-query";
+import type { CatalogHealth } from "@/lib/catalog/health";
+import {
+  CatalogHealthNotice,
+  useCatalogRefresh,
+} from "@/components/sources/catalog-health";
 import { formatValue } from "@/lib/format";
 import { SavePanelDialog, type SavedPanel } from "./save-panel-dialog";
 
@@ -22,6 +27,10 @@ interface SourceOption {
   id: string;
   name: string;
   workspaceId: string;
+  /** Server-decided; the same judgement `/api/generate` refuses on. */
+  catalog: CatalogHealth;
+  /** Whether this caller may refresh it, i.e. holds `source:manage` here. */
+  canRefresh: boolean;
 }
 
 type Status = "loading" | "done" | "error";
@@ -71,6 +80,10 @@ export function ExploreClient({
   const [result, setResult] = React.useState<Result | null>(null);
   const [saveOpen, setSaveOpen] = React.useState(false);
   const [saved, setSaved] = React.useState<SavedPanel | null>(null);
+  // Catalog state for the picker, corrected in place by a Refresh from here.
+  const catalog = useCatalogRefresh(
+    Object.fromEntries(sources.map((s) => [s.id, s.catalog])),
+  );
 
   const runQuery = React.useCallback(async (p: Panel, timeRange: TimeRange) => {
     setResult({ data: EMPTY_ROWS, status: "loading" });
@@ -165,6 +178,16 @@ export function ExploreClient({
               />
             </div>
           </div>
+          {source && (
+            <CatalogHealthNotice
+              source={source}
+              health={catalog.health[source.id]}
+              canRefresh={source.canRefresh}
+              busy={catalog.busy === source.id}
+              error={catalog.error[source.id] || null}
+              onRefresh={() => void catalog.refresh(source.id)}
+            />
+          )}
           <div>
             <Label htmlFor="prompt">Ask a question or try one below</Label>
             <div className="mb-2 flex flex-wrap items-center gap-2">

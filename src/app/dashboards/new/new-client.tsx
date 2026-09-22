@@ -21,11 +21,20 @@ import { Badge } from "@/components/ui/badge";
 import { PreviewDashboard } from "@/components/dashboard/PreviewDashboard";
 import { ErrorDisplay } from "@/components/ui/error-display";
 import { type ApiError, apiErrorFromThrown, readApiError } from "@/lib/errors";
+import type { CatalogHealth } from "@/lib/catalog/health";
+import {
+  CatalogHealthNotice,
+  useCatalogRefresh,
+} from "@/components/sources/catalog-health";
 
 interface SourceOption {
   id: string;
   name: string;
   workspaceId: string;
+  /** Server-decided; the same judgement `/api/generate` refuses on. */
+  catalog: CatalogHealth;
+  /** Whether this caller may refresh it, i.e. holds `source:manage` here. */
+  canRefresh: boolean;
 }
 
 /** Starter prompts to seed the textarea with one click. */
@@ -51,6 +60,11 @@ export function NewDashboardClient({
   const [history, setHistory] = React.useState<TurnHistory>(EMPTY_HISTORY);
   const [saveError, setSaveError] = React.useState<ApiError | null>(null);
   const [saving, setSaving] = React.useState(false);
+  // Catalog state for the picker, corrected in place by a Refresh from here.
+  const catalog = useCatalogRefresh(
+    Object.fromEntries(sources.map((s) => [s.id, s.catalog])),
+  );
+  const source = sources.find((s) => s.id === sourceId);
 
   // The instruction that produced the run in flight, so the finished turn is
   // labelled with what was actually asked rather than whatever is in the box by
@@ -209,6 +223,16 @@ export function NewDashboardClient({
                   </p>
                 )}
               </div>
+              {source && (
+                <CatalogHealthNotice
+                  source={source}
+                  health={catalog.health[source.id]}
+                  canRefresh={source.canRefresh}
+                  busy={catalog.busy === source.id}
+                  error={catalog.error[source.id] || null}
+                  onRefresh={() => void catalog.refresh(source.id)}
+                />
+              )}
               <div>
                 <Label htmlFor="prompt">
                   {refining

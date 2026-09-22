@@ -2,6 +2,7 @@ import { z } from "zod";
 import { requireIdentity, assertAuthorized, HttpError } from "@/lib/auth/authorize";
 import { readJson, json, route } from "@/lib/http";
 import { listSources, createSource } from "@/lib/db/repo";
+import { catalogHealth } from "@/lib/catalog/health";
 import { SourceDraft } from "@/lib/registry";
 
 export const runtime = "nodejs";
@@ -10,6 +11,10 @@ export const runtime = "nodejs";
  * List sources in a workspace. The `workspaceId` query param scopes the query,
  * but access is authorized against the caller's identity for that workspace
  * (never granted merely because a workspace was named).
+ *
+ * `catalogHealth` is decided here rather than in the browser so the list, the
+ * pickers and the refusal in `/api/generate` all read the same judgement from
+ * the same `CATALOG_STALE_AFTER_DAYS`.
  */
 export const GET = route("sources.list", async (req: Request) => {
   const identity = await requireIdentity();
@@ -18,7 +23,10 @@ export const GET = route("sources.list", async (req: Request) => {
 
   assertAuthorized(identity, "source:use", { workspaceId });
   const sources = await listSources(workspaceId);
-  return json({ sources });
+  return json({
+    sources,
+    catalogHealth: Object.fromEntries(sources.map((s) => [s.id, catalogHealth(s)])),
+  });
 });
 
 // The create body IS a drafted source plus the target workspace, so the

@@ -12,6 +12,8 @@ import {
   SendHorizontal,
 } from "lucide-react";
 import { SourceDraft, type SourceRecord } from "@/lib/registry";
+import { type CatalogHealth, describeCatalogHealth } from "@/lib/catalog/health";
+import { CatalogHealthBadge } from "@/components/sources/catalog-health";
 import { Button } from "@/components/ui/button";
 import { Textarea, Label } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
@@ -46,6 +48,9 @@ export function SourcesClient({ workspaces }: { workspaces: string[] }) {
   // Workspace switching is hidden for now; pin to the first accessible workspace.
   const [workspaceId] = React.useState<string | null>(workspaces[0] ?? null);
   const [sources, setSources] = React.useState<SourceRecord[] | null>(null);
+  // Decided by the server (the staleness threshold is an environment setting),
+  // keyed by source id, and replaced wholesale on every reload.
+  const [catalog, setCatalog] = React.useState<Record<string, CatalogHealth>>({});
   const [busy, setBusy] = React.useState<string | null>(null);
   const [editing, setEditing] = React.useState<string | null>(null);
   const [creating, setCreating] = React.useState(false);
@@ -59,6 +64,7 @@ export function SourcesClient({ workspaces }: { workspaces: string[] }) {
     const res = await fetch(`/api/sources?workspaceId=${encodeURIComponent(ws)}`);
     const body = await res.json();
     setSources(res.ok ? body.sources : []);
+    setCatalog(res.ok ? (body.catalogHealth ?? {}) : {});
   }, []);
 
   React.useEffect(() => {
@@ -69,7 +75,9 @@ export function SourcesClient({ workspaces }: { workspaces: string[] }) {
         `/api/sources?workspaceId=${encodeURIComponent(workspaceId)}`,
       );
       const body = await res.json();
-      if (active) setSources(res.ok ? body.sources : []);
+      if (!active) return;
+      setSources(res.ok ? body.sources : []);
+      setCatalog(res.ok ? (body.catalogHealth ?? {}) : {});
     })();
     return () => {
       active = false;
@@ -84,10 +92,22 @@ export function SourcesClient({ workspaces }: { workspaces: string[] }) {
     setBusy(null);
   }
 
+  // A refresh reports what it found, not merely that it ran: a table the
+  // database no longer has is the whole reason to press this button, and the
+  // old "catalog refreshed" said the same thing whether one had gone or not.
   async function refresh(id: string) {
     setBusy(id);
     const res = await fetch(`/api/sources/${id}/refresh`, { method: "POST" });
-    setNotice(res.ok ? `${id}: catalog refreshed` : `${id}: refresh failed`);
+    const body = await res.json().catch(() => null);
+    const health: CatalogHealth | undefined = body?.catalogHealth;
+    const source = sources?.find((s) => s.id === id);
+    setNotice(
+      !res.ok
+        ? `${id}: refresh failed`
+        : health && source
+          ? describeCatalogHealth(source, health)
+          : `${id}: catalog refreshed`,
+    );
     setBusy(null);
     if (workspaceId) void load(workspaceId);
   }
@@ -175,6 +195,7 @@ export function SourcesClient({ workspaces }: { workspaces: string[] }) {
               <TableHeader>Endpoint</TableHeader>
               <TableHeader>Schema</TableHeader>
               <TableHeader>Tables</TableHeader>
+              <TableHeader>Catalog</TableHeader>
               <TableHeader>Used by</TableHeader>
               <TableHeader>Credentials</TableHeader>
               <TableHeader>Status</TableHeader>
@@ -193,6 +214,9 @@ export function SourcesClient({ workspaces }: { workspaces: string[] }) {
                 </TableCell>
                 <TableCell>{source.config.schema}</TableCell>
                 <TableCell>{source.config.tables.length}</TableCell>
+                <TableCell>
+                  <CatalogHealthBadge source={source} health={catalog[source.id]} />
+                </TableCell>
                 <TableCell>
                   <ImpactCell
                     state={impact[source.id]}

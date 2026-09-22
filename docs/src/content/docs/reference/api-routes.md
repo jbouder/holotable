@@ -25,7 +25,7 @@ All routes run on the Node runtime. Every one resolves identity with
 
 | Route | Method | Min role | Notes |
 | --- | --- | --- | --- |
-| `/api/generate` | POST | editor | Streams a validated dashboard, panel, or explore-panel spec. Authorized against the workspace owning the selected **source**. Rate limited and budgeted |
+| `/api/generate` | POST | editor | Streams a validated dashboard, panel, or explore-panel spec. Authorized against the workspace owning the selected **source**. Refuses with a 400 when that source's catalog was never refreshed or names nothing that still exists. Rate limited and budgeted |
 | `/api/query` | POST | editor | One-shot guarded query for preview and Explore |
 | `/api/sql/validate` | POST | editor | Runs the SQL guard against a source's catalog without executing. Always `200`; the verdict is `{ ok, error? }` |
 
@@ -33,13 +33,13 @@ All routes run on the Node runtime. Every one resolves identity with
 
 | Route | Method | Min role | Notes |
 | --- | --- | --- | --- |
-| `/api/sources` | GET | viewer | List sources in a workspace |
+| `/api/sources` | GET | viewer | List sources in a workspace, each with its catalog health |
 | `/api/sources` | POST | source-admin | Create |
 | `/api/sources/generate` | POST | editor | Streams a validated `SourceDraft` — never credentials. Rate limited and budgeted |
 | `/api/sources/[id]` | GET/PUT/DELETE | source-admin | Delete tombstones when referenced |
 | `/api/sources/[id]/impact` | GET | source-admin | Dashboards and panels currently referencing the source, scoped to its workspace |
 | `/api/sources/[id]/test` | POST | source-admin | Connectivity test |
-| `/api/sources/[id]/refresh` | POST | source-admin | Re-introspect the catalog |
+| `/api/sources/[id]/refresh` | POST | source-admin | Re-introspect the catalog; records freshness and any allowlisted table the database no longer has |
 
 ## Auth
 

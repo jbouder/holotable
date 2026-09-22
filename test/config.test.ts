@@ -234,6 +234,7 @@ test("malformed values are errors regardless of environment", () => {
     MAX_QUERY_ROWS: "lots",
     MAX_RESULT_BYTES: "0",
     QUERY_TIMEOUT_SECONDS: "-5",
+    CATALOG_STALE_AFTER_DAYS: "-1",
     SHUTDOWN_GRACE_MS: "forever",
     DEFAULT_TIME_FROM: "yesterday-ish",
     SESSION_COOKIE_NAME: "has space",
@@ -245,6 +246,17 @@ test("malformed values are errors regardless of environment", () => {
   }
   // A malformed value is reported once, for its shape, not again as missing.
   assert.equal(e.filter((v) => v === "DATABASE_URL").length, 1);
+});
+
+test("a catalog staleness threshold of zero is allowed and disables the check", () => {
+  // Unlike the other numeric limits, 0 is meaningful here: it turns off the
+  // age warning while leaving the never-refreshed refusal in place.
+  assert.deepEqual(
+    validateConfig({ CATALOG_STALE_AFTER_DAYS: "0" }, { production: false }).filter(
+      (p) => p.variable === "CATALOG_STALE_AFTER_DAYS",
+    ),
+    [],
+  );
 });
 
 test("a minimum refresh interval above the default is an error", () => {

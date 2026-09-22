@@ -22,6 +22,12 @@ Referenced sources are **tombstoned** rather than deleted, so dashboards
 referencing them keep resolving to a tombstone marker instead of breaking
 silently.
 
+`catalog_refreshed_at` and `catalog_missing_tables` sit beside `config` rather
+than inside it: `config` is the allowlist its author owns and the browser is
+shown, while these two are what the last introspection found. They are what
+[catalog health](/concepts/generating-a-panel/) is computed from, and only
+`POST /api/sources/[id]/refresh` writes them.
+
 ### `dashboards`
 
 Identity: `workspace_id`, `title`, `created_by`, `current_version_id`,

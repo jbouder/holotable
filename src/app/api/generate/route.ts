@@ -8,6 +8,7 @@ import {
   streamPanel,
   streamExplorePanel,
 } from "@/lib/ai/generate";
+import { catalogHealth, catalogRefusal } from "@/lib/catalog/health";
 import { enforceLlmLimits } from "@/lib/limits/llm";
 import { Dashboard, Panel } from "@/lib/ir";
 
@@ -43,8 +44,14 @@ const Body = z.discriminatedUnion("mode", [
  * Generate a dashboard/panel spec via the LLM. Runs the model exactly once.
  * Authorization: editor on the workspace that OWNS the selected source (the
  * workspace is derived from the trusted source record, never from the request).
- * Then the workspace's rate limit and token budget are enforced; over either,
- * the request is refused with 429 before the model is called.
+ * Then the catalog is checked, and the workspace's rate limit and token budget
+ * are enforced; over either, the request is refused with 429 before the model
+ * is called.
+ *
+ * The catalog check comes before the limits deliberately: a source whose
+ * tables were never verified cannot produce working SQL, and spending a
+ * workspace's rate allowance to be told so is the wrong order. The refusal is
+ * a 400 that names the source and the fix.
  */
 export const POST = route("generate", async (req: Request) => {
   const identity = await requireIdentity();
@@ -58,6 +65,10 @@ export const POST = route("generate", async (req: Request) => {
   assertAuthorized(identity, "dashboard:generate", {
     workspaceId: source.workspaceId,
   });
+
+  const refusal = catalogRefusal(source, catalogHealth(source));
+  if (refusal) throw new HttpError(400, refusal);
+
   const usage = await enforceLlmLimits({
     identity,
     workspaceId: source.workspaceId,

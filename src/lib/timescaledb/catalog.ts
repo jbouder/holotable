@@ -1,5 +1,6 @@
 import { Client } from "pg";
 import { fenceUntrustedBlock, sanitizePromptField } from "@/lib/ai/untrusted";
+import { liveCatalogTables } from "@/lib/catalog/health";
 import {
   resolveCredentials,
   CatalogColumn,
@@ -33,6 +34,12 @@ const MAX = {
  * a line or exceed its schema maximum. Callers fence the result with
  * {@link fenceUntrustedBlock}; use {@link buildCatalogPrompt} for the common
  * single-source case. Exported for testing.
+ *
+ * A table the last refresh could not find is omitted. Its columns are the last
+ * ones it had, not the ones it has, and describing them to the model is how a
+ * dropped table turns into confident SQL against a relation that is gone. It
+ * stays in the allowlist — only the author edits that — so nothing here
+ * widens what the guard permits.
  */
 export function renderCatalog(source: SourceRecord): string {
   const f = sanitizePromptField;
@@ -43,7 +50,7 @@ export function renderCatalog(source: SourceRecord): string {
   lines.push(`Database: ${f(source.config.database, MAX.database)}`);
   lines.push(`Schema: ${f(source.config.schema, MAX.schema)}`);
   lines.push("Tables (only these may be queried):");
-  for (const table of source.config.tables) {
+  for (const table of liveCatalogTables(source)) {
     const description = table.description
       ? ` -- ${f(table.description, MAX.tableDescription)}`
       : "";
@@ -137,16 +144,36 @@ export async function discoverTables(
   }
 }
 
+/** What a refresh found: the re-read catalog, and what it could not find. */
+export interface CatalogRefresh {
+  config: SourceConfig;
+  /**
+   * Allowlisted tables `information_schema` returned no column for — dropped,
+   * renamed, or no longer readable by the source's read-only role.
+   */
+  missingTables: string[];
+}
+
 /**
  * Refresh column metadata for the existing table allowlist. This never expands
- * the set of tables available to generated SQL.
+ * the set of tables available to generated SQL, and it never shrinks it
+ * either: the allowlist is its author's, and a table that has gone missing is
+ * *reported* rather than dropped, because a revoked grant and a dropped table
+ * look identical from here and only one of them should cost the author their
+ * configuration.
+ *
+ * A missing table keeps its last known columns in the stored config so the
+ * author can still see what it was, but it is recorded in `missingTables`,
+ * which is what makes the source read `drifted` and what keeps those columns
+ * out of the prompt (see {@link renderCatalog}).
  */
-export async function refreshCatalog(source: SourceRecord): Promise<SourceConfig> {
+export async function refreshCatalog(source: SourceRecord): Promise<CatalogRefresh> {
   const client = catalogClient(source.config, source.secretRef);
 
   await client.connect();
   try {
     const tables: CatalogTable[] = [];
+    const missingTables: string[] = [];
     for (const existing of source.config.tables) {
       const result = await client.query<{ column_name: string; data_type: string }>(
         `SELECT column_name, data_type
@@ -155,6 +182,7 @@ export async function refreshCatalog(source: SourceRecord): Promise<SourceConfig
           ORDER BY ordinal_position`,
         [source.config.database, source.config.schema, existing.name],
       );
+      if (result.rows.length === 0) missingTables.push(existing.name);
       tables.push({
         name: existing.name,
         description: existing.description,
@@ -168,7 +196,7 @@ export async function refreshCatalog(source: SourceRecord): Promise<SourceConfig
             : existing.columns,
       });
     }
-    return SourceConfig.parse({ ...source.config, tables });
+    return { config: SourceConfig.parse({ ...source.config, tables }), missingTables };
   } finally {
     await client.end();
   }
