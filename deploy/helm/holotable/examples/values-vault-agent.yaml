@@ -1,0 +1,86 @@
+# Wiring 2 of 3 — HashiCorp Vault, through the Agent injector.
+#
+# The injector writes a rendered file into the pod; it cannot set environment
+# variables on its own. The app reads credentials from the environment, so the
+# template renders `export` lines and the container's entrypoint sources them
+# before exec'ing the server. That is the whole trick, and it is why `app.command`
+# exists.
+#
+# Nothing here is a credential: the pod authenticates to Vault as its
+# ServiceAccount and the values are fetched at start.
+#
+#   helm install holotable deploy/helm/holotable -f values-vault-agent.yaml
+#
+# Prefer the Vault Secrets Operator if you run it: it syncs a Vault path into a
+# Kubernetes Secret, and then this is wiring 1 with `secrets.existingSecret`
+# pointing at the synced Secret — no entrypoint wrapper, no file to source.
+
+serviceAccount:
+  create: true
+  # The Kubernetes auth role bound to this ServiceAccount in Vault.
+  annotations: {}
+
+podAnnotations:
+  vault.hashicorp.com/agent-inject: "true"
+  vault.hashicorp.com/role: holotable
+  vault.hashicorp.com/agent-inject-secret-env: secret/data/holotable
+  # One `export` per line, sourced by the entrypoint below. Quoting matters:
+  # a password with a space in it has to survive the shell.
+  vault.hashicorp.com/agent-inject-template-env: |
+    {{- with secret "secret/data/holotable" -}}
+    export SESSION_SECRET='{{ .Data.data.session_secret }}'
+    export DATABASE_URL='{{ .Data.data.database_url }}'
+    export OIDC_CLIENT_SECRET='{{ .Data.data.oidc_client_secret }}'
+    export OPENAI_API_KEY='{{ .Data.data.openai_api_key }}'
+    export TS_METRICS_USERNAME='{{ .Data.data.ts_metrics_username }}'
+    export TS_METRICS_PASSWORD='{{ .Data.data.ts_metrics_password }}'
+    {{- end }}
+
+app:
+  # `exec` so the server is still PID 1's child and receives SIGTERM directly —
+  # without it the shell swallows the signal and the drain never starts.
+  command:
+    - /bin/sh
+    - -c
+    - . /vault/secrets/env && exec node server.js
+
+# The migration Job needs DATABASE_URL too, and it runs as a pre-install hook —
+# before the app pod exists. So it gets its own injection, its own
+# ServiceAccount (the Vault role binds to this name), and the same wrapper.
+migrations:
+  serviceAccount:
+    create: true
+    # name: holotable-migrate      # what the Vault Kubernetes auth role binds to
+  podAnnotations:
+    vault.hashicorp.com/agent-inject: "true"
+    # A Job must not be kept alive by a sidecar that never exits.
+    vault.hashicorp.com/agent-pre-populate-only: "true"
+    vault.hashicorp.com/role: holotable
+    vault.hashicorp.com/agent-inject-secret-env: secret/data/holotable
+    vault.hashicorp.com/agent-inject-template-env: |
+      {{- with secret "secret/data/holotable" -}}
+      export DATABASE_URL='{{ .Data.data.database_url }}'
+      {{- end }}
+  command:
+    - /bin/sh
+    - -c
+    - . /vault/secrets/env && exec node node_modules/.bin/tsx scripts/migrate.ts
+
+config:
+  OIDC_ISSUER: https://kc.example.com/realms/holotable
+  OIDC_CLIENT_ID: holotable
+  OIDC_JWKS_URL: https://kc.example.com/realms/holotable/protocol/openid-connect/certs
+  OIDC_REDIRECT_URI: https://holotable.example.com/api/auth/callback
+  AI_PROVIDER: openai-compatible
+  OPENAI_BASE_URL: https://openrouter.ai/api/v1
+  AI_MODEL: openai/gpt-4o-mini
+
+# The injector adds its own sidecar and memory-backed volume; it does not need
+# the app container's root filesystem to be writable.
+securityContext:
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: true
+  privileged: false
+  capabilities:
+    drop:
+      - ALL

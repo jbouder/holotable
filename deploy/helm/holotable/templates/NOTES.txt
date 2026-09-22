@@ -1,0 +1,54 @@
+Holotable {{ .Chart.AppVersion }} is installed as {{ include "holotable.fullname" . }}.
+
+Reach it:
+{{- if .Values.ingress.enabled }}
+{{- range .Values.ingress.hosts }}
+  http{{ if $.Values.ingress.tls }}s{{ end }}://{{ .host }}
+{{- end }}
+{{- else }}
+  kubectl --namespace {{ .Release.Namespace }} port-forward svc/{{ include "holotable.fullname" . }} 3000:{{ .Values.service.port }}
+  open http://localhost:3000
+{{- end }}
+
+Check it:
+  kubectl --namespace {{ .Release.Namespace }} get pods -l app.kubernetes.io/instance={{ .Release.Name }}
+  kubectl --namespace {{ .Release.Namespace }} exec deploy/{{ include "holotable.fullname" . }} -- \
+    node -e "fetch('http://127.0.0.1:{{ .Values.app.port }}/api/ready').then(r=>r.text()).then(console.log)"
+
+{{- if not (include "holotable.secretName" .) }}
+
+WARNING: no credential source is configured.
+
+  Neither secrets.existingSecret nor secrets.create is set, so the pod has no
+  SESSION_SECRET and no DATABASE_URL. Its startup validation will refuse to
+  boot and say so in the log — which is the intended behaviour, not a crash to
+  debug. Create a Secret holding the credential environment and set
+  secrets.existingSecret to its name. The chart README has all three wirings.
+{{- end }}
+
+{{- if or .Values.autoscaling.enabled (gt (int .Values.replicaCount) 1) }}
+
+WARNING: this release runs more than one app replica.
+
+  The poller is process-local: each replica polls every dashboard it has a
+  subscriber for, so TimescaleDB sees the load multiplied, and two viewers of
+  one dashboard can see different data. Safe horizontal scaling is
+  https://github.com/jbouder/holotable/issues/40. Until it lands, keep
+  replicaCount at 1 and autoscaling disabled.
+{{- end }}
+
+{{- if and .Values.podDisruptionBudget.enabled (eq (int .Values.replicaCount) 1) .Values.podDisruptionBudget.minAvailable (not .Values.autoscaling.enabled) }}
+
+WARNING: a PodDisruptionBudget of minAvailable {{ .Values.podDisruptionBudget.minAvailable }} over a single
+replica blocks voluntary disruption entirely: `kubectl drain` on this node will
+wait forever. Either run more replicas (see above) or set
+podDisruptionBudget.maxUnavailable: 1 instead.
+{{- end }}
+
+{{- if not .Values.migrations.enabled }}
+
+NOTE: migrations.enabled is false, so no schema migration ran. Apply them
+yourself before the new pods serve traffic:
+  kubectl --namespace {{ .Release.Namespace }} run holotable-migrate --rm -i --restart=Never \
+    --image={{ include "holotable.migrateImage" . }} --env=DATABASE_URL=...
+{{- end }}

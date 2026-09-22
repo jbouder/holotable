@@ -61,6 +61,8 @@ Key locations:
 - `docs/` — the Astro + Starlight documentation site (its own `package.json`;
   content under `docs/src/content/docs/`)
 - `timescaledb/` — database bootstrap/schema assets
+- `deploy/` — the Helm chart (`deploy/helm/holotable/`, with runnable example
+  values under `examples/`) and a reference Argo CD `Application`
 - `.github/` — CI workflows, issue forms, the pull request template, `CODEOWNERS`
 
 Important files:
@@ -285,8 +287,8 @@ Before finalizing code changes, run the checks relevant to your change:
 - `npm run build` for framework/build-sensitive changes
 
 CI (`.github/workflows/ci.yml`) runs all four on every pull request, plus a
-Docker image build, and they are required to merge. Three constraints they
-enforce that are easy to break accidentally:
+Docker image build and a Helm lint/template pass, and they are required to
+merge. Four constraints they enforce that are easy to break accidentally:
 
 - `lint` is **Biome**, linter and formatter in one tool, configured entirely in
   `biome.json`. CI runs `biome ci`, which never writes, so an unformatted file
@@ -301,6 +303,13 @@ enforce that are easy to break accidentally:
   secret, the change is wrong. Startup validation (`validateConfig` in
   `src/lib/config.ts`, run from `src/instrumentation.ts`) is a runtime concern
   and is skipped during the build phase on purpose.
+- The `Helm chart` job renders `deploy/helm/holotable` with its defaults, with
+  each example values file, and with every optional object enabled, and then
+  asserts that two *bad* renders still fail: a credential under `.Values.config`
+  (which would land in a ConfigMap in clear text) and a
+  `terminationGracePeriodSeconds` below the drain budget (which would make the
+  kubelet `SIGKILL` the server mid-drain). Those two guards are `fail` calls in
+  the templates; if you change them, change the assertions with them.
 - The server refuses to boot on an invalid configuration. When a change reads a
   new environment variable, add it to `EnvSchema`/`validateConfig` with a
   message that names the variable and what to do, keep a *missing* value a

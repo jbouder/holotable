@@ -76,6 +76,7 @@ export default defineConfig({
             { label: "Prometheus metrics", slug: "operations/metrics" },
             { label: "Structured logging", slug: "operations/logging" },
             { label: "Database migrations", slug: "operations/migrations" },
+            { label: "Deploying on Kubernetes", slug: "operations/kubernetes" },
           ],
         },
         {

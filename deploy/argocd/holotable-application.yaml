@@ -1,0 +1,86 @@
+# A reference Argo CD Application for the chart in ../helm/holotable.
+#
+# Copy it, point `repoURL` at your fork or at the repository that holds your
+# values, and apply it to the namespace Argo CD runs in. It is an example, not
+# something this repository deploys.
+#
+# Two things carry over from the chart:
+#
+#   * The migration Job is a `pre-install,pre-upgrade` Helm hook. Argo CD reads
+#     Helm hooks and runs it as a PreSync resource, so a sync that would deploy
+#     code needing an unapplied migration fails before the Deployment is
+#     touched. Nothing extra to configure.
+#   * Credentials are not here. `secrets.existingSecret` names a Secret that
+#     something else — a sealed secret, the Vault Secrets Operator, the Secrets
+#     Store CSI driver — puts in the namespace. Nothing in this file or in the
+#     chart's values may be a credential, and the chart refuses to render if a
+#     credential is set as plain config.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: holotable
+  namespace: argocd
+  finalizers:
+    # Delete the workloads when the Application is deleted, rather than
+    # orphaning them.
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+
+  source:
+    repoURL: https://github.com/jbouder/holotable.git
+    # Track a tag or a commit in a real deployment; HEAD of a branch means the
+    # cluster changes when someone merges.
+    targetRevision: main
+    path: deploy/helm/holotable
+    helm:
+      releaseName: holotable
+      # Values that live in git alongside this file. Anything secret is
+      # referenced by name, never inlined.
+      valuesObject:
+        image:
+          repository: ghcr.io/jbouder/holotable
+          # Pin by digest so a re-sync cannot quietly pull different bytes.
+          tag: "0.1.0"
+        secrets:
+          existingSecret: holotable-env
+        config:
+          OIDC_ISSUER: https://kc.example.com/realms/holotable
+          OIDC_CLIENT_ID: holotable
+          OIDC_JWKS_URL: https://kc.example.com/realms/holotable/protocol/openid-connect/certs
+          OIDC_REDIRECT_URI: https://holotable.example.com/api/auth/callback
+          AI_PROVIDER: openai-compatible
+          OPENAI_BASE_URL: https://openrouter.ai/api/v1
+          AI_MODEL: openai/gpt-4o-mini
+        ingress:
+          enabled: true
+          className: nginx
+          hosts:
+            - host: holotable.example.com
+              paths:
+                - path: /
+                  pathType: Prefix
+          tls:
+            - secretName: holotable-tls
+              hosts:
+                - holotable.example.com
+
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: holotable
+
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      # Server-side apply keeps large annotations (and a third party's edits to
+      # the Ingress) from fighting the last-applied-configuration annotation.
+      - ServerSideApply=true
+    retry:
+      limit: 3
+      backoff:
+        duration: 20s
+        factor: 2
+        maxDuration: 5m

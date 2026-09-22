@@ -196,6 +196,76 @@ jobs:
         env:
           MIGRATE_TEST_DATABASE_URL: ${{ env.DATABASE_URL }}
 
+  helm:
+    name: Helm chart
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: azure/setup-helm@v4
+        with:
+          # Pinned so a chart that renders here renders the same next week.
+          # The chart itself is apiVersion v2 and uses nothing newer than
+          # Kubernetes 1.25 APIs, so Helm 4 renders it identically.
+          version: v3.16.4
+
+      - name: Lint
+        run: helm lint deploy/helm/holotable
+
+      # The default values must render: a chart that needs a values file to
+      # produce valid YAML cannot be inspected by anyone evaluating it.
+      - name: Template with defaults
+        run: helm template holotable deploy/helm/holotable > /dev/null
+
+      # The three secret wirings in the chart README are runnable values files,
+      # not prose. This is what keeps them that way.
+      - name: Template every example
+        run: |
+          for f in deploy/helm/holotable/examples/*.yaml; do
+            echo "::group::$f"
+            helm template holotable deploy/helm/holotable -f "$f" > /dev/null
+            echo "::endgroup::"
+          done
+
+      # Every optional object at once: Ingress, HPA, PDB, NetworkPolicy, and a
+      # chart-managed Secret, which no other rendering above reaches.
+      - name: Template every optional object
+        run: |
+          helm template holotable deploy/helm/holotable \
+            --set ingress.enabled=true \
+            --set autoscaling.enabled=true \
+            --set podDisruptionBudget.enabled=true \
+            --set podDisruptionBudget.minAvailable=null \
+            --set podDisruptionBudget.maxUnavailable=1 \
+            --set networkPolicy.enabled=true \
+            --set networkPolicy.ingressFrom[0].namespaceSelector.matchLabels."kubernetes\.io/metadata\.name"=ingress-nginx \
+            --set secrets.create=true \
+            --set secrets.values.SESSION_SECRET=not-a-real-secret \
+            > /dev/null
+
+      # The guard that keeps invariant 5 (no credential in a client-visible or
+      # cluster-readable payload) true for the chart: `config` becomes a
+      # ConfigMap, so a credential there is readable by anyone who can read the
+      # namespace. The render must refuse.
+      - name: A credential in `config` fails the render
+        run: |
+          if helm template holotable deploy/helm/holotable \
+            --set config.SESSION_SECRET=oops > /dev/null 2>&1; then
+            echo "::error::a credential in .Values.config rendered instead of failing"
+            exit 1
+          fi
+
+      # The other render-time guard: a grace period below the drain budget
+      # means the kubelet SIGKILLs the server mid-drain, which silently undoes
+      # the graceful shutdown the probes and preStop hook are there to deliver.
+      - name: A grace period below the drain budget fails the render
+        run: |
+          if helm template holotable deploy/helm/holotable \
+            --set terminationGracePeriodSeconds=5 > /dev/null 2>&1; then
+            echo "::error::terminationGracePeriodSeconds below the drain budget rendered instead of failing"
+            exit 1
+          fi
+
   build:
     name: Build
     runs-on: ubuntu-latest

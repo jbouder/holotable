@@ -1,0 +1,47 @@
+{{- if .Values.networkPolicy.enabled }}
+# Default-deny in both directions for the app pod, with holes for the peers you
+# name. The app's egress is small and known — the config store, the metrics
+# store, Keycloak, and the model provider — which is what makes a policy worth
+# writing: an injected query cannot be turned into a call to somewhere else.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "holotable.fullname" . }}
+  labels:
+    {{- include "holotable.labels" . | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+      {{- include "holotable.selectorLabels" . | nindent 6 }}
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    {{- if .Values.networkPolicy.ingressFrom }}
+    - from:
+        {{- toYaml .Values.networkPolicy.ingressFrom | nindent 8 }}
+      ports:
+        - protocol: TCP
+          port: {{ .Values.app.port }}
+    {{- else }}
+    # networkPolicy.ingressFrom is empty, so nothing may reach the app. That is
+    # a deny-all, not an allow-all: name your ingress controller's namespace.
+    []
+    {{- end }}
+  egress:
+    {{- if .Values.networkPolicy.allowDNS }}
+    - to:
+        - namespaceSelector: {}
+          podSelector:
+            matchLabels:
+              k8s-app: kube-dns
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+    {{- end }}
+    {{- with .Values.networkPolicy.egressTo }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+{{- end }}

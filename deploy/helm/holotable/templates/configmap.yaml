@@ -1,0 +1,9 @@
+{{- include "holotable.assertNoSecretsInConfig" . -}}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "holotable.fullname" . }}
+  labels:
+    {{- include "holotable.labels" . | nindent 4 }}
+data:
+  {{- include "holotable.configData" . | nindent 2 }}

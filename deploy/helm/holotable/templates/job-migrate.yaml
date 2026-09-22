@@ -1,0 +1,124 @@
+{{- if .Values.migrations.enabled }}
+{{- if .Values.migrations.serviceAccount.create }}
+# The Job's ServiceAccount, and a hook itself: a pre-install hook runs before
+# any ordinary release resource exists, so a Job pointing at the app's
+# ServiceAccount is rejected on a first install with "serviceaccount not found".
+# Weighted ahead of the Job, and removed again once the hook phase succeeds.
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: {{ include "holotable.migrateServiceAccountName" . }}
+  labels:
+    {{- include "holotable.labels" . | nindent 4 }}
+    app.kubernetes.io/component: migrate
+  annotations:
+    helm.sh/hook: pre-install,pre-upgrade
+    helm.sh/hook-weight: {{ sub (int .Values.migrations.hookWeight) 10 | quote }}
+    helm.sh/hook-delete-policy: before-hook-creation,hook-succeeded
+    {{- with .Values.migrations.serviceAccount.annotations }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+automountServiceAccountToken: {{ .Values.serviceAccount.automountServiceAccountToken }}
+---
+{{- end }}
+# Schema migrations, as a release hook rather than an init container.
+#
+# An init container would run once per pod and race itself on a multi-replica
+# rollout; a hook runs once per release, before the new pods exist. `migrate`
+# takes a Postgres advisory lock anyway, so a second runner waits rather than
+# corrupting anything — but the ordering that matters is this one: the schema
+# is in place before any new code serves a request, and a failed migration
+# aborts the release, leaving the previous version running.
+#
+# Argo CD translates `pre-install,pre-upgrade` into its own PreSync phase, so
+# the same manifest gates a GitOps sync.
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ include "holotable.fullname" . }}-migrate
+  labels:
+    {{- include "holotable.labels" . | nindent 4 }}
+    app.kubernetes.io/component: migrate
+  annotations:
+    helm.sh/hook: pre-install,pre-upgrade
+    helm.sh/hook-weight: {{ .Values.migrations.hookWeight | quote }}
+    # Not `hook-succeeded`: a Job that failed is the one you want to read the
+    # logs of, and it is replaced at the next release anyway.
+    helm.sh/hook-delete-policy: before-hook-creation
+spec:
+  backoffLimit: {{ .Values.migrations.backoffLimit }}
+  activeDeadlineSeconds: {{ .Values.migrations.activeDeadlineSeconds }}
+  {{- with .Values.migrations.ttlSecondsAfterFinished }}
+  ttlSecondsAfterFinished: {{ . }}
+  {{- end }}
+  template:
+    metadata:
+      labels:
+        {{- include "holotable.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: migrate
+      {{- with .Values.migrations.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+    spec:
+      restartPolicy: Never
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      serviceAccountName: {{ include "holotable.migrateServiceAccountName" . }}
+      automountServiceAccountToken: {{ .Values.serviceAccount.automountServiceAccountToken }}
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      containers:
+        - name: migrate
+          # The `migrate` target's CMD is already
+          # `node node_modules/.bin/tsx scripts/migrate.ts`.
+          image: {{ include "holotable.migrateImage" . }}
+          imagePullPolicy: {{ .Values.migrations.image.pullPolicy }}
+          {{- with .Values.migrations.command }}
+          command:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- with .Values.migrations.args }}
+          args:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          securityContext:
+            {{- toYaml .Values.securityContext | nindent 12 }}
+          # The same environment as the app: the runner needs DATABASE_URL, and
+          # taking it from the same sources keeps the two from pointing at
+          # different databases.
+          envFrom:
+            {{- include "holotable.migrateEnvFrom" . | nindent 12 }}
+          {{- with .Values.extraEnv }}
+          env:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          resources:
+            {{- toYaml .Values.migrations.resources | nindent 12 }}
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+            {{- with .Values.extraVolumeMounts }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
+      volumes:
+        - name: tmp
+          emptyDir: {}
+        {{- with .Values.extraVolumes }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+      {{- with .Values.migrations.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.migrations.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.migrations.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+{{- end }}
