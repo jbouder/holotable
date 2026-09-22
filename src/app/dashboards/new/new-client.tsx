@@ -35,6 +35,7 @@ import {
 } from "@/components/sources/catalog-health";
 import { type Template, templateSpec } from "@/lib/templates";
 import { TemplatePicker } from "@/components/templates/TemplatePicker";
+import { NoSources } from "@/components/onboarding/no-sources";
 
 interface SourceOption {
   id: string;
@@ -54,9 +55,15 @@ interface SourceOption {
 export function NewDashboardClient({
   sources,
   model,
+  canManageSources,
 }: {
   sources: SourceOption[];
   model: string;
+  /**
+   * Whether this caller holds `source:manage` anywhere, which decides whether
+   * the no-source empty state offers to add one or names who can.
+   */
+  canManageSources: boolean;
 }) {
   const router = useRouter();
   const [activeTab, setActiveTab] = React.useState<"chat" | "preview">("chat");
@@ -173,11 +180,7 @@ export function NewDashboardClient({
   if (sources.length === 0) {
     return (
       <div className="mx-auto max-w-2xl">
-        <Card>
-          <CardContent className="text-sm text-muted">
-            You have no data sources to build from. Create one under Data sources first.
-          </CardContent>
-        </Card>
+        <NoSources canManageSources={canManageSources} />
       </div>
     );
   }

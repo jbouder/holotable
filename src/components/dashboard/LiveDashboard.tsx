@@ -55,12 +55,15 @@ export function LiveDashboard({
   maxWindowPoints,
   header,
   actions,
+  empty,
 }: {
   dashboardId: string;
   spec: Dashboard;
   maxWindowPoints: number;
   header?: React.ReactNode;
   actions?: React.ReactNode;
+  /** Shown in place of the grid when the spec carries no panels. */
+  empty?: React.ReactNode;
 }) {
   const [states, setStates] = React.useState<Record<string, PanelState>>({});
   const [live, setLive] = React.useState(true);
@@ -232,6 +235,7 @@ export function LiveDashboard({
 
       <DashboardGrid
         panels={spec.panels}
+        empty={empty}
         renderPanel={(panel) => (
           <PanelView panel={panel} state={states[panel.id]} paused={!live} />
         )}

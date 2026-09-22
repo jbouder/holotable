@@ -19,6 +19,8 @@ streams the results live.
 Full documentation lives in [`docs/`](docs/) as an Astro + Starlight site
 (`cd docs && npm install && npm run dev`). Start with:
 
+- [Your first dashboard](docs/src/content/docs/getting-started/your-first-dashboard.md) — from an
+  empty install to a live dashboard over your own database, in three steps.
 - [Invariants](docs/src/content/docs/architecture/invariants.md) — the guarantees the design rests on,
   and [Scaling](docs/src/content/docs/architecture/scaling.md) for the single-instance poller caveat.
 - [How it works](docs/src/content/docs/concepts/how-it-works.md) — a panel from prompt to live chart.
