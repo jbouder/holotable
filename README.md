@@ -1,6 +1,7 @@
 # Holotable
 
 [![CI](https://github.com/jbouder/holotable/actions/workflows/ci.yml/badge.svg)](https://github.com/jbouder/holotable/actions/workflows/ci.yml)
+[![Open in GitHub Codespaces](https://github.com/codespaces/badge.svg)](https://codespaces.new/jbouder/holotable)
 
 Natural-language monitoring dashboards. Describe what you want to see; a language
 model authors a **validated visualization spec** (SQL + chart config) — never the

@@ -1,0 +1,55 @@
+# The devcontainer's own service, merged on top of the repository's
+# docker-compose.yml rather than added to it.
+#
+# Two files instead of one, because `docker compose up` at the repository root
+# must keep meaning what it means today: the full production-shaped stack, app
+# container included. `app-dev` is only ever started by the devcontainer, which
+# passes both files.
+#
+# It joins the same default network as `postgres`, `keycloak`, `migrate` and
+# `seed`, so a contributor's `npm run dev` talks to exactly the services
+# `docker compose up` would have started, over the same names.
+
+services:
+  app-dev:
+    # Node 22, matching the Dockerfile's `node:22-bookworm-slim` base. The
+    # devcontainer image rather than that base: it carries the `node` user,
+    # git, and the shell setup an editor session needs and a runtime image
+    # deliberately does not.
+    image: mcr.microsoft.com/devcontainers/typescript-node:1-22-bookworm
+
+    # The dev container owns no workload. VS Code (or the devcontainer CLI)
+    # execs into it; `npm run dev` is a contributor's command, not an entrypoint.
+    command: sleep infinity
+
+    volumes:
+      # `.`, not `..`: relative paths in a compose file resolve against the
+      # project directory, and with two `-f` files that is the directory of the
+      # first one — the repository root. `:cached` keeps the bind mount cheap
+      # on macOS and Windows and is a no-op on Linux, which is what Codespaces
+      # runs.
+      - .:/workspaces/holotable:cached
+
+    environment:
+      # The three values that differ inside the compose network from what
+      # `.env.example` has for a host install: service names, not localhost.
+      #
+      # These are process environment, and both Next (`@next/env`) and the
+      # scripts read `process.env` first, so a `.env` copied straight from
+      # `.env.example` — DATABASE_URL blank, TS_METRICS_HOST=localhost — does
+      # not fight with them. Everything else still comes from `.env`, which is
+      # the contributor's file to edit.
+      DATABASE_URL: "postgresql://${POSTGRES_USER:-holotable}:${POSTGRES_PASSWORD:-holotable}@postgres:5432/holotable"
+      TIMESCALEDB_URL: "postgresql://${POSTGRES_USER:-holotable}:${POSTGRES_PASSWORD:-holotable}@postgres:5432/holotable"
+      TS_METRICS_HOST: postgres
+
+    # The same trick the `app` service uses, for the same reason: OIDC_ISSUER
+    # and OIDC_JWKS_URL are browser-facing URLs on localhost:8080, and a
+    # server-side fetch of them from inside this container would otherwise hit
+    # its own loopback instead of the published Keycloak port.
+    extra_hosts:
+      - "localhost:host-gateway"
+
+    depends_on:
+      postgres:
+        condition: service_healthy

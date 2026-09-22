@@ -64,6 +64,12 @@ Key locations:
 - `deploy/` — the Helm chart (`deploy/helm/holotable/`, with runnable example
   values under `examples/`) and a reference Argo CD `Application`
 - `.github/` — CI workflows, issue forms, the pull request template, `CODEOWNERS`
+- `.devcontainer/` — the contributor environment: a `devcontainer.json` and a
+  second compose file that adds one `app-dev` service on top of the root
+  `docker-compose.yml`. The root file is unchanged on purpose, so
+  `docker compose up` still means the full production-shaped stack; a change
+  to the services, the ports or `.env.example` usually needs a matching change
+  here.
 
 Important files:
 

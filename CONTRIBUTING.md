@@ -17,7 +17,39 @@ a problem with [@jbouder](https://github.com/jbouder) directly.
 
 ## Local setup
 
-Either path works. Docker is the shorter one.
+Three paths. The devcontainer is the shortest, Docker the most production-shaped.
+
+### Devcontainer or Codespaces
+
+[![Open in GitHub Codespaces](https://github.com/codespaces/badge.svg)](https://codespaces.new/jbouder/holotable)
+
+Open the repository in VS Code and choose **Reopen in Container**, or press the
+badge to start a Codespace. `.devcontainer/` layers one `app-dev` service on
+top of the repository's own `docker-compose.yml`, so the container you work in
+sits on the same network as the TimescaleDB, Keycloak, migration and seeder
+services `docker compose up` would have started. The production `app` service
+is deliberately not among them: port 3000 belongs to your `npm run dev`.
+
+Setup runs itself. `.env` is created from `.env.example` if you do not already
+have one, `npm ci` runs, migrations are applied, and the seeder starts filling
+the `demo` workspace. Then:
+
+```bash
+npm run dev                        # http://localhost:3000
+```
+
+**The one thing it cannot supply is a model.** Set `AI_MODEL` and an API key in
+`.env` — the container prints exactly which values are still missing when it
+finishes setting up. Without them the app runs and every generate request
+fails.
+
+Two things to know about Codespaces specifically. Ports 3000, 5432 and 8080 are
+forwarded, but Keycloak is then reachable at a `*.app.github.dev` URL rather
+than `localhost:8080`, so signing in needs the `OIDC_*` values in `.env` and the
+client's redirect URIs in `keycloak/holotable-realm.json` pointed at the
+forwarded addresses. And the Docker-in-Docker feature is there so the
+Testcontainers suite has a daemon of its own; the compose stack above runs on
+the outer one.
 
 ### Docker
 
