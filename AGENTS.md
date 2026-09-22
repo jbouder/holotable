@@ -85,6 +85,11 @@ Important files:
   log, the per-request `AsyncLocalStorage` context, and the redaction pass
   every payload goes through; a log line never carries a credential, and SQL
   and prompt text is reduced to a digest
+- `src/lib/self-monitoring/` — the committed self-monitoring demo: the
+  dashboard spec (also an IR snapshot), the source catalog, and the Prometheus
+  text-format parser the collector uses. `test/self-monitoring.test.ts` holds
+  the spec, the catalog and the collector's metric allowlist to one contract,
+  so a panel cannot be written against a metric nothing collects
 - `src/app/globals.css` — design tokens and Tailwind v4 theme setup
 - `next.config.ts` — standalone output, `pg` externalization
 - `package.json` — authoritative scripts/tooling
@@ -277,6 +282,8 @@ npm run config:check # validate the environment as the server does at startup (e
 npm run migrate    # apply Postgres migrations (--check, --dry-run, --down)
 npm run migrate:verify # round-trip every migration (scratch database)
 npm run seed       # looping metrics seeder
+npm run self-metrics # scrape the app's own /api/metrics into metrics.holotable_self
+npm run smoke      # end-to-end check of the self-monitoring demo dashboard
 ```
 
 Before finalizing code changes, run the checks relevant to your change:

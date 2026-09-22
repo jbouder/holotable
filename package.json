@@ -17,7 +17,9 @@
     "config:check": "tsx scripts/config-check.ts",
     "migrate": "tsx scripts/migrate.ts",
     "migrate:verify": "tsx scripts/migrate-verify.ts",
-    "seed": "tsx scripts/seed.ts"
+    "seed": "tsx scripts/seed.ts",
+    "self-metrics": "tsx scripts/self-metrics.ts",
+    "smoke": "tsx scripts/smoke.ts"
   },
   "dependencies": {
     "@ai-sdk/openai": "4.0.11",

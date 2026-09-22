@@ -41,8 +41,18 @@ cp .env.example .env               # edit DATABASE_URL, TIMESCALEDB_URL, secrets
 psql "$DATABASE_URL" -f timescaledb/init/001_schema.sql
 npm run migrate                    # apply Postgres migrations
 npm run seed                       # looping metrics seeder (+ demo source/dashboard)
+npm run self-metrics               # optional: scrape the app's own /api/metrics
 npm run dev                        # http://localhost:3000
 ```
+
+`npm run self-metrics` is the self-monitoring demo (#54): it lands the app's own
+`/api/metrics` in `metrics.holotable_self`, which the seeder registers as a
+source, so the **Holotable self-monitoring** dashboard reads guarded SQL over
+real data the app produced. It needs `METRICS_TOKEN` set to the same value the
+app has, or the scrape is refused with a 404. Under `docker compose` it runs on
+its own and the token has a local default;
+`docker compose --profile smoke run --rm smoke` then checks the whole path end
+to end.
 
 Authentication is OIDC-only — there is no local or dev login path — so you need
 the Keycloak from `docker compose` (or your own realm) even when running the app
