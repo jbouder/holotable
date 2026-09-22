@@ -20,12 +20,21 @@ export function DashboardGrid({
   renderPanel,
   rowHeight = 84,
   onPanelError,
+  empty,
 }: {
   panels: Panel[];
   renderPanel: (panel: Panel) => React.ReactNode;
   rowHeight?: number;
   onPanelError?: (report: PanelErrorReport) => void;
+  /**
+   * What to draw instead of the grid when there are no panels. Passed in
+   * rather than written here, because the right next action differs by surface
+   * — an editor is offered the editor, a preview is simply still empty.
+   */
+  empty?: React.ReactNode;
 }) {
+  if (panels.length === 0) return empty ?? null;
+
   return (
     <div
       className="grid gap-4"

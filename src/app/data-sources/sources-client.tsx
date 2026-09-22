@@ -10,6 +10,8 @@ import {
   Loader2,
   Pencil,
   SendHorizontal,
+  Database,
+  ExternalLink,
 } from "lucide-react";
 import { SourceDraft, type SourceRecord } from "@/lib/registry";
 import { type CatalogHealth, describeCatalogHealth } from "@/lib/catalog/health";
@@ -17,6 +19,7 @@ import { CatalogHealthBadge } from "@/components/sources/catalog-health";
 import { Button } from "@/components/ui/button";
 import { Textarea, Label } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
+import { EmptyState } from "@/components/ui/empty-state";
 import { Dialog } from "@/components/ui/dialog";
 import {
   Table,
@@ -27,6 +30,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { ErrorDisplay } from "@/components/ui/error-display";
+import { FIRST_DASHBOARD_DOCS_URL } from "@/lib/onboarding";
 import { apiErrorFromThrown, readApiError } from "@/lib/errors";
 import { buildSourceDescriptionStarters } from "@/lib/prompts/starters";
 import { SourceForm } from "./source-form";
@@ -38,7 +42,18 @@ import {
   useSourceImpactMap,
 } from "./source-impact";
 
-export function SourcesClient({ workspaces }: { workspaces: string[] }) {
+export function SourcesClient({
+  workspaces,
+  startCreating = false,
+}: {
+  workspaces: string[];
+  /**
+   * Open the Add source dialog on arrival. Set by `?new=1`, which is where the
+   * first-run flow's "Connect a data source" step points: the step lands on the
+   * form rather than on a page with a button to find.
+   */
+  startCreating?: boolean;
+}) {
   // Workspace switching is hidden for now; pin to the first accessible workspace.
   const [workspaceId] = React.useState<string | null>(workspaces[0] ?? null);
   const [sources, setSources] = React.useState<SourceRecord[] | null>(null);
@@ -47,7 +62,7 @@ export function SourcesClient({ workspaces }: { workspaces: string[] }) {
   const [catalog, setCatalog] = React.useState<Record<string, CatalogHealth>>({});
   const [busy, setBusy] = React.useState<string | null>(null);
   const [editing, setEditing] = React.useState<string | null>(null);
-  const [creating, setCreating] = React.useState(false);
+  const [creating, setCreating] = React.useState(startCreating);
   const [notice, setNotice] = React.useState<string | null>(null);
   // The source whose impact is on screen, and the one awaiting a delete
   // confirmation; both are ids so a reload cannot leave a stale copy open.
@@ -141,6 +156,13 @@ export function SourcesClient({ workspaces }: { workspaces: string[] }) {
     );
   }
 
+  // True only once the health of every listed source is known, so the hint
+  // does not appear and then vanish while the list is still loading.
+  const nothingQueryable =
+    sources !== null &&
+    sources.length > 0 &&
+    sources.every((source) => catalog[source.id]?.blocked === true);
+
   const sourceBeingEdited = sources?.find((source) => source.id === editing);
   const sourceShowingImpact = sources?.find((source) => source.id === showingImpact);
   const sourceBeingDeleted = sources?.find((source) => source.id === confirmingDelete);
@@ -177,10 +199,45 @@ export function SourcesClient({ workspaces }: { workspaces: string[] }) {
         </div>
       )}
 
+      {/*
+        Every source here is still unusable: registering one is only half the
+        job, and the half that is left is two buttons in the row below. Said
+        once for the whole list rather than per row, and gone the moment any
+        source becomes queryable.
+      */}
+      {nothingQueryable && (
+        <div className="rounded-lg border border-warning/40 bg-surface px-3 py-2 text-sm text-muted">
+          Next: press <span className="text-foreground">Test</span> to check the
+          credentials resolve, then <span className="text-foreground">Refresh</span> to
+          read the tables and columns. Until a refresh has run, generating against this
+          source is refused.
+        </div>
+      )}
+
       {sources === null ? (
         <p className="text-sm text-muted">Loading…</p>
       ) : sources.length === 0 ? (
-        <p className="text-sm text-muted">No sources in this workspace yet.</p>
+        <EmptyState
+          icon={<Database className="h-6 w-6" />}
+          title="No sources in this workspace yet"
+          description={
+            <>
+              A source names the database, the schema and the tables Holotable may read.
+              Its credentials stay in the server environment under a secret reference —
+              they are never stored here.{" "}
+              <a
+                href={FIRST_DASHBOARD_DOCS_URL}
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex items-center gap-1 text-foreground underline underline-offset-2"
+              >
+                The walkthrough <ExternalLink className="h-3 w-3" />
+              </a>{" "}
+              has the whole sequence.
+            </>
+          }
+          action={<Button onClick={() => setCreating(true)}>Add source</Button>}
+        />
       ) : (
         <Table>
           <TableHead>

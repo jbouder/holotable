@@ -21,6 +21,7 @@ import {
   useCatalogRefresh,
 } from "@/components/sources/catalog-health";
 import { formatValue } from "@/lib/format";
+import { NoSources } from "@/components/onboarding/no-sources";
 import { SavePanelDialog, type SavedPanel } from "./save-panel-dialog";
 
 interface SourceOption {
@@ -59,11 +60,17 @@ const TIME_PRESETS: { value: string; label: string }[] = [
 export function ExploreClient({
   sources,
   model,
+  canManageSources,
   defaultTimeRange,
   defaultRefreshIntervalMs,
 }: {
   sources: SourceOption[];
   model: string;
+  /**
+   * Whether this caller holds `source:manage` anywhere, which decides whether
+   * the no-source empty state offers to add one or names who can.
+   */
+  canManageSources: boolean;
   /** Server-configured defaults, used when Explore creates a dashboard. */
   defaultTimeRange: TimeRange;
   defaultRefreshIntervalMs: number;
@@ -128,13 +135,7 @@ export function ExploreClient({
   const sourceName = source?.name ?? sourceId;
 
   if (sources.length === 0) {
-    return (
-      <Card>
-        <CardContent className="text-sm text-muted">
-          You have no data sources to explore. Create one under Data sources first.
-        </CardContent>
-      </Card>
-    );
+    return <NoSources canManageSources={canManageSources} />;
   }
 
   return (

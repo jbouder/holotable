@@ -1,4 +1,4 @@
-import { can, getIdentity } from "@/lib/auth/authorize";
+import { authorizedWorkspaces, can, getIdentity } from "@/lib/auth/authorize";
 import { accessibleWorkspaces, hasWorkspaceRole } from "@/lib/auth/claims";
 import { listSources } from "@/lib/db/repo";
 import { catalogHealth } from "@/lib/catalog/health";
@@ -37,6 +37,7 @@ export default async function ExplorePage() {
     <ExploreClient
       sources={sources}
       model={config.aiModel}
+      canManageSources={authorizedWorkspaces(identity, "source:manage").length > 0}
       // Defaults for a dashboard created from a result. The server stays the
       // authority for resolving these expressions at execution time.
       defaultTimeRange={{ from: config.defaultTimeFrom, to: config.defaultTimeTo }}

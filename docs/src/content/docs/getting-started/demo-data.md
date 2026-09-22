@@ -2,7 +2,7 @@
 title: Demo data
 description: What the seeder creates, how to run it, and the knobs that tune it.
 sidebar:
-  order: 3
+  order: 4
 ---
 
 `npm run seed` (`scripts/seed.ts`) is a long-running seeder that gives a fresh

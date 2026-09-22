@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { Download, Pencil } from "lucide-react";
+import { Download, LayoutTemplate, Pencil } from "lucide-react";
 import { getIdentity } from "@/lib/auth/authorize";
 import { can } from "@/lib/auth/authorize";
 import { getDashboardById } from "@/lib/db/repo";
@@ -11,6 +11,7 @@ import { DashboardChat } from "@/components/dashboard/DashboardChat";
 import { DeleteDashboardButton } from "@/components/dashboard/delete-dashboard-button";
 import { SaveAsTemplate } from "@/components/templates/SaveAsTemplate";
 import { Button } from "@/components/ui/button";
+import { EmptyState } from "@/components/ui/empty-state";
 
 export const dynamic = "force-dynamic";
 
@@ -52,6 +53,27 @@ export default async function DashboardViewPage({
         dashboardId={id}
         spec={dashboard.spec}
         maxWindowPoints={config.maxWindowPoints}
+        // A saved dashboard with no panels is reachable — an import trimmed to
+        // nothing, or every panel deleted in the editor — and used to render as
+        // a header over blank space with a live badge above it.
+        empty={
+          <EmptyState
+            icon={<LayoutTemplate className="h-6 w-6" />}
+            title="This dashboard has no panels"
+            description={
+              canEdit
+                ? "Open the editor and describe the panel you want; the model writes the spec and the server runs the query."
+                : "Nothing has been added to it yet. An editor can add panels from the dashboard editor."
+            }
+            action={
+              canEdit ? (
+                <Link href={`/dashboards/${id}/edit`}>
+                  <Button>Add a panel</Button>
+                </Link>
+              ) : undefined
+            }
+          />
+        }
         header={
           <div>
             <h1 className="text-2xl font-semibold">{dashboard.spec.title}</h1>

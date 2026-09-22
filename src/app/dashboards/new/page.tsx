@@ -1,4 +1,4 @@
-import { can, getIdentity } from "@/lib/auth/authorize";
+import { authorizedWorkspaces, can, getIdentity } from "@/lib/auth/authorize";
 import { accessibleWorkspaces, hasWorkspaceRole } from "@/lib/auth/claims";
 import { listSources } from "@/lib/db/repo";
 import { catalogHealth } from "@/lib/catalog/health";
@@ -32,5 +32,11 @@ export default async function NewDashboardPage() {
     canRefresh: can(identity, "source:manage", { workspaceId: s.workspaceId }),
   }));
 
-  return <NewDashboardClient sources={sources} model={config.aiModel} />;
+  return (
+    <NewDashboardClient
+      sources={sources}
+      model={config.aiModel}
+      canManageSources={authorizedWorkspaces(identity, "source:manage").length > 0}
+    />
+  );
 }

@@ -41,6 +41,10 @@ export default defineConfig({
           items: [
             { label: "Introduction", slug: "getting-started/introduction" },
             { label: "Quick start", slug: "getting-started/quick-start" },
+            {
+              label: "Your first dashboard",
+              slug: "getting-started/your-first-dashboard",
+            },
             { label: "Demo data", slug: "getting-started/demo-data" },
           ],
         },

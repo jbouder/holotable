@@ -49,5 +49,7 @@ These are enforced, not aspirational — see [Invariants](/architecture/invarian
 ## Where to go next
 
 - [Quick start](/getting-started/quick-start/) — run it with Docker or locally.
+- [Your first dashboard](/getting-started/your-first-dashboard/) — the three
+  steps from an empty install to a live dashboard over your own database.
 - [How it works](/concepts/how-it-works/) — the path from prompt to live chart.
 - [Invariants](/architecture/invariants/) — the numbered guarantees the design rests on.
