@@ -6,6 +6,7 @@ import type { Panel } from "@/lib/ir";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { EChart } from "@/components/charts/EChart";
+import { PanelSqlDialog } from "@/components/dashboard/PanelSqlDialog";
 import { buildChartOption, type PanelData } from "@/components/charts/options";
 import { formatValue } from "@/lib/format";
 import { cn } from "@/lib/utils";
@@ -41,8 +42,11 @@ export function PanelView({
   return (
     <Card className={cn("flex h-full flex-col", status === "stale" && "opacity-60")}>
       <CardHeader>
-        <CardTitle>{panel.title}</CardTitle>
-        {showBadge && <StatusBadge status={status} />}
+        <CardTitle className="min-w-0 truncate">{panel.title}</CardTitle>
+        <div className="flex shrink-0 items-center gap-1">
+          {showBadge && <StatusBadge status={status} />}
+          <PanelSqlDialog panel={panel} />
+        </div>
       </CardHeader>
       <CardContent className="flex-1 min-h-0">
         <PanelBody panel={panel} data={data} state={state} onRetry={onRetry} />
