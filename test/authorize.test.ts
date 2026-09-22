@@ -95,7 +95,16 @@ test("errorResponse sends an HttpError's status, message, and extra headers", as
   const res = errorResponse(new HttpError(429, "slow down", { "Retry-After": "7" }));
   assert.equal(res.status, 429);
   assert.equal(res.headers.get("Retry-After"), "7");
-  assert.deepEqual(await res.json(), { error: "slow down" });
+  // `kind` rides along so the client presents the error without inferring it
+  // from the status; `requestId` is absent outside a request context.
+  assert.deepEqual(await res.json(), { error: "slow down", kind: "rate_limit" });
   const plain = errorResponse(new HttpError(403, "no"));
   assert.equal(plain.headers.get("Retry-After"), null);
+});
+
+test("errorResponse takes an explicit kind over the one the status implies", async () => {
+  // A failed statement and a malformed body are both 400s; only the thrower
+  // knows which, so the query route says so.
+  const res = errorResponse(new HttpError(400, "bad column", {}, "statement"));
+  assert.deepEqual(await res.json(), { error: "bad column", kind: "statement" });
 });

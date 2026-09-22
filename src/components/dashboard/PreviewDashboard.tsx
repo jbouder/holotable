@@ -4,6 +4,7 @@ import * as React from "react";
 import type { Dashboard, Panel } from "@/lib/ir";
 import { DashboardGrid } from "@/components/dashboard/DashboardGrid";
 import { PanelView, type PanelState } from "@/components/dashboard/PanelView";
+import { apiErrorFromThrown, readApiError } from "@/lib/errors";
 
 /**
  * One-shot preview: runs each panel's guarded query once via /api/query and
@@ -30,23 +31,21 @@ export function PreviewDashboard({ spec }: { spec: Dashboard }) {
             timeRange,
           }),
         });
-        const body = await res.json();
         if (!res.ok) {
+          const error = await readApiError(res);
           setStates((s) => ({
             ...s,
-            [panel.id]: {
-              data: { columns: [], rows: [] },
-              status: "error",
-              error: body.error ?? "query failed",
-            },
+            [panel.id]: { data: { columns: [], rows: [] }, status: "error", error },
           }));
           return;
         }
+        const body = await res.json();
         setStates((s) => ({
           ...s,
           [panel.id]: {
             data: { columns: body.columns, rows: body.rows },
             status: "live",
+            updatedAt: Date.now(),
           },
         }));
       } catch (err) {
@@ -55,7 +54,7 @@ export function PreviewDashboard({ spec }: { spec: Dashboard }) {
           [panel.id]: {
             data: { columns: [], rows: [] },
             status: "error",
-            error: err instanceof Error ? err.message : "query failed",
+            error: apiErrorFromThrown(err),
           },
         }));
       }

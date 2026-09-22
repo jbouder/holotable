@@ -17,7 +17,8 @@ import { Input, Textarea, Label } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { PreviewDashboard } from "@/components/dashboard/PreviewDashboard";
-import { RetryNotice } from "@/components/dashboard/RetryNotice";
+import { ErrorDisplay } from "@/components/ui/error-display";
+import { type ApiError, apiErrorFromThrown, readApiError } from "@/lib/errors";
 
 interface SourceOption {
   id: string;
@@ -54,7 +55,7 @@ export function EditDashboardClient({
   );
   const [activeTab, setActiveTab] = React.useState<"editor" | "preview">("editor");
   const [saving, setSaving] = React.useState(false);
-  const [error, setError] = React.useState<string | null>(null);
+  const [error, setError] = React.useState<ApiError | null>(null);
   const [nlPrompt, setNlPrompt] = React.useState("");
 
   const selected = spec.panels.find((p) => p.id === selectedId) ?? null;
@@ -124,7 +125,13 @@ export function EditDashboardClient({
     setError(null);
     const parsed = safeParseDashboard(spec);
     if (!parsed.success) {
-      setError(`invalid spec: ${parsed.error.issues[0]?.message}`);
+      const issue = parsed.error.issues[0];
+      setError({
+        error: issue
+          ? `${issue.path.join(".") || "spec"}: ${issue.message}`
+          : "The dashboard spec is not valid.",
+        kind: "validation",
+      });
       setSaving(false);
       return;
     }
@@ -133,10 +140,9 @@ export function EditDashboardClient({
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ spec: parsed.data }),
     });
-    const body = await res.json();
     setSaving(false);
     if (!res.ok) {
-      setError(body.error ?? "save failed");
+      setError(await readApiError(res));
       return;
     }
     router.push(`/dashboards/${dashboardId}`);
@@ -164,7 +170,14 @@ export function EditDashboardClient({
           </Button>
         </div>
       </div>
-      {error && <p className="text-sm text-danger">{error}</p>}
+      {error && (
+        <ErrorDisplay
+          error={error}
+          onRetry={save}
+          retryLabel="Save again"
+          disabled={saving}
+        />
+      )}
 
       <div
         className="flex w-fit rounded-lg border border-border bg-surface p-1"
@@ -331,9 +344,10 @@ export function EditDashboardClient({
                       </Button>
                     </div>
                     {genError && (
-                      <RetryNotice
-                        message={`Edit failed: ${genError.message}`}
+                      <ErrorDisplay
+                        error={apiErrorFromThrown(genError)}
                         onRetry={runNlEdit}
+                        retryLabel="Try again"
                         disabled={isLoading}
                       />
                     )}

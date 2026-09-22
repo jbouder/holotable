@@ -2,7 +2,8 @@ import { cookies } from "next/headers";
 import { config } from "@/lib/config";
 import { hasWorkspaceRole, type Identity } from "@/lib/auth/claims";
 import { verifySessionToken } from "@/lib/auth/session";
-import { amendRequest, log } from "@/lib/log";
+import { type ErrorKind, kindFromStatus, OPAQUE_MESSAGE } from "@/lib/errors";
+import { amendRequest, currentRequest, log } from "@/lib/log";
 
 /**
  * Centralized authorization.
@@ -35,6 +36,13 @@ export class HttpError extends Error {
     message: string,
     /** Extra response headers, e.g. `Retry-After` on a 429. */
     public headers: Record<string, string> = {},
+    /**
+     * How the client should present this. Omitted means "whatever the status
+     * implies" ({@link kindFromStatus}), which is right for the great majority
+     * of throws; a route names it only when the status alone would mislead —
+     * a failed statement is a `400`, but so is a malformed body.
+     */
+    public kind?: ErrorKind,
   ) {
     super(message);
     this.name = "HttpError";
@@ -115,17 +123,33 @@ export function assertAuthorized(
   }
 }
 
-/** Convert a thrown HttpError (or unknown error) into a JSON Response. */
+/**
+ * Convert a thrown HttpError (or unknown error) into a JSON Response.
+ *
+ * Every body carries `kind` so the client presents the error without inferring
+ * it from the status, and the request id so a user reporting a failure has
+ * something to quote that appears verbatim in the log. Neither widens what is
+ * disclosed: the unhandled path still answers with {@link OPAQUE_MESSAGE} and
+ * keeps the real cause in the log line below.
+ */
 export function errorResponse(err: unknown): Response {
+  const requestId = currentRequest()?.requestId;
   if (err instanceof HttpError) {
     return Response.json(
-      { error: err.message },
+      {
+        error: err.message,
+        kind: err.kind ?? kindFromStatus(err.status),
+        requestId,
+      },
       { status: err.status, headers: err.headers },
     );
   }
-  // The message never reaches the caller — a 500 body says only "internal
-  // error" — so this line is the only record of what actually broke. The
+  // The message never reaches the caller — a 500 body says only the generic
+  // sentence — so this line is the only record of what actually broke. The
   // request id on it is the one the caller was handed.
   log.error("request.unhandled_error", { err });
-  return Response.json({ error: "internal error" }, { status: 500 });
+  return Response.json(
+    { error: OPAQUE_MESSAGE, kind: "infrastructure", requestId },
+    { status: 500 },
+  );
 }

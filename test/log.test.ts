@@ -20,6 +20,7 @@ import {
 import { validateConfig } from "@/lib/config";
 import { route, REQUEST_ID_HEADER } from "@/lib/http";
 import { HttpError } from "@/lib/auth/authorize";
+import { OPAQUE_MESSAGE } from "@/lib/errors";
 
 /** A logger that keeps its lines as parsed objects. */
 function capture(level: LogLevelSetting = "debug") {
@@ -333,7 +334,11 @@ describe("route()", () => {
       const response = await handler(request());
 
       assert.equal(response.status, 404);
-      assert.deepEqual(await response.json(), { error: "thing not found" });
+      assert.deepEqual(await response.json(), {
+        error: "thing not found",
+        kind: "not_found",
+        requestId: response.headers.get("x-request-id"),
+      });
       assert.equal(lines.at(-1)?.level, "warn");
       assert.equal(lines.at(-1)?.msg, "request.rejected");
     } finally {
@@ -351,7 +356,15 @@ describe("route()", () => {
       const response = await handler(request());
 
       assert.equal(response.status, 500);
-      assert.deepEqual(await response.json(), { error: "internal error" });
+      // The body is generic, and the request id on it is the one this request
+      // logged under — so a user can quote it and the line can be found.
+      const body = await response.json();
+      assert.deepEqual(body, {
+        error: OPAQUE_MESSAGE,
+        kind: "infrastructure",
+        requestId: response.headers.get("x-request-id"),
+      });
+      assert.ok(!JSON.stringify(body).includes("hunter2"));
 
       const unhandled = lines.find((l) => l.msg === "request.unhandled_error");
       const err = unhandled?.err as { message: string };

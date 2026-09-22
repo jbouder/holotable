@@ -12,7 +12,8 @@ import { Select } from "@/components/ui/select";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { PreviewDashboard } from "@/components/dashboard/PreviewDashboard";
-import { RetryNotice } from "@/components/dashboard/RetryNotice";
+import { ErrorDisplay } from "@/components/ui/error-display";
+import { type ApiError, apiErrorFromThrown, readApiError } from "@/lib/errors";
 
 interface SourceOption {
   id: string;
@@ -41,7 +42,7 @@ export function NewDashboardClient({
   const [sourceId, setSourceId] = React.useState<string | null>(sources[0]?.id ?? null);
   const [prompt, setPrompt] = React.useState("");
   const [finalSpec, setFinalSpec] = React.useState<Dashboard | null>(null);
-  const [saveError, setSaveError] = React.useState<string | null>(null);
+  const [saveError, setSaveError] = React.useState<ApiError | null>(null);
   const [saving, setSaving] = React.useState(false);
 
   const { object, submit, isLoading, error, stop } = useObject({
@@ -72,7 +73,10 @@ export function NewDashboardClient({
     setSaveError(null);
     const parsed = safeParseDashboard(finalSpec);
     if (!parsed.success) {
-      setSaveError("generated spec is invalid");
+      setSaveError({
+        error: `The generated spec is invalid: ${parsed.error.issues[0]?.message ?? "validation failed"}`,
+        kind: "validation",
+      });
       setSaving(false);
       return;
     }
@@ -81,12 +85,12 @@ export function NewDashboardClient({
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ spec: parsed.data }),
     });
-    const body = await res.json();
     setSaving(false);
     if (!res.ok) {
-      setSaveError(body.error ?? "save failed");
+      setSaveError(await readApiError(res));
       return;
     }
+    const body = await res.json();
     router.push(`/dashboards/${body.dashboard.id}`);
   }
 
@@ -228,13 +232,21 @@ export function NewDashboardClient({
                 </div>
               )}
               {error && (
-                <RetryNotice
-                  message={`Generation failed: ${error.message}`}
+                <ErrorDisplay
+                  error={apiErrorFromThrown(error)}
                   onRetry={generate}
+                  retryLabel="Try again"
                   disabled={isLoading}
                 />
               )}
-              {saveError && <p className="text-sm text-danger">{saveError}</p>}
+              {saveError && (
+                <ErrorDisplay
+                  error={saveError}
+                  onRetry={save}
+                  retryLabel="Save again"
+                  disabled={saving}
+                />
+              )}
             </CardContent>
           </Card>
 

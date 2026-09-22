@@ -25,6 +25,8 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { ErrorDisplay } from "@/components/ui/error-display";
+import { type ApiError, apiErrorFromThrown, readApiError } from "@/lib/errors";
 
 /** Starter descriptions to seed the natural-language drafter with one click. */
 const SOURCE_PROMPT_PRESETS = [
@@ -276,8 +278,7 @@ export function SourcesClient({ workspaces }: { workspaces: string[] }) {
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ name, secretRef, config }),
               });
-              const body = await res.json();
-              if (!res.ok) return body.error ?? "update failed";
+              if (!res.ok) return readApiError(res);
               setEditing(null);
               setNotice(`${sourceBeingEdited.id}: updated`);
               if (workspaceId) void load(workspaceId);
@@ -345,8 +346,7 @@ function CreateSourcePanel({
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ workspaceId, id, name, secretRef, config }),
               });
-              const body = await res.json();
-              if (!res.ok) return body.error ?? "create failed";
+              if (!res.ok) return readApiError(res);
               onCreated();
               return null;
             }}
@@ -452,7 +452,14 @@ function NaturalLanguageDrafter({
           Stop
         </Button>
       )}
-      {error && <p className="text-sm text-danger">Draft failed: {error.message}</p>}
+      {error && (
+        <ErrorDisplay
+          error={apiErrorFromThrown(error)}
+          onRetry={draft}
+          retryLabel="Try again"
+          disabled={isLoading}
+        />
+      )}
       {isLoading && object && (
         <pre className="max-h-40 overflow-auto rounded-lg border border-border bg-surface p-3 text-xs text-muted">
           {JSON.stringify(object, null, 2)}
@@ -479,7 +486,8 @@ function SourceForm({
   mode: "create" | "edit";
   submitLabel: string;
   initial?: { id?: string; name: string; secretRef: string; configText: string };
-  onSubmit: (values: SourceFormValues) => Promise<string | null>;
+  /** Resolves to the failure to show, or null on success. */
+  onSubmit: (values: SourceFormValues) => Promise<ApiError | null>;
   onCancel?: () => void;
 }) {
   const [id, setId] = React.useState(initial?.id ?? "");
@@ -488,7 +496,7 @@ function SourceForm({
   const [configText, setConfigText] = React.useState(
     initial?.configText ?? CONFIG_TEMPLATE,
   );
-  const [error, setError] = React.useState<string | null>(null);
+  const [error, setError] = React.useState<ApiError | null>(null);
   const [saving, setSaving] = React.useState(false);
 
   async function submit(e: React.FormEvent) {
@@ -498,7 +506,7 @@ function SourceForm({
     try {
       config = JSON.parse(configText);
     } catch {
-      setError("config is not valid JSON");
+      setError({ error: "The connection config is not valid JSON.", kind: "validation" });
       return;
     }
     setSaving(true);
@@ -556,7 +564,7 @@ function SourceForm({
           onChange={(e) => setConfigText(e.target.value)}
         />
       </div>
-      {error && <p className="text-sm text-danger">{error}</p>}
+      {error && <ErrorDisplay error={error} />}
       <div className="flex gap-2">
         <Button type="submit" disabled={saving}>
           {saving ? (

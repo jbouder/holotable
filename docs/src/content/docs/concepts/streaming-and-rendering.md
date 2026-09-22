@@ -48,6 +48,8 @@ Client side (`LiveDashboard.tsx` → `PanelView.tsx` → `EChart.tsx`):
 - A **staleness watchdog** marks panels `stale` if no `tick` arrives within
   roughly two refresh intervals, and on an `EventSource` transport error — which
   auto-reconnects.
+- Each panel records **when its data arrived**; the status badge reports it, so
+  panels that go stale independently can be told apart.
 
 `PanelView` picks a renderer from `panel.viz`:
 
@@ -61,12 +63,34 @@ created **once**, and every update is `setOption(option, { notMerge: false })`.
 The chart **merges** incoming data into the existing series — it is never torn
 down and recreated on a data tick, so streaming feels continuous.
 
+## Connection state
+
+`EventSource` retries forever and says nothing about it, so a dead stream and a
+slow one look the same. `LiveDashboard` therefore tracks the connection
+separately from panel data, through the reducer in `src/lib/connection.ts`:
+`connecting` → `live` → `reconnecting` → `failed`, plus `paused`.
+
+The header indicator shows that state, names the attempt while reconnecting,
+and reports how long ago data last arrived — counting up for the first minute,
+then an absolute clock time. Once the automatic retries have failed
+`MANUAL_RECONNECT_AFTER_ATTEMPTS` times, or the browser gives up outright
+(`readyState === CLOSED`, typically an expired session), a manual **Reconnect**
+appears; it replaces the `EventSource`, which is the only way to shortcut the
+browser's own retry schedule. The whole indicator is one polite `aria-live`
+region carrying a full sentence, so a state change is announced rather than a
+stream of counting seconds.
+
+A reopened socket does **not** reset the freshness clock: it answers "how old
+is this number", not "how old is this connection".
+
 ## Pausing
 
-The viewer can pause live updates. The Live/Pause toggle closes the
+The viewer can pause live updates. The Pause/Resume toggle closes the
 `EventSource`; resuming reattaches to the shared poller. While paused, the
 transient `live` and `loading` badges are suppressed — they no longer reflect
-reality — but error and tombstone states remain meaningful.
+reality — but error and tombstone states remain meaningful. Paused reads as a
+distinct, muted state in the indicator; it is not the same thing as a dropped
+stream.
 
 ## A rendering detail worth knowing
 

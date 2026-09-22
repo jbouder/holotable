@@ -162,6 +162,14 @@ over `MAX_RESULT_BYTES`. Routes
 translate it to a `400` with the real message so an editor can fix and retry;
 connection and socket failures stay a generic `500` and are never surfaced.
 
+The split is carried, not inferred. Every error body names a `kind`
+(`src/lib/errors.ts`), and the SSE path honours it too: a `panel-error` frame
+carries the real message only for a statement failure, and
+`describePanelError` reduces anything else to the generic sentence with the
+cause going to the log. The client decides presentation from `kind` alone —
+`presentError` discards the message on the opaque path regardless of what
+arrived, so a careless server change cannot turn into a disclosure.
+
 ## 17. Every model call is rate limited and budgeted, server-side
 
 The three routes that call the model run `enforceLlmLimits`

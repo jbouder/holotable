@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { experimental_useObject as useObject } from "@ai-sdk/react";
-import { Loader2, SendHorizontal, Compass, AlertTriangle, RefreshCw } from "lucide-react";
+import { Loader2, SendHorizontal, Compass } from "lucide-react";
 import { Panel, type TimeRange } from "@/lib/ir";
 import { Button } from "@/components/ui/button";
 import { Textarea, Label } from "@/components/ui/input";
@@ -11,7 +11,8 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { EChart } from "@/components/charts/EChart";
 import { buildChartOption, type PanelData } from "@/components/charts/options";
-import { RetryNotice } from "@/components/dashboard/RetryNotice";
+import { ErrorDisplay } from "@/components/ui/error-display";
+import { type ApiError, apiErrorFromThrown, readApiError } from "@/lib/errors";
 import { formatValue } from "@/lib/format";
 
 interface SourceOption {
@@ -25,7 +26,7 @@ type Status = "loading" | "done" | "error";
 interface Result {
   data: PanelData;
   status: Status;
-  error?: string;
+  error?: ApiError;
 }
 
 const CHART_VIZ = new Set(["line", "bar", "heatmap", "pie", "donut"]);
@@ -76,18 +77,14 @@ export function ExploreClient({
           timeRange,
         }),
       });
-      const body = await res.json();
       if (!res.ok) {
-        setResult({ data: EMPTY, status: "error", error: body.error ?? "query failed" });
+        setResult({ data: EMPTY, status: "error", error: await readApiError(res) });
         return;
       }
+      const body = await res.json();
       setResult({ data: { columns: body.columns, rows: body.rows }, status: "done" });
     } catch (err) {
-      setResult({
-        data: EMPTY,
-        status: "error",
-        error: err instanceof Error ? err.message : "query failed",
-      });
+      setResult({ data: EMPTY, status: "error", error: apiErrorFromThrown(err) });
     }
   }, []);
 
@@ -226,9 +223,10 @@ export function ExploreClient({
             </div>
           )}
           {error && (
-            <RetryNotice
-              message={`Generation failed: ${error.message}`}
+            <ErrorDisplay
+              error={apiErrorFromThrown(error)}
               onRetry={generate}
+              retryLabel="Try again"
               disabled={isLoading}
             />
           )}
@@ -315,14 +313,10 @@ function ResultBody({
   }
   if (result.status === "error") {
     return (
-      <div className="flex flex-col items-start gap-2">
-        <div className="flex items-center gap-2 text-sm text-danger">
-          <AlertTriangle className="h-4 w-4" /> {result.error ?? "Query failed"}
-        </div>
-        <Button variant="secondary" size="sm" onClick={onRetry}>
-          <RefreshCw className="h-3.5 w-3.5" /> Retry
-        </Button>
-      </div>
+      <ErrorDisplay
+        error={result.error ?? { error: "Query failed", kind: "statement" }}
+        onRetry={onRetry}
+      />
     );
   }
   if (data.rows.length === 0) {

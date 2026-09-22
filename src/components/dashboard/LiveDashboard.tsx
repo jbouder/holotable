@@ -6,15 +6,24 @@ import type { Dashboard, TimeRange } from "@/lib/ir";
 import type { PollerEvent } from "@/lib/poller/registry";
 import { DashboardGrid } from "@/components/dashboard/DashboardGrid";
 import { PanelView, type PanelState } from "@/components/dashboard/PanelView";
+import { ConnectionIndicator } from "@/components/dashboard/ConnectionIndicator";
 import type { PanelData } from "@/components/charts/options";
 import { Button } from "@/components/ui/button";
 import { TimeRangeFilter } from "@/components/dashboard/TimeRangeFilter";
-import { cn } from "@/lib/utils";
+import {
+  type ConnectionSignal,
+  type ConnectionStatus,
+  INITIAL_CONNECTION,
+  reduceConnection,
+} from "@/lib/connection";
 import { DRAIN_EVENT } from "@/lib/sse";
 
 /**
  * A panel that was live is now only as fresh as its last frame. Used on a
  * transport error, on the server's drain frame, and by the watchdog.
+ *
+ * `updatedAt` is deliberately left alone: it records when the data arrived, and
+ * going stale does not change that. It is what the panel's tooltip reports.
  */
 function markStale(prev: Record<string, PanelState>): Record<string, PanelState> {
   const out: Record<string, PanelState> = {};
@@ -33,6 +42,10 @@ function markStale(prev: Record<string, PanelState>): Record<string, PanelState>
  * rolling window; PanelView applies them via ECharts setOption without
  * recreating charts. A panel becomes "stale" if no tick arrives within roughly
  * two refresh intervals.
+ *
+ * Connection state is tracked separately from panel state, in the reducer in
+ * `lib/connection.ts`: `EventSource` retries forever and says nothing, so
+ * without it a dead stream and a paused one are the same grey dot.
  */
 export function LiveDashboard({
   dashboardId,
@@ -50,14 +63,24 @@ export function LiveDashboard({
   const [states, setStates] = React.useState<Record<string, PanelState>>({});
   const [live, setLive] = React.useState(true);
   const [timeRange, setTimeRange] = React.useState<TimeRange>(spec.timeRange);
+  const [connection, setConnection] =
+    React.useState<ConnectionStatus>(INITIAL_CONNECTION);
+  // Bumped by the manual Reconnect to tear the EventSource down and build a
+  // new one; the browser's own retry schedule is not something a page can
+  // shortcut, so the socket has to be replaced rather than nudged.
+  const [reconnectNonce, setReconnectNonce] = React.useState(0);
   const lastTickRef = React.useRef<number>(0);
   const streamUrl = React.useMemo(() => {
     const params = new URLSearchParams(timeRange);
     return `/api/dashboards/${dashboardId}/stream?${params.toString()}`;
   }, [dashboardId, timeRange]);
 
+  const signal = React.useCallback((s: ConnectionSignal) => {
+    setConnection((prev) => reduceConnection(prev, s));
+  }, []);
+
   const applyEvent = React.useCallback(
-    (event: PollerEvent) => {
+    (event: PollerEvent, at: number) => {
       setStates((prev) => {
         if (event.type === "tick") return prev;
         const cur = prev[event.panelId];
@@ -67,7 +90,8 @@ export function LiveDashboard({
             [event.panelId]: {
               data: cur?.data ?? { columns: [], rows: [] },
               status: "error",
-              error: event.error,
+              error: { error: event.error, kind: event.kind },
+              updatedAt: cur?.updatedAt,
             },
           };
         }
@@ -77,6 +101,7 @@ export function LiveDashboard({
             [event.panelId]: {
               data: cur?.data ?? { columns: [], rows: [] },
               status: "tombstoned",
+              updatedAt: cur?.updatedAt,
             },
           };
         }
@@ -84,44 +109,60 @@ export function LiveDashboard({
         const next = mergeData(cur?.data, event, maxWindowPoints);
         return {
           ...prev,
-          [event.panelId]: { data: next, status: "live" },
+          [event.panelId]: { data: next, status: "live", updatedAt: at },
         };
       });
     },
     [maxWindowPoints],
   );
 
+  // `reconnectNonce` is listed as a dependency but never read in the body —
+  // changing it is the whole point. Re-running this effect is the only way to
+  // replace an EventSource, whose own retry schedule a page cannot reach.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: the nonce exists to force a fresh EventSource
   React.useEffect(() => {
     if (!live) return;
     lastTickRef.current = Date.now();
     const es = new EventSource(streamUrl);
-    es.onopen = () => setStates({});
+    es.onopen = () => {
+      setStates({});
+      signal({ type: "open" });
+    };
     es.onmessage = (msg) => {
       try {
         const event = JSON.parse(msg.data) as PollerEvent;
         if (event.type === "tick") {
           lastTickRef.current = event.at;
+          signal({ type: "tick", at: event.at });
         }
-        applyEvent(event);
+        applyEvent(event, Date.now());
       } catch {
         /* ignore malformed frame */
       }
     };
     es.onerror = () => {
-      // Mark everything stale on transport error; EventSource auto-reconnects.
+      // Mark everything stale on transport error. `readyState === CLOSED` is
+      // the browser saying it will NOT retry — an expired session on the
+      // stream route, typically — which is the one case a manual Reconnect
+      // cannot fix by itself but must still be distinguishable from a retry
+      // already in flight.
       setStates(markStale);
+      signal({ type: "error", closed: es.readyState === EventSource.CLOSED });
     };
     // The server sends this just before it stops, along with an SSE `retry:`
     // hint that EventSource honours: the reconnect lands on a healthy instance
     // after a spread-out delay, so say "stale" now rather than wait out the
     // watchdog.
-    const onDraining = () => setStates(markStale);
+    const onDraining = () => {
+      setStates(markStale);
+      signal({ type: "error", closed: false });
+    };
     es.addEventListener(DRAIN_EVENT, onDraining);
     return () => {
       es.removeEventListener(DRAIN_EVENT, onDraining);
       es.close();
     };
-  }, [applyEvent, live, streamUrl]);
+  }, [applyEvent, live, signal, streamUrl, reconnectNonce]);
 
   // Staleness watchdog. Disabled while paused — a paused dashboard is not stale.
   React.useEffect(() => {
@@ -135,11 +176,23 @@ export function LiveDashboard({
     return () => clearInterval(id);
   }, [spec.refreshIntervalMs, live]);
 
+  // Read `live` directly rather than from a `setLive` updater: the updater can
+  // run twice under StrictMode, and signalling the reducer from inside it would
+  // count the pause twice.
+  function togglePause() {
+    signal({ type: live ? "pause" : "resume" });
+    setLive(!live);
+  }
+
   return (
     <div>
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
         {header}
-        <div className="flex shrink-0 flex-wrap items-center gap-1">
+        <div className="flex shrink-0 flex-wrap items-center gap-2">
+          <ConnectionIndicator
+            status={connection}
+            onReconnect={() => setReconnectNonce((n) => n + 1)}
+          />
           <TimeRangeFilter value={timeRange} onChange={setTimeRange} />
           <Button
             variant="ghost"
@@ -147,16 +200,10 @@ export function LiveDashboard({
             aria-pressed={!live}
             aria-label={live ? "Pause live updates" : "Resume live updates"}
             className="text-muted hover:text-foreground"
-            onClick={() => setLive((v) => !v)}
+            onClick={togglePause}
           >
-            <span
-              className={cn(
-                "h-2 w-2 rounded-full",
-                live ? "animate-pulse bg-success" : "bg-muted",
-              )}
-            />
-            {live ? "Live" : "Paused"}
             {live ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
+            {live ? "Pause" : "Resume"}
           </Button>
           {actions}
         </div>
