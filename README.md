@@ -90,6 +90,27 @@ npm run seed                       # looping metrics seeder (+ demo source/dashb
 npm run dev                        # http://localhost:3000
 ```
 
+## Deploying (Kubernetes)
+
+`deploy/helm/holotable/` is a Helm chart for the app, its migration Job, and the
+objects around them; `deploy/argocd/holotable-application.yaml` is a reference
+Argo CD `Application`.
+
+```bash
+helm install holotable deploy/helm/holotable \
+  -f deploy/helm/holotable/examples/values-kubernetes-secret.yaml
+```
+
+It deploys neither TimescaleDB nor Keycloak, and it holds no credentials: those
+come from a Secret you name, and the chart refuses to render if one is set as
+plain config. Migrations run as a pre-upgrade hook, so a failed migration aborts
+the release instead of rolling out code against a schema it cannot use. Keep
+`replicaCount` at 1 until [#40](https://github.com/jbouder/holotable/issues/40)
+makes the poller topology-aware.
+
+See [Deploying on Kubernetes](https://holotable-docs.pages.dev/operations/kubernetes/)
+and the [chart README](deploy/helm/holotable/README.md).
+
 ## Seeding demo data
 
 `npm run seed` (`scripts/seed.ts`) is a long-running seeder that gives a fresh

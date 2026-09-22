@@ -1,0 +1,27 @@
+apiVersion: v2
+name: holotable
+description: Natural-language monitoring dashboards — the app, its migration job, and the wiring a cluster needs.
+type: application
+
+# The chart's own version. Bumped when the chart changes, independently of the
+# application it deploys.
+version: 0.1.0
+# The application version the default image tag points at.
+appVersion: "0.1.0"
+
+# policy/v1 PodDisruptionBudget and autoscaling/v2 HPA are both 1.25-era APIs.
+# Nothing here needs anything newer: the preStop handler is an `exec` rather
+# than the native `sleep` action precisely so the chart works below 1.30.
+kubeVersion: ">=1.25.0-0"
+
+home: https://github.com/jbouder/holotable
+sources:
+  - https://github.com/jbouder/holotable
+keywords:
+  - monitoring
+  - dashboards
+  - timescaledb
+  - observability
+maintainers:
+  - name: jbouder
+    url: https://github.com/jbouder

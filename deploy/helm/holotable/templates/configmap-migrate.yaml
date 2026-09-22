@@ -1,0 +1,19 @@
+{{- if .Values.migrations.enabled }}
+# The migration Job's copy of the non-secret environment. It exists because the
+# Job is a pre-install hook: hooks run before the release's ordinary resources
+# are created, so on a first install the app's ConfigMap is not there yet. Same
+# data, from the same helper, removed again once the hook phase succeeds.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "holotable.fullname" . }}-migrate
+  labels:
+    {{- include "holotable.labels" . | nindent 4 }}
+    app.kubernetes.io/component: migrate
+  annotations:
+    helm.sh/hook: pre-install,pre-upgrade
+    helm.sh/hook-weight: {{ sub (int .Values.migrations.hookWeight) 10 | quote }}
+    helm.sh/hook-delete-policy: before-hook-creation,hook-succeeded
+data:
+  {{- include "holotable.configData" . | nindent 2 }}
+{{- end }}

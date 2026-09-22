@@ -1,0 +1,41 @@
+{{- if .Values.autoscaling.enabled }}
+# Enabled at your own risk until https://github.com/jbouder/holotable/issues/40
+# lands: the poller lives in the Node process and is keyed by dashboard in a
+# process-local map, so every replica polls every dashboard it has a subscriber
+# for. Scaling out multiplies the load on TimescaleDB and lets two viewers of
+# one dashboard see different data. NOTES.txt repeats this after install.
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: {{ include "holotable.fullname" . }}
+  labels:
+    {{- include "holotable.labels" . | nindent 4 }}
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: {{ include "holotable.fullname" . }}
+  minReplicas: {{ .Values.autoscaling.minReplicas }}
+  maxReplicas: {{ .Values.autoscaling.maxReplicas }}
+  metrics:
+    {{- with .Values.autoscaling.targetCPUUtilizationPercentage }}
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: {{ . }}
+    {{- end }}
+    {{- with .Values.autoscaling.targetMemoryUtilizationPercentage }}
+    - type: Resource
+      resource:
+        name: memory
+        target:
+          type: Utilization
+          averageUtilization: {{ . }}
+    {{- end }}
+  {{- with .Values.autoscaling.behavior }}
+  behavior:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+{{- end }}

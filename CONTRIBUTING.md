@@ -60,7 +60,8 @@ cd docs && npm install && npm run dev
 ## Checks
 
 Run these before you push. CI runs the same four on every pull request, plus a
-Docker image build, and they are required to merge.
+Docker image build and a Helm lint/template pass, and they are required to
+merge.
 
 ```bash
 npm run lint         # biome check (lint + format, no writes)
@@ -74,6 +75,14 @@ and exits 1 on anything that would refuse to boot; `NODE_ENV=production` applies
 the production rules. Missing values are warnings in development and errors in
 production, so `.env.example` always starts the dev server. The rules and how to
 add one are in `docs/src/content/docs/operations/startup-validation.md`.
+
+If you touch `deploy/`, render the chart before you push — the CI job does the
+same, plus every example values file:
+
+```bash
+helm lint deploy/helm/holotable
+helm template holotable deploy/helm/holotable > /dev/null
+```
 
 `npm run test:fuzz` runs the property-based SQL guard suite on its own.
 `npm test` includes it with a fixed seed and a small iteration count, so it is

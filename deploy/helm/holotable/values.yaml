@@ -1,0 +1,288 @@
+# Default values for the Holotable chart.
+#
+# Nothing here is a credential, and nothing here may become one: values under
+# `config` are rendered into a ConfigMap in clear text, and the chart refuses
+# to render if a known secret name appears there. Credentials reach the pod
+# through `secrets.existingSecret` or `extraEnvFrom` — see the chart README.
+
+# -- Override the chart name used in resource names.
+nameOverride: ""
+# -- Override the full resource name prefix (`<release>-holotable` by default).
+fullnameOverride: ""
+
+# -- Number of app replicas. Keep this at 1: the poller is process-local, so a
+# second replica polls every dashboard a second time
+# (https://github.com/jbouder/holotable/issues/40). See "Replicas" in the README.
+replicaCount: 1
+
+image:
+  # -- Image repository for the `runtime` target of the repository Dockerfile.
+  # No image is published yet (https://github.com/jbouder/holotable/issues/97),
+  # so point this at a registry you build into.
+  repository: ghcr.io/jbouder/holotable
+  # -- Image tag. Defaults to the chart's appVersion.
+  tag: ""
+  # -- Pin by digest instead of tag (`sha256:...`). Wins over `tag` when set.
+  digest: ""
+  pullPolicy: IfNotPresent
+
+# -- `imagePullSecrets` for both the Deployment and the migration Job.
+imagePullSecrets: []
+
+migrations:
+  # -- Run `scripts/migrate.ts` as a pre-install/pre-upgrade hook. A failed
+  # migration aborts the release, so the new code never reaches the cluster
+  # against a schema it cannot use.
+  enabled: true
+  image:
+    # -- Image built from the Dockerfile's `migrate` target.
+    repository: ghcr.io/jbouder/holotable
+    # -- Defaults to `<appVersion>-migrate`.
+    tag: ""
+    digest: ""
+    pullPolicy: IfNotPresent
+  # -- Hook weight. Lower runs earlier; leave this alone unless you add hooks.
+  # The Job's own ServiceAccount is created ten weights ahead of it.
+  hookWeight: -5
+  # -- Override the Job's entrypoint. Empty runs the `migrate` image's CMD.
+  # Needed only to source an injected environment file (see the Vault example).
+  command: []
+  args: []
+  serviceAccount:
+    # -- Create a ServiceAccount for the migration Job. The app's own
+    # ServiceAccount cannot be used: it is an ordinary release resource, and on
+    # a first install the pre-install hook runs before it exists. This one is a
+    # hook itself, so it is there in time.
+    create: true
+    # -- Use an existing ServiceAccount instead. Set `create: false` with it.
+    name: ""
+    # -- Annotations on it. A Vault Kubernetes auth role binds to this account,
+    # so the Job can be handed credentials the same way the app is.
+    annotations: {}
+  # -- Job retries. The migration runner takes an advisory lock and is safe to
+  # retry, but a failure is nearly always deterministic, so one retry is plenty.
+  backoffLimit: 1
+  # -- Hard ceiling on the Job, in seconds. It also bounds how long a release
+  # waits on a migration that is stuck behind the advisory lock.
+  activeDeadlineSeconds: 600
+  # -- Delete the Job this long after it finishes. Null keeps a failed Job (and
+  # its logs) until the next release replaces it, which is usually what you want
+  # when a migration is what blocked the rollout.
+  ttlSecondsAfterFinished: null
+  resources:
+    requests:
+      cpu: 50m
+      memory: 128Mi
+    limits:
+      memory: 512Mi
+  podAnnotations: {}
+  nodeSelector: {}
+  tolerations: []
+  affinity: {}
+
+serviceAccount:
+  create: true
+  # -- Name of the ServiceAccount to use. Generated from the release when empty.
+  name: ""
+  # -- Annotations on the ServiceAccount. Where a Vault Agent role or a cloud
+  # workload identity binding goes.
+  annotations: {}
+  # -- The app calls no Kubernetes API, so it needs no token.
+  automountServiceAccountToken: false
+
+service:
+  type: ClusterIP
+  # -- Port the Service listens on.
+  port: 80
+  annotations: {}
+  # -- `nodePort` when `service.type` is NodePort.
+  nodePort: null
+
+ingress:
+  enabled: false
+  className: ""
+  annotations: {}
+  hosts:
+    - host: holotable.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+  tls: []
+  #  - secretName: holotable-tls
+  #    hosts:
+  #      - holotable.example.com
+
+app:
+  # -- Container port. The image defaults to 3000; changing this sets PORT.
+  port: 3000
+  # -- Drain budget after SIGTERM, in milliseconds (`SHUTDOWN_GRACE_MS`).
+  # Readiness starts failing, pollers stop, SSE subscribers get a reconnect
+  # hint, in-flight queries are awaited, then the pools close.
+  shutdownGraceMs: 10000
+  # -- Override the container entrypoint. Empty runs the image's own CMD
+  # (`node server.js`). The Vault Agent example in `examples/` wraps it so the
+  # injected environment file is sourced before the server starts.
+  command: []
+  # -- Arguments for `app.command`.
+  args: []
+  # -- Seconds the preStop hook sleeps before SIGTERM is delivered, so the
+  # endpoints controller can take the pod out of the Service first. Added to
+  # the derived `terminationGracePeriodSeconds`.
+  preStopSleepSeconds: 5
+
+# -- Non-secret environment, rendered into a ConfigMap and mounted with
+# `envFrom`. Every key is an environment variable from
+# https://holotable-docs.pages.dev/reference/configuration/ — for example
+# OIDC_ISSUER, OIDC_CLIENT_ID, OIDC_REDIRECT_URI, LOG_LEVEL, MAX_QUERY_ROWS.
+# Credentials do NOT go here; the chart fails to render if they do.
+config: {}
+#  OIDC_ISSUER: https://kc.example.com/realms/holotable
+#  OIDC_CLIENT_ID: holotable
+#  OIDC_JWKS_URL: https://kc.example.com/realms/holotable/protocol/openid-connect/certs
+#  OIDC_REDIRECT_URI: https://holotable.example.com/api/auth/callback
+#  AI_PROVIDER: openai-compatible
+#  AI_MODEL: openai/gpt-4o-mini
+#  OPENAI_BASE_URL: https://openrouter.ai/api/v1
+
+secrets:
+  # -- Name of an existing Secret holding the credential environment:
+  # SESSION_SECRET, DATABASE_URL, OIDC_CLIENT_SECRET, METRICS_TOKEN, the
+  # OPENAI_API_KEY or AI_GATEWAY_API_KEY, and one
+  # `<SECRET_REF>_USERNAME`/`<SECRET_REF>_PASSWORD` pair per data source. Its
+  # keys are loaded with `envFrom`, so they are the variable names verbatim.
+  existingSecret: ""
+  # -- Let the chart create that Secret from `secrets.values`. Off by default:
+  # it puts credentials in your values file, and therefore in `helm get values`
+  # and in whatever holds your values file. Prefer `existingSecret`.
+  create: false
+  # -- Contents of the chart-managed Secret. Only read when `create` is true.
+  values: {}
+
+# -- Extra `envFrom` sources on the app container: more Secrets or ConfigMaps,
+# by name. This is how a CSI-synced or operator-synced Secret is wired in.
+extraEnvFrom: []
+#  - secretRef:
+#      name: holotable-db
+
+# -- Extra environment variables on the app container, as a raw env list.
+# Takes `valueFrom`, so a single key from a Secret can be mapped by hand.
+extraEnv: []
+
+# -- Extra volumes on the app pod, for a Vault Agent or CSI secret mount.
+extraVolumes: []
+# -- Extra volume mounts on the app container.
+extraVolumeMounts: []
+
+# -- Overrides the whole container `lifecycle` block. Left empty the chart
+# renders a preStop `exec` sleep, which works on every supported cluster.
+# On 1.30+ the native handler is `{preStop: {sleep: {seconds: 5}}}`.
+lifecycle: {}
+
+# -- Seconds the kubelet waits after SIGTERM before SIGKILL. Empty derives it
+# from `app.shutdownGraceMs` + `app.preStopSleepSeconds` + 5s of slack. Setting
+# it below the drain budget fails the render rather than cutting a drain short.
+terminationGracePeriodSeconds: ""
+
+livenessProbe:
+  httpGet:
+    path: /api/health
+    port: http
+  initialDelaySeconds: 10
+  periodSeconds: 30
+  timeoutSeconds: 5
+  failureThreshold: 3
+readinessProbe:
+  httpGet:
+    path: /api/ready
+    port: http
+  initialDelaySeconds: 5
+  periodSeconds: 10
+  timeoutSeconds: 5
+  # One failed probe takes the pod out of rotation: it is also what removes a
+  # draining pod, and /api/ready answers `draining` immediately on SIGTERM.
+  failureThreshold: 1
+  successThreshold: 1
+startupProbe:
+  httpGet:
+    path: /api/health
+    port: http
+  periodSeconds: 5
+  # 30 × 5s: a cold start has to run Next's server boot and the startup
+  # configuration check before it answers anything.
+  failureThreshold: 30
+
+resources:
+  requests:
+    cpu: 100m
+    memory: 256Mi
+  limits:
+    memory: 1Gi
+
+autoscaling:
+  # -- Leave this off. An HPA scales the app horizontally, and horizontal is
+  # exactly what the poller is not yet safe for
+  # (https://github.com/jbouder/holotable/issues/40).
+  enabled: false
+  minReplicas: 1
+  maxReplicas: 3
+  targetCPUUtilizationPercentage: 75
+  targetMemoryUtilizationPercentage: null
+  behavior: {}
+
+podDisruptionBudget:
+  # -- Only meaningful with more than one replica, which is not yet supported.
+  enabled: false
+  minAvailable: 1
+  maxUnavailable: null
+
+networkPolicy:
+  # -- Default-deny egress and ingress for the app pod. Off by default because
+  # the correct peers are cluster-specific; the selectors below are examples.
+  enabled: false
+  # -- Namespace/pod selectors allowed to reach the app port (your ingress
+  # controller). An empty list allows nothing, which is a working default only
+  # if you also disable the policy.
+  ingressFrom: []
+  #  - namespaceSelector:
+  #      matchLabels:
+  #        kubernetes.io/metadata.name: ingress-nginx
+  # -- Egress peers beyond DNS: Postgres/TimescaleDB, Keycloak, the AI provider.
+  egressTo: []
+  #  - to:
+  #      - ipBlock:
+  #          cidr: 10.0.0.0/8
+  #    ports:
+  #      - protocol: TCP
+  #        port: 5432
+  # -- Allow DNS to kube-dns. Almost always wanted when the policy is on.
+  allowDNS: true
+
+podAnnotations: {}
+#  prometheus.io/scrape: "true"
+#  prometheus.io/path: /api/metrics
+#  prometheus.io/port: "3000"
+podLabels: {}
+
+podSecurityContext:
+  runAsNonRoot: true
+  # The image creates uid/gid 1001 (`nextjs`) and runs as it.
+  runAsUser: 1001
+  runAsGroup: 1001
+  fsGroup: 1001
+  seccompProfile:
+    type: RuntimeDefault
+
+securityContext:
+  allowPrivilegeEscalation: false
+  # The app writes only to the two emptyDir volumes mounted below.
+  readOnlyRootFilesystem: true
+  privileged: false
+  capabilities:
+    drop:
+      - ALL
+
+nodeSelector: {}
+tolerations: []
+affinity: {}
+topologySpreadConstraints: []
+priorityClassName: ""
