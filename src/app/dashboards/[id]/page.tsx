@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { Download, LayoutTemplate, Pencil } from "lucide-react";
+import { Download, LayoutTemplate, Pencil, Tag } from "lucide-react";
 import { getIdentity } from "@/lib/auth/authorize";
 import { can } from "@/lib/auth/authorize";
 import { getDashboardById } from "@/lib/db/repo";
@@ -9,9 +9,11 @@ import { SignIn } from "@/components/sign-in";
 import { LiveDashboard } from "@/components/dashboard/LiveDashboard";
 import { DashboardChat } from "@/components/dashboard/DashboardChat";
 import { DeleteDashboardButton } from "@/components/dashboard/delete-dashboard-button";
+import { RecordDashboardVisit } from "@/components/dashboard/RecordDashboardVisit";
 import { SaveAsTemplate } from "@/components/templates/SaveAsTemplate";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
+import { dashboardListHref, EMPTY_QUERY } from "@/lib/dashboard-list";
 
 export const dynamic = "force-dynamic";
 
@@ -77,11 +79,32 @@ export default async function DashboardViewPage({
         header={
           <div>
             <h1 className="text-2xl font-semibold">{dashboard.spec.title}</h1>
-            <p className="text-xs text-muted">
+            {/*
+              The description is row metadata (#119), so it sits beside the
+              title rather than in the spec line below it — that line describes
+              what the server is executing, and prose is not part of that.
+            */}
+            {dashboard.description && (
+              <p className="mt-1 max-w-3xl text-sm text-muted">{dashboard.description}</p>
+            )}
+            <p className="mt-1 text-xs text-muted">
               {dashboard.workspaceId} · v{dashboard.version} · refresh{" "}
               {Math.round(dashboard.spec.refreshIntervalMs / 1000)}s ·{" "}
               {dashboard.spec.timeRange.from} → {dashboard.spec.timeRange.to}
             </p>
+            {dashboard.tags.length > 0 && (
+              <div className="mt-2 flex flex-wrap gap-1">
+                {dashboard.tags.map((tag) => (
+                  <Link
+                    key={tag}
+                    href={dashboardListHref({ ...EMPTY_QUERY, tags: [tag] })}
+                    className="inline-flex items-center gap-1 rounded-full border border-border px-2 py-0.5 text-[11px] text-muted transition-colors hover:border-primary/50 hover:text-foreground focus-visible:outline-2 focus-visible:outline-primary"
+                  >
+                    <Tag className="h-2.5 w-2.5" aria-hidden /> {tag}
+                  </Link>
+                ))}
+              </div>
+            )}
           </div>
         }
         actions={
@@ -126,6 +149,7 @@ export default async function DashboardViewPage({
         }
       />
 
+      <RecordDashboardVisit dashboardId={id} />
       <DashboardChat dashboardId={id} dashboardTitle={dashboard.spec.title} />
     </div>
   );

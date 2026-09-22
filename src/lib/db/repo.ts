@@ -1,4 +1,11 @@
 import { query, withTransaction } from "@/lib/db/pg";
+import { type DashboardSort, PAGE_SIZE } from "@/lib/dashboard-list";
+import {
+  type DashboardRecord,
+  type DashboardSummary,
+  escapeLike,
+  normalizeTags,
+} from "@/lib/dashboard-metadata";
 import { log } from "@/lib/log";
 import { SourceConfig, type SourceRecord } from "@/lib/registry";
 import { type Dashboard, parseDashboard } from "@/lib/ir";
@@ -220,52 +227,236 @@ export async function deleteSource(
 /* Dashboard repository                                                       */
 /* -------------------------------------------------------------------------- */
 
-export interface DashboardSummary {
-  id: string;
-  workspaceId: string;
-  title: string;
-  createdBy: string;
-  version: number;
-  updatedAt: string;
-}
-
-export interface DashboardRecord extends DashboardSummary {
-  spec: Dashboard;
-}
+// The row shapes live in `@/lib/dashboard-metadata` so the list UI can name
+// them without importing `pg`; re-exported here because this is where every
+// caller already reaches for them.
+export type { DashboardRecord, DashboardSummary };
 
 type DashboardJoinRow = {
   id: string;
   workspace_id: string;
   title: string;
+  description: string | null;
+  tags: string[] | null;
   created_by: string;
+  created_at: string;
   updated_at: string;
   version: number | null;
+  favorite: boolean | null;
   spec: unknown;
 };
 
-export async function listDashboards(workspaceId: string): Promise<DashboardSummary[]> {
-  const rows = await query<DashboardJoinRow>(
-    `SELECT d.id, d.workspace_id, d.title, d.created_by, d.updated_at, dv.version
-     FROM dashboards d
-     LEFT JOIN dashboard_versions dv ON dv.id = d.current_version_id
-     WHERE d.workspace_id = $1 AND d.deleted_at IS NULL
-     ORDER BY d.updated_at DESC`,
-    [workspaceId],
-  );
-  return rows.map((r) => ({
-    id: r.id,
-    workspaceId: r.workspace_id,
-    title: r.title,
-    createdBy: r.created_by,
-    version: r.version ?? 0,
-    updatedAt: r.updated_at,
-  }));
+function mapSummary(row: DashboardJoinRow): DashboardSummary {
+  return {
+    id: row.id,
+    workspaceId: row.workspace_id,
+    title: row.title,
+    description: row.description,
+    tags: row.tags ?? [],
+    createdBy: row.created_by,
+    version: row.version ?? 0,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+    favorite: row.favorite ?? false,
+  };
 }
 
-/** Fetch a dashboard with its current spec (no workspace scoping for authz). */
+/** What the list page and `GET /api/dashboards` may narrow the list by. */
+export interface DashboardListOptions {
+  /** Free text over title and description. */
+  search?: string;
+  /** ANDed: a dashboard must carry every one of them. */
+  tags?: string[];
+  sort?: DashboardSort;
+  limit?: number;
+  offset?: number;
+  /**
+   * Whose favourites to resolve. Favouriting is per person, so without a
+   * subject every row comes back `favorite: false` — which is the right answer
+   * for a caller that has no identity in hand rather than a reason to fail.
+   */
+  userSub?: string;
+  /** Only rows `userSub` has starred. Requires `userSub`. */
+  favoritesOnly?: boolean;
+  /**
+   * Only these ids, in addition to every other filter. This is how the
+   * recently-viewed strip resolves the ids a browser kept: the workspace scope
+   * and the caller's authorization still decide what comes back, so an id from
+   * storage can name a row but never reach one.
+   */
+  ids?: string[];
+}
+
+/**
+ * Dashboard ids are `gen_random_uuid()` primary keys, and `ids` reaches this
+ * function from a browser's `localStorage` — so a value that is not a UUID is
+ * filtered out here rather than handed to `$n::uuid[]`, where it would fail the
+ * whole query instead of simply matching nothing.
+ */
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/** `sort` → the ORDER BY it selects. Fixed strings; never interpolated input. */
+const DASHBOARD_ORDER: Record<DashboardSort, string> = {
+  updated: "d.updated_at DESC, d.id",
+  created: "d.created_at DESC, d.id",
+  title: "lower(d.title) ASC, d.id",
+};
+
+/**
+ * One page of the dashboards in a workspace, with the total the filters match.
+ *
+ * The filtering, ordering and paging all happen in SQL rather than over a full
+ * list in memory: the list is the page a workspace with three hundred
+ * dashboards lands on, and `ORDER BY updated_at DESC` over all of them to show
+ * twenty-four is the shape that stops working first.
+ *
+ * `total` rides along on the same query as a window count, so the pager cannot
+ * disagree with the rows above it.
+ */
+export async function listDashboards(
+  workspaceId: string,
+  opts: DashboardListOptions = {},
+): Promise<{ dashboards: DashboardSummary[]; total: number }> {
+  const search = opts.search?.trim() ? `%${escapeLike(opts.search.trim())}%` : null;
+  const tags = opts.tags?.length ? opts.tags : null;
+  const order = DASHBOARD_ORDER[opts.sort ?? "updated"];
+  // An `ids` filter that survives normalization to nothing must stay a filter
+  // that matches nothing, not fall back to "every dashboard".
+  const ids = opts.ids ? opts.ids.filter((id) => UUID.test(id)) : null;
+
+  const rows = await query<DashboardJoinRow & { total: string }>(
+    `SELECT d.id, d.workspace_id, d.title, d.description, d.tags,
+            d.created_by, d.created_at, d.updated_at,
+            dv.version,
+            (f.dashboard_id IS NOT NULL) AS favorite,
+            COUNT(*) OVER () AS total
+     FROM dashboards d
+     LEFT JOIN dashboard_versions dv ON dv.id = d.current_version_id
+     LEFT JOIN dashboard_favorites f
+       ON f.dashboard_id = d.id AND f.user_sub = $2::text
+     WHERE d.workspace_id = $1 AND d.deleted_at IS NULL
+       AND ($3::text IS NULL
+            OR d.title ILIKE $3 ESCAPE '\\'
+            OR d.description ILIKE $3 ESCAPE '\\')
+       AND ($4::text[] IS NULL OR d.tags @> $4)
+       AND ($5::boolean IS NOT TRUE OR f.dashboard_id IS NOT NULL)
+       AND ($6::uuid[] IS NULL OR d.id = ANY($6))
+     ORDER BY ${order}
+     LIMIT $7 OFFSET $8`,
+    [
+      workspaceId,
+      opts.userSub ?? null,
+      search,
+      tags,
+      opts.favoritesOnly ?? false,
+      ids,
+      opts.limit ?? PAGE_SIZE,
+      opts.offset ?? 0,
+    ],
+  );
+
+  return {
+    dashboards: rows.map(mapSummary),
+    // `COUNT(*) OVER ()` is a bigint, and a page past the end has no rows to
+    // carry it — which is itself the answer only when nothing matched.
+    total: rows[0] ? Number(rows[0].total) : 0,
+  };
+}
+
+/**
+ * Every tag in use in a workspace, with how many dashboards carry it.
+ *
+ * This is the filter bar's vocabulary, and it is derived rather than stored:
+ * there is no tag registry to keep in step, so a tag stops existing exactly
+ * when the last dashboard wearing it stops wearing it.
+ */
+export async function listDashboardTags(
+  workspaceId: string,
+): Promise<{ tag: string; count: number }[]> {
+  const rows = await query<{ tag: string; count: string }>(
+    `SELECT tag, COUNT(*)::text AS count
+     FROM dashboards d, unnest(d.tags) AS tag
+     WHERE d.workspace_id = $1 AND d.deleted_at IS NULL
+     GROUP BY tag
+     ORDER BY COUNT(*) DESC, tag ASC`,
+    [workspaceId],
+  );
+  return rows.map((r) => ({ tag: r.tag, count: Number(r.count) }));
+}
+
+/**
+ * Write a dashboard's description and tags.
+ *
+ * Workspace-scoped in the statement itself, not just at the route: a dashboard
+ * id is the only thing a caller supplies, and the `WHERE` is what makes an id
+ * from another workspace a miss rather than a write. No version is appended —
+ * these columns are not in the spec, which is the whole reason they are
+ * columns (see `src/lib/dashboard-metadata.ts`).
+ */
+export async function updateDashboardMetadata(
+  workspaceId: string,
+  id: string,
+  patch: { description?: string | null; tags?: string[] },
+): Promise<DashboardSummary | null> {
+  const rows = await query<DashboardJoinRow>(
+    `UPDATE dashboards d
+        SET description = CASE WHEN $3::boolean THEN $4::text ELSE d.description END,
+            tags        = COALESCE($5::text[], d.tags),
+            updated_at  = now()
+      WHERE d.id = $1 AND d.workspace_id = $2 AND d.deleted_at IS NULL
+      RETURNING d.id, d.workspace_id, d.title, d.description, d.tags,
+                d.created_by, d.created_at, d.updated_at,
+                (SELECT version FROM dashboard_versions
+                  WHERE id = d.current_version_id) AS version,
+                FALSE AS favorite`,
+    [
+      id,
+      workspaceId,
+      // `description` is nullable, so "clear it" and "leave it alone" cannot
+      // both be expressed by a null parameter; the boolean says which was meant.
+      patch.description !== undefined,
+      patch.description ?? null,
+      // Normalized here as well as at the API boundary, so the column's
+      // invariant — folded, deduplicated, sorted — is a property of the table
+      // rather than of one route remembering to hold it.
+      patch.tags ? normalizeTags(patch.tags) : null,
+    ],
+  );
+  return rows[0] ? mapSummary(rows[0]) : null;
+}
+
+/** Star or unstar a dashboard for one person. Idempotent in both directions. */
+export async function setDashboardFavorite(
+  userSub: string,
+  dashboardId: string,
+  favorite: boolean,
+): Promise<void> {
+  if (favorite) {
+    await query(
+      `INSERT INTO dashboard_favorites (user_sub, dashboard_id)
+       VALUES ($1, $2) ON CONFLICT DO NOTHING`,
+      [userSub, dashboardId],
+    );
+    return;
+  }
+  await query(
+    `DELETE FROM dashboard_favorites WHERE user_sub = $1 AND dashboard_id = $2`,
+    [userSub, dashboardId],
+  );
+}
+
+/**
+ * Fetch a dashboard with its current spec (no workspace scoping for authz).
+ *
+ * `favorite` is false here rather than resolved: this is the record the viewer
+ * and the editor read, and whether the reader starred it is the list's
+ * question, asked once for a page of rows instead of once per dashboard.
+ */
 export async function getDashboardById(id: string): Promise<DashboardRecord | null> {
   const rows = await query<DashboardJoinRow>(
-    `SELECT d.id, d.workspace_id, d.title, d.created_by, d.updated_at,
+    `SELECT d.id, d.workspace_id, d.title, d.description, d.tags,
+            d.created_by, d.created_at, d.updated_at,
+            FALSE AS favorite,
             dv.version, dv.spec
      FROM dashboards d
      LEFT JOIN dashboard_versions dv ON dv.id = d.current_version_id
@@ -274,28 +465,24 @@ export async function getDashboardById(id: string): Promise<DashboardRecord | nu
   );
   const r = rows[0];
   if (!r || r.spec == null) return null;
-  return {
-    id: r.id,
-    workspaceId: r.workspace_id,
-    title: r.title,
-    createdBy: r.created_by,
-    version: r.version ?? 0,
-    updatedAt: r.updated_at,
-    spec: parseDashboard(r.spec),
-  };
+  return { ...mapSummary(r), spec: parseDashboard(r.spec) };
 }
 
 export async function createDashboard(input: {
   workspaceId: string;
   createdBy: string;
   spec: Dashboard;
+  /** Row metadata to write alongside version 1 (a duplicate carries it over). */
+  description?: string | null;
+  tags?: string[];
 }): Promise<DashboardRecord> {
   const spec = parseDashboard(input.spec);
+  const tags = normalizeTags(input.tags ?? []);
   return withTransaction(async (client) => {
     const d = await client.query<{ id: string; created_at: string }>(
-      `INSERT INTO dashboards (workspace_id, title, created_by)
-       VALUES ($1,$2,$3) RETURNING id, created_at`,
-      [input.workspaceId, spec.title, input.createdBy],
+      `INSERT INTO dashboards (workspace_id, title, created_by, description, tags)
+       VALUES ($1,$2,$3,$4,$5) RETURNING id, created_at`,
+      [input.workspaceId, spec.title, input.createdBy, input.description ?? null, tags],
     );
     const dashboardId = d.rows[0].id;
     const v = await client.query<{ id: string; created_at: string }>(
@@ -311,9 +498,13 @@ export async function createDashboard(input: {
       id: dashboardId,
       workspaceId: input.workspaceId,
       title: spec.title,
+      description: input.description ?? null,
+      tags,
       createdBy: input.createdBy,
       version: 1,
+      createdAt: d.rows[0].created_at,
       updatedAt: v.rows[0].created_at,
+      favorite: false,
       spec,
     };
   });
@@ -322,6 +513,10 @@ export async function createDashboard(input: {
 /**
  * Save a new immutable version of an existing dashboard. Existing versions are
  * never mutated; a new dashboard_versions row is written and becomes current.
+ *
+ * The `title` column is written from `spec.title` on every save — the spec is
+ * the authority for the name (`TITLE_AUTHORITY` in `dashboard-metadata.ts`),
+ * which is why a rename goes through here rather than updating the row.
  */
 export async function saveDashboardVersion(input: {
   dashboardId: string;
@@ -349,19 +544,30 @@ export async function saveDashboardVersion(input: {
         input.note ?? null,
       ],
     );
-    const d = await client.query<{ workspace_id: string; created_by: string }>(
+    const d = await client.query<{
+      workspace_id: string;
+      created_by: string;
+      created_at: string;
+      description: string | null;
+      tags: string[] | null;
+    }>(
       `UPDATE dashboards
        SET current_version_id = $2, title = $3, updated_at = now()
-       WHERE id = $1 RETURNING workspace_id, created_by`,
+       WHERE id = $1
+       RETURNING workspace_id, created_by, created_at, description, tags`,
       [input.dashboardId, v.rows[0].id, spec.title],
     );
     return {
       id: input.dashboardId,
       workspaceId: d.rows[0].workspace_id,
       title: spec.title,
+      description: d.rows[0].description,
+      tags: d.rows[0].tags ?? [],
       createdBy: d.rows[0].created_by,
       version,
+      createdAt: d.rows[0].created_at,
       updatedAt: v.rows[0].created_at,
+      favorite: false,
       spec,
     };
   });
