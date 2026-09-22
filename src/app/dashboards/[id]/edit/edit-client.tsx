@@ -10,6 +10,7 @@ import {
   SendHorizontal,
   Loader2,
   LayoutGrid,
+  LayoutTemplate,
   Unplug,
 } from "lucide-react";
 import {
@@ -37,6 +38,9 @@ import { missingSourceIds, panelsUsingSource, repointPanels } from "@/lib/panel-
 import { RepointPanelsDialog } from "@/components/dashboard/RepointPanelsDialog";
 import { ErrorDisplay } from "@/components/ui/error-display";
 import { type ApiError, apiErrorFromThrown, readApiError } from "@/lib/errors";
+import { appendTemplate, type Template } from "@/lib/templates";
+import { SaveAsTemplate } from "@/components/templates/SaveAsTemplate";
+import { TemplatePicker } from "@/components/templates/TemplatePicker";
 
 interface SourceOption {
   id: string;
@@ -60,11 +64,14 @@ const FORMAT_OPTIONS = [
 
 export function EditDashboardClient({
   dashboardId,
+  workspaceId,
   initialSpec,
   initialPanelId,
   sources,
 }: {
   dashboardId: string;
+  /** The dashboard's own workspace: where a template is saved and read from. */
+  workspaceId: string;
   initialSpec: Dashboard;
   /** Panel to open selected; ignored when it is not in the spec. */
   initialPanelId?: string;
@@ -98,6 +105,7 @@ export function EditDashboardClient({
     sourceId: string;
     panelIds: string[];
   } | null>(null);
+  const [picking, setPicking] = React.useState(false);
 
   const selected = spec.panels.find((p) => p.id === selectedId) ?? null;
   // Sources a panel names that the page did not load: tombstoned, deleted, or
@@ -163,6 +171,19 @@ export function EditDashboardClient({
     };
     setSpec((s) => ({ ...s, panels: [...s.panels, panel] }));
     setSelectedId(id);
+  }
+
+  /**
+   * Bring a template's panels in at the bottom of the grid, already pointed at
+   * the source chosen in the picker. One `setSpec`, so it is one step to undo
+   * (#81); nothing is written until the existing Save appends a version, which
+   * re-validates every statement server-side against that source.
+   */
+  function applyTemplate(input: { template: Template; sourceId: string }) {
+    const next = appendTemplate(spec, input.template.body, input.sourceId);
+    setSpec(next);
+    setSelectedId(next.panels[next.panels.length - 1]?.id ?? null);
+    setPicking(false);
   }
 
   function removePanel(id: string) {
@@ -438,9 +459,19 @@ export function EditDashboardClient({
             <Card className="lg:col-span-1">
               <CardHeader>
                 <CardTitle>Panels</CardTitle>
-                <Button variant="secondary" size="sm" onClick={addPanel}>
-                  <Plus className="h-4 w-4" /> Add
-                </Button>
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    onClick={() => setPicking(true)}
+                    disabled={sources.length === 0}
+                  >
+                    <LayoutTemplate className="h-4 w-4" /> From template
+                  </Button>
+                  <Button variant="secondary" size="sm" onClick={addPanel}>
+                    <Plus className="h-4 w-4" /> Add
+                  </Button>
+                </div>
               </CardHeader>
               <CardContent className="space-y-3">
                 <div className="space-y-1">
@@ -470,6 +501,16 @@ export function EditDashboardClient({
             <Card className="lg:col-span-2">
               <CardHeader>
                 <CardTitle>{selected ? "Panel editor" : "No panel selected"}</CardTitle>
+                {selected && (
+                  <SaveAsTemplate
+                    // Keyed on the panel so the dialog's defaults follow the
+                    // selection instead of keeping the last panel's name.
+                    key={selected.id}
+                    workspaceId={workspaceId}
+                    defaultName={selected.title}
+                    subject={{ kind: "panel", panel: selected }}
+                  />
+                )}
               </CardHeader>
               <CardContent className="space-y-4">
                 {selected && (
@@ -552,6 +593,17 @@ export function EditDashboardClient({
         >
           <PreviewDashboard spec={spec} />
         </section>
+      )}
+
+      {picking && (
+        <TemplatePicker
+          workspaceId={workspaceId}
+          sources={sources.map((s) => ({ id: s.id, name: s.name }))}
+          defaultSourceId={selected?.query.sourceId}
+          applyLabel="Add panels"
+          onApply={applyTemplate}
+          onClose={() => setPicking(false)}
+        />
       )}
 
       {repointing && repointPanelSet.length > 0 && (

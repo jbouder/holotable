@@ -39,6 +39,7 @@ export default async function EditDashboardPage({
   return (
     <EditDashboardClient
       dashboardId={id}
+      workspaceId={dashboard.workspaceId}
       initialSpec={dashboard.spec}
       initialPanelId={panel}
       version={dashboard.version}

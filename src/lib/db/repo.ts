@@ -1,9 +1,11 @@
 import { query, withTransaction } from "@/lib/db/pg";
+import { log } from "@/lib/log";
 import { SourceConfig, type SourceRecord } from "@/lib/registry";
 import { type Dashboard, parseDashboard } from "@/lib/ir";
 import type { BudgetStore } from "@/lib/limits/budget";
 import type { WorkspaceLimits } from "@/lib/limits/llm";
 import type { ImpactDashboard, SourceImpact } from "@/lib/source-impact";
+import { type Template, TemplateBody, TemplateKind } from "@/lib/templates";
 
 /* -------------------------------------------------------------------------- */
 /* Source registry repository                                                 */
@@ -426,3 +428,121 @@ export const pgBudgetStore: BudgetStore = {
     );
   },
 };
+
+/* -------------------------------------------------------------------------- */
+/* Template repository (#120)                                                 */
+/* -------------------------------------------------------------------------- */
+
+type TemplateRow = {
+  id: string;
+  workspace_id: string;
+  kind: string;
+  name: string;
+  description: string | null;
+  body: unknown;
+  created_by: string;
+  created_at: string;
+};
+
+/**
+ * A stored row as the picker's {@link Template}.
+ *
+ * `body` is parsed against the IR on the way out as well as on the way in: a
+ * row written before an IR change is exactly the case where a template would
+ * otherwise be applied as a shape nothing else in the system accepts.
+ */
+function mapTemplate(row: TemplateRow): Template {
+  return {
+    id: row.id,
+    origin: "workspace",
+    kind: TemplateKind.parse(row.kind),
+    name: row.name,
+    description: row.description ?? undefined,
+    body: TemplateBody.parse(row.body),
+    workspaceId: row.workspace_id,
+    createdBy: row.created_by,
+    createdAt: row.created_at,
+  };
+}
+
+/**
+ * The templates saved in a workspace, newest name-ordered so the picker reads
+ * the same way twice. A row whose stored body no longer parses against the IR
+ * is dropped rather than failing the whole list: one unreadable template must
+ * not take the other five down with it.
+ */
+export async function listTemplates(
+  workspaceId: string,
+  kind?: TemplateKind,
+): Promise<Template[]> {
+  const rows = await query<TemplateRow>(
+    `SELECT * FROM templates
+      WHERE workspace_id = $1 AND ($2::text IS NULL OR kind = $2)
+      ORDER BY kind, name`,
+    [workspaceId, kind ?? null],
+  );
+  return rows.flatMap((row) => {
+    try {
+      return [mapTemplate(row)];
+    } catch {
+      log.warn("template.unreadable", { templateId: row.id });
+      return [];
+    }
+  });
+}
+
+/** Fetch a template WITHOUT workspace scoping (for authorization lookups). */
+export async function getTemplateById(id: string): Promise<Template | null> {
+  const rows = await query<TemplateRow>(`SELECT * FROM templates WHERE id = $1`, [id]);
+  return rows[0] ? mapTemplate(rows[0]) : null;
+}
+
+/** Raised when the workspace already has a template of this kind and name. */
+export class DuplicateTemplateName extends Error {}
+
+/** PostgreSQL's unique_violation. */
+const UNIQUE_VIOLATION = "23505";
+
+export async function createTemplate(input: {
+  workspaceId: string;
+  name: string;
+  description?: string;
+  body: TemplateBody;
+  createdBy: string;
+}): Promise<Template> {
+  const body = TemplateBody.parse(input.body);
+  try {
+    const rows = await query<TemplateRow>(
+      `INSERT INTO templates (workspace_id, kind, name, description, body, created_by)
+       VALUES ($1,$2,$3,$4,$5,$6)
+       RETURNING *`,
+      [
+        input.workspaceId,
+        body.kind,
+        input.name,
+        input.description ?? null,
+        JSON.stringify(body),
+        input.createdBy,
+      ],
+    );
+    return mapTemplate(rows[0]);
+  } catch (err) {
+    if ((err as { code?: string }).code === UNIQUE_VIOLATION) {
+      throw new DuplicateTemplateName(input.name);
+    }
+    throw err;
+  }
+}
+
+/**
+ * Delete a template. Hard, unlike a source or a dashboard: nothing references
+ * a template after it has been applied — instantiation copies the spec — so
+ * there is no dangling reference a tombstone would protect.
+ */
+export async function deleteTemplate(workspaceId: string, id: string): Promise<boolean> {
+  const rows = await query<{ id: string }>(
+    `DELETE FROM templates WHERE id = $1 AND workspace_id = $2 RETURNING id`,
+    [id, workspaceId],
+  );
+  return rows.length > 0;
+}

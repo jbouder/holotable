@@ -105,3 +105,25 @@ supplied by the importer and refuses the whole import, naming the ids, when any
 of them is still not a live source in the target workspace. Guessing by name or
 by catalog shape would point a panel at the wrong database and report
 plausible-looking numbers instead of an error.
+
+## Keeping one, and applying it again
+
+A template is the same document kept for reuse (`src/lib/templates.ts`). Its
+body is a `Panel` or a `Dashboard` out of this IR, tagged with which, and
+nothing else — so "IR-validated on write and on instantiation" is a property of
+the schema rather than a habit, and a template is exactly as safe to keep and
+hand around as the spec it was taken from.
+
+Applying one re-points every panel at a source the reader picks, for the reason
+an import does: the ids a template carries meant something in one registry, and
+a template's whole purpose is to be used somewhere else. The SQL itself is
+never rewritten to fit a different schema — the picker runs the guard over each
+statement against the chosen source's catalog and shows what fails, and fixing
+it is the author's job in the editor.
+
+The starter templates that ship with the app are not stored at all. They are
+built from a source's own catalog on request (`src/lib/builtin-templates.ts`),
+the way the starter prompts are: the four golden signals, parameterized by a
+table and its time column, offered only where the columns support them. That
+also means they cannot drift — a built-in exists for as long as the catalog
+supports it, and stops being offered when it does not.

@@ -9,6 +9,7 @@ import { SignIn } from "@/components/sign-in";
 import { LiveDashboard } from "@/components/dashboard/LiveDashboard";
 import { DashboardChat } from "@/components/dashboard/DashboardChat";
 import { DeleteDashboardButton } from "@/components/dashboard/delete-dashboard-button";
+import { SaveAsTemplate } from "@/components/templates/SaveAsTemplate";
 import { Button } from "@/components/ui/button";
 
 export const dynamic = "force-dynamic";
@@ -30,6 +31,13 @@ export default async function DashboardViewPage({
   }
 
   const canEdit = can(identity, "dashboard:update", {
+    workspaceId: dashboard.workspaceId,
+  });
+
+  // Saving a template writes to this workspace, so it is gated on the same
+  // `dashboard:create` the API checks rather than on being able to edit THIS
+  // dashboard -- the two happen to coincide today and need not tomorrow.
+  const canSaveTemplate = can(identity, "dashboard:create", {
     workspaceId: dashboard.workspaceId,
   });
 
@@ -70,6 +78,14 @@ export default async function DashboardViewPage({
                 <Download className="h-4 w-4" /> Export
               </Button>
             </a>
+            {canSaveTemplate && (
+              <SaveAsTemplate
+                workspaceId={dashboard.workspaceId}
+                defaultName={dashboard.spec.title}
+                subject={{ kind: "dashboard", dashboard: dashboard.spec }}
+                variant="ghost"
+              />
+            )}
             {canEdit && (
               <Link href={`/dashboards/${id}/edit`}>
                 <Button
