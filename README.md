@@ -162,6 +162,8 @@ default single-instance setup these are the same TimescaleDB database.
 | `/api/sources/[id]/test` | POST | Connectivity test |
 | `/api/sources/[id]/refresh` | POST | Re-introspect catalog |
 | `/api/auth/login` · `/callback` · `/logout` | | OIDC session |
+| `/api/health` · `/api/ready` | GET | Liveness and readiness probes (no auth) |
+| `/api/metrics` | GET | Prometheus scrape; `404` until `METRICS_TOKEN` or `METRICS_ALLOWED_CIDRS` is set |
 
 ## Source secret references
 
@@ -195,6 +197,9 @@ documented defaults:
   `LLM_DAILY_TOKEN_BUDGET=2000000` per workspace per UTC day, on every
   model-backed route; `0` disables, and `workspace_limits` overrides per
   workspace. Over either is a `429` with `Retry-After`.
+- **Metrics:** `METRICS_TOKEN` and/or `METRICS_ALLOWED_CIDRS` gate
+  `GET /api/metrics`; with neither set the endpoint answers `404`. Set both and
+  both are required. See [Prometheus metrics](docs/src/content/docs/operations/metrics.md).
 - **AI:** `AI_PROVIDER` (`gateway` | `openai-compatible`) + `AI_MODEL` — no model
   is baked in; this is a deliberate open decision (see architecture doc).
   The `openai-compatible` path works with any OpenAI-compatible endpoint. It

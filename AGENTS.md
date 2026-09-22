@@ -74,15 +74,20 @@ Important files:
 - `src/lib/security-headers.ts` and `src/proxy.ts` — the header baseline and
   the per-request Content-Security-Policy nonce; an inline `<script>` or
   `<style>` needs the nonce or the browser blocks it
+- `src/lib/metrics.ts` and `src/lib/metrics-access.ts` — the Prometheus
+  instruments and the gate on `/api/metrics`; a scrape is unauthenticated by
+  session, so the endpoint stays closed until `METRICS_TOKEN` or
+  `METRICS_ALLOWED_CIDRS` is set
 - `src/app/globals.css` — design tokens and Tailwind v4 theme setup
 - `next.config.ts` — standalone output, `pg` externalization
 - `package.json` — authoritative scripts/tooling
 - `SECURITY.md` — the trust model and the disclosure process
 - `CONTRIBUTING.md` — the human-facing version of this file
 
-The five files with a `CODEOWNERS` entry (`src/lib/sql/`, `src/lib/auth/`,
-`ir.ts`, `time.ts`, `registry.ts`) are the ones where a quiet regression stops
-being a bug and becomes a vulnerability. Changes there need a test.
+The six paths with a `CODEOWNERS` entry (`src/lib/sql/`, `src/lib/auth/`,
+`ir.ts`, `time.ts`, `registry.ts`, `metrics-access.ts`) are the ones where a
+quiet regression stops being a bug and becomes a vulnerability. Changes there
+need a test.
 
 For `src/lib/sql/` that test is often already written for you:
 `test/sql-safety.fuzz.test.ts` generates statements from adversarial shapes and

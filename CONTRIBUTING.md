@@ -167,8 +167,9 @@ issue and make the case first, rather than arriving with it already written.
   is most expensive.
 - **Draft PRs** are fine and encouraged for work you want early eyes on.
 
-Files under `src/lib/sql/`, `src/lib/auth/`, and `src/lib/ir.ts` have a code
-owner and will always be reviewed before merge.
+Files under `src/lib/sql/`, `src/lib/auth/`, `src/lib/ir.ts`, and
+`src/lib/metrics-access.ts` have a code owner and will always be reviewed
+before merge.
 
 ## Style
 

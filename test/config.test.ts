@@ -420,3 +420,59 @@ test("build identity is optional and never blocks a boot", () => {
     );
   }
 });
+
+test("METRICS_ALLOWED_CIDRS must parse, or the server does not boot", () => {
+  // An entry that does not parse is dropped by the gate, which would quietly
+  // narrow the allowlist an operator thought they had written.
+  const bad = validateConfig(
+    { ...VALID_PRODUCTION, METRICS_ALLOWED_CIDRS: "10.0.0.0/8, not-an-address" },
+    { production: true },
+  );
+  assert.deepEqual(variables(errors(bad)), ["METRICS_ALLOWED_CIDRS"]);
+  assert.match(errors(bad)[0].message, /CIDR/);
+
+  assert.deepEqual(
+    validateConfig(
+      {
+        ...VALID_PRODUCTION,
+        METRICS_TOKEN: "0123456789abcdef0123456789abcdef",
+        METRICS_ALLOWED_CIDRS: "10.0.0.0/8, ::1, 127.0.0.1",
+      },
+      { production: true },
+    ),
+    [],
+  );
+});
+
+test("an unconfigured metrics endpoint is not a problem; it is the default", () => {
+  // /api/metrics answers 404 until one of the two is set, so silence here is
+  // correct — the endpoint is closed, not misconfigured.
+  assert.deepEqual(validateConfig(VALID_PRODUCTION, { production: true }), []);
+});
+
+test("a CIDR allowlist without a token warns that it trusts a header", () => {
+  const problems = validateConfig(
+    { ...VALID_PRODUCTION, METRICS_ALLOWED_CIDRS: "10.0.0.0/8" },
+    { production: true },
+  );
+  assert.deepEqual(errors(problems), []);
+  assert.deepEqual(variables(warnings(problems)), ["METRICS_ALLOWED_CIDRS"]);
+  assert.match(warnings(problems)[0].message, /X-Forwarded-For/);
+  // Development is where an operator scrapes over a loopback allowlist.
+  assert.deepEqual(
+    validateConfig({ METRICS_ALLOWED_CIDRS: "127.0.0.1" }, { production: false }).filter(
+      (p) => p.variable.startsWith("METRICS_"),
+    ),
+    [],
+  );
+});
+
+test("a short scrape token warns rather than blocking a boot", () => {
+  const problems = validateConfig(
+    { ...VALID_PRODUCTION, METRICS_TOKEN: "short" },
+    { production: true },
+  );
+  assert.deepEqual(errors(problems), []);
+  assert.deepEqual(variables(warnings(problems)), ["METRICS_TOKEN"]);
+  assert.match(warnings(problems)[0].message, /openssl rand/);
+});

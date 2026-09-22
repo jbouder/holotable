@@ -1,4 +1,5 @@
 import { config } from "@/lib/config";
+import { recordSqlRejection, type SqlRejectionReason } from "@/lib/metrics";
 import { allowedTables, type SourceConfig } from "@/lib/registry";
 import { analyzeSelect, containsComment } from "@/lib/sql/ast";
 
@@ -190,6 +191,25 @@ const TIME_ERROR_SUFFIX =
 export interface ValidationResult {
   ok: boolean;
   error?: string;
+  /**
+   * Which class of rule refused the statement. A fixed enum, unlike `error`,
+   * which names the offending table or function and is therefore attacker-
+   * influenced text. Only the reason is safe to use as a metric label.
+   */
+  reason?: SqlRejectionReason;
+}
+
+/**
+ * Refuse a statement: build the result and count it.
+ *
+ * Every rejection below goes through here, so the
+ * `holotable_sql_validation_rejections_total` counter cannot drift from the
+ * guard — a new rule that returns its own object would be a missing metric,
+ * and a new rule that forgets the `reason` would not compile.
+ */
+function reject(reason: SqlRejectionReason, error: string): ValidationResult {
+  recordSqlRejection(reason);
+  return { ok: false, error, reason };
 }
 
 /**
@@ -207,7 +227,7 @@ function hasFunctionCall(haystack: string, fn: string): boolean {
 }
 
 function timeFunctionError(fn: string): ValidationResult {
-  return { ok: false, error: `disallowed function ${fn}(): ${TIME_ERROR_SUFFIX}` };
+  return reject("time", `disallowed function ${fn}(): ${TIME_ERROR_SUFFIX}`);
 }
 
 /**
@@ -218,14 +238,14 @@ export async function validateSql(
   source: SourceConfig,
 ): Promise<ValidationResult> {
   const trimmed = stripTerminators(sql);
-  if (trimmed.length === 0) return { ok: false, error: "empty SQL" };
+  if (trimmed.length === 0) return reject("empty", "empty SQL");
 
   // The parse-tree pass: one SELECT, allowlisted constructs only, and a full
   // account of the relations, functions, keywords and literals it contains.
   const analyzed = await analyzeSelect(trimmed);
-  if (!analyzed.ok) return { ok: false, error: analyzed.error };
+  if (!analyzed.ok) return reject("structure", analyzed.error);
   if (await containsComment(trimmed)) {
-    return { ok: false, error: "comments are not allowed" };
+    return reject("comment", "comments are not allowed");
   }
   const { tables, functions, keywords, strings } = analyzed.analysis;
 
@@ -233,22 +253,19 @@ export async function validateSql(
   // (`current_timestamp`, `localtime`, …) or server identity (`current_user`,
   // `session_user`, `current_schema`, …). None has a place in a spec.
   if (keywords.length > 0) {
-    return { ok: false, error: `disallowed keyword: ${keywords[0]}` };
+    return reject("keyword", `disallowed keyword: ${keywords[0]}`);
   }
 
   for (const fn of functions) {
     if (FORBIDDEN_FUNCTION_SET.has(fn.name)) {
-      return { ok: false, error: `disallowed table function: ${fn.name}()` };
+      return reject("function", `disallowed table function: ${fn.name}()`);
     }
     if (FORBIDDEN_TIME_FUNCTION_SET.has(fn.name)) return timeFunctionError(fn.name);
   }
 
   for (const literal of strings) {
     if (TIME_INPUT_LITERALS.has(literal.trim().toLowerCase())) {
-      return {
-        ok: false,
-        error: `disallowed time literal '${literal}': ${TIME_ERROR_SUFFIX}`,
-      };
+      return reject("time", `disallowed time literal '${literal}': ${TIME_ERROR_SUFFIX}`);
     }
   }
 
@@ -262,7 +279,7 @@ export async function validateSql(
   for (const table of tables) {
     const ref = table.schema ? `${table.schema}.${table.name}` : table.name;
     if (!allow.has(ref)) {
-      return { ok: false, error: `table not in catalog allowlist: ${ref}` };
+      return reject("catalog", `table not in catalog allowlist: ${ref}`);
     }
   }
 
@@ -270,7 +287,7 @@ export async function validateSql(
   // of the parser.
   for (const fn of FORBIDDEN_FUNCTIONS) {
     if (hasFunctionCall(trimmed, fn)) {
-      return { ok: false, error: `disallowed table function: ${fn}()` };
+      return reject("function", `disallowed table function: ${fn}()`);
     }
   }
   for (const fn of FORBIDDEN_TIME_FUNCTIONS) {

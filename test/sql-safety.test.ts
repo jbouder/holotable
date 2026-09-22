@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { validateSql, buildExecutablePlan } from "@/lib/sql/safety";
 import { SourceConfig } from "@/lib/registry";
 import { resolveTimeRange, resolveTimeExpr } from "@/lib/time";
+import { renderMetrics, resetMetricsForTests } from "@/lib/metrics";
 
 const source = SourceConfig.parse({
   host: "postgres",
@@ -184,4 +185,48 @@ test("resolveTimeRange requires from < to", () => {
   const r = resolveTimeRange({ from: "now-1h", to: "now" }, now);
   assert.ok(r.from.getTime() < r.to.getTime());
   assert.throws(() => resolveTimeRange({ from: "now", to: "now-1h" }, now));
+});
+
+/**
+ * Every rejection carries a `reason` from a fixed enum, because that — never
+ * the `error` string, which names the offending table or function — is what
+ * `holotable_sql_validation_rejections_total` uses as a label. A rule that
+ * stopped reporting its reason would be a metric that silently went blind, so
+ * the mapping is pinned here alongside the guard itself.
+ */
+test("every rule reports the class of rule that refused the statement", async () => {
+  const cases: Array<[reason: string, sql: string]> = [
+    ["empty", "   "],
+    ["structure", "INSERT INTO http_requests (status) VALUES (200)"],
+    ["structure", "SELECT 1 FROM http_requests; SELECT 2 FROM http_requests"],
+    ["comment", "SELECT ts FROM http_requests -- and the rest"],
+    ["keyword", "SELECT current_user FROM http_requests"],
+    ["function", "SELECT pg_read_file('/etc/passwd') FROM http_requests"],
+    ["time", "SELECT now() FROM http_requests"],
+    ["time", "SELECT ts FROM http_requests WHERE ts > 'now'"],
+    ["catalog", "SELECT * FROM pg_catalog.pg_authid"],
+  ];
+  for (const [reason, sql] of cases) {
+    const r = await validateSql(sql, source);
+    assert.equal(r.ok, false, `expected ${sql} to be refused`);
+    assert.equal(r.reason, reason, `${sql} -> ${r.error}`);
+  }
+});
+
+test("an accepted statement carries no rejection reason", async () => {
+  const r = await validateSql("SELECT ts FROM http_requests", source);
+  assert.equal(r.ok, true, r.error);
+  assert.equal(r.reason, undefined);
+});
+
+test("a rejection is counted once, under its own reason", async () => {
+  resetMetricsForTests();
+  await validateSql("SELECT * FROM pg_catalog.pg_authid", source);
+  await validateSql("SELECT * FROM pg_catalog.pg_authid", source);
+  await validateSql("SELECT now() FROM http_requests", source);
+  await validateSql("SELECT ts FROM http_requests", source);
+
+  const scrape = await renderMetrics();
+  assert.match(scrape, /holotable_sql_validation_rejections_total\{reason="catalog"\} 2/);
+  assert.match(scrape, /holotable_sql_validation_rejections_total\{reason="time"\} 1/);
 });

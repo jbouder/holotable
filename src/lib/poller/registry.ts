@@ -5,6 +5,12 @@ import { validateSql, buildExecutablePlan } from "@/lib/sql/safety";
 import { resolveTimeRange } from "@/lib/time";
 import { executePlan } from "@/lib/timescaledb/client";
 import { config } from "@/lib/config";
+import {
+  forgetDashboard,
+  observePollerTick,
+  setActivePollers,
+  setSseSubscribers,
+} from "@/lib/metrics";
 
 /**
  * Shared in-process dashboard poller.
@@ -167,9 +173,11 @@ class DashboardPoller {
 
   subscribe(listener: Listener): () => void {
     this.listeners.add(listener);
+    setSseSubscribers(this.dashboardId, this.listeners.size);
     if (!this.running) this.start();
     return () => {
       this.listeners.delete(listener);
+      setSseSubscribers(this.dashboardId, this.listeners.size);
       if (this.listeners.size === 0) this.stop();
     };
   }
@@ -184,6 +192,7 @@ class DashboardPoller {
 
   private start() {
     this.running = true;
+    setActivePollers(registry.size);
     void this.tick();
   }
 
@@ -199,6 +208,10 @@ class DashboardPoller {
         break;
       }
     }
+    // Stop exporting a dashboard nobody is watching, rather than leaving its
+    // gauge pinned at zero for the life of the process.
+    forgetDashboard(this.dashboardId);
+    setActivePollers(registry.size);
   }
 
   private broadcast(event: PollerEvent) {
@@ -219,6 +232,7 @@ class DashboardPoller {
 
   private async tick() {
     if (!this.running) return;
+    const startedAt = performance.now();
     const window = resolveTimeRange(this.spec.timeRange);
     await Promise.all(
       this.spec.panels.map(async (p) => {
@@ -239,6 +253,10 @@ class DashboardPoller {
         }
       }),
     );
+    // Every panel is executed and broadcast by this point, so the tick's cost
+    // is the whole cycle — not one query — which is what a refresh interval
+    // has to accommodate.
+    observePollerTick(this.dashboardId, (performance.now() - startedAt) / 1000);
     this.broadcast({ type: "tick", at: Date.now() });
     this.scheduleNext();
   }
