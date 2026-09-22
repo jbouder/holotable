@@ -9,12 +9,11 @@ import {
   Plug,
   Loader2,
   Pencil,
-  X,
   SendHorizontal,
 } from "lucide-react";
 import { SourceDraft, type SourceRecord } from "@/lib/registry";
 import { Button } from "@/components/ui/button";
-import { Input, Textarea, Label } from "@/components/ui/input";
+import { Textarea, Label } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
 import { Dialog } from "@/components/ui/dialog";
 import {
@@ -26,7 +25,8 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { ErrorDisplay } from "@/components/ui/error-display";
-import { type ApiError, apiErrorFromThrown, readApiError } from "@/lib/errors";
+import { apiErrorFromThrown, readApiError } from "@/lib/errors";
+import { SourceForm } from "./source-form";
 
 /** Starter descriptions to seed the natural-language drafter with one click. */
 const SOURCE_PROMPT_PRESETS = [
@@ -34,30 +34,6 @@ const SOURCE_PROMPT_PRESETS = [
   "Postgres at localhost:5432, database app, public schema. Track an events table with a created_at timestamp, an event_type, and a user_id.",
   "TimescaleDB hypertable of IoT readings: a sensor_readings table keyed on time, with device_id, temperature, and humidity columns.",
 ];
-
-const CONFIG_TEMPLATE = JSON.stringify(
-  {
-    host: "postgres",
-    port: 5432,
-    database: "holotable",
-    schema: "metrics",
-    ssl: false,
-    tables: [
-      {
-        name: "http_requests",
-        description: "per-request events",
-        timeField: "ts",
-        columns: [
-          { name: "ts", type: "timestamp with time zone" },
-          { name: "status", type: "smallint" },
-          { name: "duration_ms", type: "double precision" },
-        ],
-      },
-    ],
-  },
-  null,
-  2,
-);
 
 export function SourcesClient({ workspaces }: { workspaces: string[] }) {
   // Workspace switching is hidden for now; pin to the first accessible workspace.
@@ -266,10 +242,11 @@ export function SourcesClient({ workspaces }: { workspaces: string[] }) {
         >
           <SourceForm
             mode="edit"
+            workspaceId={sourceBeingEdited.workspaceId}
             initial={{
               name: sourceBeingEdited.name,
               secretRef: sourceBeingEdited.secretRef,
-              configText: JSON.stringify(sourceBeingEdited.config, null, 2),
+              config: sourceBeingEdited.config,
             }}
             submitLabel="Save changes"
             onSubmit={async ({ name, secretRef, config }) => {
@@ -306,12 +283,7 @@ function CreateSourcePanel({
   onCreated: () => void;
   onCancel: () => void;
 }) {
-  const [seed, setSeed] = React.useState<{
-    id: string;
-    name: string;
-    secretRef: string;
-    configText: string;
-  }>();
+  const [seed, setSeed] = React.useState<SourceDraft>();
   // Bumped on each draft so the form remounts and re-seeds from the new values.
   const [seedSeq, setSeedSeq] = React.useState(0);
   // The configuration form stays hidden until the drafter returns a result;
@@ -324,12 +296,7 @@ function CreateSourcePanel({
       <NaturalLanguageDrafter
         workspaceId={workspaceId}
         onDraft={(draft) => {
-          setSeed({
-            id: draft.id,
-            name: draft.name,
-            secretRef: draft.secretRef,
-            configText: JSON.stringify(draft.config, null, 2),
-          });
+          setSeed(draft);
           setSeedSeq((n) => n + 1);
         }}
       />
@@ -338,6 +305,7 @@ function CreateSourcePanel({
           <SourceForm
             key={seedSeq}
             mode="create"
+            workspaceId={workspaceId}
             submitLabel="Create source"
             initial={seed}
             onSubmit={async ({ id, name, secretRef, config }) => {
@@ -399,8 +367,8 @@ function NaturalLanguageDrafter({
       <Label htmlFor="nl-source">Describe the source</Label>
       <p className="text-xs text-muted">
         Draft the connection and table catalog from plain English. Never include passwords
-        — credentials come from the <code>secret_ref</code> environment family. Review the
-        generated config below, then Test and Refresh to pull live columns.
+        — credentials come from the <code>secret_ref</code> environment family. The draft
+        fills in the form below for you to review, adjust, and create.
       </p>
       <div className="flex flex-wrap items-center gap-2">
         {SOURCE_PROMPT_PRESETS.map((preset) => (
@@ -466,122 +434,5 @@ function NaturalLanguageDrafter({
         </pre>
       )}
     </div>
-  );
-}
-
-interface SourceFormValues {
-  id: string;
-  name: string;
-  secretRef: string;
-  config: unknown;
-}
-
-function SourceForm({
-  mode,
-  submitLabel,
-  initial,
-  onSubmit,
-  onCancel,
-}: {
-  mode: "create" | "edit";
-  submitLabel: string;
-  initial?: { id?: string; name: string; secretRef: string; configText: string };
-  /** Resolves to the failure to show, or null on success. */
-  onSubmit: (values: SourceFormValues) => Promise<ApiError | null>;
-  onCancel?: () => void;
-}) {
-  const [id, setId] = React.useState(initial?.id ?? "");
-  const [name, setName] = React.useState(initial?.name ?? "");
-  const [secretRef, setSecretRef] = React.useState(initial?.secretRef ?? "TS_METRICS");
-  const [configText, setConfigText] = React.useState(
-    initial?.configText ?? CONFIG_TEMPLATE,
-  );
-  const [error, setError] = React.useState<ApiError | null>(null);
-  const [saving, setSaving] = React.useState(false);
-
-  async function submit(e: React.FormEvent) {
-    e.preventDefault();
-    setError(null);
-    let config: unknown;
-    try {
-      config = JSON.parse(configText);
-    } catch {
-      setError({ error: "The connection config is not valid JSON.", kind: "validation" });
-      return;
-    }
-    setSaving(true);
-    const err = await onSubmit({ id, name, secretRef, config });
-    setSaving(false);
-    if (err) {
-      setError(err);
-      return;
-    }
-    if (mode === "create") {
-      setId("");
-      setName("");
-    }
-  }
-
-  return (
-    <form onSubmit={submit} className="space-y-3">
-      <div className="grid gap-3 sm:grid-cols-3">
-        {mode === "create" && (
-          <div>
-            <Label htmlFor="s-id">Source id</Label>
-            <Input
-              id="s-id"
-              value={id}
-              onChange={(e) => setId(e.target.value)}
-              placeholder="ts-metrics"
-            />
-          </div>
-        )}
-        <div>
-          <Label htmlFor="s-name">Name</Label>
-          <Input
-            id="s-name"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            placeholder="Metrics"
-          />
-        </div>
-        <div>
-          <Label htmlFor="s-secret">secret_ref (env family)</Label>
-          <Input
-            id="s-secret"
-            value={secretRef}
-            onChange={(e) => setSecretRef(e.target.value)}
-          />
-        </div>
-      </div>
-      <div>
-        <Label htmlFor="s-config">Connection + catalog (JSON)</Label>
-        <Textarea
-          id="s-config"
-          rows={12}
-          className="font-mono text-xs"
-          value={configText}
-          onChange={(e) => setConfigText(e.target.value)}
-        />
-      </div>
-      {error && <ErrorDisplay error={error} />}
-      <div className="flex gap-2">
-        <Button type="submit" disabled={saving}>
-          {saving ? (
-            <Loader2 className="h-4 w-4 animate-spin" />
-          ) : mode === "create" ? (
-            <Plus className="h-4 w-4" />
-          ) : (
-            <Pencil className="h-4 w-4" />
-          )}
-          {submitLabel}
-        </Button>
-        {onCancel && (
-          <Button type="button" variant="secondary" disabled={saving} onClick={onCancel}>
-            <X className="h-4 w-4" /> Cancel
-          </Button>
-        )}
-      </div>
-    </form>
   );
 }

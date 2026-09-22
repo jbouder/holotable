@@ -4,7 +4,10 @@ import {
   resolveCredentials,
   CatalogColumn,
   CatalogTable,
+  MAX_COLUMNS,
+  MAX_TABLES,
   SourceConfig,
+  type SourceConnection,
   type SourceRecord,
 } from "@/lib/registry";
 
@@ -68,21 +71,78 @@ export function buildCatalogPrompt(source: SourceRecord): string {
   return fenceUntrustedBlock("CATALOG", renderCatalog(source));
 }
 
+/** A client for introspection only: no statement timeout, no query path. */
+function catalogClient(connection: SourceConnection, secretRef: string): Client {
+  const credentials = resolveCredentials(secretRef);
+  return new Client({
+    host: connection.host,
+    port: connection.port,
+    database: connection.database,
+    user: credentials.username,
+    password: credentials.password,
+    ssl: connection.ssl,
+    application_name: "holotable-catalog",
+  });
+}
+
+/**
+ * Every table in the schema the source's read-only user can see, with its
+ * columns — the menu a source author picks an allowlist from.
+ *
+ * This is *not* an allowlist and never becomes one on its own: nothing here
+ * reaches `SourceConfig` until the author selects a table and the create/update
+ * route validates it. `information_schema` already scopes its rows to what the
+ * connecting role has privileges on, and that role is the read-only one named
+ * by `secret_ref`, so discovery can show no more than execution could read.
+ */
+export async function discoverTables(
+  connection: SourceConnection,
+  secretRef: string,
+): Promise<CatalogTable[]> {
+  const client = catalogClient(connection, secretRef);
+  await client.connect();
+  try {
+    const result = await client.query<{
+      table_name: string;
+      column_name: string;
+      data_type: string;
+    }>(
+      `SELECT c.table_name, c.column_name, c.data_type
+         FROM information_schema.columns c
+         JOIN information_schema.tables t
+           ON t.table_catalog = c.table_catalog
+          AND t.table_schema = c.table_schema
+          AND t.table_name = c.table_name
+        WHERE c.table_catalog = $1
+          AND c.table_schema = $2
+          AND t.table_type IN ('BASE TABLE', 'VIEW')
+        ORDER BY c.table_name, c.ordinal_position`,
+      [connection.database, connection.schema],
+    );
+
+    const byTable = new Map<string, CatalogColumn[]>();
+    for (const row of result.rows) {
+      const columns = byTable.get(row.table_name) ?? [];
+      if (columns.length === 0) {
+        if (byTable.size >= MAX_TABLES) continue;
+        byTable.set(row.table_name, columns);
+      }
+      if (columns.length >= MAX_COLUMNS) continue;
+      columns.push({ name: row.column_name, type: row.data_type });
+    }
+
+    return [...byTable].map(([name, columns]) => ({ name, columns }));
+  } finally {
+    await client.end();
+  }
+}
+
 /**
  * Refresh column metadata for the existing table allowlist. This never expands
  * the set of tables available to generated SQL.
  */
 export async function refreshCatalog(source: SourceRecord): Promise<SourceConfig> {
-  const credentials = resolveCredentials(source.secretRef);
-  const client = new Client({
-    host: source.config.host,
-    port: source.config.port,
-    database: source.config.database,
-    user: credentials.username,
-    password: credentials.password,
-    ssl: source.config.ssl,
-    application_name: "holotable-catalog",
-  });
+  const client = catalogClient(source.config, source.secretRef);
 
   await client.connect();
   try {

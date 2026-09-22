@@ -165,7 +165,7 @@ default single-instance setup these are the same TimescaleDB database.
 | `/dashboards/[id]` | Live viewer (SSE) with a Live/Pause toggle and a read-only dashboard chat assistant | viewer |
 | `/dashboards/[id]/edit` | Panel CRUD/layout, single-panel NL edits, version save | editor |
 | `/explore` | Ad-hoc NL questions against editable sources (with sample-question chips); streams one panel spec, then runs it through guarded query preview | editor |
-| `/data-sources` | Source CRUD / test / refresh, plus a natural-language drafter that seeds the create form from a plain-English description | source-admin |
+| `/data-sources` | Source CRUD / test / refresh; a structured connection form with live table discovery (JSON behind an Advanced toggle), plus a natural-language drafter that seeds it from a plain-English description | source-admin |
 
 ## API
 
@@ -182,6 +182,7 @@ default single-instance setup these are the same TimescaleDB database.
 | `/api/sources/[id]` | GET/PUT/DELETE | Get / update / delete (tombstone if referenced) |
 | `/api/sources/[id]/test` | POST | Connectivity test |
 | `/api/sources/[id]/refresh` | POST | Re-introspect catalog |
+| `/api/sources/discover` | POST | List the tables and columns a prospective source's read-only user can see, to pick an allowlist from (nothing is persisted) |
 | `/api/auth/login` · `/callback` · `/logout` | | OIDC session |
 | `/api/health` · `/api/ready` | GET | Liveness and readiness probes (no auth) |
 | `/api/metrics` | GET | Prometheus scrape; `404` until `METRICS_TOKEN` or `METRICS_ALLOWED_CIDRS` is set |
