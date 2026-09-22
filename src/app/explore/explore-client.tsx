@@ -31,6 +31,11 @@ interface SourceOption {
   catalog: CatalogHealth;
   /** Whether this caller may refresh it, i.e. holds `source:manage` here. */
   canRefresh: boolean;
+  /**
+   * One-click starters built from this source's catalog by `buildStarters`.
+   * Per source, so switching the picker switches the chips.
+   */
+  starters: string[];
 }
 
 type Status = "loading" | "done" | "error";
@@ -49,16 +54,6 @@ const TIME_PRESETS: { value: string; label: string }[] = [
   { value: "now-6h", label: "Last 6 hours" },
   { value: "now-24h", label: "Last 24 hours" },
   { value: "now-7d", label: "Last 7 days" },
-];
-
-// One-click sample questions for quick testing. Chosen to exercise the seeded
-// http_requests catalog and a spread of viz types (line / table / stat).
-const EXAMPLE_PROMPTS: string[] = [
-  "How many rows are in this data source?",
-  "Chart request volume per minute",
-  "Which routes returned the most 5xx errors?",
-  "Top routes by request count",
-  "Total requests in this window",
 ];
 
 export function ExploreClient({
@@ -127,6 +122,9 @@ export function ExploreClient({
   const streaming = isLoading || object !== undefined;
   const rangeLabel = TIME_PRESETS.find((p) => p.value === from)?.label ?? from;
   const source = sources.find((s) => s.id === sourceId);
+  // Chips for the selected source. Server-built from its catalog, so they
+  // change with the picker and never describe a table this source cannot read.
+  const starters = source?.starters ?? [];
   const sourceName = source?.name ?? sourceId;
 
   if (sources.length === 0) {
@@ -189,26 +187,34 @@ export function ExploreClient({
             />
           )}
           <div>
-            <Label htmlFor="prompt">Ask a question or try one below</Label>
-            <div className="mb-2 flex flex-wrap items-center gap-2">
-              {EXAMPLE_PROMPTS.map((example) => (
-                <button
-                  key={example}
-                  type="button"
-                  disabled={isLoading}
-                  onClick={() => setPrompt(example)}
-                  className="rounded-full border border-border bg-surface px-3 py-1 text-xs text-muted transition-colors hover:border-primary hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50"
-                >
-                  {example}
-                </button>
-              ))}
-            </div>
+            <Label htmlFor="prompt">
+              {starters.length > 0 ? "Ask a question or try one below" : "Ask a question"}
+            </Label>
+            {starters.length > 0 && (
+              <div className="mb-2 flex flex-wrap items-center gap-2">
+                {starters.map((example) => (
+                  <button
+                    key={example}
+                    type="button"
+                    disabled={isLoading}
+                    onClick={() => setPrompt(example)}
+                    className="rounded-full border border-border bg-surface px-3 py-1 text-xs text-muted transition-colors hover:border-primary hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    {example}
+                  </button>
+                ))}
+              </div>
+            )}
             <div className="relative">
               <Textarea
                 id="prompt"
                 rows={3}
                 className="pr-14"
-                placeholder="e.g. Which routes had the most errors? (add “as a chart” to visualize)"
+                placeholder={
+                  starters[0]
+                    ? `e.g. ${starters[0]} (add “as a chart” to visualize)`
+                    : "Ask a question about this data source (add “as a chart” to visualize)"
+                }
                 value={prompt}
                 onChange={(e) => setPrompt(e.target.value)}
                 onKeyDown={(e) => {

@@ -28,6 +28,7 @@ import {
 } from "@/components/ui/table";
 import { ErrorDisplay } from "@/components/ui/error-display";
 import { apiErrorFromThrown, readApiError } from "@/lib/errors";
+import { buildSourceDescriptionStarters } from "@/lib/prompts/starters";
 import { SourceForm } from "./source-form";
 import { SecretRefBadge, useSecretRefReadinessMap } from "./secret-ref-status";
 import {
@@ -36,13 +37,6 @@ import {
   SourceImpactDialog,
   useSourceImpactMap,
 } from "./source-impact";
-
-/** Starter descriptions to seed the natural-language drafter with one click. */
-const SOURCE_PROMPT_PRESETS = [
-  "TimescaleDB at metrics-db:5432, database prod, schema metrics. Track http_requests (ts, status, duration_ms) and cpu_usage (ts, host, pct).",
-  "Postgres at localhost:5432, database app, public schema. Track an events table with a created_at timestamp, an event_type, and a user_id.",
-  "TimescaleDB hypertable of IoT readings: a sensor_readings table keyed on time, with device_id, temperature, and humidity columns.",
-];
 
 export function SourcesClient({ workspaces }: { workspaces: string[] }) {
   // Workspace switching is hidden for now; pin to the first accessible workspace.
@@ -306,6 +300,7 @@ export function SourcesClient({ workspaces }: { workspaces: string[] }) {
           <CreateSourcePanel
             key={`create-${workspaceId}`}
             workspaceId={workspaceId}
+            existing={sources ?? []}
             onCreated={() => {
               setCreating(false);
               setNotice("source created");
@@ -360,10 +355,13 @@ export function SourcesClient({ workspaces }: { workspaces: string[] }) {
  */
 function CreateSourcePanel({
   workspaceId,
+  existing,
   onCreated,
   onCancel,
 }: {
   workspaceId: string;
+  /** The workspace's current sources, which the drafter's examples are drawn from. */
+  existing: SourceRecord[];
   onCreated: () => void;
   onCancel: () => void;
 }) {
@@ -379,6 +377,7 @@ function CreateSourcePanel({
     <div className="space-y-4">
       <NaturalLanguageDrafter
         workspaceId={workspaceId}
+        existing={existing}
         onDraft={(draft) => {
           setSeed(draft);
           setSeedSeq((n) => n + 1);
@@ -427,12 +426,21 @@ function CreateSourcePanel({
  */
 function NaturalLanguageDrafter({
   workspaceId,
+  existing,
   onDraft,
 }: {
   workspaceId: string;
+  existing: SourceRecord[];
   onDraft: (draft: SourceDraft) => void;
 }) {
   const [description, setDescription] = React.useState("");
+  // There is no catalog to read here — this is how a source comes to exist —
+  // so the examples are drawn from the sources the workspace already has, and
+  // fall back to the shape of a description when there are none.
+  const presets = React.useMemo(
+    () => buildSourceDescriptionStarters(existing),
+    [existing],
+  );
   const { object, submit, isLoading, error, stop } = useObject({
     api: "/api/sources/generate",
     schema: SourceDraft,
@@ -455,7 +463,7 @@ function NaturalLanguageDrafter({
         fills in the form below for you to review, adjust, and create.
       </p>
       <div className="flex flex-wrap items-center gap-2">
-        {SOURCE_PROMPT_PRESETS.map((preset) => (
+        {presets.map((preset) => (
           <button
             key={preset}
             type="button"
@@ -473,7 +481,11 @@ function NaturalLanguageDrafter({
           id="nl-source"
           rows={3}
           className="pr-14"
-          placeholder="e.g. TimescaleDB at metrics-db:5432, database prod, schema metrics. Track http_requests (ts, status, duration_ms) and cpu_usage (ts, host, pct)."
+          placeholder={
+            presets[0]
+              ? `e.g. ${presets[0]}`
+              : "Describe the database and the tables to track"
+          }
           value={description}
           onChange={(e) => setDescription(e.target.value)}
           onKeyDown={(e) => {
