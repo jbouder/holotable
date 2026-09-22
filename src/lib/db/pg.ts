@@ -20,6 +20,19 @@ export function getPool(): Pool {
   return pool;
 }
 
+/**
+ * Close the shared pool. Graceful shutdown (#47) only: `end()` waits for every
+ * checked-out client to be released, which is what makes in-flight config-store
+ * work finish before the process exits. The next `getPool()` would build a new
+ * pool, which nothing does after a drain.
+ */
+export async function closePool(): Promise<void> {
+  const current = pool;
+  if (!current) return;
+  pool = null;
+  await current.end();
+}
+
 export async function query<T extends Record<string, unknown> = Record<string, unknown>>(
   text: string,
   params: unknown[] = [],

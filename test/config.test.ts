@@ -202,6 +202,28 @@ test("a JWKS URL on a different origin from the issuer is a warning", () => {
   assert.equal(problems[0].severity, "warning");
 });
 
+test("SHUTDOWN_GRACE_MS is a positive number of milliseconds or unset", () => {
+  // Unset is the common case: the drain budget has a 10s default, and a
+  // deployment only sets it to match its own kill timeout.
+  assert.deepEqual(validateConfig(VALID_PRODUCTION, { production: true }), []);
+  for (const value of ["1000", "30000", ""]) {
+    const ok = validateConfig(
+      { ...VALID_PRODUCTION, SHUTDOWN_GRACE_MS: value },
+      { production: true },
+    );
+    assert.deepEqual(errors(ok), [], formatConfigProblems(ok));
+  }
+  // 0 would make the drain a no-op, which is the behaviour this exists to fix.
+  for (const value of ["0", "-1", "soon"]) {
+    const bad = validateConfig(
+      { ...VALID_PRODUCTION, SHUTDOWN_GRACE_MS: value },
+      { production: true },
+    );
+    assert.deepEqual(variables(errors(bad)), ["SHUTDOWN_GRACE_MS"]);
+    assert.match(bad[0].message, /positive integer/);
+  }
+});
+
 test("malformed values are errors regardless of environment", () => {
   const env: Environment = {
     DATABASE_URL: "mysql://nope",
@@ -212,6 +234,7 @@ test("malformed values are errors regardless of environment", () => {
     MAX_QUERY_ROWS: "lots",
     MAX_RESULT_BYTES: "0",
     QUERY_TIMEOUT_SECONDS: "-5",
+    SHUTDOWN_GRACE_MS: "forever",
     DEFAULT_TIME_FROM: "yesterday-ish",
     SESSION_COOKIE_NAME: "has space",
   };

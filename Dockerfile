@@ -72,6 +72,10 @@ ENV GIT_COMMIT=$GIT_COMMIT
 USER nextjs
 EXPOSE 3000
 ENV PORT=3000 HOSTNAME=0.0.0.0
+# Hand SIGTERM/SIGINT to the app's own handler (src/lib/shutdown.ts) instead of
+# Next's, which exits 143 without draining. `node server.js` is PID 1 here, so
+# the signal from `docker stop` or a pod eviction arrives directly.
+ENV NEXT_MANUAL_SIG_HANDLE=true
 # Liveness only: /api/health answers whenever the process is serving, with no
 # I/O. The slim base has no curl or wget, so the probe is Node's own fetch.
 # Readiness (database, Keycloak) is /api/ready, which an orchestrator probes

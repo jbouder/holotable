@@ -3,6 +3,7 @@ import { resolveCredentials, type SourceRecord } from "@/lib/registry";
 import { config } from "@/lib/config";
 import type { ExecutablePlan } from "@/lib/sql/safety";
 import { ResultCollector } from "@/lib/timescaledb/result-cap";
+import { trackInFlight } from "@/lib/shutdown";
 
 function clientFor(source: SourceRecord): Client {
   const credentials = resolveCredentials(source.secretRef);
@@ -125,11 +126,21 @@ function collectResult(
   });
 }
 
-/** Execute a guarded plan in a read-only transaction. */
-export async function executePlan(
+/**
+ * Execute a guarded plan in a read-only transaction.
+ *
+ * Counted as in flight so graceful shutdown (#47) waits for it: each execution
+ * opens its own short-lived `Client`, so there is no pool whose `end()` would
+ * do the waiting for us.
+ */
+export function executePlan(
   source: SourceRecord,
   plan: ExecutablePlan,
 ): Promise<QueryResult> {
+  return trackInFlight(() => runPlan(source, plan));
+}
+
+async function runPlan(source: SourceRecord, plan: ExecutablePlan): Promise<QueryResult> {
   const client = clientFor(source);
   let transactionStarted = false;
   try {
@@ -162,7 +173,13 @@ export async function executePlan(
 }
 
 /** Lightweight connectivity and read-permission test for a source. */
-export async function testSource(
+export function testSource(
+  source: SourceRecord,
+): Promise<{ ok: boolean; message: string }> {
+  return trackInFlight(() => runSourceTest(source));
+}
+
+async function runSourceTest(
   source: SourceRecord,
 ): Promise<{ ok: boolean; message: string }> {
   const client = clientFor(source);

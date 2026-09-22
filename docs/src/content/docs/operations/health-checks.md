@@ -1,6 +1,6 @@
 ---
-title: Health and readiness
-description: The liveness and readiness endpoints an orchestrator probes, what each one checks, and what they are allowed to say.
+title: Health, readiness, and shutdown
+description: The liveness and readiness endpoints an orchestrator probes, what each one checks, what they are allowed to say, and how the server drains on SIGTERM.
 sidebar:
   order: 7
 ---
@@ -92,3 +92,55 @@ readinessProbe:
 
 Readiness fails as soon as the process begins draining, which is what removes
 a terminating pod from its Service before the server stops accepting work.
+
+## Graceful shutdown
+
+`SIGTERM` (a rolling deploy, a pod eviction, `docker stop`) starts a drain
+rather than an exit. The sequence lives in `src/lib/shutdown.ts`:
+
+1. **The drain flag is set**, synchronously. `/api/ready` answers `503` with
+   `"status": "draining"` from that moment, and the load balancer stops
+   routing here. `/api/health` stays `200` — a process on its way out is not
+   broken, and restarting it is the wrong cure.
+2. **Every poller stops** (`stopAllPollers`), so no new metric query is issued.
+3. **Open SSE streams get a terminal frame** — an SSE `retry:` hint plus a
+   named `draining` event — and are closed. `EventSource` honours `retry:`
+   natively, so subscribers come back to a healthy instance; the delay is
+   randomized per stream (2–10s) so a terminating instance does not send all
+   of its viewers back at the same moment, to the replacement that is least
+   able to absorb them.
+4. **In-flight queries are awaited.** Metric queries open a short-lived client
+   each and are counted explicitly; config-store work is awaited by
+   `pool.end()`, which waits for every checked-out client to be released.
+5. **The process exits 0**, whether it drained or ran out of budget. A slow
+   query should not make an orchestrator report a failed shutdown.
+
+The whole sequence is bounded by `SHUTDOWN_GRACE_MS` (default `10000`). A
+second `SIGTERM` or `SIGINT` skips the remaining wait and exits immediately.
+
+The HTTP listener is deliberately left open during the drain: readiness has
+already taken the instance out of rotation, so a request that still arrives is
+served rather than refused.
+
+### Give the drain room to finish
+
+The orchestrator's kill timeout must exceed `SHUTDOWN_GRACE_MS`, or the
+process is killed mid-drain:
+
+```yaml
+# Kubernetes
+terminationGracePeriodSeconds: 20
+```
+
+```yaml
+# docker-compose.yml, already set on the `app` service
+stop_grace_period: 20s
+```
+
+### `NEXT_MANUAL_SIG_HANDLE`
+
+Next installs its own `SIGTERM`/`SIGINT` handlers, which exit `143` without
+draining and would win the race. `NEXT_MANUAL_SIG_HANDLE=true` hands the
+signals to the app instead; it is set in the `start` script and in the runtime
+image, and a deployment that starts the server some other way must set it too.
+It has no effect under `next dev`, where Next does not hand signals over.

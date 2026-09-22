@@ -24,4 +24,11 @@ export async function register() {
     // so the outcome does not depend on how the server was launched.
     process.exit(1);
   }
+
+  // Own the termination signals (#47). Next installs its own SIGTERM/SIGINT
+  // handlers, which exit 143 without draining, so `NEXT_MANUAL_SIG_HANDLE=true`
+  // is set in the `start` script and in the runtime image to hand them over;
+  // without it these handlers still run but Next may exit first.
+  const { installSignalHandlers } = await import("@/lib/shutdown");
+  installSignalHandlers();
 }
