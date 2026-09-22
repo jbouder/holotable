@@ -2,7 +2,7 @@ import type { Dashboard, Panel } from "@/lib/ir";
 import { getSourceById } from "@/lib/db/repo";
 import type { SourceRecord } from "@/lib/registry";
 import { validateSql, buildExecutablePlan } from "@/lib/sql/safety";
-import { resolveTimeRange } from "@/lib/time";
+import { resolveTimeRange, TimeRangeError } from "@/lib/time";
 import { executePlan, QueryExecutionError } from "@/lib/timescaledb/client";
 import { config } from "@/lib/config";
 import { type ErrorKind, OPAQUE_MESSAGE } from "@/lib/errors";
@@ -43,6 +43,7 @@ export type PollerEvent =
       rows: Record<string, unknown>[];
     }
   | { type: "panel-error"; panelId: string; error: string; kind: ErrorKind }
+  | { type: "dashboard-error"; error: string; kind: ErrorKind }
   | { type: "tombstone"; panelId: string; sourceId: string }
   | { type: "tick"; at: number };
 
@@ -180,6 +181,29 @@ export function describePanelError(err: unknown): { error: string; kind: ErrorKi
   return { error: OPAQUE_MESSAGE, kind: "infrastructure" };
 }
 
+/**
+ * Classify a failure of the tick itself rather than of one panel.
+ *
+ * The time range is the only part of the spec a viewer picks, so a range that
+ * will not resolve is theirs to fix and keeps its real message — the same split
+ * {@link describePanelError} makes for a statement failure. Anything else that
+ * breaks the loop is ours: it is opaque to the browser and the cause goes to
+ * the log with the dashboard id on it.
+ *
+ * Exported for unit testing.
+ */
+export function describeTickError(
+  err: unknown,
+  dashboardId: string,
+): { error: string; kind: ErrorKind } {
+  if (err instanceof TimeRangeError) {
+    log.warn("poller.time_range_failed", { dashboardId, err });
+    return { error: err.message, kind: "validation" };
+  }
+  log.error("poller.tick_failed", { dashboardId, err });
+  return { error: OPAQUE_MESSAGE, kind: "infrastructure" };
+}
+
 /** Default executor used in production. */
 export const defaultPanelExecutor: PanelExecutor = makePanelExecutor();
 
@@ -188,6 +212,7 @@ class DashboardPoller {
   private cursors = new Map<string, string>();
   private timer: NodeJS.Timeout | null = null;
   private running = false;
+  private ticking = false;
 
   constructor(
     readonly dashboardId: string,
@@ -216,10 +241,38 @@ class DashboardPoller {
     return this.running;
   }
 
+  /**
+   * A poller that is running but has neither a tick in flight nor one
+   * scheduled will never tick again. The guards in `tick()` are what stop that
+   * happening; this is what stops a poller it happened to anyway from being
+   * handed to the next subscriber (#140), who would otherwise get a Live badge
+   * over a chart that never updates.
+   */
+  get isStalled(): boolean {
+    return this.running && !this.ticking && this.timer === null;
+  }
+
   private start() {
     this.running = true;
     setActivePollers(registry.size);
-    void this.tick();
+    this.runTick();
+  }
+
+  /**
+   * Start a tick from a context that cannot await it.
+   *
+   * `tick()` handles its own failures and reschedules in a `finally`, so this
+   * handler should never fire. It exists because the previous `void this.tick()`
+   * discarded the rejection instead: `void` marks a deliberate fire-and-forget,
+   * it does not make one safe, and a discarded rejection here means the loop
+   * stops for every viewer of the dashboard with nothing logged and nothing
+   * sent (#140).
+   */
+  private runTick(): void {
+    this.tick().catch((err) => {
+      log.error("poller.tick_crashed", { dashboardId: this.dashboardId, err });
+      this.scheduleNext();
+    });
   }
 
   stop() {
@@ -252,39 +305,67 @@ class DashboardPoller {
 
   private scheduleNext() {
     if (!this.running || this.listeners.size === 0) return;
+    // Called from a `finally` and from the crash handler above, so it cannot
+    // assume it runs once per tick: a second live timer would double the
+    // dashboard's query rate for the life of the poller.
+    if (this.timer) clearTimeout(this.timer);
     const interval = Math.max(config.minRefreshIntervalMs, this.spec.refreshIntervalMs);
-    this.timer = setTimeout(() => void this.tick(), interval);
+    this.timer = setTimeout(() => this.runTick(), interval);
   }
 
+  /**
+   * One cycle: resolve the window, execute every panel, broadcast, reschedule.
+   *
+   * Everything outside the per-panel `try` used to be unguarded, and
+   * `resolveTimeRange` throws on a range that is inverted or unparseable — a
+   * range a viewer can select. The rejection was discarded, `scheduleNext()`
+   * never ran, and the poller stayed in the registry ticking for nobody (#140).
+   * So the whole body is guarded and the reschedule is in a `finally`: a
+   * failure is broadcast, logged, and retried on the next interval rather than
+   * ending the loop.
+   */
   private async tick() {
     if (!this.running) return;
-    const startedAt = performance.now();
-    const window = resolveTimeRange(this.spec.timeRange);
-    await Promise.all(
-      this.spec.panels.map(async (p) => {
-        try {
-          const events = await this.executor(
-            p,
-            window,
-            this.cursors,
-            this.dashboardWorkspaceId,
-          );
-          for (const e of events) this.broadcast(e);
-        } catch (err) {
-          this.broadcast({
-            type: "panel-error",
-            panelId: p.id,
-            ...describePanelError(err),
-          });
-        }
-      }),
-    );
-    // Every panel is executed and broadcast by this point, so the tick's cost
-    // is the whole cycle — not one query — which is what a refresh interval
-    // has to accommodate.
-    observePollerTick(this.dashboardId, (performance.now() - startedAt) / 1000);
-    this.broadcast({ type: "tick", at: Date.now() });
-    this.scheduleNext();
+    this.ticking = true;
+    try {
+      const startedAt = performance.now();
+      const window = resolveTimeRange(this.spec.timeRange);
+      await Promise.all(
+        this.spec.panels.map(async (p) => {
+          try {
+            const events = await this.executor(
+              p,
+              window,
+              this.cursors,
+              this.dashboardWorkspaceId,
+            );
+            for (const e of events) this.broadcast(e);
+          } catch (err) {
+            this.broadcast({
+              type: "panel-error",
+              panelId: p.id,
+              ...describePanelError(err),
+            });
+          }
+        }),
+      );
+      // Every panel is executed and broadcast by this point, so the tick's cost
+      // is the whole cycle — not one query — which is what a refresh interval
+      // has to accommodate.
+      observePollerTick(this.dashboardId, (performance.now() - startedAt) / 1000);
+      // Only on a completed cycle: `tick` is what the viewer's freshness
+      // readout and staleness watchdog run on, so a failed cycle must not
+      // refresh it.
+      this.broadcast({ type: "tick", at: Date.now() });
+    } catch (err) {
+      this.broadcast({
+        type: "dashboard-error",
+        ...describeTickError(err, this.dashboardId),
+      });
+    } finally {
+      this.ticking = false;
+      this.scheduleNext();
+    }
   }
 }
 
@@ -309,8 +390,14 @@ export function getPoller(
 ): DashboardPoller {
   const key = JSON.stringify([dashboardId, spec.timeRange.from, spec.timeRange.to]);
   const existing = registry.get(key);
-  if (existing && existing.version >= version) return existing;
-  if (existing) existing.stop();
+  if (existing?.isStalled) {
+    // Sharing it would hand this subscriber a poller that never ticks again.
+    log.warn("poller.stalled_replaced", { dashboardId, version: existing.version });
+    existing.stop();
+  } else if (existing) {
+    if (existing.version >= version) return existing;
+    existing.stop();
+  }
   const poller = new DashboardPoller(dashboardId, version, workspaceId, spec, executor);
   registry.set(key, poller);
   return poller;

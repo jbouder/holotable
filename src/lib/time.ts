@@ -6,6 +6,21 @@ import type { TimeRange } from "@/lib/ir";
  * window; the model never supplies time values.
  */
 
+/**
+ * A time expression or range the server refused to resolve.
+ *
+ * Typed rather than a bare `Error` so a caller can tell "the range you picked
+ * is unusable" — the one part of a dashboard spec a viewer chooses, and so
+ * theirs to fix — from an infrastructure failure that must stay opaque. The
+ * message names only the expression it was handed.
+ */
+export class TimeRangeError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "TimeRangeError";
+  }
+}
+
 const REL_RE = /^now(?:-(\d+)([smhdw]))?$/;
 
 const UNIT_MS: Record<string, number> = {
@@ -26,7 +41,7 @@ export function resolveTimeExpr(expr: string, now: Date = new Date()): Date {
   }
   const d = new Date(expr);
   if (Number.isNaN(d.getTime())) {
-    throw new Error(`invalid time expression: ${expr}`);
+    throw new TimeRangeError(`invalid time expression: ${expr}`);
   }
   return d;
 }
@@ -43,7 +58,7 @@ export function resolveTimeRange(
   const from = resolveTimeExpr(range.from, now);
   const to = resolveTimeExpr(range.to, now);
   if (from.getTime() >= to.getTime()) {
-    throw new Error("time range `from` must be before `to`");
+    throw new TimeRangeError("time range `from` must be before `to`");
   }
   return { from, to };
 }

@@ -166,7 +166,9 @@ The split is carried, not inferred. Every error body names a `kind`
 (`src/lib/errors.ts`), and the SSE path honours it too: a `panel-error` frame
 carries the real message only for a statement failure, and
 `describePanelError` reduces anything else to the generic sentence with the
-cause going to the log. The client decides presentation from `kind` alone —
+cause going to the log. `describeTickError` makes the same split for a
+`dashboard-error`: a `TimeRangeError` keeps its message because the range is
+the one part of the spec a viewer picks, and everything else is opaque. The client decides presentation from `kind` alone —
 `presentError` discards the message on the opaque path regardless of what
 arrived, so a careless server change cannot turn into a disclosure.
 
