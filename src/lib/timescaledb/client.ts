@@ -83,6 +83,20 @@ function searchPathStatement(schema: string): string {
   return `SET LOCAL search_path TO "${schema}", public`;
 }
 
+/**
+ * Everything the session is put into before a plan runs, in order.
+ *
+ * Exported because `/api/sql/plan` shows it to the author (#110): the claim
+ * that execution is read-only and schema-pinned is only worth making if what
+ * is shown is what runs, so both read this one list rather than describing it
+ * twice.
+ */
+export function sessionStatements(schema: string): string[] {
+  return [READ_ONLY_TRANSACTION, searchPathStatement(schema)];
+}
+
+const READ_ONLY_TRANSACTION = "BEGIN TRANSACTION READ ONLY";
+
 /** Postgres returns `Date` for timestamps; the client receives ISO strings. */
 function serializableRow(row: Record<string, unknown>): Record<string, unknown> {
   return Object.fromEntries(
@@ -170,9 +184,10 @@ async function runPlan(source: SourceRecord, plan: ExecutablePlan): Promise<Quer
   let transactionStarted = false;
   try {
     await client.connect();
-    await client.query("BEGIN TRANSACTION READ ONLY");
+    const [transaction, searchPath] = sessionStatements(source.config.schema);
+    await client.query(transaction);
     transactionStarted = true;
-    await client.query(searchPathStatement(source.config.schema));
+    await client.query(searchPath);
     return await collectResult(client, plan, config.maxResultBytes);
   } catch (err) {
     if (isMissingTimeFieldError(err, plan.timeField)) {
@@ -210,7 +225,7 @@ async function runSourceTest(
   const client = clientFor(source);
   try {
     await client.connect();
-    await client.query("BEGIN TRANSACTION READ ONLY");
+    await client.query(READ_ONLY_TRANSACTION);
     await client.query("SELECT 1 AS ok");
     await client.query("ROLLBACK");
     return { ok: true, message: "connection succeeded" };

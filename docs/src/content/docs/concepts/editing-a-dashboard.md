@@ -75,6 +75,13 @@ natural-language box, so the first thing you do with the panel is say what it
 should be. That runs the model once and lands as a reviewable diff, exactly like
 any other natural-language edit.
 
+## Panel description
+
+The panel editor has a **Description** field: one sentence saying what the panel
+computes. The model writes one for every panel it generates, and this is where a
+human corrects it. It is shown to readers behind the info control on the panel
+header, never as a paragraph on the dashboard itself.
+
 ## Undo and redo
 
 Every change to the spec — adding, duplicating, reordering, deleting or editing

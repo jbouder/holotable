@@ -100,6 +100,8 @@ interface EditIntent {
 }
 
 const VIZ_OPTIONS = VizType.options.map((v) => ({ value: v, label: v }));
+/** `Panel.description` is `z.string().max(500)`; the box stops at the same place. */
+const PANEL_DESCRIPTION_MAX = 500;
 const WIDTH_PRESETS = [
   { value: "12", label: "Full width" },
   { value: "6", label: "Half (2-up)" },
@@ -1289,6 +1291,27 @@ function PanelEditor({
             options={FORMAT_OPTIONS}
           />
         </div>
+      </div>
+
+      <div>
+        <Label htmlFor="p-description">Description (what this panel computes)</Label>
+        <Textarea
+          id="p-description"
+          rows={2}
+          maxLength={PANEL_DESCRIPTION_MAX}
+          placeholder="e.g. Requests per minute, grouped by route"
+          value={panel.description ?? ""}
+          onChange={(e) =>
+            onChange((p) => ({ ...p, description: e.target.value || undefined }), {
+              action: "edit panel description",
+              key: `${panel.id}:description`,
+            })
+          }
+        />
+        <p className="mt-1 text-xs text-muted">
+          Shown to readers behind the info icon on the panel. The model writes one for
+          every panel it generates; this is where you correct it.
+        </p>
       </div>
 
       <div className="space-y-2">

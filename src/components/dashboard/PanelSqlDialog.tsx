@@ -2,10 +2,11 @@
 
 import * as React from "react";
 import { Check, Code, Copy } from "lucide-react";
-import type { Panel } from "@/lib/ir";
+import type { Panel, TimeRange } from "@/lib/ir";
 import { Button } from "@/components/ui/button";
 import { Dialog } from "@/components/ui/dialog";
 import { panelDetails } from "@/lib/panel-details";
+import { QueryPlanSection } from "@/components/sql/QueryPlanSection";
 
 const COPIED_RESET_MS = 2_000;
 
@@ -14,7 +15,14 @@ const COPIED_RESET_MS = 2_000;
  * field are already in the spec the client holds, so this reveals nothing new —
  * it just stops the editor being the only place to see it.
  */
-export function PanelSqlDialog({ panel }: { panel: Panel }) {
+export function PanelSqlDialog({
+  panel,
+  timeRange,
+}: {
+  panel: Panel;
+  /** Enables the "what actually runs" section; absent on surfaces with no window. */
+  timeRange?: TimeRange;
+}) {
   const [open, setOpen] = React.useState(false);
 
   return (
@@ -29,13 +37,13 @@ export function PanelSqlDialog({ panel }: { panel: Panel }) {
         <Code className="h-4 w-4" />
       </Button>
       <Dialog onOpenChange={setOpen} open={open} title="Generated SQL">
-        <PanelSqlBody panel={panel} />
+        <PanelSqlBody panel={panel} timeRange={timeRange} />
       </Dialog>
     </>
   );
 }
 
-function PanelSqlBody({ panel }: { panel: Panel }) {
+function PanelSqlBody({ panel, timeRange }: { panel: Panel; timeRange?: TimeRange }) {
   const details = panelDetails(panel);
   const [copied, setCopied] = React.useState(false);
   const [copyFailed, setCopyFailed] = React.useState(false);
@@ -98,6 +106,8 @@ function PanelSqlBody({ panel }: { panel: Panel }) {
         The dashboard time range is applied by the server at execution time and is not
         part of this statement.
       </p>
+
+      {timeRange && <QueryPlanSection query={panel.query} timeRange={timeRange} />}
     </div>
   );
 }

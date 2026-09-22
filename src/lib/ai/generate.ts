@@ -37,6 +37,21 @@ export const SQL_RULES = `SQL rules (STRICT):
 - Every panel's query.sourceId MUST equal the provided sourceId.
 - Keep result sets small; the server also enforces row limits.`;
 
+/**
+ * Every panel carries its own one-sentence explanation.
+ *
+ * `Panel.description` has always been in the IR and was asked for only by the
+ * explore prompt, so a dashboard panel titled "p95 latency" left the reader
+ * nothing short of the SQL. The wording is the explore prompt's, promoted to
+ * the shared system prompt: intent, never values. A description that quoted a
+ * number would be the model reporting data, which is the one thing it must not
+ * do (invariant 2).
+ */
+export const DESCRIPTION_RULE = `Every panel MUST carry a "description": ONE sentence
+saying WHAT the query computes — the measure, the grouping and the unit — phrased
+as intent. NEVER state, estimate or invent a result value, a threshold or a
+trend; you have not seen the data.`;
+
 function baseSystem(source: SourceRecord): string {
   return `You design monitoring dashboards as a strict JSON spec.
 You NEVER return data rows — only a viz specification (SQL + layout).
@@ -48,6 +63,8 @@ Catalog (metadata only):
 ${buildCatalogPrompt(source)}
 
 ${SQL_RULES}
+
+${DESCRIPTION_RULE}
 
 Layout: a 12-column grid. By DEFAULT place two panels side by side (w=6 each)
 and 4 rows tall (h=4), laid out left-to-right, top-to-bottom, without overlaps.
@@ -101,9 +118,8 @@ export function streamExplorePanel(input: {
     prompt: `Answer this question with a SINGLE panel:
 """${prompt}"""
 
-Return one Panel. Give it a concise title, a one-sentence "description" of WHAT
-the query computes (describe intent only — never invent result values), use id
-"explore", and set layout to {"x":0,"y":0,"w":12,"h":4}.
+Return one Panel. Give it a concise title, use id "explore", and set layout to
+{"x":0,"y":0,"w":12,"h":4}.
 
 Viz selection (IMPORTANT — default to text/tabular output):
 - Default to viz "table" and return the relevant rows/columns.

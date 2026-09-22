@@ -1,12 +1,13 @@
 "use client";
 
 import type * as React from "react";
-import { Loader2 } from "lucide-react";
-import type { Panel } from "@/lib/ir";
+import { Info, Loader2 } from "lucide-react";
+import type { Panel, TimeRange } from "@/lib/ir";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ErrorDisplay } from "@/components/ui/error-display";
 import { EChart } from "@/components/charts/EChart";
 import { PanelSqlDialog } from "@/components/dashboard/PanelSqlDialog";
+import { Popover } from "@/components/ui/popover";
 import { buildChartOption, type PanelData } from "@/components/charts/options";
 import { formatClockTime } from "@/lib/connection";
 import type { ApiError } from "@/lib/errors";
@@ -34,11 +35,18 @@ export function PanelView({
   state,
   onRetry,
   paused = false,
+  timeRange,
 }: {
   panel: Panel;
   state?: PanelState;
   onRetry?: () => void;
   paused?: boolean;
+  /**
+   * The window this panel is being shown for. Only the details dialog uses it,
+   * to ask the server what it would run (#110); a surface that does not know
+   * its window simply does not offer that.
+   */
+  timeRange?: TimeRange;
 }) {
   const data = state?.data ?? EMPTY;
   const status = state?.status ?? "loading";
@@ -53,13 +61,33 @@ export function PanelView({
         <CardTitle className="min-w-0 truncate">{panel.title}</CardTitle>
         <div className="flex shrink-0 items-center gap-1">
           {showBadge && <StatusBadge status={status} updatedAt={state?.updatedAt} />}
-          <PanelSqlDialog panel={panel} />
+          <PanelDescription panel={panel} />
+          <PanelSqlDialog panel={panel} timeRange={timeRange} />
         </div>
       </CardHeader>
       <CardContent className="flex-1 min-h-0">
         <PanelBody panel={panel} data={data} state={state} onRetry={onRetry} />
       </CardContent>
     </Card>
+  );
+}
+
+/**
+ * What the panel computes, on demand (#106).
+ *
+ * `Panel.description` is optional and always has been, so a panel without one
+ * renders exactly as it did — no icon, no placeholder. It says intent, never a
+ * value: the model that wrote it has not seen the data.
+ */
+function PanelDescription({ panel }: { panel: Panel }) {
+  if (!panel.description) return null;
+  return (
+    <Popover
+      label={`What "${panel.title}" computes`}
+      trigger={<Info className="h-4 w-4" />}
+    >
+      {panel.description}
+    </Popover>
   );
 }
 
