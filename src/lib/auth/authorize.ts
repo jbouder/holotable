@@ -2,6 +2,7 @@ import { cookies } from "next/headers";
 import { config } from "@/lib/config";
 import { hasWorkspaceRole, type Identity } from "@/lib/auth/claims";
 import { verifySessionToken } from "@/lib/auth/session";
+import { amendRequest, log } from "@/lib/log";
 
 /**
  * Centralized authorization.
@@ -94,6 +95,10 @@ export async function getIdentityFromToken(
 export async function requireIdentity(): Promise<Identity> {
   const identity = await getIdentity();
   if (!identity) throw new HttpError(401, "authentication required");
+  // Attach the subject to every line this request writes from here on. Doing
+  // it in the one function every authenticated route already calls is what
+  // keeps handlers free of logging plumbing.
+  amendRequest({ sub: identity.sub });
   return identity;
 }
 
@@ -103,7 +108,9 @@ export function assertAuthorized(
   action: Action,
   ctx: AuthzContext,
 ): void {
+  amendRequest({ workspaceId: ctx.workspaceId });
   if (!can(identity, action, ctx)) {
+    log.warn("authz.denied", { action, platformAdmin: identity.platformAdmin });
     throw new HttpError(403, `not authorized for ${action}`);
   }
 }
@@ -116,6 +123,9 @@ export function errorResponse(err: unknown): Response {
       { status: err.status, headers: err.headers },
     );
   }
-  console.error("Unhandled error:", err);
+  // The message never reaches the caller — a 500 body says only "internal
+  // error" — so this line is the only record of what actually broke. The
+  // request id on it is the one the caller was handed.
+  log.error("request.unhandled_error", { err });
   return Response.json({ error: "internal error" }, { status: 500 });
 }

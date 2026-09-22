@@ -13,10 +13,22 @@ export async function register() {
   if (process.env.NEXT_RUNTIME !== "nodejs") return;
   if (process.env.NEXT_PHASE === "phase-production-build") return;
 
+  // Imported here rather than at the top of the file for the same reason the
+  // rest are: this module is also loaded for the edge runtime, where
+  // `node:async_hooks` does not exist.
+  const { log } = await import("@/lib/log");
+
   const { runStartupChecks } = await import("@/lib/startup");
   const result = await runStartupChecks();
   if (result.report) {
-    (result.ok ? console.warn : console.error)(result.report);
+    // The report is a multi-line block written for a human; it rides as one
+    // field so that a JSON consumer gets one event and `pretty` output in
+    // development still prints it legibly.
+    const write = result.ok ? log.warn : log.error;
+    write(result.ok ? "config.warnings" : "config.invalid", {
+      report: result.report,
+      problems: result.problems.length,
+    });
   }
   if (!result.ok) {
     // Throwing here surfaces as "An error occurred while loading

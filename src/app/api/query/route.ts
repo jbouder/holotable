@@ -1,11 +1,6 @@
 import { z } from "zod";
-import {
-  requireIdentity,
-  assertAuthorized,
-  errorResponse,
-  HttpError,
-} from "@/lib/auth/authorize";
-import { readJson, json } from "@/lib/http";
+import { requireIdentity, assertAuthorized, HttpError } from "@/lib/auth/authorize";
+import { readJson, json, route } from "@/lib/http";
 import { getSourceById } from "@/lib/db/repo";
 import { validateSql, buildExecutablePlan } from "@/lib/sql/safety";
 import { resolveTimeRange } from "@/lib/time";
@@ -27,7 +22,7 @@ const Body = z.object({
  * Authorization: editor on the trusted source's workspace. The SQL is fully
  * validated and the server injects the time range; the model never controls it.
  */
-export async function POST(req: Request) {
+export const POST = route("query", async (req: Request) => {
   try {
     const identity = await requireIdentity();
     const body = await readJson(req, Body);
@@ -58,6 +53,7 @@ export async function POST(req: Request) {
     if (err instanceof QueryExecutionError) {
       return json({ error: err.message }, { status: 400 });
     }
-    return errorResponse(err);
+    // Everything else is `route()`'s to classify, log, and answer.
+    throw err;
   }
-}
+});

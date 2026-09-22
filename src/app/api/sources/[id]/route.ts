@@ -1,18 +1,14 @@
 import { z } from "zod";
-import {
-  requireIdentity,
-  assertAuthorized,
-  errorResponse,
-  HttpError,
-} from "@/lib/auth/authorize";
-import { readJson, json } from "@/lib/http";
+import { requireIdentity, assertAuthorized, HttpError } from "@/lib/auth/authorize";
+import { readJson, json, route } from "@/lib/http";
 import { getSourceById, updateSource, deleteSource } from "@/lib/db/repo";
 import { SourceConfig } from "@/lib/registry";
 
 export const runtime = "nodejs";
 
-export async function GET(_req: Request, ctx: RouteContext<"/api/sources/[id]">) {
-  try {
+export const GET = route(
+  "sources.get",
+  async (_req: Request, ctx: RouteContext<"/api/sources/[id]">) => {
     const identity = await requireIdentity();
     const { id } = await ctx.params;
     const source = await getSourceById(id);
@@ -20,10 +16,8 @@ export async function GET(_req: Request, ctx: RouteContext<"/api/sources/[id]">)
 
     assertAuthorized(identity, "source:use", { workspaceId: source.workspaceId });
     return json({ source });
-  } catch (err) {
-    return errorResponse(err);
-  }
-}
+  },
+);
 
 const UpdateBody = z.object({
   name: z.string().min(1).max(200).optional(),
@@ -34,8 +28,9 @@ const UpdateBody = z.object({
     .optional(),
 });
 
-export async function PUT(req: Request, ctx: RouteContext<"/api/sources/[id]">) {
-  try {
+export const PUT = route(
+  "sources.update",
+  async (req: Request, ctx: RouteContext<"/api/sources/[id]">) => {
     const identity = await requireIdentity();
     const { id } = await ctx.params;
     const source = await getSourceById(id);
@@ -47,14 +42,13 @@ export async function PUT(req: Request, ctx: RouteContext<"/api/sources/[id]">) 
     const updated = await updateSource(source.workspaceId, id, patch);
     if (!updated) throw new HttpError(409, "source is tombstoned and cannot be edited");
     return json({ source: updated });
-  } catch (err) {
-    return errorResponse(err);
-  }
-}
+  },
+);
 
 /** Delete a source; referenced sources are tombstoned rather than removed. */
-export async function DELETE(_req: Request, ctx: RouteContext<"/api/sources/[id]">) {
-  try {
+export const DELETE = route(
+  "sources.delete",
+  async (_req: Request, ctx: RouteContext<"/api/sources/[id]">) => {
     const identity = await requireIdentity();
     const { id } = await ctx.params;
     const source = await getSourceById(id);
@@ -63,7 +57,5 @@ export async function DELETE(_req: Request, ctx: RouteContext<"/api/sources/[id]
     assertAuthorized(identity, "source:manage", { workspaceId: source.workspaceId });
     const outcome = await deleteSource(source.workspaceId, id);
     return json({ outcome });
-  } catch (err) {
-    return errorResponse(err);
-  }
-}
+  },
+);

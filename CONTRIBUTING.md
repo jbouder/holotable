@@ -101,8 +101,9 @@ Three notes on the less obvious ones:
 Four lint rules are errors on purpose and are worth knowing before you hit them:
 `noFloatingPromises` (mark a deliberate fire-and-forget with `void`, so the
 intent is visible), `useExhaustiveDependencies`, `noExplicitAny`, and
-`noConsole` (`console.warn` and `console.error` are allowed until structured
-logging lands). Fix a violation rather than suppressing it; if a suppression is
+`noConsole` (nothing is allowed in `src/` — write through `log` from
+`src/lib/log.ts`; `scripts/` and `test/` are exempt). Fix a violation rather
+than suppressing it; if a suppression is
 genuinely right, use a scoped `// biome-ignore` with a reason on the line.
 
 If you touch database code, consider whether `npm run migrate` or `npm run seed`

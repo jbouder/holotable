@@ -1,4 +1,5 @@
 import { config } from "@/lib/config";
+import { log as logger } from "@/lib/log";
 
 /**
  * Graceful shutdown.
@@ -143,8 +144,11 @@ export interface ShutdownOptions {
   stopPollers?: () => void | Promise<void>;
   /** Close the config-store pool. Defaults to the shared `pg` pool. */
   closePool?: () => Promise<void>;
-  /** Where the one-line progress report goes. Defaults to `console.warn`. */
-  log?: (message: string) => void;
+  /**
+   * Where the one-line progress report goes. Defaults to the structured
+   * logger; a test injects a collector.
+   */
+  log?: (message: string, fields?: Record<string, unknown>) => void;
 }
 
 async function defaultStopPollers(): Promise<void> {
@@ -174,7 +178,7 @@ export function isShuttingDown(): boolean {
 
 async function runShutdown(opts: ShutdownOptions): Promise<number> {
   const graceMs = opts.graceMs ?? config.shutdownGraceMs;
-  const log = opts.log ?? ((message: string) => console.warn(message));
+  const log = opts.log ?? ((message, fields) => logger.warn(message, fields));
   const startedAt = Date.now();
 
   // The flag first and synchronously: every probe from here on must fail,
@@ -198,11 +202,11 @@ async function runShutdown(opts: ShutdownOptions): Promise<number> {
   );
 
   const elapsed = Date.now() - startedAt;
-  log(
-    completed
-      ? `shutdown: drained in ${elapsed}ms`
-      : `shutdown: grace period of ${graceMs}ms expired with ${inFlight} query/queries in flight; exiting anyway`,
-  );
+  if (completed) {
+    log("shutdown.drained", { elapsedMs: elapsed });
+  } else {
+    log("shutdown.grace_expired", { graceMs, elapsedMs: elapsed, inFlight });
+  }
   return 0;
 }
 
@@ -219,10 +223,10 @@ export function installSignalHandlers(): void {
       // A second signal is an operator asking for the wait to stop. The first
       // one has already closed the streams and stopped the pollers.
       if (isShuttingDown()) {
-        console.warn(`shutdown: ${signal} received while draining; exiting now`);
+        logger.warn("shutdown.signal_repeated", { signal });
         process.exit(0);
       }
-      console.warn(`shutdown: ${signal} received; draining`);
+      logger.warn("shutdown.signal", { signal });
       void shutdown().then((code) => process.exit(code));
     });
   }

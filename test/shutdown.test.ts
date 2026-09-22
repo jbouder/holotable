@@ -81,7 +81,7 @@ describe("shutdown", () => {
     assert.equal(readinessHttpStatus(after.status), 503);
     // Liveness must not follow readiness down: restarting a process that is on
     // its way out is the wrong cure, and the orchestrator would do exactly that.
-    assert.equal(health().status, 200);
+    assert.equal((await health(new Request("http://localhost/api/health"))).status, 200);
   });
 
   it("waits for in-flight queries, then closes the pool", async () => {
@@ -115,19 +115,24 @@ describe("shutdown", () => {
 
   it("gives up on a query that outruns the grace period and still exits 0", async () => {
     void trackInFlight(hang);
-    const messages: string[] = [];
+    const lines: Array<[string, Record<string, unknown> | undefined]> = [];
 
     const startedAt = Date.now();
     const code = await shutdown({
       ...isolated,
       graceMs: 60,
-      log: (m) => messages.push(m),
+      log: (m, fields) => lines.push([m, fields]),
     });
     const elapsed = Date.now() - startedAt;
 
     assert.equal(code, 0);
     assert.ok(elapsed < 2_000, `shutdown took ${elapsed}ms, well past its budget`);
-    assert.match(messages.join("\n"), /grace period of 60ms expired/);
+    assert.deepEqual(
+      lines.map(([m]) => m),
+      ["shutdown.grace_expired"],
+    );
+    assert.equal(lines[0][1]?.graceMs, 60);
+    assert.equal(lines[0][1]?.inFlight, 1);
   });
 
   it("counts work as finished even when it throws", async () => {

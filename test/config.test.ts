@@ -476,3 +476,50 @@ test("a short scrape token warns rather than blocking a boot", () => {
   assert.deepEqual(variables(warnings(problems)), ["METRICS_TOKEN"]);
   assert.match(warnings(problems)[0].message, /openssl rand/);
 });
+
+test("LOG_LEVEL and LOG_FORMAT accept only their own vocabularies", () => {
+  // `silent` parses too, but earns a warning of its own in the next test.
+  for (const level of ["debug", "info", "warn", "error"]) {
+    assert.deepEqual(
+      validateConfig({ ...VALID_PRODUCTION, LOG_LEVEL: level }, { production: true }),
+      [],
+    );
+  }
+  assert.deepEqual(
+    errors(
+      validateConfig({ ...VALID_PRODUCTION, LOG_LEVEL: "silent" }, { production: true }),
+    ),
+    [],
+  );
+  const bad = validateConfig(
+    { ...VALID_PRODUCTION, LOG_LEVEL: "verbose", LOG_FORMAT: "logfmt" },
+    { production: true },
+  );
+  assert.deepEqual(variables(errors(bad)).sort(), ["LOG_FORMAT", "LOG_LEVEL"]);
+  assert.match(errors(bad)[0].message, /debug, info, warn, error, silent/);
+});
+
+test("a production server that logs nothing, or logs for a human, is warned about", () => {
+  const silent = validateConfig(
+    { ...VALID_PRODUCTION, LOG_LEVEL: "silent" },
+    { production: true },
+  );
+  assert.deepEqual(errors(silent), []);
+  assert.deepEqual(variables(warnings(silent)), ["LOG_LEVEL"]);
+  assert.match(warnings(silent)[0].message, /unhandled errors/);
+
+  const pretty = validateConfig(
+    { ...VALID_PRODUCTION, LOG_FORMAT: "pretty" },
+    { production: true },
+  );
+  assert.deepEqual(variables(warnings(pretty)), ["LOG_FORMAT"]);
+
+  // Both are the development defaults, so neither is worth saying there.
+  assert.deepEqual(
+    validateConfig(
+      { LOG_LEVEL: "silent", LOG_FORMAT: "pretty" },
+      { production: false },
+    ).filter((p) => p.variable.startsWith("LOG_")),
+    [],
+  );
+});

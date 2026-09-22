@@ -1,12 +1,7 @@
 import { z } from "zod";
 import type { UIMessage } from "ai";
-import {
-  requireIdentity,
-  assertAuthorized,
-  errorResponse,
-  HttpError,
-} from "@/lib/auth/authorize";
-import { readJson } from "@/lib/http";
+import { requireIdentity, assertAuthorized, HttpError } from "@/lib/auth/authorize";
+import { readJson, route } from "@/lib/http";
 import { getDashboardById, getSourceById } from "@/lib/db/repo";
 import { resolveChatSources, streamDashboardChat } from "@/lib/ai/chat";
 import { enforceLlmLimits } from "@/lib/limits/llm";
@@ -30,11 +25,9 @@ const Body = z.object({
  * A turn may take several model round trips; the rate limit counts the turn
  * once and the budget records the usage summed over every step.
  */
-export async function POST(
-  req: Request,
-  { params }: { params: Promise<{ id: string }> },
-) {
-  try {
+export const POST = route(
+  "dashboards.chat",
+  async (req: Request, { params }: { params: Promise<{ id: string }> }) => {
     const identity = await requireIdentity();
     const { id } = await params;
     const body = await readJson(req, Body);
@@ -64,7 +57,5 @@ export async function POST(
     });
 
     return result.toUIMessageStreamResponse();
-  } catch (err) {
-    return errorResponse(err);
-  }
-}
+  },
+);

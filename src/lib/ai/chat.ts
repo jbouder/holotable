@@ -18,6 +18,7 @@ import { Dashboard, Panel } from "@/lib/ir";
 import type { SourceRecord } from "@/lib/registry";
 import { can } from "@/lib/auth/authorize";
 import type { Identity } from "@/lib/auth/claims";
+import { log } from "@/lib/log";
 
 /**
  * Dashboard chat.
@@ -255,7 +256,7 @@ export async function streamDashboardChat(input: {
             // the model can correct itself; anything else is infra — log it and
             // return a generic message rather than leaking internals.
             if (err instanceof QueryExecutionError) return { error: err.message };
-            console.error("dashboard chat runQuery failed:", err);
+            log.error("chat.run_query_failed", { sourceId: built.source.id, err });
             return { error: "query execution failed" };
           }
         },
