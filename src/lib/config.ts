@@ -216,6 +216,20 @@ const EnvSchema = z.object({
     z.enum(["true", "false"], { error: 'must be "true" or "false"' }),
   ),
 
+  // Spelled out rather than imported from `src/lib/log.ts`: this module is
+  // reachable from the browser bundle and that one imports `node:async_hooks`.
+  // `test/log.test.ts` fails if the two vocabularies drift apart.
+  LOG_LEVEL: blank(
+    z.enum(["debug", "info", "warn", "error", "silent"], {
+      error: "must be one of debug, info, warn, error, silent",
+    }),
+  ),
+  LOG_FORMAT: blank(
+    z.enum(["json", "pretty"], {
+      error: 'must be "json" (one object per line) or "pretty" (human-readable)',
+    }),
+  ),
+
   METRICS_TOKEN: blank(z.string()),
   METRICS_ALLOWED_CIDRS: blank(
     z.string().refine(
@@ -348,6 +362,23 @@ export function validateConfig(
     warning(
       "CSP_REPORT_ONLY",
       "is true; the Content-Security-Policy is reported, not enforced. Set it to false once the browser console shows no violations.",
+    );
+  }
+
+  // --- Logging ------------------------------------------------------------
+  // Both have a working default in every environment, so neither is ever
+  // missing. What is worth saying at boot is that this deployment has chosen
+  // to throw its own record away, or to emit something no aggregator parses.
+  if (production && values.LOG_LEVEL === "silent") {
+    warning(
+      "LOG_LEVEL",
+      "is silent; this server will write no log at all, including unhandled errors. Set it to info unless something else is capturing them.",
+    );
+  }
+  if (production && values.LOG_FORMAT === "pretty") {
+    warning(
+      "LOG_FORMAT",
+      "is pretty; lines are written for a human to read and a log aggregator will not parse them as JSON. Leave it unset in production.",
     );
   }
 

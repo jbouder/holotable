@@ -1,7 +1,7 @@
 import { z } from "zod";
-import { requireIdentity, assertAuthorized, errorResponse } from "@/lib/auth/authorize";
+import { requireIdentity, assertAuthorized } from "@/lib/auth/authorize";
 import { accessibleWorkspaces } from "@/lib/auth/claims";
-import { readJson, json } from "@/lib/http";
+import { readJson, json, route } from "@/lib/http";
 import { listDashboards, createDashboard } from "@/lib/db/repo";
 import { resolveAndValidateDashboard } from "@/lib/dashboard-service";
 import { Dashboard } from "@/lib/ir";
@@ -9,16 +9,12 @@ import { Dashboard } from "@/lib/ir";
 export const runtime = "nodejs";
 
 /** List dashboards across every workspace the caller can view. */
-export async function GET() {
-  try {
-    const identity = await requireIdentity();
-    const workspaces = accessibleWorkspaces(identity);
-    const lists = await Promise.all(workspaces.map((w) => listDashboards(w)));
-    return json({ dashboards: lists.flat() });
-  } catch (err) {
-    return errorResponse(err);
-  }
-}
+export const GET = route("dashboards.list", async () => {
+  const identity = await requireIdentity();
+  const workspaces = accessibleWorkspaces(identity);
+  const lists = await Promise.all(workspaces.map((w) => listDashboards(w)));
+  return json({ dashboards: lists.flat() });
+});
 
 const CreateBody = z.object({ spec: Dashboard });
 
@@ -27,21 +23,17 @@ const CreateBody = z.object({ spec: Dashboard });
  * referenced by the spec (never from a request field), then create is
  * authorized against that workspace.
  */
-export async function POST(req: Request) {
-  try {
-    const identity = await requireIdentity();
-    const { spec } = await readJson(req, CreateBody);
+export const POST = route("dashboards.create", async (req: Request) => {
+  const identity = await requireIdentity();
+  const { spec } = await readJson(req, CreateBody);
 
-    const { workspaceId } = await resolveAndValidateDashboard(spec);
-    assertAuthorized(identity, "dashboard:create", { workspaceId });
+  const { workspaceId } = await resolveAndValidateDashboard(spec);
+  assertAuthorized(identity, "dashboard:create", { workspaceId });
 
-    const record = await createDashboard({
-      workspaceId,
-      createdBy: identity.sub,
-      spec,
-    });
-    return json({ dashboard: record }, { status: 201 });
-  } catch (err) {
-    return errorResponse(err);
-  }
-}
+  const record = await createDashboard({
+    workspaceId,
+    createdBy: identity.sub,
+    spec,
+  });
+  return json({ dashboard: record }, { status: 201 });
+});

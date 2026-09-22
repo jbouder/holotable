@@ -1,11 +1,6 @@
 import { z } from "zod";
-import {
-  requireIdentity,
-  assertAuthorized,
-  errorResponse,
-  HttpError,
-} from "@/lib/auth/authorize";
-import { readJson, json } from "@/lib/http";
+import { requireIdentity, assertAuthorized, HttpError } from "@/lib/auth/authorize";
+import { readJson, json, route } from "@/lib/http";
 import {
   getDashboardById,
   saveDashboardVersion,
@@ -17,8 +12,9 @@ import { Dashboard } from "@/lib/ir";
 
 export const runtime = "nodejs";
 
-export async function GET(_req: Request, ctx: RouteContext<"/api/dashboards/[id]">) {
-  try {
+export const GET = route(
+  "dashboards.get",
+  async (_req: Request, ctx: RouteContext<"/api/dashboards/[id]">) => {
     const identity = await requireIdentity();
     const { id } = await ctx.params;
     const dashboard = await getDashboardById(id);
@@ -28,16 +24,15 @@ export async function GET(_req: Request, ctx: RouteContext<"/api/dashboards/[id]
       workspaceId: dashboard.workspaceId,
     });
     return json({ dashboard });
-  } catch (err) {
-    return errorResponse(err);
-  }
-}
+  },
+);
 
 const UpdateBody = z.object({ spec: Dashboard });
 
 /** Save a new immutable version of the dashboard (editor). */
-export async function PUT(req: Request, ctx: RouteContext<"/api/dashboards/[id]">) {
-  try {
+export const PUT = route(
+  "dashboards.update",
+  async (req: Request, ctx: RouteContext<"/api/dashboards/[id]">) => {
     const identity = await requireIdentity();
     const { id } = await ctx.params;
     const existing = await getDashboardById(id);
@@ -60,14 +55,13 @@ export async function PUT(req: Request, ctx: RouteContext<"/api/dashboards/[id]"
     });
     invalidatePoller(id);
     return json({ dashboard: record });
-  } catch (err) {
-    return errorResponse(err);
-  }
-}
+  },
+);
 
 /** Delete a dashboard (owner, workspace source-admin, or platform admin). */
-export async function DELETE(_req: Request, ctx: RouteContext<"/api/dashboards/[id]">) {
-  try {
+export const DELETE = route(
+  "dashboards.delete",
+  async (_req: Request, ctx: RouteContext<"/api/dashboards/[id]">) => {
     const identity = await requireIdentity();
     const { id } = await ctx.params;
     const existing = await getDashboardById(id);
@@ -81,7 +75,5 @@ export async function DELETE(_req: Request, ctx: RouteContext<"/api/dashboards/[
     await softDeleteDashboard(id);
     invalidatePoller(id);
     return json({ ok: true });
-  } catch (err) {
-    return errorResponse(err);
-  }
-}
+  },
+);

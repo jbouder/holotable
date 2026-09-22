@@ -1,8 +1,9 @@
 import { clearSessionCookie } from "@/lib/auth/cookie";
+import { route } from "@/lib/http";
 
 export const runtime = "nodejs";
 
-export async function POST() {
+export const POST = route("auth.logout", async () => {
   await clearSessionCookie();
   return Response.json({ ok: true });
-}
+});

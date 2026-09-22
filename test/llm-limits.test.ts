@@ -17,6 +17,7 @@ import {
   resolveLimits,
 } from "@/lib/limits/llm";
 import { MemoryRateLimitStore, takeToken } from "@/lib/limits/rate";
+import { createLogger, setLogger } from "@/lib/log";
 
 /* -------------------------------------------------------------------------- */
 /* Token bucket                                                               */
@@ -293,11 +294,14 @@ test("a failing usage store is logged, not surfaced", async () => {
       throw new Error("db down");
     },
   };
-  const logged: unknown[] = [];
-  const original = console.error;
-  console.error = (...args: unknown[]) => {
-    logged.push(args);
-  };
+  const logged: Array<Record<string, unknown>> = [];
+  const restore = setLogger(
+    createLogger({
+      level: "error",
+      format: "json",
+      sink: (line) => logged.push(JSON.parse(line) as Record<string, unknown>),
+    }),
+  );
   try {
     const rec = await enforceLlmLimits(
       { identity: alice, workspaceId: "ws", route: "generate" },
@@ -306,9 +310,12 @@ test("a failing usage store is logged, not surfaced", async () => {
     assert.doesNotThrow(() => rec.record(usage(1)));
     await new Promise((r) => setImmediate(r));
   } finally {
-    console.error = original;
+    restore();
   }
   assert.equal(logged.length, 1);
+  assert.equal(logged[0].msg, "llm.usage_record_failed");
+  assert.equal(logged[0].route, "generate");
+  assert.equal((logged[0].err as { message: string }).message, "db down");
 });
 
 test("per-workspace overrides win over the environment, and 0 lifts a limit", async () => {

@@ -78,6 +78,10 @@ Important files:
   instruments and the gate on `/api/metrics`; a scrape is unauthenticated by
   session, so the endpoint stays closed until `METRICS_TOKEN` or
   `METRICS_ALLOWED_CIDRS` is set
+- `src/lib/log.ts` and the `route()` wrapper in `src/lib/http.ts` — the JSON
+  log, the per-request `AsyncLocalStorage` context, and the redaction pass
+  every payload goes through; a log line never carries a credential, and SQL
+  and prompt text is reduced to a digest
 - `src/app/globals.css` — design tokens and Tailwind v4 theme setup
 - `next.config.ts` — standalone output, `pg` externalization
 - `package.json` — authoritative scripts/tooling
@@ -297,8 +301,9 @@ enforce that are easy to break accidentally:
 
 Four Biome rules are errors deliberately: `noFloatingPromises`,
 `useExhaustiveDependencies`, `noExplicitAny` (which matches the TypeScript rule
-below), and `noConsole` with `warn`/`error` allowed until structured logging
-lands. Fix violations rather than suppressing them. A deliberate
+below), and `noConsole`, which now allows nothing in `src/` — write through
+`log` from `src/lib/log.ts` instead. `scripts/` and `test/` are exempt, since a
+CLI's output is its interface. Fix violations rather than suppressing them. A deliberate
 fire-and-forget promise is marked with the `void` operator — that is the
 sanctioned opt-out and it makes the intent visible at the call site; a bare
 `// biome-ignore` needs a reason and should be rare.

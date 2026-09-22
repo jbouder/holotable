@@ -1,14 +1,10 @@
-import {
-  requireIdentity,
-  assertAuthorized,
-  errorResponse,
-  HttpError,
-} from "@/lib/auth/authorize";
+import { requireIdentity, assertAuthorized, HttpError } from "@/lib/auth/authorize";
 import { getDashboardById } from "@/lib/db/repo";
 import { getPoller, type PollerEvent } from "@/lib/poller/registry";
 import { TimeRange } from "@/lib/ir";
 import { drainFrame } from "@/lib/sse";
 import { onDrain } from "@/lib/shutdown";
+import { route } from "@/lib/http";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -20,11 +16,9 @@ export const dynamic = "force-dynamic";
  * same-origin requests). Each subscriber is independently authorized here, then
  * attaches to the ONE shared in-process poller for this dashboard.
  */
-export async function GET(
-  req: Request,
-  ctx: RouteContext<"/api/dashboards/[id]/stream">,
-) {
-  try {
+export const GET = route(
+  "dashboards.stream",
+  async (req: Request, ctx: RouteContext<"/api/dashboards/[id]/stream">) => {
     const identity = await requireIdentity();
     const { id } = await ctx.params;
     const dashboard = await getDashboardById(id);
@@ -101,7 +95,5 @@ export async function GET(
         Connection: "keep-alive",
       },
     });
-  } catch (err) {
-    return errorResponse(err);
-  }
-}
+  },
+);

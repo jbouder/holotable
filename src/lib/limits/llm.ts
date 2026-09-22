@@ -37,6 +37,7 @@ import {
   utcDay,
 } from "@/lib/limits/budget";
 import { MemoryRateLimitStore, type RateLimitStore } from "@/lib/limits/rate";
+import { log } from "@/lib/log";
 import { recordLlmRequest, recordLlmTokens } from "@/lib/metrics";
 
 export type { LlmRoute } from "@/lib/limits/budget";
@@ -162,7 +163,7 @@ export async function enforceLlmLimits(
       void deps.budgetStore
         .record({ workspaceId, day: utcDay(deps.now()), route, model, ...tokens })
         .catch((err: unknown) => {
-          console.error("failed to record LLM usage:", err);
+          log.error("llm.usage_record_failed", { route, model, err });
         });
     },
   };

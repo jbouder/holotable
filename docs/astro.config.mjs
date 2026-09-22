@@ -74,6 +74,7 @@ export default defineConfig({
             { label: "LLM rate limits and budgets", slug: "operations/llm-limits" },
             { label: "Health, readiness, and shutdown", slug: "operations/health-checks" },
             { label: "Prometheus metrics", slug: "operations/metrics" },
+            { label: "Structured logging", slug: "operations/logging" },
           ],
         },
         {

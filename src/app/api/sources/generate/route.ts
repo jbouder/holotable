@@ -1,6 +1,6 @@
 import { z } from "zod";
-import { requireIdentity, assertAuthorized, errorResponse } from "@/lib/auth/authorize";
-import { readJson } from "@/lib/http";
+import { requireIdentity, assertAuthorized } from "@/lib/auth/authorize";
+import { readJson, route } from "@/lib/http";
 import { streamSourceDraft } from "@/lib/ai/generate";
 import { enforceLlmLimits } from "@/lib/limits/llm";
 
@@ -22,24 +22,20 @@ const Body = z.object({
  * The workspace's rate limit and token budget are enforced after that check,
  * so the limits are keyed by a workspace the caller is already authorized in.
  */
-export async function POST(req: Request) {
-  try {
-    const identity = await requireIdentity();
-    const body = await readJson(req, Body);
+export const POST = route("sources.draft", async (req: Request) => {
+  const identity = await requireIdentity();
+  const body = await readJson(req, Body);
 
-    assertAuthorized(identity, "source:manage", {
-      workspaceId: body.workspaceId,
-    });
+  assertAuthorized(identity, "source:manage", {
+    workspaceId: body.workspaceId,
+  });
 
-    const usage = await enforceLlmLimits({
-      identity,
-      workspaceId: body.workspaceId,
-      route: "source-draft",
-    });
+  const usage = await enforceLlmLimits({
+    identity,
+    workspaceId: body.workspaceId,
+    route: "source-draft",
+  });
 
-    const result = streamSourceDraft({ prompt: body.prompt, onUsage: usage.record });
-    return result.toTextStreamResponse();
-  } catch (err) {
-    return errorResponse(err);
-  }
-}
+  const result = streamSourceDraft({ prompt: body.prompt, onUsage: usage.record });
+  return result.toTextStreamResponse();
+});

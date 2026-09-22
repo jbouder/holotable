@@ -1,3 +1,4 @@
+import { route } from "@/lib/http";
 import { checkReadiness, readinessHttpStatus } from "@/lib/readiness";
 
 export const runtime = "nodejs";
@@ -15,10 +16,16 @@ export const dynamic = "force-dynamic";
  * No auth: a probe comes from the orchestrator, not from a signed-in user, and
  * the body is deliberately free of anything worth protecting.
  */
-export async function GET(): Promise<Response> {
-  const report = await checkReadiness();
-  return Response.json(report, {
-    status: readinessHttpStatus(report.status),
-    headers: { "Cache-Control": "no-store" },
-  });
-}
+export const GET = route(
+  "ready",
+  async () => {
+    const report = await checkReadiness();
+    return Response.json(report, {
+      status: readinessHttpStatus(report.status),
+      headers: { "Cache-Control": "no-store" },
+    });
+  },
+  // Probed as often as liveness is. A drain turns these into `request.failed`
+  // at error level regardless, which is the part worth seeing.
+  { quiet: true },
+);

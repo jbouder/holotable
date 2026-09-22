@@ -12,8 +12,8 @@
     "format": "biome format --write",
     "format:check": "biome format",
     "typecheck": "next typegen && tsc --noEmit",
-    "test": "node --test --import tsx \"test/**/*.test.ts\"",
-    "test:fuzz": "node --test --import tsx test/sql-safety.fuzz.test.ts",
+    "test": "LOG_LEVEL=silent node --test --import tsx \"test/**/*.test.ts\"",
+    "test:fuzz": "LOG_LEVEL=silent node --test --import tsx test/sql-safety.fuzz.test.ts",
     "config:check": "tsx scripts/config-check.ts",
     "migrate": "tsx scripts/migrate.ts",
     "seed": "tsx scripts/seed.ts"

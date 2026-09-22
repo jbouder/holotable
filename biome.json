@@ -31,7 +31,7 @@
       "correctness": { "useExhaustiveDependencies": "error" },
       "suspicious": {
         "noExplicitAny": "error",
-        "noConsole": { "level": "error", "options": { "allow": ["warn", "error"] } }
+        "noConsole": "error"
       },
       "nursery": { "noFloatingPromises": "error" }
     }
@@ -39,7 +39,7 @@
   "assist": { "actions": { "source": { "organizeImports": "off" } } },
   "overrides": [
     {
-      "includes": ["scripts/**"],
+      "includes": ["scripts/**", "test/**"],
       "linter": {
         "rules": {
           "suspicious": {
