@@ -42,7 +42,12 @@ export default async function EditDashboardPage({
       workspaceId={dashboard.workspaceId}
       initialSpec={dashboard.spec}
       initialPanelId={panel}
-      version={dashboard.version}
+      initialVersion={dashboard.version}
+      updatedAt={dashboard.updatedAt}
+      // Scopes draft autosave to this viewer: `localStorage` is per browser,
+      // not per session, so two people on one machine must not be offered each
+      // other's unsaved work (#118).
+      userSub={identity.sub}
       sources={sources}
     />
   );

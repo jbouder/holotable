@@ -35,8 +35,10 @@ Identity: `workspace_id`, `title`, `created_by`, `current_version_id`,
 
 ### `dashboard_versions`
 
-**Append-only**: `dashboard_id`, `version`, and the entire validated spec as
-`jsonb`. A new row is written on every save; existing rows are never mutated.
+**Append-only**: `dashboard_id`, `version`, the entire validated spec as
+`jsonb`, and an optional `note` — the author's own one line about what changed,
+written in the editor and displayed as-is. A new row is written on every save;
+existing rows are never mutated.
 
 This is the property that makes viewing and polling pure replays of a fixed
 spec, and it means a saved dashboard is a stable, auditable artifact. The full

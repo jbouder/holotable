@@ -11,6 +11,9 @@ import {
   Loader2,
   LayoutGrid,
   LayoutTemplate,
+  Keyboard,
+  Redo2,
+  Undo2,
   Unplug,
 } from "lucide-react";
 import {
@@ -41,6 +44,35 @@ import { type ApiError, apiErrorFromThrown, readApiError } from "@/lib/errors";
 import { appendTemplate, type Template } from "@/lib/templates";
 import { SaveAsTemplate } from "@/components/templates/SaveAsTemplate";
 import { TemplatePicker } from "@/components/templates/TemplatePicker";
+import { DraftBanner } from "@/components/editor/DraftBanner";
+import { LeaveGuardDialog } from "@/components/editor/LeaveGuardDialog";
+import { ShortcutsDialog } from "@/components/editor/ShortcutsDialog";
+import { useHistory } from "@/lib/editor/use-history";
+import {
+  type Binding,
+  formatShortcut,
+  useIsMac,
+  useShortcuts,
+} from "@/lib/editor/use-shortcuts";
+import {
+  interceptedHref,
+  isDirty,
+  relativeTime,
+  UNLOAD_PROMPT,
+  VERSION_NOTE_MAX,
+} from "@/lib/editor/session";
+import {
+  browserDraftStorage,
+  clearDraft,
+  DRAFT_DEBOUNCE_MS,
+  draftKey,
+  draftOffer,
+  type DraftOffer,
+  type DraftStorage,
+  pruneDrafts,
+  readDraft,
+  writeDraft,
+} from "@/lib/editor/drafts";
 
 interface SourceOption {
   id: string;
@@ -48,6 +80,13 @@ interface SourceOption {
   workspaceId: string;
   /** Tables and columns, for completion and the editor's allowlist hint. */
   catalog: SourceCatalog;
+}
+
+/** How a spec change is recorded in the undo stack. */
+interface EditIntent {
+  action: string;
+  /** Consecutive edits sharing a key coalesce into one history entry. */
+  key?: string | null;
 }
 
 const VIZ_OPTIONS = VizType.options.map((v) => ({ value: v, label: v }));
@@ -67,6 +106,9 @@ export function EditDashboardClient({
   workspaceId,
   initialSpec,
   initialPanelId,
+  initialVersion,
+  updatedAt,
+  userSub,
   sources,
 }: {
   dashboardId: string;
@@ -75,11 +117,33 @@ export function EditDashboardClient({
   initialSpec: Dashboard;
   /** Panel to open selected; ignored when it is not in the spec. */
   initialPanelId?: string;
-  version: number;
+  /** Version of the spec this editor opened on; the draft conflict check reads it. */
+  initialVersion: number;
+  /** When that version was written, for the header's 'last saved' line. */
+  updatedAt: string;
+  /** The viewer's subject, which scopes their drafts within this browser. */
+  userSub: string;
   sources: SourceOption[];
 }) {
   const router = useRouter();
-  const [spec, setSpec] = React.useState<Dashboard>(initialSpec);
+  const mac = useIsMac();
+  // Every spec mutation goes through `history.set`, which is what makes an
+  // accidental delete or a mistaken Arrange recoverable (#81).
+  const history = useHistory<Dashboard>(initialSpec);
+  const spec = history.state;
+
+  // What the server holds. The dirty flag is the difference between this and
+  // the working spec, so an edit that lands back on the saved value — typing a
+  // character and deleting it — is correctly not a change (#117).
+  const [savedSpec, setSavedSpec] = React.useState<Dashboard>(initialSpec);
+  const [version, setVersion] = React.useState(initialVersion);
+  const [savedAt, setSavedAt] = React.useState(() => {
+    const parsed = Date.parse(updatedAt);
+    return Number.isNaN(parsed) ? 0 : parsed;
+  });
+  const [note, setNote] = React.useState("");
+  const dirty = isDirty(spec, savedSpec);
+
   const [selectedId, setSelectedId] = React.useState<string | null>(
     initialSpec.panels.find((p) => p.id === initialPanelId)?.id ??
       initialSpec.panels[0]?.id ??
@@ -89,6 +153,9 @@ export function EditDashboardClient({
   const [saving, setSaving] = React.useState(false);
   const [error, setError] = React.useState<ApiError | null>(null);
   const [nlPrompt, setNlPrompt] = React.useState("");
+  const [showShortcuts, setShowShortcuts] = React.useState(false);
+  /** Where a guarded click wanted to go, held until the author answers. */
+  const [pendingHref, setPendingHref] = React.useState<string | null>(null);
   // A generated panel waits here to be accepted or rejected. It holds the id
   // of the panel it would replace rather than a copy of it, so a manual edit
   // made while the proposal is open shows up in the diff instead of being
@@ -106,6 +173,15 @@ export function EditDashboardClient({
     panelIds: string[];
   } | null>(null);
   const [picking, setPicking] = React.useState(false);
+
+  // Wall clock for the relative timestamps, resolved after mount: rendering
+  // "2 minutes ago" on the server would be a hydration mismatch by definition.
+  const [now, setNow] = React.useState(0);
+  React.useEffect(() => {
+    setNow(Date.now());
+    const timer = setInterval(() => setNow(Date.now()), 30_000);
+    return () => clearInterval(timer);
+  }, []);
 
   const selected = spec.panels.find((p) => p.id === selectedId) ?? null;
   // Sources a panel names that the page did not load: tombstoned, deleted, or
@@ -138,24 +214,99 @@ export function EditDashboardClient({
     },
   });
 
-  function updateSpec(patch: Partial<Dashboard>) {
-    setSpec((s) => ({ ...s, ...patch }));
+  /* ---------------------------------------------------------------------- */
+  /* Draft autosave (#118)                                                   */
+  /* ---------------------------------------------------------------------- */
+
+  const storageRef = React.useRef<DraftStorage | null>(null);
+  const [offer, setOffer] = React.useState<DraftOffer>({ kind: "none" });
+  /** Until the stored draft has been read, autosave must not touch storage. */
+  const [draftRead, setDraftRead] = React.useState(false);
+  const key = draftKey(dashboardId, userSub);
+
+  React.useEffect(() => {
+    const storage = browserDraftStorage();
+    storageRef.current = storage;
+    const at = Date.now();
+    // Drafts for dashboards nobody will reopen are what makes the per-key cap
+    // insufficient on its own.
+    pruneDrafts(storage, at);
+    setOffer(
+      draftOffer({
+        draft: readDraft(storage, key),
+        dashboardId,
+        currentVersion: initialVersion,
+        savedSpec: initialSpec,
+        now: at,
+      }),
+    );
+    setDraftRead(true);
+  }, [key, dashboardId, initialVersion, initialSpec]);
+
+  React.useEffect(() => {
+    if (!draftRead) return;
+    const storage = storageRef.current;
+    if (!dirty) {
+      // Only once the offer has been answered: clearing now would throw away
+      // the very draft the banner is offering.
+      if (offer.kind === "none") clearDraft(storage, key);
+      return;
+    }
+    // Editing past the banner is itself an answer — the author has chosen to
+    // work from the saved version — and from here on it is their NEW work that
+    // autosave has to protect. Leaving the banner up with autosave paused would
+    // be the one state in which the editor quietly stops keeping a draft.
+    if (offer.kind !== "none") setOffer({ kind: "none" });
+    const timer = setTimeout(() => {
+      writeDraft(storage, key, {
+        dashboardId,
+        baseVersion: version,
+        savedAt: Date.now(),
+        spec,
+      });
+    }, DRAFT_DEBOUNCE_MS);
+    return () => clearTimeout(timer);
+  }, [draftRead, offer.kind, dirty, spec, key, dashboardId, version]);
+
+  function restoreDraft() {
+    if (offer.kind === "none") return;
+    // Restoring is itself an edit, so it is one step to undo rather than a
+    // decision the author cannot take back.
+    history.set(offer.draft.spec, { action: "restore autosaved changes" });
+    setSelectedId(offer.draft.spec.panels[0]?.id ?? null);
+    setOffer({ kind: "none" });
+  }
+
+  function discardDraft() {
+    clearDraft(storageRef.current, key);
+    setOffer({ kind: "none" });
+  }
+
+  /* ---------------------------------------------------------------------- */
+  /* Spec mutations — each one an undo step                                  */
+  /* ---------------------------------------------------------------------- */
+
+  function updateSpec(patch: Partial<Dashboard>, intent: EditIntent) {
+    history.set((s) => ({ ...s, ...patch }), intent);
   }
 
   function arrangeColumns(columns: number) {
-    setSpec((s) => ({ ...s, panels: autoLayoutPanels(s.panels, columns) }));
+    history.set((s) => ({ ...s, panels: autoLayoutPanels(s.panels, columns) }), {
+      action: `arrange ${columns}-up`,
+    });
   }
 
   /** One drag, resize or nudge from the arranger: one change to the spec. */
   function setPanels(panels: Panel[]) {
-    setSpec((s) => ({ ...s, panels }));
+    // A drag emits a change per pointer move; they coalesce into one step.
+    history.set((s) => ({ ...s, panels }), { action: "move panels", key: "arrange" });
   }
 
-  function updatePanel(id: string, fn: (p: Panel) => Panel) {
-    setSpec((s) => ({
-      ...s,
-      panels: s.panels.map((p) => (p.id === id ? fn(p) : p)),
-    }));
+  function updatePanel(id: string, fn: (p: Panel) => Panel, intent: EditIntent) {
+    history.set(
+      (s) => ({ ...s, panels: s.panels.map((p) => (p.id === id ? fn(p) : p)) }),
+      intent,
+    );
   }
 
   function addPanel() {
@@ -169,27 +320,35 @@ export function EditDashboardClient({
       query: { sourceId: sources[0].id, sql: "SELECT 1 AS value", timeField: undefined },
       layout: { x: 0, y: maxY, w: 6, h: 4 },
     };
-    setSpec((s) => ({ ...s, panels: [...s.panels, panel] }));
+    history.set((s) => ({ ...s, panels: [...s.panels, panel] }), {
+      action: "add panel",
+    });
     setSelectedId(id);
   }
 
   /**
    * Bring a template's panels in at the bottom of the grid, already pointed at
-   * the source chosen in the picker. One `setSpec`, so it is one step to undo
-   * (#81); nothing is written until the existing Save appends a version, which
+   * the source chosen in the picker. One history entry, so it is one step to
+   * undo; nothing is written until the existing Save appends a version, which
    * re-validates every statement server-side against that source.
    */
   function applyTemplate(input: { template: Template; sourceId: string }) {
     const next = appendTemplate(spec, input.template.body, input.sourceId);
-    setSpec(next);
+    history.set(next, { action: `add panels from "${input.template.name}"` });
     setSelectedId(next.panels[next.panels.length - 1]?.id ?? null);
     setPicking(false);
   }
 
   function removePanel(id: string) {
-    setSpec((s) => ({ ...s, panels: s.panels.filter((p) => p.id !== id) }));
+    history.set((s) => ({ ...s, panels: s.panels.filter((p) => p.id !== id) }), {
+      action: "delete panel",
+    });
     if (proposal?.panelId === id) discardProposal();
-    if (selectedId === id) setSelectedId(spec.panels[0]?.id ?? null);
+    // Select what is LEFT: falling back to `panels[0]` selected the panel that
+    // was just removed whenever it happened to be the first one.
+    if (selectedId === id) {
+      setSelectedId(spec.panels.find((p) => p.id !== id)?.id ?? null);
+    }
   }
 
   /** Drop the proposal, cancelling the run behind it if one is still going. */
@@ -224,32 +383,46 @@ export function EditDashboardClient({
   }
 
   function runNlEdit() {
-    if (!selected || !nlPrompt.trim()) return;
+    if (!selected || !nlPrompt.trim() || isLoading) return;
     generatePanel(selected, nlPrompt);
   }
 
   function acceptProposal() {
     const generated = proposal?.panel;
     if (!generated || !proposalBase) return;
-    // One setSpec, so accepting is one step for undo/redo (#81) rather than a
-    // field-by-field trail.
-    updatePanel(proposalBase.id, () => acceptedPanel(proposalBase, generated));
+    // One history entry, so rejecting a generated change after the fact is one
+    // undo rather than a field-by-field trail.
+    updatePanel(proposalBase.id, () => acceptedPanel(proposalBase, generated), {
+      action: "apply natural-language edit",
+    });
     setProposal(null);
     setNlPrompt("");
   }
 
   /**
-   * Move the reviewed panels onto their new source. One `setSpec`, so a bulk
-   * re-point is one step to undo (#81) rather than one per panel — and nothing
+   * Move the reviewed panels onto their new source. One history entry, so a
+   * bulk re-point is one step to undo rather than one per panel — and nothing
    * is written here: the change is saved by the existing Save version, which
    * appends a version and re-validates every statement server-side.
    */
   function applyRepoint(input: { sourceId: string; panelIds: string[] }) {
-    setSpec((s) => ({ ...s, panels: repointPanels(s.panels, input) }));
+    history.set((s) => ({ ...s, panels: repointPanels(s.panels, input) }), {
+      action: "re-point panels",
+    });
     setRepointing(null);
   }
 
-  async function save() {
+  /* ---------------------------------------------------------------------- */
+  /* Saving (#117)                                                           */
+  /* ---------------------------------------------------------------------- */
+
+  /**
+   * Write a new version. Returns whether it landed, so the callers that go
+   * somewhere afterwards only go on success — a failed save leaves the author
+   * in the editor with their changes and the error, which is the whole point of
+   * splitting the navigation out of the save.
+   */
+  async function save(options: { navigate: boolean } = { navigate: false }) {
     setSaving(true);
     setError(null);
     const parsed = safeParseDashboard(spec);
@@ -262,20 +435,206 @@ export function EditDashboardClient({
         kind: "validation",
       });
       setSaving(false);
-      return;
+      return false;
     }
-    const res = await fetch(`/api/dashboards/${dashboardId}`, {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ spec: parsed.data }),
-    });
+    const trimmed = note.trim();
+    let res: Response;
+    try {
+      res = await fetch(`/api/dashboards/${dashboardId}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ spec: parsed.data, note: trimmed || undefined }),
+      });
+    } catch (thrown) {
+      setSaving(false);
+      setError(apiErrorFromThrown(thrown));
+      return false;
+    }
     setSaving(false);
     if (!res.ok) {
       setError(await readApiError(res));
+      return false;
+    }
+    const body = (await res.json().catch(() => null)) as {
+      dashboard?: { version?: number };
+    } | null;
+    setSavedSpec(parsed.data);
+    setVersion((v) => body?.dashboard?.version ?? v + 1);
+    setSavedAt(Date.now());
+    setNote("");
+    // The saved version now holds everything the draft did.
+    clearDraft(storageRef.current, key);
+    setOffer({ kind: "none" });
+    if (options.navigate) router.push(`/dashboards/${dashboardId}`);
+    return true;
+  }
+
+  /* ---------------------------------------------------------------------- */
+  /* Leaving with unsaved changes (#117)                                     */
+  /* ---------------------------------------------------------------------- */
+
+  React.useEffect(() => {
+    if (!dirty) return;
+    function onBeforeUnload(event: BeforeUnloadEvent) {
+      event.preventDefault();
+      event.returnValue = UNLOAD_PROMPT;
+    }
+    window.addEventListener("beforeunload", onBeforeUnload);
+    return () => window.removeEventListener("beforeunload", onBeforeUnload);
+  }, [dirty]);
+
+  React.useEffect(() => {
+    if (!dirty) return;
+    let opening: ReturnType<typeof setTimeout> | undefined;
+    // The App Router exposes no navigation event, so the guard intercepts the
+    // click that would START the navigation. Capture phase, so it runs before
+    // the Link that would otherwise have already pushed.
+    function onClick(event: MouseEvent) {
+      const anchor = (event.target as HTMLElement | null)?.closest?.("a");
+      if (!anchor) return;
+      const href = interceptedHref({
+        href: anchor.getAttribute("href"),
+        target: anchor.getAttribute("target"),
+        download: anchor.hasAttribute("download"),
+        metaKey: event.metaKey,
+        ctrlKey: event.ctrlKey,
+        shiftKey: event.shiftKey,
+        altKey: event.altKey,
+        button: event.button,
+        origin: window.location.origin,
+        currentPath: window.location.pathname,
+      });
+      if (!href) return;
+      event.preventDefault();
+      event.stopPropagation();
+      // Opened on the NEXT task, not in this handler. A dialog mounted while
+      // its own click is still being dispatched reads the tail of that click as
+      // a press outside itself and closes again — the link would be swallowed
+      // with nothing shown, which is worse than either answer.
+      opening = setTimeout(() => setPendingHref(href), 0);
+    }
+    document.addEventListener("click", onClick, true);
+    return () => {
+      document.removeEventListener("click", onClick, true);
+      clearTimeout(opening);
+    };
+  }, [dirty]);
+
+  /** Go somewhere, asking first when there is unsaved work. */
+  function leave(href: string) {
+    if (dirty) {
+      setPendingHref(href);
       return;
     }
-    router.push(`/dashboards/${dashboardId}`);
+    router.push(href);
   }
+
+  function leaveNow(href: string) {
+    clearDraft(storageRef.current, key);
+    setPendingHref(null);
+    router.push(href);
+  }
+
+  /* ---------------------------------------------------------------------- */
+  /* Keyboard shortcuts (#121)                                               */
+  /* ---------------------------------------------------------------------- */
+
+  const dialogOpen = picking || repointing !== null || pendingHref !== null;
+  const bindings: Binding[] = [
+    {
+      id: "save",
+      key: "s",
+      mod: true,
+      inTextField: true,
+      group: "Saving",
+      description: "Save a version and keep editing",
+      run: () => void save({ navigate: false }),
+      disabled: saving,
+    },
+    {
+      id: "save-view",
+      key: "s",
+      mod: true,
+      shift: true,
+      inTextField: true,
+      group: "Saving",
+      description: "Save and view the dashboard",
+      run: () => void save({ navigate: true }),
+      disabled: saving,
+    },
+    {
+      id: "undo",
+      key: "z",
+      mod: true,
+      group: "Editing",
+      description: "Undo",
+      run: history.undo,
+      disabled: !history.canUndo,
+    },
+    {
+      id: "redo",
+      key: "z",
+      mod: true,
+      shift: true,
+      group: "Editing",
+      description: "Redo",
+      run: history.redo,
+      disabled: !history.canRedo,
+    },
+    {
+      id: "new-panel",
+      key: "n",
+      group: "Editing",
+      description: "Add a panel",
+      run: addPanel,
+      disabled: sources.length === 0,
+    },
+    {
+      id: "run",
+      key: "Enter",
+      mod: true,
+      inTextField: true,
+      group: "Editing",
+      description: "Apply the natural-language edit (run the preview in the SQL box)",
+      run: () => {
+        // The SQL box binds Cmd+Enter to its own preview run; a second handler
+        // firing on the same keystroke would apply an unrelated NL edit.
+        if (document.activeElement?.id === "p-sql") return;
+        runNlEdit();
+      },
+    },
+    {
+      id: "focus-prompt",
+      key: "/",
+      group: "Editing",
+      description: "Focus the natural-language prompt",
+      run: () => document.getElementById("nl")?.focus(),
+    },
+    {
+      id: "dismiss",
+      key: "Escape",
+      group: "Editing",
+      description: "Dismiss the generated panel under review",
+      run: discardProposal,
+      // A dialog closes itself on Escape; dismissing the proposal underneath it
+      // at the same time would be two actions from one keystroke.
+      disabled: dialogOpen || proposal === null,
+    },
+    {
+      id: "shortcuts",
+      key: "?",
+      anyShift: true,
+      group: "Help",
+      description: "Show this list",
+      run: () => setShowShortcuts((open) => !open),
+    },
+  ];
+  useShortcuts(bindings);
+
+  const hint = (id: string) => {
+    const binding = bindings.find((b) => b.id === id);
+    return binding ? ` (${formatShortcut(binding, mac)})` : "";
+  };
 
   // The finished generation once it lands, the partial object while it
   // streams — so the same diff fills in live instead of a JSON dump.
@@ -288,17 +647,78 @@ export function EditDashboardClient({
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-semibold">Edit dashboard</h1>
-        <div className="flex items-center gap-2">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h1 className="text-2xl font-semibold">Edit dashboard</h1>
+          <p className="mt-0.5 text-xs text-muted">
+            Version {version}
+            {dirty ? (
+              <span className="text-warning"> &middot; unsaved changes</span>
+            ) : (
+              savedAt > 0 && now > 0 && <> &middot; saved {relativeTime(savedAt, now)}</>
+            )}
+          </p>
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="flex items-center gap-1">
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={history.undo}
+              disabled={!history.canUndo}
+              aria-label="Undo"
+              title={`Undo${history.undoAction ? ` ${history.undoAction}` : ""}${hint("undo")}`}
+            >
+              <Undo2 className="h-4 w-4" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={history.redo}
+              disabled={!history.canRedo}
+              aria-label="Redo"
+              title={`Redo${history.redoAction ? ` ${history.redoAction}` : ""}${hint("redo")}`}
+            >
+              <Redo2 className="h-4 w-4" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => setShowShortcuts(true)}
+              aria-label="Keyboard shortcuts"
+              title={`Keyboard shortcuts${hint("shortcuts")}`}
+            >
+              <Keyboard className="h-4 w-4" />
+            </Button>
+          </div>
+          <Input
+            aria-label="Version note"
+            placeholder="What changed? (optional)"
+            className="w-56"
+            maxLength={VERSION_NOTE_MAX}
+            value={note}
+            onChange={(e) => setNote(e.target.value)}
+          />
           <Button
             variant="secondary"
-            onClick={() => router.push(`/dashboards/${dashboardId}`)}
+            onClick={() => leave(`/dashboards/${dashboardId}`)}
             disabled={saving}
           >
             Cancel
           </Button>
-          <Button onClick={save} disabled={saving}>
+          <Button
+            variant="secondary"
+            onClick={() => void save({ navigate: true })}
+            disabled={saving}
+            title={`Save and view${hint("save-view")}`}
+          >
+            Save &amp; view
+          </Button>
+          <Button
+            onClick={() => void save({ navigate: false })}
+            disabled={saving}
+            title={`Save a version and keep editing${hint("save")}`}
+          >
             {saving ? (
               <Loader2 className="h-4 w-4 animate-spin" />
             ) : (
@@ -311,9 +731,18 @@ export function EditDashboardClient({
       {error && (
         <ErrorDisplay
           error={error}
-          onRetry={save}
+          onRetry={() => void save({ navigate: false })}
           retryLabel="Save again"
           disabled={saving}
+        />
+      )}
+
+      {offer.kind !== "none" && (
+        <DraftBanner
+          offer={offer}
+          now={now || offer.draft.savedAt}
+          onRestore={restoreDraft}
+          onDiscard={discardDraft}
         />
       )}
 
@@ -385,7 +814,12 @@ export function EditDashboardClient({
                 <Input
                   id="title"
                   value={spec.title}
-                  onChange={(e) => updateSpec({ title: e.target.value })}
+                  onChange={(e) =>
+                    updateSpec(
+                      { title: e.target.value },
+                      { action: "edit dashboard title", key: "spec:title" },
+                    )
+                  }
                 />
               </div>
               <div>
@@ -395,7 +829,10 @@ export function EditDashboardClient({
                   type="number"
                   value={spec.refreshIntervalMs}
                   onChange={(e) =>
-                    updateSpec({ refreshIntervalMs: Number(e.target.value) })
+                    updateSpec(
+                      { refreshIntervalMs: Number(e.target.value) },
+                      { action: "change refresh interval", key: "spec:refresh" },
+                    )
                   }
                 />
               </div>
@@ -405,7 +842,10 @@ export function EditDashboardClient({
                   id="from"
                   value={spec.timeRange.from}
                   onChange={(e) =>
-                    updateSpec({ timeRange: { ...spec.timeRange, from: e.target.value } })
+                    updateSpec(
+                      { timeRange: { ...spec.timeRange, from: e.target.value } },
+                      { action: "change time range", key: "spec:from" },
+                    )
                   }
                 />
               </div>
@@ -415,7 +855,10 @@ export function EditDashboardClient({
                   id="to"
                   value={spec.timeRange.to}
                   onChange={(e) =>
-                    updateSpec({ timeRange: { ...spec.timeRange, to: e.target.value } })
+                    updateSpec(
+                      { timeRange: { ...spec.timeRange, to: e.target.value } },
+                      { action: "change time range", key: "spec:to" },
+                    )
                   }
                 />
               </div>
@@ -468,7 +911,12 @@ export function EditDashboardClient({
                   >
                     <LayoutTemplate className="h-4 w-4" /> From template
                   </Button>
-                  <Button variant="secondary" size="sm" onClick={addPanel}>
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    onClick={addPanel}
+                    title={`Add a panel${hint("new-panel")}`}
+                  >
                     <Plus className="h-4 w-4" /> Add
                   </Button>
                 </div>
@@ -528,7 +976,7 @@ export function EditDashboardClient({
                         panelIds: [selected.id],
                       })
                     }
-                    onChange={(fn) => updatePanel(selected.id, fn)}
+                    onChange={(fn, intent) => updatePanel(selected.id, fn, intent)}
                   />
                 )}
                 {selected && (
@@ -550,7 +998,7 @@ export function EditDashboardClient({
                         onClick={runNlEdit}
                         disabled={isLoading || !nlPrompt.trim()}
                         aria-label="Apply NL edit"
-                        title="Apply NL edit"
+                        title={`Apply NL edit${hint("run")}`}
                         className="absolute bottom-4 right-2"
                       >
                         {isLoading ? (
@@ -615,6 +1063,30 @@ export function EditDashboardClient({
           onClose={() => setRepointing(null)}
         />
       )}
+
+      <ShortcutsDialog
+        shortcuts={bindings}
+        open={showShortcuts}
+        onOpenChange={setShowShortcuts}
+      />
+
+      <LeaveGuardDialog
+        open={pendingHref !== null}
+        saving={saving}
+        onCancel={() => setPendingHref(null)}
+        onDiscard={() => {
+          if (pendingHref) leaveNow(pendingHref);
+        }}
+        onSave={() => {
+          const href = pendingHref;
+          void save({ navigate: false }).then((ok) => {
+            if (ok && href) {
+              setPendingHref(null);
+              router.push(href);
+            }
+          });
+        }}
+      />
     </div>
   );
 }
@@ -633,7 +1105,8 @@ function PanelEditor({
   /** This panel's source is not among the workspace's live sources. */
   sourceMissing: boolean;
   onRepoint: () => void;
-  onChange: (fn: (p: Panel) => Panel) => void;
+  /** Each control names its own undo step, so a burst of typing is one entry. */
+  onChange: (fn: (p: Panel) => Panel, intent: EditIntent) => void;
 }) {
   const preview = usePanelPreview(panel, timeRange);
   const catalog = sources.find((s) => s.id === panel.query.sourceId)?.catalog ?? null;
@@ -663,7 +1136,12 @@ function PanelEditor({
           <Input
             id="p-title"
             value={panel.title}
-            onChange={(e) => onChange((p) => ({ ...p, title: e.target.value }))}
+            onChange={(e) =>
+              onChange((p) => ({ ...p, title: e.target.value }), {
+                action: "edit panel title",
+                key: `${panel.id}:title`,
+              })
+            }
           />
         </div>
         <div>
@@ -671,7 +1149,9 @@ function PanelEditor({
           <Select
             value={panel.query.sourceId}
             onValueChange={(v) =>
-              onChange((p) => ({ ...p, query: { ...p.query, sourceId: v } }))
+              onChange((p) => ({ ...p, query: { ...p.query, sourceId: v } }), {
+                action: "change panel source",
+              })
             }
             options={sourceOptions}
           />
@@ -680,7 +1160,11 @@ function PanelEditor({
           <Label>Visualization</Label>
           <Select
             value={panel.viz}
-            onValueChange={(v) => onChange((p) => ({ ...p, viz: v as Panel["viz"] }))}
+            onValueChange={(v) =>
+              onChange((p) => ({ ...p, viz: v as Panel["viz"] }), {
+                action: "change visualization",
+              })
+            }
             options={VIZ_OPTIONS}
           />
         </div>
@@ -689,7 +1173,10 @@ function PanelEditor({
           <Select
             value={panel.format ?? ""}
             onValueChange={(v) =>
-              onChange((p) => ({ ...p, format: v ? (v as Panel["format"]) : undefined }))
+              onChange(
+                (p) => ({ ...p, format: v ? (v as Panel["format"]) : undefined }),
+                { action: "change value format" },
+              )
             }
             options={FORMAT_OPTIONS}
           />
@@ -704,7 +1191,12 @@ function PanelEditor({
           id="p-sql"
           value={panel.query.sql}
           catalog={catalog}
-          onChange={(sql) => onChange((p) => ({ ...p, query: { ...p.query, sql } }))}
+          onChange={(sql) =>
+            onChange((p) => ({ ...p, query: { ...p.query, sql } }), {
+              action: "edit SQL",
+              key: `${panel.id}:sql`,
+            })
+          }
           onRun={() => {
             if (preview.busy === null) preview.run();
           }}
@@ -718,10 +1210,10 @@ function PanelEditor({
         <Select
           value={String(panel.layout.w)}
           onValueChange={(v) =>
-            onChange((p) => ({
-              ...p,
-              layout: clampLayout({ ...p.layout, w: Number(v) }),
-            }))
+            onChange(
+              (p) => ({ ...p, layout: clampLayout({ ...p.layout, w: Number(v) }) }),
+              { action: "change panel width" },
+            )
           }
           options={
             WIDTH_PRESETS.some((o) => o.value === String(panel.layout.w))
@@ -746,7 +1238,9 @@ function PanelEditor({
         sql={panel.query.sql}
         catalog={catalog}
         onChange={(timeField) =>
-          onChange((p) => ({ ...p, query: { ...p.query, timeField } }))
+          onChange((p) => ({ ...p, query: { ...p.query, timeField } }), {
+            action: "change time field",
+          })
         }
       />
 
@@ -759,10 +1253,13 @@ function PanelEditor({
               type="number"
               value={panel.layout[k]}
               onChange={(e) =>
-                onChange((p) => ({
-                  ...p,
-                  layout: clampLayout({ ...p.layout, [k]: Number(e.target.value) }),
-                }))
+                onChange(
+                  (p) => ({
+                    ...p,
+                    layout: clampLayout({ ...p.layout, [k]: Number(e.target.value) }),
+                  }),
+                  { action: "edit panel position", key: `${panel.id}:layout` },
+                )
               }
             />
           </div>

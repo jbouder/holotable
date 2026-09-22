@@ -56,6 +56,7 @@ export default defineConfig({
             { label: "Generating a panel", slug: "concepts/generating-a-panel" },
             { label: "Executing a panel", slug: "concepts/executing-a-panel" },
             { label: "Streaming and rendering", slug: "concepts/streaming-and-rendering" },
+            { label: "Editing a dashboard", slug: "concepts/editing-a-dashboard" },
           ],
         },
         {
