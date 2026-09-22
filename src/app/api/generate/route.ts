@@ -2,9 +2,14 @@ import { z } from "zod";
 import { requireIdentity, assertAuthorized, HttpError } from "@/lib/auth/authorize";
 import { readJson, route } from "@/lib/http";
 import { getSourceById } from "@/lib/db/repo";
-import { streamDashboard, streamPanel, streamExplorePanel } from "@/lib/ai/generate";
+import {
+  streamDashboard,
+  streamDashboardRefinement,
+  streamPanel,
+  streamExplorePanel,
+} from "@/lib/ai/generate";
 import { enforceLlmLimits } from "@/lib/limits/llm";
-import { Panel } from "@/lib/ir";
+import { Dashboard, Panel } from "@/lib/ir";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -14,6 +19,12 @@ const Body = z.discriminatedUnion("mode", [
     mode: z.literal("dashboard"),
     sourceId: z.string().min(1),
     prompt: z.string().min(1).max(4000),
+  }),
+  z.object({
+    mode: z.literal("dashboard-refine"),
+    sourceId: z.string().min(1),
+    prompt: z.string().min(1).max(4000),
+    current: Dashboard,
   }),
   z.object({
     mode: z.literal("panel"),
@@ -59,9 +70,16 @@ export const POST = route("generate", async (req: Request) => {
   const result =
     body.mode === "dashboard"
       ? streamDashboard({ source, prompt: body.prompt, onUsage })
-      : body.mode === "explore"
-        ? streamExplorePanel({ source, prompt: body.prompt, onUsage })
-        : streamPanel({ source, prompt: body.prompt, current: body.current, onUsage });
+      : body.mode === "dashboard-refine"
+        ? streamDashboardRefinement({
+            source,
+            prompt: body.prompt,
+            current: body.current,
+            onUsage,
+          })
+        : body.mode === "explore"
+          ? streamExplorePanel({ source, prompt: body.prompt, onUsage })
+          : streamPanel({ source, prompt: body.prompt, current: body.current, onUsage });
 
   return result.toTextStreamResponse();
 });

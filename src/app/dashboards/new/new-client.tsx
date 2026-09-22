@@ -3,9 +3,16 @@
 import * as React from "react";
 import { useRouter } from "next/navigation";
 import { experimental_useObject as useObject } from "@ai-sdk/react";
-import { Loader2, SendHorizontal, Save } from "lucide-react";
+import { Loader2, SendHorizontal, Save, RotateCcw, Undo2 } from "lucide-react";
 import { Dashboard, safeParseDashboard } from "@/lib/ir";
-import { autoLayoutPanels, DEFAULT_COLUMNS } from "@/lib/layout";
+import {
+  activeSpec,
+  appendTurn,
+  EMPTY_HISTORY,
+  normalizeTurn,
+  restoreTurn,
+  type TurnHistory,
+} from "@/lib/dashboard-turns";
 import { Button } from "@/components/ui/button";
 import { Textarea, Label } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
@@ -41,30 +48,51 @@ export function NewDashboardClient({
   const [activeTab, setActiveTab] = React.useState<"chat" | "preview">("chat");
   const [sourceId, setSourceId] = React.useState<string | null>(sources[0]?.id ?? null);
   const [prompt, setPrompt] = React.useState("");
-  const [finalSpec, setFinalSpec] = React.useState<Dashboard | null>(null);
+  const [history, setHistory] = React.useState<TurnHistory>(EMPTY_HISTORY);
   const [saveError, setSaveError] = React.useState<ApiError | null>(null);
   const [saving, setSaving] = React.useState(false);
+
+  // The instruction that produced the run in flight, so the finished turn is
+  // labelled with what was actually asked rather than whatever is in the box by
+  // the time the stream lands.
+  const submittedPrompt = React.useRef("");
+
+  const finalSpec = activeSpec(history);
+  const refining = history.turns.length > 0;
 
   const { object, submit, isLoading, error, stop } = useObject({
     api: "/api/generate",
     schema: Dashboard,
     onFinish({ object }) {
       if (!object) return;
-      // Arrange panels two-up by default; the model's raw {x,y,w,h} guesses
-      // often overlap. Users can rearrange in the editor.
-      setFinalSpec({
-        ...object,
-        panels: autoLayoutPanels(object.panels, DEFAULT_COLUMNS),
-      });
+      setHistory((h) => appendTurn(h, normalizeTurn(submittedPrompt.current, object)));
+      // Clear the box only once the turn has landed, so a failed run keeps the
+      // prompt for Try again — and only if the author has not started typing
+      // the next follow-up into it while this one streamed.
+      setPrompt((p) => (p === submittedPrompt.current ? "" : p));
       setActiveTab("preview");
     },
   });
 
   function generate() {
     if (!sourceId || !prompt.trim()) return;
-    setFinalSpec(null);
     setSaveError(null);
-    submit({ mode: "dashboard", sourceId, prompt });
+    submittedPrompt.current = prompt;
+    // A follow-up sends the previewed spec back as context and gets the whole
+    // dashboard again; one model call either way. Nothing is persisted until
+    // the author saves.
+    submit(
+      finalSpec
+        ? { mode: "dashboard-refine", sourceId, prompt, current: finalSpec }
+        : { mode: "dashboard", sourceId, prompt },
+    );
+  }
+
+  function startOver() {
+    setHistory(EMPTY_HISTORY);
+    setSaveError(null);
+    setPrompt("");
+    setActiveTab("chat");
   }
 
   async function save() {
@@ -94,7 +122,10 @@ export function NewDashboardClient({
     router.push(`/dashboards/${body.dashboard.id}`);
   }
 
-  const showStreaming = isLoading || object !== undefined;
+  // While a turn streams, show the partial object; once it lands (or after a
+  // restore) show the turn being previewed, so the JSON always matches the
+  // preview tab rather than whichever run happened last.
+  const shownSpec = isLoading ? object : finalSpec;
 
   if (sources.length === 0) {
     return (
@@ -118,7 +149,8 @@ export function NewDashboardClient({
           </div>
           <p className="mt-1 text-sm text-muted">
             Describe the dashboard you want in plain English. The model generates a
-            validated spec, then preview and save it as live panels.
+            validated spec; refine it with follow-ups, then preview and save it as live
+            panels.
           </p>
         </div>
 
@@ -164,34 +196,50 @@ export function NewDashboardClient({
                     id="source"
                     value={sourceId}
                     onValueChange={setSourceId}
+                    disabled={refining}
                     options={sources.map((s) => ({
                       value: s.id,
                       label: `${s.name} (${s.workspaceId})`,
                     }))}
                   />
                 </div>
+                {refining && (
+                  <p className="pb-3 text-xs text-muted">
+                    Locked while refining — start over to build from another source.
+                  </p>
+                )}
               </div>
               <div>
-                <Label htmlFor="prompt">Describe the dashboard or try one below</Label>
-                <div className="mb-2 flex flex-wrap items-center gap-2">
-                  {PROMPT_PRESETS.map((preset) => (
-                    <button
-                      key={preset}
-                      type="button"
-                      disabled={isLoading}
-                      onClick={() => setPrompt(preset)}
-                      className="rounded-full border border-border bg-surface px-3 py-1 text-xs text-muted transition-colors hover:border-primary hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50"
-                    >
-                      {preset}
-                    </button>
-                  ))}
-                </div>
+                <Label htmlFor="prompt">
+                  {refining
+                    ? "Refine it — each follow-up is one more turn"
+                    : "Describe the dashboard or try one below"}
+                </Label>
+                {!refining && (
+                  <div className="mb-2 flex flex-wrap items-center gap-2">
+                    {PROMPT_PRESETS.map((preset) => (
+                      <button
+                        key={preset}
+                        type="button"
+                        disabled={isLoading}
+                        onClick={() => setPrompt(preset)}
+                        className="rounded-full border border-border bg-surface px-3 py-1 text-xs text-muted transition-colors hover:border-primary hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50"
+                      >
+                        {preset}
+                      </button>
+                    ))}
+                  </div>
+                )}
                 <div className="relative">
                   <Textarea
                     id="prompt"
                     rows={3}
                     className="pr-14"
-                    placeholder="e.g. Show request rate, p95 latency, and error ratio over the last hour"
+                    placeholder={
+                      refining
+                        ? "e.g. Make the third one a bar chart, and add p99 latency"
+                        : "e.g. Show request rate, p95 latency, and error ratio over the last hour"
+                    }
                     value={prompt}
                     onChange={(e) => setPrompt(e.target.value)}
                     onKeyDown={(e) => {
@@ -205,8 +253,8 @@ export function NewDashboardClient({
                     size="icon"
                     onClick={generate}
                     disabled={isLoading || !prompt.trim()}
-                    aria-label="Generate"
-                    title="Generate"
+                    aria-label={refining ? "Refine" : "Generate"}
+                    title={refining ? "Refine" : "Generate"}
                     className="absolute bottom-4 right-2"
                   >
                     {isLoading ? (
@@ -225,9 +273,19 @@ export function NewDashboardClient({
                     </Button>
                   )}
                   {finalSpec && (
-                    <Button variant="secondary" onClick={save} disabled={saving}>
-                      <Save className="h-4 w-4" /> Save
-                    </Button>
+                    <>
+                      <Button variant="secondary" onClick={save} disabled={saving}>
+                        <Save className="h-4 w-4" /> Save
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={startOver}
+                        disabled={isLoading || saving}
+                      >
+                        <RotateCcw className="h-4 w-4" /> Start over
+                      </Button>
+                    </>
                   )}
                 </div>
               )}
@@ -250,7 +308,57 @@ export function NewDashboardClient({
             </CardContent>
           </Card>
 
-          {showStreaming && (
+          {refining && (
+            <Card>
+              <CardHeader>
+                <CardTitle>Turns</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <ol className="space-y-2">
+                  {history.turns.map((turn, i) => {
+                    const active = i === history.index;
+                    return (
+                      <li
+                        key={turn.id}
+                        className={`flex items-start justify-between gap-3 rounded-lg border p-3 ${
+                          active
+                            ? "border-primary bg-surface-2"
+                            : "border-border bg-surface"
+                        }`}
+                      >
+                        <div className="min-w-0">
+                          <div className="text-xs text-muted">
+                            Turn {i + 1} · {turn.spec.panels.length}{" "}
+                            {turn.spec.panels.length === 1 ? "panel" : "panels"}
+                            {active && " · previewing"}
+                          </div>
+                          <p className="mt-1 break-words text-sm text-foreground">
+                            {turn.prompt}
+                          </p>
+                        </div>
+                        {!active && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            disabled={isLoading}
+                            onClick={() => setHistory((h) => restoreTurn(h, i))}
+                          >
+                            <Undo2 className="h-4 w-4" /> Restore
+                          </Button>
+                        )}
+                      </li>
+                    );
+                  })}
+                </ol>
+                <p className="text-xs text-muted">
+                  Nothing is saved until you press Save. Refining from a restored turn
+                  drops the turns that followed it.
+                </p>
+              </CardContent>
+            </Card>
+          )}
+
+          {shownSpec !== undefined && shownSpec !== null && (
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
@@ -266,7 +374,7 @@ export function NewDashboardClient({
               </CardHeader>
               <CardContent>
                 <pre className="max-h-96 overflow-auto rounded-lg border border-border bg-surface p-4 text-xs text-muted">
-                  {JSON.stringify(object, null, 2)}
+                  {JSON.stringify(shownSpec, null, 2)}
                 </pre>
               </CardContent>
             </Card>

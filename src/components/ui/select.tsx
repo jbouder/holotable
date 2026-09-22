@@ -16,6 +16,7 @@ export function Select({
   placeholder = "Select…",
   className,
   id,
+  disabled,
 }: {
   value: string | null;
   onValueChange: (value: string) => void;
@@ -23,17 +24,19 @@ export function Select({
   placeholder?: string;
   className?: string;
   id?: string;
+  disabled?: boolean;
 }) {
   return (
     <BaseSelect.Root
       value={value}
+      disabled={disabled}
       onValueChange={(v) => onValueChange(String(v))}
       items={options.map((o) => ({ value: o.value, label: o.label }))}
     >
       <BaseSelect.Trigger
         id={id}
         className={cn(
-          "flex h-10 min-w-40 items-center justify-between gap-2 rounded-lg border border-border bg-surface px-3 text-sm text-foreground focus-visible:outline-2 focus-visible:outline-primary",
+          "flex h-10 min-w-40 items-center justify-between gap-2 rounded-lg border border-border bg-surface px-3 text-sm text-foreground focus-visible:outline-2 focus-visible:outline-primary data-[disabled]:cursor-not-allowed data-[disabled]:opacity-50",
           className,
         )}
       >
