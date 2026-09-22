@@ -65,7 +65,7 @@ export function PanelLayoutGrid({
   // itself is untouched until the pointer comes up.
   const shown = preview ?? panels;
 
-  function begin(e: React.PointerEvent, panel: Panel, mode: DragMode) {
+  function begin(e: React.PointerEvent<HTMLButtonElement>, panel: Panel, mode: DragMode) {
     const width = container.current?.getBoundingClientRect().width ?? 0;
     if (width <= 0 || e.button !== 0) return;
     // Suppressing the default also suppresses focus, and a panel that cannot
@@ -85,7 +85,7 @@ export function PanelLayoutGrid({
     });
   }
 
-  function track(e: React.PointerEvent) {
+  function track(e: React.PointerEvent<HTMLButtonElement>) {
     if (!drag || e.pointerId !== drag.pointerId) return;
     const { dx, dy } = snapDelta(
       e.clientX - drag.fromX,
@@ -99,7 +99,7 @@ export function PanelLayoutGrid({
     setPreview(applyLayout(panels, drag.id, next));
   }
 
-  function end(e: React.PointerEvent, commit: boolean) {
+  function end(e: React.PointerEvent<HTMLButtonElement>, commit: boolean) {
     if (!drag || e.pointerId !== drag.pointerId) return;
     if (commit && preview && !sameLayouts(preview, panels)) onChange(preview);
     setDrag(null);
@@ -107,7 +107,11 @@ export function PanelLayoutGrid({
   }
 
   /** Arrow keys move the panel; with Shift (or from the handle) they resize it. */
-  function nudge(e: React.KeyboardEvent, panel: Panel, mode: DragMode) {
+  function nudge(
+    e: React.KeyboardEvent<HTMLButtonElement>,
+    panel: Panel,
+    mode: DragMode,
+  ) {
     const step = NUDGE[e.key];
     if (!step) return;
     e.preventDefault();
