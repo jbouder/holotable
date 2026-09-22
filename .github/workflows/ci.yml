@@ -119,6 +119,83 @@ jobs:
           FUZZ_RUNS: 20000
           FUZZ_SEED: ${{ github.run_id }}
 
+  migrations:
+    name: Migrations
+    runs-on: ubuntu-latest
+    # A scratch database the job may destroy: migrate-verify rolls every
+    # migration back, so it refuses to run against a schema that holds
+    # anything. TimescaleDB rather than plain Postgres on purpose — a rollback
+    # that fails only with the extension loaded is exactly what a parse-only
+    # dry run misses.
+    services:
+      postgres:
+        image: timescale/timescaledb:2.17.2-pg16
+        env:
+          POSTGRES_USER: holotable
+          POSTGRES_PASSWORD: holotable
+          POSTGRES_DB: holotable
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U holotable"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+    env:
+      DATABASE_URL: postgresql://holotable:holotable@127.0.0.1:5432/holotable
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: package-lock.json
+
+      - name: Install
+        run: npm ci
+
+      # The deploy gate, proven in both directions. On a fresh database every
+      # migration is pending, so --check must fail; after applying them it must
+      # pass. A deploy pipeline runs the second form before rolling out, and a
+      # deploy whose code needs a migration that has not run fails there
+      # instead of in the request path.
+      - name: --check fails when migrations are pending
+        run: |
+          if npm run migrate --silent -- --check; then
+            echo "::error::--check passed on an unmigrated database"
+            exit 1
+          fi
+
+      - name: --dry-run applies nothing
+        run: |
+          npm run migrate --silent -- --dry-run
+          if npm run migrate --silent -- --check; then
+            echo "::error::--dry-run left migrations applied"
+            exit 1
+          fi
+
+      - name: Apply, then --check passes
+        run: |
+          npm run migrate --silent
+          npm run migrate --silent -- --check
+
+      # From empty to fully applied and back: every down path runs against the
+      # real server and must land on exactly the schema its predecessor left,
+      # re-applying must land back where it was, and re-running the whole set
+      # must be a no-op. Needs the database it just migrated to be empty again.
+      - name: Round-trip every migration
+        run: |
+          psql "$DATABASE_URL" -q -c 'DROP SCHEMA public CASCADE; CREATE SCHEMA public;'
+          npm run migrate:verify
+
+      # The advisory lock that serializes two migrate Jobs from one rollout.
+      # Skipped in the required Test job, which has no database.
+      - name: Advisory lock
+        run: LOG_LEVEL=silent node --test --import tsx test/migrations.test.ts
+        env:
+          MIGRATE_TEST_DATABASE_URL: ${{ env.DATABASE_URL }}
+
   build:
     name: Build
     runs-on: ubuntu-latest

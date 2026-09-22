@@ -16,6 +16,7 @@
     "test:fuzz": "LOG_LEVEL=silent node --test --import tsx test/sql-safety.fuzz.test.ts",
     "config:check": "tsx scripts/config-check.ts",
     "migrate": "tsx scripts/migrate.ts",
+    "migrate:verify": "tsx scripts/migrate-verify.ts",
     "seed": "tsx scripts/seed.ts"
   },
   "dependencies": {

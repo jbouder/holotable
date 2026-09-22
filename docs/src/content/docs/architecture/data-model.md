@@ -69,6 +69,8 @@ column inherits the environment; `0` disables that limit.
 ## Migrations
 
 `scripts/migrate.ts` applies `migrations/*.sql` in filename order inside a
-transaction, recording each in `schema_migrations` so it runs once. There is
-currently no dry-run, rollback, or pending-migration CI gate —
-[#57](https://github.com/jbouder/holotable/issues/57).
+transaction, recording each in `schema_migrations` so it runs once. Every
+migration declares a rollback or an explicit reason it has none, concurrent
+runs serialize on an advisory lock, and `--check` is the pipeline gate against
+deploying code ahead of its schema. See
+[Database migrations](/operations/migrations/).

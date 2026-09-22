@@ -67,3 +67,15 @@ ALTER TABLE dashboards
   ADD CONSTRAINT dashboards_current_version_fk
   FOREIGN KEY (current_version_id) REFERENCES dashboard_versions (id)
   DEFERRABLE INITIALLY DEFERRED;
+
+-- rollback:
+-- Drops the constraint first: dashboards and dashboard_versions reference each
+-- other, so neither table can be dropped while the deferrable FK stands.
+-- pgcrypto is deliberately left installed. CREATE EXTENSION IF NOT EXISTS is
+-- shared with anything else in the database that wants gen_random_uuid(), and
+-- dropping it here would break them.
+ALTER TABLE IF EXISTS dashboards
+  DROP CONSTRAINT IF EXISTS dashboards_current_version_fk;
+DROP TABLE IF EXISTS dashboard_versions;
+DROP TABLE IF EXISTS dashboards;
+DROP TABLE IF EXISTS sources;

@@ -272,7 +272,8 @@ npm run typecheck  # next typegen && tsc --noEmit
 npm test           # node --test via tsx
 npm run test:fuzz  # property-based SQL guard suite alone (FUZZ_RUNS, FUZZ_SEED)
 npm run config:check # validate the environment as the server does at startup (exit 1 = would not boot)
-npm run migrate    # apply Postgres migrations
+npm run migrate    # apply Postgres migrations (--check, --dry-run, --down)
+npm run migrate:verify # round-trip every migration (scratch database)
 npm run seed       # looping metrics seeder
 ```
 
@@ -318,6 +319,17 @@ sanctioned opt-out and it makes the intent visible at the call site; a bare
 
 If changing database-related code, also consider whether `migrate` or `seed`
 behavior is impacted.
+
+A new migration in `migrations/` must declare its down path in the file —
+either a `-- rollback:` section whose remainder undoes it, or an
+`-- irreversible: <reason>` line. `loadMigrations` in
+`scripts/lib/migrations.ts` throws on a migration that declares neither, so
+every mode including `--check` fails until it is written. The `Migrations` CI
+job rolls each reversible migration back against a TimescaleDB service
+container and asserts the schema fingerprint matches the previous step, so an
+incomplete down path fails CI. Prefer expand/contract over an in-place change
+to an existing column: during a rolling update both versions of the code run at
+once. `docs/src/content/docs/operations/migrations.md` has both.
 
 `CONTRIBUTING.md` says the same things for human contributors, including the
 branch and Conventional Commit conventions and the pull request template's

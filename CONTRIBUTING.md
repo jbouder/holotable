@@ -110,6 +110,16 @@ If you touch database code, consider whether `npm run migrate` or `npm run seed`
 behavior changes too. Migrations should be additive and safe to apply to an
 existing database.
 
+A new migration must declare its down path in the file: a `-- rollback:`
+section holding the statements that undo it, or an `-- irreversible: <reason>`
+line saying why there is none. The runner refuses to load a migration that
+declares neither, so this fails locally, not in review. The `Migrations` CI job
+then rolls every reversible migration back against a real TimescaleDB and
+checks the schema lands on exactly what the previous migration left — a down
+path that forgets to drop one table fails there. For a change the old code
+cannot tolerate, use expand/contract; both are documented in
+[Database migrations](docs/src/content/docs/operations/migrations.md).
+
 ## Invariants a pull request must not break
 
 This is the part that matters most, and the part a reviewer will push back on.
