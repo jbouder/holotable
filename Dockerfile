@@ -62,12 +62,21 @@ COPY --from=build /app/.next/static ./.next/static
 # breakage only shows up here.
 COPY --from=build /app/public ./public
 
+# Build identity for GET /api/health, so a running container can say which
+# build it is. Optional: unset reads "unknown", and the version falls back to
+# package.json. Pass it with `--build-arg GIT_COMMIT=$(git rev-parse HEAD)`.
+# Last, and after every COPY, so changing it never invalidates a cached layer.
+ARG GIT_COMMIT=""
+ENV GIT_COMMIT=$GIT_COMMIT
+
 USER nextjs
 EXPOSE 3000
 ENV PORT=3000 HOSTNAME=0.0.0.0
 # Liveness only: /api/health answers whenever the process is serving, with no
 # I/O. The slim base has no curl or wget, so the probe is Node's own fetch.
-# Readiness (database, Keycloak) is a separate endpoint (#53).
+# Readiness (database, Keycloak) is /api/ready, which an orchestrator probes
+# separately; Docker has one health state, and it is liveness that belongs in
+# it — a container is not broken because its database went away.
 HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 \
   CMD ["node", "-e", "fetch(`http://127.0.0.1:${process.env.PORT || 3000}/api/health`).then((r) => process.exit(r.ok ? 0 : 1), () => process.exit(1))"]
 CMD ["node", "server.js"]

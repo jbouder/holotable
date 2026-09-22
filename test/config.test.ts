@@ -381,3 +381,19 @@ test("a disabled LLM limit is a warning in production only", () => {
   for (const p of warnings(prod)) assert.match(p.message, /is 0;/);
   assert.deepEqual(validateConfig(off, { production: false }), []);
 });
+
+test("build identity is optional and never blocks a boot", () => {
+  // APP_VERSION and GIT_COMMIT label the build in GET /api/health. Neither is
+  // required — the version falls back to package.json and the commit to
+  // "unknown" — so neither may ever produce a problem, in any environment.
+  for (const production of [true, false]) {
+    assert.deepEqual(validateConfig(VALID_PRODUCTION, { production }), []);
+    assert.deepEqual(
+      validateConfig(
+        { ...VALID_PRODUCTION, APP_VERSION: "1.4.0", GIT_COMMIT: "0f2c1ab" },
+        { production },
+      ),
+      [],
+    );
+  }
+});
