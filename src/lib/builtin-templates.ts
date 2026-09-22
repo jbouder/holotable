@@ -1,7 +1,7 @@
 import { liveCatalogTables, type CatalogSubject } from "@/lib/catalog/health";
+import { isPlainIdentifier, timeColumn } from "@/lib/catalog/identifiers";
 import type { Panel, ValueFormat } from "@/lib/ir";
 import type { CatalogColumn, CatalogTable } from "@/lib/registry";
-import { isTimestampType } from "@/lib/source-form";
 import type { Template, TemplateKind } from "@/lib/templates";
 
 /**
@@ -29,10 +29,11 @@ import type { Template, TemplateKind } from "@/lib/templates";
  * - **Plain identifiers only.** Catalog names come from a database the
  *   operator may not control and are interpolated into SQL text here, so a
  *   name that is not an ordinary unquoted identifier disqualifies its table or
- *   column rather than being escaped. This is the same rule `starters.ts`
- *   applies for the same reason, stated separately because the consequence of
- *   breaking it is different: there it is a bad suggestion, here it would be
- *   generated SQL.
+ *   column rather than being escaped — see `src/lib/catalog/identifiers.ts`,
+ *   which also decides which column the server filters time on. A table with
+ *   no time column gets no templates at all: every signal below is a time
+ *   series, and one that cannot be narrowed to the dashboard's window would
+ *   read the whole table on every tick.
  * - **`date_trunc`, not `time_bucket`.** Both pass the guard and both work on
  *   TimescaleDB, but a source can be plain PostgreSQL and a shipped template
  *   that fails there is worse than one bucket of lower resolution.
@@ -48,13 +49,6 @@ export type GoldenSignal = (typeof GOLDEN_SIGNALS)[number];
 
 /** How many tables of a catalog contribute templates. */
 const MAX_TABLES = 3;
-
-/** An ordinary unquoted SQL identifier — see the note above. */
-const PLAIN_IDENTIFIER = /^[A-Za-z_][A-Za-z0-9_$]{0,62}$/;
-
-function isPlainIdentifier(name: string): boolean {
-  return PLAIN_IDENTIFIER.test(name);
-}
 
 const NUMERIC_TYPE =
   /^(smallint|integer|bigint|int2|int4|int8|int|decimal|numeric|real|double precision|float4|float8|float|money)\b/i;
@@ -94,22 +88,6 @@ function isCategoryColumn(column: CatalogColumn): boolean {
     CATEGORY_NAME.test(column.name) &&
     (TEXTUAL_TYPE.test(type) || INTEGER_TYPE.test(type))
   );
-}
-
-/**
- * The column the server will filter time on, or null.
- *
- * The declared `timeField` first — its author said so — then the first
- * timestamp-typed column. A table with neither gets no templates at all: every
- * signal below is a time series, and one that cannot be narrowed to the
- * dashboard's window would read the whole table on every tick.
- */
-function timeColumn(table: CatalogTable): string | null {
-  if (table.timeField && isPlainIdentifier(table.timeField)) return table.timeField;
-  const found = table.columns.find(
-    (c) => isPlainIdentifier(c.name) && isTimestampType(c.type),
-  );
-  return found ? found.name : null;
 }
 
 /** The measure a signal reads: the first column whose name fits it. */
