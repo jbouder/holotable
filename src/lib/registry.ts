@@ -8,6 +8,14 @@ import { z } from "zod";
  * env-var family from which they are resolved at execution time.
  */
 
+/**
+ * The allowlist caps, named because discovery has to honour them too: the menu
+ * a source author picks from can never be allowed to exceed what a valid
+ * `SourceConfig` could hold.
+ */
+export const MAX_TABLES = 200;
+export const MAX_COLUMNS = 200;
+
 export const CatalogColumn = z
   .object({
     name: z.string().min(1).max(128),
@@ -23,23 +31,46 @@ export const CatalogTable = z
     description: z.string().max(500).optional(),
     /** Preferred time column for server-injected time filtering. */
     timeField: z.string().min(1).max(128).optional(),
-    columns: z.array(CatalogColumn).min(1).max(200),
+    columns: z.array(CatalogColumn).min(1).max(MAX_COLUMNS),
   })
   .strict();
 export type CatalogTable = z.infer<typeof CatalogTable>;
 
-export const SourceConfig = z
+/**
+ * How to reach the database, without the catalog.
+ *
+ * Split out of {@link SourceConfig} so table discovery can be asked for before
+ * an allowlist exists: the discovery route needs exactly these fields and must
+ * not be handed a `tables` array it would have no use for. `SourceConfig`
+ * extends it, so the two can never drift in their constraints.
+ */
+export const SourceConnection = z
   .object({
     host: z.string().min(1).max(255),
     port: z.number().int().min(1).max(65535),
     database: z.string().min(1).max(128),
     schema: z.string().min(1).max(128).default("public"),
     ssl: z.boolean().default(false),
-    /** The table allowlist. Only these tables may be referenced by any SQL. */
-    tables: z.array(CatalogTable).min(1).max(200),
   })
   .strict();
+export type SourceConnection = z.infer<typeof SourceConnection>;
+
+export const SourceConfig = SourceConnection.extend({
+  /** The table allowlist. Only these tables may be referenced by any SQL. */
+  tables: z.array(CatalogTable).min(1).max(MAX_TABLES),
+}).strict();
 export type SourceConfig = z.infer<typeof SourceConfig>;
+
+/** The connection half of a stored config, for a reconnect or a rediscovery. */
+export function sourceConnection(cfg: SourceConfig): SourceConnection {
+  return {
+    host: cfg.host,
+    port: cfg.port,
+    database: cfg.database,
+    schema: cfg.schema,
+    ssl: cfg.ssl,
+  };
+}
 
 /**
  * A drafted source: the full create payload minus the workspace (which is
