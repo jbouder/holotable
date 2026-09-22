@@ -50,6 +50,24 @@ Stored specs are parsed against the **current** schema, and every IR object is
 change would invalidate every saved dashboard on read.
 :::
 
+### `templates`
+
+A reusable spec: `workspace_id`, `kind` (`panel` or `dashboard`), `name`,
+`description`, and `body` as `jsonb`. The body **is** the IR — a `Panel` or a
+`Dashboard` tagged with which one — so it is validated against the same schema
+on write and on read, and it carries no connection detail or credential for the
+same reason a dashboard version does not.
+
+Two constraints hold the row together: `kind = body->>'kind'`, so the column
+can be filtered on without becoming a second opinion about the contents, and
+`UNIQUE (workspace_id, kind, name)`, because two rows that read identically in
+a picker are a bug rather than a feature (the API answers that clash with a
+`409`).
+
+Deleting a template is a hard delete. Instantiating one copies its spec into an
+ordinary dashboard, so unlike a source there is never a reference left pointing
+back at the row.
+
 ### `llm_usage`
 
 Token counters per `(workspace_id, day, route, model)`: `input_tokens`,

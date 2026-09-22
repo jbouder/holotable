@@ -3,7 +3,14 @@
 import * as React from "react";
 import { useRouter } from "next/navigation";
 import { experimental_useObject as useObject } from "@ai-sdk/react";
-import { Loader2, SendHorizontal, Save, RotateCcw, Undo2 } from "lucide-react";
+import {
+  LayoutTemplate,
+  Loader2,
+  SendHorizontal,
+  Save,
+  RotateCcw,
+  Undo2,
+} from "lucide-react";
 import { Dashboard, safeParseDashboard } from "@/lib/ir";
 import {
   activeSpec,
@@ -26,6 +33,8 @@ import {
   CatalogHealthNotice,
   useCatalogRefresh,
 } from "@/components/sources/catalog-health";
+import { type Template, templateSpec } from "@/lib/templates";
+import { TemplatePicker } from "@/components/templates/TemplatePicker";
 
 interface SourceOption {
   id: string;
@@ -56,6 +65,7 @@ export function NewDashboardClient({
   const [history, setHistory] = React.useState<TurnHistory>(EMPTY_HISTORY);
   const [saveError, setSaveError] = React.useState<ApiError | null>(null);
   const [saving, setSaving] = React.useState(false);
+  const [picking, setPicking] = React.useState(false);
   // Catalog state for the picker, corrected in place by a Refresh from here.
   const catalog = useCatalogRefresh(
     Object.fromEntries(sources.map((s) => [s.id, s.catalog])),
@@ -99,6 +109,26 @@ export function NewDashboardClient({
         ? { mode: "dashboard-refine", sourceId, prompt, current: finalSpec }
         : { mode: "dashboard", sourceId, prompt },
     );
+  }
+
+  /**
+   * A template lands as turn one, so it can be refined with follow-ups exactly
+   * like a generated dashboard and saved through the same Save. Appended
+   * directly rather than through `normalizeTurn`, which re-flows panels two-up:
+   * a dashboard template's arrangement is most of what made it worth keeping.
+   */
+  function applyTemplate(input: { template: Template; sourceId: string }) {
+    const spec = templateSpec(input.template.body, {
+      title: input.template.name,
+      sourceId: input.sourceId,
+    });
+    setHistory((h) =>
+      appendTurn(h, { prompt: `From template "${input.template.name}"`, spec }),
+    );
+    setSourceId(input.sourceId);
+    setSaveError(null);
+    setPicking(false);
+    setActiveTab("preview");
   }
 
   function startOver() {
@@ -216,6 +246,16 @@ export function NewDashboardClient({
                     }))}
                   />
                 </div>
+                {!refining && (
+                  <Button
+                    variant="secondary"
+                    className="mb-0.5"
+                    onClick={() => setPicking(true)}
+                    disabled={isLoading}
+                  >
+                    <LayoutTemplate className="h-4 w-4" /> Start from a template
+                  </Button>
+                )}
                 {refining && (
                   <p className="pb-3 text-xs text-muted">
                     Locked while refining — start over to build from another source.
@@ -423,6 +463,19 @@ export function NewDashboardClient({
             </Card>
           )}
         </section>
+      )}
+
+      {picking && source && (
+        <TemplatePicker
+          workspaceId={source.workspaceId}
+          sources={sources
+            .filter((s) => s.workspaceId === source.workspaceId)
+            .map((s) => ({ id: s.id, name: s.name }))}
+          defaultSourceId={source.id}
+          applyLabel="Use template"
+          onApply={applyTemplate}
+          onClose={() => setPicking(false)}
+        />
       )}
     </div>
   );

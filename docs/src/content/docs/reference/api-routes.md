@@ -23,6 +23,25 @@ All routes run on the Node runtime. Every one resolves identity with
 | `/api/dashboards/[id]/stream` | GET | viewer | SSE deltas, cookie-authenticated |
 | `/api/dashboards/[id]/chat` | POST | viewer | Read-only chat with a guarded `runQuery` tool. Rate limited and budgeted |
 
+## Templates
+
+A template is a reusable `Panel` or `Dashboard` spec, workspace-scoped and
+authorized exactly like the dashboards it is made of — there is no `template:*`
+vocabulary in `can()`, because a template carries no capability its dashboard
+did not.
+
+| Route | Method | Min role | Notes |
+| --- | --- | --- | --- |
+| `/api/templates` | GET | viewer | Templates saved in a workspace. `?kind=panel\|dashboard` narrows; `?sourceId=` additionally returns the **built-in** golden-signal starters parameterized by that source's catalog |
+| `/api/templates` | POST | editor | Save a panel or dashboard as a template. The body is put through the same `resolveAndValidateDashboard` a save uses, so every statement is re-guarded and the workspace must match the one derived from the sources. `409` when the workspace already has that name |
+| `/api/templates/[id]` | DELETE | owner / source-admin | Hard delete — instantiating a template copies its spec, so nothing points back at the row |
+
+There is deliberately **no instantiate route**. Applying a template re-points
+its panels at a source the user picks, re-checks each statement through
+`/api/sql/validate`, and then goes out through the ordinary create or save,
+so a dashboard built from a template is indistinguishable from one built by
+hand.
+
 ## Generation and query
 
 | Route | Method | Min role | Notes |
@@ -75,7 +94,7 @@ can correct and retry. Connection and infrastructure failures return a generic
 | 401 | No valid session |
 | 403 | Authenticated but not authorized for the action |
 | 404 | Resource not found |
-| 409 | Source is tombstoned |
+| 409 | Source is tombstoned, or a template name is already taken in the workspace |
 | 429 | A model-backed route hit the workspace's rate limit or token budget; the message says which and when it resets, and `Retry-After` is set. See [LLM rate limits and budgets](/operations/llm-limits/) |
 | 500 | Infrastructure failure — deliberately opaque |
 
