@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { Pencil } from "lucide-react";
+import { Download, Pencil } from "lucide-react";
 import { getIdentity } from "@/lib/auth/authorize";
 import { can } from "@/lib/auth/authorize";
 import { getDashboardById } from "@/lib/db/repo";
@@ -56,6 +56,20 @@ export default async function DashboardViewPage({
         }
         actions={
           <>
+            {/*
+              A plain link, not a button with a fetch behind it: the route
+              answers with a `Content-Disposition`, so the browser saves the
+              file itself and this page ships no JavaScript for it.
+            */}
+            <a href={`/api/dashboards/${id}/export`} download>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="text-muted hover:text-foreground"
+              >
+                <Download className="h-4 w-4" /> Export
+              </Button>
+            </a>
             {canEdit && (
               <Link href={`/dashboards/${id}/edit`}>
                 <Button

@@ -74,3 +74,34 @@ rather than a silently ignored field. That is what makes a stored spec safe to
 parse years later — and it is also why the IR needs an explicit version field
 and an upgrader chain before the first breaking change
 ([#58](https://github.com/jbouder/holotable/issues/58)).
+
+## Leaving and entering the app
+
+A spec is a self-contained document, so getting one out of the app is an
+envelope around it rather than a serializer
+(`src/lib/dashboard-export.ts`):
+
+```json
+{
+  "format": "holotable.dashboard",
+  "formatVersion": 1,
+  "exportedAt": "2026-09-22T12:00:00.000Z",
+  "manifest": { "title": "…", "panelCount": 7, "dashboardVersion": 3, "sourceIds": ["…"] },
+  "spec": { "…": "the Dashboard IR, verbatim" }
+}
+```
+
+`formatVersion` versions the *envelope*, not the IR — it is the reader's signal
+to refuse a file it would otherwise misread, and the place the upgrader chain
+from [#58](https://github.com/jbouder/holotable/issues/58) would attach.
+
+The manifest is informational: an import makes every decision from `spec`, so a
+doctored manifest changes nothing. What an import cannot decide for itself is
+what the source ids mean. They are opaque registry references, which is what
+keeps the file free of hosts and credentials in the first place, and it is also
+why the same file means different things in different deployments — so
+`POST /api/dashboards/import` re-points them through an **explicit** mapping
+supplied by the importer and refuses the whole import, naming the ids, when any
+of them is still not a live source in the target workspace. Guessing by name or
+by catalog shape would point a panel at the wrong database and report
+plausible-looking numbers instead of an error.
