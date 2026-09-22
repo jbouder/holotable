@@ -4,6 +4,8 @@ import * as React from "react";
 import { useRouter } from "next/navigation";
 import { Trash2, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { ErrorDisplay } from "@/components/ui/error-display";
+import { type ApiError, readApiError } from "@/lib/errors";
 
 /**
  * Deletes a dashboard via DELETE /api/dashboards/[id] (soft delete, server
@@ -19,7 +21,7 @@ export function DeleteDashboardButton({
 }) {
   const router = useRouter();
   const [deleting, setDeleting] = React.useState(false);
-  const [error, setError] = React.useState<string | null>(null);
+  const [error, setError] = React.useState<ApiError | null>(null);
 
   async function onDelete() {
     if (!window.confirm(`Delete "${title}"? This cannot be undone.`)) return;
@@ -29,8 +31,7 @@ export function DeleteDashboardButton({
       method: "DELETE",
     });
     if (!res.ok) {
-      const body = await res.json().catch(() => ({}));
-      setError(body.error ?? "delete failed");
+      setError(await readApiError(res));
       setDeleting(false);
       return;
     }
@@ -55,7 +56,13 @@ export function DeleteDashboardButton({
         Delete
       </Button>
       {error && (
-        <span className="absolute top-full mt-1 text-xs text-danger">{error}</span>
+        <ErrorDisplay
+          error={error}
+          onRetry={onDelete}
+          retryLabel="Try again"
+          disabled={deleting}
+          className="absolute top-full z-10 mt-1 w-max max-w-xs"
+        />
       )}
     </div>
   );

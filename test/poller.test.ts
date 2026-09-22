@@ -2,12 +2,16 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
   computeDelta,
+  describePanelError,
   getPoller,
   invalidatePoller,
   activePollerCount,
   makePanelExecutor,
   type PanelExecutor,
 } from "@/lib/poller/registry";
+import { OPAQUE_MESSAGE } from "@/lib/errors";
+import { QueryExecutionError } from "@/lib/timescaledb/client";
+import { createLogger, setLogger } from "@/lib/log";
 import type { Dashboard, Panel } from "@/lib/ir";
 import type { SourceRecord } from "@/lib/registry";
 
@@ -241,4 +245,82 @@ test("makePanelExecutor allows execution when source workspace matches dashboard
     true,
     "executor must attempt query execution for same-workspace source",
   );
+});
+
+// --- panel error classification (invariant 16 on the SSE path) ---
+
+/** Keep the error the opaque branch logs out of the test output, and count it. */
+function captureLog<T>(fn: () => T): { result: T; errors: number } {
+  const lines: Array<{ level: string }> = [];
+  const restore = setLogger(
+    createLogger({
+      level: "debug",
+      format: "json",
+      sink: (line) => lines.push(JSON.parse(line) as { level: string }),
+    }),
+  );
+  try {
+    const result = fn();
+    return { result, errors: lines.filter((l) => l.level === "error").length };
+  } finally {
+    restore();
+  }
+}
+
+test("a statement failure keeps its real message so the editor can fix it", () => {
+  const { result, errors } = captureLog(() =>
+    describePanelError(new QueryExecutionError('column "durationms" does not exist')),
+  );
+  assert.deepEqual(result, {
+    error: 'column "durationms" does not exist',
+    kind: "statement",
+  });
+  // Nothing to log: this is the user's query, not an incident.
+  assert.equal(errors, 0);
+});
+
+test("a connection failure never reaches the browser", () => {
+  // The poller used to broadcast err.message for anything, which put the
+  // database host and port in front of every viewer of the dashboard.
+  const err = Object.assign(new Error("connect ECONNREFUSED 10.0.0.5:5432"), {
+    code: "ECONNREFUSED",
+  });
+  const { result, errors } = captureLog(() => describePanelError(err));
+  assert.equal(result.kind, "infrastructure");
+  assert.equal(result.error, OPAQUE_MESSAGE);
+  assert.ok(!result.error.includes("ECONNREFUSED"));
+  assert.ok(!result.error.includes("10.0.0.5"));
+  // The real cause is not lost, it just goes to the log instead.
+  assert.equal(errors, 1);
+});
+
+test("a non-Error throw is opaque too", () => {
+  const { result } = captureLog(() => describePanelError("something odd"));
+  assert.equal(result.kind, "infrastructure");
+  assert.equal(result.error, OPAQUE_MESSAGE);
+});
+
+test("a rejected query is reported as the statement it is", async () => {
+  const executor = makePanelExecutor(
+    async () =>
+      ({
+        id: "s1",
+        workspaceId: "w1",
+        name: "s",
+        secretRef: "TS",
+        tombstonedAt: null,
+        config: { host: "h", port: 5432, database: "d", schema: "public", tables: [] },
+      }) as unknown as SourceRecord,
+  );
+  const events = await executor(
+    spec().panels[0],
+    { from: new Date(0), to: new Date(1) },
+    new Map(),
+    "w1",
+  );
+  assert.equal(events.length, 1);
+  const [event] = events;
+  assert.equal(event.type, "panel-error");
+  if (event.type !== "panel-error") return;
+  assert.equal(event.kind, "statement");
 });

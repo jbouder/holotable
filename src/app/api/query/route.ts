@@ -49,9 +49,10 @@ export const POST = route("query", async (req: Request) => {
     return json(result);
   } catch (err) {
     // A failed statement is the user's query to fix — surface it as a 400 with
-    // the real message so the client can show it and offer a retry.
+    // the real message, tagged `statement` so the client offers an edit-and-
+    // retry rather than the generic "correct the highlighted value".
     if (err instanceof QueryExecutionError) {
-      return json({ error: err.message }, { status: 400 });
+      throw new HttpError(400, err.message, {}, "statement");
     }
     // Everything else is `route()`'s to classify, log, and answer.
     throw err;

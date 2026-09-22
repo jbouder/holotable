@@ -74,3 +74,10 @@ can correct and retry. Connection and infrastructure failures return a generic
 | 409 | Source is tombstoned |
 | 429 | A model-backed route hit the workspace's rate limit or token budget; the message says which and when it resets, and `Retry-After` is set. See [LLM rate limits and budgets](/operations/llm-limits/) |
 | 500 | Infrastructure failure — deliberately opaque |
+
+Every error body is `{ error, kind, requestId }`. `kind` is one of
+`validation`, `statement`, `authorization`, `not_found`, `conflict`,
+`rate_limit`, or `infrastructure`, and it is what a client presents from — a
+`400` is both a rejected body and a failed statement, and only the route knows
+which. `requestId` is the same value as the `x-request-id` header, repeated in
+the body so the opaque path has something the user can quote back.

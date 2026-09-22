@@ -15,6 +15,8 @@ import {
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/input";
+import { ErrorDisplay } from "@/components/ui/error-display";
+import { apiErrorFromThrown } from "@/lib/errors";
 
 /**
  * Floating, read-only chat scoped to one dashboard. It talks to
@@ -32,11 +34,13 @@ export function DashboardChat({
   const [open, setOpen] = React.useState(false);
   const [input, setInput] = React.useState("");
 
-  const { messages, sendMessage, setMessages, status, stop, error } = useChat({
-    transport: new DefaultChatTransport({
-      api: `/api/dashboards/${dashboardId}/chat`,
-    }),
-  });
+  const { messages, sendMessage, setMessages, status, stop, error, regenerate } = useChat(
+    {
+      transport: new DefaultChatTransport({
+        api: `/api/dashboards/${dashboardId}/chat`,
+      }),
+    },
+  );
 
   const busy = status === "submitted" || status === "streaming";
   const listRef = React.useRef<HTMLDivElement>(null);
@@ -138,9 +142,11 @@ export function DashboardChat({
         )}
 
         {error && (
-          <p className="mt-3 text-xs text-danger">
-            Something went wrong. Please try again.
-          </p>
+          <ErrorDisplay
+            error={apiErrorFromThrown(error)}
+            className="mt-3"
+            onRetry={() => regenerate()}
+          />
         )}
       </div>
 

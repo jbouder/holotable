@@ -3,8 +3,10 @@ import { getSourceById } from "@/lib/db/repo";
 import type { SourceRecord } from "@/lib/registry";
 import { validateSql, buildExecutablePlan } from "@/lib/sql/safety";
 import { resolveTimeRange } from "@/lib/time";
-import { executePlan } from "@/lib/timescaledb/client";
+import { executePlan, QueryExecutionError } from "@/lib/timescaledb/client";
 import { config } from "@/lib/config";
+import { type ErrorKind, OPAQUE_MESSAGE } from "@/lib/errors";
+import { log } from "@/lib/log";
 import {
   forgetDashboard,
   observePollerTick,
@@ -40,7 +42,7 @@ export type PollerEvent =
       columns: string[];
       rows: Record<string, unknown>[];
     }
-  | { type: "panel-error"; panelId: string; error: string }
+  | { type: "panel-error"; panelId: string; error: string; kind: ErrorKind }
   | { type: "tombstone"; panelId: string; sourceId: string }
   | { type: "tick"; at: number };
 
@@ -112,7 +114,12 @@ export function makePanelExecutor(
     const check = await validateSql(panel.query.sql, source.config);
     if (!check.ok) {
       return [
-        { type: "panel-error", panelId: panel.id, error: check.error ?? "invalid sql" },
+        {
+          type: "panel-error",
+          panelId: panel.id,
+          error: check.error ?? "invalid sql",
+          kind: "statement",
+        },
       ];
     }
 
@@ -152,6 +159,25 @@ export function makePanelExecutor(
       },
     ];
   };
+}
+
+/**
+ * Classify a panel failure for broadcast, honouring invariant 16 on the SSE
+ * path as the query route already does on the request path.
+ *
+ * This used to broadcast `err.message` for anything, so a connection failure
+ * put its host and port in front of every viewer of the dashboard. A statement
+ * failure is the editor's to fix and keeps its real message; everything else
+ * is generic, and the real cause goes to the log with the panel id on it.
+ *
+ * Exported for unit testing.
+ */
+export function describePanelError(err: unknown): { error: string; kind: ErrorKind } {
+  if (err instanceof QueryExecutionError) {
+    return { error: err.message, kind: "statement" };
+  }
+  log.error("poller.panel_failed", { err });
+  return { error: OPAQUE_MESSAGE, kind: "infrastructure" };
 }
 
 /** Default executor used in production. */
@@ -248,7 +274,7 @@ class DashboardPoller {
           this.broadcast({
             type: "panel-error",
             panelId: p.id,
-            error: err instanceof Error ? err.message : String(err),
+            ...describePanelError(err),
           });
         }
       }),

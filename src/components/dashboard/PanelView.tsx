@@ -1,13 +1,15 @@
 "use client";
 
 import type * as React from "react";
-import { AlertTriangle, DatabaseZap, Loader2, RefreshCw } from "lucide-react";
+import { Loader2 } from "lucide-react";
 import type { Panel } from "@/lib/ir";
-import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { ErrorDisplay } from "@/components/ui/error-display";
 import { EChart } from "@/components/charts/EChart";
 import { PanelSqlDialog } from "@/components/dashboard/PanelSqlDialog";
 import { buildChartOption, type PanelData } from "@/components/charts/options";
+import { formatClockTime } from "@/lib/connection";
+import type { ApiError } from "@/lib/errors";
 import { formatValue } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
@@ -16,7 +18,13 @@ export type PanelStatus = "loading" | "live" | "stale" | "error" | "tombstoned";
 export interface PanelState {
   data: PanelData;
   status: PanelStatus;
-  error?: string;
+  error?: ApiError;
+  /**
+   * When this panel's data last arrived. Panels go stale independently — one
+   * failing query does not stop the others — so the dashboard-wide "updated Ns
+   * ago" is not the answer for any individual panel.
+   */
+  updatedAt?: number;
 }
 
 const EMPTY: PanelData = { columns: [], rows: [] };
@@ -44,7 +52,7 @@ export function PanelView({
       <CardHeader>
         <CardTitle className="min-w-0 truncate">{panel.title}</CardTitle>
         <div className="flex shrink-0 items-center gap-1">
-          {showBadge && <StatusBadge status={status} />}
+          {showBadge && <StatusBadge status={status} updatedAt={state?.updatedAt} />}
           <PanelSqlDialog panel={panel} />
         </div>
       </CardHeader>
@@ -67,22 +75,26 @@ function PanelBody({
   onRetry?: () => void;
 }) {
   if (state?.status === "tombstoned") {
+    // A tombstone is the `conflict` kind: the source is gone, and the fix is to
+    // repoint the panel. Routing it through ErrorDisplay is what gets it that
+    // guidance instead of a bare sentence.
     return (
-      <Message icon={<DatabaseZap className="h-5 w-5" />}>
-        Data source removed (tombstoned). This panel no longer resolves.
-      </Message>
+      <ErrorDisplay
+        layout="block"
+        error={{
+          error: "This panel's data source has been removed.",
+          kind: "conflict",
+        }}
+      />
     );
   }
   if (state?.status === "error") {
     return (
-      <Message icon={<AlertTriangle className="h-5 w-5 text-danger" />}>
-        <span>{state.error ?? "Query failed"}</span>
-        {onRetry && (
-          <Button variant="secondary" size="sm" className="mt-1" onClick={onRetry}>
-            <RefreshCw className="h-3.5 w-3.5" /> Retry
-          </Button>
-        )}
-      </Message>
+      <ErrorDisplay
+        layout="block"
+        error={state.error ?? { error: "Query failed", kind: "statement" }}
+        onRetry={onRetry}
+      />
     );
   }
   if (data.rows.length === 0 && (!state || state.status === "loading")) {
@@ -172,15 +184,26 @@ const STATUS_STYLES: Record<PanelStatus, string> = {
   tombstoned: "bg-danger/20 text-danger",
 };
 
-function StatusBadge({ status }: { status: PanelStatus }) {
+/**
+ * The badge doubles as the panel's freshness readout: an absolute clock time in
+ * the tooltip rather than a relative one, so it stays correct without a timer
+ * re-rendering every panel and every chart once a second. The dashboard header
+ * is where the live-counting "Ns ago" belongs.
+ */
+function StatusBadge({ status, updatedAt }: { status: PanelStatus; updatedAt?: number }) {
+  const freshness =
+    updatedAt === undefined ? "No data yet" : `Updated at ${formatClockTime(updatedAt)}`;
   return (
     <span
+      title={freshness}
       className={cn(
         "rounded-full px-2 py-0.5 text-xs font-medium capitalize",
         STATUS_STYLES[status],
       )}
     >
       {status}
+      {/* The tooltip is mouse-only; this is the same fact for everyone else. */}
+      <span className="sr-only">. {freshness}</span>
     </span>
   );
 }
