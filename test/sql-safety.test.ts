@@ -2,7 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { validateSql, buildExecutablePlan } from "@/lib/sql/safety";
 import { SourceConfig } from "@/lib/registry";
-import { resolveTimeRange, resolveTimeExpr } from "@/lib/time";
+import { resolveTimeRange, resolveTimeExpr, TimeRangeError } from "@/lib/time";
 import { renderMetrics, resetMetricsForTests } from "@/lib/metrics";
 
 const source = SourceConfig.parse({
@@ -178,6 +178,13 @@ test("resolveTimeExpr resolves relative expressions against a fixed now", () => 
   assert.equal(resolveTimeExpr("now", now).toISOString(), now.toISOString());
   assert.equal(resolveTimeExpr("now-1h", now).toISOString(), "2024-01-01T11:00:00.000Z");
   assert.equal(resolveTimeExpr("now-15m", now).toISOString(), "2024-01-01T11:45:00.000Z");
+});
+
+test("a range that will not resolve throws TimeRangeError, not a bare Error", () => {
+  // The type is the contract: the poller shows a TimeRangeError's message to
+  // the viewer (the range is theirs to fix) and keeps everything else opaque.
+  assert.throws(() => resolveTimeExpr("not-a-time"), TimeRangeError);
+  assert.throws(() => resolveTimeRange({ from: "now", to: "now-1h" }), TimeRangeError);
 });
 
 test("resolveTimeRange requires from < to", () => {

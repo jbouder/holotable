@@ -28,7 +28,12 @@ Server side (`.../stream/route.ts` and `src/lib/poller/registry.ts`):
      `append`. Non-time panels are sent as a full `replace` snapshot.
 
 Events are broadcast to every subscriber's stream. The event types are `panel`
-(`append`/`replace`), `panel-error`, `tombstone`, and `tick`.
+(`append`/`replace`), `panel-error`, `dashboard-error`, `tombstone`, and `tick`.
+
+A `tick` is sent only when the whole cycle completed. A cycle that failed
+before the panels — an unresolvable time range, say — sends a
+`dashboard-error` instead, the poller reschedules anyway, and the viewer shows
+the failure above the grid rather than a Live badge over frozen charts.
 
 :::caution[Single-instance caveat]
 The poller lives in the Node process, so it is correct for a *single* app
@@ -45,6 +50,8 @@ Client side (`LiveDashboard.tsx` → `PanelView.tsx` → `EChart.tsx`):
 - `append` rows are concatenated into a **bounded rolling window**
   (`MAX_WINDOW_POINTS`, default 720) — old points fall off the front.
 - `replace` swaps the window; `panel-error` and `tombstone` flip panel status.
+- `dashboard-error` belongs to no panel: it renders as a banner above the grid,
+  marks every panel stale, and clears on the next completed `tick`.
 - A **staleness watchdog** marks panels `stale` if no `tick` arrives within
   roughly two refresh intervals, and on an `EventSource` transport error — which
   auto-reconnects.

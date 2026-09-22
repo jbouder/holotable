@@ -6,6 +6,8 @@ import type { Dashboard, TimeRange } from "@/lib/ir";
 import type { PollerEvent } from "@/lib/poller/registry";
 import { DashboardGrid } from "@/components/dashboard/DashboardGrid";
 import { PanelView, type PanelState } from "@/components/dashboard/PanelView";
+import { ErrorDisplay } from "@/components/ui/error-display";
+import type { ApiError } from "@/lib/errors";
 import { ConnectionIndicator } from "@/components/dashboard/ConnectionIndicator";
 import type { PanelData } from "@/components/charts/options";
 import { Button } from "@/components/ui/button";
@@ -65,6 +67,10 @@ export function LiveDashboard({
   const [timeRange, setTimeRange] = React.useState<TimeRange>(spec.timeRange);
   const [connection, setConnection] =
     React.useState<ConnectionStatus>(INITIAL_CONNECTION);
+  // A failure of the whole cycle rather than of one panel — an unresolvable
+  // time range, typically. It belongs above the grid because it is not any one
+  // panel's, and it clears on the next completed tick.
+  const [dashboardError, setDashboardError] = React.useState<ApiError | null>(null);
   // Bumped by the manual Reconnect to tear the EventSource down and build a
   // new one; the browser's own retry schedule is not something a page can
   // shortcut, so the socket has to be replaced rather than nudged.
@@ -82,7 +88,9 @@ export function LiveDashboard({
   const applyEvent = React.useCallback(
     (event: PollerEvent, at: number) => {
       setStates((prev) => {
-        if (event.type === "tick") return prev;
+        // Neither carries a panel id: a tick is freshness, a dashboard error is
+        // handled by the caller and shown above the grid.
+        if (event.type === "tick" || event.type === "dashboard-error") return prev;
         const cur = prev[event.panelId];
         if (event.type === "panel-error") {
           return {
@@ -126,6 +134,7 @@ export function LiveDashboard({
     const es = new EventSource(streamUrl);
     es.onopen = () => {
       setStates({});
+      setDashboardError(null);
       signal({ type: "open" });
     };
     es.onmessage = (msg) => {
@@ -133,7 +142,17 @@ export function LiveDashboard({
         const event = JSON.parse(msg.data) as PollerEvent;
         if (event.type === "tick") {
           lastTickRef.current = event.at;
+          // A tick only arrives on a completed cycle, so it is also the signal
+          // that whatever broke the last one is over.
+          setDashboardError(null);
           signal({ type: "tick", at: event.at });
+        }
+        if (event.type === "dashboard-error") {
+          setDashboardError({ error: event.error, kind: event.kind });
+          // The stream is healthy, the data behind it is not: every panel is
+          // now only as fresh as its last frame, so say so rather than leave a
+          // live badge over frozen charts.
+          setStates(markStale);
         }
         applyEvent(event, Date.now());
       } catch {
@@ -208,6 +227,8 @@ export function LiveDashboard({
           {actions}
         </div>
       </div>
+
+      {dashboardError && <ErrorDisplay error={dashboardError} className="mb-4" />}
 
       <DashboardGrid
         panels={spec.panels}

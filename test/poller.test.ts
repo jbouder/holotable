@@ -3,13 +3,16 @@ import assert from "node:assert/strict";
 import {
   computeDelta,
   describePanelError,
+  describeTickError,
   getPoller,
   invalidatePoller,
   activePollerCount,
   makePanelExecutor,
   type PanelExecutor,
+  type PollerEvent,
 } from "@/lib/poller/registry";
 import { OPAQUE_MESSAGE } from "@/lib/errors";
+import { TimeRangeError } from "@/lib/time";
 import { QueryExecutionError } from "@/lib/timescaledb/client";
 import { createLogger, setLogger } from "@/lib/log";
 import type { Dashboard, Panel } from "@/lib/ir";
@@ -323,4 +326,97 @@ test("a rejected query is reported as the statement it is", async () => {
   assert.equal(event.type, "panel-error");
   if (event.type !== "panel-error") return;
   assert.equal(event.kind, "statement");
+});
+
+// --- tick resilience (#140) ---
+
+/** The async variant of `captureLog`, for a tick that has to be awaited. */
+async function captureLogAsync<T>(
+  fn: () => Promise<T>,
+): Promise<{ result: T; lines: Array<{ level: string; msg?: string }> }> {
+  const lines: Array<{ level: string; msg?: string }> = [];
+  const restore = setLogger(
+    createLogger({
+      level: "debug",
+      format: "json",
+      sink: (line) => lines.push(JSON.parse(line) as { level: string; msg?: string }),
+    }),
+  );
+  try {
+    return { result: await fn(), lines };
+  } finally {
+    restore();
+  }
+}
+
+test("an unresolvable time range is the viewer's to fix, so it keeps its message", () => {
+  const { result, errors } = captureLog(() =>
+    describeTickError(new TimeRangeError("invalid time expression: not-a-time"), "d1"),
+  );
+  assert.deepEqual(result, {
+    error: "invalid time expression: not-a-time",
+    kind: "validation",
+  });
+  // A range someone picked is not an incident.
+  assert.equal(errors, 0);
+});
+
+test("any other tick failure is opaque and logged", () => {
+  const err = Object.assign(new Error("connect ECONNREFUSED 10.0.0.5:5432"), {
+    code: "ECONNREFUSED",
+  });
+  const { result, errors } = captureLog(() => describeTickError(err, "d1"));
+  assert.equal(result.kind, "infrastructure");
+  assert.equal(result.error, OPAQUE_MESSAGE);
+  assert.ok(!result.error.includes("10.0.0.5"));
+  assert.equal(errors, 1);
+});
+
+test("a throw outside the per-panel try is broadcast and the poller keeps ticking", async () => {
+  // `from` equals `to`, which the IR accepts and `resolveTimeRange` rejects —
+  // the reachable case, since the viewer picks the range and the poller key
+  // includes it. The throw lands outside the per-panel try.
+  const inverted = spec({ timeRange: { from: "now", to: "now" } });
+  const poller = getPoller("dash-badrange", 1, "ws1", inverted, noopExecutor);
+  const events: PollerEvent[] = [];
+
+  const { lines } = await captureLogAsync(async () => {
+    const unsub = poller.subscribe((e) => events.push(e));
+    await new Promise((r) => setTimeout(r, 20));
+    return unsub;
+  });
+
+  const failure = events.find((e) => e.type === "dashboard-error");
+  assert.ok(failure, "the subscriber must be told the cycle failed");
+  assert.equal(failure.kind, "validation");
+  assert.match(failure.error, /from` must be before `to/);
+  assert.ok(
+    !events.some((e) => e.type === "tick"),
+    "a failed cycle must not refresh the freshness readout",
+  );
+  assert.ok(
+    lines.some((l) => l.msg === "poller.time_range_failed"),
+    "the failure must reach the log too",
+  );
+  // The tick has finished, so "not stalled" means the next one is armed. This
+  // is the regression: `scheduleNext()` used to be skipped and every viewer
+  // kept a Live badge over a frozen chart.
+  assert.equal(poller.isStalled, false, "the poller must still be scheduled");
+  assert.equal(poller.isRunning, true);
+
+  invalidatePoller("dash-badrange");
+});
+
+test("getPoller replaces a stalled poller instead of sharing it", () => {
+  const poller = getPoller("dash-stalled", 1, "ws1", spec(), noopExecutor);
+  // Forced, because the guards above make it unreachable through the public
+  // API — which is the point: this asserts the last line of defence.
+  (poller as unknown as { running: boolean }).running = true;
+  assert.equal(poller.isStalled, true);
+
+  const next = getPoller("dash-stalled", 1, "ws1", spec(), noopExecutor);
+  assert.notEqual(next, poller, "a dead poller must not be handed to a subscriber");
+  assert.equal(next.isStalled, false);
+
+  invalidatePoller("dash-stalled");
 });
