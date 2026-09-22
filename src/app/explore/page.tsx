@@ -23,5 +23,14 @@ export default async function ExplorePage() {
     workspaceId: s.workspaceId,
   }));
 
-  return <ExploreClient sources={sources} model={config.aiModel} />;
+  return (
+    <ExploreClient
+      sources={sources}
+      model={config.aiModel}
+      // Defaults for a dashboard created from a result. The server stays the
+      // authority for resolving these expressions at execution time.
+      defaultTimeRange={{ from: config.defaultTimeFrom, to: config.defaultTimeTo }}
+      defaultRefreshIntervalMs={config.defaultRefreshIntervalMs}
+    />
+  );
 }

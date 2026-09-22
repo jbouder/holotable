@@ -8,13 +8,17 @@ export const dynamic = "force-dynamic";
 
 export default async function EditDashboardPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ id: string }>;
+  /** `?panel=` preselects a panel — how Explore hands off a saved result. */
+  searchParams: Promise<{ panel?: string }>;
 }) {
   const identity = await getIdentity();
   if (!identity) return <SignIn />;
 
   const { id } = await params;
+  const { panel } = await searchParams;
   const dashboard = await getDashboardById(id);
   if (!dashboard) notFound();
   if (!can(identity, "dashboard:update", { workspaceId: dashboard.workspaceId })) {
@@ -31,6 +35,7 @@ export default async function EditDashboardPage({
     <EditDashboardClient
       dashboardId={id}
       initialSpec={dashboard.spec}
+      initialPanelId={panel}
       version={dashboard.version}
       sources={sources}
     />
