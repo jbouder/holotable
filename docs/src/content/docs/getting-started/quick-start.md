@@ -63,7 +63,7 @@ npm run seed     # looping metrics seeder
 | Path | Purpose | Min role |
 | --- | --- | --- |
 | `/dashboards` | List dashboards in a workspace | viewer |
-| `/dashboards/new` | Prompt → preview → save, with one-click starter prompts | editor |
+| `/dashboards/new` | Prompt → preview → save, with starter prompts built from the selected source's catalog | editor |
 | `/dashboards/[id]` | Live viewer (SSE) with Live/Pause and a read-only chat assistant | viewer |
 | `/dashboards/[id]/edit` | Panel CRUD/layout, single-panel NL edits, version save | editor |
 | `/explore` | Ad-hoc NL questions against editable sources | editor |

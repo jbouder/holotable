@@ -2,6 +2,7 @@ import { can, getIdentity } from "@/lib/auth/authorize";
 import { accessibleWorkspaces, hasWorkspaceRole } from "@/lib/auth/claims";
 import { listSources } from "@/lib/db/repo";
 import { catalogHealth } from "@/lib/catalog/health";
+import { buildStarters } from "@/lib/prompts/starters";
 import { config } from "@/lib/config";
 import { SignIn } from "@/components/sign-in";
 import { ExploreClient } from "./explore-client";
@@ -25,6 +26,10 @@ export default async function ExplorePage() {
     // Decided here, not in the browser: the staleness threshold is an
     // environment setting, and `/api/generate` refuses on this same call.
     catalog: catalogHealth(s),
+    // Derived here because the catalog stays on the server: the browser is
+    // handed the suggestions, never the table and column list they were
+    // built from.
+    starters: buildStarters(s, "panel"),
     canRefresh: can(identity, "source:manage", { workspaceId: s.workspaceId }),
   }));
 

@@ -35,16 +35,12 @@ interface SourceOption {
   catalog: CatalogHealth;
   /** Whether this caller may refresh it, i.e. holds `source:manage` here. */
   canRefresh: boolean;
+  /**
+   * One-click starters built from this source's catalog by `buildStarters`.
+   * Per source, so switching the picker switches the chips.
+   */
+  starters: string[];
 }
-
-/** Starter prompts to seed the textarea with one click. */
-const PROMPT_PRESETS = [
-  "p95 and p99 latency trends over time",
-  "HTTP status code breakdown over time",
-  "Slowest endpoints by p95 latency",
-  "Total requests and error count as stat panels",
-  "Request rate and error ratio over the last hour",
-];
 
 export function NewDashboardClient({
   sources,
@@ -65,6 +61,9 @@ export function NewDashboardClient({
     Object.fromEntries(sources.map((s) => [s.id, s.catalog])),
   );
   const source = sources.find((s) => s.id === sourceId);
+  // Chips for the selected source. Server-built from its catalog, so they
+  // change with the picker and never describe a table this source cannot read.
+  const starters = source?.starters ?? [];
 
   // The instruction that produced the run in flight, so the finished turn is
   // labelled with what was actually asked rather than whatever is in the box by
@@ -237,11 +236,13 @@ export function NewDashboardClient({
                 <Label htmlFor="prompt">
                   {refining
                     ? "Refine it — each follow-up is one more turn"
-                    : "Describe the dashboard or try one below"}
+                    : starters.length > 0
+                      ? "Describe the dashboard or try one below"
+                      : "Describe the dashboard"}
                 </Label>
-                {!refining && (
+                {!refining && starters.length > 0 && (
                   <div className="mb-2 flex flex-wrap items-center gap-2">
-                    {PROMPT_PRESETS.map((preset) => (
+                    {starters.map((preset) => (
                       <button
                         key={preset}
                         type="button"
@@ -261,8 +262,10 @@ export function NewDashboardClient({
                     className="pr-14"
                     placeholder={
                       refining
-                        ? "e.g. Make the third one a bar chart, and add p99 latency"
-                        : "e.g. Show request rate, p95 latency, and error ratio over the last hour"
+                        ? "e.g. Make the third one a bar chart, and add a 95th percentile line"
+                        : starters[0]
+                          ? `e.g. ${starters[0]}`
+                          : "Describe the dashboard you want"
                     }
                     value={prompt}
                     onChange={(e) => setPrompt(e.target.value)}
