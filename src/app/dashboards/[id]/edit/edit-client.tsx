@@ -21,6 +21,8 @@ import { SqlEditor } from "@/components/sql/SqlEditor";
 import { TimeFieldPicker } from "@/components/sql/TimeFieldPicker";
 import type { SourceCatalog } from "@/lib/registry";
 import { PanelPreview, usePanelPreview } from "@/components/dashboard/PanelPreview";
+import { PanelDiffView } from "@/components/dashboard/PanelDiffView";
+import { acceptedPanel, diffPanels, type PanelDraft } from "@/lib/panel-diff";
 import { ErrorDisplay } from "@/components/ui/error-display";
 import { type ApiError, apiErrorFromThrown, readApiError } from "@/lib/errors";
 
@@ -68,23 +70,36 @@ export function EditDashboardClient({
   const [saving, setSaving] = React.useState(false);
   const [error, setError] = React.useState<ApiError | null>(null);
   const [nlPrompt, setNlPrompt] = React.useState("");
+  // A generated panel waits here to be accepted or rejected. It holds the id
+  // of the panel it would replace rather than a copy of it, so a manual edit
+  // made while the proposal is open shows up in the diff instead of being
+  // silently discarded by the Accept. `panel` is null until the object lands.
+  const [proposal, setProposal] = React.useState<{
+    panelId: string;
+    prompt: string;
+    panel: Panel | null;
+  } | null>(null);
 
   const selected = spec.panels.find((p) => p.id === selectedId) ?? null;
+  const proposalBase = proposal
+    ? (spec.panels.find((p) => p.id === proposal.panelId) ?? null)
+    : null;
 
   const {
     object,
     submit,
+    stop,
     isLoading,
     error: genError,
   } = useObject({
     api: "/api/generate",
     schema: Panel,
     onFinish({ object }) {
-      if (object) updatePanel(object.id, () => object);
+      // Deliberately does NOT apply anything: the generation lands in the
+      // proposal and the author accepts it, or it never touches the spec.
+      if (object) setProposal((p) => (p ? { ...p, panel: object } : p));
     },
   });
-
-  const showStreaming = isLoading || object !== undefined;
 
   function updateSpec(patch: Partial<Dashboard>) {
     setSpec((s) => ({ ...s, ...patch }));
@@ -118,17 +133,54 @@ export function EditDashboardClient({
 
   function removePanel(id: string) {
     setSpec((s) => ({ ...s, panels: s.panels.filter((p) => p.id !== id) }));
+    if (proposal?.panelId === id) discardProposal();
     if (selectedId === id) setSelectedId(spec.panels[0]?.id ?? null);
+  }
+
+  /** Drop the proposal, cancelling the run behind it if one is still going. */
+  function discardProposal() {
+    if (isLoading) stop();
+    setProposal(null);
+  }
+
+  function selectPanel(id: string) {
+    if (id === selectedId) return;
+    discardProposal();
+    setSelectedId(id);
+  }
+
+  /**
+   * One model call. `base` is what the model is asked to change and what the
+   * diff is against — on a regenerate that is still the panel in the spec, not
+   * the generation being reviewed, so pressing Regenerate twice cannot compound
+   * the model's own output.
+   */
+  function generatePanel(base: Panel, prompt: string, feedback = "") {
+    const instruction = feedback.trim()
+      ? `${prompt}\n\nAdditional feedback: ${feedback.trim()}`.slice(0, 4000)
+      : prompt;
+    setProposal({ panelId: base.id, prompt, panel: null });
+    submit({
+      mode: "panel",
+      sourceId: base.query.sourceId,
+      prompt: instruction,
+      current: base,
+    });
   }
 
   function runNlEdit() {
     if (!selected || !nlPrompt.trim()) return;
-    submit({
-      mode: "panel",
-      sourceId: selected.query.sourceId,
-      prompt: nlPrompt,
-      current: selected,
-    });
+    generatePanel(selected, nlPrompt);
+  }
+
+  function acceptProposal() {
+    const generated = proposal?.panel;
+    if (!generated || !proposalBase) return;
+    // One setSpec, so accepting is one step for undo/redo (#81) rather than a
+    // field-by-field trail.
+    updatePanel(proposalBase.id, () => acceptedPanel(proposalBase, generated));
+    setProposal(null);
+    setNlPrompt("");
   }
 
   async function save() {
@@ -158,6 +210,15 @@ export function EditDashboardClient({
     }
     router.push(`/dashboards/${dashboardId}`);
   }
+
+  // The finished generation once it lands, the partial object while it
+  // streams — so the same diff fills in live instead of a JSON dump.
+  const draft: PanelDraft | null =
+    proposal?.panel ?? (proposal && isLoading ? ((object ?? {}) as PanelDraft) : null);
+  const diff =
+    proposal && proposalBase && draft
+      ? diffPanels(proposalBase, draft, { streaming: proposal.panel === null })
+      : null;
 
   return (
     <div className="space-y-4">
@@ -294,7 +355,7 @@ export function EditDashboardClient({
                     <button
                       key={p.id}
                       type="button"
-                      onClick={() => setSelectedId(p.id)}
+                      onClick={() => selectPanel(p.id)}
                       className={`flex w-full items-center justify-between rounded px-2 py-1.5 text-left text-sm ${
                         p.id === selectedId ? "bg-surface-2" : "hover:bg-surface-2"
                       }`}
@@ -366,22 +427,16 @@ export function EditDashboardClient({
                         disabled={isLoading}
                       />
                     )}
-                    {showStreaming && (
-                      <div className="space-y-1.5">
-                        <Label className="flex items-center gap-2">
-                          {isLoading ? (
-                            <>
-                              <Loader2 className="h-4 w-4 animate-spin" />
-                              <span className="animate-pulse">Generating config…</span>
-                            </>
-                          ) : (
-                            "Generated config"
-                          )}
-                        </Label>
-                        <pre className="max-h-96 overflow-auto rounded-lg border border-border bg-surface p-4 text-xs text-muted">
-                          {JSON.stringify(object, null, 2)}
-                        </pre>
-                      </div>
+                    {diff && proposal && proposalBase && (
+                      <PanelDiffView
+                        diff={diff}
+                        streaming={proposal.panel === null}
+                        onAccept={acceptProposal}
+                        onReject={discardProposal}
+                        onRegenerate={(feedback) =>
+                          generatePanel(proposalBase, proposal.prompt, feedback)
+                        }
+                      />
                     )}
                   </div>
                 )}
