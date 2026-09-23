@@ -80,6 +80,12 @@ hand.
 | --- | --- | --- | --- |
 | `/api/me` | GET | signed in | The caller's own subject, display name, email, platform-admin flag and workspace roles, all from the session. No parameters, so it can only describe the identity that asked. The name and email are display-only and never reach `can()` |
 
+## Workspaces
+
+| Route | Method | Min role | Notes |
+| --- | --- | --- | --- |
+| `/api/workspaces/[id]/limits` | PATCH | platform admin | Set or clear the workspace's `ratePerMinute` and `dailyTokenBudget` overrides in `workspace_limits`. A present key is written, `null` inherits the environment's value again, `0` disables the limit, and an absent key is left alone. Gated on `workspace:limits`, which no workspace role grants. Each change writes a `workspace_limits.changed` log line with the before and after values. Answers with the workspace's effective limits and today's usage; the next model call uses them, with no restart |
+
 ## Auth
 
 | Route | Method | Notes |

@@ -1,6 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
+  ACTIONS,
   authorizedWorkspaces,
   can,
   errorResponse,
@@ -61,15 +62,7 @@ test("delete allowed for a source-admin who is not the owner", () => {
 
 test("all actions denied in a workspace the user has no role in", () => {
   const id = identity(["/workspaces/other/source-admin"]);
-  const actions: Action[] = [
-    "dashboard:view",
-    "dashboard:create",
-    "dashboard:update",
-    "dashboard:generate",
-    "dashboard:delete",
-    "source:manage",
-    "source:use",
-  ];
+  const actions: readonly Action[] = ACTIONS;
   for (const a of actions) {
     assert.equal(can(id, a, { workspaceId: "w", ownerSub: "u1" }), false, a);
   }
@@ -77,18 +70,22 @@ test("all actions denied in a workspace the user has no role in", () => {
 
 test("platform admin bypasses every action in every workspace", () => {
   const id = identity(["/platform-admins"], "root");
-  const actions: Action[] = [
-    "dashboard:view",
-    "dashboard:create",
-    "dashboard:update",
-    "dashboard:generate",
-    "dashboard:delete",
-    "source:manage",
-    "source:use",
-  ];
+  const actions: readonly Action[] = ACTIONS;
   for (const a of actions) {
     assert.equal(can(id, a, { workspaceId: "any-workspace" }), true, a);
   }
+});
+
+test("only a platform admin may change a workspace's AI limits", () => {
+  for (const role of ["viewer", "editor", "source-admin"]) {
+    const id = identity([`/workspaces/w/${role}`]);
+    assert.equal(can(id, "workspace:limits", { workspaceId: "w" }), false, role);
+  }
+  const admin = identity(["/platform-admins"], "root");
+  assert.equal(can(admin, "workspace:limits", { workspaceId: "w" }), true);
+  // Including a workspace the admin's claims do not name: limits can be set
+  // ahead of a workspace's first use.
+  assert.equal(can(admin, "workspace:limits", { workspaceId: "not-yet-used" }), true);
 });
 
 test("authorization is scoped to the passed workspace, not any owned one", () => {
