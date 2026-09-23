@@ -79,31 +79,42 @@ export default async function DashboardViewPage({
             }
             action={
               canEdit ? (
-                <Link href={`/dashboards/${id}/edit`}>
+                <Link key="edit" href={`/dashboards/${id}/edit`}>
                   <Button>Add a panel</Button>
                 </Link>
               ) : undefined
             }
           />
         }
+        // `header` and `actions` are keyed child by child although no child is
+        // mapped. Both cross into the client component `LiveDashboard`, and
+        // the RSC client can stream an element that references a client
+        // component (`Link`, `Button`) as a lazy chunk; its "keys already
+        // checked" flag lands on the element only once that chunk resolves,
+        // so on some cold loads React sees an unkeyed child in a list and
+        // warns. A real key makes the check pass whichever arrives first.
         header={
           <div>
-            <h1 className="text-2xl font-semibold">{dashboard.spec.title}</h1>
+            <h1 key="title" className="text-2xl font-semibold">
+              {dashboard.spec.title}
+            </h1>
             {/*
               The description is row metadata (#119), so it sits beside the
               title rather than in the spec line below it — that line describes
               what the server is executing, and prose is not part of that.
             */}
             {dashboard.description && (
-              <p className="mt-1 max-w-3xl text-sm text-muted">{dashboard.description}</p>
+              <p key="description" className="mt-1 max-w-3xl text-sm text-muted">
+                {dashboard.description}
+              </p>
             )}
-            <p className="mt-1 text-xs text-muted">
+            <p key="meta" className="mt-1 text-xs text-muted">
               {dashboard.workspaceId} · v{dashboard.version} · refresh{" "}
               {Math.round(dashboard.spec.refreshIntervalMs / 1000)}s ·{" "}
               {dashboard.spec.timeRange.from} → {dashboard.spec.timeRange.to}
             </p>
             {dashboard.tags.length > 0 && (
-              <div className="mt-2 flex flex-wrap gap-1">
+              <div key="tags" className="mt-2 flex flex-wrap gap-1">
                 {dashboard.tags.map((tag) => (
                   <Link
                     key={tag}
@@ -124,7 +135,7 @@ export default async function DashboardViewPage({
               answers with a `Content-Disposition`, so the browser saves the
               file itself and this page ships no JavaScript for it.
             */}
-            <a href={`/api/dashboards/${id}/export`} download>
+            <a key="export" href={`/api/dashboards/${id}/export`} download>
               <Button
                 variant="ghost"
                 size="sm"
@@ -137,6 +148,7 @@ export default async function DashboardViewPage({
             </a>
             {canSaveTemplate && (
               <SaveAsTemplate
+                key="template"
                 workspaceId={dashboard.workspaceId}
                 defaultName={dashboard.spec.title}
                 subject={{ kind: "dashboard", dashboard: dashboard.spec }}
@@ -158,7 +170,11 @@ export default async function DashboardViewPage({
               </Link>
             )}
             {canDelete && (
-              <DeleteDashboardButton dashboardId={id} title={dashboard.spec.title} />
+              <DeleteDashboardButton
+                key="delete"
+                dashboardId={id}
+                title={dashboard.spec.title}
+              />
             )}
           </>
         }
