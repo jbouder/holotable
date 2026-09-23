@@ -12,6 +12,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { EChart } from "@/components/charts/EChart";
 import { buildChartOption, type PanelData } from "@/components/charts/options";
+import { useTimeDisplay } from "@/components/time-display";
 import { ErrorDisplay } from "@/components/ui/error-display";
 import { type ApiError, apiErrorFromThrown } from "@/lib/errors";
 import { EMPTY_ROWS, runPanelQuery } from "@/lib/panel-query";
@@ -383,6 +384,7 @@ function ResultBody({
   data: PanelData;
   onRetry: () => void;
 }) {
+  const display = useTimeDisplay();
   if (!result || result.status === "loading") {
     return (
       <div className="flex items-center gap-2 text-sm text-muted">
@@ -405,7 +407,7 @@ function ResultBody({
   if (CHART_VIZ.has(panel.viz)) {
     return (
       <div className="h-96 border border-border bg-surface p-2">
-        <EChart option={buildChartOption(panel, data)} />
+        <EChart option={buildChartOption(panel, data, display)} />
       </div>
     );
   }

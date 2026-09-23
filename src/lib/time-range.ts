@@ -1,5 +1,12 @@
 import { type Panel, TimeRange } from "@/lib/ir";
 import { resolveTimeRange } from "@/lib/time";
+import {
+  formatDateTime,
+  fromZonedInput,
+  LOCAL_TIME_DISPLAY,
+  type TimeDisplay,
+  toZonedInput,
+} from "@/lib/time-display";
 
 /**
  * The vocabulary behind the dashboard time picker.
@@ -221,7 +228,11 @@ export function formatSpan(ms: number): string {
  * windows read as "Last 90m", and an absolute window shows its actual bounds —
  * a reader must be able to tell at a glance which of the three they are in.
  */
-export function describeRange(range: TimeRange, now: Date = new Date()): string {
+export function describeRange(
+  range: TimeRange,
+  now: Date = new Date(),
+  display: TimeDisplay = LOCAL_TIME_DISPLAY,
+): string {
   const preset = matchingPreset(range);
   if (preset) return preset;
   if (isRolling(range)) {
@@ -231,47 +242,39 @@ export function describeRange(range: TimeRange, now: Date = new Date()): string 
   }
   try {
     const { from, to } = resolveTimeRange(range, now);
-    return `${formatInstant(from)} → ${formatInstant(to)}`;
+    return `${formatInstant(from, display)} → ${formatInstant(to, display)}`;
   } catch {
     return `${range.from} → ${range.to}`;
   }
 }
 
 /**
- * Local time, because an operator comparing a chart against a pager knows what
- * time it was where they are. The stored expression stays UTC ISO-8601.
+ * Local time by default, because an operator comparing a chart against a pager
+ * knows what time it was where they are; the person's time display preference
+ * (#214) can choose another zone or clock. The stored expression stays UTC
+ * ISO-8601.
  */
-export function formatInstant(date: Date): string {
-  return date.toLocaleString(undefined, {
-    month: "short",
-    day: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
+export function formatInstant(
+  date: Date,
+  display: TimeDisplay = LOCAL_TIME_DISPLAY,
+): string {
+  return formatDateTime(date, display);
 }
 
-/** `Date` → the value an `<input type="datetime-local">` wants, in local time. */
-export function toLocalInput(date: Date): string {
-  const pad = (n: number) => String(n).padStart(2, "0");
-  return (
-    `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}` +
-    `T${pad(date.getHours())}:${pad(date.getMinutes())}`
-  );
+/** `Date` → the value an `<input type="datetime-local">` wants, on the display's clock. */
+export function toLocalInput(
+  date: Date,
+  display: TimeDisplay = LOCAL_TIME_DISPLAY,
+): string {
+  return toZonedInput(date, display);
 }
 
 /** The inverse of {@link toLocalInput}; `null` for anything unparseable. */
-export function fromLocalInput(value: string): Date | null {
-  const m = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})(?::(\d{2}))?$/.exec(value);
-  if (!m) return null;
-  const date = new Date(
-    Number(m[1]),
-    Number(m[2]) - 1,
-    Number(m[3]),
-    Number(m[4]),
-    Number(m[5]),
-    m[6] ? Number(m[6]) : 0,
-  );
-  return Number.isNaN(date.getTime()) ? null : date;
+export function fromLocalInput(
+  value: string,
+  display: TimeDisplay = LOCAL_TIME_DISPLAY,
+): Date | null {
+  return fromZonedInput(value, display);
 }
 
 /**

@@ -35,14 +35,30 @@ export interface DashboardQuery {
   /** Selected tags, ANDed: a dashboard must carry all of them. */
   tags: string[];
   sort: DashboardSort;
+  /** Only the dashboards the reader has starred. */
+  favorites: boolean;
   /** 1-based, so the URL reads the way the pager does. */
   page: number;
 }
+
+/**
+ * How the list opens when the URL says nothing: the reader's saved defaults
+ * (#215), or these. A URL parameter always wins over them, and a value equal
+ * to them is left out of the URL, so the reader's own plain `/dashboards` is
+ * the list they chose.
+ */
+export interface ListDefaults {
+  sort: DashboardSort;
+  favorites: boolean;
+}
+
+export const DEFAULT_LIST: ListDefaults = { sort: DEFAULT_SORT, favorites: false };
 
 export const EMPTY_QUERY: DashboardQuery = {
   search: "",
   tags: [],
   sort: DEFAULT_SORT,
+  favorites: false,
   page: 1,
 };
 
@@ -65,9 +81,13 @@ function read(source: QuerySource, key: string): string[] {
  * an error page. The clamping is also what keeps a crafted `?page=` from
  * turning into an unbounded `OFFSET`.
  */
-export function parseDashboardQuery(source: QuerySource): DashboardQuery {
+export function parseDashboardQuery(
+  source: QuerySource,
+  defaults: ListDefaults = DEFAULT_LIST,
+): DashboardQuery {
   const sortParam = read(source, "sort")[0];
   const pageParam = Number(read(source, "page")[0]);
+  const favoritesParam = read(source, "favorites")[0];
 
   return {
     search: (read(source, "q")[0] ?? "").trim().slice(0, SEARCH_MAX),
@@ -76,7 +96,9 @@ export function parseDashboardQuery(source: QuerySource): DashboardQuery {
     tags: normalizeTags(read(source, "tag").flatMap((t) => t.split(","))),
     sort: (DASHBOARD_SORTS as readonly string[]).includes(sortParam ?? "")
       ? (sortParam as DashboardSort)
-      : DEFAULT_SORT,
+      : defaults.sort,
+    favorites:
+      favoritesParam === "1" ? true : favoritesParam === "0" ? false : defaults.favorites,
     page: Number.isFinite(pageParam)
       ? Math.min(MAX_PAGE, Math.max(1, Math.trunc(pageParam)))
       : 1,
@@ -91,18 +113,27 @@ export function parseDashboardQuery(source: QuerySource): DashboardQuery {
  * `/dashboards?q=&sort=updated&page=1` are the same list, and only one of them
  * should ever appear in someone's history.
  */
-export function dashboardQueryString(query: DashboardQuery): string {
+export function dashboardQueryString(
+  query: DashboardQuery,
+  defaults: ListDefaults = DEFAULT_LIST,
+): string {
   const params = new URLSearchParams();
   if (query.search) params.set("q", query.search);
   for (const tag of query.tags) params.append("tag", tag);
-  if (query.sort !== DEFAULT_SORT) params.set("sort", query.sort);
+  if (query.sort !== defaults.sort) params.set("sort", query.sort);
+  if (query.favorites !== defaults.favorites) {
+    params.set("favorites", query.favorites ? "1" : "0");
+  }
   if (query.page > 1) params.set("page", String(query.page));
   return params.toString();
 }
 
 /** `/dashboards`, or `/dashboards?…` when anything is set. */
-export function dashboardListHref(query: DashboardQuery): string {
-  const qs = dashboardQueryString(query);
+export function dashboardListHref(
+  query: DashboardQuery,
+  defaults: ListDefaults = DEFAULT_LIST,
+): string {
+  const qs = dashboardQueryString(query, defaults);
   return qs ? `/dashboards?${qs}` : "/dashboards";
 }
 
@@ -123,7 +154,7 @@ export function toggleTag(query: DashboardQuery, tag: string): DashboardQuery {
 
 /** Is the list showing a subset? What the "Clear" affordance keys off. */
 export function isFiltered(query: DashboardQuery): boolean {
-  return query.search !== "" || query.tags.length > 0;
+  return query.search !== "" || query.tags.length > 0 || query.favorites;
 }
 
 /** Rows to skip for this page. */

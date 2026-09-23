@@ -12,6 +12,7 @@ import { LoadingLabel, PanelSkeleton } from "@/components/dashboard/PanelSkeleto
 import { Popover } from "@/components/ui/popover";
 import { buildChartOption, type PanelData } from "@/components/charts/options";
 import { formatClockTime } from "@/lib/connection";
+import { useTimeDisplay } from "@/components/time-display";
 import type { ApiError } from "@/lib/errors";
 import { formatValue } from "@/lib/format";
 import { supportsImageExport } from "@/lib/panel-export";
@@ -218,6 +219,7 @@ function PanelBody({
   crosshairGroup?: string;
   onSelectTimeRange?: (range: TimeRange) => void;
 }) {
+  const display = useTimeDisplay();
   if (state?.status === "tombstoned") {
     // A tombstone is the `conflict` kind: the source is gone, and the fix is to
     // repoint the panel. Routing it through ErrorDisplay is what gets it that
@@ -263,7 +265,7 @@ function PanelBody({
       return (
         <EChart
           ref={chartRef}
-          option={buildChartOption(panel, data)}
+          option={buildChartOption(panel, data, display)}
           crosshairGroup={crosshairGroup}
           onBrush={
             onSelectTimeRange && supportsTimeBrush(panel)
@@ -370,8 +372,11 @@ const STATUS_STYLES: Record<PanelStatus, string> = {
  * is where the live-counting "Ns ago" belongs.
  */
 function StatusBadge({ status, updatedAt }: { status: PanelStatus; updatedAt?: number }) {
+  const display = useTimeDisplay();
   const freshness =
-    updatedAt === undefined ? "No data yet" : `Updated at ${formatClockTime(updatedAt)}`;
+    updatedAt === undefined
+      ? "No data yet"
+      : `Updated at ${formatClockTime(updatedAt, display)}`;
   return (
     <span
       title={freshness}

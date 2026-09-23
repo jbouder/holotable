@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import { useTimeDisplay } from "@/components/time-display";
 import { RefreshCw } from "lucide-react";
 import {
   connectionAnnouncement,
@@ -49,6 +50,7 @@ export function ConnectionIndicator({
   onReconnect: () => void;
 }) {
   const now = useTickingNow(status.lastEventAt !== undefined);
+  const display = useTimeDisplay();
   const tone = connectionTone(status.state);
   const offerReconnect = shouldOfferReconnect(status);
 
@@ -63,7 +65,7 @@ export function ConnectionIndicator({
         aria-atomic="true"
         className={cn("flex items-center gap-1.5 text-xs", TEXT[tone])}
       >
-        <span className="sr-only">{connectionAnnouncement(status, now)}</span>
+        <span className="sr-only">{connectionAnnouncement(status, now, display)}</span>
         <span
           aria-hidden="true"
           className={cn("h-2 w-2 shrink-0 rounded-full", DOT[tone])}
@@ -72,7 +74,7 @@ export function ConnectionIndicator({
           {connectionLabel(status)}
         </span>
         <span aria-hidden="true" className="text-muted">
-          · {formatAge(status.lastEventAt, now)}
+          · {formatAge(status.lastEventAt, now, display)}
         </span>
       </div>
       {offerReconnect && (

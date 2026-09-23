@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { useRouter } from "next/navigation";
-import { Search, X } from "lucide-react";
+import { Search, Star, X } from "lucide-react";
 import { Input, Label } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { Button, ButtonLabel } from "@/components/ui/button";
@@ -12,6 +12,7 @@ import {
   type DashboardSort,
   dashboardListHref,
   isFiltered,
+  type ListDefaults,
   toggleTag,
 } from "@/lib/dashboard-list";
 
@@ -33,9 +34,12 @@ const SORTS: { value: DashboardSort; label: string }[] = [
 export function DashboardListControls({
   query,
   tags,
+  defaults,
 }: {
   query: DashboardQuery;
   tags: { tag: string; count: number }[];
+  /** The reader's saved list defaults, which the URL leaves out. */
+  defaults?: ListDefaults;
 }) {
   const router = useRouter();
   const [search, setSearch] = React.useState(query.search);
@@ -45,15 +49,15 @@ export function DashboardListControls({
   React.useEffect(() => {
     if (search === query.search) return;
     const timer = setTimeout(() => {
-      router.replace(dashboardListHref({ ...query, search, page: 1 }));
+      router.replace(dashboardListHref({ ...query, search, page: 1 }, defaults));
     }, 250);
     return () => clearTimeout(timer);
-  }, [search, query, router]);
+  }, [search, query, router, defaults]);
 
   // A back/forward navigation changes the query under us; the box follows it.
   React.useEffect(() => setSearch(query.search), [query.search]);
 
-  const go = (next: DashboardQuery) => router.replace(dashboardListHref(next));
+  const go = (next: DashboardQuery) => router.replace(dashboardListHref(next, defaults));
 
   return (
     <div className="mb-4 flex flex-col gap-3">
@@ -84,11 +88,25 @@ export function DashboardListControls({
             collapse
             title="Clear filters"
             className="shrink-0"
-            onClick={() => go({ ...query, search: "", tags: [], page: 1 })}
+            onClick={() =>
+              go({ ...query, search: "", tags: [], favorites: false, page: 1 })
+            }
           >
             <X className="h-4 w-4" /> <ButtonLabel>Clear</ButtonLabel>
           </Button>
         )}
+        <Button
+          variant={query.favorites ? "secondary" : "ghost"}
+          size="sm"
+          collapse
+          aria-pressed={query.favorites}
+          title="Show only starred dashboards"
+          className="shrink-0"
+          onClick={() => go({ ...query, favorites: !query.favorites, page: 1 })}
+        >
+          <Star className={cn("h-4 w-4", query.favorites && "fill-current")} />{" "}
+          <ButtonLabel>Favorites</ButtonLabel>
+        </Button>
         <Label htmlFor="dashboard-sort" className="sr-only">
           Sort dashboards
         </Label>

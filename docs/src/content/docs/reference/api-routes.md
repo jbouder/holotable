@@ -79,6 +79,7 @@ hand.
 | Route | Method | Min role | Notes |
 | --- | --- | --- | --- |
 | `/api/me` | GET | signed in | The caller's own subject, display name, email, platform-admin flag and workspace roles, all from the session. No parameters, so it can only describe the identity that asked. The name and email are display-only and never reach `can()` |
+| `/api/me/preferences` | GET / PATCH | signed in | The caller's own preferences: time zone, clock, start page and dashboard list defaults. PATCH merges a partial object; an unknown key or an invalid value is a 400 naming the field, and a start dashboard must be one the caller can view. No subject parameter, so nobody reads or writes another person's row |
 
 ## Auth
 
