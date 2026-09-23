@@ -12,7 +12,7 @@ import {
   summarizeTemplate,
   templateSourceIds,
 } from "@/lib/templates";
-import { Button } from "@/components/ui/button";
+import { Button, ButtonLabel } from "@/components/ui/button";
 import { Dialog } from "@/components/ui/dialog";
 import { Input, Label, Textarea } from "@/components/ui/input";
 import { ErrorDisplay } from "@/components/ui/error-display";
@@ -34,24 +34,28 @@ import { ErrorDisplay } from "@/components/ui/error-display";
  * editing the panel afterwards does not change the template, and applying the
  * template later does not touch the panel it came from.
  */
-export function SaveAsTemplate({
-  workspaceId,
-  subject,
-  defaultName,
-  disabled,
-  label = "Save as template",
-  size = "sm",
-  variant = "secondary",
-}: {
+type SaveAsTemplateOptions = {
   workspaceId: string;
   /** The live panel or dashboard; read when the dialog opens. */
   subject: { kind: "panel"; panel: Panel } | { kind: "dashboard"; dashboard: Dashboard };
   defaultName: string;
-  disabled?: boolean;
-  label?: string;
-  size?: "sm" | "md";
-  variant?: "secondary" | "ghost";
-}) {
+};
+
+/**
+ * The dialog and its state, without a trigger, for a caller that opens it from
+ * somewhere other than the stock button — an overflow menu item, say. Render
+ * `dialog` outside anything that unmounts when it closes (a menu popup does),
+ * or the dialog goes with it.
+ */
+export function useSaveAsTemplate({
+  workspaceId,
+  subject,
+  defaultName,
+}: SaveAsTemplateOptions): {
+  openDialog: () => void;
+  saved: string | null;
+  dialog: React.ReactNode;
+} {
   const [open, setOpen] = React.useState(false);
   const [snapshot, setSnapshot] = React.useState<TemplateBody | null>(null);
   const [name, setName] = React.useState(defaultName);
@@ -107,76 +111,118 @@ export function SaveAsTemplate({
   const kindWord = subject.kind;
   const sourceCount = snapshot ? templateSourceIds(snapshot).length : 0;
 
+  const dialog = (
+    <Dialog
+      open={open}
+      onOpenChange={setOpen}
+      title={`Save this ${kindWord} as a template`}
+      className="max-w-lg"
+    >
+      <div className="space-y-4">
+        <p className="text-sm text-muted">
+          The spec is copied as it stands now. Applying it later re-points it at a source
+          you pick and re-checks the SQL against that source&rsquo;s catalog — nothing is
+          linked back to this {kindWord}.
+        </p>
+
+        <div>
+          <Label htmlFor="template-name">Name</Label>
+          <Input
+            id="template-name"
+            value={name}
+            maxLength={200}
+            onChange={(e) => setName(e.target.value)}
+          />
+        </div>
+
+        <div>
+          <Label htmlFor="template-description">Description (optional)</Label>
+          <Textarea
+            id="template-description"
+            rows={2}
+            maxLength={500}
+            placeholder="What this is for, and what to point it at"
+            value={description}
+            onChange={(e) => setDescription(e.target.value)}
+          />
+        </div>
+
+        {snapshot && (
+          <p className="text-xs text-muted">
+            {summarizeTemplate(snapshot)} · {sourceCount}{" "}
+            {sourceCount === 1 ? "source" : "sources"} referenced · saved to workspace{" "}
+            <code>{workspaceId}</code>
+          </p>
+        )}
+
+        {error && <ErrorDisplay error={error} />}
+
+        <div className="flex justify-end gap-2">
+          <Button variant="ghost" onClick={() => setOpen(false)} disabled={saving}>
+            Cancel
+          </Button>
+          <Button
+            onClick={() => void submit()}
+            disabled={saving || !snapshot || !name.trim()}
+          >
+            {saving ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <BookmarkPlus className="h-4 w-4" />
+            )}
+            Save template
+          </Button>
+        </div>
+      </div>
+    </Dialog>
+  );
+
+  return { openDialog, saved, dialog };
+}
+
+export function SaveAsTemplate({
+  workspaceId,
+  subject,
+  defaultName,
+  disabled,
+  label = "Save as template",
+  collapse = false,
+  size = "sm",
+  variant = "secondary",
+}: SaveAsTemplateOptions & {
+  disabled?: boolean;
+  label?: string;
+  /** Collapse the trigger to its icon below `sm` (see `Button`'s `collapse`). */
+  collapse?: boolean;
+  size?: "sm" | "md";
+  variant?: "secondary" | "ghost";
+}) {
+  const { openDialog, saved, dialog } = useSaveAsTemplate({
+    workspaceId,
+    subject,
+    defaultName,
+  });
+
   return (
     <>
-      <Button variant={variant} size={size} onClick={openDialog} disabled={disabled}>
-        {saved ? <Check className="h-4 w-4" /> : <BookmarkPlus className="h-4 w-4" />}
-        {saved ? "Saved as template" : label}
-      </Button>
-
-      <Dialog
-        open={open}
-        onOpenChange={setOpen}
-        title={`Save this ${kindWord} as a template`}
-        className="max-w-lg"
+      <Button
+        variant={variant}
+        size={size}
+        collapse={collapse}
+        title={collapse ? label : undefined}
+        onClick={openDialog}
+        disabled={disabled}
       >
-        <div className="space-y-4">
-          <p className="text-sm text-muted">
-            The spec is copied as it stands now. Applying it later re-points it at a
-            source you pick and re-checks the SQL against that source&rsquo;s catalog —
-            nothing is linked back to this {kindWord}.
-          </p>
-
-          <div>
-            <Label htmlFor="template-name">Name</Label>
-            <Input
-              id="template-name"
-              value={name}
-              maxLength={200}
-              onChange={(e) => setName(e.target.value)}
-            />
-          </div>
-
-          <div>
-            <Label htmlFor="template-description">Description (optional)</Label>
-            <Textarea
-              id="template-description"
-              rows={2}
-              maxLength={500}
-              placeholder="What this is for, and what to point it at"
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-            />
-          </div>
-
-          {snapshot && (
-            <p className="text-xs text-muted">
-              {summarizeTemplate(snapshot)} · {sourceCount}{" "}
-              {sourceCount === 1 ? "source" : "sources"} referenced · saved to workspace{" "}
-              <code>{workspaceId}</code>
-            </p>
-          )}
-
-          {error && <ErrorDisplay error={error} />}
-
-          <div className="flex justify-end gap-2">
-            <Button variant="ghost" onClick={() => setOpen(false)} disabled={saving}>
-              Cancel
-            </Button>
-            <Button
-              onClick={() => void submit()}
-              disabled={saving || !snapshot || !name.trim()}
-            >
-              {saving ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : (
-                <BookmarkPlus className="h-4 w-4" />
-              )}
-              Save template
-            </Button>
-          </div>
-        </div>
-      </Dialog>
+        {saved ? <Check className="h-4 w-4" /> : <BookmarkPlus className="h-4 w-4" />}
+        {collapse ? (
+          <ButtonLabel>{saved ? "Saved as template" : label}</ButtonLabel>
+        ) : saved ? (
+          "Saved as template"
+        ) : (
+          label
+        )}
+      </Button>
+      {dialog}
     </>
   );
 }

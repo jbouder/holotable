@@ -109,10 +109,7 @@ export function ImpactList({ impact }: { impact: SourceImpact }) {
   return (
     <ul className="space-y-3">
       {impact.dashboards.map((dashboard) => (
-        <li
-          key={dashboard.id}
-          className="rounded-lg border border-border bg-surface-2 p-3"
-        >
+        <li key={dashboard.id} className="border border-border bg-surface-2 p-3">
           <Link
             href={`/dashboards/${dashboard.id}`}
             className="text-sm font-medium underline-offset-4 hover:underline"

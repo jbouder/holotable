@@ -37,7 +37,7 @@ export function SourceTestReport({
     <section
       aria-label={`Test result for ${sourceName}`}
       className={cn(
-        "rounded-lg border bg-surface p-3 text-sm",
+        "border bg-surface p-3 text-sm",
         finding ? "border-warning/50" : "border-success/40",
       )}
     >
@@ -58,7 +58,7 @@ export function SourceTestReport({
           type="button"
           onClick={onDismiss}
           aria-label="Dismiss test result"
-          className="inline-flex h-6 w-6 shrink-0 cursor-pointer items-center justify-center rounded text-muted transition-colors hover:bg-surface-2 hover:text-foreground focus-visible:outline-2 focus-visible:outline-primary"
+          className="inline-flex h-6 w-6 shrink-0 cursor-pointer items-center justify-center text-muted transition-colors hover:bg-surface-2 hover:text-foreground focus-visible:outline-2 focus-visible:outline-primary"
         >
           <X className="h-4 w-4" />
         </button>
@@ -135,7 +135,7 @@ function ReadOnlyVerdictRow({ result }: { result: SourceTestResult }) {
   return (
     <div
       className={cn(
-        "mb-2 flex items-start gap-2 rounded-md border px-2 py-1.5 text-xs",
+        "mb-2 flex items-start gap-2 border px-2 py-1.5 text-xs",
         TONE_STYLES[tone],
       )}
     >

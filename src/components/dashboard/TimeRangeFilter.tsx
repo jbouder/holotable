@@ -56,7 +56,7 @@ export function TimeRangeFilter({
 
   return (
     <div className="flex items-center gap-1">
-      <div className="flex items-center rounded-lg border border-border bg-surface p-1">
+      <div className="flex items-center border border-border bg-surface p-1">
         <IconButton
           label="Shift back one window"
           onClick={() => onChange(shiftRange(value, -1))}
@@ -113,7 +113,7 @@ function FixedRangeBadge({
   onChange: (range: TimeRange) => void;
 }) {
   return (
-    <span className="inline-flex items-center gap-1 rounded-full bg-warning/15 py-0.5 pl-2 pr-1 text-xs font-medium text-warning">
+    <span className="inline-flex items-center gap-1 bg-warning/15 py-0.5 pl-2 pr-1 text-xs font-medium text-warning">
       Fixed range
       <Button
         variant="ghost"
@@ -231,7 +231,7 @@ function RangeForm({
             onChange={(e) => setAmount(e.target.value)}
           />
           <fieldset
-            className="flex items-center gap-0.5 rounded-lg border border-border p-0.5"
+            className="flex items-center gap-0.5 border border-border p-0.5"
             aria-label="Unit"
           >
             {UNIT_CHOICES.map((choice) => (

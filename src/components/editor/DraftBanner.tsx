@@ -31,7 +31,7 @@ export function DraftBanner({
 
   return (
     <div
-      className={`flex flex-wrap items-center justify-between gap-3 rounded-lg border px-3 py-2 text-sm ${
+      className={`flex flex-wrap items-center justify-between gap-3 border px-3 py-2 text-sm ${
         conflict ? "border-warning/40 bg-warning/10" : "border-border bg-surface-2"
       }`}
     >

@@ -18,7 +18,7 @@ import { type CatalogHealth, describeCatalogHealth } from "@/lib/catalog/health"
 import { CatalogHealthBadge } from "@/components/sources/catalog-health";
 import { SourceTestReport } from "@/components/sources/SourceTestReport";
 import type { SourceTestResult } from "@/lib/source-test";
-import { Button } from "@/components/ui/button";
+import { Button, ButtonLabel } from "@/components/ui/button";
 import { Textarea, Label } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
@@ -205,19 +205,21 @@ export function SourcesClient({
               accessible workspace. Restore this to switch workspaces. */}
           {sources !== null && (
             <Button
+              collapse
+              title="Add source"
               onClick={() => {
                 setNotice(null);
                 setCreating(true);
               }}
             >
-              <Plus className="h-4 w-4" /> Add source
+              <Plus className="h-4 w-4" /> <ButtonLabel>Add source</ButtonLabel>
             </Button>
           )}
         </div>
       </div>
 
       {notice && (
-        <div className="rounded-lg border border-border bg-surface px-3 py-2 text-sm text-muted">
+        <div className="border border-border bg-surface px-3 py-2 text-sm text-muted">
           {notice}
         </div>
       )}
@@ -237,7 +239,7 @@ export function SourcesClient({
         source becomes queryable.
       */}
       {nothingQueryable && (
-        <div className="rounded-lg border border-warning/40 bg-surface px-3 py-2 text-sm text-muted">
+        <div className="border border-warning/40 bg-surface px-3 py-2 text-sm text-muted">
           Next: press <span className="text-foreground">Test</span> to check the
           credentials resolve, then <span className="text-foreground">Refresh</span> to
           read the tables and columns. Until a refresh has run, generating against this
@@ -565,7 +567,7 @@ function NaturalLanguageDrafter({
             disabled={isLoading}
             onClick={() => setDescription(preset)}
             title={preset}
-            className="max-w-full truncate rounded-full border border-border bg-surface px-3 py-1 text-xs text-muted transition-colors hover:border-primary hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50"
+            className="max-w-full truncate border border-border bg-surface px-3 py-1 text-xs text-muted transition-colors hover:border-primary hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50"
           >
             {preset}
           </button>
@@ -620,7 +622,7 @@ function NaturalLanguageDrafter({
         />
       )}
       {isLoading && object && (
-        <pre className="max-h-40 overflow-auto rounded-lg border border-border bg-surface p-3 text-xs text-muted">
+        <pre className="max-h-40 overflow-auto border border-border bg-surface p-3 text-xs text-muted">
           {JSON.stringify(object, null, 2)}
         </pre>
       )}

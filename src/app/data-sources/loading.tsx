@@ -10,7 +10,7 @@ export default function Loading() {
       </div>
       <div className="space-y-3">
         {[0, 1, 2].map((i) => (
-          <Skeleton key={i} className="h-24 rounded-lg" />
+          <Skeleton key={i} className="h-24" />
         ))}
       </div>
       <span role="status" className="sr-only">

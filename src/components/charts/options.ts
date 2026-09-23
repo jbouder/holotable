@@ -81,7 +81,7 @@ function seriesKeys(panel: Panel, data: PanelData): string[] {
 const BASE: EChartsOption = {
   color: palette,
   grid: { left: 44, right: 16, top: 24, bottom: 28 },
-  tooltip: { trigger: "axis" },
+  tooltip: { trigger: "axis", borderRadius: 0 },
   legend: { top: 0, textStyle: { color: "#9aa0aa" } },
   backgroundColor: "transparent",
 };
@@ -138,7 +138,7 @@ function buildScatter(data: PanelData): EChartsOption {
   const [x, ...seriesKeys] = numericColumns;
   return {
     ...BASE,
-    tooltip: { trigger: "item" },
+    tooltip: { trigger: "item", borderRadius: 0 },
     xAxis: {
       type: "value",
       name: x,
@@ -173,7 +173,7 @@ function buildPie(panel: Panel, data: PanelData): EChartsOption {
   return {
     color: palette,
     backgroundColor: "transparent",
-    tooltip: { trigger: "item" },
+    tooltip: { trigger: "item", borderRadius: 0 },
     legend: { top: 0, textStyle: { color: "#9aa0aa" } },
     series: [
       {

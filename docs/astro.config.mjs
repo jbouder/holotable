@@ -11,7 +11,7 @@ import starlightLinksValidator from "starlight-links-validator";
  * assets (see wrangler.jsonc), so no SSR adapter is required.
  */
 export default defineConfig({
-  site: process.env.DOCS_SITE_URL || "https://holotable-docs.pages.dev",
+  site: process.env.DOCS_SITE_URL || "https://holotable-docs.beskar.workers.dev",
   output: "static",
   srcDir: "./src",
   publicDir: "./public",

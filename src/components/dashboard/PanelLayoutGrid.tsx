@@ -159,7 +159,7 @@ export function PanelLayoutGrid({
                   onKeyDown={(e) => nudge(e, panel, "move")}
                   onClick={() => onSelect?.(panel.id)}
                   className={cn(
-                    "absolute inset-0 flex touch-none select-none flex-col items-start gap-0.5 overflow-hidden rounded-lg border p-2 text-left transition-colors",
+                    "absolute inset-0 flex touch-none select-none flex-col items-start gap-0.5 overflow-hidden border p-2 text-left transition-colors",
                     active ? "cursor-grabbing" : "cursor-grab",
                     panel.id === selectedId
                       ? "border-primary bg-surface-2"
@@ -181,7 +181,7 @@ export function PanelLayoutGrid({
                   onPointerUp={(e) => end(e, true)}
                   onPointerCancel={(e) => end(e, false)}
                   onKeyDown={(e) => nudge(e, panel, "resize")}
-                  className="absolute bottom-0 right-0 h-4 w-4 cursor-se-resize touch-none rounded-br-lg border-b-2 border-r-2 border-muted hover:border-primary"
+                  className="absolute bottom-0 right-0 h-4 w-4 cursor-se-resize touch-none border-b-2 border-r-2 border-muted hover:border-primary"
                 />
               </div>
             );

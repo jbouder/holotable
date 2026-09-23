@@ -1,4 +1,4 @@
-import { loadEnvConfig } from "@next/env";
+import "./lib/env";
 import { runStartupChecks } from "@/lib/startup";
 
 /**
@@ -14,7 +14,6 @@ import { runStartupChecks } from "@/lib/startup";
  */
 async function main(): Promise<number> {
   const production = process.env.NODE_ENV === "production";
-  loadEnvConfig(process.cwd(), !production);
 
   const result = await runStartupChecks({ production });
   if (result.report) {

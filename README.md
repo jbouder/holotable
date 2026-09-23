@@ -118,7 +118,7 @@ the release instead of rolling out code against a schema it cannot use. Keep
 `replicaCount` at 1 until [#40](https://github.com/jbouder/holotable/issues/40)
 makes the poller topology-aware.
 
-See [Deploying on Kubernetes](https://holotable-docs.pages.dev/operations/kubernetes/)
+See [Deploying on Kubernetes](https://holotable-docs.beskar.workers.dev/operations/kubernetes/)
 and the [chart README](deploy/helm/holotable/README.md).
 
 ## Seeding demo data

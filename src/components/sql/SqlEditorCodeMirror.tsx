@@ -80,7 +80,7 @@ const theme = EditorView.theme({
   ".cm-tooltip": {
     backgroundColor: "var(--surface-2)",
     border: "1px solid var(--border)",
-    borderRadius: "calc(var(--radius) - 0.25rem)",
+    borderRadius: "var(--radius)",
     color: "var(--foreground)",
   },
   ".cm-tooltip.cm-tooltip-autocomplete > ul > li[aria-selected]": {

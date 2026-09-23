@@ -11,5 +11,5 @@ import { cn } from "@/lib/utils";
  * "loading" out loud.
  */
 export function Skeleton({ className, ...props }: React.ComponentPropsWithRef<"div">) {
-  return <div aria-hidden className={cn("skeleton rounded-md", className)} {...props} />;
+  return <div aria-hidden className={cn("skeleton", className)} {...props} />;
 }

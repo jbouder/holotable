@@ -1,3 +1,4 @@
+import "./lib/env";
 import { Client } from "pg";
 import {
   isCollected,

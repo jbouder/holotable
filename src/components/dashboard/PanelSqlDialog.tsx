@@ -79,7 +79,7 @@ function PanelSqlBody({ panel, timeRange }: { panel: Panel; timeRange?: TimeRang
         <dd className="truncate font-mono">{details.timeField ?? "—"}</dd>
       </dl>
 
-      <div className="rounded-lg border border-border bg-surface-2">
+      <div className="border border-border bg-surface-2">
         <div className="flex items-center justify-between gap-4 border-b border-border px-3 py-2">
           <span className="text-xs font-medium text-muted">SQL</span>
           <Button onClick={() => void copy()} size="sm" variant="secondary">

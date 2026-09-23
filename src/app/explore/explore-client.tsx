@@ -212,7 +212,7 @@ export function ExploreClient({
                     type="button"
                     disabled={isLoading}
                     onClick={() => setPrompt(example)}
-                    className="rounded-full border border-border bg-surface px-3 py-1 text-xs text-muted transition-colors hover:border-primary hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50"
+                    className="border border-border bg-surface px-3 py-1 text-xs text-muted transition-colors hover:border-primary hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50"
                   >
                     {example}
                   </button>
@@ -347,7 +347,7 @@ function ResultView({
       </div>
 
       {saved && (
-        <p className="flex flex-wrap items-center gap-1 rounded-lg border border-border bg-surface px-4 py-2 text-sm text-muted">
+        <p className="flex flex-wrap items-center gap-1 border border-border bg-surface px-4 py-2 text-sm text-muted">
           Saved as a panel.
           <Link
             href={`/dashboards/${saved.dashboardId}`}
@@ -360,7 +360,7 @@ function ResultView({
 
       <ResultBody panel={panel} result={result} data={data} onRetry={onRetry} />
 
-      <details className="rounded-lg border border-border bg-surface">
+      <details className="border border-border bg-surface">
         <summary className="cursor-pointer px-4 py-2 text-sm text-muted">
           Generated SQL
         </summary>
@@ -404,7 +404,7 @@ function ResultBody({
 
   if (CHART_VIZ.has(panel.viz)) {
     return (
-      <div className="h-96 rounded-lg border border-border bg-surface p-2">
+      <div className="h-96 border border-border bg-surface p-2">
         <EChart option={buildChartOption(panel, data)} />
       </div>
     );
@@ -423,7 +423,7 @@ function StatView({ panel, data }: { panel: Panel; data: PanelData }) {
     ) ?? data.columns[data.columns.length - 1];
   const value = last?.[valueKey];
   return (
-    <div className="rounded-lg border border-border bg-surface px-6 py-8">
+    <div className="border border-border bg-surface px-6 py-8">
       <div className="text-4xl font-semibold tabular-nums">
         {value === undefined ? "—" : formatValue(value, panel.format)}
       </div>
@@ -436,7 +436,7 @@ function ResultTable({ panel, data }: { panel: Panel; data: PanelData }) {
   const rows = data.rows.slice(0, MAX_TABLE_ROWS);
   return (
     <div className="space-y-2">
-      <div className="max-h-[32rem] overflow-auto rounded-lg border border-border">
+      <div className="max-h-[32rem] overflow-auto border border-border">
         <table className="w-full text-left text-sm">
           <thead className="sticky top-0 bg-surface-2 text-muted">
             <tr>

@@ -24,7 +24,7 @@ export function Dialog({
         <BaseDialog.Backdrop className="fixed inset-0 z-40 bg-black/60" />
         <BaseDialog.Popup
           className={cn(
-            "fixed inset-x-4 top-1/2 z-50 mx-auto max-h-[calc(100vh-2rem)] w-auto max-w-3xl -translate-y-1/2 overflow-y-auto rounded-lg border border-border bg-surface p-4 shadow-xl focus:outline-none sm:p-6",
+            "fixed inset-x-4 top-1/2 z-50 mx-auto max-h-[calc(100vh-2rem)] w-auto max-w-3xl -translate-y-1/2 overflow-y-auto border border-border bg-surface p-4 pt-2 shadow-xl focus:outline-none sm:p-6 sm:pt-3",
             className,
           )}
         >
@@ -32,7 +32,7 @@ export function Dialog({
             <BaseDialog.Title className="text-lg font-semibold">{title}</BaseDialog.Title>
             <BaseDialog.Close
               aria-label="Close dialog"
-              className="inline-flex h-9 w-9 cursor-pointer items-center justify-center rounded-lg text-foreground transition-colors hover:bg-surface-2 focus-visible:outline-2 focus-visible:outline-primary"
+              className="inline-flex h-9 w-9 cursor-pointer items-center justify-center text-foreground transition-colors hover:bg-surface-2 focus-visible:outline-2 focus-visible:outline-primary"
             >
               <X className="h-4 w-4" />
             </BaseDialog.Close>

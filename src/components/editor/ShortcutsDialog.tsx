@@ -48,7 +48,7 @@ export function ShortcutsDialog({
                 >
                   <dt className="text-sm">{shortcut.description}</dt>
                   <dd>
-                    <kbd className="rounded border border-border bg-surface-2 px-2 py-0.5 font-mono text-xs">
+                    <kbd className="border border-border bg-surface-2 px-2 py-0.5 font-mono text-xs">
                       {formatShortcut(shortcut, mac)}
                     </kbd>
                   </dd>

@@ -158,7 +158,7 @@ export function DashboardDetailsDialog({
                   key={tag}
                   type="button"
                   onClick={() => setTags(tags.filter((t) => t !== tag))}
-                  className="inline-flex cursor-pointer items-center gap-1 rounded-full border border-border bg-surface-2 px-2.5 py-0.5 text-xs text-foreground transition-colors hover:border-danger/50 hover:text-danger"
+                  className="inline-flex cursor-pointer items-center gap-1 border border-border bg-surface-2 px-2.5 py-0.5 text-xs text-foreground transition-colors hover:border-danger/50 hover:text-danger"
                 >
                   {tag}
                   <X className="h-3 w-3" aria-hidden />
@@ -198,7 +198,7 @@ export function DashboardDetailsDialog({
                   type="button"
                   onClick={() => addTags(tag)}
                   disabled={tags.length >= MAX_TAGS}
-                  className="cursor-pointer rounded-full border border-border px-2.5 py-0.5 text-xs text-muted transition-colors hover:border-primary/50 hover:text-foreground disabled:cursor-not-allowed disabled:opacity-40"
+                  className="cursor-pointer border border-border px-2.5 py-0.5 text-xs text-muted transition-colors hover:border-primary/50 hover:text-foreground disabled:cursor-not-allowed disabled:opacity-40"
                 >
                   {tag}
                 </button>

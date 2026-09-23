@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { Download, LayoutTemplate, Pencil, Tag } from "lucide-react";
+import { LayoutTemplate, Pencil, Tag } from "lucide-react";
 import { getIdentity } from "@/lib/auth/authorize";
 import { can } from "@/lib/auth/authorize";
 import { getDashboardById } from "@/lib/db/repo";
@@ -8,10 +8,9 @@ import { config } from "@/lib/config";
 import { SignIn } from "@/components/sign-in";
 import { LiveDashboard } from "@/components/dashboard/LiveDashboard";
 import { DashboardChat } from "@/components/dashboard/DashboardChat";
-import { DeleteDashboardButton } from "@/components/dashboard/delete-dashboard-button";
+import { DashboardActionsMenu } from "@/components/dashboard/dashboard-actions-menu";
 import { RecordDashboardVisit } from "@/components/dashboard/RecordDashboardVisit";
-import { SaveAsTemplate } from "@/components/templates/SaveAsTemplate";
-import { Button } from "@/components/ui/button";
+import { Button, ButtonLabel } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
 import { dashboardListHref, EMPTY_QUERY } from "@/lib/dashboard-list";
 import { chatSuggestions } from "@/lib/chat-history";
@@ -79,36 +78,47 @@ export default async function DashboardViewPage({
             }
             action={
               canEdit ? (
-                <Link href={`/dashboards/${id}/edit`}>
+                <Link key="edit" href={`/dashboards/${id}/edit`}>
                   <Button>Add a panel</Button>
                 </Link>
               ) : undefined
             }
           />
         }
+        // `header` and `actions` are keyed child by child although no child is
+        // mapped. Both cross into the client component `LiveDashboard`, and
+        // the RSC client can stream an element that references a client
+        // component (`Link`, `Button`) as a lazy chunk; its "keys already
+        // checked" flag lands on the element only once that chunk resolves,
+        // so on some cold loads React sees an unkeyed child in a list and
+        // warns. A real key makes the check pass whichever arrives first.
         header={
           <div>
-            <h1 className="text-2xl font-semibold">{dashboard.spec.title}</h1>
+            <h1 key="title" className="text-2xl font-semibold">
+              {dashboard.spec.title}
+            </h1>
             {/*
               The description is row metadata (#119), so it sits beside the
               title rather than in the spec line below it — that line describes
               what the server is executing, and prose is not part of that.
             */}
             {dashboard.description && (
-              <p className="mt-1 max-w-3xl text-sm text-muted">{dashboard.description}</p>
+              <p key="description" className="mt-1 max-w-3xl text-sm text-muted">
+                {dashboard.description}
+              </p>
             )}
-            <p className="mt-1 text-xs text-muted">
+            <p key="meta" className="mt-1 text-xs text-muted">
               {dashboard.workspaceId} · v{dashboard.version} · refresh{" "}
               {Math.round(dashboard.spec.refreshIntervalMs / 1000)}s ·{" "}
               {dashboard.spec.timeRange.from} → {dashboard.spec.timeRange.to}
             </p>
             {dashboard.tags.length > 0 && (
-              <div className="mt-2 flex flex-wrap gap-1">
+              <div key="tags" className="mt-2 flex flex-wrap gap-1">
                 {dashboard.tags.map((tag) => (
                   <Link
                     key={tag}
                     href={dashboardListHref({ ...EMPTY_QUERY, tags: [tag] })}
-                    className="inline-flex items-center gap-1 rounded-full border border-border px-2 py-0.5 text-[11px] text-muted transition-colors hover:border-primary/50 hover:text-foreground focus-visible:outline-2 focus-visible:outline-primary"
+                    className="inline-flex items-center gap-1 border border-border px-2 py-0.5 text-[11px] text-muted transition-colors hover:border-primary/50 hover:text-foreground focus-visible:outline-2 focus-visible:outline-primary"
                   >
                     <Tag className="h-2.5 w-2.5" aria-hidden /> {tag}
                   </Link>
@@ -119,42 +129,28 @@ export default async function DashboardViewPage({
         }
         actions={
           <>
-            {/*
-              A plain link, not a button with a fetch behind it: the route
-              answers with a `Content-Disposition`, so the browser saves the
-              file itself and this page ships no JavaScript for it.
-            */}
-            <a href={`/api/dashboards/${id}/export`} download>
-              <Button
-                variant="ghost"
-                size="sm"
-                className="text-muted hover:text-foreground"
-              >
-                <Download className="h-4 w-4" /> Export
-              </Button>
-            </a>
-            {canSaveTemplate && (
-              <SaveAsTemplate
-                workspaceId={dashboard.workspaceId}
-                defaultName={dashboard.spec.title}
-                subject={{ kind: "dashboard", dashboard: dashboard.spec }}
-                variant="ghost"
-              />
-            )}
             {canEdit && (
-              <Link href={`/dashboards/${id}/edit`}>
+              <Link key="edit" href={`/dashboards/${id}/edit`}>
                 <Button
                   variant="ghost"
                   size="sm"
+                  collapse
+                  title="Edit"
                   className="text-muted hover:text-foreground"
                 >
-                  <Pencil className="h-4 w-4" /> Edit
+                  <Pencil className="h-4 w-4" /> <ButtonLabel>Edit</ButtonLabel>
                 </Button>
               </Link>
             )}
-            {canDelete && (
-              <DeleteDashboardButton dashboardId={id} title={dashboard.spec.title} />
-            )}
+            <DashboardActionsMenu
+              key="more"
+              dashboardId={id}
+              title={dashboard.spec.title}
+              workspaceId={dashboard.workspaceId}
+              spec={dashboard.spec}
+              canSaveTemplate={canSaveTemplate}
+              canDelete={canDelete}
+            />
           </>
         }
       />

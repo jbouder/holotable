@@ -1,3 +1,4 @@
+import "./lib/env";
 import { getDashboardById, getSourceById, listDashboards } from "@/lib/db/repo";
 import type { Panel } from "@/lib/ir";
 import {

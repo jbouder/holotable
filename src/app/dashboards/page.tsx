@@ -16,11 +16,7 @@ import {
 } from "@/lib/dashboard-list";
 import { catalogHealth } from "@/lib/catalog/health";
 import { onboardingState } from "@/lib/onboarding";
-import {
-  HOW_IT_WORKS_DISMISSED_COOKIE,
-  isDismissed,
-  SETUP_DISMISSED_COOKIE,
-} from "@/lib/dismissals";
+import { isDismissed, SETUP_DISMISSED_COOKIE } from "@/lib/dismissals";
 import type { ImportTarget } from "@/lib/dashboard-export";
 import { SignIn } from "@/components/sign-in";
 import { FirstRun } from "@/components/onboarding/first-run";
@@ -28,7 +24,7 @@ import { DashboardCard } from "@/components/dashboard/DashboardCard";
 import { DashboardListControls } from "@/components/dashboard/DashboardListControls";
 import { RecentDashboards } from "@/components/dashboard/RecentDashboards";
 import { ImportDashboard } from "./import-dashboard";
-import { Button } from "@/components/ui/button";
+import { Button, ButtonLabel } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
 
 export const dynamic = "force-dynamic";
@@ -128,8 +124,9 @@ export default async function DashboardsPage({
           <div className="flex items-center gap-2">
             <ImportDashboard targets={importTargets} />
             <Link href="/dashboards/new">
-              <Button>
-                <Plus className="h-4 w-4" /> New dashboard
+              <Button collapse title="Create New Dashboard">
+                <Plus className="h-4 w-4" />{" "}
+                <ButtonLabel>Create New Dashboard</ButtonLabel>
               </Button>
             </Link>
           </div>
@@ -245,15 +242,13 @@ function PagerLink({
 }) {
   if (disabled) {
     return (
-      <span className="rounded-lg border border-border px-3 py-1.5 opacity-40">
-        {children}
-      </span>
+      <span className="border border-border px-3 py-1.5 opacity-40">{children}</span>
     );
   }
   return (
     <Link
       href={href}
-      className="rounded-lg border border-border px-3 py-1.5 text-foreground transition-colors hover:border-foreground/40 focus-visible:outline-2 focus-visible:outline-primary"
+      className="border border-border px-3 py-1.5 text-foreground transition-colors hover:border-foreground/40 focus-visible:outline-2 focus-visible:outline-primary"
     >
       {children}
     </Link>
@@ -306,7 +301,6 @@ async function FirstRunSection({
     <FirstRun
       state={state}
       dismissed={isDismissed(jar.get(SETUP_DISMISSED_COOKIE)?.value)}
-      howItWorksDismissed={isDismissed(jar.get(HOW_IT_WORKS_DISMISSED_COOKIE)?.value)}
     />
   );
 }

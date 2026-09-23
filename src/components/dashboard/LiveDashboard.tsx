@@ -10,7 +10,9 @@ import { ErrorDisplay } from "@/components/ui/error-display";
 import type { ApiError } from "@/lib/errors";
 import { ConnectionIndicator } from "@/components/dashboard/ConnectionIndicator";
 import type { PanelData } from "@/components/charts/options";
+import { NavPortal } from "@/components/nav-slot";
 import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 import { TimeRangeFilter } from "@/components/dashboard/TimeRangeFilter";
 import {
   type ConnectionSignal,
@@ -237,35 +239,53 @@ export function LiveDashboard({
     setLive(!live);
   }
 
+  // Rendered in two places — the top bar from `lg`, the page body below it —
+  // and only one is ever displayed, so the hidden copy is out of the
+  // accessibility tree and its live region never announces.
+  const streamControls = (
+    <>
+      <ConnectionIndicator
+        status={connection}
+        onReconnect={() => setReconnectNonce((n) => n + 1)}
+      />
+      <Button
+        variant="ghost"
+        size="icon"
+        aria-pressed={!live}
+        aria-label={live ? "Pause live updates" : "Resume live updates"}
+        title={live ? "Pause live updates" : "Resume live updates"}
+        className={cn(
+          "h-8 w-8",
+          // Paused is a state worth noticing — the numbers on screen have
+          // stopped moving — so it takes the warning tone the time picker
+          // uses for a fixed window.
+          live ? "text-muted hover:text-foreground" : "text-warning hover:text-warning",
+        )}
+        onClick={togglePause}
+      >
+        {live ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4 fill-current" />}
+      </Button>
+      <TimeRangeFilter value={timeRange} onChange={setTimeRange} />
+    </>
+  );
+
   return (
     <div>
-      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-        {header}
+      <div className="mb-4 space-y-3">
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0">{header}</div>
+          {actions && <div className="flex shrink-0 items-center gap-1">{actions}</div>}
+        </div>
         {/*
-          `shrink-0` only from `sm`. Below it the row has to be allowed to
-          shrink, or it sizes to max-content, its own `flex-wrap` never
-          engages, and seven controls push the page sideways (#78).
+          Below `lg` the top bar has no room for the stream controls, so they
+          sit here under the title instead; from `lg` they are portalled into
+          the bar (see `NavSlot`).
         */}
-        <div className="flex flex-wrap items-center gap-2 sm:shrink-0">
-          <ConnectionIndicator
-            status={connection}
-            onReconnect={() => setReconnectNonce((n) => n + 1)}
-          />
-          <TimeRangeFilter value={timeRange} onChange={setTimeRange} />
-          <Button
-            variant="ghost"
-            size="sm"
-            aria-pressed={!live}
-            aria-label={live ? "Pause live updates" : "Resume live updates"}
-            className="text-muted hover:text-foreground"
-            onClick={togglePause}
-          >
-            {live ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
-            {live ? "Pause" : "Resume"}
-          </Button>
-          {actions}
+        <div className="flex flex-wrap items-center gap-2 lg:hidden">
+          {streamControls}
         </div>
       </div>
+      <NavPortal>{streamControls}</NavPortal>
 
       {dashboardError && <ErrorDisplay error={dashboardError} className="mb-4" />}
 

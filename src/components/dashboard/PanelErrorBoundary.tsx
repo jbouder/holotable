@@ -103,7 +103,7 @@ export function PanelRenderErrorCard({
     <Card className="flex h-full flex-col">
       <CardHeader>
         <CardTitle className="min-w-0 truncate">{panel.title}</CardTitle>
-        <span className="shrink-0 rounded-full bg-danger/20 px-2 py-0.5 text-xs font-medium text-danger">
+        <span className="shrink-0 bg-danger/20 px-2 py-0.5 text-xs font-medium text-danger">
           Render error
         </span>
       </CardHeader>

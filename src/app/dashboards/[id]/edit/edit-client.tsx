@@ -34,7 +34,7 @@ import {
 } from "@/lib/panel-list";
 import { isStarterSql, starterPanel } from "@/lib/panel-starter";
 import { clampLayout } from "@/lib/grid-layout";
-import { Button } from "@/components/ui/button";
+import { Button, ButtonLabel } from "@/components/ui/button";
 import { Input, Textarea, Label } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -862,7 +862,7 @@ export function EditDashboardClient({
         return (
           <div
             key={sourceId}
-            className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-warning/40 bg-warning/10 px-3 py-2 text-sm"
+            className="flex flex-wrap items-center justify-between gap-3 border border-warning/40 bg-warning/10 px-3 py-2 text-sm"
           >
             <p className="flex items-start gap-2">
               <Unplug className="mt-0.5 h-4 w-4 shrink-0 text-warning" />
@@ -888,7 +888,7 @@ export function EditDashboardClient({
       })}
 
       <div
-        className="flex w-fit rounded-lg border border-border bg-surface p-1"
+        className="flex w-fit border border-border bg-surface p-1"
         role="tablist"
         aria-label="Dashboard workspace"
       >
@@ -901,7 +901,7 @@ export function EditDashboardClient({
             aria-controls={`edit-dashboard-${tab}-panel`}
             id={`edit-dashboard-${tab}-tab`}
             onClick={() => setActiveTab(tab)}
-            className={`rounded-md px-3 py-1.5 text-sm font-medium capitalize transition-colors ${
+            className={`px-3 py-1.5 text-sm font-medium capitalize transition-colors ${
               activeTab === tab
                 ? "bg-surface-2 text-foreground"
                 : "text-muted hover:text-foreground"
@@ -1017,28 +1017,33 @@ export function EditDashboardClient({
                   <Button
                     variant="secondary"
                     size="sm"
+                    collapse
+                    title="Add a panel from a template"
                     onClick={() => setPicking(true)}
                     disabled={sources.length === 0}
                   >
-                    <LayoutTemplate className="h-4 w-4" /> From template
+                    <LayoutTemplate className="h-4 w-4" />{" "}
+                    <ButtonLabel>From template</ButtonLabel>
                   </Button>
                   <Button
                     variant="secondary"
                     size="sm"
                     onClick={() => addPanel(true)}
                     disabled={sources.length === 0}
+                    collapse
                     title="Add a panel and describe it to the model"
                   >
-                    <Sparkles className="h-4 w-4" /> Describe
+                    <Sparkles className="h-4 w-4" /> <ButtonLabel>Describe</ButtonLabel>
                   </Button>
                   <Button
                     variant="secondary"
                     size="sm"
                     onClick={() => addPanel()}
                     disabled={sources.length === 0}
+                    collapse
                     title={`Add a panel${hint("new-panel")}`}
                   >
-                    <Plus className="h-4 w-4" /> Add
+                    <Plus className="h-4 w-4" /> <ButtonLabel>Add</ButtonLabel>
                   </Button>
                 </div>
               </CardHeader>
@@ -1290,7 +1295,7 @@ function PanelEditor({
   return (
     <div className="space-y-3">
       {sourceMissing && (
-        <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-warning/40 bg-warning/10 px-3 py-2 text-sm">
+        <div className="flex flex-wrap items-center justify-between gap-2 border border-warning/40 bg-warning/10 px-3 py-2 text-sm">
           <span>This panel&rsquo;s data source has been removed.</span>
           <Button variant="secondary" size="sm" onClick={onRepoint}>
             Re-point to another source

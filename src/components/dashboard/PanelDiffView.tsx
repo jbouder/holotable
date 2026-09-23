@@ -45,15 +45,13 @@ function FieldRow({
       <span className="text-muted">{label}</span>
       {changed ? (
         <span className="flex flex-wrap items-center gap-1.5">
-          <span className="rounded bg-danger/10 px-1.5 py-0.5 text-muted line-through decoration-danger/40">
+          <span className="bg-danger/10 px-1.5 py-0.5 text-muted line-through decoration-danger/40">
             {before}
           </span>
           <span aria-hidden="true" className="text-muted">
             →
           </span>
-          <span className="rounded bg-success/10 px-1.5 py-0.5 text-foreground">
-            {after}
-          </span>
+          <span className="bg-success/10 px-1.5 py-0.5 text-foreground">{after}</span>
         </span>
       ) : (
         <span className="text-foreground">{before}</span>
@@ -85,7 +83,7 @@ export function PanelDiffView({
   const changed = diff.fields.filter((f) => f.changed);
 
   return (
-    <div className="space-y-3 rounded-lg border border-border bg-surface p-3">
+    <div className="space-y-3 border border-border bg-surface p-3">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="flex items-center gap-2">
           <Label className="mb-0">
@@ -181,7 +179,7 @@ export function PanelDiffView({
             <span>unchanged</span>
           )}
         </div>
-        <pre className="max-h-72 overflow-auto rounded border border-border bg-background p-2 font-mono text-xs leading-relaxed">
+        <pre className="max-h-72 overflow-auto border border-border bg-background p-2 font-mono text-xs leading-relaxed">
           {diff.sql.lines.map((line, i) => (
             <div
               // Line numbers repeat across kinds, so position is the only

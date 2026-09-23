@@ -380,7 +380,7 @@ export function SourceForm({
             {errors.tables && <p className="text-xs text-danger">{errors.tables}</p>}
 
             {rows.length === 0 ? (
-              <p className="rounded-lg border border-dashed border-border px-3 py-6 text-center text-sm text-muted">
+              <p className="border border-dashed border-border px-3 py-6 text-center text-sm text-muted">
                 {menu.ran
                   ? `No tables visible to ${secretRef} in schema ${form.schema}.`
                   : "Fill in the connection, then discover the tables this source may read."}
@@ -489,7 +489,7 @@ function TableRowItem({
   const options = timeFieldOptions(table);
 
   return (
-    <li className="rounded-lg border border-border bg-surface px-3 py-2">
+    <li className="border border-border bg-surface px-3 py-2">
       <div className="flex items-center justify-between gap-3">
         <Checkbox
           checked={selected}

@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { Search, X } from "lucide-react";
 import { Input, Label } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
-import { Button } from "@/components/ui/button";
+import { Button, ButtonLabel } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import {
   type DashboardQuery,
@@ -57,8 +57,14 @@ export function DashboardListControls({
 
   return (
     <div className="mb-4 flex flex-col gap-3">
-      <div className="flex flex-wrap items-center gap-2">
-        <div className="relative min-w-56 flex-1">
+      {/*
+        One row at every width. The search takes whatever the controls leave
+        and the sort control sits at the right edge; on a phone the search
+        shrinks instead of the sort wrapping below it (`min-w-0` lets the
+        input go narrower than its intrinsic width).
+      */}
+      <div className="flex items-center gap-2">
+        <div className="relative min-w-0 flex-1">
           <Search
             className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted"
             aria-hidden
@@ -71,26 +77,30 @@ export function DashboardListControls({
             onChange={(e) => setSearch(e.target.value)}
           />
         </div>
+        {isFiltered(query) && (
+          <Button
+            variant="ghost"
+            size="sm"
+            collapse
+            title="Clear filters"
+            className="shrink-0"
+            onClick={() => go({ ...query, search: "", tags: [], page: 1 })}
+          >
+            <X className="h-4 w-4" /> <ButtonLabel>Clear</ButtonLabel>
+          </Button>
+        )}
         <Label htmlFor="dashboard-sort" className="sr-only">
           Sort dashboards
         </Label>
         <Select
           id="dashboard-sort"
+          className="shrink-0"
           value={query.sort}
           options={SORTS}
           onValueChange={(value) =>
             go({ ...query, sort: value as DashboardSort, page: 1 })
           }
         />
-        {isFiltered(query) && (
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => go({ ...query, search: "", tags: [], page: 1 })}
-          >
-            <X className="h-4 w-4" /> Clear
-          </Button>
-        )}
       </div>
 
       {tags.length > 0 && (
@@ -104,7 +114,7 @@ export function DashboardListControls({
                 aria-pressed={active}
                 onClick={() => go(toggleTag(query, tag))}
                 className={cn(
-                  "inline-flex cursor-pointer items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-xs transition-colors focus-visible:outline-2 focus-visible:outline-primary",
+                  "inline-flex cursor-pointer items-center gap-1.5 border px-2.5 py-0.5 text-xs transition-colors focus-visible:outline-2 focus-visible:outline-primary",
                   active
                     ? "border-primary/60 bg-primary/10 text-foreground"
                     : "border-border text-muted hover:border-foreground/40 hover:text-foreground",
