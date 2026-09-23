@@ -7,8 +7,11 @@ import {
   streamDashboardRefinement,
   streamPanel,
   streamExplorePanel,
+  type OnGenerationFinish,
 } from "@/lib/ai/generate";
 import { catalogHealth, catalogRefusal } from "@/lib/catalog/health";
+import { recordGeneration } from "@/lib/ai/log";
+import { buildCatalogPrompt } from "@/lib/timescaledb/catalog";
 import { enforceLlmLimits } from "@/lib/limits/llm";
 import { Dashboard, Panel } from "@/lib/ir";
 
@@ -74,23 +77,42 @@ export const POST = route("generate", async (req: Request) => {
     workspaceId: source.workspaceId,
     route: "generate",
   });
-  const onUsage = usage.record;
+
+  // What the model is about to be shown, so the log can say which catalog was
+  // in context without keeping the text. Built here rather than handed back by
+  // the stream: it is a pure function of the same trusted source record.
+  const catalog = buildCatalogPrompt(source);
+  const onFinish: OnGenerationFinish = (event) => {
+    usage.record(event.usage);
+    recordGeneration({
+      workspaceId: source.workspaceId,
+      createdBy: identity.sub,
+      mode: body.mode,
+      sourceId: source.id,
+      prompt: body.prompt,
+      catalog,
+      spec: event.object,
+      model: event.modelId,
+      usage: event.usage,
+      error: event.error,
+    });
+  };
 
   // A ternary rather than `let result` + if/else: the latter gives `result`
   // an implicit `any`, which loses the streamObject result type here.
   const result =
     body.mode === "dashboard"
-      ? streamDashboard({ source, prompt: body.prompt, onUsage })
+      ? streamDashboard({ source, prompt: body.prompt, onFinish })
       : body.mode === "dashboard-refine"
         ? streamDashboardRefinement({
             source,
             prompt: body.prompt,
             current: body.current,
-            onUsage,
+            onFinish,
           })
         : body.mode === "explore"
-          ? streamExplorePanel({ source, prompt: body.prompt, onUsage })
-          : streamPanel({ source, prompt: body.prompt, current: body.current, onUsage });
+          ? streamExplorePanel({ source, prompt: body.prompt, onFinish })
+          : streamPanel({ source, prompt: body.prompt, current: body.current, onFinish });
 
   return result.toTextStreamResponse();
 });

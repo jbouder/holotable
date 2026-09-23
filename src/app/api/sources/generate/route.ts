@@ -1,7 +1,8 @@
 import { z } from "zod";
 import { requireIdentity, assertAuthorized } from "@/lib/auth/authorize";
 import { readJson, route } from "@/lib/http";
-import { streamSourceDraft } from "@/lib/ai/generate";
+import { type OnGenerationFinish, streamSourceDraft } from "@/lib/ai/generate";
+import { recordGeneration } from "@/lib/ai/log";
 import { enforceLlmLimits } from "@/lib/limits/llm";
 
 export const runtime = "nodejs";
@@ -36,6 +37,25 @@ export const POST = route("sources.draft", async (req: Request) => {
     route: "source-draft",
   });
 
-  const result = streamSourceDraft({ prompt: body.prompt, onUsage: usage.record });
+  // A source description is the prompt most likely to contain a pasted
+  // connection string, which is exactly what the log's redaction pass is for.
+  // There is no source yet, so no catalog was in context.
+  const onFinish: OnGenerationFinish = (event) => {
+    usage.record(event.usage);
+    recordGeneration({
+      workspaceId: body.workspaceId,
+      createdBy: identity.sub,
+      mode: "source-draft",
+      sourceId: null,
+      prompt: body.prompt,
+      catalog: null,
+      spec: event.object,
+      model: event.modelId,
+      usage: event.usage,
+      error: event.error,
+    });
+  };
+
+  const result = streamSourceDraft({ prompt: body.prompt, onFinish });
   return result.toTextStreamResponse();
 });

@@ -110,6 +110,16 @@ export const config = {
    */
   chatHistoryRetentionDays: num("CHAT_HISTORY_RETENTION_DAYS", 30),
 
+  /**
+   * How long a `generation_log` row -- the redacted prompt, the spec the model
+   * returned, and what it cost -- is kept. The sweep runs on write, so
+   * shortening this takes effect at the next generation in that workspace and
+   * immediately for anyone reading the log. `0` disables the age check and
+   * lets the log grow without bound, which is for an operator shipping the
+   * rows somewhere else. Documented default: 30 days.
+   */
+  generationLogRetentionDays: num("GENERATION_LOG_RETENTION_DAYS", 30),
+
   /** Cookie name used for the session JWT. */
   sessionCookieName: str("SESSION_COOKIE_NAME", "holotable_session"),
 
@@ -314,6 +324,7 @@ const EnvSchema = z.object({
   CATALOG_STALE_AFTER_DAYS: blank(nonNegativeInt),
   CHAT_HISTORY_MAX_MESSAGES: blank(positiveInt),
   CHAT_HISTORY_RETENTION_DAYS: blank(nonNegativeInt),
+  GENERATION_LOG_RETENTION_DAYS: blank(nonNegativeInt),
   SHUTDOWN_GRACE_MS: blank(positiveInt),
 });
 

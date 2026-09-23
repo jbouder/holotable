@@ -85,6 +85,12 @@ Important files:
   log, the per-request `AsyncLocalStorage` context, and the redaction pass
   every payload goes through; a log line never carries a credential, and SQL
   and prompt text is reduced to a digest
+- `src/lib/ai/log.ts` — the generation log: one redacted prompt/spec pair per
+  model call. `redactPrompt` is deliberately more aggressive than the log's
+  `redactString` (it also eats `*_API_KEY`-family assignments and long
+  base64/hex runs), the catalog is kept as a hash rather than as text, and a
+  write that fails is dropped rather than failing the generation. The only
+  reader is `GET /api/generation-log`, behind `source:manage`
 - `src/lib/self-monitoring/` — the committed self-monitoring demo: the
   dashboard spec (also an IR snapshot), the source catalog, and the Prometheus
   text-format parser the collector uses. `test/self-monitoring.test.ts` holds

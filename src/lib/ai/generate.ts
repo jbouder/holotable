@@ -16,10 +16,44 @@ import { SourceDraft, type SourceRecord } from "@/lib/registry";
  */
 
 /**
- * Reports the finished call's token usage. The routes pass the recorder from
- * `enforceLlmLimits` so every call lands in the workspace's budget.
+ * What a finished generation reports back to its route.
+ *
+ * One callback rather than two: the route has to spend the usage against the
+ * workspace's budget AND record the prompt/spec pair (#23), and both want the
+ * same moment. Keeping it to one hook means a new generation path cannot wire
+ * up half of that by accident.
  */
-export type OnUsage = (usage: LanguageModelUsage) => void;
+export interface GenerationFinish {
+  /** The validated object, or undefined when the run produced none. */
+  object: unknown;
+  usage: LanguageModelUsage;
+  /** A schema-validation or provider failure, when there was one. */
+  error: unknown;
+  /** The model the provider says answered, which can be more specific than AI_MODEL. */
+  modelId: string;
+}
+
+/**
+ * Reports a finished call. The routes pass a handler that spends the usage
+ * against the workspace's budget and writes the generation log row.
+ */
+export type OnGenerationFinish = (event: GenerationFinish) => void;
+
+/** Adapt `streamObject`'s finish event to {@link GenerationFinish}. */
+function finish(onFinish: OnGenerationFinish | undefined) {
+  return (event: {
+    object: unknown;
+    usage: LanguageModelUsage;
+    error: unknown;
+    response: { modelId?: string };
+  }) =>
+    onFinish?.({
+      object: event.object,
+      usage: event.usage,
+      error: event.error,
+      modelId: event.response.modelId ?? "",
+    });
+}
 
 export const SQL_RULES = `SQL rules (STRICT):
 - Emit TimescaleDB/PostgreSQL SELECT statements only. No INSERT/UPDATE/DDL, no semicolons, no comments.
@@ -81,12 +115,12 @@ small set of categories (one label column + one numeric value column; OMIT
 export function streamDashboard(input: {
   source: SourceRecord;
   prompt: string;
-  onUsage?: OnUsage;
+  onFinish?: OnGenerationFinish;
 }) {
-  const { source, prompt, onUsage } = input;
+  const { source, prompt, onFinish } = input;
   return streamObject({
     model: getModel(),
-    onFinish: ({ usage }) => onUsage?.(usage),
+    onFinish: finish(onFinish),
     schema: Dashboard,
     schemaName: "Dashboard",
     schemaDescription: "A monitoring dashboard specification (viz spec, not data).",
@@ -105,12 +139,12 @@ Use refreshIntervalMs=${config.defaultRefreshIntervalMs} and timeRange {from:"${
 export function streamExplorePanel(input: {
   source: SourceRecord;
   prompt: string;
-  onUsage?: OnUsage;
+  onFinish?: OnGenerationFinish;
 }) {
-  const { source, prompt, onUsage } = input;
+  const { source, prompt, onFinish } = input;
   return streamObject({
     model: getModel(),
-    onFinish: ({ usage }) => onUsage?.(usage),
+    onFinish: finish(onFinish),
     schema: Panel,
     schemaName: "Panel",
     schemaDescription: "A single panel specification (viz spec, not data).",
@@ -140,11 +174,14 @@ Viz selection (IMPORTANT — default to text/tabular output):
  * is persisted. There is no source to authorize against yet, so unlike the
  * dashboard paths this prompt carries no catalog metadata.
  */
-export function streamSourceDraft(input: { prompt: string; onUsage?: OnUsage }) {
-  const { prompt, onUsage } = input;
+export function streamSourceDraft(input: {
+  prompt: string;
+  onFinish?: OnGenerationFinish;
+}) {
+  const { prompt, onFinish } = input;
   return streamObject({
     model: getModel(),
-    onFinish: ({ usage }) => onUsage?.(usage),
+    onFinish: finish(onFinish),
     schema: SourceDraft,
     schemaName: "SourceDraft",
     schemaDescription:
@@ -181,12 +218,12 @@ export function streamPanel(input: {
   source: SourceRecord;
   prompt: string;
   current: Panel;
-  onUsage?: OnUsage;
+  onFinish?: OnGenerationFinish;
 }) {
-  const { source, prompt, current, onUsage } = input;
+  const { source, prompt, current, onFinish } = input;
   return streamObject({
     model: getModel(),
-    onFinish: ({ usage }) => onUsage?.(usage),
+    onFinish: finish(onFinish),
     schema: Panel,
     schemaName: "Panel",
     schemaDescription: "A single dashboard panel specification (viz spec, not data).",
@@ -210,12 +247,12 @@ export function streamDashboardRefinement(input: {
   source: SourceRecord;
   prompt: string;
   current: Dashboard;
-  onUsage?: OnUsage;
+  onFinish?: OnGenerationFinish;
 }) {
-  const { source, prompt, current, onUsage } = input;
+  const { source, prompt, current, onFinish } = input;
   return streamObject({
     model: getModel(),
-    onFinish: ({ usage }) => onUsage?.(usage),
+    onFinish: finish(onFinish),
     schema: Dashboard,
     schemaName: "Dashboard",
     schemaDescription: "A monitoring dashboard specification (viz spec, not data).",
