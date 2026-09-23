@@ -165,6 +165,36 @@ contain a row the panel was not already showing, and cannot become a second,
 unguarded way to run a query. Exporting the **full** result set server-side is
 a different feature and is not this one.
 
+## Getting around: Cmd/Ctrl+K
+
+`CommandPalette` (`src/components/command-palette.tsx`) is mounted in the root
+layout for a signed-in identity and opens anywhere in the app. It lists
+dashboards, data sources, the app's pages, and a handful of actions — new
+dashboard, new source, the theme, and a catalog refresh for a source the caller
+administers.
+
+It is a navigator, not a second API surface. Results come from
+`GET /api/search`, whose candidate workspaces come from the validated claims:
+there is no workspace parameter, so nothing in the query string can widen what
+comes back, and a result is by construction somewhere the identity could
+already go. A source is projected to its id, name and workspace —
+`SourceRecord` carries the connection config and the catalog, and neither has
+any business in a search result (invariant 5). The one action that is not
+navigation posts to the same guarded `/api/sources/[id]/refresh` the source
+list already uses, which checks `source:manage` for itself.
+
+Matching and ordering live in `src/lib/command-palette.ts` as pure functions
+over a payload and a query, which is what makes them testable. Actions are
+*data* — a tagged union the component switches on — rather than callbacks, so a
+command can be ranked, compared and remembered. Recently-used commands are kept
+in `localStorage` and lead the list before anything is typed; once something is
+typed the score decides and recency only breaks ties. A remembered id is
+treated as untrusted: it can name a command, never reach one.
+
+The listbox follows the APG combobox pattern rather than a menu — real focus
+stays in the text field and `aria-activedescendant` points at the selection —
+because a menu would move focus out of the box being typed into.
+
 ## A rendering detail worth knowing
 
 Design tokens are authored in **OKLCH**, but ECharts cannot parse `oklch()`.
