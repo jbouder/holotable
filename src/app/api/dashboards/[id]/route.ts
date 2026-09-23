@@ -5,10 +5,12 @@ import {
   getDashboardById,
   saveDashboardVersion,
   softDeleteDashboard,
+  updateDashboardMetadata,
 } from "@/lib/db/repo";
 import { resolveAndValidateDashboard } from "@/lib/dashboard-service";
 import { invalidatePoller } from "@/lib/poller/registry";
 import { Dashboard } from "@/lib/ir";
+import { DashboardDescription, DashboardTags } from "@/lib/dashboard-metadata";
 import { VERSION_NOTE_MAX } from "@/lib/editor/session";
 
 export const runtime = "nodejs";
@@ -65,6 +67,72 @@ export const PUT = route(
     });
     invalidatePoller(id);
     return json({ dashboard: record });
+  },
+);
+
+/**
+ * Metadata, not a spec edit.
+ *
+ * `description` and `tags` are columns on the dashboard row and are written in
+ * place — no version is appended, because nothing executes them (#119). The
+ * title is the opposite case: the spec owns it (`TITLE_AUTHORITY`), so a
+ * rename here appends a version whose spec differs only in its title, exactly
+ * as renaming in the editor does. A `null` description clears it; an omitted
+ * one leaves it alone.
+ */
+const PatchBody = z
+  .object({
+    title: Dashboard.shape.title.optional(),
+    description: DashboardDescription.nullable().optional(),
+    tags: DashboardTags.optional(),
+  })
+  .refine((b) => Object.keys(b).length > 0, { message: "nothing to update" });
+
+export const PATCH = route(
+  "dashboards.patch",
+  async (req: Request, ctx: RouteContext<"/api/dashboards/[id]">) => {
+    const identity = await requireIdentity();
+    const { id } = await ctx.params;
+    const existing = await getDashboardById(id);
+    if (!existing) throw new HttpError(404, "dashboard not found");
+
+    // The workspace comes from the stored row, never from the body, and both
+    // halves below are gated on the same one edit permission.
+    const { workspaceId } = existing;
+    assertAuthorized(identity, "dashboard:update", { workspaceId });
+
+    const patch = await readJson(req, PatchBody);
+    let record = { ...existing };
+
+    if (patch.title !== undefined && patch.title !== existing.spec.title) {
+      // Deliberately NOT re-validated through `resolveAndValidateDashboard`:
+      // the panels are the ones already stored, no SQL and no source reference
+      // changes, and failing a rename because a source was tombstoned since
+      // the last save would block the one edit that cannot break anything.
+      const saved = await saveDashboardVersion({
+        dashboardId: id,
+        createdBy: identity.sub,
+        spec: { ...existing.spec, title: patch.title },
+        note: `renamed from "${existing.spec.title}"`.slice(0, VERSION_NOTE_MAX),
+      });
+      record = { ...record, ...saved };
+      invalidatePoller(id);
+    }
+
+    if (patch.description !== undefined || patch.tags !== undefined) {
+      const updated = await updateDashboardMetadata(workspaceId, id, {
+        // `null` clears it and `undefined` leaves it alone, which is exactly
+        // what the parsed body already distinguishes — so it is passed through
+        // rather than defaulted.
+        description: patch.description,
+        tags: patch.tags,
+      });
+      if (!updated) throw new HttpError(404, "dashboard not found");
+      record = { ...record, ...updated };
+    }
+
+    const { spec: _spec, ...summary } = record;
+    return json({ dashboard: summary });
   },
 );
 

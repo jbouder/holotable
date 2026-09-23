@@ -43,8 +43,8 @@ interface PanelOutcome {
 }
 
 async function findDashboard() {
-  const summaries = await listDashboards("demo");
-  const summary = summaries.find((d) => d.title === SELF_DASHBOARD_TITLE);
+  const { dashboards } = await listDashboards("demo", { search: SELF_DASHBOARD_TITLE });
+  const summary = dashboards.find((d) => d.title === SELF_DASHBOARD_TITLE);
   if (!summary) return null;
   // Parses the stored spec against the IR on the way out; a spec the current
   // schema rejects fails here rather than silently rendering nothing.
