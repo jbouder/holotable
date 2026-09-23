@@ -19,6 +19,7 @@ import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/input";
 import { ErrorDisplay } from "@/components/ui/error-display";
+import { Skeleton } from "@/components/ui/skeleton";
 import { apiErrorFromThrown } from "@/lib/errors";
 import { type ChatCitation, citationsFromMessage } from "@/lib/chat-history";
 
@@ -180,11 +181,7 @@ export function DashboardChat({
             {messages.map((message) => (
               <MessageBubble key={message.id} message={message} panels={panels} />
             ))}
-            {status === "submitted" && (
-              <div className="flex items-center gap-2 text-xs text-muted">
-                <Loader2 className="h-3.5 w-3.5 animate-spin" /> Thinking…
-              </div>
-            )}
+            {status === "submitted" && <PendingAnswer />}
             {lastIsAnswer && <Suggestions suggestions={suggestions} onPick={ask} />}
           </div>
         )}
@@ -238,6 +235,29 @@ export function DashboardChat({
           )}
         </div>
       </div>
+    </div>
+  );
+}
+
+/**
+ * The answer, before it has any words in it.
+ *
+ * Shaped like the assistant bubble it becomes, and left-aligned in the same
+ * place, so the list does not jump when the first token lands (#72). It is
+ * three lines because most answers here are two or three; the real one
+ * replaces it the moment streaming starts.
+ */
+function PendingAnswer() {
+  return (
+    <div className="flex flex-col items-start gap-1">
+      <div className="flex w-[85%] flex-col gap-1.5 rounded-lg bg-surface-2 px-3 py-2">
+        <Skeleton className="h-2.5 w-full" />
+        <Skeleton className="h-2.5 w-11/12" />
+        <Skeleton className="h-2.5 w-2/3" />
+      </div>
+      <span role="status" className="sr-only">
+        Thinking…
+      </span>
     </div>
   );
 }

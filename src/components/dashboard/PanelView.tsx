@@ -1,13 +1,14 @@
 "use client";
 
 import * as React from "react";
-import { Info, Loader2 } from "lucide-react";
+import { Info } from "lucide-react";
 import type { Panel, TimeRange } from "@/lib/ir";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ErrorDisplay } from "@/components/ui/error-display";
 import { EChart, type EChartHandle } from "@/components/charts/EChart";
 import { PanelSqlDialog } from "@/components/dashboard/PanelSqlDialog";
 import { PanelActions } from "@/components/dashboard/PanelActions";
+import { LoadingLabel, PanelSkeleton } from "@/components/dashboard/PanelSkeleton";
 import { Popover } from "@/components/ui/popover";
 import { buildChartOption, type PanelData } from "@/components/charts/options";
 import { formatClockTime } from "@/lib/connection";
@@ -241,8 +242,15 @@ function PanelBody({
     );
   }
   if (data.rows.length === 0 && (!state || state.status === "loading")) {
+    // A skeleton in the panel's own shape rather than a centred spinner: the
+    // panel already occupies its final grid cell, and filling it with the
+    // silhouette of what is coming is what stops the page moving when the
+    // rows land (#72).
     return (
-      <Message icon={<Loader2 className="h-5 w-5 animate-spin" />}>Loading…</Message>
+      <>
+        <PanelSkeleton viz={panel.viz} />
+        <LoadingLabel>Loading {panel.title}…</LoadingLabel>
+      </>
     );
   }
 
@@ -289,21 +297,34 @@ function StatView({ panel, data }: { panel: Panel; data: PanelData }) {
   const value = last?.[valueKey];
   return (
     <div className="flex h-full items-center justify-center">
-      <span className="text-4xl font-semibold tabular-nums">
+      {/* Shrinks with the viewport: a 4xl number is most of a phone panel. */}
+      <span className="text-3xl font-semibold tabular-nums sm:text-4xl">
         {value === undefined ? "—" : formatValue(value, panel.format)}
       </span>
     </div>
   );
 }
 
+/**
+ * The first column is sticky and the table scrolls sideways under it, so a
+ * narrow screen keeps the label of the row it is reading (#78). `w-max` rather
+ * than `w-full`: the table is allowed to be wider than the panel — that is
+ * what gives it something to scroll — and stretches to fill when it is not.
+ */
 function TableView({ data }: { data: PanelData }) {
   return (
     <div className="max-h-full overflow-auto">
-      <table className="w-full text-left text-sm">
-        <thead className="sticky top-0 bg-surface-2 text-muted">
+      <table className="w-max min-w-full text-left text-sm">
+        <thead className="sticky top-0 z-10 bg-surface-2 text-muted">
           <tr>
-            {data.columns.map((c) => (
-              <th key={c} className="px-2 py-1 font-medium">
+            {data.columns.map((c, i) => (
+              <th
+                key={c}
+                className={cn(
+                  "px-2 py-1 font-medium",
+                  i === 0 && "sticky left-0 z-10 bg-surface-2",
+                )}
+              >
                 {c}
               </th>
             ))}
@@ -315,8 +336,14 @@ function TableView({ data }: { data: PanelData }) {
             // render-only — nothing is reordered, edited or keyed off state.
             // biome-ignore lint/suspicious/noArrayIndexKey: result rows have no id
             <tr key={i} className="border-t border-border">
-              {data.columns.map((c) => (
-                <td key={c} className="px-2 py-1 tabular-nums">
+              {data.columns.map((c, col) => (
+                <td
+                  key={c}
+                  className={cn(
+                    "px-2 py-1 tabular-nums",
+                    col === 0 && "sticky left-0 bg-surface",
+                  )}
+                >
                   {String(r[c] ?? "")}
                 </td>
               ))}
@@ -324,21 +351,6 @@ function TableView({ data }: { data: PanelData }) {
           ))}
         </tbody>
       </table>
-    </div>
-  );
-}
-
-function Message({
-  icon,
-  children,
-}: {
-  icon: React.ReactNode;
-  children: React.ReactNode;
-}) {
-  return (
-    <div className="flex h-full flex-col items-center justify-center gap-2 text-center text-sm text-muted">
-      {icon}
-      {children}
     </div>
   );
 }
@@ -364,7 +376,10 @@ function StatusBadge({ status, updatedAt }: { status: PanelStatus; updatedAt?: n
     <span
       title={freshness}
       className={cn(
-        "rounded-full px-2 py-0.5 text-xs font-medium capitalize",
+        // Below `sm` the header has room for the title and the actions and
+        // nothing else, so the badge steps aside visually and stays readable
+        // to a screen reader (#78).
+        "rounded-full px-2 py-0.5 text-xs font-medium capitalize max-sm:sr-only",
         STATUS_STYLES[status],
       )}
     >

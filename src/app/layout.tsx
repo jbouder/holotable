@@ -67,7 +67,7 @@ export default async function RootLayout({
       </head>
       <body className="min-h-full flex flex-col">
         <NavBar />
-        <main className="flex-1 px-6 py-6">{children}</main>
+        <main className="flex-1 px-4 py-6 sm:px-6">{children}</main>
         {signedIn && <CommandPalette />}
       </body>
     </html>

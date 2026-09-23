@@ -241,7 +241,12 @@ export function LiveDashboard({
     <div>
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
         {header}
-        <div className="flex shrink-0 flex-wrap items-center gap-2">
+        {/*
+          `shrink-0` only from `sm`. Below it the row has to be allowed to
+          shrink, or it sizes to max-content, its own `flex-wrap` never
+          engages, and seven controls push the page sideways (#78).
+        */}
+        <div className="flex flex-wrap items-center gap-2 sm:shrink-0">
           <ConnectionIndicator
             status={connection}
             onReconnect={() => setReconnectNonce((n) => n + 1)}
