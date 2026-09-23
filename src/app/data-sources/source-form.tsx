@@ -19,7 +19,7 @@ import {
   type TableMenu,
   emptyFormState,
   emptyMenu,
-  menuAfterDiscovery,
+  applyDiscovery,
   rememberTable,
   formStateFromConfig,
   formStateFromConfigText,
@@ -113,6 +113,7 @@ export function SourceForm({
 
   const [menu, setMenu] = React.useState<TableMenu>(emptyMenu);
   const [discovering, setDiscovering] = React.useState(false);
+  const [unticked, setUnticked] = React.useState<string[]>([]);
 
   // Missing credentials are reported, never enforced: an unconfigured ref
   // still saves, because the variables are the operator's to set and may land
@@ -203,7 +204,10 @@ export function SourceForm({
       setError(outcome.error);
       return;
     }
-    setMenu((current) => menuAfterDiscovery(current, outcome.tables));
+    const applied = applyDiscovery(form, menu, outcome.tables);
+    setForm(applied.state);
+    setMenu(applied.menu);
+    setUnticked(applied.unticked);
   }
 
   async function submit(event: React.FormEvent) {
@@ -425,6 +429,13 @@ export function SourceForm({
               </Button>
             </div>
             {errors.tables && <p className="text-xs text-danger">{errors.tables}</p>}
+            {unticked.length > 0 && (
+              <p className="text-xs text-warning">
+                Unticked {unticked.join(", ")}: not found in schema {form.schema}. Tick{" "}
+                {unticked.length === 1 ? "it" : "them"} again to keep{" "}
+                {unticked.length === 1 ? "it" : "them"} anyway.
+              </p>
+            )}
 
             {rows.length === 0 ? (
               <p className="border border-dashed border-border px-3 py-6 text-center text-sm text-muted">
@@ -444,6 +455,10 @@ export function SourceForm({
                       // and its column list — off the screen.
                       setMenu((current) => rememberTable(current, row.table));
                       setForm(toggleTable(form, row.table));
+                      // A table ticked back is no longer news.
+                      setUnticked((current) =>
+                        current.filter((name) => name !== row.table.name),
+                      );
                     }}
                     onChange={(patch) =>
                       setForm(updateTable(form, row.table.name, patch))

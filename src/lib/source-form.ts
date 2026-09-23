@@ -381,6 +381,38 @@ export function menuAfterDiscovery(menu: TableMenu, tables: CatalogTable[]): Tab
   };
 }
 
+export interface DiscoveryResult {
+  state: SourceFormState;
+  menu: TableMenu;
+  /** Allowlisted tables the live schema does not have, now unticked. */
+  unticked: string[];
+}
+
+/**
+ * Apply a discovery to the form: fold it into the menu, and untick every
+ * allowlisted table the live schema does not have.
+ *
+ * Discovery never *adds* to the allowlist — ticking is the only way in — but a
+ * table it cannot find is one the guard would refuse and Test would report as
+ * unreadable, typically a placeholder the drafter invented. Keeping it ticked
+ * would save it. It stays on the menu, marked not discovered and whole, so an
+ * untick the author disagrees with is one click to undo.
+ */
+export function applyDiscovery(
+  state: SourceFormState,
+  menu: TableMenu,
+  tables: CatalogTable[],
+): DiscoveryResult {
+  const found = new Set(tables.map((table) => table.name));
+  const missing = state.tables.filter((table) => !found.has(table.name));
+  const remembered = missing.reduce(rememberTable, menu);
+  return {
+    state: { ...state, tables: state.tables.filter((table) => found.has(table.name)) },
+    menu: menuAfterDiscovery(remembered, tables),
+    unticked: missing.map((table) => table.name),
+  };
+}
+
 /** Keep a table on the menu — what an untick calls so the row survives it. */
 export function rememberTable(menu: TableMenu, table: CatalogTable): TableMenu {
   if (menu.tables.some((known) => known.name === table.name)) return menu;

@@ -121,7 +121,7 @@ function button(container: HTMLElement, label: string): Element {
   return found;
 }
 
-test("discovery lists live tables and allowlists none of them", async () => {
+test("discovery lists live tables, allowlists none of them, and unticks what it did not find", async () => {
   const { bodies } = stubDiscovery({ ok: true, tables: DISCOVERED });
   // Start from a config whose one table is not among the discovered ones, so
   // every discovered row starts unticked.
@@ -147,14 +147,13 @@ test("discovery lists live tables and allowlists none of them", async () => {
   assert.match(harness.text(), /http_requests/);
   assert.match(harness.text(), /cpu_usage/);
 
-  // Discovery changed nothing about the allowlist: saving now saves the one
-  // table that was already there.
+  // `legacy` is not in the schema, so discovery unticked it and said so; with
+  // nothing ticked there is nothing to save.
+  assert.match(harness.text(), /Unticked legacy: not found in schema metrics/);
   harness.click(button(harness.container, "Save"));
   await settle();
-  assert.deepEqual(
-    submitted.at(0)?.config.tables.map((t) => t.name),
-    ["legacy"],
-  );
+  assert.equal(submitted.length, 0);
+  assert.match(harness.text(), /Select at least one table/);
   harness.unmount();
 });
 
@@ -166,19 +165,20 @@ test("ticking a discovered table is what adds it, with its time column", async (
   harness.click(button(harness.container, "Discover tables"));
   await settle();
 
-  // Rows are the allowlist first, then the discovery: legacy, http_requests, cpu_usage.
+  // `legacy` is not in the schema, so discovery unticked it; the rows are the
+  // discovery, then what it did not find: http_requests, cpu_usage, legacy.
   const boxes = checkboxes(harness.container);
   assert.equal(boxes.length, 3);
-  harness.click(boxes[2]);
+  harness.click(boxes[1]);
   harness.click(button(harness.container, "Save"));
   await settle();
 
   const tables = submitted.at(0)?.config.tables ?? [];
   assert.deepEqual(
     tables.map((t) => t.name),
-    ["legacy", "cpu_usage"],
+    ["cpu_usage"],
   );
-  assert.equal(tables[1].timeField, "observed_at");
+  assert.equal(tables[0].timeField, "observed_at");
   harness.unmount();
 });
 
