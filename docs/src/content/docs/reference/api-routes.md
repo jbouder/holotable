@@ -17,7 +17,10 @@ All routes run on the Node runtime. Every one resolves identity with
 | `/api/dashboards` | POST | editor | Create; validates the spec and derives the workspace from trusted sources |
 | `/api/dashboards/[id]` | GET | viewer | Current version with its spec |
 | `/api/dashboards/[id]` | PUT | editor | Appends a **new immutable version** |
+| `/api/dashboards/[id]` | PATCH | editor | Metadata. `description` and `tags` are written to the row in place; a `title` appends a **version**, because the spec owns the name |
 | `/api/dashboards/[id]` | DELETE | owner / source-admin | Soft delete |
+| `/api/dashboards/[id]/duplicate` | POST | viewer + editor | Copies the current spec into a new dashboard at version 1, titled `"… (copy)"`. Re-validates the spec, so a copy of a dashboard whose source was tombstoned fails loudly |
+| `/api/dashboards/[id]/favorite` | PUT / DELETE | viewer | Star or unstar it **for the caller**. No body: the subject is always the session's own |
 | `/api/dashboards/[id]/export` | GET | viewer | Downloads the current spec as a JSON file (`Content-Disposition: attachment`). Carries source **ids** only — no workspace, author, or connection detail |
 | `/api/dashboards/import` | POST | editor | Creates a dashboard at version 1 from an exported file. The target workspace is a request field re-checked by `can()`; source ids are re-pointed by an **explicit** mapping and any still unresolved refuse the whole import |
 | `/api/dashboards/[id]/stream` | GET | viewer | SSE deltas, cookie-authenticated |

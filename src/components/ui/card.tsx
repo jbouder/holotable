@@ -1,7 +1,10 @@
 import type * as React from "react";
 import { cn } from "@/lib/utils";
 
-export function Card({ className, ...props }: React.HTMLAttributes<HTMLDivElement>) {
+// `ComponentPropsWithRef` rather than `HTMLAttributes`: a panel that can go
+// fullscreen needs to focus its own card, and in React 19 `ref` is an ordinary
+// prop — so the primitive simply passes it through.
+export function Card({ className, ...props }: React.ComponentPropsWithRef<"div">) {
   return (
     <div
       className={cn("rounded-lg border border-border bg-surface shadow-sm", className)}

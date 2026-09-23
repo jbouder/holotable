@@ -10,6 +10,7 @@ import {
   Loader2,
   LayoutGrid,
   LayoutTemplate,
+  Info,
   Keyboard,
   Sparkles,
   Redo2,
@@ -57,6 +58,7 @@ import { DraftBanner } from "@/components/editor/DraftBanner";
 import { Dialog } from "@/components/ui/dialog";
 import { LeaveGuardDialog } from "@/components/editor/LeaveGuardDialog";
 import { ShortcutsDialog } from "@/components/editor/ShortcutsDialog";
+import { DashboardDetailsDialog } from "@/components/dashboard/DashboardDetailsDialog";
 import { useHistory } from "@/lib/editor/use-history";
 import {
   type Binding,
@@ -122,6 +124,8 @@ export function EditDashboardClient({
   updatedAt,
   userSub,
   sources,
+  metadata,
+  tagSuggestions = [],
 }: {
   dashboardId: string;
   /** The dashboard's own workspace: where a template is saved and read from. */
@@ -136,6 +140,14 @@ export function EditDashboardClient({
   /** The viewer's subject, which scopes their drafts within this browser. */
   userSub: string;
   sources: SourceOption[];
+  /**
+   * Description and tags as stored on the dashboard row. They are NOT spec,
+   * so they are not in `history`, are not part of `dirty`, and are saved the
+   * moment the details dialog is confirmed rather than by Save version (#119).
+   */
+  metadata: { description: string | null; tags: string[] };
+  /** Tags already in use in this workspace, offered in the dialog. */
+  tagSuggestions?: string[];
 }) {
   const router = useRouter();
   const mac = useIsMac();
@@ -154,6 +166,8 @@ export function EditDashboardClient({
     return Number.isNaN(parsed) ? 0 : parsed;
   });
   const [note, setNote] = React.useState("");
+  const [details, setDetails] = React.useState(metadata);
+  const [showDetails, setShowDetails] = React.useState(false);
   const dirty = isDirty(spec, savedSpec);
 
   const [selectedId, setSelectedId] = React.useState<string | null>(
@@ -767,6 +781,15 @@ export function EditDashboardClient({
             >
               <Keyboard className="h-4 w-4" />
             </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => setShowDetails(true)}
+              aria-label="Dashboard details"
+              title="Description and tags (saved separately from the spec)"
+            >
+              <Info className="h-4 w-4" />
+            </Button>
           </div>
           <Input
             aria-label="Version note"
@@ -1178,6 +1201,21 @@ export function EditDashboardClient({
         shortcuts={bindings}
         open={showShortcuts}
         onOpenChange={setShowShortcuts}
+      />
+
+      {/*
+        No `allowRename`: the title is a spec field, edited in the settings
+        card above and saved with the version. Offering a second, immediately
+        applied rename here would be two names for the same thing.
+      */}
+      <DashboardDetailsDialog
+        dashboardId={dashboardId}
+        initial={{ title: spec.title, ...details }}
+        suggestions={tagSuggestions}
+        allowRename={false}
+        open={showDetails}
+        onOpenChange={setShowDetails}
+        onSaved={(next) => setDetails({ description: next.description, tags: next.tags })}
       />
 
       <LeaveGuardDialog

@@ -33,6 +33,32 @@ shown, while these two are what the last introspection found. They are what
 Identity: `workspace_id`, `title`, `created_by`, `current_version_id`,
 `deleted_at`. Deletion is a soft delete.
 
+Plus workspace **metadata**: `description` and `tags text[]`. These are *about*
+the dashboard rather than part of it — nothing executes them, they are not in
+the spec IR, and they do not travel in an export — which is why editing them
+writes the row in place instead of appending a version, and why they cost no
+`specVersion` bump.
+
+:::note[The spec owns the title]
+`dashboards.title` is a **mirror**: `saveDashboardVersion` writes it from
+`spec.title` on every save. A rename therefore cannot be a column update — the
+next save would silently undo it — so `PATCH /api/dashboards/[id]` with a
+`title` appends a version whose spec differs only in its name. The alternative
+(the row wins, and the copy stops) was rejected because the spec is what an
+export carries, what the chat prompt names, and what the viewer's header reads;
+two answers to "what is this dashboard called" is worse than one extra version
+row. The decision is recorded as `TITLE_AUTHORITY` in
+`src/lib/dashboard-metadata.ts`.
+:::
+
+### `dashboard_favorites`
+
+`user_sub`, `dashboard_id`, `created_at`. Favouriting is **per person**, so it
+keys on the identity's subject and sits outside the dashboard row everyone
+shares; the API takes the subject from the validated session and never from a
+request field. `ON DELETE CASCADE`, because a favourite of a deleted dashboard
+is a bookmark to nothing rather than a dangling reference.
+
 ### `dashboard_versions`
 
 **Append-only**: `dashboard_id`, `version`, the entire validated spec as
