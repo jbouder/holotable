@@ -10,7 +10,7 @@ export function SignIn() {
   return (
     <div className="flex min-h-[70vh] items-center justify-center">
       <Card className="w-full max-w-sm">
-        <CardContent className="space-y-6 p-6 sm:p-8">
+        <CardContent className="space-y-7 p-6 sm:p-8">
           <div>
             <div className="flex items-center gap-3">
               <span
@@ -26,7 +26,7 @@ export function SignIn() {
             </p>
           </div>
 
-          <div className="space-y-2">
+          <div className="space-y-4">
             <a href="/api/auth/login" className="block">
               <Button className="w-full">
                 <LogIn className="h-4 w-4" /> Sign in
