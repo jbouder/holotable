@@ -79,6 +79,13 @@ export const STATIC_COMMANDS: Command[] = [
     action: { type: "navigate", href: "/data-sources" },
   },
   {
+    id: "page:settings",
+    kind: "page",
+    title: "Settings",
+    keywords: "preferences account profile appearance shortcuts",
+    action: { type: "navigate", href: "/settings" },
+  },
+  {
     id: "action:new-dashboard",
     kind: "action",
     title: "New dashboard",

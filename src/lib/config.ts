@@ -120,6 +120,14 @@ export const config = {
    */
   generationLogRetentionDays: num("GENERATION_LOG_RETENTION_DAYS", 30),
 
+  /**
+   * The identity provider's self-service account page, e.g. Keycloak's
+   * `<issuer>/account`. The account settings section links to it when set, so
+   * people can change the name, email and password the provider owns. Unset
+   * hides the link.
+   */
+  oidcAccountUrl: str("OIDC_ACCOUNT_URL", ""),
+
   /** Cookie name used for the session JWT. */
   sessionCookieName: str("SESSION_COOKIE_NAME", "holotable_session"),
 
@@ -312,6 +320,9 @@ const EnvSchema = z.object({
       ),
   ),
   OIDC_AUDIENCE: blank(z.string()),
+  OIDC_ACCOUNT_URL: blank(
+    httpUrl("the identity provider's account page, e.g. <issuer>/account"),
+  ),
 
   DEFAULT_REFRESH_INTERVAL_MS: blank(positiveInt),
   MIN_REFRESH_INTERVAL_MS: blank(positiveInt),

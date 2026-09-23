@@ -63,7 +63,7 @@ OIDC_CLIENT_ID=holotable
 OIDC_CLIENT_SECRET=<client secret>
 OIDC_JWKS_URL=http://localhost:8080/realms/holotable/protocol/openid-connect/certs
 OIDC_GROUPS_CLAIM=groups
-OIDC_SCOPE=openid profile groups
+OIDC_SCOPE=openid profile email groups
 ```
 
 - `OIDC_JWKS_URL` enables RS256 verification of Keycloak-issued tokens.

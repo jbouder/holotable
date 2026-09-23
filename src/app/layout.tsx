@@ -35,7 +35,13 @@ export default async function RootLayout({
   // The palette searches an authenticated endpoint, so it is not mounted for a
   // signed-out visitor: a Cmd+K that could only ever answer 401 is worse than
   // no Cmd+K.
-  const signedIn = (await getIdentity()) !== null;
+  const identity = await getIdentity();
+  const signedIn = identity !== null;
+  // Display-only fields for the header's account menu; nothing else about the
+  // identity is handed to the client here.
+  const account = identity
+    ? { displayName: identity.displayName ?? null, email: identity.email ?? null }
+    : null;
   return (
     <html
       lang="en"
@@ -66,7 +72,7 @@ export default async function RootLayout({
         />
       </head>
       <body className="min-h-full flex flex-col">
-        <NavBar />
+        <NavBar account={account} />
         <main className="flex-1 px-4 py-6 sm:px-6">{children}</main>
         {signedIn && <CommandPalette />}
       </body>

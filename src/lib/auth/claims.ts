@@ -30,6 +30,46 @@ export interface Identity {
   platformAdmin: boolean;
   /** Highest role held per workspace id. */
   workspaces: Record<string, WorkspaceRole>;
+  /**
+   * Display-only profile fields (#208). They let the header and the settings
+   * page show a person something they recognise as themselves, and nothing
+   * else: no authorization decision reads them. `can()` decides from `sub`,
+   * `platformAdmin` and `workspaces` alone, and a test holds it to that.
+   * Absent when the token did not carry the claim.
+   */
+  displayName?: string;
+  email?: string;
+}
+
+/** The display-only part of an {@link Identity}. */
+export type Profile = Pick<Identity, "displayName" | "email">;
+
+/** Longer than any real name or address, short enough to keep a cookie small. */
+const PROFILE_MAX_LENGTH = 254;
+
+function profileString(value: unknown): string | undefined {
+  if (typeof value !== "string") return undefined;
+  // Control characters have no business in a name, and stripping them keeps a
+  // claim from smuggling line breaks into the header or a log line.
+  // biome-ignore lint/suspicious/noControlCharactersInRegex: stripping them is the point
+  const clean = value.replace(/[\u0000-\u001f\u007f]/g, "").trim();
+  return clean ? clean.slice(0, PROFILE_MAX_LENGTH) : undefined;
+}
+
+/**
+ * Read the display-only profile from a validated token's claims: OIDC's
+ * standard `name` (falling back to `preferred_username`) and `email`. The
+ * first-party session token writes the same claim names back, so one reader
+ * serves both.
+ */
+export function profileFromClaims(claims: Readonly<Record<string, unknown>>): Profile {
+  const displayName =
+    profileString(claims.name) ?? profileString(claims.preferred_username);
+  const email = profileString(claims.email);
+  return {
+    ...(displayName ? { displayName } : {}),
+    ...(email ? { email } : {}),
+  };
 }
 
 function isWorkspaceRole(value: string): value is WorkspaceRole {

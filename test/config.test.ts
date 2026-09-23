@@ -282,6 +282,7 @@ test("malformed values are errors regardless of environment", () => {
     OPENAI_BASE_URL: "not a url",
     OPENAI_API: "completions",
     OIDC_SCOPE: "profile email",
+    OIDC_ACCOUNT_URL: "kc.example.com/realms/holotable/account",
     MAX_QUERY_ROWS: "lots",
     MAX_RESULT_BYTES: "0",
     QUERY_TIMEOUT_SECONDS: "-5",

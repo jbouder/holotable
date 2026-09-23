@@ -140,6 +140,7 @@ config: {}
 #  OIDC_CLIENT_ID: holotable
 #  OIDC_JWKS_URL: https://kc.example.com/realms/holotable/protocol/openid-connect/certs
 #  OIDC_REDIRECT_URI: https://holotable.example.com/api/auth/callback
+#  OIDC_ACCOUNT_URL: https://kc.example.com/realms/holotable/account
 #  AI_PROVIDER: openai-compatible
 #  AI_MODEL: openai/gpt-4o-mini
 #  OPENAI_BASE_URL: https://openrouter.ai/api/v1

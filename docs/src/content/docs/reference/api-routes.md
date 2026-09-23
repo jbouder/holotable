@@ -74,6 +74,12 @@ hand.
 | --- | --- | --- | --- |
 | `/api/search` | GET | viewer | What the command palette searches. Dashboards and sources across every workspace the caller can already reach, taken from the claims — there is **no** workspace parameter to widen it. A source is projected to its id, name, workspace and whether the caller may manage it; the connection config and the catalog never leave the server |
 
+## Account
+
+| Route | Method | Min role | Notes |
+| --- | --- | --- | --- |
+| `/api/me` | GET | signed in | The caller's own subject, display name, email, platform-admin flag and workspace roles, all from the session. No parameters, so it can only describe the identity that asked. The name and email are display-only and never reach `can()` |
+
 ## Auth
 
 | Route | Method | Notes |
