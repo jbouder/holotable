@@ -22,6 +22,7 @@ import { Button, ButtonLabel } from "@/components/ui/button";
 import { Textarea, Label } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
+import { PageHeader } from "@/components/ui/page-header";
 import { Dialog } from "@/components/ui/dialog";
 import {
   Table,
@@ -192,18 +193,13 @@ export function SourcesClient({
 
   return (
     <div className="space-y-6">
-      <div className="flex items-start justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-semibold">Data sources</h1>
-          <p className="mt-1 text-sm text-muted">
-            Manage the connections that dashboards and Explore query against. Sources are
-            scoped to a workspace and referenced by stable IDs.
-          </p>
-        </div>
-        <div className="flex items-end gap-3">
-          {/* Workspace selector hidden for now; defaults to the first
-              accessible workspace. Restore this to switch workspaces. */}
-          {sources !== null && (
+      {/* Workspace selector hidden for now; defaults to the first accessible
+          workspace. Restore it among the actions to switch workspaces. */}
+      <PageHeader
+        title="Data sources"
+        description="Manage the connections that dashboards and Explore query against. Sources are scoped to a workspace and referenced by stable IDs."
+        actions={
+          sources !== null && (
             <Button
               collapse
               title="Add source"
@@ -214,9 +210,9 @@ export function SourcesClient({
             >
               <Plus className="h-4 w-4" /> <ButtonLabel>Add source</ButtonLabel>
             </Button>
-          )}
-        </div>
-      </div>
+          )
+        }
+      />
 
       {notice && (
         <div className="border border-border bg-surface px-3 py-2 text-sm text-muted">

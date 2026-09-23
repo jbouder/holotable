@@ -29,6 +29,7 @@ import { RecentDashboards } from "@/components/dashboard/RecentDashboards";
 import { ImportDashboard } from "./import-dashboard";
 import { Button, ButtonLabel } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
+import { PageHeader } from "@/components/ui/page-header";
 
 export const dynamic = "force-dynamic";
 
@@ -131,20 +132,24 @@ export default async function DashboardsPage({
 
   return (
     <div>
-      <div className="mb-6 flex items-center justify-between">
-        <h1 className="text-2xl font-semibold">Dashboards</h1>
-        {canCreate && (
-          <div className="flex items-center gap-2">
-            <ImportDashboard targets={importTargets} />
-            <Link href="/dashboards/new">
-              <Button collapse title="Create New Dashboard">
-                <Plus className="h-4 w-4" />{" "}
-                <ButtonLabel>Create New Dashboard</ButtonLabel>
-              </Button>
-            </Link>
-          </div>
-        )}
-      </div>
+      <PageHeader
+        className="mb-6"
+        title="Dashboards"
+        description="Live dashboards in your workspaces. Each panel is a guarded query the server runs against its data source."
+        actions={
+          canCreate && (
+            <>
+              <ImportDashboard targets={importTargets} />
+              <Link href="/dashboards/new">
+                <Button collapse title="Create New Dashboard">
+                  <Plus className="h-4 w-4" />{" "}
+                  <ButtonLabel>Create New Dashboard</ButtonLabel>
+                </Button>
+              </Link>
+            </>
+          )
+        }
+      />
 
       {startUnavailable && (
         <div
