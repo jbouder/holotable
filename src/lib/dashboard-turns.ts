@@ -20,6 +20,12 @@ export interface TurnDraft {
   prompt: string;
   /** The full spec the model returned, layout-normalized. */
   spec: Dashboard;
+  /**
+   * The model that produced it. Absent when nothing did — a turn applied from
+   * a template — which is why it is not defaulted to the configured model: the
+   * badge in the turn list is there to say which generations cost something.
+   */
+  model?: string;
 }
 
 export interface DashboardTurn extends TurnDraft {
@@ -41,10 +47,15 @@ export const EMPTY_HISTORY: TurnHistory = { turns: [], index: -1, nextId: 1 };
  * Normalize a freshly generated spec the way the initial generation does: the
  * model's raw {x,y,w,h} guesses often overlap, so panels are re-flowed two-up.
  */
-export function normalizeTurn(prompt: string, spec: Dashboard): TurnDraft {
+export function normalizeTurn(
+  prompt: string,
+  spec: Dashboard,
+  model?: string,
+): TurnDraft {
   return {
     prompt,
     spec: { ...spec, panels: autoLayoutPanels(spec.panels, DEFAULT_COLUMNS) },
+    ...(model ? { model } : {}),
   };
 }
 
@@ -55,6 +66,27 @@ export function normalizeTurn(prompt: string, spec: Dashboard): TurnDraft {
  */
 export function appendTurn(history: TurnHistory, draft: TurnDraft): TurnHistory {
   const kept = history.turns.slice(0, history.index + 1);
+  return {
+    turns: [...kept, { ...draft, id: `turn-${history.nextId}` }],
+    index: kept.length,
+    nextId: history.nextId + 1,
+  };
+}
+
+/**
+ * Replace the turn being previewed, dropping any turn that followed it.
+ *
+ * This is what a regenerate produces: the author is not adding a step, they
+ * are asking for a different answer to the step they are looking at. Turns
+ * after it were derived from the answer being thrown away, so they go with it
+ * — the same rule {@link appendTurn} applies when refining from a restored
+ * turn. A fresh id, because it is a different spec.
+ *
+ * With no turns yet there is nothing to replace, so it appends.
+ */
+export function replaceTurn(history: TurnHistory, draft: TurnDraft): TurnHistory {
+  if (history.index < 0) return appendTurn(history, draft);
+  const kept = history.turns.slice(0, history.index);
   return {
     turns: [...kept, { ...draft, id: `turn-${history.nextId}` }],
     index: kept.length,

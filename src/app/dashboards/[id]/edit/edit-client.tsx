@@ -46,6 +46,7 @@ import { TimeFieldPicker } from "@/components/sql/TimeFieldPicker";
 import type { SourceCatalog } from "@/lib/registry";
 import { PanelPreview, usePanelPreview } from "@/components/dashboard/PanelPreview";
 import { PanelDiffView } from "@/components/dashboard/PanelDiffView";
+import { PromptHistoryMenu, usePromptHistory } from "@/components/prompt-history";
 import { acceptedPanel, diffPanels, type PanelDraft } from "@/lib/panel-diff";
 import { missingSourceIds, panelsUsingSource, repointPanels } from "@/lib/panel-repoint";
 import { RepointPanelsDialog } from "@/components/dashboard/RepointPanelsDialog";
@@ -126,6 +127,7 @@ export function EditDashboardClient({
   sources,
   metadata,
   tagSuggestions = [],
+  model,
 }: {
   dashboardId: string;
   /** The dashboard's own workspace: where a template is saved and read from. */
@@ -148,6 +150,8 @@ export function EditDashboardClient({
   metadata: { description: string | null; tags: string[] };
   /** Tags already in use in this workspace, offered in the dialog. */
   tagSuggestions?: string[];
+  /** The configured generation model, shown on a proposal so its cost is visible. */
+  model: string;
 }) {
   const router = useRouter();
   const mac = useIsMac();
@@ -179,6 +183,10 @@ export function EditDashboardClient({
   const [saving, setSaving] = React.useState(false);
   const [error, setError] = React.useState<ApiError | null>(null);
   const [nlPrompt, setNlPrompt] = React.useState("");
+  // Recent panel-edit prompts for this workspace, offered back on the box
+  // (#83). A separate list from the create box: "make it a bar chart" is a
+  // panel edit and is nonsense as a dashboard description.
+  const prompts = usePromptHistory(workspaceId, "panel");
   const [showShortcuts, setShowShortcuts] = React.useState(false);
   /** Where a guarded click wanted to go, held until the author answers. */
   const [pendingHref, setPendingHref] = React.useState<string | null>(null);
@@ -465,6 +473,9 @@ export function EditDashboardClient({
 
   function runNlEdit() {
     if (!selected || !nlPrompt.trim() || isLoading) return;
+    // Remembered on submit, not on success: a run that failed, or one whose
+    // result was rejected, is the prompt most likely to be wanted back.
+    prompts.remember(nlPrompt);
     generatePanel(selected, nlPrompt);
   }
 
@@ -1085,9 +1096,16 @@ export function EditDashboardClient({
                 )}
                 {selected && (
                   <div className="space-y-2 border-t border-border pt-4">
-                    <Label htmlFor="nl">
-                      Natural-language edit (runs the model once)
-                    </Label>
+                    <div className="flex items-center justify-between gap-2">
+                      <Label htmlFor="nl" className="mb-0">
+                        Natural-language edit (runs the model once)
+                      </Label>
+                      <PromptHistoryMenu
+                        history={prompts}
+                        disabled={isLoading}
+                        onPick={setNlPrompt}
+                      />
+                    </div>
                     <div className="relative">
                       <Textarea
                         id="nl"
@@ -1123,6 +1141,7 @@ export function EditDashboardClient({
                     {diff && proposal && proposalBase && (
                       <PanelDiffView
                         diff={diff}
+                        model={model}
                         streaming={proposal.panel === null}
                         onAccept={acceptProposal}
                         onReject={discardProposal}

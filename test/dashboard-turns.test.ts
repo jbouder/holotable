@@ -6,6 +6,7 @@ import {
   appendTurn,
   EMPTY_HISTORY,
   normalizeTurn,
+  replaceTurn,
   restoreTurn,
   type TurnHistory,
 } from "@/lib/dashboard-turns";
@@ -148,4 +149,67 @@ test("normalizing keeps the rest of the spec and does not mutate the input", () 
   assert.equal(turn.spec.refreshIntervalMs, 15_000);
   assert.deepEqual(turn.spec.timeRange, { from: "now-1h", to: "now" });
   assert.deepEqual(spec.panels[0]?.layout, { x: 0, y: 0, w: 12, h: 4 });
+});
+
+/* -------------------------------------------------------------------------- */
+/* Regenerate (#83)                                                           */
+/* -------------------------------------------------------------------------- */
+
+test("a regenerate replaces the turn being previewed rather than adding one", () => {
+  const h = replaceTurn(history(2), {
+    prompt: "p2",
+    spec: dashboard("t2-again", [panel("b")]),
+  });
+  assert.deepEqual(
+    h.turns.map((t) => t.prompt),
+    ["p1", "p2"],
+  );
+  assert.equal(h.index, 1);
+  assert.equal(activeSpec(h)?.title, "t2-again");
+});
+
+test("regenerating an earlier turn drops the turns derived from the old answer", () => {
+  const h = replaceTurn(restoreTurn(history(3), 0), {
+    prompt: "p1",
+    spec: dashboard("t1-again", [panel("a")]),
+  });
+  assert.equal(h.turns.length, 1);
+  assert.equal(activeSpec(h)?.title, "t1-again");
+});
+
+test("a replaced turn's id is never reused", () => {
+  const h = history(2);
+  const replaced = replaceTurn(h, { prompt: "p2", spec: dashboard("again", []) });
+  assert.ok(!h.turns.map((t) => t.id).includes(replaced.turns[1]?.id ?? ""));
+});
+
+test("regenerating with no turns yet simply starts one", () => {
+  const h = replaceTurn(EMPTY_HISTORY, {
+    prompt: "first",
+    spec: dashboard("first", [panel("a")]),
+  });
+  assert.equal(h.turns.length, 1);
+  assert.equal(h.index, 0);
+});
+
+test("replacing never mutates the history it was given", () => {
+  const h = history(2);
+  const before = JSON.stringify(h);
+  replaceTurn(h, { prompt: "p2", spec: dashboard("again", []) });
+  assert.equal(JSON.stringify(h), before);
+});
+
+/* -------------------------------------------------------------------------- */
+/* Which model produced a turn (#83)                                          */
+/* -------------------------------------------------------------------------- */
+
+test("a turn records the model that produced it, and a template records none", () => {
+  const generated = normalizeTurn("p", dashboard("t", [panel("a")]), "gpt-4o-mini");
+  assert.equal(generated.model, "gpt-4o-mini");
+
+  // A template is applied directly rather than through `normalizeTurn`; the
+  // absence of a model is what the turn list reads to say no call was made.
+  const fromTemplate = normalizeTurn("p", dashboard("t", [panel("a")]));
+  assert.equal(fromTemplate.model, undefined);
+  assert.equal("model" in fromTemplate, false);
 });

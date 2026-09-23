@@ -17,12 +17,15 @@ export function Menu({
   trigger,
   children,
   className,
+  panelClassName,
 }: {
   /** The trigger's accessible name — it holds an icon, so it needs one. */
   label: string;
   trigger: React.ReactNode;
   children: React.ReactNode;
   className?: string;
+  /** Widens the popup for a menu whose items are sentences, not verbs. */
+  panelClassName?: string;
 }) {
   return (
     <BaseMenu.Root>
@@ -38,7 +41,12 @@ export function Menu({
       </BaseMenu.Trigger>
       <BaseMenu.Portal>
         <BaseMenu.Positioner side="bottom" align="end" sideOffset={4} className="z-50">
-          <BaseMenu.Popup className="min-w-44 rounded-lg border border-border bg-surface p-1 shadow-xl focus:outline-none">
+          <BaseMenu.Popup
+            className={cn(
+              "min-w-44 rounded-lg border border-border bg-surface p-1 shadow-xl focus:outline-none",
+              panelClassName,
+            )}
+          >
             {children}
           </BaseMenu.Popup>
         </BaseMenu.Positioner>

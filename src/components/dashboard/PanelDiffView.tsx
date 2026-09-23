@@ -64,12 +64,15 @@ function FieldRow({
 
 export function PanelDiffView({
   diff,
+  model,
   streaming,
   onAccept,
   onReject,
   onRegenerate,
 }: {
   diff: PanelDiff;
+  /** The model that produced this proposal, so the cost of a regenerate is visible. */
+  model?: string;
   /** The object is still arriving; the diff fills in as it does. */
   streaming: boolean;
   onAccept: () => void;
@@ -95,6 +98,7 @@ export function PanelDiffView({
               "Proposed changes"
             )}
           </Label>
+          {model && <Badge title="Generation model">{model}</Badge>}
           {!streaming && (
             <Badge>
               {diff.identical

@@ -22,6 +22,7 @@ import {
 } from "@/components/sources/catalog-health";
 import { formatValue } from "@/lib/format";
 import { NoSources } from "@/components/onboarding/no-sources";
+import { PromptHistoryMenu, usePromptHistory } from "@/components/prompt-history";
 import { SavePanelDialog, type SavedPanel } from "./save-panel-dialog";
 
 interface SourceOption {
@@ -86,6 +87,9 @@ export function ExploreClient({
   const catalog = useCatalogRefresh(
     Object.fromEntries(sources.map((s) => [s.id, s.catalog])),
   );
+  const source = sources.find((s) => s.id === sourceId);
+  // Recent Explore questions for this workspace, offered back on the box (#83).
+  const prompts = usePromptHistory(source?.workspaceId, "explore");
 
   const runQuery = React.useCallback(async (p: Panel, timeRange: TimeRange) => {
     setResult({ data: EMPTY_ROWS, status: "loading" });
@@ -114,6 +118,7 @@ export function ExploreClient({
 
   function generate() {
     if (!sourceId || !prompt.trim()) return;
+    prompts.remember(prompt);
     setPanel(null);
     setResult(null);
     setSaved(null);
@@ -128,7 +133,6 @@ export function ExploreClient({
 
   const streaming = isLoading || object !== undefined;
   const rangeLabel = TIME_PRESETS.find((p) => p.value === from)?.label ?? from;
-  const source = sources.find((s) => s.id === sourceId);
   // Chips for the selected source. Server-built from its catalog, so they
   // change with the picker and never describe a table this source cannot read.
   const starters = source?.starters ?? [];
@@ -188,9 +192,18 @@ export function ExploreClient({
             />
           )}
           <div>
-            <Label htmlFor="prompt">
-              {starters.length > 0 ? "Ask a question or try one below" : "Ask a question"}
-            </Label>
+            <div className="flex items-center justify-between gap-2">
+              <Label htmlFor="prompt">
+                {starters.length > 0
+                  ? "Ask a question or try one below"
+                  : "Ask a question"}
+              </Label>
+              <PromptHistoryMenu
+                history={prompts}
+                disabled={isLoading}
+                onPick={setPrompt}
+              />
+            </div>
             {starters.length > 0 && (
               <div className="mb-2 flex flex-wrap items-center gap-2">
                 {starters.map((example) => (

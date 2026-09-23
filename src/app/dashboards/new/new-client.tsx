@@ -6,6 +6,7 @@ import { experimental_useObject as useObject } from "@ai-sdk/react";
 import {
   LayoutTemplate,
   Loader2,
+  RefreshCw,
   SendHorizontal,
   Save,
   RotateCcw,
@@ -17,11 +18,14 @@ import {
   appendTurn,
   EMPTY_HISTORY,
   normalizeTurn,
+  replaceTurn,
   restoreTurn,
   type TurnHistory,
 } from "@/lib/dashboard-turns";
+import { PromptHistoryMenu, usePromptHistory } from "@/components/prompt-history";
+import { PROMPT_MAX_LENGTH } from "@/lib/prompt-history";
 import { Button } from "@/components/ui/button";
-import { Textarea, Label } from "@/components/ui/input";
+import { Input, Textarea, Label } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -82,10 +86,26 @@ export function NewDashboardClient({
   // change with the picker and never describe a table this source cannot read.
   const starters = source?.starters ?? [];
 
-  // The instruction that produced the run in flight, so the finished turn is
-  // labelled with what was actually asked rather than whatever is in the box by
-  // the time the stream lands.
-  const submittedPrompt = React.useRef("");
+  // Recent prompts for this workspace, offered back on the box (#83). Per
+  // workspace because a prompt names that workspace's tables; the list lives
+  // in `localStorage` and is never sent anywhere — the durable, redacted record
+  // of what was asked is the generation log (#23).
+  const prompts = usePromptHistory(source?.workspaceId, "dashboard");
+
+  // Feedback for a regenerate of the turn being previewed. Cleared whenever
+  // the turn under review changes, so it cannot be carried onto another one.
+  const [feedback, setFeedback] = React.useState("");
+
+  /**
+   * The run in flight: what was asked, and whether it is adding a turn or
+   * replacing the one being previewed. Held in a ref so the finish callback
+   * labels the turn with what was actually asked rather than whatever is in
+   * the box by the time the stream lands.
+   */
+  const running = React.useRef<{ prompt: string; replacing: boolean }>({
+    prompt: "",
+    replacing: false,
+  });
 
   const finalSpec = activeSpec(history);
   const refining = history.turns.length > 0;
@@ -95,27 +115,75 @@ export function NewDashboardClient({
     schema: Dashboard,
     onFinish({ object }) {
       if (!object) return;
-      setHistory((h) => appendTurn(h, normalizeTurn(submittedPrompt.current, object)));
+      const turn = normalizeTurn(running.current.prompt, object, model);
+      setHistory((h) =>
+        running.current.replacing ? replaceTurn(h, turn) : appendTurn(h, turn),
+      );
+      setFeedback("");
       // Clear the box only once the turn has landed, so a failed run keeps the
       // prompt for Try again — and only if the author has not started typing
       // the next follow-up into it while this one streamed.
-      setPrompt((p) => (p === submittedPrompt.current ? "" : p));
+      setPrompt((p) => (p === running.current.prompt ? "" : p));
       setActiveTab("preview");
     },
   });
 
-  function generate() {
-    if (!sourceId || !prompt.trim()) return;
+  /**
+   * One model call. `base` is the spec the run starts from — the previewed
+   * dashboard for a follow-up, and for a regenerate the spec the turn being
+   * replaced was itself generated from, so pressing Regenerate twice cannot
+   * compound the model's own output. (Same rule as the panel editor's
+   * regenerate, #111.)
+   */
+  function runGeneration(input: {
+    instruction: string;
+    base: Dashboard | null;
+    replacing: boolean;
+  }) {
+    if (!sourceId) return;
     setSaveError(null);
-    submittedPrompt.current = prompt;
+    running.current = { prompt: input.instruction, replacing: input.replacing };
+    submit(
+      input.base
+        ? {
+            mode: "dashboard-refine",
+            sourceId,
+            prompt: input.instruction,
+            current: input.base,
+          }
+        : { mode: "dashboard", sourceId, prompt: input.instruction },
+    );
+  }
+
+  function generate() {
+    if (!sourceId || !prompt.trim() || isLoading) return;
+    prompts.remember(prompt);
     // A follow-up sends the previewed spec back as context and gets the whole
     // dashboard again; one model call either way. Nothing is persisted until
     // the author saves.
-    submit(
-      finalSpec
-        ? { mode: "dashboard-refine", sourceId, prompt, current: finalSpec }
-        : { mode: "dashboard", sourceId, prompt },
-    );
+    runGeneration({ instruction: prompt, base: finalSpec, replacing: false });
+  }
+
+  /**
+   * Ask again for the turn being previewed, with a note about what was wrong.
+   *
+   * One model call, carrying the turn's own prompt, the spec it was generated
+   * from, and the feedback. It replaces that turn rather than adding one: the
+   * author is not taking another step, they are asking for a different answer
+   * to the step they are looking at.
+   */
+  function regenerate() {
+    const turn = history.turns[history.index];
+    if (!turn || isLoading) return;
+    const note = feedback.trim();
+    const instruction = note
+      ? `${turn.prompt}\n\nAdditional feedback: ${note}`.slice(0, PROMPT_MAX_LENGTH)
+      : turn.prompt;
+    runGeneration({
+      instruction,
+      base: history.turns[history.index - 1]?.spec ?? null,
+      replacing: true,
+    });
   }
 
   /**
@@ -142,7 +210,14 @@ export function NewDashboardClient({
     setHistory(EMPTY_HISTORY);
     setSaveError(null);
     setPrompt("");
+    setFeedback("");
     setActiveTab("chat");
+  }
+
+  /** Preview an earlier turn. The feedback box belongs to the turn it was typed on. */
+  function restore(index: number) {
+    setHistory((h) => restoreTurn(h, index));
+    setFeedback("");
   }
 
   async function save() {
@@ -276,13 +351,20 @@ export function NewDashboardClient({
                 />
               )}
               <div>
-                <Label htmlFor="prompt">
-                  {refining
-                    ? "Refine it — each follow-up is one more turn"
-                    : starters.length > 0
-                      ? "Describe the dashboard or try one below"
-                      : "Describe the dashboard"}
-                </Label>
+                <div className="flex items-center justify-between gap-2">
+                  <Label htmlFor="prompt">
+                    {refining
+                      ? "Refine it — each follow-up is one more turn"
+                      : starters.length > 0
+                        ? "Describe the dashboard or try one below"
+                        : "Describe the dashboard"}
+                  </Label>
+                  <PromptHistoryMenu
+                    history={prompts}
+                    disabled={isLoading}
+                    onPick={setPrompt}
+                  />
+                </div>
                 {!refining && starters.length > 0 && (
                   <div className="mb-2 flex flex-wrap items-center gap-2">
                     {starters.map((preset) => (
@@ -397,10 +479,20 @@ export function NewDashboardClient({
                         }`}
                       >
                         <div className="min-w-0">
-                          <div className="text-xs text-muted">
-                            Turn {i + 1} · {turn.spec.panels.length}{" "}
-                            {turn.spec.panels.length === 1 ? "panel" : "panels"}
-                            {active && " · previewing"}
+                          <div className="flex flex-wrap items-center gap-2 text-xs text-muted">
+                            <span>
+                              Turn {i + 1} · {turn.spec.panels.length}{" "}
+                              {turn.spec.panels.length === 1 ? "panel" : "panels"}
+                              {active && " · previewing"}
+                            </span>
+                            {/* What produced it, so the cost of a regenerate is
+                                visible. A turn applied from a template carries
+                                no model because nothing was asked of one. */}
+                            {turn.model ? (
+                              <Badge title="Generation model">{turn.model}</Badge>
+                            ) : (
+                              <span>no model call</span>
+                            )}
                           </div>
                           <p className="mt-1 break-words text-sm text-foreground">
                             {turn.prompt}
@@ -411,7 +503,7 @@ export function NewDashboardClient({
                             variant="ghost"
                             size="sm"
                             disabled={isLoading}
-                            onClick={() => setHistory((h) => restoreTurn(h, i))}
+                            onClick={() => restore(i)}
                           >
                             <Undo2 className="h-4 w-4" /> Restore
                           </Button>
@@ -420,9 +512,35 @@ export function NewDashboardClient({
                     );
                   })}
                 </ol>
+                {/* Not quite? Ask again for THIS turn with a note about what
+                    was wrong, rather than talking the dashboard forward. One
+                    model call, and it replaces the turn instead of adding one.
+                    Offered only for a turn a model produced. */}
+                {history.turns[history.index]?.model && (
+                  <div className="flex flex-wrap items-end gap-2 border-t border-border pt-3">
+                    <div className="min-w-48 flex-1">
+                      <Label htmlFor="regen-feedback">
+                        Not quite — what should change?
+                      </Label>
+                      <Input
+                        id="regen-feedback"
+                        value={feedback}
+                        placeholder="e.g. fewer panels, and put the error rate first"
+                        onChange={(e) => setFeedback(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter" && !isLoading) regenerate();
+                        }}
+                      />
+                    </div>
+                    <Button variant="secondary" onClick={regenerate} disabled={isLoading}>
+                      <RefreshCw className="h-4 w-4" /> Regenerate
+                    </Button>
+                  </div>
+                )}
                 <p className="text-xs text-muted">
                   Nothing is saved until you press Save. Refining from a restored turn
-                  drops the turns that followed it.
+                  drops the turns that followed it, and a regenerate replaces the turn you
+                  are previewing.
                 </p>
               </CardContent>
             </Card>

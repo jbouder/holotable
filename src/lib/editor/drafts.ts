@@ -1,4 +1,6 @@
 import { z } from "zod";
+import type { BrowserStorage } from "@/lib/browser-storage";
+import { browserStorage } from "@/lib/browser-storage";
 import { Dashboard } from "@/lib/ir";
 import { specFingerprint } from "@/lib/editor/session";
 
@@ -63,14 +65,11 @@ export function draftKey(dashboardId: string, userSub: string): string {
   return `${DRAFT_KEY_PREFIX}${dashboardId}:${userSub}`;
 }
 
-/** The minimum of the Storage API this module uses, so tests can supply one. */
-export interface DraftStorage {
-  getItem(key: string): string | null;
-  setItem(key: string, value: string): void;
-  removeItem(key: string): void;
-  readonly length: number;
-  key(index: number): string | null;
-}
+/**
+ * The minimum of the Storage API this module uses, so tests can supply one.
+ * Shared with recent prompts (#83), which needs exactly the same subset.
+ */
+export type DraftStorage = BrowserStorage;
 
 /**
  * Reading `localStorage` throws outright in some privacy modes, and the value
@@ -248,9 +247,5 @@ export function draftOffer(input: {
 
 /** `localStorage` if this browser has one it will actually hand over. */
 export function browserDraftStorage(): DraftStorage | null {
-  try {
-    return typeof window === "undefined" ? null : window.localStorage;
-  } catch {
-    return null;
-  }
+  return browserStorage();
 }

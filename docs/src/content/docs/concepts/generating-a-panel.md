@@ -134,6 +134,37 @@ followed it. **Nothing is persisted until Save** — that is still the ordinary
 because every panel's `query.sourceId` must match the source the spec was
 generated against.
 
+## Asking again, and remembering what you asked
+
+Two affordances make a generation feel reversible rather than final.
+
+**Regenerate with feedback.** A follow-up talks the dashboard *forward*; a
+regenerate asks again for the turn you are looking at, with a note about what
+was wrong ("fewer panels, and put the error rate first"). It is one model call,
+carrying the turn's own prompt, the spec that turn was generated **from**, and
+the feedback — and it *replaces* that turn rather than adding one. Deliberately
+not the spec being reviewed: feeding the model back its own rejected answer
+compounds it, and pressing Regenerate twice would drift further each time. The
+panel editor's regenerate works the same way one level down, against the panel
+in the spec rather than the proposal on screen.
+
+Each turn is badged with the model that produced it, so the cost of asking
+again is visible; a turn applied from a template says *no model call*, because
+none was made.
+
+**Recent prompts.** The prompt box keeps the last few prompts per workspace and
+offers them back in a dropdown; choosing one fills the box rather than
+submitting, so re-use and edit are the same gesture. The create box, the panel
+editor's NL edit and Explore keep separate lists — "make it a bar chart" is a
+panel edit and is nonsense as a dashboard description.
+
+The list lives in `localStorage` (`src/lib/prompt-history.ts`) and is never sent
+anywhere: it is capped, expired, scoped to `(workspace, box)`, and read back as
+untrusted. The durable record of what was asked is the **generation log**, which
+stores a redacted prompt, a hash of the catalog that was in context and the spec
+that came back, and is readable only by a workspace source-admin — see
+[Data model](/architecture/data-model/).
+
 ## Keeping an Explore answer
 
 An explore panel is a spec like any other, so Explore can pin it to a dashboard
