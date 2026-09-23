@@ -125,7 +125,7 @@ export function DashboardChat({
         size="icon"
         aria-label="Ask about this dashboard"
         onClick={() => setOpen(true)}
-        className="fixed bottom-6 right-6 z-50 h-12 w-12 shadow-lg"
+        className="fixed bottom-6 right-6 z-50 h-12 w-12 rounded-full shadow-lg"
       >
         <MessageSquare className="h-5 w-5" />
       </Button>
