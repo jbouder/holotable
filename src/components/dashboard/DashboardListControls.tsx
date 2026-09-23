@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { Search, X } from "lucide-react";
 import { Input, Label } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
-import { Button } from "@/components/ui/button";
+import { Button, ButtonLabel } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import {
   type DashboardQuery,
@@ -86,9 +86,11 @@ export function DashboardListControls({
           <Button
             variant="ghost"
             size="sm"
+            collapse
+            title="Clear filters"
             onClick={() => go({ ...query, search: "", tags: [], page: 1 })}
           >
-            <X className="h-4 w-4" /> Clear
+            <X className="h-4 w-4" /> <ButtonLabel>Clear</ButtonLabel>
           </Button>
         )}
       </div>

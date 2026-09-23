@@ -12,7 +12,7 @@ import {
   referencedSourceIds,
 } from "@/lib/dashboard-export";
 import type { ApiError } from "@/lib/errors";
-import { Button } from "@/components/ui/button";
+import { Button, ButtonLabel } from "@/components/ui/button";
 import { Label } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { Dialog } from "@/components/ui/dialog";
@@ -98,8 +98,8 @@ export function ImportDashboard({ targets }: { targets: ImportTarget[] }) {
 
   return (
     <>
-      <Button variant="secondary" onClick={openDialog}>
-        <Upload className="h-4 w-4" /> Import
+      <Button variant="secondary" collapse title="Import" onClick={openDialog}>
+        <Upload className="h-4 w-4" /> <ButtonLabel>Import</ButtonLabel>
       </Button>
 
       <Dialog

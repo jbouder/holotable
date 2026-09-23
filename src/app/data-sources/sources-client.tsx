@@ -18,7 +18,7 @@ import { type CatalogHealth, describeCatalogHealth } from "@/lib/catalog/health"
 import { CatalogHealthBadge } from "@/components/sources/catalog-health";
 import { SourceTestReport } from "@/components/sources/SourceTestReport";
 import type { SourceTestResult } from "@/lib/source-test";
-import { Button } from "@/components/ui/button";
+import { Button, ButtonLabel } from "@/components/ui/button";
 import { Textarea, Label } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
@@ -205,12 +205,14 @@ export function SourcesClient({
               accessible workspace. Restore this to switch workspaces. */}
           {sources !== null && (
             <Button
+              collapse
+              title="Add source"
               onClick={() => {
                 setNotice(null);
                 setCreating(true);
               }}
             >
-              <Plus className="h-4 w-4" /> Add source
+              <Plus className="h-4 w-4" /> <ButtonLabel>Add source</ButtonLabel>
             </Button>
           )}
         </div>

@@ -3,7 +3,7 @@
 import * as React from "react";
 import { useRouter } from "next/navigation";
 import { Trash2, Loader2 } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { Button, ButtonLabel } from "@/components/ui/button";
 import { ErrorDisplay } from "@/components/ui/error-display";
 import { type ApiError, readApiError } from "@/lib/errors";
 
@@ -44,6 +44,8 @@ export function DeleteDashboardButton({
       <Button
         variant="ghost"
         size="sm"
+        collapse
+        title="Delete"
         onClick={onDelete}
         disabled={deleting}
         className="text-muted hover:bg-danger/10 hover:text-danger"
@@ -53,7 +55,7 @@ export function DeleteDashboardButton({
         ) : (
           <Trash2 className="h-4 w-4" />
         )}
-        Delete
+        <ButtonLabel>Delete</ButtonLabel>
       </Button>
       {error && (
         <ErrorDisplay

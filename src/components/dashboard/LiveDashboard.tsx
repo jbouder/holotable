@@ -10,7 +10,7 @@ import { ErrorDisplay } from "@/components/ui/error-display";
 import type { ApiError } from "@/lib/errors";
 import { ConnectionIndicator } from "@/components/dashboard/ConnectionIndicator";
 import type { PanelData } from "@/components/charts/options";
-import { Button } from "@/components/ui/button";
+import { Button, ButtonLabel } from "@/components/ui/button";
 import { TimeRangeFilter } from "@/components/dashboard/TimeRangeFilter";
 import {
   type ConnectionSignal,
@@ -257,11 +257,13 @@ export function LiveDashboard({
             size="sm"
             aria-pressed={!live}
             aria-label={live ? "Pause live updates" : "Resume live updates"}
+            title={live ? "Pause live updates" : "Resume live updates"}
+            collapse
             className="text-muted hover:text-foreground"
             onClick={togglePause}
           >
             {live ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
-            {live ? "Pause" : "Resume"}
+            <ButtonLabel>{live ? "Pause" : "Resume"}</ButtonLabel>
           </Button>
           {actions}
         </div>

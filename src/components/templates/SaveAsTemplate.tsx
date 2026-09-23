@@ -12,7 +12,7 @@ import {
   summarizeTemplate,
   templateSourceIds,
 } from "@/lib/templates";
-import { Button } from "@/components/ui/button";
+import { Button, ButtonLabel } from "@/components/ui/button";
 import { Dialog } from "@/components/ui/dialog";
 import { Input, Label, Textarea } from "@/components/ui/input";
 import { ErrorDisplay } from "@/components/ui/error-display";
@@ -40,6 +40,7 @@ export function SaveAsTemplate({
   defaultName,
   disabled,
   label = "Save as template",
+  collapse = false,
   size = "sm",
   variant = "secondary",
 }: {
@@ -49,6 +50,8 @@ export function SaveAsTemplate({
   defaultName: string;
   disabled?: boolean;
   label?: string;
+  /** Collapse the trigger to its icon below `sm` (see `Button`'s `collapse`). */
+  collapse?: boolean;
   size?: "sm" | "md";
   variant?: "secondary" | "ghost";
 }) {
@@ -109,9 +112,22 @@ export function SaveAsTemplate({
 
   return (
     <>
-      <Button variant={variant} size={size} onClick={openDialog} disabled={disabled}>
+      <Button
+        variant={variant}
+        size={size}
+        collapse={collapse}
+        title={collapse ? label : undefined}
+        onClick={openDialog}
+        disabled={disabled}
+      >
         {saved ? <Check className="h-4 w-4" /> : <BookmarkPlus className="h-4 w-4" />}
-        {saved ? "Saved as template" : label}
+        {collapse ? (
+          <ButtonLabel>{saved ? "Saved as template" : label}</ButtonLabel>
+        ) : saved ? (
+          "Saved as template"
+        ) : (
+          label
+        )}
       </Button>
 
       <Dialog

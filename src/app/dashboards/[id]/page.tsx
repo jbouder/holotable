@@ -11,7 +11,7 @@ import { DashboardChat } from "@/components/dashboard/DashboardChat";
 import { DeleteDashboardButton } from "@/components/dashboard/delete-dashboard-button";
 import { RecordDashboardVisit } from "@/components/dashboard/RecordDashboardVisit";
 import { SaveAsTemplate } from "@/components/templates/SaveAsTemplate";
-import { Button } from "@/components/ui/button";
+import { Button, ButtonLabel } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
 import { dashboardListHref, EMPTY_QUERY } from "@/lib/dashboard-list";
 import { chatSuggestions } from "@/lib/chat-history";
@@ -128,9 +128,11 @@ export default async function DashboardViewPage({
               <Button
                 variant="ghost"
                 size="sm"
+                collapse
+                title="Export"
                 className="text-muted hover:text-foreground"
               >
-                <Download className="h-4 w-4" /> Export
+                <Download className="h-4 w-4" /> <ButtonLabel>Export</ButtonLabel>
               </Button>
             </a>
             {canSaveTemplate && (
@@ -139,6 +141,7 @@ export default async function DashboardViewPage({
                 defaultName={dashboard.spec.title}
                 subject={{ kind: "dashboard", dashboard: dashboard.spec }}
                 variant="ghost"
+                collapse
               />
             )}
             {canEdit && (
@@ -146,9 +149,11 @@ export default async function DashboardViewPage({
                 <Button
                   variant="ghost"
                   size="sm"
+                  collapse
+                  title="Edit"
                   className="text-muted hover:text-foreground"
                 >
-                  <Pencil className="h-4 w-4" /> Edit
+                  <Pencil className="h-4 w-4" /> <ButtonLabel>Edit</ButtonLabel>
                 </Button>
               </Link>
             )}

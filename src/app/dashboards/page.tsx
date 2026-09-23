@@ -24,7 +24,7 @@ import { DashboardCard } from "@/components/dashboard/DashboardCard";
 import { DashboardListControls } from "@/components/dashboard/DashboardListControls";
 import { RecentDashboards } from "@/components/dashboard/RecentDashboards";
 import { ImportDashboard } from "./import-dashboard";
-import { Button } from "@/components/ui/button";
+import { Button, ButtonLabel } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
 
 export const dynamic = "force-dynamic";
@@ -124,8 +124,8 @@ export default async function DashboardsPage({
           <div className="flex items-center gap-2">
             <ImportDashboard targets={importTargets} />
             <Link href="/dashboards/new">
-              <Button>
-                <Plus className="h-4 w-4" /> New dashboard
+              <Button collapse title="New dashboard">
+                <Plus className="h-4 w-4" /> <ButtonLabel>New dashboard</ButtonLabel>
               </Button>
             </Link>
           </div>

@@ -34,7 +34,7 @@ import {
 } from "@/lib/panel-list";
 import { isStarterSql, starterPanel } from "@/lib/panel-starter";
 import { clampLayout } from "@/lib/grid-layout";
-import { Button } from "@/components/ui/button";
+import { Button, ButtonLabel } from "@/components/ui/button";
 import { Input, Textarea, Label } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -1017,28 +1017,33 @@ export function EditDashboardClient({
                   <Button
                     variant="secondary"
                     size="sm"
+                    collapse
+                    title="Add a panel from a template"
                     onClick={() => setPicking(true)}
                     disabled={sources.length === 0}
                   >
-                    <LayoutTemplate className="h-4 w-4" /> From template
+                    <LayoutTemplate className="h-4 w-4" />{" "}
+                    <ButtonLabel>From template</ButtonLabel>
                   </Button>
                   <Button
                     variant="secondary"
                     size="sm"
                     onClick={() => addPanel(true)}
                     disabled={sources.length === 0}
+                    collapse
                     title="Add a panel and describe it to the model"
                   >
-                    <Sparkles className="h-4 w-4" /> Describe
+                    <Sparkles className="h-4 w-4" /> <ButtonLabel>Describe</ButtonLabel>
                   </Button>
                   <Button
                     variant="secondary"
                     size="sm"
                     onClick={() => addPanel()}
                     disabled={sources.length === 0}
+                    collapse
                     title={`Add a panel${hint("new-panel")}`}
                   >
-                    <Plus className="h-4 w-4" /> Add
+                    <Plus className="h-4 w-4" /> <ButtonLabel>Add</ButtonLabel>
                   </Button>
                 </div>
               </CardHeader>
