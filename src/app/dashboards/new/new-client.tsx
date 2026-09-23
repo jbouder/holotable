@@ -126,7 +126,8 @@ export function NewDashboardClient({
       // prompt for Try again — and only if the author has not started typing
       // the next follow-up into it while this one streamed.
       setPrompt((p) => (p === running.current.prompt ? "" : p));
-      setActiveTab("preview");
+      // Stay on Chat: the next follow-up, Save and Start over are all here,
+      // and Preview is one click away when the author wants it.
     },
   });
 
@@ -205,7 +206,6 @@ export function NewDashboardClient({
     setSourceId(input.sourceId);
     setSaveError(null);
     setPicking(false);
-    setActiveTab("preview");
   }
 
   function startOver() {
