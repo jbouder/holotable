@@ -19,6 +19,7 @@ import {
   reduceConnection,
 } from "@/lib/connection";
 import { DRAIN_EVENT } from "@/lib/sse";
+import { isRolling, rangeSearch } from "@/lib/time-range";
 
 /**
  * A panel that was live is now only as fresh as its last frame. Used on a
@@ -53,6 +54,7 @@ export function LiveDashboard({
   dashboardId,
   spec,
   maxWindowPoints,
+  initialTimeRange,
   header,
   actions,
   empty,
@@ -60,6 +62,12 @@ export function LiveDashboard({
   dashboardId: string;
   spec: Dashboard;
   maxWindowPoints: number;
+  /**
+   * The window to open on, from the URL. The server validated it against the
+   * IR and fell back to the spec's own range, so this is always a window the
+   * stream route will accept.
+   */
+  initialTimeRange?: TimeRange;
   header?: React.ReactNode;
   actions?: React.ReactNode;
   /** Shown in place of the grid when the spec carries no panels. */
@@ -67,7 +75,9 @@ export function LiveDashboard({
 }) {
   const [states, setStates] = React.useState<Record<string, PanelState>>({});
   const [live, setLive] = React.useState(true);
-  const [timeRange, setTimeRange] = React.useState<TimeRange>(spec.timeRange);
+  const [timeRange, setTimeRange] = React.useState<TimeRange>(
+    initialTimeRange ?? spec.timeRange,
+  );
   const [connection, setConnection] =
     React.useState<ConnectionStatus>(INITIAL_CONNECTION);
   // A failure of the whole cycle rather than of one panel — an unresolvable
@@ -79,10 +89,28 @@ export function LiveDashboard({
   // shortcut, so the socket has to be replaced rather than nudged.
   const [reconnectNonce, setReconnectNonce] = React.useState(0);
   const lastTickRef = React.useRef<number>(0);
+  const rolling = isRolling(timeRange);
   const streamUrl = React.useMemo(() => {
     const params = new URLSearchParams(timeRange);
     return `/api/dashboards/${dashboardId}/stream?${params.toString()}`;
   }, [dashboardId, timeRange]);
+
+  /**
+   * Keep the URL on the window being viewed, so a range is a link someone can
+   * send.
+   *
+   * `history.replaceState` rather than `router.replace`: this is the same
+   * route, and a Next navigation would re-render the server page and remount
+   * this component — tearing down the EventSource and blanking every panel
+   * every time the range changed.
+   */
+  React.useEffect(() => {
+    const search = rangeSearch(timeRange, spec.timeRange);
+    const url = `${window.location.pathname}${search}`;
+    if (url !== window.location.pathname + window.location.search) {
+      window.history.replaceState(null, "", url);
+    }
+  }, [timeRange, spec.timeRange]);
 
   const signal = React.useCallback((s: ConnectionSignal) => {
     setConnection((prev) => reduceConnection(prev, s));
@@ -187,8 +215,11 @@ export function LiveDashboard({
   }, [applyEvent, live, signal, streamUrl, reconnectNonce]);
 
   // Staleness watchdog. Disabled while paused — a paused dashboard is not stale.
+  // An absolute window is frozen by definition: the poller keeps ticking, but
+  // it re-queries the same seconds, so "no new data" is the correct state and
+  // not a stale one.
   React.useEffect(() => {
-    if (!live) return;
+    if (!live || !rolling) return;
     const budget = Math.max(spec.refreshIntervalMs * 2, 6_000);
     const id = setInterval(() => {
       if (Date.now() - lastTickRef.current > budget) {
@@ -196,7 +227,7 @@ export function LiveDashboard({
       }
     }, budget);
     return () => clearInterval(id);
-  }, [spec.refreshIntervalMs, live]);
+  }, [spec.refreshIntervalMs, live, rolling]);
 
   // Read `live` directly rather than from a `setLive` updater: the updater can
   // run twice under StrictMode, and signalling the reducer from inside it would
@@ -243,6 +274,8 @@ export function LiveDashboard({
             paused={!live}
             timeRange={timeRange}
             dashboardTitle={spec.title}
+            crosshairGroup={dashboardId}
+            onSelectTimeRange={setTimeRange}
           />
         )}
       />
