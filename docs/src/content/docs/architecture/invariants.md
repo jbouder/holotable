@@ -99,6 +99,16 @@ model controls neither the time window nor resource usage. Each execution also p
 plus `public`, so unqualified table names resolve only against the allowlisted
 schema.
 
+`POST /api/sources/[id]/test` is where that claim is *checked* rather than
+assumed (#126). Inside the same read-only transaction, it attempts a harmless
+write — `CREATE TEMP TABLE` — and reports whether the server refused it with
+SQLSTATE `25006`. The refusal is the expected outcome; a write that **succeeds**
+means the configured role is more privileged than everything above assumes, and
+the test says so as a finding rather than showing a tick. The probe runs in a
+savepoint inside a transaction that is always rolled back, and Postgres makes
+DDL transactional, so it cannot leave anything behind even in the case where
+the server allows it.
+
 ## 9. The catalog prompt is metadata only, and that metadata is untrusted
 
 Table and column names and types for a **single selected, authorized source per
