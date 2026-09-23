@@ -94,7 +94,7 @@ export function DashboardListControls({
         </Label>
         <Select
           id="dashboard-sort"
-          className="shrink-0 sm:w-44"
+          className="shrink-0"
           value={query.sort}
           options={SORTS}
           onValueChange={(value) =>

@@ -124,8 +124,9 @@ export default async function DashboardsPage({
           <div className="flex items-center gap-2">
             <ImportDashboard targets={importTargets} />
             <Link href="/dashboards/new">
-              <Button collapse title="New dashboard" className="sm:w-44">
-                <Plus className="h-4 w-4" /> <ButtonLabel>New dashboard</ButtonLabel>
+              <Button collapse title="Create New Dashboard">
+                <Plus className="h-4 w-4" />{" "}
+                <ButtonLabel>Create New Dashboard</ButtonLabel>
               </Button>
             </Link>
           </div>
