@@ -24,7 +24,7 @@ export function Dialog({
         <BaseDialog.Backdrop className="fixed inset-0 z-40 bg-black/60" />
         <BaseDialog.Popup
           className={cn(
-            "fixed inset-x-4 top-1/2 z-50 mx-auto max-h-[calc(100vh-2rem)] w-auto max-w-3xl -translate-y-1/2 overflow-y-auto border border-border bg-surface p-4 shadow-xl focus:outline-none sm:p-6",
+            "fixed inset-x-4 top-1/2 z-50 mx-auto max-h-[calc(100vh-2rem)] w-auto max-w-3xl -translate-y-1/2 overflow-y-auto border border-border bg-surface p-4 pt-2 shadow-xl focus:outline-none sm:p-6 sm:pt-3",
             className,
           )}
         >
