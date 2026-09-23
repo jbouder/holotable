@@ -58,13 +58,13 @@ export function DashboardListControls({
   return (
     <div className="mb-4 flex flex-col gap-3">
       {/*
-        One row at every width. The search grows with the screen up to
-        `max-w-xl` and the sort control is pushed to the right edge; on a
-        phone the search shrinks instead of the sort wrapping below it
-        (`min-w-0` lets the input go narrower than its intrinsic width).
+        One row at every width. The search takes whatever the controls leave
+        and the sort control sits at the right edge; on a phone the search
+        shrinks instead of the sort wrapping below it (`min-w-0` lets the
+        input go narrower than its intrinsic width).
       */}
       <div className="flex items-center gap-2">
-        <div className="relative min-w-0 max-w-xl flex-1">
+        <div className="relative min-w-0 flex-1">
           <Search
             className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted"
             aria-hidden
@@ -94,7 +94,7 @@ export function DashboardListControls({
         </Label>
         <Select
           id="dashboard-sort"
-          className="ml-auto shrink-0 sm:w-44"
+          className="shrink-0 sm:w-44"
           value={query.sort}
           options={SORTS}
           onValueChange={(value) =>
