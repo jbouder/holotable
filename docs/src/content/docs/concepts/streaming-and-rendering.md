@@ -90,6 +90,49 @@ stream of counting seconds.
 A reopened socket does **not** reset the freshness clock: it answers "how old
 is this number", not "how old is this connection".
 
+## Choosing the window
+
+The header's time picker offers three ways to say the same thing, plus shift
+and zoom over whatever is currently chosen:
+
+- **Quick ranges** — the five presets (15m … 7d), all relative to `now`.
+- **Last N** — a custom relative width in minutes, hours, days or weeks.
+- **Absolute** — two `datetime-local` instants, entered and displayed in the
+  reader's own zone and stored as UTC ISO-8601.
+- **Shift back / forward** moves the window by its own width; **zoom out**
+  doubles it. Shifting forward past `now` snaps back to the rolling window of
+  the same width, which is how a reader who went looking at yesterday returns
+  to live.
+- **Brushing** a line, area or bar panel that has a `timeField` selects the
+  stretch of time the drag covered and makes it the dashboard's window.
+  `brushedRange` reads the timestamps of the first and last rows the selection
+  covered; a selection it cannot read leaves the window alone rather than
+  guessing at one. `scatter`, `pie`, `donut`, `heatmap`, `stat` and `table`
+  panels are not brushable — their x-axis is not time laid out left to right.
+- Panels on one dashboard share a **crosshair**: moving the pointer over one
+  chart moves the axis pointer on the others. This is done by forwarding the
+  hovered category index between the instances, not with `echarts.connect`,
+  which mirrors *every* connected action — a brush included — and would make
+  one drag produce a selection on every panel.
+
+Everything the picker emits is a pair of IR `TimeExpr` strings. The client is
+never the authority on the window that was queried: the expressions go out on
+the stream URL, the route re-parses them against `TimeRange`, and the poller
+calls `resolveTimeRange` itself on every tick (invariant 4). A window that
+`TimeRange` refuses is a `400` on the stream and falls back to the dashboard's
+own range on the page.
+
+An **absolute** window is frozen by definition — the poller keeps ticking, but
+it re-queries the same seconds — so the picker badges it *Fixed range* and
+offers a way back, and the staleness watchdog is switched off for it. "No new
+data" is the correct state there, not a stale one.
+
+The chosen window is written into the URL with `history.replaceState`, so a
+range is a link someone can send. It is `replaceState` and not a Next
+navigation because re-rendering the server page would remount the viewer and
+tear down the `EventSource` on every change. The dashboard's own range is left
+out of the query string, so the default link stays clean.
+
 ## Pausing
 
 The viewer can pause live updates. The Pause/Resume toggle closes the
@@ -121,6 +164,36 @@ None of the three asks the server for anything. An export therefore cannot
 contain a row the panel was not already showing, and cannot become a second,
 unguarded way to run a query. Exporting the **full** result set server-side is
 a different feature and is not this one.
+
+## Getting around: Cmd/Ctrl+K
+
+`CommandPalette` (`src/components/command-palette.tsx`) is mounted in the root
+layout for a signed-in identity and opens anywhere in the app. It lists
+dashboards, data sources, the app's pages, and a handful of actions — new
+dashboard, new source, the theme, and a catalog refresh for a source the caller
+administers.
+
+It is a navigator, not a second API surface. Results come from
+`GET /api/search`, whose candidate workspaces come from the validated claims:
+there is no workspace parameter, so nothing in the query string can widen what
+comes back, and a result is by construction somewhere the identity could
+already go. A source is projected to its id, name and workspace —
+`SourceRecord` carries the connection config and the catalog, and neither has
+any business in a search result (invariant 5). The one action that is not
+navigation posts to the same guarded `/api/sources/[id]/refresh` the source
+list already uses, which checks `source:manage` for itself.
+
+Matching and ordering live in `src/lib/command-palette.ts` as pure functions
+over a payload and a query, which is what makes them testable. Actions are
+*data* — a tagged union the component switches on — rather than callbacks, so a
+command can be ranked, compared and remembered. Recently-used commands are kept
+in `localStorage` and lead the list before anything is typed; once something is
+typed the score decides and recency only breaks ties. A remembered id is
+treated as untrusted: it can name a command, never reach one.
+
+The listbox follows the APG combobox pattern rather than a menu — real focus
+stays in the text field and `aria-activedescendant` points at the selection —
+because a menu would move focus out of the box being typed into.
 
 ## A rendering detail worth knowing
 

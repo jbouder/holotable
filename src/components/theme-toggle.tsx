@@ -2,50 +2,21 @@
 
 import * as React from "react";
 import { Moon, Sun, Monitor } from "lucide-react";
+import {
+  applyTheme,
+  DEFAULT_THEME,
+  savedTheme,
+  setTheme as storeTheme,
+  type Theme,
+  THEME_EVENT,
+} from "@/lib/theme";
 import { cn } from "@/lib/utils";
-
-type Theme = "dark" | "light" | "system";
-
-const STORAGE_KEY = "theme";
-const THEMES: Theme[] = ["dark", "light", "system"];
-
-/**
- * What the server renders and what the client hydrates with. The inline
- * bootstrap script in the root layout falls back to the same value, so the two
- * have to stay in step.
- */
-const DEFAULT_THEME: Theme = "dark";
 
 const OPTIONS: { value: Theme; label: string; Icon: typeof Sun }[] = [
   { value: "light", label: "Light", Icon: Sun },
   { value: "dark", label: "Dark", Icon: Moon },
   { value: "system", label: "System", Icon: Monitor },
 ];
-
-function isTheme(value: string | null): value is Theme {
-  return THEMES.includes(value as Theme);
-}
-
-function savedTheme(): Theme {
-  try {
-    const value = window.localStorage.getItem(STORAGE_KEY);
-    return isTheme(value) ? value : DEFAULT_THEME;
-  } catch {
-    return DEFAULT_THEME;
-  }
-}
-
-function applyTheme(theme: Theme) {
-  const resolved =
-    theme === "system"
-      ? window.matchMedia("(prefers-color-scheme: dark)").matches
-        ? "dark"
-        : "light"
-      : theme;
-
-  document.documentElement.dataset.theme = resolved;
-  document.documentElement.style.colorScheme = resolved;
-}
 
 export function ThemeToggle() {
   // Not savedTheme(): the server has no localStorage, so the first client
@@ -76,14 +47,17 @@ export function ThemeToggle() {
     return () => media.removeEventListener("change", handleChange);
   }, [theme]);
 
+  // The toggle is no longer the only way to change the theme -- the command
+  // palette can too -- so it follows the preference rather than owning it.
+  React.useEffect(() => {
+    const onThemeChange = (e: Event) => setTheme((e as CustomEvent<Theme>).detail);
+    window.addEventListener(THEME_EVENT, onThemeChange);
+    return () => window.removeEventListener(THEME_EVENT, onThemeChange);
+  }, []);
+
   function updateTheme(value: Theme) {
     setTheme(value);
-    applyTheme(value);
-    try {
-      window.localStorage.setItem(STORAGE_KEY, value);
-    } catch {
-      // The selected theme still applies when storage is unavailable.
-    }
+    storeTheme(value);
   }
 
   return (

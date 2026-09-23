@@ -1,29 +1,44 @@
 "use client";
 
-import type * as React from "react";
+import * as React from "react";
 import { Popover as BasePopover } from "@base-ui/react/popover";
 import { cn } from "@/lib/utils";
 
 /**
- * A small panel of text anchored to the control that opens it.
+ * A small panel anchored to the control that opens it.
  *
  * Deliberately a popover and not a tooltip: the content is prose a reader may
- * want to keep open and select, and a tooltip is not reachable by touch.
+ * want to keep open and select, or a form they need to reach, and a tooltip is
+ * neither selectable nor reachable by touch.
+ *
+ * `children` may be a function, which receives a `close` callback — a form
+ * inside a popover needs to dismiss itself once it has been applied. That is
+ * why the open state is held here rather than left to Base UI: `Popover.Close`
+ * closes on a click of the element it renders, and "apply, then close" is not
+ * a click on anything in particular.
  */
 export function Popover({
   label,
   trigger,
   children,
   className,
+  panelClassName,
+  align = "end",
 }: {
-  /** The trigger's accessible name — it holds an icon, so it needs one. */
+  /** The trigger's accessible name — it usually holds an icon, so it needs one. */
   label: string;
   trigger: React.ReactNode;
-  children: React.ReactNode;
+  children: React.ReactNode | ((close: () => void) => React.ReactNode);
+  /** Replaces the default icon-button trigger styling when a caller needs a wider control. */
   className?: string;
+  panelClassName?: string;
+  align?: "start" | "center" | "end";
 }) {
+  const [open, setOpen] = React.useState(false);
+  const close = React.useCallback(() => setOpen(false), []);
+
   return (
-    <BasePopover.Root>
+    <BasePopover.Root open={open} onOpenChange={setOpen}>
       <BasePopover.Trigger
         aria-label={label}
         title={label}
@@ -35,9 +50,19 @@ export function Popover({
         {trigger}
       </BasePopover.Trigger>
       <BasePopover.Portal>
-        <BasePopover.Positioner side="bottom" align="end" sideOffset={4} className="z-50">
-          <BasePopover.Popup className="max-w-xs rounded-lg border border-border bg-surface p-3 text-xs leading-relaxed text-foreground shadow-xl focus:outline-none">
-            {children}
+        <BasePopover.Positioner
+          side="bottom"
+          align={align}
+          sideOffset={4}
+          className="z-50"
+        >
+          <BasePopover.Popup
+            className={cn(
+              "max-w-xs rounded-lg border border-border bg-surface p-3 text-xs leading-relaxed text-foreground shadow-xl focus:outline-none",
+              panelClassName,
+            )}
+          >
+            {typeof children === "function" ? children(close) : children}
           </BasePopover.Popup>
         </BasePopover.Positioner>
       </BasePopover.Portal>

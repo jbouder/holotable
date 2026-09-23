@@ -67,6 +67,12 @@ hand.
 | `/api/sources/[id]/test` | POST | source-admin | Connectivity, latency, server and role identity, a **read-only proof**, and per-table reachability. All of it inside one rolled-back read-only transaction |
 | `/api/sources/[id]/refresh` | POST | source-admin | Re-introspect the catalog; records freshness and any allowlisted table the database no longer has |
 
+## Search
+
+| Route | Method | Min role | Notes |
+| --- | --- | --- | --- |
+| `/api/search` | GET | viewer | What the command palette searches. Dashboards and sources across every workspace the caller can already reach, taken from the claims — there is **no** workspace parameter to widen it. A source is projected to its id, name, workspace and whether the caller may manage it; the connection config and the catalog never leave the server |
+
 ## Auth
 
 | Route | Method | Notes |

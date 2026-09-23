@@ -3,6 +3,8 @@ import { Chakra_Petch, JetBrains_Mono } from "next/font/google";
 import { headers } from "next/headers";
 import "./globals.css";
 import { NavBar } from "@/components/nav-bar";
+import { CommandPalette } from "@/components/command-palette";
+import { getIdentity } from "@/lib/auth/authorize";
 import { NONCE_REQUEST_HEADER } from "@/lib/security-headers";
 
 const fontSans = Chakra_Petch({
@@ -30,6 +32,10 @@ export default async function RootLayout({
   // stamps its own scripts with it; the hand-written script below is ours to
   // stamp. Absent only when the proxy did not run for this request.
   const nonce = (await headers()).get(NONCE_REQUEST_HEADER) ?? undefined;
+  // The palette searches an authenticated endpoint, so it is not mounted for a
+  // signed-out visitor: a Cmd+K that could only ever answer 401 is worse than
+  // no Cmd+K.
+  const signedIn = (await getIdentity()) !== null;
   return (
     <html
       lang="en"
@@ -62,6 +68,7 @@ export default async function RootLayout({
       <body className="min-h-full flex flex-col">
         <NavBar />
         <main className="flex-1 px-6 py-6">{children}</main>
+        {signedIn && <CommandPalette />}
       </body>
     </html>
   );

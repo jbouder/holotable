@@ -15,18 +15,22 @@ import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
 import { dashboardListHref, EMPTY_QUERY } from "@/lib/dashboard-list";
 import { chatSuggestions } from "@/lib/chat-history";
+import { rangeFromParams } from "@/lib/time-range";
 
 export const dynamic = "force-dynamic";
 
 export default async function DashboardViewPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ id: string }>;
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
   const identity = await getIdentity();
   if (!identity) return <SignIn />;
 
   const { id } = await params;
+  const query = await searchParams;
   const dashboard = await getDashboardById(id);
   if (!dashboard) notFound();
 
@@ -56,6 +60,11 @@ export default async function DashboardViewPage({
         dashboardId={id}
         spec={dashboard.spec}
         maxWindowPoints={config.maxWindowPoints}
+        // A shared link carries the window it was shared for. It is parsed
+        // against the IR here and falls back to the dashboard's own range, so
+        // a mangled `?from=` opens the dashboard rather than an error — and
+        // the stream route re-validates and re-resolves it regardless.
+        initialTimeRange={rangeFromParams(query, dashboard.spec.timeRange)}
         // A saved dashboard with no panels is reachable — an import trimmed to
         // nothing, or every panel deleted in the editor — and used to render as
         // a header over blank space with a live badge above it.
