@@ -6,8 +6,8 @@ sidebar:
 ---
 
 Everything that belongs to you rather than to a dashboard lives behind the
-**account menu**, the round button with your initials at the right of the top
-bar. It shows who you are signed in as and holds four things:
+**account menu** at the right of the top bar: your initials in a round avatar,
+with your name beside them on a wider screen. It holds four things:
 
 - **Settings**, the page described below.
 - **Keyboard shortcuts**, which opens the shortcuts section of Settings.

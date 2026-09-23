@@ -1,6 +1,6 @@
 "use client";
 
-import { Keyboard, LogOut, Settings, UserRound } from "lucide-react";
+import { ChevronDown, Keyboard, LogOut, Settings, UserRound } from "lucide-react";
 import {
   Menu,
   MenuItem,
@@ -23,7 +23,9 @@ export interface ProfileMenuAccount {
  * The account menu at the right of the header (#210): who is signed in, the
  * way into Settings, the theme, and Sign out. It replaces the bar's bare Sign
  * out button and theme toggle, and it is the same control at every width, so
- * there is one place for a person's own things.
+ * there is one place for a person's own things. The trigger shows who is
+ * signed in without opening it: initials always, the name beside them from
+ * `sm` up.
  */
 export function ProfileMenu({ account }: { account: ProfileMenuAccount }) {
   const [theme, setTheme] = useThemePreference();
@@ -39,15 +41,29 @@ export function ProfileMenu({ account }: { account: ProfileMenuAccount }) {
 
   return (
     <Menu
-      label="Account menu"
-      className="h-8 w-8 rounded-full border border-border bg-surface-2 text-xs font-semibold text-foreground"
+      label={name ? `${name}, account menu` : "Account menu"}
+      className="group h-8 w-auto gap-1.5 px-1 text-foreground"
       panelClassName="w-64"
       trigger={
-        letters ? (
-          <span aria-hidden>{letters}</span>
-        ) : (
-          <UserRound className="h-4 w-4" aria-hidden />
-        )
+        <>
+          <span
+            aria-hidden
+            className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-border bg-surface-2 text-xs font-semibold"
+          >
+            {letters ?? <UserRound className="h-4 w-4" />}
+          </span>
+          {/* The name is the point of the pill, but below `sm` it would push
+              the bar onto two lines (#78); there the initials carry it. */}
+          {name && (
+            <span aria-hidden className="hidden max-w-40 truncate text-sm sm:inline">
+              {name}
+            </span>
+          )}
+          <ChevronDown
+            aria-hidden
+            className="h-4 w-4 shrink-0 text-muted motion-safe:transition-transform group-data-[popup-open]:rotate-180"
+          />
+        </>
       }
     >
       <div className="px-2 pt-1.5 pb-2">
