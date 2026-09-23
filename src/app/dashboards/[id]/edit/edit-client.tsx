@@ -919,7 +919,7 @@ export function EditDashboardClient({
             id="edit-dashboard-editor-panel"
             aria-labelledby="edit-dashboard-editor-tab"
           >
-            <CardContent className="grid grid-cols-1 gap-4 md:grid-cols-4">
+            <CardContent className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-4">
               <div>
                 <Label htmlFor="title">Title</Label>
                 <Input
@@ -1297,7 +1297,7 @@ function PanelEditor({
           </Button>
         </div>
       )}
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         <div>
           <Label htmlFor="p-title">Title</Label>
           <Input
@@ -1432,7 +1432,11 @@ function PanelEditor({
         }
       />
 
-      <div className="grid grid-cols-4 gap-2">
+      {/*
+        Two up on a phone rather than four 60px-wide number inputs in a row
+        (#78); still one row from `sm`, where it fits.
+      */}
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
         {(["x", "y", "w", "h"] as const).map((k) => (
           <div key={k}>
             <Label htmlFor={`p-${k}`}>{k}</Label>

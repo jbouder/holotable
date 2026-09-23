@@ -4,9 +4,11 @@
  * refuse a misconfigured boot.
  *
  * Two guards. `NEXT_RUNTIME`: the hook also runs for the edge runtime, where
- * neither `pg` nor `process.exit` exist. `NEXT_PHASE`: `next build` invokes
- * the hook while prerendering routes, with `NODE_ENV=production` and no
- * deployment environment; the build must keep succeeding with no `.env` at
+ * neither `pg` nor `process.exit` exist — which is why every Node-only import
+ * here is dynamic, and why the failure exit is reached through
+ * `@/lib/shutdown` rather than written inline. `NEXT_PHASE`: `next build`
+ * invokes the hook while prerendering routes, with `NODE_ENV=production` and
+ * no deployment environment; the build must keep succeeding with no `.env` at
  * all, so validation is a runtime concern only.
  */
 export async function register() {
@@ -30,17 +32,20 @@ export async function register() {
       problems: result.problems.length,
     });
   }
+  // Node-only, like every other import here. It owns both the exit below and
+  // the signal handlers underneath it.
+  const { exitStartupFailure, installSignalHandlers } = await import("@/lib/shutdown");
+
   if (!result.ok) {
     // Throwing here surfaces as "An error occurred while loading
     // instrumentation hook" and Next aborts the start; exit explicitly as well
     // so the outcome does not depend on how the server was launched.
-    process.exit(1);
+    exitStartupFailure();
   }
 
   // Own the termination signals (#47). Next installs its own SIGTERM/SIGINT
   // handlers, which exit 143 without draining, so `NEXT_MANUAL_SIG_HANDLE=true`
   // is set in the `start` script and in the runtime image to hand them over;
   // without it these handlers still run but Next may exit first.
-  const { installSignalHandlers } = await import("@/lib/shutdown");
   installSignalHandlers();
 }

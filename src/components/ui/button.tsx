@@ -31,7 +31,10 @@ export const Button = React.forwardRef<HTMLElement, ButtonProps>(
     <BaseButton
       ref={ref}
       className={cn(
-        "inline-flex items-center justify-center gap-2 rounded-lg font-medium transition-colors cursor-pointer disabled:cursor-not-allowed focus-visible:outline-2 focus-visible:outline-primary",
+        // `tap-target` is the coarse-pointer minimum (#78): on a touch screen
+        // every button grows to 44px in both directions, and on a mouse-driven
+        // screen the compact sizes below are left exactly as they were.
+        "tap-target inline-flex items-center justify-center gap-2 rounded-lg font-medium transition-colors cursor-pointer disabled:cursor-not-allowed focus-visible:outline-2 focus-visible:outline-primary",
         VARIANTS[variant],
         SIZES[size],
         className,

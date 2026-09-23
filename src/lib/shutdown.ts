@@ -233,6 +233,20 @@ export function installSignalHandlers(): void {
 }
 
 /**
+ * Stop the process because it must not serve traffic — a failed startup check.
+ *
+ * It lives here rather than inline in `src/instrumentation.ts` because that
+ * module is compiled for the edge runtime as well as for Node. The guard at
+ * the top of `register()` means the edge build never reaches this, but a bare
+ * `process.exit` in that file is still flagged as an unsupported Node API, and
+ * a standing warning about a line that cannot run is a warning nobody reads.
+ * This module is Node-only and already owns the process's exit codes.
+ */
+export function exitStartupFailure(): never {
+  process.exit(1);
+}
+
+/**
  * Reset every module-level flag. Test-only: a real process drains once and
  * exits, so nothing in `src/` may call this.
  */

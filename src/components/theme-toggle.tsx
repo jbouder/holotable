@@ -82,7 +82,7 @@ export function ThemeToggle() {
             title={label}
             onClick={() => updateTheme(value)}
             className={cn(
-              "flex h-7 w-7 items-center justify-center rounded-md transition-colors cursor-pointer focus-visible:outline-2 focus-visible:outline-primary",
+              "tap-target flex h-7 w-7 items-center justify-center rounded-md transition-colors cursor-pointer focus-visible:outline-2 focus-visible:outline-primary",
               active
                 ? "bg-primary text-primary-foreground"
                 : "text-muted hover:bg-surface hover:text-foreground",

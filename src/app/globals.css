@@ -68,3 +68,49 @@ body {
     border-color: var(--border);
   }
 }
+
+/*
+ * Skeleton placeholders (#72).
+ *
+ * A highlight sweeping across a muted block, not a pulse: a skeleton should
+ * read as "arriving", and a fading rectangle reads as "broken". The whole
+ * animation sits behind `prefers-reduced-motion: no-preference`, so a reader
+ * who asked for less motion is left with a static block and every call site
+ * gets that for free.
+ */
+@keyframes holotable-shimmer {
+  from {
+    background-position: 150% 0;
+  }
+  to {
+    background-position: -50% 0;
+  }
+}
+
+@utility skeleton {
+  background-color: var(--surface-2);
+
+  @media (prefers-reduced-motion: no-preference) {
+    background-image: linear-gradient(
+      90deg,
+      transparent 0%,
+      color-mix(in oklab, var(--foreground) 10%, transparent) 50%,
+      transparent 100%
+    );
+    background-repeat: no-repeat;
+    background-size: 200% 100%;
+    animation: holotable-shimmer 1.6s linear infinite;
+  }
+}
+
+/*
+ * The minimum comfortable target for a finger, applied only where there is a
+ * finger (#78). Scoped to a coarse pointer so a mouse-driven dashboard keeps
+ * its compact toolbars, which is most of what makes a dense grid readable.
+ */
+@utility tap-target {
+  @media (pointer: coarse) {
+    min-height: 2.75rem;
+    min-width: 2.75rem;
+  }
+}

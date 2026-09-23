@@ -30,6 +30,7 @@ import { Select } from "@/components/ui/select";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { PreviewDashboard } from "@/components/dashboard/PreviewDashboard";
+import { GeneratingPanels } from "@/components/dashboard/GeneratingPanels";
 import { ErrorDisplay } from "@/components/ui/error-display";
 import { type ApiError, apiErrorFromThrown, readApiError } from "@/lib/errors";
 import type { CatalogHealth } from "@/lib/catalog/health";
@@ -246,11 +247,6 @@ export function NewDashboardClient({
     const body = await res.json();
     router.push(`/dashboards/${body.dashboard.id}`);
   }
-
-  // While a turn streams, show the partial object; once it lands (or after a
-  // restore) show the turn being previewed, so the JSON always matches the
-  // preview tab rather than whichever run happened last.
-  const shownSpec = isLoading ? object : finalSpec;
 
   if (sources.length === 0) {
     return (
@@ -546,23 +542,34 @@ export function NewDashboardClient({
             </Card>
           )}
 
-          {shownSpec !== undefined && shownSpec !== null && (
+          {/*
+            While it streams, the dashboard is drawn as panel-shaped cards
+            that fill in as their titles arrive; the JSON is what the finished
+            spec is, and stays available behind a disclosure once there is a
+            finished spec to read (#72).
+          */}
+          {isLoading && (
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
-                  {isLoading ? (
-                    <>
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                      <span className="animate-pulse">Generating config…</span>
-                    </>
-                  ) : (
-                    "Generated config"
-                  )}
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  <span>{object?.title || "Generating…"}</span>
                 </CardTitle>
               </CardHeader>
               <CardContent>
+                <GeneratingPanels panels={object?.panels} />
+              </CardContent>
+            </Card>
+          )}
+
+          {!isLoading && finalSpec && (
+            <Card>
+              <CardHeader>
+                <CardTitle>Generated config</CardTitle>
+              </CardHeader>
+              <CardContent>
                 <pre className="max-h-96 overflow-auto rounded-lg border border-border bg-surface p-4 text-xs text-muted">
-                  {JSON.stringify(shownSpec, null, 2)}
+                  {JSON.stringify(finalSpec, null, 2)}
                 </pre>
               </CardContent>
             </Card>

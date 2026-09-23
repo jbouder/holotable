@@ -59,8 +59,10 @@ test("a panel that throws degrades to an error card; siblings keep rendering", a
   assert.match(text, /alpha/);
   assert.match(text, /omega/);
   assert.match(text, /41/);
-  // Three panels are still in the grid — nothing was unmounted.
-  assert.equal(h.container.querySelectorAll("[style*='grid-column']").length, 3);
+  // Three panels are still in the grid — nothing was unmounted. The grid
+  // positions its cells through per-breakpoint custom properties (#78), so
+  // one of those is what marks a cell.
+  assert.equal(h.container.querySelectorAll("[style*='--area-lg']").length, 3);
 
   h.unmount();
 });

@@ -133,51 +133,61 @@ export function PanelLayoutGrid({
   }
 
   return (
-    <div ref={container}>
-      <DashboardGrid
-        panels={shown}
-        rowHeight={ARRANGE_ROW_HEIGHT}
-        renderPanel={(panel) => {
-          const { x, y, w, h } = panel.layout;
-          const active = drag?.id === panel.id;
-          return (
-            <div className="relative h-full">
-              <button
-                type="button"
-                aria-label={`${panel.title}, column ${x + 1}, row ${y + 1}, ${w} of 12 wide, ${h} rows tall. Arrow keys move, shift and arrow keys resize.`}
-                onPointerDown={(e) => begin(e, panel, "move")}
-                onPointerMove={track}
-                onPointerUp={(e) => end(e, true)}
-                onPointerCancel={(e) => end(e, false)}
-                onKeyDown={(e) => nudge(e, panel, "move")}
-                onClick={() => onSelect?.(panel.id)}
-                className={cn(
-                  "absolute inset-0 flex touch-none select-none flex-col items-start gap-0.5 overflow-hidden rounded-lg border p-2 text-left transition-colors",
-                  active ? "cursor-grabbing" : "cursor-grab",
-                  panel.id === selectedId
-                    ? "border-primary bg-surface-2"
-                    : "border-border bg-surface hover:bg-surface-2",
-                )}
-              >
-                <span className="w-full truncate text-xs font-medium">{panel.title}</span>
-                <span className="text-[10px] text-muted">
-                  {panel.viz} · {w}×{h}
-                </span>
-              </button>
-              <button
-                type="button"
-                aria-label={`Resize ${panel.title}. Arrow keys resize.`}
-                onPointerDown={(e) => begin(e, panel, "resize")}
-                onPointerMove={track}
-                onPointerUp={(e) => end(e, true)}
-                onPointerCancel={(e) => end(e, false)}
-                onKeyDown={(e) => nudge(e, panel, "resize")}
-                className="absolute bottom-0 right-0 h-4 w-4 cursor-se-resize touch-none rounded-br-lg border-b-2 border-r-2 border-muted hover:border-primary"
-              />
-            </div>
-          );
-        }}
-      />
+    // The arranger authors 12-column coordinates, so it keeps all twelve at
+    // every width and scrolls sideways when they do not fit: a drag measured
+    // against a re-flowed six-column grid would commit a position the author
+    // never chose (#78). `container` is the inner element on purpose — the
+    // pixel-to-cell math needs the grid's width, not the viewport's.
+    <div className="overflow-x-auto pb-1">
+      <div ref={container} className="min-w-[34rem]">
+        <DashboardGrid
+          panels={shown}
+          responsive={false}
+          rowHeight={ARRANGE_ROW_HEIGHT}
+          renderPanel={(panel) => {
+            const { x, y, w, h } = panel.layout;
+            const active = drag?.id === panel.id;
+            return (
+              <div className="relative h-full">
+                <button
+                  type="button"
+                  aria-label={`${panel.title}, column ${x + 1}, row ${y + 1}, ${w} of 12 wide, ${h} rows tall. Arrow keys move, shift and arrow keys resize.`}
+                  onPointerDown={(e) => begin(e, panel, "move")}
+                  onPointerMove={track}
+                  onPointerUp={(e) => end(e, true)}
+                  onPointerCancel={(e) => end(e, false)}
+                  onKeyDown={(e) => nudge(e, panel, "move")}
+                  onClick={() => onSelect?.(panel.id)}
+                  className={cn(
+                    "absolute inset-0 flex touch-none select-none flex-col items-start gap-0.5 overflow-hidden rounded-lg border p-2 text-left transition-colors",
+                    active ? "cursor-grabbing" : "cursor-grab",
+                    panel.id === selectedId
+                      ? "border-primary bg-surface-2"
+                      : "border-border bg-surface hover:bg-surface-2",
+                  )}
+                >
+                  <span className="w-full truncate text-xs font-medium">
+                    {panel.title}
+                  </span>
+                  <span className="text-[10px] text-muted">
+                    {panel.viz} · {w}×{h}
+                  </span>
+                </button>
+                <button
+                  type="button"
+                  aria-label={`Resize ${panel.title}. Arrow keys resize.`}
+                  onPointerDown={(e) => begin(e, panel, "resize")}
+                  onPointerMove={track}
+                  onPointerUp={(e) => end(e, true)}
+                  onPointerCancel={(e) => end(e, false)}
+                  onKeyDown={(e) => nudge(e, panel, "resize")}
+                  className="absolute bottom-0 right-0 h-4 w-4 cursor-se-resize touch-none rounded-br-lg border-b-2 border-r-2 border-muted hover:border-primary"
+                />
+              </div>
+            );
+          }}
+        />
+      </div>
     </div>
   );
 }
