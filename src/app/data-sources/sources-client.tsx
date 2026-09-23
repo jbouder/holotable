@@ -286,7 +286,14 @@ export function SourcesClient({
           </TableHead>
           <TableBody>
             {sources.map((source) => (
-              <TableRow key={source.id}>
+              // The id doubles as the anchor the command palette links to
+              // (`/data-sources#source-<id>`): there is no per-source route,
+              // and a browser scrolling to a row needs nothing but this.
+              <TableRow
+                key={source.id}
+                id={`source-${source.id}`}
+                className="scroll-mt-24 target:bg-surface-2"
+              >
                 <TableCell>
                   <div className="font-medium">{source.name}</div>
                   <div className="text-xs text-muted">{source.id}</div>
