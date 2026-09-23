@@ -13,6 +13,7 @@ import type { BudgetStore } from "@/lib/limits/budget";
 import type { WorkspaceLimits } from "@/lib/limits/llm";
 import type { ImpactDashboard, SourceImpact } from "@/lib/source-impact";
 import type { StoredChatMessage } from "@/lib/chat-history";
+import type { GenerationLogEntry, GenerationLogRow } from "@/lib/ai/log";
 import { type Template, TemplateBody, TemplateKind } from "@/lib/templates";
 
 /* -------------------------------------------------------------------------- */
@@ -643,6 +644,119 @@ export const pgBudgetStore: BudgetStore = {
     );
   },
 };
+
+/* -------------------------------------------------------------------------- */
+/* Generation log (#23)                                                       */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * Write one generation and sweep what fell out of retention.
+ *
+ * The sweep runs in the same statement batch as the insert, which is what
+ * keeps the table bounded without a scheduled job: the only way a row is added
+ * is the only way rows are removed. `0` days disables the age check and lets
+ * the log grow, which is the right default for nobody and an option for an
+ * operator who ships rows elsewhere.
+ *
+ * Every value here has already been through `generationRow`; this function
+ * does no redaction of its own on purpose, so there is exactly one place to
+ * read to know what reaches the column.
+ */
+export async function insertGenerationLog(
+  row: GenerationLogRow,
+  retentionDays: number,
+): Promise<void> {
+  await withTransaction(async (client) => {
+    await client.query(
+      `INSERT INTO generation_log
+         (workspace_id, created_by, mode, source_id, prompt_redacted,
+          catalog_hash, spec, model, attempts, input_tokens, output_tokens, error)
+       VALUES ($1, $2, $3, $4, $5, $6, $7::jsonb, $8, $9, $10, $11, $12)`,
+      [
+        row.workspaceId,
+        row.createdBy,
+        row.mode,
+        row.sourceId,
+        row.promptRedacted,
+        row.catalogHash,
+        row.spec === null ? null : JSON.stringify(row.spec),
+        row.model,
+        row.attempts,
+        row.inputTokens,
+        row.outputTokens,
+        row.error,
+      ],
+    );
+    if (retentionDays > 0) {
+      await client.query(
+        `DELETE FROM generation_log
+          WHERE workspace_id = $1
+            AND created_at <= now() - make_interval(days => $2)`,
+        [row.workspaceId, retentionDays],
+      );
+    }
+  });
+}
+
+type GenerationLogEntryRow = {
+  id: string;
+  workspace_id: string;
+  created_by: string;
+  created_at: string;
+  mode: string;
+  source_id: string | null;
+  prompt_redacted: string;
+  catalog_hash: string | null;
+  spec: unknown;
+  model: string;
+  attempts: number;
+  input_tokens: number;
+  output_tokens: number;
+  error: string | null;
+};
+
+/**
+ * The most recent generations in the given workspaces, newest first.
+ *
+ * The caller passes workspaces it has already decided the identity may read --
+ * `authorizedWorkspaces(identity, "source:manage", …)` -- so an empty list
+ * here means an empty answer rather than an unscoped one. The age filter is
+ * applied on read as well as on write, so shortening the retention window
+ * hides rows immediately instead of whenever the next generation happens.
+ */
+export async function listGenerationLog(
+  workspaceIds: string[],
+  opts: { limit: number; retentionDays: number },
+): Promise<GenerationLogEntry[]> {
+  if (workspaceIds.length === 0) return [];
+  const rows = await query<GenerationLogEntryRow>(
+    `SELECT id, workspace_id, created_by, created_at, mode, source_id,
+            prompt_redacted, catalog_hash, spec, model, attempts,
+            input_tokens, output_tokens, error
+       FROM generation_log
+      WHERE workspace_id = ANY($1)
+        AND ($3 <= 0 OR created_at > now() - make_interval(days => $3))
+      ORDER BY created_at DESC, id DESC
+      LIMIT $2`,
+    [workspaceIds, opts.limit, opts.retentionDays],
+  );
+  return rows.map((row) => ({
+    id: row.id,
+    workspaceId: row.workspace_id,
+    createdBy: row.created_by,
+    createdAt: row.created_at,
+    mode: row.mode as GenerationLogEntry["mode"],
+    sourceId: row.source_id,
+    promptRedacted: row.prompt_redacted,
+    catalogHash: row.catalog_hash,
+    spec: row.spec,
+    model: row.model,
+    attempts: row.attempts,
+    inputTokens: row.input_tokens,
+    outputTokens: row.output_tokens,
+    error: row.error,
+  }));
+}
 
 /* -------------------------------------------------------------------------- */
 /* Template repository (#120)                                                 */

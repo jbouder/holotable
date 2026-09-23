@@ -54,6 +54,7 @@ hand.
 | `/api/generate` | POST | editor | Streams a validated dashboard, panel, or explore-panel spec. Authorized against the workspace owning the selected **source**. Refuses with a 400 when that source's catalog was never refreshed or names nothing that still exists. Rate limited and budgeted |
 | `/api/query` | POST | editor | One-shot guarded query for preview and Explore |
 | `/api/sql/validate` | POST | editor | Runs the SQL guard against a source's catalog without executing. Always `200`; the verdict is `{ ok, error? }` |
+| `/api/generation-log` | GET | source-admin | The redacted prompt/spec pairs every generation leaves behind. Workspaces come from the caller's claims, so `?workspaceId=` narrows and can never widen; a viewer or editor reads an empty list rather than a 403. `?limit=` is clamped |
 
 ## Sources
 

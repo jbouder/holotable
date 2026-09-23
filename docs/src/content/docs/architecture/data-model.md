@@ -121,6 +121,32 @@ Bounded by `CHAT_HISTORY_MAX_MESSAGES` and `CHAT_HISTORY_RETENTION_DAYS`, swept
 in the same transaction as each write — the only way a row is added is the only
 way rows are removed, so there is no scheduled job to forget to run.
 
+### `generation_log`
+
+One row per model generation: `mode`, `source_id`, `prompt_redacted`,
+`catalog_hash`, `spec`, `model`, `attempts`, `input_tokens`, `output_tokens`,
+`error`. It answers the question a wrong dashboard raises — what was asked, and
+what came back — and it is the corpus the eval harness
+([#24](https://github.com/jbouder/holotable/issues/24)) will read.
+
+Three things keep it safe to hold. The prompt is stored **redacted**
+(`redactPrompt` in `src/lib/ai/log.ts`), because people paste connection
+strings into free text. The catalog is stored as a **hash**, not as text: "was
+this the same catalog?" is the question the column answers, and the schema
+itself is not needed to answer it. `spec` is a validated IR spec, which by
+construction carries opaque source ids and no connection detail.
+
+Written on the stream's finish callback and never on a read path; a write that
+fails is logged and dropped rather than failing the generation. Read only by a
+workspace source-admin (or a platform admin) through `GET /api/generation-log`
+— never on a dashboard, source or spec payload. Swept on write by
+`GENERATION_LOG_RETENTION_DAYS`, and the same window is applied on read, so
+shortening it takes effect at once.
+
+There is deliberately no foreign key to `sources`: a log entry outliving the
+source it names is the normal case, and a cascade would erase exactly the
+history someone came looking for.
+
 ### `llm_usage`
 
 Token counters per `(workspace_id, day, route, model)`: `input_tokens`,

@@ -258,6 +258,23 @@ test("chat history limits are bounded, and zero days means keep forever", () => 
   );
 });
 
+test("generation log retention is non-negative, and zero means keep forever", () => {
+  for (const value of ["0", "30", "365", ""]) {
+    const ok = validateConfig(
+      { ...VALID_PRODUCTION, GENERATION_LOG_RETENTION_DAYS: value },
+      { production: true },
+    );
+    assert.deepEqual(errors(ok), [], formatConfigProblems(ok));
+  }
+  for (const value of ["-1", "forever"]) {
+    const bad = validateConfig(
+      { ...VALID_PRODUCTION, GENERATION_LOG_RETENTION_DAYS: value },
+      { production: true },
+    );
+    assert.deepEqual(variables(errors(bad)), ["GENERATION_LOG_RETENTION_DAYS"]);
+  }
+});
+
 test("malformed values are errors regardless of environment", () => {
   const env: Environment = {
     DATABASE_URL: "mysql://nope",
