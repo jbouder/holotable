@@ -215,8 +215,10 @@ Field rules:
 - 'id': lowercase slug, e.g. "ts-metrics". Derive it from the name/purpose.
 - 'name': a short human-readable label.
 - 'config.host'/'config.port'/'config.database': from the description; default
-  port to 5432 and, when unstated, use a clearly-placeholder host the user will
-  correct. 'config.schema' defaults to "public"; 'config.ssl' defaults to false.
+  port to 5432. When the description gives no host or database, or gives a
+  placeholder in angle brackets such as <host> or <database>, emit exactly
+  "<host>" / "<database>". NEVER invent a plausible-looking host or database
+  name: the form refuses to save a placeholder, which is the point. 'config.schema' defaults to "public"; 'config.ssl' defaults to false.
 - 'config.tables': list the tables the user describes. For each, include its
   columns with a reasonable PostgreSQL 'type', and set 'timeField' to the time
   column when there is one (used for server-injected time filtering). If the

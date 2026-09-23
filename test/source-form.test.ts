@@ -123,6 +123,20 @@ test("whitespace around a connection field is not part of it", () => {
   assert.equal(result.ok && result.config.host, "db.internal");
 });
 
+test("a placeholder left in a connection field is refused, and says what to replace", () => {
+  const state = filled({ host: "<host>", database: "<database>" });
+  const connection = connectionFromFormState(state);
+  assert.equal(connection.ok, false);
+  const errors = connection.ok ? {} : connection.errors;
+  assert.match(errors.host ?? "", /Replace the placeholder <host> with the real host/);
+  assert.match(errors.database ?? "", /Replace the placeholder <database>/);
+
+  // Saving is refused the same way, not only discovery.
+  assert.equal(configFromFormState(state).ok, false);
+  // An ordinary hostname is untouched.
+  assert.equal(connectionFromFormState(filled({ host: "db.internal" })).ok, true);
+});
+
 test("the empty form defaults the port and the schema and allowlists nothing", () => {
   const state = emptyFormState();
   assert.equal(state.port, "5432");
