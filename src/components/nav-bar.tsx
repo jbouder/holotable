@@ -12,6 +12,7 @@ import {
   X,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { NavSlot } from "@/components/nav-slot";
 import { ThemeToggle } from "@/components/theme-toggle";
 
 const LINKS = [
@@ -73,6 +74,7 @@ export function NavBar() {
           </div>
         </nav>
         <div className="flex shrink-0 items-center gap-2">
+          <NavSlot />
           <ThemeToggle />
           <Button
             variant="ghost"

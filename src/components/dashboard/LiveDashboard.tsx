@@ -10,7 +10,8 @@ import { ErrorDisplay } from "@/components/ui/error-display";
 import type { ApiError } from "@/lib/errors";
 import { ConnectionIndicator } from "@/components/dashboard/ConnectionIndicator";
 import type { PanelData } from "@/components/charts/options";
-import { Button, ButtonLabel } from "@/components/ui/button";
+import { NavPortal } from "@/components/nav-slot";
+import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { TimeRangeFilter } from "@/components/dashboard/TimeRangeFilter";
 import {
@@ -238,6 +239,36 @@ export function LiveDashboard({
     setLive(!live);
   }
 
+  // Rendered in two places — the top bar from `lg`, the page body below it —
+  // and only one is ever displayed, so the hidden copy is out of the
+  // accessibility tree and its live region never announces.
+  const streamControls = (
+    <>
+      <ConnectionIndicator
+        status={connection}
+        onReconnect={() => setReconnectNonce((n) => n + 1)}
+      />
+      <Button
+        variant="ghost"
+        size="icon"
+        aria-pressed={!live}
+        aria-label={live ? "Pause live updates" : "Resume live updates"}
+        title={live ? "Pause live updates" : "Resume live updates"}
+        className={cn(
+          "h-8 w-8",
+          // Paused is a state worth noticing — the numbers on screen have
+          // stopped moving — so it takes the warning tone the time picker
+          // uses for a fixed window.
+          live ? "text-muted hover:text-foreground" : "text-warning hover:text-warning",
+        )}
+        onClick={togglePause}
+      >
+        {live ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4 fill-current" />}
+      </Button>
+      <TimeRangeFilter value={timeRange} onChange={setTimeRange} />
+    </>
+  );
+
   return (
     <div>
       <div className="mb-4 space-y-3">
@@ -246,48 +277,15 @@ export function LiveDashboard({
           {actions && <div className="flex shrink-0 items-center gap-1">{actions}</div>}
         </div>
         {/*
-          The stream controls get their own row under the title, left-aligned,
-          so they sit next to the data they control rather than competing with
-          the page actions on the right. The row wraps on a phone.
+          Below `lg` the top bar has no room for the stream controls, so they
+          sit here under the title instead; from `lg` they are portalled into
+          the bar (see `NavSlot`).
         */}
-        <div className="flex flex-wrap items-center gap-2">
-          <TimeRangeFilter value={timeRange} onChange={setTimeRange} />
-          <ConnectionIndicator
-            status={connection}
-            onReconnect={() => setReconnectNonce((n) => n + 1)}
-          />
-          {/*
-            Framed like the time picker so the two read as one set of stream
-            controls. Paused is a state worth noticing — the numbers on screen
-            have stopped moving — so it takes the warning tone the time picker
-            uses for a fixed window.
-          */}
-          <div className="flex items-center border border-border bg-surface p-1">
-            <Button
-              variant="ghost"
-              size="sm"
-              aria-pressed={!live}
-              aria-label={live ? "Pause live updates" : "Resume live updates"}
-              title={live ? "Pause live updates" : "Resume live updates"}
-              collapse
-              className={cn(
-                "h-7 gap-1.5 px-2 text-xs",
-                live
-                  ? "text-muted hover:text-foreground"
-                  : "text-warning hover:text-warning",
-              )}
-              onClick={togglePause}
-            >
-              {live ? (
-                <Pause className="h-3.5 w-3.5" />
-              ) : (
-                <Play className="h-3.5 w-3.5 fill-current" />
-              )}
-              <ButtonLabel>{live ? "Pause" : "Resume"}</ButtonLabel>
-            </Button>
-          </div>
+        <div className="flex flex-wrap items-center gap-2 lg:hidden">
+          {streamControls}
         </div>
       </div>
+      <NavPortal>{streamControls}</NavPortal>
 
       {dashboardError && <ErrorDisplay error={dashboardError} className="mb-4" />}
 
