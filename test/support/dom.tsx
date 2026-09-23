@@ -38,6 +38,8 @@ const dom = new JSDOM("<!doctype html><html><body></body></html>", {
 // process; `mount()` gives each test its own container underneath.
 const g = globalThis as unknown as Record<string, unknown>;
 g.window = dom.window;
+// `next/link` schedules its viewport prefetch through `self.requestIdleCallback`.
+g.self = dom.window;
 g.document = dom.window.document;
 // Node 22 defines a getter-only global `navigator`; overwrite it outright.
 Object.defineProperty(globalThis, "navigator", {

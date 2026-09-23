@@ -22,14 +22,26 @@ import { EmptyState } from "@/components/ui/empty-state";
  * it back is one more. The progress it shows is computed on the server from the
  * workspace itself (see `src/lib/onboarding.ts`), so nothing here decides
  * whether a step is done — it only draws it.
+ *
+ * While the guide is up it is the page: "Welcome to Holotable" is the `h1` and
+ * the page's own header is held back, since "Dashboards" over three setup
+ * steps names a list that is not there. The header comes back with the empty
+ * state once the guide is dismissed — which happens here, without a reload,
+ * so the page hands its header in rather than deciding itself.
  */
 export function FirstRun({
   state,
   dismissed: initiallyDismissed,
+  header,
+  banner,
 }: {
   state: OnboardingState;
   /** Read from the cookie on the server, so a dismissed flow never flashes. */
   dismissed: boolean;
+  /** The page's title block, drawn whenever the guide is not. */
+  header?: React.ReactNode;
+  /** A page notice, drawn above whatever this shows. */
+  banner?: React.ReactNode;
 }) {
   const [dismissed, setLocalDismissed] = React.useState(initiallyDismissed);
 
@@ -45,14 +57,18 @@ export function FirstRun({
   // set up. Three buttons they cannot press would be worse than one sentence.
   if (!state.actionable) {
     return (
-      <EmptyState
-        icon={<Lock className="h-6 w-6" />}
-        title="Nothing to show yet"
-        description={
-          state.steps.find((step) => step.status !== "done")?.waitingOn ??
-          "No dashboards have been created in your workspaces yet."
-        }
-      />
+      <>
+        {header}
+        {banner}
+        <EmptyState
+          icon={<Lock className="h-6 w-6" />}
+          title="Nothing to show yet"
+          description={
+            state.steps.find((step) => step.status !== "done")?.waitingOn ??
+            "No dashboards have been created in your workspaces yet."
+          }
+        />
+      </>
     );
   }
 
@@ -63,22 +79,26 @@ export function FirstRun({
     // back 403 is the thing the role rule exists to prevent.
     const generate = state.steps.find((step) => step.id === "generate");
     return (
-      <EmptyState
-        title="No dashboards yet"
-        description="Describe the dashboard you want in plain English and the model writes the spec; the server runs the SQL."
-        action={
-          <div className="flex flex-wrap items-center justify-center gap-2">
-            {generate?.action && (
-              <Link href={generate.action.href}>
-                <Button>{generate.action.label}</Button>
-              </Link>
-            )}
-            <Button variant="ghost" onClick={() => dismiss(false)}>
-              Show the setup guide
-            </Button>
-          </div>
-        }
-      />
+      <>
+        {header}
+        {banner}
+        <EmptyState
+          title="No dashboards yet"
+          description="Describe the dashboard you want in plain English and the model writes the spec; the server runs the SQL."
+          action={
+            <div className="flex flex-wrap items-center justify-center gap-2">
+              {generate?.action && (
+                <Link href={generate.action.href}>
+                  <Button>{generate.action.label}</Button>
+                </Link>
+              )}
+              <Button variant="ghost" onClick={() => dismiss(false)}>
+                Show the setup guide
+              </Button>
+            </div>
+          }
+        />
+      </>
     );
   }
 
@@ -86,8 +106,9 @@ export function FirstRun({
   // screen a centred column reads as a modal floating over an empty page.
   return (
     <div className="space-y-4">
+      {banner}
       <div className="max-w-prose">
-        <h2 className="text-xl font-semibold">Welcome to Holotable</h2>
+        <h1 className="text-2xl font-semibold">Welcome to Holotable</h1>
         <p className="mt-1 text-sm text-muted">
           Three steps to a live dashboard. Progress is read from your workspace, so you
           can leave at any point and pick up where you stopped.
