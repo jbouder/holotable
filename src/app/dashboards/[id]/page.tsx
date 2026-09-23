@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { Download, LayoutTemplate, Pencil, Tag } from "lucide-react";
+import { LayoutTemplate, Pencil, Tag } from "lucide-react";
 import { getIdentity } from "@/lib/auth/authorize";
 import { can } from "@/lib/auth/authorize";
 import { getDashboardById } from "@/lib/db/repo";
@@ -8,9 +8,8 @@ import { config } from "@/lib/config";
 import { SignIn } from "@/components/sign-in";
 import { LiveDashboard } from "@/components/dashboard/LiveDashboard";
 import { DashboardChat } from "@/components/dashboard/DashboardChat";
-import { DeleteDashboardButton } from "@/components/dashboard/delete-dashboard-button";
+import { DashboardActionsMenu } from "@/components/dashboard/dashboard-actions-menu";
 import { RecordDashboardVisit } from "@/components/dashboard/RecordDashboardVisit";
-import { SaveAsTemplate } from "@/components/templates/SaveAsTemplate";
 import { Button, ButtonLabel } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
 import { dashboardListHref, EMPTY_QUERY } from "@/lib/dashboard-list";
@@ -130,34 +129,8 @@ export default async function DashboardViewPage({
         }
         actions={
           <>
-            {/*
-              A plain link, not a button with a fetch behind it: the route
-              answers with a `Content-Disposition`, so the browser saves the
-              file itself and this page ships no JavaScript for it.
-            */}
-            <a key="export" href={`/api/dashboards/${id}/export`} download>
-              <Button
-                variant="ghost"
-                size="sm"
-                collapse
-                title="Export"
-                className="text-muted hover:text-foreground"
-              >
-                <Download className="h-4 w-4" /> <ButtonLabel>Export</ButtonLabel>
-              </Button>
-            </a>
-            {canSaveTemplate && (
-              <SaveAsTemplate
-                key="template"
-                workspaceId={dashboard.workspaceId}
-                defaultName={dashboard.spec.title}
-                subject={{ kind: "dashboard", dashboard: dashboard.spec }}
-                variant="ghost"
-                collapse
-              />
-            )}
             {canEdit && (
-              <Link href={`/dashboards/${id}/edit`}>
+              <Link key="edit" href={`/dashboards/${id}/edit`}>
                 <Button
                   variant="ghost"
                   size="sm"
@@ -169,13 +142,15 @@ export default async function DashboardViewPage({
                 </Button>
               </Link>
             )}
-            {canDelete && (
-              <DeleteDashboardButton
-                key="delete"
-                dashboardId={id}
-                title={dashboard.spec.title}
-              />
-            )}
+            <DashboardActionsMenu
+              key="more"
+              dashboardId={id}
+              title={dashboard.spec.title}
+              workspaceId={dashboard.workspaceId}
+              spec={dashboard.spec}
+              canSaveTemplate={canSaveTemplate}
+              canDelete={canDelete}
+            />
           </>
         }
       />

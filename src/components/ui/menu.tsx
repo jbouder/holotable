@@ -55,22 +55,40 @@ export function Menu({
   );
 }
 
-/** One action. `danger` marks the destructive one, which is always last. */
+/**
+ * One action. `danger` marks the destructive one, which is always last.
+ *
+ * With `href` the item renders as a link, so a download stays a plain
+ * `<a download>` the browser handles, not a click handler that fakes one.
+ */
 export function MenuItem({
   children,
   disabled,
   danger,
   onClick,
+  href,
+  download,
 }: {
   children: React.ReactNode;
   disabled?: boolean;
   danger?: boolean;
-  onClick: () => void;
+  onClick?: () => void;
+  href?: string;
+  download?: boolean;
 }) {
   return (
     <BaseMenu.Item
       disabled={disabled}
       onClick={onClick}
+      render={
+        href
+          ? (props) => (
+              <a {...props} href={href} download={download}>
+                {props.children}
+              </a>
+            )
+          : undefined
+      }
       className={cn(
         "tap-target flex cursor-pointer select-none items-center gap-2 px-2 py-1.5 text-sm text-foreground outline-none data-[highlighted]:bg-surface-2 data-[disabled]:cursor-not-allowed data-[disabled]:opacity-40",
         danger && "text-danger data-[highlighted]:bg-danger/10",
