@@ -90,6 +90,49 @@ stream of counting seconds.
 A reopened socket does **not** reset the freshness clock: it answers "how old
 is this number", not "how old is this connection".
 
+## Choosing the window
+
+The header's time picker offers three ways to say the same thing, plus shift
+and zoom over whatever is currently chosen:
+
+- **Quick ranges** — the five presets (15m … 7d), all relative to `now`.
+- **Last N** — a custom relative width in minutes, hours, days or weeks.
+- **Absolute** — two `datetime-local` instants, entered and displayed in the
+  reader's own zone and stored as UTC ISO-8601.
+- **Shift back / forward** moves the window by its own width; **zoom out**
+  doubles it. Shifting forward past `now` snaps back to the rolling window of
+  the same width, which is how a reader who went looking at yesterday returns
+  to live.
+- **Brushing** a line, area or bar panel that has a `timeField` selects the
+  stretch of time the drag covered and makes it the dashboard's window.
+  `brushedRange` reads the timestamps of the first and last rows the selection
+  covered; a selection it cannot read leaves the window alone rather than
+  guessing at one. `scatter`, `pie`, `donut`, `heatmap`, `stat` and `table`
+  panels are not brushable — their x-axis is not time laid out left to right.
+- Panels on one dashboard share a **crosshair**: moving the pointer over one
+  chart moves the axis pointer on the others. This is done by forwarding the
+  hovered category index between the instances, not with `echarts.connect`,
+  which mirrors *every* connected action — a brush included — and would make
+  one drag produce a selection on every panel.
+
+Everything the picker emits is a pair of IR `TimeExpr` strings. The client is
+never the authority on the window that was queried: the expressions go out on
+the stream URL, the route re-parses them against `TimeRange`, and the poller
+calls `resolveTimeRange` itself on every tick (invariant 4). A window that
+`TimeRange` refuses is a `400` on the stream and falls back to the dashboard's
+own range on the page.
+
+An **absolute** window is frozen by definition — the poller keeps ticking, but
+it re-queries the same seconds — so the picker badges it *Fixed range* and
+offers a way back, and the staleness watchdog is switched off for it. "No new
+data" is the correct state there, not a stale one.
+
+The chosen window is written into the URL with `history.replaceState`, so a
+range is a link someone can send. It is `replaceState` and not a Next
+navigation because re-rendering the server page would remount the viewer and
+tear down the `EventSource` on every change. The dashboard's own range is left
+out of the query string, so the default link stays clean.
+
 ## Pausing
 
 The viewer can pause live updates. The Pause/Resume toggle closes the

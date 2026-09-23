@@ -14,6 +14,7 @@ import { formatClockTime } from "@/lib/connection";
 import type { ApiError } from "@/lib/errors";
 import { formatValue } from "@/lib/format";
 import { supportsImageExport } from "@/lib/panel-export";
+import { brushedRange, supportsTimeBrush } from "@/lib/time-range";
 import { cn } from "@/lib/utils";
 
 export type PanelStatus = "loading" | "live" | "stale" | "error" | "tombstoned";
@@ -39,6 +40,8 @@ export function PanelView({
   paused = false,
   timeRange,
   dashboardTitle,
+  crosshairGroup,
+  onSelectTimeRange,
 }: {
   panel: Panel;
   state?: PanelState;
@@ -52,6 +55,14 @@ export function PanelView({
   timeRange?: TimeRange;
   /** Names the export file. A surface without one exports by panel title alone. */
   dashboardTitle?: string;
+  /** Panels sharing this name move their axis pointer together. */
+  crosshairGroup?: string;
+  /**
+   * Called with the window a brush across this panel selected. A surface that
+   * does not own a time range simply does not pass it, and the panel is not
+   * brushable.
+   */
+  onSelectTimeRange?: (range: TimeRange) => void;
 }) {
   const data = state?.data ?? EMPTY;
   const status = state?.status ?? "loading";
@@ -114,6 +125,8 @@ export function PanelView({
             state={state}
             onRetry={onRetry}
             chartRef={chart}
+            crosshairGroup={crosshairGroup}
+            onSelectTimeRange={onSelectTimeRange}
           />
         </CardContent>
       </Card>
@@ -192,6 +205,8 @@ function PanelBody({
   state,
   onRetry,
   chartRef,
+  crosshairGroup,
+  onSelectTimeRange,
 }: {
   panel: Panel;
   data: PanelData;
@@ -199,6 +214,8 @@ function PanelBody({
   onRetry?: () => void;
   /** Forwarded to the chart so the PNG export can reach it. */
   chartRef?: React.RefObject<EChartHandle | null>;
+  crosshairGroup?: string;
+  onSelectTimeRange?: (range: TimeRange) => void;
 }) {
   if (state?.status === "tombstoned") {
     // A tombstone is the `conflict` kind: the source is gone, and the fix is to
@@ -235,7 +252,31 @@ function PanelBody({
     case "table":
       return <TableView data={data} />;
     default:
-      return <EChart ref={chartRef} option={buildChartOption(panel, data)} />;
+      return (
+        <EChart
+          ref={chartRef}
+          option={buildChartOption(panel, data)}
+          crosshairGroup={crosshairGroup}
+          onBrush={
+            onSelectTimeRange && supportsTimeBrush(panel)
+              ? ({ startIndex, endIndex }) => {
+                  // A brush names a stretch of history, and the rows behind
+                  // the chart are what give the indices a meaning. An
+                  // unreadable selection — a gap in the data, a timestamp the
+                  // driver serialized as something unexpected — leaves the
+                  // window alone rather than guessing at one.
+                  const range = brushedRange(
+                    data.rows,
+                    panel.query.timeField,
+                    startIndex,
+                    endIndex,
+                  );
+                  if (range) onSelectTimeRange(range);
+                }
+              : undefined
+          }
+        />
+      );
   }
 }
 
