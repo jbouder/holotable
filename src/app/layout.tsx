@@ -6,6 +6,7 @@ import { NavBar } from "@/components/nav-bar";
 import { CommandPalette } from "@/components/command-palette";
 import { getIdentity } from "@/lib/auth/authorize";
 import { NONCE_REQUEST_HEADER } from "@/lib/security-headers";
+import { BOOTSTRAP_SCRIPT } from "@/lib/bootstrap";
 
 const fontSans = Chakra_Petch({
   subsets: ["latin"],
@@ -51,11 +52,12 @@ export default async function RootLayout({
     >
       <head>
         {/*
-          Sets the theme before first paint so the page does not flash light
-          then dark. It has to be inline and synchronous in <head> — next/script
+          Sets the theme and the motion preference before first paint so the
+          page does not flash light then dark, or animate once before the
+          reduce setting lands (src/lib/bootstrap.ts). It has to be inline and synchronous in <head> — next/script
           with beforeInteractive still runs after the first paint — and the
-          content is a hard-coded literal with no interpolation, so there is no
-          injection surface. The nonce is what lets it run under the
+          content is built from constants only, never from request data, so
+          there is no injection surface. The nonce is what lets it run under the
           Content-Security-Policy; without it the browser blocks the script
           and the page flashes. Browsers hide the nonce from the DOM (the
           attribute reads as "" after parsing), so React would report a
@@ -64,11 +66,8 @@ export default async function RootLayout({
         <script
           nonce={nonce}
           suppressHydrationWarning
-          // biome-ignore lint/security/noDangerouslySetInnerHtml: static literal, must run before first paint
-          dangerouslySetInnerHTML={{
-            __html:
-              '(function(){try{var p=localStorage.getItem("theme");if(p!=="dark"&&p!=="light"&&p!=="system")p="dark";var t=p==="system"?(matchMedia("(prefers-color-scheme: dark)").matches?"dark":"light"):p;document.documentElement.dataset.theme=t;document.documentElement.style.colorScheme=t}catch(e){}})()',
-          }}
+          // biome-ignore lint/security/noDangerouslySetInnerHtml: constant script, must run before first paint
+          dangerouslySetInnerHTML={{ __html: BOOTSTRAP_SCRIPT }}
         />
       </head>
       <body className="min-h-full flex flex-col">

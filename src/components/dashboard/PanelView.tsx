@@ -14,6 +14,7 @@ import { buildChartOption, type PanelData } from "@/components/charts/options";
 import { formatClockTime } from "@/lib/connection";
 import type { ApiError } from "@/lib/errors";
 import { formatValue } from "@/lib/format";
+import { PANEL_EXIT_SHORTCUT } from "@/lib/shortcuts";
 import { supportsImageExport } from "@/lib/panel-export";
 import { brushedRange, supportsTimeBrush } from "@/lib/time-range";
 import { cn } from "@/lib/utils";
@@ -152,7 +153,7 @@ function useExpanded() {
     // opened fullscreen closes on its own Escape, and the focus may be
     // anywhere inside by the time the next one arrives.
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") setExpanded(false);
+      if (e.key === PANEL_EXIT_SHORTCUT.key) setExpanded(false);
     };
     document.addEventListener("keydown", onKey);
     return () => document.removeEventListener("keydown", onKey);
@@ -176,7 +177,7 @@ function useExpanded() {
         return true;
       }),
     onKeyDown: (e: React.KeyboardEvent) => {
-      if (e.key === "Escape") setExpanded(false);
+      if (e.key === PANEL_EXIT_SHORTCUT.key) setExpanded(false);
     },
   };
 }

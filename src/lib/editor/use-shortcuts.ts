@@ -3,7 +3,8 @@
 import * as React from "react";
 
 /**
- * Scoped keyboard shortcuts for the editor (#121).
+ * Scoped keyboard shortcuts (#121). What exists is declared in
+ * `src/lib/shortcuts.ts` (#217); this module matches, formats and binds.
  *
  * The editor is a tool people iterate in, so reaching for the Save button and
  * clicking a send icon adds up. Everything here is additive: every action a
@@ -47,6 +48,11 @@ export interface Shortcut {
    * binding must never eat a character someone is typing.
    */
   inTextField?: boolean;
+  /**
+   * What to print instead of the key, for an entry that stands for a family of
+   * keys ("Arrow keys"). Modifiers are still printed in front of it.
+   */
+  keysLabel?: string;
   /** What the binding does, for the `?` overlay and the button tooltips. */
   description: string;
   /** Heading the overlay groups it under. */
@@ -151,6 +157,11 @@ export function formatShortcut(shortcut: Shortcut, mac: boolean): string {
   if (shortcut.mod) parts.push(mac ? "⌘" : "Ctrl");
   if (shortcut.shift) parts.push(mac ? "⇧" : "Shift");
   if (shortcut.alt) parts.push(mac ? "⌥" : "Alt");
+  if (shortcut.keysLabel) {
+    parts.push(shortcut.keysLabel);
+    // A word after a Mac glyph reads as one token ("⇧Arrow keys"); space it.
+    return mac ? parts.join(parts.length > 1 ? " " : "") : parts.join("+");
+  }
   const lower = shortcut.key.toLowerCase();
   parts.push(KEY_LABELS[lower] ?? shortcut.key.toUpperCase());
   return mac ? parts.join("") : parts.join("+");

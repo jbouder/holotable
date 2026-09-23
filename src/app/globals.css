@@ -4,8 +4,13 @@
  * Design tokens expressed in OKLCH (Tailwind v4 @theme). Chart colors are
  * resolved to sRGB hex at runtime by lib/color/oklch.ts before being handed to
  * ECharts (canvas cannot consume oklch()/CSS vars).
+ *
+ * `[data-theme="dark"]` repeats the dark set so any element, not only
+ * `<html>`, can opt into a palette: the appearance settings draw a dark
+ * preview inside a light page that way.
  */
-:root {
+:root,
+[data-theme="dark"] {
   color-scheme: dark;
   --background: oklch(0.16 0.02 265);
   --surface: oklch(0.21 0.02 265);
@@ -101,6 +106,44 @@ body {
     background-size: 200% 100%;
     animation: holotable-shimmer 1.6s linear infinite;
   }
+}
+
+/*
+ * Reduced motion (#212). The root layout resolves the preference onto
+ * `<html data-motion>` before first paint: "reduce" (chosen, or the OS asks
+ * for it under "Follow system") stills every transition and animation, and
+ * "allow" brings the skeleton shimmer back even when the OS asks for less,
+ * because the person said so here. Without the attribute (the bootstrap
+ * script blocked) the media queries above still apply on their own.
+ *
+ * No `!important`: these rules are unlayered, and unlayered CSS outranks
+ * every rule in Tailwind's `@layer utilities` whatever its specificity, so a
+ * `transition-colors` class cannot win them back.
+ */
+:root[data-motion="reduce"] *,
+:root[data-motion="reduce"] *::before,
+:root[data-motion="reduce"] *::after {
+  animation-duration: 0.01ms;
+  animation-iteration-count: 1;
+  transition-duration: 0.01ms;
+  scroll-behavior: auto;
+}
+
+:root[data-motion="reduce"] .skeleton {
+  background-image: none;
+  animation: none;
+}
+
+:root[data-motion="allow"] .skeleton {
+  background-image: linear-gradient(
+    90deg,
+    transparent 0%,
+    color-mix(in oklab, var(--foreground) 10%, transparent) 50%,
+    transparent 100%
+  );
+  background-repeat: no-repeat;
+  background-size: 200% 100%;
+  animation: holotable-shimmer 1.6s linear infinite;
 }
 
 /*

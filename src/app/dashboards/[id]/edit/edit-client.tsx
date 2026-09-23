@@ -61,12 +61,8 @@ import { LeaveGuardDialog } from "@/components/editor/LeaveGuardDialog";
 import { ShortcutsDialog } from "@/components/editor/ShortcutsDialog";
 import { DashboardDetailsDialog } from "@/components/dashboard/DashboardDetailsDialog";
 import { useHistory } from "@/lib/editor/use-history";
-import {
-  type Binding,
-  formatShortcut,
-  useIsMac,
-  useShortcuts,
-} from "@/lib/editor/use-shortcuts";
+import { formatShortcut, useIsMac, useShortcuts } from "@/lib/editor/use-shortcuts";
+import { bindShortcuts, EDITOR_SHORTCUTS } from "@/lib/shortcuts";
 import {
   interceptedHref,
   isDirty,
@@ -632,72 +628,21 @@ export function EditDashboardClient({
   /* ---------------------------------------------------------------------- */
 
   const dialogOpen = picking || repointing !== null || pendingHref !== null;
-  const bindings: Binding[] = [
-    {
-      id: "save",
-      key: "s",
-      mod: true,
-      inTextField: true,
-      group: "Saving",
-      description: "Save a version and keep editing",
-      run: () => void save({ navigate: false }),
-      disabled: saving,
-    },
-    {
-      id: "save-view",
-      key: "s",
-      mod: true,
-      shift: true,
-      inTextField: true,
-      group: "Saving",
-      description: "Save and view the dashboard",
-      run: () => void save({ navigate: true }),
-      disabled: saving,
-    },
-    {
-      id: "undo",
-      key: "z",
-      mod: true,
-      group: "Editing",
-      description: "Undo",
-      run: history.undo,
-      disabled: !history.canUndo,
-    },
-    {
-      id: "redo",
-      key: "z",
-      mod: true,
-      shift: true,
-      group: "Editing",
-      description: "Redo",
-      run: history.redo,
-      disabled: !history.canRedo,
-    },
-    {
-      id: "new-panel",
-      key: "n",
-      group: "Editing",
-      description: "Add a panel",
-      run: () => addPanel(),
-      disabled: sources.length === 0,
-    },
-    {
-      id: "duplicate-panel",
-      key: "d",
-      group: "Editing",
-      description: "Duplicate the selected panel",
+  // The keys and descriptions live in the registry (#217); this only says
+  // what each one does here and when it is off.
+  const bindings = bindShortcuts(EDITOR_SHORTCUTS, {
+    save: { run: () => void save({ navigate: false }), disabled: saving },
+    "save-view": { run: () => void save({ navigate: true }), disabled: saving },
+    undo: { run: history.undo, disabled: !history.canUndo },
+    redo: { run: history.redo, disabled: !history.canRedo },
+    "new-panel": { run: () => addPanel(), disabled: sources.length === 0 },
+    "duplicate-panel": {
       run: () => {
         if (selectedId) duplicate(selectedId);
       },
       disabled: selectedId === null,
     },
-    {
-      id: "run",
-      key: "Enter",
-      mod: true,
-      inTextField: true,
-      group: "Editing",
-      description: "Apply the natural-language edit (run the preview in the SQL box)",
+    run: {
       run: () => {
         // The SQL box binds Cmd+Enter to its own preview run; a second handler
         // firing on the same keystroke would apply an unrelated NL edit.
@@ -705,32 +650,15 @@ export function EditDashboardClient({
         runNlEdit();
       },
     },
-    {
-      id: "focus-prompt",
-      key: "/",
-      group: "Editing",
-      description: "Focus the natural-language prompt",
-      run: () => document.getElementById("nl")?.focus(),
-    },
-    {
-      id: "dismiss",
-      key: "Escape",
-      group: "Editing",
-      description: "Dismiss the generated panel under review",
+    "focus-prompt": { run: () => document.getElementById("nl")?.focus() },
+    dismiss: {
       run: discardProposal,
       // A dialog closes itself on Escape; dismissing the proposal underneath it
       // at the same time would be two actions from one keystroke.
       disabled: dialogOpen || proposal === null,
     },
-    {
-      id: "shortcuts",
-      key: "?",
-      anyShift: true,
-      group: "Help",
-      description: "Show this list",
-      run: () => setShowShortcuts((open) => !open),
-    },
-  ];
+    shortcuts: { run: () => setShowShortcuts((open) => !open) },
+  });
   useShortcuts(bindings);
 
   const hint = (id: string) => {
@@ -1221,11 +1149,7 @@ export function EditDashboardClient({
         </div>
       </Dialog>
 
-      <ShortcutsDialog
-        shortcuts={bindings}
-        open={showShortcuts}
-        onOpenChange={setShowShortcuts}
-      />
+      <ShortcutsDialog open={showShortcuts} onOpenChange={setShowShortcuts} />
 
       {/*
         No `allowRename`: the title is a spec field, edited in the settings

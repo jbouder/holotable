@@ -3,6 +3,7 @@
 import * as React from "react";
 import * as echarts from "echarts";
 import type { EChartsOption } from "echarts";
+import { useReducedMotion } from "@/components/motion-preference";
 
 /**
  * What a caller outside the chart can ask it for.
@@ -87,6 +88,13 @@ export function EChart({
   const onBrushRef = React.useRef(onBrush);
   onBrushRef.current = onBrush;
   const brushing = onBrush !== undefined;
+  // Reduced motion (#212) turns off ECharts' own transitions. Read through a
+  // ref by the init effect so a chart rebuilt for a new crosshair group keeps
+  // it, and applied as a merged option when it changes, which never recreates
+  // the chart.
+  const reduceMotion = useReducedMotion();
+  const reduceMotionRef = React.useRef(reduceMotion);
+  reduceMotionRef.current = reduceMotion;
 
   React.useEffect(() => {
     if (!containerRef.current) return;
@@ -94,6 +102,7 @@ export function EChart({
       renderer: "canvas",
     });
     chartRef.current = chart;
+    chart.setOption({ animation: !reduceMotionRef.current });
 
     const observer = new ResizeObserver(() => chart.resize());
     observer.observe(containerRef.current);
@@ -109,6 +118,10 @@ export function EChart({
       chartRef.current = null;
     };
   }, [crosshairGroup, brushing]);
+
+  React.useEffect(() => {
+    chartRef.current?.setOption({ animation: !reduceMotion }, { notMerge: false });
+  }, [reduceMotion]);
 
   React.useEffect(() => {
     const chart = chartRef.current;
