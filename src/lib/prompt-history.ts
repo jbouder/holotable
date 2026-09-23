@@ -177,6 +177,34 @@ export function prunePromptHistory(storage: BrowserStorage | null, now: number):
   return empty.length;
 }
 
+/** Every prompt-history key in this browser, whatever the workspace or box. */
+export function promptHistoryKeys(storage: BrowserStorage | null): string[] {
+  if (!storage) return [];
+  const keys: string[] = [];
+  try {
+    for (let i = 0; i < storage.length; i++) {
+      const key = storage.key(i);
+      if (key?.startsWith(PROMPT_HISTORY_PREFIX)) keys.push(key);
+    }
+  } catch {
+    return [];
+  }
+  return keys;
+}
+
+/** How many usable prompts are remembered across every list (#216). */
+export function countPromptHistory(storage: BrowserStorage | null, now: number): number {
+  return promptHistoryKeys(storage).reduce(
+    (n, key) => n + readPromptHistory(storage, key, now).length,
+    0,
+  );
+}
+
+/** Forget every recent prompt in this browser. */
+export function clearAllPromptHistory(storage: BrowserStorage | null): void {
+  for (const key of promptHistoryKeys(storage)) clearPromptHistory(storage, key);
+}
+
 /** A prompt as one line in a dropdown: collapsed whitespace, clipped. */
 export function promptLabel(prompt: string, max = 80): string {
   const line = prompt.trim().replace(/\s+/g, " ");

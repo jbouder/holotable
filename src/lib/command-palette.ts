@@ -330,6 +330,17 @@ export function pushRecent(
 
 export const RECENTS_STORAGE_KEY = "command-palette-recents";
 
+/** Forget the palette's recently used commands (#216). */
+export function clearRecents(
+  storage: Pick<Storage, "removeItem"> | undefined | null,
+): void {
+  try {
+    storage?.removeItem(RECENTS_STORAGE_KEY);
+  } catch {
+    /* Already unreachable. */
+  }
+}
+
 /**
  * Recents come out of `localStorage`, which anything on the origin can write,
  * so the value is treated as untrusted: anything that is not an array of short
