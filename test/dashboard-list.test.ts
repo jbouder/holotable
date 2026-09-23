@@ -36,6 +36,7 @@ test("search, tags, sort and page are read back", () => {
     search: "errors",
     tags: ["api", "prod"],
     sort: "title",
+    favorites: false,
     page: 3,
   });
 });
@@ -68,7 +69,13 @@ test("an enormous search string is truncated rather than passed on", () => {
 test("Next's searchParams object reads the same as URLSearchParams", () => {
   assert.deepEqual(
     parseDashboardQuery({ q: "errors", tag: ["prod", "api"], page: "2" }),
-    { search: "errors", tags: ["api", "prod"], sort: DEFAULT_SORT, page: 2 },
+    {
+      search: "errors",
+      tags: ["api", "prod"],
+      sort: DEFAULT_SORT,
+      favorites: false,
+      page: 2,
+    },
   );
 });
 
@@ -86,6 +93,7 @@ test("a query survives the round trip through a URL", () => {
     search: "p95 latency",
     tags: ["api", "prod"],
     sort: "title",
+    favorites: true,
     page: 4,
   };
   assert.deepEqual(parse(dashboardQueryString(query)), query);
@@ -190,4 +198,45 @@ test("a stored list longer than the cap is trimmed on the way in and out", () =>
   );
   assert.equal(JSON.parse(written).length, RECENT_MAX);
   assert.equal(readRecent({ getItem: () => JSON.stringify(ids) }).length, RECENT_MAX);
+});
+
+/* -------------------------------------------------------------------------- */
+/* Saved list defaults (#215)                                                 */
+/* -------------------------------------------------------------------------- */
+
+const SAVED = { sort: "title", favorites: true } as const;
+
+test("a plain URL opens with the reader's saved sort and favorites filter", () => {
+  const query = parseDashboardQuery(new URLSearchParams(""), SAVED);
+  assert.equal(query.sort, "title");
+  assert.equal(query.favorites, true);
+});
+
+test("explicit query parameters win over the saved defaults", () => {
+  const query = parseDashboardQuery(
+    new URLSearchParams("sort=updated&favorites=0"),
+    SAVED,
+  );
+  assert.equal(query.sort, "updated");
+  assert.equal(query.favorites, false);
+  // An unrecognised value is not an explicit choice; the default stands.
+  assert.equal(
+    parseDashboardQuery(new URLSearchParams("favorites=maybe"), SAVED).favorites,
+    true,
+  );
+});
+
+test("links leave out whatever equals the saved defaults, and keep what differs", () => {
+  const saved = parseDashboardQuery(new URLSearchParams(""), SAVED);
+  assert.equal(dashboardListHref(saved, SAVED), "/dashboards");
+  const all = { ...saved, sort: "updated" as const, favorites: false };
+  assert.equal(dashboardListHref(all, SAVED), "/dashboards?sort=updated&favorites=0");
+  assert.deepEqual(
+    parseDashboardQuery(new URLSearchParams(dashboardQueryString(all, SAVED)), SAVED),
+    all,
+  );
+});
+
+test("a favorites-only list counts as filtered, so an empty one is not the first run", () => {
+  assert.equal(isFiltered({ ...EMPTY_QUERY, favorites: true }), true);
 });

@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 import Link from "next/link";
 import { cookies } from "next/headers";
-import { Plus, SearchX, Star } from "lucide-react";
+import { Info, Plus, SearchX, Star } from "lucide-react";
 import { authorizedWorkspaces, can, getIdentity } from "@/lib/auth/authorize";
 import { accessibleWorkspaces, type Identity } from "@/lib/auth/claims";
 import { listDashboardTags, listDashboards, listSources } from "@/lib/db/repo";
@@ -9,6 +9,7 @@ import type { DashboardSummary } from "@/lib/dashboard-metadata";
 import {
   dashboardListHref,
   isFiltered,
+  type ListDefaults,
   PAGE_SIZE,
   pageCount,
   pageOffset,
@@ -18,7 +19,9 @@ import { catalogHealth } from "@/lib/catalog/health";
 import { onboardingState } from "@/lib/onboarding";
 import { isDismissed, SETUP_DISMISSED_COOKIE } from "@/lib/dismissals";
 import type { ImportTarget } from "@/lib/dashboard-export";
+import { requestPreferences, START_UNAVAILABLE_NOTICE } from "@/lib/preferences-server";
 import { SignIn } from "@/components/sign-in";
+import { DismissNotice } from "@/components/dashboard/DismissNotice";
 import { FirstRun } from "@/components/onboarding/first-run";
 import { DashboardCard } from "@/components/dashboard/DashboardCard";
 import { DashboardListControls } from "@/components/dashboard/DashboardListControls";
@@ -38,7 +41,16 @@ export default async function DashboardsPage({
   const identity = await getIdentity();
   if (!identity) return <SignIn />;
 
-  const query = parseDashboardQuery(await searchParams);
+  const params = await searchParams;
+  const prefs = await requestPreferences(identity);
+  // The reader's saved list defaults (#215). A URL parameter still wins, and
+  // every link below leaves out whatever equals these.
+  const listDefaults: ListDefaults = {
+    sort: prefs.dashboardSort,
+    favorites: prefs.favoritesOnly,
+  };
+  const query = parseDashboardQuery(params, listDefaults);
+  const startUnavailable = params.notice === START_UNAVAILABLE_NOTICE;
   const workspaces = accessibleWorkspaces(identity);
   const editable = authorizedWorkspaces(identity, "dashboard:create");
   const canCreate = editable.length > 0;
@@ -57,6 +69,7 @@ export default async function DashboardsPage({
         limit: PAGE_SIZE,
         offset: pageOffset(query),
         userSub: identity.sub,
+        favoritesOnly: query.favorites,
       }),
     ),
   );
@@ -133,11 +146,29 @@ export default async function DashboardsPage({
         )}
       </div>
 
+      {startUnavailable && (
+        <div
+          role="status"
+          className="mb-4 flex items-start gap-2 border border-warning/40 bg-warning/10 px-3 py-2 text-sm"
+        >
+          <Info className="mt-0.5 h-4 w-4 shrink-0 text-warning" aria-hidden />
+          <p>
+            Your start dashboard is no longer available to you, so you are on the
+            dashboard list.{" "}
+            <Link href="/settings/preferences" className="text-primary hover:underline">
+              Choose another start page
+            </Link>
+            .
+          </p>
+          <DismissNotice param="notice" />
+        </div>
+      )}
+
       {emptyWorkspace ? (
         <FirstRunSection identity={identity} workspaces={workspaces} />
       ) : (
         <>
-          <DashboardListControls query={query} tags={tags} />
+          <DashboardListControls query={query} tags={tags} defaults={listDefaults} />
           {showSections && <RecentDashboards />}
 
           {favorites.length > 0 && (
@@ -159,10 +190,17 @@ export default async function DashboardsPage({
               <EmptyState
                 icon={<SearchX className="h-6 w-6" />}
                 title="Nothing matches"
-                description="No dashboard in your workspaces matches this search and these tags."
+                description={
+                  query.favorites && !query.search && query.tags.length === 0
+                    ? "You have not starred any dashboards yet. Star one from its card, or show all dashboards."
+                    : "No dashboard in your workspaces matches this search and these tags."
+                }
                 action={
                   <Link
-                    href={dashboardListHref({ ...query, search: "", tags: [], page: 1 })}
+                    href={dashboardListHref(
+                      { ...query, search: "", tags: [], favorites: false, page: 1 },
+                      listDefaults,
+                    )}
                   >
                     <Button variant="secondary">Clear filters</Button>
                   </Link>
@@ -173,7 +211,13 @@ export default async function DashboardsPage({
             )}
           </section>
 
-          <Pager page={query.page} pages={pageCount(total)} query={query} total={total} />
+          <Pager
+            page={query.page}
+            pages={pageCount(total)}
+            query={query}
+            total={total}
+            defaults={listDefaults}
+          />
         </>
       )}
     </div>
@@ -198,11 +242,13 @@ function Pager({
   pages,
   query,
   total,
+  defaults,
 }: {
   page: number;
   pages: number;
   query: ReturnType<typeof parseDashboardQuery>;
   total: number;
+  defaults: ListDefaults;
 }) {
   if (pages <= 1) return null;
   return (
@@ -215,13 +261,13 @@ function Pager({
       </span>
       <div className="flex gap-2">
         <PagerLink
-          href={dashboardListHref({ ...query, page: page - 1 })}
+          href={dashboardListHref({ ...query, page: page - 1 }, defaults)}
           disabled={page <= 1}
         >
           Previous
         </PagerLink>
         <PagerLink
-          href={dashboardListHref({ ...query, page: page + 1 })}
+          href={dashboardListHref({ ...query, page: page + 1 }, defaults)}
           disabled={page >= pages}
         >
           Next

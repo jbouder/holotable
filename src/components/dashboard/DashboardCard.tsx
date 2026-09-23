@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import Link from "next/link";
+import { LocalTime } from "@/components/time-display";
 import { useRouter } from "next/navigation";
 import { Copy, Loader2, MoreVertical, Star, Tag, Trash2, Pencil } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
@@ -173,7 +174,9 @@ export function DashboardCard({
           <span>
             {dashboard.workspaceId} · v{dashboard.version}
           </span>
-          <span>updated {new Date(dashboard.updatedAt).toLocaleString()}</span>
+          <span>
+            updated <LocalTime iso={dashboard.updatedAt} />
+          </span>
         </div>
 
         {error && (

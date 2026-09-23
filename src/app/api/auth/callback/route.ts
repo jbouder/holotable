@@ -44,5 +44,8 @@ export const GET = route("auth.callback", async (req: Request) => {
   // reports its bind host (0.0.0.0), so an absolute redirect would move the
   // browser off the host the session cookie was just set on (localhost),
   // dropping the cookie and bouncing back to login.
-  return new Response(null, { status: 302, headers: { Location: "/dashboards" } });
+  //
+  // `/` rather than `/dashboards`: the home route sends the new session to the
+  // person's chosen start page (#215), with the same fallbacks either way.
+  return new Response(null, { status: 302, headers: { Location: "/" } });
 });

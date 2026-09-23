@@ -1105,3 +1105,40 @@ export async function clearChatMessages(
   );
   return rows.length;
 }
+
+/* -------------------------------------------------------------------------- */
+/* User preferences (#213)                                                    */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * The stored preference object for one subject, unvalidated, or null when the
+ * subject has never saved one. `parsePreferences` is the only thing that should
+ * read the result.
+ */
+export async function getUserPreferences(sub: string): Promise<unknown | null> {
+  const rows = await query<{ prefs: unknown }>(
+    `SELECT prefs FROM user_preferences WHERE sub = $1`,
+    [sub],
+  );
+  return rows[0]?.prefs ?? null;
+}
+
+/**
+ * Merge an already-validated patch into one subject's row, creating it on the
+ * first save. The merge is JSONB `||` in one statement, so two tabs saving
+ * different fields at once cannot overwrite each other's change.
+ */
+export async function mergeUserPreferences(
+  sub: string,
+  patch: Record<string, unknown>,
+): Promise<unknown> {
+  const rows = await query<{ prefs: unknown }>(
+    `INSERT INTO user_preferences (sub, prefs)
+     VALUES ($1, $2::jsonb)
+     ON CONFLICT (sub)
+     DO UPDATE SET prefs = user_preferences.prefs || EXCLUDED.prefs, updated_at = now()
+     RETURNING prefs`,
+    [sub, JSON.stringify(patch)],
+  );
+  return rows[0]?.prefs ?? patch;
+}

@@ -1,3 +1,5 @@
+import { formatClock, LOCAL_TIME_DISPLAY, type TimeDisplay } from "@/lib/time-display";
+
 /**
  * Connection and freshness state for the live dashboard stream.
  *
@@ -130,25 +132,38 @@ const RELATIVE_LIMIT_MS = 60_000;
  * watching it; absolute past that, where "127s ago" is arithmetic nobody wants
  * to do and a clock time is what they would compare against.
  */
-export function formatAge(lastEventAt: number | undefined, now: number): string {
+export function formatAge(
+  lastEventAt: number | undefined,
+  now: number,
+  display: TimeDisplay = LOCAL_TIME_DISPLAY,
+): string {
   if (lastEventAt === undefined) return "no data yet";
   const age = now - lastEventAt;
   if (age < JUST_NOW_MS) return "updated just now";
   if (age < RELATIVE_LIMIT_MS) return `updated ${Math.floor(age / 1000)}s ago`;
-  return `updated at ${formatClockTime(lastEventAt)}`;
+  return `updated at ${formatClockTime(lastEventAt, display)}`;
 }
 
-/** Local wall-clock time, zero-padded. Stable across locales, unlike `toLocaleTimeString`. */
-export function formatClockTime(at: number): string {
-  const d = new Date(at);
-  const pad = (n: number) => String(n).padStart(2, "0");
-  return `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+/**
+ * Wall-clock time with seconds, zero-padded and stable across locales, unlike
+ * `toLocaleTimeString`. Local by default; the time display preference (#214)
+ * can pick another zone or the 12-hour clock.
+ */
+export function formatClockTime(
+  at: number,
+  display: TimeDisplay = LOCAL_TIME_DISPLAY,
+): string {
+  return formatClock(new Date(at), display);
 }
 
 /**
  * The full sentence a screen reader is handed when the state changes. The
  * indicator is an `aria-live` region, so this is what actually gets announced.
  */
-export function connectionAnnouncement(status: ConnectionStatus, now: number): string {
-  return `${connectionLabel(status)}. ${formatAge(status.lastEventAt, now)}.`;
+export function connectionAnnouncement(
+  status: ConnectionStatus,
+  now: number,
+  display: TimeDisplay = LOCAL_TIME_DISPLAY,
+): string {
+  return `${connectionLabel(status)}. ${formatAge(status.lastEventAt, now, display)}.`;
 }

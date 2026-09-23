@@ -5,6 +5,10 @@ import "./globals.css";
 import { NavBar } from "@/components/nav-bar";
 import { CommandPalette } from "@/components/command-palette";
 import { getIdentity } from "@/lib/auth/authorize";
+import { timeDisplayOf } from "@/lib/preferences";
+import { requestPreferences } from "@/lib/preferences-server";
+import { LOCAL_TIME_DISPLAY } from "@/lib/time-display";
+import { TimeDisplayProvider } from "@/components/time-display";
 import { NONCE_REQUEST_HEADER } from "@/lib/security-headers";
 import { BOOTSTRAP_SCRIPT } from "@/lib/bootstrap";
 
@@ -43,6 +47,11 @@ export default async function RootLayout({
   const account = identity
     ? { displayName: identity.displayName ?? null, email: identity.email ?? null }
     : null;
+  // How this person wants times shown (#214). Signed out it is browser-local;
+  // a database that does not answer yields the same, never an error page.
+  const timeDisplay = identity
+    ? timeDisplayOf(await requestPreferences(identity))
+    : LOCAL_TIME_DISPLAY;
   return (
     <html
       lang="en"
@@ -71,9 +80,11 @@ export default async function RootLayout({
         />
       </head>
       <body className="min-h-full flex flex-col">
-        <NavBar account={account} />
-        <main className="flex-1 px-4 py-6 sm:px-6">{children}</main>
-        {signedIn && <CommandPalette />}
+        <TimeDisplayProvider value={timeDisplay}>
+          <NavBar account={account} />
+          <main className="flex-1 px-4 py-6 sm:px-6">{children}</main>
+          {signedIn && <CommandPalette />}
+        </TimeDisplayProvider>
       </body>
     </html>
   );

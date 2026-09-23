@@ -1,6 +1,7 @@
 import type { EChartsOption } from "echarts";
 import type { Panel } from "@/lib/ir";
 import { chartPalette } from "@/lib/color/oklch";
+import { formatDateTime, LOCAL_TIME_DISPLAY, type TimeDisplay } from "@/lib/time-display";
 
 export interface PanelData {
   columns: string[];
@@ -78,6 +79,32 @@ function seriesKeys(panel: Panel, data: PanelData): string[] {
   return data.columns.filter((c) => c !== x && isNumeric(data.rows, c));
 }
 
+/** An ISO-8601-shaped timestamp, the form every driver serializes one to. */
+const TIMESTAMP_RE = /^\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}/;
+
+function asInstant(value: unknown): Date | null {
+  if (value instanceof Date) return Number.isNaN(value.getTime()) ? null : value;
+  if (typeof value !== "string" || !TIMESTAMP_RE.test(value)) return null;
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? null : date;
+}
+
+/**
+ * The category labels for a time axis, on the person's clock (#214). Only the
+ * labels change: the axis still has one category per row in row order, which
+ * is what the brush maps indices back through. A value that is not a
+ * timestamp keeps its raw text, and seconds are shown only when some row has
+ * them, so a per-minute series does not read `14:05:00, 14:06:00, …`.
+ */
+export function timeAxisLabels(values: unknown[], display: TimeDisplay): string[] {
+  const instants = values.map(asInstant);
+  const seconds = instants.some((d) => d !== null && d.getUTCSeconds() !== 0);
+  return values.map((v, i) => {
+    const d = instants[i];
+    return d ? formatDateTime(d, display, { seconds }) : toText(v);
+  });
+}
+
 const BASE: EChartsOption = {
   color: palette,
   grid: { left: 44, right: 16, top: 24, bottom: 28 },
@@ -89,15 +116,24 @@ const BASE: EChartsOption = {
 /**
  * Build an ECharts option from a panel spec + current (bounded) data. Only
  * line/area/bar/scatter/heatmap/pie/donut map to ECharts; stat/table are rendered as HTML.
+ *
+ * `display` is how the viewer wants times shown; the time field's axis labels
+ * (and so the axis tooltip, which repeats them) follow it.
  */
-export function buildChartOption(panel: Panel, raw: PanelData): EChartsOption {
+export function buildChartOption(
+  panel: Panel,
+  raw: PanelData,
+  display: TimeDisplay = LOCAL_TIME_DISPLAY,
+): EChartsOption {
   const data = normalize(raw);
   const x = xKey(panel, data);
   const keys = seriesKeys(panel, data);
-  const categories = data.rows.map((r) => toText(r[x]));
+  const xValues = data.rows.map((r) => r[x]);
+  const categories =
+    panel.query.timeField === x ? timeAxisLabels(xValues, display) : xValues.map(toText);
 
   if (panel.viz === "heatmap") {
-    return buildHeatmap(panel, data);
+    return buildHeatmap(panel, data, display);
   }
 
   if (panel.viz === "pie" || panel.viz === "donut") {
@@ -191,9 +227,14 @@ function buildPie(panel: Panel, data: PanelData): EChartsOption {
   };
 }
 
-function buildHeatmap(_panel: Panel, data: PanelData): EChartsOption {
+function buildHeatmap(
+  panel: Panel,
+  data: PanelData,
+  display: TimeDisplay,
+): EChartsOption {
   const [xk, yk, vk] = data.columns;
   const xs = [...new Set(data.rows.map((r) => toText(r[xk])))];
+  const xLabels = panel.query.timeField === xk ? timeAxisLabels(xs, display) : xs;
   const ys = [...new Set(data.rows.map((r) => toText(r[yk])))];
   const values = data.rows.map((r) => [
     xs.indexOf(toText(r[xk])),
@@ -205,7 +246,7 @@ function buildHeatmap(_panel: Panel, data: PanelData): EChartsOption {
     backgroundColor: "transparent",
     tooltip: { position: "top" },
     grid: { left: 60, right: 16, top: 24, bottom: 40 },
-    xAxis: { type: "category", data: xs, axisLabel: { color: "#9aa0aa" } },
+    xAxis: { type: "category", data: xLabels, axisLabel: { color: "#9aa0aa" } },
     yAxis: { type: "category", data: ys, axisLabel: { color: "#9aa0aa" } },
     visualMap: {
       min: 0,

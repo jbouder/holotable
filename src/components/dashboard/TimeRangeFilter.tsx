@@ -24,6 +24,8 @@ import {
 } from "@/lib/time-range";
 import { resolveTimeRange } from "@/lib/time";
 import { cn } from "@/lib/utils";
+import { useTimeDisplay, useZoneBadge } from "@/components/time-display";
+import type { TimeDisplay } from "@/lib/time-display";
 
 /**
  * Seconds are deliberately absent: a window narrower than a minute is shorter
@@ -53,6 +55,8 @@ export function TimeRangeFilter({
   onChange: (range: TimeRange) => void;
 }) {
   const rolling = isRolling(value);
+  const display = useTimeDisplay();
+  const zone = useZoneBadge();
 
   return (
     <div className="flex items-center gap-1">
@@ -71,13 +75,22 @@ export function TimeRangeFilter({
           trigger={
             <>
               <Clock className="h-3.5 w-3.5" aria-hidden />
-              <span className="max-w-44 truncate">{describeRange(value)}</span>
+              <span className="max-w-44 truncate">
+                {describeRange(value, new Date(), display)}
+              </span>
+              {zone && (
+                <span className="border border-border px-1 text-[10px] text-muted">
+                  {zone}
+                </span>
+              )}
             </>
           }
         >
           {(close) => (
             <RangeForm
               value={value}
+              display={display}
+              zone={zone}
               onChange={(next) => {
                 onChange(next);
                 close();
@@ -161,9 +174,13 @@ function IconButton({
  */
 function RangeForm({
   value,
+  display,
+  zone,
   onChange,
 }: {
   value: TimeRange;
+  display: TimeDisplay;
+  zone: string | null;
   onChange: (range: TimeRange) => void;
 }) {
   const initialRelative = parseRelative(value.from);
@@ -173,12 +190,12 @@ function RangeForm({
   const [unit, setUnit] = React.useState<RelativeUnit>(
     () => initialRelative?.unit ?? "m",
   );
-  const [from, setFrom] = React.useState(() => localInputFor(value, "from"));
-  const [to, setTo] = React.useState(() => localInputFor(value, "to"));
+  const [from, setFrom] = React.useState(() => localInputFor(value, "from", display));
+  const [to, setTo] = React.useState(() => localInputFor(value, "to", display));
 
   const relative = relativeRange(Number(amount), unit);
-  const fromDate = fromLocalInput(from);
-  const toDate = fromLocalInput(to);
+  const fromDate = fromLocalInput(from, display);
+  const toDate = fromLocalInput(to, display);
   const absolute = fromDate && toDate ? absoluteRange(fromDate, toDate) : null;
   const absoluteError =
     from && to && !absolute ? "Pick an end at least a second after the start." : null;
@@ -292,8 +309,8 @@ function RangeForm({
       </form>
 
       <p className="text-muted">
-        Times are shown in your local zone and stored as UTC. The server resolves the
-        window it actually queries.
+        Times are shown in {zone ?? "your local zone"} and stored as UTC. The server
+        resolves the window it actually queries.
       </p>
     </div>
   );
@@ -303,9 +320,13 @@ function RangeForm({
  * Seed the absolute inputs from wherever the picker currently is, so opening it
  * on a live dashboard offers that window rather than an empty pair of fields.
  */
-function localInputFor(value: TimeRange, end: "from" | "to"): string {
+function localInputFor(
+  value: TimeRange,
+  end: "from" | "to",
+  display: TimeDisplay,
+): string {
   try {
-    return toLocalInput(resolveTimeRange(value)[end]);
+    return toLocalInput(resolveTimeRange(value)[end], display);
   } catch {
     return "";
   }
