@@ -16,6 +16,8 @@ import {
 import { SourceDraft, type SourceRecord } from "@/lib/registry";
 import { type CatalogHealth, describeCatalogHealth } from "@/lib/catalog/health";
 import { CatalogHealthBadge } from "@/components/sources/catalog-health";
+import { SourceTestReport } from "@/components/sources/SourceTestReport";
+import type { SourceTestResult } from "@/lib/source-test";
 import { Button } from "@/components/ui/button";
 import { Textarea, Label } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
@@ -64,6 +66,13 @@ export function SourcesClient({
   const [editing, setEditing] = React.useState<string | null>(null);
   const [creating, setCreating] = React.useState(startCreating);
   const [notice, setNotice] = React.useState<string | null>(null);
+  // The test's answer is a structure now, not a sentence, so it gets its own
+  // state rather than being flattened into the notice line (#126).
+  const [testResult, setTestResult] = React.useState<{
+    sourceId: string;
+    sourceName: string;
+    result: SourceTestResult;
+  } | null>(null);
   // The source whose impact is on screen, and the one awaiting a delete
   // confirmation; both are ids so a reload cannot leave a stale copy open.
   const [showingImpact, setShowingImpact] = React.useState<string | null>(null);
@@ -95,9 +104,23 @@ export function SourcesClient({
 
   async function test(id: string) {
     setBusy(id);
+    setNotice(null);
     const res = await fetch(`/api/sources/${id}/test`, { method: "POST" });
-    const body = await res.json();
-    setNotice(`${id}: ${body.message ?? (res.ok ? "ok" : "failed")}`);
+    const body = await res.json().catch(() => null);
+    const source = sources?.find((s) => s.id === id);
+    if (body && typeof body.message === "string") {
+      setTestResult({
+        sourceId: id,
+        sourceName: source?.name ?? id,
+        // The route answers with the whole result on success and on a failed
+        // connection alike; a transport failure is the only case with nothing
+        // to render, and it falls through to the notice below.
+        result: body as SourceTestResult,
+      });
+    } else {
+      setTestResult(null);
+      setNotice(`${id}: test failed`);
+    }
     setBusy(null);
   }
 
@@ -197,6 +220,14 @@ export function SourcesClient({
         <div className="rounded-lg border border-border bg-surface px-3 py-2 text-sm text-muted">
           {notice}
         </div>
+      )}
+
+      {testResult && (
+        <SourceTestReport
+          sourceName={testResult.sourceName}
+          result={testResult.result}
+          onDismiss={() => setTestResult(null)}
+        />
       )}
 
       {/*

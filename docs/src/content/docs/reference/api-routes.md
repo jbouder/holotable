@@ -59,7 +59,7 @@ hand.
 | `/api/sources/generate` | POST | editor | Streams a validated `SourceDraft` — never credentials. Rate limited and budgeted |
 | `/api/sources/[id]` | GET/PUT/DELETE | source-admin | Delete tombstones when referenced |
 | `/api/sources/[id]/impact` | GET | source-admin | Dashboards and panels currently referencing the source, scoped to its workspace |
-| `/api/sources/[id]/test` | POST | source-admin | Connectivity test |
+| `/api/sources/[id]/test` | POST | source-admin | Connectivity, latency, server and role identity, a **read-only proof**, and per-table reachability. All of it inside one rolled-back read-only transaction |
 | `/api/sources/[id]/refresh` | POST | source-admin | Re-introspect the catalog; records freshness and any allowlisted table the database no longer has |
 
 ## Auth

@@ -5,6 +5,8 @@ import type { ExecutablePlan } from "@/lib/sql/safety";
 import { ResultCollector } from "@/lib/timescaledb/result-cap";
 import { observeQuery } from "@/lib/metrics";
 import { trackInFlight } from "@/lib/shutdown";
+import { isPlainIdentifier } from "@/lib/catalog/identifiers";
+import type { SourceTestResult, TestReadOnly, TestTable } from "@/lib/source-test";
 
 function clientFor(source: SourceRecord): Client {
   const credentials = resolveCredentials(source.secretRef);
@@ -212,29 +214,174 @@ async function runPlan(source: SourceRecord, plan: ExecutablePlan): Promise<Quer
   }
 }
 
-/** Lightweight connectivity and read-permission test for a source. */
-export function testSource(
-  source: SourceRecord,
-): Promise<{ ok: boolean; message: string }> {
+/**
+ * Connectivity, identity and read-only proof for a source (#126).
+ *
+ * Everything happens inside the same `BEGIN TRANSACTION READ ONLY` the poller
+ * uses, and the transaction is always rolled back — which is what makes the
+ * write probe below safe to run at all: Postgres makes DDL transactional, so a
+ * temp table created by the probe cannot survive the `ROLLBACK` in `finally`
+ * even in the case where the server unexpectedly allows it.
+ *
+ * Each optional step runs inside its own savepoint. A failed statement aborts
+ * a Postgres transaction outright, so without them the first unreadable table
+ * would make every later check report the same "current transaction is
+ * aborted" instead of its own answer.
+ */
+export function testSource(source: SourceRecord): Promise<SourceTestResult> {
   return trackInFlight(() => runSourceTest(source));
 }
 
-async function runSourceTest(
-  source: SourceRecord,
-): Promise<{ ok: boolean; message: string }> {
-  const client = clientFor(source);
+/** A statement's SQLSTATE, when it has one. */
+function sqlState(err: unknown): string | null {
+  const code = (err as { code?: unknown })?.code;
+  return typeof code === "string" ? code : null;
+}
+
+function errorMessage(err: unknown): string {
+  return err instanceof Error ? err.message : String(err);
+}
+
+/** `25006` — "cannot execute … in a read-only transaction". The healthy answer. */
+const READ_ONLY_SQLSTATE = "25006";
+
+/**
+ * Run `body` so that its failure costs only itself.
+ *
+ * Returns the value, or the error. The `ROLLBACK TO` is issued on both paths:
+ * releasing a savepoint that was never used is cheap, and forgetting it on the
+ * success path would leave a growing stack across a two-hundred-table catalog.
+ */
+async function inSavepoint<T>(
+  client: Client,
+  name: string,
+  body: () => Promise<T>,
+): Promise<{ ok: true; value: T } | { ok: false; error: unknown }> {
+  await client.query(`SAVEPOINT ${name}`);
   try {
+    const value = await body();
+    await client.query(`ROLLBACK TO SAVEPOINT ${name}`);
+    return { ok: true, value };
+  } catch (error) {
+    await client.query(`ROLLBACK TO SAVEPOINT ${name}`).catch(() => undefined);
+    return { ok: false, error };
+  }
+}
+
+async function runSourceTest(source: SourceRecord): Promise<SourceTestResult> {
+  const client = clientFor(source);
+  let connected = false;
+  try {
+    const startedAt = Date.now();
     await client.connect();
+    connected = true;
+    const connectMs = Date.now() - startedAt;
+
     await client.query(READ_ONLY_TRANSACTION);
-    await client.query("SELECT 1 AS ok");
-    await client.query("ROLLBACK");
-    return { ok: true, message: "connection succeeded" };
-  } catch (err) {
+    await client.query(searchPathStatement(source.config.schema));
+
+    const queryStartedAt = Date.now();
+    const identity = await client.query<{
+      version: string;
+      current_user: string;
+      session_user: string;
+      search_path: string;
+      timescaledb: string | null;
+    }>(
+      `SELECT version() AS version,
+              current_user,
+              session_user,
+              current_setting('search_path') AS search_path,
+              (SELECT extversion FROM pg_extension WHERE extname = 'timescaledb')
+                AS timescaledb`,
+    );
+    const queryMs = Date.now() - queryStartedAt;
+    const row = identity.rows[0];
+
     return {
-      ok: false,
-      message: err instanceof Error ? err.message : String(err),
+      ok: true,
+      message: "connection succeeded",
+      latency: { connectMs, queryMs },
+      server: { version: row.version, timescaledb: row.timescaledb },
+      role: {
+        currentUser: row.current_user,
+        sessionUser: row.session_user,
+        searchPath: row.search_path,
+      },
+      readOnly: await proveReadOnly(client),
+      tables: await checkTables(client, source),
     };
+  } catch (err) {
+    return { ok: false, message: errorMessage(err) };
   } finally {
+    if (connected) {
+      await client.query("ROLLBACK").catch(() => undefined);
+    }
     await client.end().catch(() => undefined);
   }
+}
+
+/**
+ * Attempt a harmless write and report that the server refused it.
+ *
+ * The transaction is already `READ ONLY`, so the refusal is the expected
+ * outcome and the interesting case is the other one: a write that succeeds
+ * means this role is more privileged than every guarantee downstream assumes,
+ * and the operator needs to be told in those words rather than shown a tick.
+ */
+async function proveReadOnly(client: Client): Promise<TestReadOnly> {
+  const probe = await inSavepoint(client, "holo_write_probe", () =>
+    client.query("CREATE TEMP TABLE _holo_write_probe (i integer)"),
+  );
+
+  if (probe.ok) {
+    return {
+      verdict: "accepted",
+      detail:
+        "CREATE TEMP TABLE succeeded inside a READ ONLY transaction. The " +
+        "statement was rolled back, but this role is not read-only.",
+    };
+  }
+  if (sqlState(probe.error) === READ_ONLY_SQLSTATE) {
+    return { verdict: "refused", detail: errorMessage(probe.error) };
+  }
+  // Refused, but for some other reason — no temp schema, a permission denial,
+  // a proxy rewriting the statement. Reported as unproven rather than as a
+  // pass: this check only means something when the reason is the right one.
+  return {
+    verdict: "unknown",
+    detail: errorMessage(probe.error),
+  };
+}
+
+/**
+ * Confirm each allowlisted table exists and is readable, with `LIMIT 0` so the
+ * check costs a plan and no rows.
+ *
+ * A table whose name is not a plain identifier is reported as unchecked rather
+ * than quoted into the statement, the same rule `src/lib/catalog/identifiers.ts`
+ * applies: the cost is one unverified row in this report, and the alternative
+ * is interpolating a name from a database the operator may not control.
+ */
+async function checkTables(client: Client, source: SourceRecord): Promise<TestTable[]> {
+  const results: TestTable[] = [];
+  for (const [index, table] of source.config.tables.entries()) {
+    if (!isPlainIdentifier(table.name)) {
+      results.push({
+        table: table.name,
+        reachable: false,
+        error: "not checked: the table name is not a plain SQL identifier",
+      });
+      continue;
+    }
+    const probe = await inSavepoint(client, `holo_table_${index}`, () =>
+      client.query(`SELECT 1 FROM ${table.name} LIMIT 0`),
+    );
+    results.push(
+      probe.ok
+        ? { table: table.name, reachable: true }
+        : { table: table.name, reachable: false, error: errorMessage(probe.error) },
+    );
+  }
+  return results;
 }
