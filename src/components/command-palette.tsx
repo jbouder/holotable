@@ -17,6 +17,7 @@ import {
   type SearchResults,
   STATIC_COMMANDS,
 } from "@/lib/command-palette";
+import { PALETTE_SHORTCUT } from "@/lib/shortcuts";
 import { setTheme } from "@/lib/theme";
 import { cn } from "@/lib/utils";
 
@@ -64,7 +65,8 @@ export function CommandPalette() {
 
   React.useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
+      // Either modifier on any platform, as before; the key is the registry's.
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === PALETTE_SHORTCUT.key) {
         e.preventDefault();
         setOpen((was) => !was);
       }

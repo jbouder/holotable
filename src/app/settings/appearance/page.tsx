@@ -1,10 +1,11 @@
 import { settingsSection } from "@/lib/settings";
-import { SectionPlaceholder, SettingsSectionPage } from "@/components/settings/section";
+import { SettingsSectionPage } from "@/components/settings/section";
+import { AppearanceSettings } from "@/components/settings/appearance-settings";
 
 export default function Page() {
   return (
     <SettingsSectionPage section={settingsSection("appearance")}>
-      <SectionPlaceholder />
+      <AppearanceSettings />
     </SettingsSectionPage>
   );
 }
