@@ -58,7 +58,7 @@ export function DashboardListControls({
   return (
     <div className="mb-4 flex flex-col gap-3">
       <div className="flex flex-wrap items-center gap-2">
-        <div className="relative min-w-56 flex-1">
+        <div className="relative w-full sm:w-auto sm:min-w-56 sm:max-w-md sm:flex-1">
           <Search
             className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted"
             aria-hidden
@@ -104,7 +104,7 @@ export function DashboardListControls({
                 aria-pressed={active}
                 onClick={() => go(toggleTag(query, tag))}
                 className={cn(
-                  "inline-flex cursor-pointer items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-xs transition-colors focus-visible:outline-2 focus-visible:outline-primary",
+                  "inline-flex cursor-pointer items-center gap-1.5 border px-2.5 py-0.5 text-xs transition-colors focus-visible:outline-2 focus-visible:outline-primary",
                   active
                     ? "border-primary/60 bg-primary/10 text-foreground"
                     : "border-border text-muted hover:border-foreground/40 hover:text-foreground",
