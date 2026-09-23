@@ -97,6 +97,19 @@ export const config = {
    */
   llmDailyTokenBudget: num("LLM_DAILY_TOKEN_BUDGET", 2_000_000),
 
+  /**
+   * How many messages of one person's chat history on one dashboard are kept
+   * and replayed. The cap is enforced on write and on read, so lowering it
+   * takes effect at once. Documented default: 100 messages.
+   */
+  chatHistoryMaxMessages: num("CHAT_HISTORY_MAX_MESSAGES", 100),
+  /**
+   * How long a stored chat message is kept. A conversation is a reader working
+   * something out, not a record anyone audits, so it expires. `0` disables the
+   * age check and leaves only the message cap. Documented default: 30 days.
+   */
+  chatHistoryRetentionDays: num("CHAT_HISTORY_RETENTION_DAYS", 30),
+
   /** Cookie name used for the session JWT. */
   sessionCookieName: str("SESSION_COOKIE_NAME", "holotable_session"),
 
@@ -299,6 +312,8 @@ const EnvSchema = z.object({
   MAX_WINDOW_POINTS: blank(positiveInt),
   QUERY_TIMEOUT_SECONDS: blank(positiveInt),
   CATALOG_STALE_AFTER_DAYS: blank(nonNegativeInt),
+  CHAT_HISTORY_MAX_MESSAGES: blank(positiveInt),
+  CHAT_HISTORY_RETENTION_DAYS: blank(nonNegativeInt),
   SHUTDOWN_GRACE_MS: blank(positiveInt),
 });
 

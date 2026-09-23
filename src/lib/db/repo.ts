@@ -12,6 +12,7 @@ import { type Dashboard, parseDashboard } from "@/lib/ir";
 import type { BudgetStore } from "@/lib/limits/budget";
 import type { WorkspaceLimits } from "@/lib/limits/llm";
 import type { ImpactDashboard, SourceImpact } from "@/lib/source-impact";
+import type { StoredChatMessage } from "@/lib/chat-history";
 import { type Template, TemplateBody, TemplateKind } from "@/lib/templates";
 
 /* -------------------------------------------------------------------------- */
@@ -759,4 +760,118 @@ export async function deleteTemplate(workspaceId: string, id: string): Promise<b
     [id, workspaceId],
   );
   return rows.length > 0;
+}
+
+/* -------------------------------------------------------------------------- */
+/* Dashboard chat history                                                     */
+/* -------------------------------------------------------------------------- */
+
+type ChatMessageRow = {
+  id: string;
+  role: string;
+  content: unknown;
+  created_at: string;
+};
+
+/**
+ * One person's chat history on one dashboard, oldest first.
+ *
+ * Retention is applied on the way OUT as well as by the sweep on the way in:
+ * a row that is past the window is not shown even if it is still on disk, so
+ * shortening `CHAT_HISTORY_RETENTION_DAYS` takes effect immediately rather
+ * than whenever someone next sends a message. `0` days disables the age check.
+ *
+ * `LIMIT` takes the NEWEST messages and the outer select puts them back in
+ * order — the tail of a conversation is the part that has context.
+ */
+export async function listChatMessages(
+  dashboardId: string,
+  userSub: string,
+  opts: { limit: number; retentionDays: number },
+): Promise<StoredChatMessage[]> {
+  const rows = await query<ChatMessageRow>(
+    `SELECT id, role, content, created_at FROM (
+       SELECT id, role, content, created_at
+       FROM chat_messages
+       WHERE dashboard_id = $1 AND user_sub = $2
+         AND ($4 <= 0 OR created_at > now() - make_interval(days => $4))
+       ORDER BY created_at DESC, id DESC
+       LIMIT $3
+     ) recent
+     ORDER BY created_at ASC, id ASC`,
+    [dashboardId, userSub, opts.limit, opts.retentionDays],
+  );
+  return rows.map((row) => ({
+    id: row.id,
+    role: row.role as StoredChatMessage["role"],
+    content: row.content,
+    createdAt: row.created_at,
+  }));
+}
+
+/**
+ * Append (or update) messages in one conversation and sweep what fell out of
+ * retention.
+ *
+ * `ON CONFLICT ... DO UPDATE` rather than an insert: an assistant message is
+ * streamed under one id and a turn may be re-sent, so the same id arriving
+ * again means "this message grew", not "a second message".
+ *
+ * The sweep runs in the same transaction as the write, which is what keeps the
+ * table from being unbounded without a scheduled job: the only way a row is
+ * added is the only way rows are removed.
+ */
+export async function appendChatMessages(input: {
+  dashboardId: string;
+  userSub: string;
+  messages: { id: string; role: string; content: unknown }[];
+  limit: number;
+  retentionDays: number;
+}): Promise<void> {
+  if (input.messages.length === 0) return;
+  await withTransaction(async (client) => {
+    for (const message of input.messages) {
+      await client.query(
+        `INSERT INTO chat_messages (id, dashboard_id, user_sub, role, content)
+         VALUES ($1, $2, $3, $4, $5::jsonb)
+         ON CONFLICT (dashboard_id, user_sub, id)
+         DO UPDATE SET content = EXCLUDED.content`,
+        [
+          message.id,
+          input.dashboardId,
+          input.userSub,
+          message.role,
+          JSON.stringify(message.content),
+        ],
+      );
+    }
+    await client.query(
+      `DELETE FROM chat_messages
+       WHERE dashboard_id = $1 AND user_sub = $2
+         AND (
+           ($4 > 0 AND created_at <= now() - make_interval(days => $4))
+           OR id NOT IN (
+             SELECT id FROM chat_messages
+             WHERE dashboard_id = $1 AND user_sub = $2
+             ORDER BY created_at DESC, id DESC
+             LIMIT $3
+           )
+         )`,
+      [input.dashboardId, input.userSub, input.limit, input.retentionDays],
+    );
+  });
+}
+
+/** Forget one person's conversation on one dashboard. Returns how many rows went. */
+export async function clearChatMessages(
+  dashboardId: string,
+  userSub: string,
+): Promise<number> {
+  const rows = await query<{ id: string }>(
+    `DELETE FROM chat_messages
+     WHERE dashboard_id = $1 AND user_sub = $2
+     RETURNING id`,
+    [dashboardId, userSub],
+  );
+  return rows.length;
 }

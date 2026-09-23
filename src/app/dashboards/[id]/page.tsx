@@ -14,6 +14,7 @@ import { SaveAsTemplate } from "@/components/templates/SaveAsTemplate";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
 import { dashboardListHref, EMPTY_QUERY } from "@/lib/dashboard-list";
+import { chatSuggestions } from "@/lib/chat-history";
 import { rangeFromParams } from "@/lib/time-range";
 
 export const dynamic = "force-dynamic";
@@ -159,7 +160,18 @@ export default async function DashboardViewPage({
       />
 
       <RecordDashboardVisit dashboardId={id} />
-      <DashboardChat dashboardId={id} dashboardTitle={dashboard.spec.title} />
+      {/*
+        The chips are derived from the spec here rather than in the browser so
+        the derivation has one home and no model call; the panel projection is
+        what the citations match against, and carries nothing the grid below
+        does not already render.
+      */}
+      <DashboardChat
+        dashboardId={id}
+        dashboardTitle={dashboard.spec.title}
+        panels={dashboard.spec.panels.map((p) => ({ title: p.title, query: p.query }))}
+        suggestions={chatSuggestions(dashboard.spec)}
+      />
     </div>
   );
 }

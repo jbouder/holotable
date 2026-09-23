@@ -210,8 +210,14 @@ export async function streamDashboardChat(input: {
   messages: UIMessage[];
   /** Receives the usage summed over every step of the turn. */
   onUsage?: (usage: LanguageModelUsage) => void;
+  /**
+   * The request's own signal. A browser that stops a generation aborts the
+   * fetch, which aborts this, which cancels the model call — without it the
+   * provider keeps generating (and billing) for an answer nobody is reading.
+   */
+  abortSignal?: AbortSignal;
 }) {
-  const { dashboard, sources, messages, onUsage } = input;
+  const { dashboard, sources, messages, onUsage, abortSignal } = input;
   const modelMessages = await convertToModelMessages(messages);
 
   return streamText({
@@ -219,6 +225,7 @@ export async function streamDashboardChat(input: {
     system: buildSystemPrompt(dashboard, sources),
     messages: modelMessages,
     stopWhen: stepCountIs(MAX_STEPS),
+    abortSignal,
     onFinish: ({ usage }) => onUsage?.(usage),
     tools: {
       runQuery: tool({

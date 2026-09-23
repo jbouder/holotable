@@ -213,3 +213,41 @@ silently omitted, mirroring the poller's tombstone handling. It runs the same
 `validateSql` → `buildExecutablePlan` → `executePlan` pipeline, injects the
 **dashboard's own** time range, caps rows (`MAX_TOOL_ROWS`) and model-tool
 steps, and cannot mutate the dashboard. The model still authors SQL, never data.
+
+Four things make it usable rather than a demo (#82):
+
+- **History persists.** A turn is stored in `chat_messages`, keyed by
+  `(dashboard_id, user_sub, id)` — the SDK's own message id, so re-sending a
+  turn updates the row rather than appending a duplicate. A conversation is one
+  reader working something out, so it is scoped per person: two people on the
+  same dashboard have separate histories and cannot see each other's. It is
+  bounded by `CHAT_HISTORY_MAX_MESSAGES` and `CHAT_HISTORY_RETENTION_DAYS`,
+  enforced on write *and* on read, so lowering either takes effect at once
+  rather than whenever someone next sends a message. The sweep runs in the same
+  transaction as the write, which is what keeps the table bounded without a
+  scheduled job. Clearing the chat is a `DELETE` on the same route, and forgets
+  only the caller's own conversation.
+
+  Stored rows are read back as untrusted: `content` is opaque JSONB holding a
+  shape the SDK owns and evolves, so `parseStoredMessage` shape-checks each one
+  and drops what no longer parses. A conversation that starts a turn shorter
+  beats one that replays something half-understood into a prompt.
+
+- **Answers cite their queries.** An assistant message that called `runQuery`
+  renders an expandable "ran this query" footnote with the source id and the
+  statement, plus the titles of any panels whose own query is the same
+  statement. It is read off the message's own tool parts, which the SDK already
+  streamed to the browser — no second request, and nothing the client is told
+  that it was not already holding. The footnote says the server added the
+  time-range predicate rather than showing a statement that is neither what the
+  model wrote nor what the database saw.
+
+- **Follow-up chips are derived, not generated.** `chatSuggestions` builds three
+  or four questions from the panel titles and viz kinds on the server. A second
+  model call to decide what to ask a model would cost a round trip and a budget
+  entry to produce three sentences, and would be different every time.
+
+- **Stop actually stops.** The route passes the request's own `AbortSignal` into
+  `streamText`, so a browser that presses stop cancels the provider call instead
+  of leaving it generating — and billing — for an answer nobody is reading.
+  `onEnd` still fires on that path, so the partial answer is stored.

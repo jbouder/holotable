@@ -224,6 +224,40 @@ test("SHUTDOWN_GRACE_MS is a positive number of milliseconds or unset", () => {
   }
 });
 
+test("chat history limits are bounded, and zero days means keep forever", () => {
+  for (const value of ["1", "500", ""]) {
+    const ok = validateConfig(
+      { ...VALID_PRODUCTION, CHAT_HISTORY_MAX_MESSAGES: value },
+      { production: true },
+    );
+    assert.deepEqual(errors(ok), [], formatConfigProblems(ok));
+  }
+  // A cap of zero would store a conversation and then never show it.
+  for (const value of ["0", "-1", "many"]) {
+    const bad = validateConfig(
+      { ...VALID_PRODUCTION, CHAT_HISTORY_MAX_MESSAGES: value },
+      { production: true },
+    );
+    assert.deepEqual(variables(errors(bad)), ["CHAT_HISTORY_MAX_MESSAGES"]);
+  }
+  // Zero DAYS is meaningful — like CATALOG_STALE_AFTER_DAYS, it turns the age
+  // check off and leaves the message cap as the only bound.
+  assert.deepEqual(
+    validateConfig({ CHAT_HISTORY_RETENTION_DAYS: "0" }, { production: false }).filter(
+      (p) => p.variable === "CHAT_HISTORY_RETENTION_DAYS",
+    ),
+    [],
+  );
+  assert.deepEqual(
+    variables(
+      errors(
+        validateConfig({ CHAT_HISTORY_RETENTION_DAYS: "-7" }, { production: false }),
+      ),
+    ),
+    ["CHAT_HISTORY_RETENTION_DAYS"],
+  );
+});
+
 test("malformed values are errors regardless of environment", () => {
   const env: Environment = {
     DATABASE_URL: "mysql://nope",
