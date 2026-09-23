@@ -12,17 +12,23 @@ import {
 } from "@/lib/theme";
 import { cn } from "@/lib/utils";
 
-const OPTIONS: { value: Theme; label: string; Icon: typeof Sun }[] = [
+export const THEME_OPTIONS: { value: Theme; label: string; Icon: typeof Sun }[] = [
   { value: "light", label: "Light", Icon: Sun },
   { value: "dark", label: "Dark", Icon: Moon },
   { value: "system", label: "System", Icon: Monitor },
 ];
 
-export function ThemeToggle() {
+/**
+ * The theme preference as React state, for any control that shows or changes
+ * it: this toggle, the profile menu, the appearance settings. Each follows the
+ * shared preference through {@link THEME_EVENT} rather than owning it, so
+ * changing it in one place updates the others in the same tab.
+ */
+export function useThemePreference(): [Theme, (value: Theme) => void] {
   // Not savedTheme(): the server has no localStorage, so the first client
   // render has to agree with what the server sent or hydration mismatches, and
-  // React does not patch up the attributes it disagrees on -- the toggle would
-  // keep the wrong button `aria-checked` and highlighted until something else
+  // React does not patch up the attributes it disagrees on -- the control would
+  // keep the wrong item `aria-checked` and highlighted until something else
   // re-rendered it.
   const [theme, setTheme] = React.useState<Theme>(DEFAULT_THEME);
 
@@ -38,7 +44,7 @@ export function ThemeToggle() {
   }, []);
 
   // Follow the OS only while "system" is selected. Every other transition is
-  // applied by updateTheme at the click.
+  // applied by update at the click.
   React.useEffect(() => {
     if (theme !== "system") return;
     const media = window.matchMedia("(prefers-color-scheme: dark)");
@@ -47,18 +53,22 @@ export function ThemeToggle() {
     return () => media.removeEventListener("change", handleChange);
   }, [theme]);
 
-  // The toggle is no longer the only way to change the theme -- the command
-  // palette can too -- so it follows the preference rather than owning it.
   React.useEffect(() => {
     const onThemeChange = (e: Event) => setTheme((e as CustomEvent<Theme>).detail);
     window.addEventListener(THEME_EVENT, onThemeChange);
     return () => window.removeEventListener(THEME_EVENT, onThemeChange);
   }, []);
 
-  function updateTheme(value: Theme) {
+  const update = React.useCallback((value: Theme) => {
     setTheme(value);
     storeTheme(value);
-  }
+  }, []);
+
+  return [theme, update];
+}
+
+export function ThemeToggle() {
+  const [theme, updateTheme] = useThemePreference();
 
   return (
     <div
@@ -66,7 +76,7 @@ export function ThemeToggle() {
       aria-label="Theme"
       className="inline-flex items-center gap-0.5 border border-border bg-surface-2 p-0.5"
     >
-      {OPTIONS.map(({ value, label, Icon }) => {
+      {THEME_OPTIONS.map(({ value, label, Icon }) => {
         const active = theme === value;
         return (
           // The WAI-ARIA radio group pattern: a role="radiogroup" container of

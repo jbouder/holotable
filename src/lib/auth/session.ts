@@ -1,6 +1,11 @@
 import { SignJWT, jwtVerify, createRemoteJWKSet, type JWTPayload } from "jose";
 import { config } from "@/lib/config";
-import { parseGroups, type Identity } from "@/lib/auth/claims";
+import {
+  parseGroups,
+  profileFromClaims,
+  type Identity,
+  type Profile,
+} from "@/lib/auth/claims";
 
 /**
  * Session verification.
@@ -14,7 +19,8 @@ import { parseGroups, type Identity } from "@/lib/auth/claims";
  *  2. Locally-signed session tokens (HS256 via `SESSION_SECRET`): used by the
  *     OIDC callback to mint a first-party session, and by dev-only login.
  *
- * Either way we only ever trust the validated `sub` and `groups` claims.
+ * Either way authorization only ever trusts the validated `sub` and `groups`
+ * claims. `name` and `email` are read too, as display-only profile fields.
  */
 
 const GROUPS_CLAIM = process.env.OIDC_GROUPS_CLAIM || "groups";
@@ -53,7 +59,10 @@ function extractGroups(payload: JWTPayload): string[] {
 function identityFromPayload(payload: JWTPayload): Identity | null {
   const sub = typeof payload.sub === "string" ? payload.sub : null;
   if (!sub) return null;
-  return parseGroups(sub, extractGroups(payload));
+  return {
+    ...parseGroups(sub, extractGroups(payload)),
+    ...profileFromClaims(payload as Record<string, unknown>),
+  };
 }
 
 /**
@@ -87,15 +96,21 @@ export async function verifySessionToken(token: string): Promise<Identity | null
 }
 
 /**
- * Mint a first-party HS256 session token. Used by the OIDC callback (after the
- * Keycloak token is validated) and by the dev-only login route.
+ * Mint a first-party HS256 session token. Used by the OIDC callback, after the
+ * Keycloak token is validated. The profile rides along under the standard
+ * `name` and `email` claim names so {@link verifySessionToken} reads it back
+ * with the same code it uses for a Keycloak token.
  */
 export async function signSessionToken(
   sub: string,
   groups: string[],
+  profile: Profile = {},
   ttlSeconds = 60 * 60 * 8,
 ): Promise<string> {
-  return new SignJWT({ [GROUPS_CLAIM]: groups })
+  const claims: JWTPayload = { [GROUPS_CLAIM]: groups };
+  if (profile.displayName) claims.name = profile.displayName;
+  if (profile.email) claims.email = profile.email;
+  return new SignJWT(claims)
     .setProtectedHeader({ alg: "HS256" })
     .setSubject(sub)
     .setIssuer("holotable")

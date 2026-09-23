@@ -9,8 +9,9 @@ export const runtime = "nodejs";
 
 /**
  * Keycloak OIDC callback. Verifies state, exchanges the code, validates the
- * id_token via JWKS (RS256) — only the validated sub + groups are trusted — and
- * mints a first-party session cookie.
+ * id_token via JWKS (RS256) — only the validated sub + groups are trusted for
+ * authorization — and mints a first-party session cookie. The display name and
+ * email are carried over as display-only claims (#208).
  */
 export const GET = route("auth.callback", async (req: Request) => {
   const url = new URL(req.url);
@@ -32,7 +33,10 @@ export const GET = route("auth.callback", async (req: Request) => {
   );
   if (identity.platformAdmin) groups.push("/platform-admins");
 
-  const session = await signSessionToken(identity.sub, groups);
+  const session = await signSessionToken(identity.sub, groups, {
+    displayName: identity.displayName,
+    email: identity.email,
+  });
   await setSessionCookie(session);
 
   // Redirect relative to the browser's current origin. Deriving an absolute

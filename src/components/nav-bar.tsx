@@ -2,18 +2,11 @@
 
 import * as React from "react";
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
-import {
-  LayoutDashboard,
-  Database,
-  Compass,
-  LogOut,
-  Menu as MenuIcon,
-  X,
-} from "lucide-react";
+import { usePathname } from "next/navigation";
+import { LayoutDashboard, Database, Compass, Menu as MenuIcon, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { NavSlot } from "@/components/nav-slot";
-import { ThemeToggle } from "@/components/theme-toggle";
+import { ProfileMenu, type ProfileMenuAccount } from "@/components/profile-menu";
 
 const LINKS = [
   { href: "/dashboards", label: "Dashboards", Icon: LayoutDashboard },
@@ -29,9 +22,12 @@ const LINKS = [
  * A disclosure rather than a menu popup: the links stay real `<Link>`s, so
  * prefetching, middle-click and "open in new tab" keep working, and the panel
  * is ordinary markup rather than a portal over the page.
+ *
+ * The account menu (#210) stays in the bar at every width and carries Sign
+ * out, Settings and the theme. `account` is null for a signed-out visitor,
+ * who gets no menu: every item in it needs a session.
  */
-export function NavBar() {
-  const router = useRouter();
+export function NavBar({ account }: { account: ProfileMenuAccount | null }) {
   const pathname = usePathname();
   const [open, setOpen] = React.useState(false);
 
@@ -42,12 +38,6 @@ export function NavBar() {
   React.useEffect(() => {
     setOpen(false);
   }, [pathname]);
-
-  async function logout() {
-    await fetch("/api/auth/logout", { method: "POST" });
-    router.push("/dashboards");
-    router.refresh();
-  }
 
   return (
     <header className="border-b border-border bg-surface">
@@ -75,15 +65,7 @@ export function NavBar() {
         </nav>
         <div className="flex shrink-0 items-center gap-2">
           <NavSlot />
-          <ThemeToggle />
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={logout}
-            className="hidden md:inline-flex"
-          >
-            <LogOut className="h-4 w-4" /> Sign out
-          </Button>
+          {account && <ProfileMenu account={account} />}
           <Button
             variant="ghost"
             size="icon"
@@ -114,13 +96,6 @@ export function NavBar() {
               <Icon className="h-4 w-4" /> {label}
             </Link>
           ))}
-          <Button
-            variant="ghost"
-            onClick={logout}
-            className="tap-target justify-start px-3 py-3 text-sm font-normal text-muted"
-          >
-            <LogOut className="h-4 w-4" /> Sign out
-          </Button>
         </nav>
       )}
     </header>

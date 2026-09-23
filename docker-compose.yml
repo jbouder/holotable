@@ -74,8 +74,9 @@ services:
       OIDC_JWKS_URL: ${OIDC_JWKS_URL:-}
       OIDC_GROUPS_CLAIM: ${OIDC_GROUPS_CLAIM:-groups}
       OIDC_REDIRECT_URI: ${OIDC_REDIRECT_URI:-}
-      OIDC_SCOPE: ${OIDC_SCOPE:-openid profile}
+      OIDC_SCOPE: ${OIDC_SCOPE:-openid profile email}
       OIDC_AUDIENCE: ${OIDC_AUDIENCE:-}
+      OIDC_ACCOUNT_URL: ${OIDC_ACCOUNT_URL:-}
       # Prometheus scrape gate. /api/metrics answers 404 until one is set.
       METRICS_TOKEN: *metrics-token
       METRICS_ALLOWED_CIDRS: ${METRICS_ALLOWED_CIDRS:-}

@@ -15,14 +15,22 @@ import { amendRequest, currentRequest, log } from "@/lib/log";
  * id resolved from a trusted, already-scoped resource (or from the identity).
  */
 
-export type Action =
-  | "dashboard:view"
-  | "dashboard:create"
-  | "dashboard:update"
-  | "dashboard:generate"
-  | "dashboard:delete"
-  | "source:manage"
-  | "source:use";
+/**
+ * Every action {@link can} decides. A runtime list rather than only a union so
+ * the account page can describe each role by asking `can()` itself (#211),
+ * which is what keeps that description from drifting from the rule.
+ */
+export const ACTIONS = [
+  "dashboard:view",
+  "dashboard:create",
+  "dashboard:update",
+  "dashboard:generate",
+  "dashboard:delete",
+  "source:manage",
+  "source:use",
+] as const;
+
+export type Action = (typeof ACTIONS)[number];
 
 export interface AuthzContext {
   workspaceId: string;

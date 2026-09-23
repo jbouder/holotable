@@ -1,7 +1,9 @@
 "use client";
 
 import type * as React from "react";
+import Link from "next/link";
 import { Menu as BaseMenu } from "@base-ui/react/menu";
+import { Check } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 /**
@@ -102,4 +104,78 @@ export function MenuItem({
 /** A hairline between groups of actions. */
 export function MenuSeparator() {
   return <hr className="my-1 h-px border-0 bg-border" />;
+}
+
+const ITEM_CLASS =
+  "tap-target flex cursor-pointer select-none items-center gap-2 px-2 py-1.5 text-sm text-foreground outline-none data-[highlighted]:bg-surface-2 data-[disabled]:cursor-not-allowed data-[disabled]:opacity-40";
+
+/**
+ * An in-app page. A real Next `<Link>`, so the destination is prefetched and
+ * middle-click still opens a tab, which a click handler calling the router
+ * would lose. The menu closes on the click, since the page is changing.
+ */
+export function MenuLink({
+  href,
+  children,
+}: {
+  href: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <BaseMenu.LinkItem closeOnClick render={<Link href={href} />} className={ITEM_CLASS}>
+      {children}
+    </BaseMenu.LinkItem>
+  );
+}
+
+/**
+ * A set of mutually exclusive choices, e.g. the theme. The items are
+ * `menuitemradio`s with `aria-checked`, and the group carries the name a
+ * screen reader announces, because a visual caption above it is not
+ * associated with the group by the ARIA menu pattern.
+ */
+export function MenuRadioGroup<T extends string>({
+  label,
+  value,
+  onValueChange,
+  children,
+}: {
+  label: string;
+  value: T;
+  onValueChange: (value: T) => void;
+  children: React.ReactNode;
+}) {
+  return (
+    <BaseMenu.RadioGroup
+      aria-label={label}
+      value={value}
+      onValueChange={(next) => onValueChange(next as T)}
+    >
+      <div
+        aria-hidden
+        className="px-2 pt-1.5 pb-1 text-xs font-semibold uppercase tracking-wide text-muted"
+      >
+        {label}
+      </div>
+      {children}
+    </BaseMenu.RadioGroup>
+  );
+}
+
+/** One choice in a {@link MenuRadioGroup}. Stays open, so the effect is visible. */
+export function MenuRadioItem({
+  value,
+  children,
+}: {
+  value: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <BaseMenu.RadioItem value={value} closeOnClick={false} className={ITEM_CLASS}>
+      {children}
+      <BaseMenu.RadioItemIndicator className="ml-auto text-primary">
+        <Check className="h-4 w-4" aria-hidden />
+      </BaseMenu.RadioItemIndicator>
+    </BaseMenu.RadioItem>
+  );
 }

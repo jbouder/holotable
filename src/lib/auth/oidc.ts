@@ -4,7 +4,8 @@
  * Only what we need: discover endpoints, build the authorize URL, and exchange
  * the code for tokens. The returned id_token is verified via JWKS by
  * lib/auth/session (RS256) and only its validated `sub` + `groups` claims are
- * trusted; we then mint a first-party session token.
+ * trusted for authorization (`name` and `email` are read for display); we then
+ * mint a first-party session token.
  */
 
 interface Endpoints {
@@ -37,7 +38,7 @@ export async function buildAuthorizeUrl(origin: string, state: string, nonce: st
   const params = new URLSearchParams({
     client_id: requireEnv("OIDC_CLIENT_ID"),
     response_type: "code",
-    scope: process.env.OIDC_SCOPE || "openid profile groups",
+    scope: process.env.OIDC_SCOPE || "openid profile email groups",
     redirect_uri: redirectUri(origin),
     state,
     nonce,
