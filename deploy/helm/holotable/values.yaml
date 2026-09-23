@@ -132,7 +132,7 @@ app:
 
 # -- Non-secret environment, rendered into a ConfigMap and mounted with
 # `envFrom`. Every key is an environment variable from
-# https://holotable-docs.pages.dev/reference/configuration/ — for example
+# https://holotable-docs.beskar.workers.dev/reference/configuration/ — for example
 # OIDC_ISSUER, OIDC_CLIENT_ID, OIDC_REDIRECT_URI, LOG_LEVEL, MAX_QUERY_ROWS.
 # Credentials do NOT go here; the chart fails to render if they do.
 config: {}

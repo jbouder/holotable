@@ -32,11 +32,7 @@ import type { CatalogHealth } from "@/lib/catalog/health";
  * this way.
  */
 export const FIRST_DASHBOARD_DOCS_URL =
-  "https://holotable-docs.pages.dev/getting-started/your-first-dashboard/";
-
-/** The one idea, linked from the "How it works" card. */
-export const HOW_IT_WORKS_DOCS_URL =
-  "https://holotable-docs.pages.dev/concepts/how-it-works/";
+  "https://holotable-docs.beskar.workers.dev/getting-started/your-first-dashboard/";
 
 export type OnboardingStepId = "connect" | "verify" | "generate";
 

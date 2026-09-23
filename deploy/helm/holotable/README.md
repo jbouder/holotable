@@ -30,7 +30,7 @@ helm install holotable deploy/helm/holotable \
    cluster. The migration Job creates the schema on first install.
 
 3. **A Keycloak realm.** OIDC is the only way to sign in; there is no local
-   login. See [Keycloak setup](https://holotable-docs.pages.dev/operations/keycloak/).
+   login. See [Keycloak setup](https://holotable-docs.beskar.workers.dev/operations/keycloak/).
 
 4. **A Secret** holding the credential environment. The chart never generates
    one for you — see below.
@@ -54,7 +54,7 @@ The last row is the one that is easy to miss. A source stores the *name*
 `TS_METRICS` and nothing else; the server resolves `TS_METRICS_USERNAME` and
 `TS_METRICS_PASSWORD` from its own environment when it executes a query. A
 source whose family is missing saves fine and fails on **Test**. See
-[Source secret references](https://holotable-docs.pages.dev/operations/secret-references/).
+[Source secret references](https://holotable-docs.beskar.workers.dev/operations/secret-references/).
 
 Three wirings, each a runnable values file in [`examples/`](examples):
 
@@ -98,7 +98,7 @@ The three settings below are one mechanism, not three independent knobs.
 Together: no request is routed to a pod that is going away, open SSE streams
 get a reconnect hint with a randomized delay, in-flight queries finish, and the
 process exits 0. [Health, readiness, and
-shutdown](https://holotable-docs.pages.dev/operations/health-checks/) has the
+shutdown](https://holotable-docs.beskar.workers.dev/operations/health-checks/) has the
 full sequence.
 
 ## Migrations
@@ -194,7 +194,7 @@ alongside the release, with `bearerTokenSecret` pointing at the same Secret key.
 | `app.shutdownGraceMs` | `10000` | `SHUTDOWN_GRACE_MS`. Sizes the grace period. |
 | `app.preStopSleepSeconds` | `5` | preStop sleep before SIGTERM. |
 | `app.command` / `app.args` | `[]` | Entrypoint override. Needed only to source an injected environment file (see the Vault example). |
-| `config` | `{}` | Non-secret environment, rendered into a ConfigMap. Any variable from the [configuration reference](https://holotable-docs.pages.dev/reference/configuration/). |
+| `config` | `{}` | Non-secret environment, rendered into a ConfigMap. Any variable from the [configuration reference](https://holotable-docs.beskar.workers.dev/reference/configuration/). |
 | `extraEnv` | `[]` | Raw `env` entries, for a single key from a Secret via `valueFrom`. |
 | `extraEnvFrom` | `[]` | Extra `envFrom` sources, by name. |
 | `extraVolumes` / `extraVolumeMounts` | `[]` | Applied to the app **and** the migration Job. |
