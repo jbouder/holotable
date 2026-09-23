@@ -242,6 +242,7 @@ export function LiveDashboard({
             state={states[panel.id]}
             paused={!live}
             timeRange={timeRange}
+            dashboardTitle={spec.title}
           />
         )}
       />
