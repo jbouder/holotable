@@ -74,6 +74,8 @@ config:
   AI_PROVIDER: openai-compatible
   OPENAI_BASE_URL: https://openrouter.ai/api/v1
   AI_MODEL: openai/gpt-4o-mini
+  # The `ops` workspace (the `/workspaces/ops/…` groups) may use TS_METRICS.
+  SOURCE_SECRET_REFS: "TS_METRICS:ops"
 
 # The injector adds its own sidecar and memory-backed volume; it does not need
 # the app container's root filesystem to be writable.

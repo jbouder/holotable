@@ -4,7 +4,6 @@ import { readFileSync } from "node:fs";
 import {
   formatConfigProblems,
   validateConfig,
-  validateSourceSecrets,
   type ConfigProblem,
   type Environment,
 } from "@/lib/config";
@@ -29,6 +28,7 @@ const EXAMPLE_ENV = parseDotenv(
 
 /** A configuration that passes production validation outright. */
 const VALID_PRODUCTION: Environment = {
+  SOURCE_SECRET_REFS: "TS_METRICS:demo",
   DATABASE_URL: "postgresql://holotable:pw@db.internal:5432/holotable",
   SESSION_SECRET: "k3Jd9sLq2mZx8vBn4tRw7yUa1cFe6hGp0oIiPlKj",
   AI_PROVIDER: "openai-compatible",
@@ -348,17 +348,44 @@ test("every problem is reported in one pass", () => {
   }
 });
 
-test("source secret_refs missing credentials are warnings naming the variable", () => {
-  const problems = validateSourceSecrets(["TS_METRICS", "PROD_DB", "TS_METRICS"], {
-    TS_METRICS_USERNAME: "metrics_ro",
-    TS_METRICS_PASSWORD: "",
-    PROD_DB_PASSWORD: "pw",
-  });
-  // An empty password is allowed (resolveCredentials accepts it); an empty or
-  // missing username is not. Duplicate refs are checked once.
-  assert.deepEqual(variables(problems), ["PROD_DB_USERNAME"]);
-  assert.ok(problems.every((p) => p.severity === "warning"));
-  assert.match(problems[0].message, /secret_ref "PROD_DB"/);
+test("SOURCE_SECRET_REFS unset fails closed: an error in production, a warning in development", () => {
+  const { SOURCE_SECRET_REFS: _unset, ...env } = VALID_PRODUCTION;
+
+  const prod = validateConfig(env, { production: true });
+  assert.deepEqual(variables(errors(prod)), ["SOURCE_SECRET_REFS"]);
+  assert.match(errors(prod)[0].message, /no source can resolve credentials/);
+
+  const dev = validateConfig(env, { production: false });
+  assert.deepEqual(variables(errors(dev)), []);
+  assert.ok(
+    dev.some((p) => p.variable === "SOURCE_SECRET_REFS" && p.severity === "warning"),
+  );
+});
+
+test("SOURCE_SECRET_REFS set empty is a valid declaration of no sources", () => {
+  assert.deepEqual(
+    validateConfig({ ...VALID_PRODUCTION, SOURCE_SECRET_REFS: "" }, { production: true }),
+    [],
+  );
+});
+
+test("a malformed SOURCE_SECRET_REFS is an error in every environment", () => {
+  for (const production of [true, false]) {
+    const problems = validateConfig(
+      { ...VALID_PRODUCTION, SOURCE_SECRET_REFS: "TS_METRICS:demo;TS_METRICS:ops" },
+      { production },
+    );
+    assert.deepEqual(variables(errors(problems)), ["SOURCE_SECRET_REFS"]);
+    assert.match(errors(problems)[0].message, /more than once/);
+  }
+});
+
+test("SOURCE_SECRETS_DIR must be an absolute path", () => {
+  const problems = validateConfig(
+    { ...VALID_PRODUCTION, SOURCE_SECRETS_DIR: "secrets" },
+    { production: true },
+  );
+  assert.deepEqual(variables(errors(problems)), ["SOURCE_SECRETS_DIR"]);
 });
 
 test("the report lists every problem, errors first, with a verdict", () => {
@@ -396,10 +423,19 @@ test("startup checks: source credentials are checked when the database answers",
   const result = await runStartupChecks({
     env: { ...VALID_PRODUCTION, TS_METRICS_USERNAME: "ro" },
     production: true,
-    loadSecretRefs: async () => ["TS_METRICS"],
+    loadSecretRefs: async () => [
+      { secretRef: "TS_METRICS", workspaceId: "demo" },
+      { secretRef: "TS_METRICS", workspaceId: "ops" },
+    ],
   });
   assert.equal(result.ok, true);
-  assert.deepEqual(variables(result.problems), ["TS_METRICS_PASSWORD"]);
+  const byVariable = new Map(result.problems.map((p) => [p.variable, p.message]));
+  assert.deepEqual([...byVariable.keys()].sort(), [
+    "SOURCE_SECRET_REFS",
+    "TS_METRICS_USERNAME",
+  ]);
+  assert.match(byVariable.get("SOURCE_SECRET_REFS") ?? "", /workspace "ops"/);
+  assert.match(byVariable.get("TS_METRICS_USERNAME") ?? "", /TS_METRICS_PASSWORD/);
 });
 
 test("startup checks: an unreachable database degrades the source check to a warning", async () => {

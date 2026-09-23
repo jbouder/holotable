@@ -227,8 +227,8 @@ jobs:
             echo "::endgroup::"
           done
 
-      # Every optional object at once: Ingress, HPA, PDB, NetworkPolicy, and a
-      # chart-managed Secret, which no other rendering above reaches.
+      # Every optional object at once: Ingress, HPA, PDB, NetworkPolicy, a
+      # chart-managed Secret, and the source-credential mount.
       - name: Template every optional object
         run: |
           helm template holotable deploy/helm/holotable \
@@ -241,6 +241,7 @@ jobs:
             --set networkPolicy.ingressFrom[0].namespaceSelector.matchLabels."kubernetes\.io/metadata\.name"=ingress-nginx \
             --set secrets.create=true \
             --set secrets.values.SESSION_SECRET=not-a-real-secret \
+            --set sourceSecrets.secretName=holotable-sources \
             > /dev/null
 
       # The guard that keeps invariant 5 (no credential in a client-visible or

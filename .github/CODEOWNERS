@@ -24,9 +24,13 @@
 # or the model, decides what window a panel actually queries.
 /src/lib/time.ts                @jbouder
 
-# The source registry: safe connection config, catalog, and secret_ref
-# resolution. Credentials come from the environment here and are never stored.
+# The source registry: safe connection config and catalog.
 /src/lib/registry.ts            @jbouder
+
+# Source credential resolution: which workspace may use which secret_ref, and
+# where the credentials are read from. A regression here lets one workspace
+# connect with another's database role.
+/src/lib/secrets/               @jbouder
 
 # The /api/metrics gate. A scrape names dashboards and sources, per-workspace
 # model spend, and what the SQL guard is rejecting, and it sits outside the

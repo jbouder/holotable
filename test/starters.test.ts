@@ -226,6 +226,18 @@ test("source descriptions fall back to the shape of a description with no source
   assert.deepEqual(buildSourceDescriptionStarters([]), GENERIC_SOURCE_DESCRIPTIONS);
 });
 
+test("a fallback description never offers a connection detail that looks real", () => {
+  // A realistic example host drafted straight into a source that saved and
+  // then failed on Test with ENOTFOUND. The form refuses a bracketed
+  // placeholder instead, so an example has to use one.
+  for (const description of GENERIC_SOURCE_DESCRIPTIONS) {
+    const at = description.match(/ at (\S+?):\d+/);
+    if (at) assert.match(at[1], /^<[^<>]+>$/, description);
+    const database = description.match(/database (\S+?),/);
+    if (database) assert.match(database[1], /^<[^<>]+>$/, description);
+  }
+});
+
 test("a source with an unusable catalog contributes no description example", () => {
   const odd = withTables([{ name: "fine", columns: [{ name: "a", type: "text" }] }]);
   assert.deepEqual(

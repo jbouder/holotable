@@ -242,9 +242,15 @@ export function buildSourceDescriptionStarters(
 /**
  * Format, not schema. These name no table, because the point of a fallback is
  * to show what a description looks like when there is nothing real to copy.
+ *
+ * The connection details are bracketed placeholders, never a plausible
+ * address: a realistic-looking `db.internal` drafted straight into a source
+ * that saved and then failed on Test with a DNS error. The drafter carries a
+ * placeholder through verbatim, and the form refuses to save or discover
+ * while one is still in a field.
  */
 export const GENERIC_SOURCE_DESCRIPTIONS = [
-  "PostgreSQL at db.internal:5432, database app, schema public. Track a table of events with a timestamp column, a category, and a numeric measure.",
+  "PostgreSQL at <host>:5432, database <database>, schema public. Track a table of events with a timestamp column, a category, and a numeric measure.",
   "TimescaleDB hypertable keyed on time, with an identifier column and two numeric measurement columns.",
 ];
 

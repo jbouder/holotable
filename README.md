@@ -205,7 +205,7 @@ default single-instance setup these are the same TimescaleDB database.
 | `/api/sources/[id]/test` | POST | Connectivity test |
 | `/api/sources/[id]/refresh` | POST | Re-introspect catalog |
 | `/api/sources/discover` | POST | List the tables and columns a prospective source's read-only user can see, to pick an allowlist from (nothing is persisted) |
-| `/api/secret-refs/[ref]/status` | GET | Whether the server holds credentials for a `secret_ref`; a boolean only (`source:manage`) |
+| `/api/secret-refs` | GET | The `secret_ref`s granted to a workspace, each with whether the server holds credentials; names and booleans only (`source:manage`) |
 | `/api/auth/login` · `/callback` · `/logout` | | OIDC session |
 | `/api/health` · `/api/ready` | GET | Liveness and readiness probes (no auth) |
 | `/api/metrics` | GET | Prometheus scrape; `404` until `METRICS_TOKEN` or `METRICS_ALLOWED_CIDRS` is set |
@@ -213,20 +213,24 @@ default single-instance setup these are the same TimescaleDB database.
 ## Source secret references
 
 A source stores a `secret_ref` (an uppercase env-var family), never credentials.
-`resolveCredentials("TS_METRICS")` reads `TS_METRICS_USERNAME` /
-`TS_METRICS_PASSWORD` from the environment at execution time. Point a
-`secret_ref` at your **read-only** TimescaleDB role; the app never connects with a
-privileged user. See `src/lib/registry.ts`.
+`SOURCE_SECRET_REFS` declares which workspace may use which ref
+(`TS_METRICS:ops; BILLING_RO:finance`); a ref not granted to a source's
+workspace never resolves, and unset grants nothing. For a granted ref,
+`resolveCredentials` reads `TS_METRICS_USERNAME` / `TS_METRICS_PASSWORD` at
+execution time, as files in `SOURCE_SECRETS_DIR` (a mounted Secret, refreshed
+without a restart) or from the environment. Point a `secret_ref` at your
+**read-only** TimescaleDB role; the app never connects with a privileged user.
+See `src/lib/secrets/credentials.ts`.
 
 This is also why the natural-language source drafter (`/api/sources/generate`)
 only ever emits the safe `SourceDraft` shape — connection config, table catalog,
 and the `secret_ref` *name* — and is prompted to ignore any password in the
-description. Credentials must already exist in the server environment for the
-named `secret_ref`; a drafted or hand-created source whose `secret_ref` is
-unconfigured saves fine but fails on **Test** until those env vars are set. The
-source form and the source list show that readiness up front — a check when the
-server holds credentials, a warning naming the two variables to set when it does
-not — so the gap is visible before Test. Saving anyway is allowed. The draft is
+description. The source form picks the `secret_ref` from those granted to the
+workspace; a source whose ref has no credentials yet saves fine but fails on
+**Test** until they are set. The form and the source list show that readiness
+up front — a check when the server holds credentials, a warning naming the two
+variables to set when it does not, and "not granted" for a stored source whose
+grant was withdrawn — so the gap is visible before Test. The draft is
 a starting point: run **Test** and **Refresh** to pull the live column catalog
 before relying on it.
 

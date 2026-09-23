@@ -2,6 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { SourceConfig } from "@/lib/registry";
 import {
+  applyDiscovery,
   configFromFormState,
   configTextFromFormState,
   connectionFromFormState,
@@ -123,6 +124,20 @@ test("whitespace around a connection field is not part of it", () => {
   assert.equal(result.ok && result.config.host, "db.internal");
 });
 
+test("a placeholder left in a connection field is refused, and says what to replace", () => {
+  const state = filled({ host: "<host>", database: "<database>" });
+  const connection = connectionFromFormState(state);
+  assert.equal(connection.ok, false);
+  const errors = connection.ok ? {} : connection.errors;
+  assert.match(errors.host ?? "", /Replace the placeholder <host> with the real host/);
+  assert.match(errors.database ?? "", /Replace the placeholder <database>/);
+
+  // Saving is refused the same way, not only discovery.
+  assert.equal(configFromFormState(state).ok, false);
+  // An ordinary hostname is untouched.
+  assert.equal(connectionFromFormState(filled({ host: "db.internal" })).ok, true);
+});
+
 test("the empty form defaults the port and the schema and allowlists nothing", () => {
   const state = emptyFormState();
   assert.equal(state.port, "5432");
@@ -199,6 +214,51 @@ test("a table the live schema no longer has stays listed, marked undiscovered", 
     ],
   );
   assert.equal(menu.ran, true);
+});
+
+test("discovery unticks allowlisted tables the schema does not have, and keeps them listed", () => {
+  const placeholder = { name: "events", columns: [{ name: "ts", type: "timestamptz" }] };
+  const state = filled({ tables: [config.tables[0], placeholder] });
+  const live = { ...discovered, name: "http_requests" };
+
+  const applied = applyDiscovery(state, emptyMenu(), [live, discovered]);
+
+  assert.deepEqual(applied.unticked, ["events"]);
+  assert.deepEqual(
+    applied.state.tables.map((t) => t.name),
+    ["http_requests"],
+  );
+  // The kept table is the author's, not the discovered copy: its time column
+  // and description survive.
+  assert.deepEqual(applied.state.tables[0], config.tables[0]);
+  assert.deepEqual(
+    tableRows(applied.state, applied.menu).map((row) => [
+      row.table.name,
+      row.selected,
+      row.discovered,
+    ]),
+    [
+      ["http_requests", true, true],
+      ["cpu_usage", false, true],
+      ["events", false, false],
+    ],
+  );
+  // And ticking it again brings it back, columns and all (with its obvious
+  // time column, as any tick does).
+  const row = tableRows(applied.state, applied.menu).find(
+    (r) => r.table.name === "events",
+  );
+  assert.ok(row);
+  assert.deepEqual(toggleTable(applied.state, row.table).tables.at(-1), {
+    ...placeholder,
+    timeField: "ts",
+  });
+});
+
+test("discovery never adds to the allowlist", () => {
+  const applied = applyDiscovery(filled({ tables: [] }), emptyMenu(), [discovered]);
+  assert.deepEqual(applied.state.tables, []);
+  assert.deepEqual(applied.unticked, []);
 });
 
 test("a remembered table survives being unticked, and comes back whole", () => {

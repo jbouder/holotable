@@ -2,7 +2,6 @@ import { Client } from "pg";
 import { fenceUntrustedBlock, sanitizePromptField } from "@/lib/ai/untrusted";
 import { liveCatalogTables } from "@/lib/catalog/health";
 import {
-  resolveCredentials,
   CatalogColumn,
   CatalogTable,
   MAX_COLUMNS,
@@ -11,6 +10,7 @@ import {
   type SourceConnection,
   type SourceRecord,
 } from "@/lib/registry";
+import { resolveCredentials } from "@/lib/secrets/credentials";
 
 // The clamp for each catalog field in a prompt is the registry schema's own
 // maximum, read from the schema so the two cannot drift apart.
@@ -79,8 +79,12 @@ export function buildCatalogPrompt(source: SourceRecord): string {
 }
 
 /** A client for introspection only: no statement timeout, no query path. */
-function catalogClient(connection: SourceConnection, secretRef: string): Client {
-  const credentials = resolveCredentials(secretRef);
+function catalogClient(
+  connection: SourceConnection,
+  secretRef: string,
+  workspaceId: string,
+): Client {
+  const credentials = resolveCredentials(secretRef, workspaceId);
   return new Client({
     host: connection.host,
     port: connection.port,
@@ -105,8 +109,9 @@ function catalogClient(connection: SourceConnection, secretRef: string): Client 
 export async function discoverTables(
   connection: SourceConnection,
   secretRef: string,
+  workspaceId: string,
 ): Promise<CatalogTable[]> {
-  const client = catalogClient(connection, secretRef);
+  const client = catalogClient(connection, secretRef, workspaceId);
   await client.connect();
   try {
     const result = await client.query<{
@@ -168,7 +173,7 @@ export interface CatalogRefresh {
  * out of the prompt (see {@link renderCatalog}).
  */
 export async function refreshCatalog(source: SourceRecord): Promise<CatalogRefresh> {
-  const client = catalogClient(source.config, source.secretRef);
+  const client = catalogClient(source.config, source.secretRef, source.workspaceId);
 
   await client.connect();
   try {

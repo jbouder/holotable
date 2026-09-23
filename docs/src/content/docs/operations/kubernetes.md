@@ -49,6 +49,18 @@ to anyone who can read the namespace. Credentials go in a Secret, loaded with
 `<REF>_USERNAME` / `<REF>_PASSWORD` pair per source
 [`secret_ref`](/operations/secret-references/).
 
+Source credentials are better off in a Secret of their own, named by
+`sourceSecrets.secretName`. The chart mounts it as a volume and sets
+`SOURCE_SECRETS_DIR`, and the server reads the files on every connection. The
+kubelet refreshes a mounted Secret in place, so a new source's credentials, or
+a rotated password, reach the running pods within about a minute, with no
+restart. An `envFrom` Secret is read once at container start, and a change to
+one the chart does not manage rolls nothing.
+
+Which workspace may use which ref is declared in `config.SOURCE_SECRET_REFS`.
+It holds names only, so it belongs in the ConfigMap. It is required: unset, the
+server refuses to start in production.
+
 The chart enforces this rather than asking: a key under `config` named like a
 credential — `DATABASE_URL`, `TIMESCALEDB_URL`, or anything ending in
 `_SECRET`, `_TOKEN`, `_PASSWORD`, `_API_KEY`, `_KEY` — **fails the render** with

@@ -83,10 +83,37 @@ export type ConnectionResult =
 export function connectionFromFormState(state: SourceFormState): ConnectionResult {
   const errors: FieldErrors = {};
   const port = claimPort(state, errors);
+  claimPlaceholders(state, errors);
   const parsed = SourceConnection.safeParse(connectionDraft(state, port));
-  if (parsed.success && port !== undefined) return { ok: true, connection: parsed.data };
+  if (parsed.success && Object.keys(errors).length === 0) {
+    return { ok: true, connection: parsed.data };
+  }
   if (!parsed.success) collectFieldErrors(parsed.error.issues, errors);
   return { ok: false, errors };
+}
+
+/**
+ * A placeholder such as `<host>` — what the example descriptions and the
+ * drafter use for a value nobody has supplied yet.
+ */
+const PLACEHOLDER = /<[^<>]*>/;
+
+/**
+ * Claim a connection field still holding a placeholder before the schema
+ * sees it. `<host>` is a valid string as far as `SourceConnection` knows, so
+ * without this it would save, and fail only on Test with a DNS error that
+ * says nothing about where the value came from. A plausible-looking invented
+ * host is exactly that trap, which is why nothing fills one in; a bracketed
+ * placeholder that cannot be saved is the honest version of "not known yet".
+ */
+function claimPlaceholders(state: SourceFormState, errors: FieldErrors): void {
+  for (const key of ["host", "database", "schema"] as const) {
+    const match = state[key].match(PLACEHOLDER);
+    if (match && !(key in errors)) {
+      errors[key] =
+        `Replace the placeholder ${match[0]} with the real ${LABELS[key].toLowerCase()}.`;
+    }
+  }
 }
 
 const PORT_MESSAGE = "Port must be a whole number between 1 and 65535.";
@@ -107,8 +134,11 @@ function parsePort(text: string): number | undefined {
 export function configFromFormState(state: SourceFormState): FormResult {
   const errors: FieldErrors = {};
   const port = claimPort(state, errors);
+  claimPlaceholders(state, errors);
   const parsed = SourceConfig.safeParse(configDraft(state, port));
-  if (parsed.success && port !== undefined) return { ok: true, config: parsed.data };
+  if (parsed.success && Object.keys(errors).length === 0) {
+    return { ok: true, config: parsed.data };
+  }
   if (!parsed.success) collectFieldErrors(parsed.error.issues, errors);
   return { ok: false, errors };
 }
@@ -348,6 +378,38 @@ export function menuAfterDiscovery(menu: TableMenu, tables: CatalogTable[]): Tab
     tables: [...tables, ...menu.tables.filter((table) => !found.has(table.name))],
     discovered: [...found],
     ran: true,
+  };
+}
+
+export interface DiscoveryResult {
+  state: SourceFormState;
+  menu: TableMenu;
+  /** Allowlisted tables the live schema does not have, now unticked. */
+  unticked: string[];
+}
+
+/**
+ * Apply a discovery to the form: fold it into the menu, and untick every
+ * allowlisted table the live schema does not have.
+ *
+ * Discovery never *adds* to the allowlist — ticking is the only way in — but a
+ * table it cannot find is one the guard would refuse and Test would report as
+ * unreadable, typically a placeholder the drafter invented. Keeping it ticked
+ * would save it. It stays on the menu, marked not discovered and whole, so an
+ * untick the author disagrees with is one click to undo.
+ */
+export function applyDiscovery(
+  state: SourceFormState,
+  menu: TableMenu,
+  tables: CatalogTable[],
+): DiscoveryResult {
+  const found = new Set(tables.map((table) => table.name));
+  const missing = state.tables.filter((table) => !found.has(table.name));
+  const remembered = missing.reduce(rememberTable, menu);
+  return {
+    state: { ...state, tables: state.tables.filter((table) => found.has(table.name)) },
+    menu: menuAfterDiscovery(remembered, tables),
+    unticked: missing.map((table) => table.name),
   };
 }
 

@@ -3,6 +3,8 @@ import { requireIdentity, assertAuthorized, HttpError } from "@/lib/auth/authori
 import { readJson, json, route } from "@/lib/http";
 import { getSourceById, updateSource, deleteSource } from "@/lib/db/repo";
 import { SourceConfig } from "@/lib/registry";
+import { SECRET_REF_MESSAGE, SECRET_REF_PATTERN } from "@/lib/secret-refs";
+import { requireGrantedSecretRef } from "@/lib/secrets/http";
 
 export const runtime = "nodejs";
 
@@ -22,10 +24,7 @@ export const GET = route(
 const UpdateBody = z.object({
   name: z.string().min(1).max(200).optional(),
   config: SourceConfig.optional(),
-  secretRef: z
-    .string()
-    .regex(/^[A-Z][A-Z0-9_]*$/, "secretRef must be an UPPER_SNAKE env family")
-    .optional(),
+  secretRef: z.string().regex(SECRET_REF_PATTERN, SECRET_REF_MESSAGE).optional(),
 });
 
 export const PUT = route(
@@ -39,6 +38,11 @@ export const PUT = route(
     assertAuthorized(identity, "source:manage", { workspaceId: source.workspaceId });
 
     const patch = await readJson(req, UpdateBody);
+    // Only a changed ref is checked here: an unrelated edit to a source whose
+    // grant has since been withdrawn still saves, and still cannot connect.
+    if (patch.secretRef !== undefined && patch.secretRef !== source.secretRef) {
+      requireGrantedSecretRef(patch.secretRef, source.workspaceId);
+    }
     const updated = await updateSource(source.workspaceId, id, patch);
     if (!updated) throw new HttpError(409, "source is tombstoned and cannot be edited");
     return json({ source: updated });

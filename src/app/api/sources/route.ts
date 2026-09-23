@@ -4,6 +4,7 @@ import { readJson, json, route } from "@/lib/http";
 import { listSources, createSource } from "@/lib/db/repo";
 import { catalogHealth } from "@/lib/catalog/health";
 import { SourceDraft } from "@/lib/registry";
+import { requireGrantedSecretRef } from "@/lib/secrets/http";
 
 export const runtime = "nodejs";
 
@@ -41,6 +42,7 @@ export const POST = route("sources.create", async (req: Request) => {
   const body = await readJson(req, CreateBody);
 
   assertAuthorized(identity, "source:manage", { workspaceId: body.workspaceId });
+  requireGrantedSecretRef(body.secretRef, body.workspaceId);
 
   const source = await createSource({
     id: body.id,

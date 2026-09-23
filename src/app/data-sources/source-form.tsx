@@ -19,7 +19,7 @@ import {
   type TableMenu,
   emptyFormState,
   emptyMenu,
-  menuAfterDiscovery,
+  applyDiscovery,
   rememberTable,
   formStateFromConfig,
   formStateFromConfigText,
@@ -30,7 +30,12 @@ import {
   toggleTable,
   updateTable,
 } from "@/lib/source-form";
-import { SecretRefReadinessLine, useSecretRefReadiness } from "./secret-ref-status";
+import {
+  type GrantedSecretRefsState,
+  SECRET_REF_GRANTS_VAR,
+  readinessIn,
+} from "@/lib/secret-refs";
+import { SecretRefReadinessLine } from "./secret-ref-status";
 
 /**
  * The source form: connection fields, a discovered table picker, and the JSON
@@ -56,11 +61,23 @@ export interface SourceFormInitial {
   config?: SourceConfig;
 }
 
-const DEFAULT_SECRET_REF = "TS_METRICS";
+const CHOOSE_SECRET_REF = "Choose the credential reference this source connects with.";
+
+/**
+ * The ref the form stands on: the one chosen, or — when nothing is chosen and
+ * the workspace is granted exactly one — that one, so the common single-ref
+ * install needs no click. Derived rather than set from an effect, so a list
+ * that arrives late cannot overwrite a choice.
+ */
+function effectiveSecretRef(chosen: string, list: GrantedSecretRefsState): string {
+  if (chosen) return chosen;
+  return list.state === "ready" && list.refs.length === 1 ? list.refs[0].ref : "";
+}
 
 export function SourceForm({
   mode,
   workspaceId,
+  secretRefs,
   submitLabel,
   initial,
   onSubmit,
@@ -69,6 +86,8 @@ export function SourceForm({
   mode: "create" | "edit";
   /** The workspace discovery is authorized against. */
   workspaceId: string;
+  /** The refs the workspace may use, which the `secret_ref` picker offers. */
+  secretRefs: GrantedSecretRefsState;
   submitLabel: string;
   initial?: SourceFormInitial;
   /** Resolves to the failure to show, or null on success. */
@@ -77,9 +96,8 @@ export function SourceForm({
 }) {
   const [id, setId] = React.useState(initial?.id ?? "");
   const [name, setName] = React.useState(initial?.name ?? "");
-  const [secretRef, setSecretRef] = React.useState(
-    initial?.secretRef ?? DEFAULT_SECRET_REF,
-  );
+  const [chosenSecretRef, setSecretRef] = React.useState(initial?.secretRef ?? "");
+  const secretRef = effectiveSecretRef(chosenSecretRef, secretRefs);
   const [form, setForm] = React.useState<SourceFormState>(() =>
     initial?.config ? formStateFromConfig(initial.config) : emptyFormState(),
   );
@@ -95,10 +113,29 @@ export function SourceForm({
 
   const [menu, setMenu] = React.useState<TableMenu>(emptyMenu);
   const [discovering, setDiscovering] = React.useState(false);
+  const [unticked, setUnticked] = React.useState<string[]>([]);
 
-  // Readiness is reported, never enforced: an unconfigured ref still saves,
-  // because the variables are the operator's to set and may land later.
-  const readiness = useSecretRefReadiness(workspaceId, secretRef);
+  // Missing credentials are reported, never enforced: an unconfigured ref
+  // still saves, because the variables are the operator's to set and may land
+  // later. A ref that is not granted is refused by the server on save.
+  const readiness = secretRef ? readinessIn(secretRefs, secretRef) : null;
+
+  // The granted refs, plus a stored ref that is no longer granted, so editing
+  // such a source shows what it names rather than silently picking another.
+  const refOptions = [
+    ...(secretRefs.state === "ready" ? secretRefs.refs : []).map((r) => ({
+      value: r.ref,
+      label: r.ref,
+    })),
+  ];
+  if (secretRef && !refOptions.some((o) => o.value === secretRef)) {
+    refOptions.push({
+      value: secretRef,
+      label: secretRefs.state === "ready" ? `${secretRef} (not granted)` : secretRef,
+    });
+  }
+  const noRefsGranted =
+    secretRefs.state === "ready" && secretRefs.refs.length === 0 && !secretRef;
 
   /** Clear one field's error as soon as it is edited. */
   function edit<T>(setter: (value: T) => void, field: string) {
@@ -149,7 +186,7 @@ export function SourceForm({
     const connection = connectionFromFormState(form);
     const blocking = {
       ...(connection.ok ? {} : connection.errors),
-      ...draftFieldErrors({ secretRef }),
+      ...secretRefErrors(secretRef),
     };
     if (!connection.ok || Object.keys(blocking).length > 0) {
       setErrors((current) => ({ ...current, ...blocking }));
@@ -167,7 +204,10 @@ export function SourceForm({
       setError(outcome.error);
       return;
     }
-    setMenu((current) => menuAfterDiscovery(current, outcome.tables));
+    const applied = applyDiscovery(form, menu, outcome.tables);
+    setForm(applied.state);
+    setMenu(applied.menu);
+    setUnticked(applied.unticked);
   }
 
   async function submit(event: React.FormEvent) {
@@ -182,11 +222,10 @@ export function SourceForm({
     }
 
     const config = configFromFormState(form);
-    const fields = draftFieldErrors({
-      id: mode === "create" ? id : undefined,
-      name,
-      secretRef,
-    });
+    const fields = {
+      ...draftFieldErrors({ id: mode === "create" ? id : undefined, name }),
+      ...secretRefErrors(secretRef),
+    };
     const found = { ...fields, ...(config.ok ? {} : config.errors) };
     if (!config.ok || Object.keys(found).length > 0) {
       setErrors(found);
@@ -240,17 +279,29 @@ export function SourceForm({
         </Field>
         <Field
           id="s-secret"
-          label="secret_ref (env family)"
+          label="secret_ref"
           error={errors.secretRef}
-          hint="Credentials are read from this env family on the server, never stored."
+          hint="The server resolves credentials for this reference; they are never stored."
         >
-          <Input
+          <Select
             id="s-secret"
-            value={secretRef}
-            onChange={(e) => edit(setSecretRef, "secretRef")(e.target.value)}
-            {...fieldAria("s-secret", errors.secretRef)}
+            className="w-full"
+            value={secretRef || null}
+            onValueChange={edit(setSecretRef, "secretRef")}
+            options={refOptions}
+            placeholder={
+              secretRefs.state === "loading" ? "Loading…" : "Choose a reference"
+            }
+            disabled={refOptions.length === 0}
           />
-          <SecretRefReadinessLine readiness={readiness} />
+          {noRefsGranted ? (
+            <p className="mt-1 text-xs text-warning">
+              No credential references are granted to this workspace. An operator declares
+              them in <code>{SECRET_REF_GRANTS_VAR}</code>.
+            </p>
+          ) : readiness ? (
+            <SecretRefReadinessLine readiness={readiness} />
+          ) : null}
         </Field>
       </div>
 
@@ -378,6 +429,13 @@ export function SourceForm({
               </Button>
             </div>
             {errors.tables && <p className="text-xs text-danger">{errors.tables}</p>}
+            {unticked.length > 0 && (
+              <p className="text-xs text-warning">
+                Unticked {unticked.join(", ")}: not found in schema {form.schema}. Tick{" "}
+                {unticked.length === 1 ? "it" : "them"} again to keep{" "}
+                {unticked.length === 1 ? "it" : "them"} anyway.
+              </p>
+            )}
 
             {rows.length === 0 ? (
               <p className="border border-dashed border-border px-3 py-6 text-center text-sm text-muted">
@@ -397,6 +455,10 @@ export function SourceForm({
                       // and its column list — off the screen.
                       setMenu((current) => rememberTable(current, row.table));
                       setForm(toggleTable(form, row.table));
+                      // A table ticked back is no longer news.
+                      setUnticked((current) =>
+                        current.filter((name) => name !== row.table.name),
+                      );
                     }}
                     onChange={(patch) =>
                       setForm(updateTable(form, row.table.name, patch))
@@ -553,4 +615,13 @@ function TableRowItem({
 
 function columnSummary(table: CatalogTable): string {
   return table.columns.map((column) => `${column.name} ${column.type}`).join(", ");
+}
+
+/**
+ * The `secret_ref` field's error, if any. An empty choice gets a sentence of
+ * its own; anything else is checked against the `SourceDraft` field, as the
+ * other fields are.
+ */
+function secretRefErrors(secretRef: string): FieldErrors {
+  return secretRef ? draftFieldErrors({ secretRef }) : { secretRef: CHOOSE_SECRET_REF };
 }

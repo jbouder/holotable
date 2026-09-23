@@ -144,6 +144,10 @@ config: {}
 #  AI_PROVIDER: openai-compatible
 #  AI_MODEL: openai/gpt-4o-mini
 #  OPENAI_BASE_URL: https://openrouter.ai/api/v1
+#  # Which workspaces may use which source secret_ref. Required: unset grants
+#  # nothing and the server refuses to boot in production. Workspace ids are
+#  # the `<id>` in `/workspaces/<id>/<role>` groups; "*" grants every workspace.
+#  SOURCE_SECRET_REFS: "TS_METRICS:ops; BILLING_RO:finance"
 
 secrets:
   # -- Name of an existing Secret holding the credential environment:
@@ -168,6 +172,19 @@ extraEnvFrom: []
 # -- Extra environment variables on the app container, as a raw env list.
 # Takes `valueFrom`, so a single key from a Secret can be mapped by hand.
 extraEnv: []
+
+# Source credentials as files. The kubelet refreshes a mounted Secret in place,
+# and the server reads the files on every connection, so adding or rotating a
+# source's credentials needs no restart — unlike the `envFrom` Secret above,
+# which is read once at container start.
+sourceSecrets:
+  # -- A Secret whose keys are `<SECRET_REF>_USERNAME` / `<SECRET_REF>_PASSWORD`,
+  # the same names as the environment variables. Mounted whole at `mountPath`,
+  # which also sets `SOURCE_SECRETS_DIR`. Empty mounts nothing, and source
+  # credentials come from the environment only.
+  secretName: ""
+  # -- Where that Secret is mounted.
+  mountPath: /var/run/holotable/source-secrets
 
 # -- Extra volumes on the app pod, for a Vault Agent or CSI secret mount.
 extraVolumes: []
