@@ -158,7 +158,20 @@ daily budget; see [LLM rate limits and budgets](/operations/llm-limits/).
 
 Optional per-workspace overrides of `LLM_RATE_PER_MINUTE` and
 `LLM_DAILY_TOKEN_BUDGET`: `rate_per_minute`, `daily_token_budget`. A `NULL`
-column inherits the environment; `0` disables that limit.
+column inherits the environment; `0` disables that limit. Platform admins edit
+it from **Settings → Workspaces** through `PATCH /api/workspaces/[id]/limits`.
+
+### `user_preferences`
+
+One row per subject: `sub` (primary key), `prefs` (JSONB), `updated_at`. It
+holds the choices that follow a person between devices: time zone, clock,
+start page and dashboard list defaults. Keyed by `sub` alone, because a
+preference is personal and not workspace-scoped. Read through
+`parsePreferences` in `src/lib/preferences.ts`, which validates field by field
+and drops or defaults anything stale, so an old row never breaks a page. Only
+`GET` and `PATCH /api/me/preferences` touch it, and only for the caller's own
+`sub`. Theme and motion are deliberately not here; see
+[Settings and your account](/getting-started/settings/).
 
 ## Metrics store (TimescaleDB)
 
