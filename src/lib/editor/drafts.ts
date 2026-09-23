@@ -157,6 +157,61 @@ export function pruneDrafts(storage: DraftStorage | null, now: number): number {
   return stale.length;
 }
 
+/** One stored draft as the local-data settings list shows it (#216). */
+export interface DraftSummary {
+  key: string;
+  dashboardId: string;
+  title: string;
+  savedAt: number;
+  /** Length of the stored value, which is what counts against the quota. */
+  bytes: number;
+}
+
+/**
+ * Every readable draft that belongs to `userSub`, newest first.
+ *
+ * A key only counts when it is exactly `draftKey(envelope.dashboardId,
+ * userSub)`: matching on a suffix alone would let a subject that ends with
+ * another's claim that person's drafts. Other people's drafts on a shared
+ * browser are neither listed nor touched, and unreadable values are skipped
+ * rather than deleted here, since they may be someone else's.
+ */
+export function listDrafts(
+  storage: DraftStorage | null,
+  userSub: string,
+): DraftSummary[] {
+  if (!storage || !userSub) return [];
+  const out: DraftSummary[] = [];
+  try {
+    for (let i = 0; i < storage.length; i++) {
+      const key = storage.key(i);
+      if (!key?.startsWith(DRAFT_KEY_PREFIX) || !key.endsWith(`:${userSub}`)) continue;
+      const raw = storage.getItem(key);
+      if (!raw) continue;
+      let parsed: ReturnType<typeof DraftEnvelope.safeParse>;
+      try {
+        parsed = DraftEnvelope.safeParse(JSON.parse(raw));
+      } catch {
+        continue;
+      }
+      if (!parsed.success) continue;
+      const { dashboardId, savedAt, spec } = parsed.data;
+      if (draftKey(dashboardId, userSub) !== key) continue;
+      out.push({ key, dashboardId, title: spec.title, savedAt, bytes: raw.length });
+    }
+  } catch {
+    return [];
+  }
+  return out.sort((a, b) => b.savedAt - a.savedAt);
+}
+
+/** Discard every draft {@link listDrafts} would show for `userSub`. */
+export function clearDrafts(storage: DraftStorage | null, userSub: string): number {
+  const drafts = listDrafts(storage, userSub);
+  for (const { key } of drafts) clearDraft(storage, key);
+  return drafts.length;
+}
+
 /** What changed between the saved spec and the draft, in the author's terms. */
 export interface DraftChanges {
   title: boolean;

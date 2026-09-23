@@ -186,6 +186,17 @@ export function readRecent(storage: Pick<Storage, "getItem"> | undefined): strin
   }
 }
 
+/** Forget the recently viewed list (#216). */
+export function clearRecent(
+  storage: Pick<Storage, "removeItem"> | undefined | null,
+): void {
+  try {
+    storage?.removeItem(RECENT_KEY);
+  } catch {
+    /* Already unreachable. */
+  }
+}
+
 /** Write the list back, silently doing nothing when storage refuses. */
 export function writeRecent(
   storage: Pick<Storage, "setItem"> | undefined,
