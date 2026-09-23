@@ -1,7 +1,7 @@
 import { notFound } from "next/navigation";
 import { getIdentity, can } from "@/lib/auth/authorize";
 import { sourceCatalog } from "@/lib/registry";
-import { getDashboardById, listSources } from "@/lib/db/repo";
+import { getDashboardById, listDashboardTags, listSources } from "@/lib/db/repo";
 import { SignIn } from "@/components/sign-in";
 import { EditDashboardClient } from "./edit-client";
 
@@ -36,6 +36,10 @@ export default async function EditDashboardPage({
     catalog: sourceCatalog(s.config),
   }));
 
+  const tagSuggestions = (await listDashboardTags(dashboard.workspaceId)).map(
+    (t) => t.tag,
+  );
+
   return (
     <EditDashboardClient
       dashboardId={id}
@@ -49,6 +53,11 @@ export default async function EditDashboardPage({
       // other's unsaved work (#118).
       userSub={identity.sub}
       sources={sources}
+      // Row metadata, handed in separately from the spec because that is what
+      // it is: editing it does not make the editor dirty and does not append a
+      // version (#119).
+      metadata={{ description: dashboard.description, tags: dashboard.tags }}
+      tagSuggestions={tagSuggestions}
     />
   );
 }

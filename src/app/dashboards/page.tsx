@@ -1,9 +1,19 @@
+import type { ReactNode } from "react";
 import Link from "next/link";
 import { cookies } from "next/headers";
-import { Plus } from "lucide-react";
-import { authorizedWorkspaces, getIdentity } from "@/lib/auth/authorize";
+import { Plus, SearchX, Star } from "lucide-react";
+import { authorizedWorkspaces, can, getIdentity } from "@/lib/auth/authorize";
 import { accessibleWorkspaces, type Identity } from "@/lib/auth/claims";
-import { listDashboards, listSources } from "@/lib/db/repo";
+import { listDashboardTags, listDashboards, listSources } from "@/lib/db/repo";
+import type { DashboardSummary } from "@/lib/dashboard-metadata";
+import {
+  dashboardListHref,
+  isFiltered,
+  PAGE_SIZE,
+  pageCount,
+  pageOffset,
+  parseDashboardQuery,
+} from "@/lib/dashboard-list";
 import { catalogHealth } from "@/lib/catalog/health";
 import { onboardingState } from "@/lib/onboarding";
 import {
@@ -14,21 +24,85 @@ import {
 import type { ImportTarget } from "@/lib/dashboard-export";
 import { SignIn } from "@/components/sign-in";
 import { FirstRun } from "@/components/onboarding/first-run";
+import { DashboardCard } from "@/components/dashboard/DashboardCard";
+import { DashboardListControls } from "@/components/dashboard/DashboardListControls";
+import { RecentDashboards } from "@/components/dashboard/RecentDashboards";
 import { ImportDashboard } from "./import-dashboard";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
+import { EmptyState } from "@/components/ui/empty-state";
 
 export const dynamic = "force-dynamic";
 
-export default async function DashboardsPage() {
+export default async function DashboardsPage({
+  searchParams,
+}: {
+  /** The whole list state — search, tags, sort, page — lives in the URL. */
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
   const identity = await getIdentity();
   if (!identity) return <SignIn />;
 
+  const query = parseDashboardQuery(await searchParams);
   const workspaces = accessibleWorkspaces(identity);
-  const lists = await Promise.all(workspaces.map((w) => listDashboards(w)));
-  const dashboards = lists.flat();
   const editable = authorizedWorkspaces(identity, "dashboard:create");
   const canCreate = editable.length > 0;
+
+  // Filtering, ordering and paging all happen in SQL, per workspace. The page
+  // is therefore taken from each workspace rather than from the union — in the
+  // single-workspace install that is the same thing, and in a multi-workspace
+  // one it is the honest version of "page 2" without a cross-workspace sort
+  // the database cannot do in one statement.
+  const pages = await Promise.all(
+    workspaces.map((w) =>
+      listDashboards(w, {
+        search: query.search,
+        tags: query.tags,
+        sort: query.sort,
+        limit: PAGE_SIZE,
+        offset: pageOffset(query),
+        userSub: identity.sub,
+      }),
+    ),
+  );
+  const dashboards = pages.flatMap((p) => p.dashboards);
+  const total = pages.reduce((sum, p) => sum + p.total, 0);
+
+  const tagLists = await Promise.all(workspaces.map((w) => listDashboardTags(w)));
+  const tags = mergeTags(tagLists);
+
+  // Favorites are their own section rather than a filter, so they are read
+  // separately — and only on the unfiltered first page, where they are a
+  // shortcut rather than a second copy of what is already on screen.
+  const showSections = !isFiltered(query) && query.page === 1;
+  const favorites = showSections
+    ? (
+        await Promise.all(
+          workspaces.map((w) =>
+            listDashboards(w, {
+              sort: query.sort,
+              limit: PAGE_SIZE,
+              userSub: identity.sub,
+              favoritesOnly: true,
+            }),
+          ),
+        )
+      ).flatMap((p) => p.dashboards)
+    : [];
+
+  const renderCard = (dashboard: DashboardSummary) => (
+    <DashboardCard
+      key={dashboard.id}
+      dashboard={dashboard}
+      canEdit={can(identity, "dashboard:update", {
+        workspaceId: dashboard.workspaceId,
+      })}
+      canDelete={can(identity, "dashboard:delete", {
+        workspaceId: dashboard.workspaceId,
+        ownerSub: dashboard.createdBy,
+      })}
+      tagSuggestions={tags.map((t) => t.tag)}
+    />
+  );
 
   // The import dialog needs to know which sources each workspace offers, and
   // it needs it before the user picks a workspace. Projecting to an id and a
@@ -40,6 +114,11 @@ export default async function DashboardsPage() {
       sources: (await listSources(workspaceId)).map((s) => ({ id: s.id, name: s.name })),
     })),
   );
+
+  // An empty *workspace* gets the guided first run; an empty *result* gets the
+  // filter cleared. Telling them apart is the difference between "set Holotable
+  // up" and "that search matched nothing".
+  const emptyWorkspace = total === 0 && !isFiltered(query) && query.page === 1;
 
   return (
     <div>
@@ -57,29 +136,141 @@ export default async function DashboardsPage() {
         )}
       </div>
 
-      {dashboards.length === 0 ? (
+      {emptyWorkspace ? (
         <FirstRunSection identity={identity} workspaces={workspaces} />
       ) : (
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-          {dashboards.map((d) => (
-            <Link key={d.id} href={`/dashboards/${d.id}`} className="group">
-              <Card className="h-full transition-colors group-hover:border-foreground/40">
-                <CardContent className="flex h-full flex-col gap-2">
-                  <div className="font-medium leading-snug">{d.title}</div>
-                  <div className="mt-auto flex flex-col gap-0.5 text-xs text-muted">
-                    <span>
-                      {d.workspaceId} · v{d.version}
-                    </span>
-                    <span>updated {new Date(d.updatedAt).toLocaleString()}</span>
-                  </div>
-                </CardContent>
-              </Card>
-            </Link>
-          ))}
-        </div>
+        <>
+          <DashboardListControls query={query} tags={tags} />
+          {showSections && <RecentDashboards />}
+
+          {favorites.length > 0 && (
+            <section className="mb-6">
+              <h2 className="mb-2 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-muted">
+                <Star className="h-3.5 w-3.5" aria-hidden /> Favorites
+              </h2>
+              <DashboardGridSection>{favorites.map(renderCard)}</DashboardGridSection>
+            </section>
+          )}
+
+          <section>
+            {showSections && favorites.length > 0 && (
+              <h2 className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted">
+                All dashboards
+              </h2>
+            )}
+            {dashboards.length === 0 ? (
+              <EmptyState
+                icon={<SearchX className="h-6 w-6" />}
+                title="Nothing matches"
+                description="No dashboard in your workspaces matches this search and these tags."
+                action={
+                  <Link
+                    href={dashboardListHref({ ...query, search: "", tags: [], page: 1 })}
+                  >
+                    <Button variant="secondary">Clear filters</Button>
+                  </Link>
+                }
+              />
+            ) : (
+              <DashboardGridSection>{dashboards.map(renderCard)}</DashboardGridSection>
+            )}
+          </section>
+
+          <Pager page={query.page} pages={pageCount(total)} query={query} total={total} />
+        </>
       )}
     </div>
   );
+}
+
+function DashboardGridSection({ children }: { children: ReactNode }) {
+  return (
+    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+      {children}
+    </div>
+  );
+}
+
+/**
+ * Previous/next as links, not buttons: a page of the list is a URL, so the
+ * pager works without JavaScript and each page is somewhere the back button
+ * can return to.
+ */
+function Pager({
+  page,
+  pages,
+  query,
+  total,
+}: {
+  page: number;
+  pages: number;
+  query: ReturnType<typeof parseDashboardQuery>;
+  total: number;
+}) {
+  if (pages <= 1) return null;
+  return (
+    <nav
+      aria-label="Dashboard pages"
+      className="mt-6 flex items-center justify-between text-sm text-muted"
+    >
+      <span>
+        Page {page} of {pages} · {total} dashboard{total === 1 ? "" : "s"}
+      </span>
+      <div className="flex gap-2">
+        <PagerLink
+          href={dashboardListHref({ ...query, page: page - 1 })}
+          disabled={page <= 1}
+        >
+          Previous
+        </PagerLink>
+        <PagerLink
+          href={dashboardListHref({ ...query, page: page + 1 })}
+          disabled={page >= pages}
+        >
+          Next
+        </PagerLink>
+      </div>
+    </nav>
+  );
+}
+
+function PagerLink({
+  href,
+  disabled,
+  children,
+}: {
+  href: string;
+  disabled: boolean;
+  children: ReactNode;
+}) {
+  if (disabled) {
+    return (
+      <span className="rounded-lg border border-border px-3 py-1.5 opacity-40">
+        {children}
+      </span>
+    );
+  }
+  return (
+    <Link
+      href={href}
+      className="rounded-lg border border-border px-3 py-1.5 text-foreground transition-colors hover:border-foreground/40 focus-visible:outline-2 focus-visible:outline-primary"
+    >
+      {children}
+    </Link>
+  );
+}
+
+/** One vocabulary out of several workspaces', counts added, commonest first. */
+function mergeTags(lists: { tag: string; count: number }[][]) {
+  const totals = new Map<string, number>();
+  for (const list of lists) {
+    for (const { tag, count } of list) {
+      totals.set(tag, (totals.get(tag) ?? 0) + count);
+    }
+  }
+  return [...totals]
+    .map(([tag, count]) => ({ tag, count }))
+    .sort((a, b) => b.count - a.count || a.tag.localeCompare(b.tag));
 }
 
 /**

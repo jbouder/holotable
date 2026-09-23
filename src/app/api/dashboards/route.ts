@@ -7,6 +7,7 @@ import {
 import { readJson, json, route } from "@/lib/http";
 import { listDashboards, createDashboard } from "@/lib/db/repo";
 import { resolveAndValidateDashboard } from "@/lib/dashboard-service";
+import { PAGE_SIZE, pageOffset, parseDashboardQuery } from "@/lib/dashboard-list";
 import { Dashboard } from "@/lib/ir";
 
 export const runtime = "nodejs";
@@ -20,6 +21,16 @@ export const runtime = "nodejs";
  * widen what is returned. `editable=true` is what the Explore "save as panel"
  * picker asks for: listing a dashboard the caller cannot update would offer a
  * save the API would then refuse.
+ *
+ * `q`, `tag`, `sort` and `page` narrow it further (#80), and `id` narrows it to
+ * a named set — which is how the recently-viewed strip turns ids a browser
+ * kept into titles. None of them can widen it either: they are applied inside
+ * the same per-workspace query, after authorization has already chosen the
+ * workspaces.
+ *
+ * `total` counts what the filters match across all the authorized workspaces,
+ * which is what the pager needs; the page itself is taken per workspace, so a
+ * caller spanning several sees at most `PAGE_SIZE` from each.
  */
 export const GET = route("dashboards.list", async (req: Request) => {
   const identity = await requireIdentity();
@@ -28,9 +39,32 @@ export const GET = route("dashboards.list", async (req: Request) => {
   const action =
     params.get("editable") === "true" ? "dashboard:update" : "dashboard:view";
 
+  const query = parseDashboardQuery(params);
+  const ids = params
+    .getAll("id")
+    .flatMap((v) => v.split(","))
+    .filter(Boolean);
+
   const workspaces = authorizedWorkspaces(identity, action, only);
-  const lists = await Promise.all(workspaces.map((w) => listDashboards(w)));
-  return json({ dashboards: lists.flat() });
+  const pages = await Promise.all(
+    workspaces.map((w) =>
+      listDashboards(w, {
+        search: query.search,
+        tags: query.tags,
+        sort: query.sort,
+        limit: PAGE_SIZE,
+        offset: pageOffset(query),
+        userSub: identity.sub,
+        favoritesOnly: params.get("favorites") === "true",
+        ids: ids.length ? ids : undefined,
+      }),
+    ),
+  );
+
+  return json({
+    dashboards: pages.flatMap((p) => p.dashboards),
+    total: pages.reduce((sum, p) => sum + p.total, 0),
+  });
 });
 
 const CreateBody = z.object({ spec: Dashboard });

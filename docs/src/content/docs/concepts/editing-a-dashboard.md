@@ -36,6 +36,19 @@ A failed save leaves you exactly where you were, with the error and every
 change still in the editor. Nothing about a failure is recoverable by retrying
 from a different place, so the editor does not send you to one.
 
+## Details, which are not the spec
+
+The **details** button in the editor header (and the **Details…** action on a
+card in the dashboard list) edits the dashboard's *description* and *tags*.
+Those are columns on the `dashboards` row, not fields in the spec: they do not
+make the editor dirty, they are not undoable, they are saved the moment the
+dialog is confirmed, and they do not append a version.
+
+The **name** is the opposite case and is edited in the settings card with the
+rest of the spec. Renaming from the dashboard list does the same thing the long
+way round — it appends a version whose spec differs only in the title — because
+[the spec owns the title](/architecture/data-model/).
+
 ## The panel list
 
 The list on the left is the dashboard's panel *order*, which is what the
