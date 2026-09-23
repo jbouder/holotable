@@ -99,6 +99,29 @@ reality — but error and tombstone states remain meaningful. Paused reads as a
 distinct, muted state in the indicator; it is not the same thing as a dropped
 stream.
 
+## Fullscreen and export
+
+Each panel's header carries an overflow menu with three local actions (#76):
+
+- **Fullscreen** expands the panel over the viewport. It is not a portal: the
+  same card simply becomes `fixed`, so the panel's position in the React tree
+  never changes and the ECharts instance is *resized* by the `ResizeObserver`
+  already in `EChart` rather than disposed and rebuilt. Escape closes it and
+  focus returns to whatever opened it.
+- **Export CSV** serializes the window the panel is currently holding — RFC
+  4180 quoting, CRLF, a UTF-8 BOM so Excel reads it as UTF-8. A *text* cell
+  that starts with `=`, `+`, `-`, `@` or a tab is prefixed with an apostrophe,
+  because a spreadsheet would otherwise run it as a formula and the values come
+  from a database Holotable does not own. Numbers are never touched.
+- **Export PNG** comes out of the ECharts instance with the theme's surface
+  colour painted behind it, since the canvas itself is transparent. Stat and
+  table panels are offered the CSV alone.
+
+None of the three asks the server for anything. An export therefore cannot
+contain a row the panel was not already showing, and cannot become a second,
+unguarded way to run a query. Exporting the **full** result set server-side is
+a different feature and is not this one.
+
 ## A rendering detail worth knowing
 
 Design tokens are authored in **OKLCH**, but ECharts cannot parse `oklch()`.
