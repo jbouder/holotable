@@ -11,6 +11,7 @@ import { SourceConfig, type SourceRecord } from "@/lib/registry";
 import { type Dashboard, parseDashboard } from "@/lib/ir";
 import type { BudgetStore } from "@/lib/limits/budget";
 import type { WorkspaceLimits } from "@/lib/limits/llm";
+import type { WorkspaceUsage } from "@/lib/workspace-limits";
 import type { ImpactDashboard, SourceImpact } from "@/lib/source-impact";
 import type { StoredChatMessage } from "@/lib/chat-history";
 import type { GenerationLogEntry, GenerationLogRow } from "@/lib/ai/log";
@@ -611,6 +612,121 @@ export async function getWorkspaceLimits(
     dailyTokenBudget:
       row.daily_token_budget === null ? null : Number(row.daily_token_budget),
   };
+}
+
+/** Overrides for several workspaces at once; a workspace with no row is absent. */
+export async function listWorkspaceLimits(
+  workspaceIds: readonly string[],
+): Promise<Map<string, WorkspaceLimits>> {
+  const out = new Map<string, WorkspaceLimits>();
+  if (workspaceIds.length === 0) return out;
+  const rows = await query<{
+    workspace_id: string;
+    rate_per_minute: number | null;
+    daily_token_budget: string | null;
+  }>(
+    `SELECT workspace_id, rate_per_minute, daily_token_budget
+       FROM workspace_limits WHERE workspace_id = ANY($1::text[])`,
+    [workspaceIds],
+  );
+  for (const row of rows) {
+    out.set(row.workspace_id, {
+      ratePerMinute: row.rate_per_minute,
+      dailyTokenBudget:
+        row.daily_token_budget === null ? null : Number(row.daily_token_budget),
+    });
+  }
+  return out;
+}
+
+/**
+ * Write a workspace's overrides whole, as {@link applyLimitsPatch} resolved
+ * them. Returns the row as it was before, for the audit line.
+ *
+ * Read and write happen in one transaction with the row locked, so two admins
+ * saving different fields at once cannot lose one of the changes.
+ */
+export async function saveWorkspaceLimits(
+  workspaceId: string,
+  resolve: (current: WorkspaceLimits | null) => WorkspaceLimits,
+): Promise<{ before: WorkspaceLimits | null; after: WorkspaceLimits }> {
+  return withTransaction(async (client) => {
+    const { rows } = await client.query<{
+      rate_per_minute: number | null;
+      daily_token_budget: string | null;
+    }>(
+      `SELECT rate_per_minute, daily_token_budget
+         FROM workspace_limits WHERE workspace_id = $1 FOR UPDATE`,
+      [workspaceId],
+    );
+    const row = rows[0];
+    const before: WorkspaceLimits | null = row
+      ? {
+          ratePerMinute: row.rate_per_minute,
+          dailyTokenBudget:
+            row.daily_token_budget === null ? null : Number(row.daily_token_budget),
+        }
+      : null;
+    const after = resolve(before);
+    await client.query(
+      `INSERT INTO workspace_limits (workspace_id, rate_per_minute, daily_token_budget, updated_at)
+       VALUES ($1, $2, $3, now())
+       ON CONFLICT (workspace_id) DO UPDATE SET
+         rate_per_minute    = EXCLUDED.rate_per_minute,
+         daily_token_budget = EXCLUDED.daily_token_budget,
+         updated_at         = now()`,
+      [workspaceId, after.ratePerMinute, after.dailyTokenBudget],
+    );
+    return { before, after };
+  });
+}
+
+/** One UTC day's `llm_usage`, summed per workspace across routes and models. */
+export async function usageForDay(
+  workspaceIds: readonly string[],
+  day: string,
+): Promise<Map<string, WorkspaceUsage>> {
+  const out = new Map<string, WorkspaceUsage>();
+  if (workspaceIds.length === 0) return out;
+  const rows = await query<{
+    workspace_id: string;
+    input_tokens: string;
+    output_tokens: string;
+    requests: string;
+  }>(
+    `SELECT workspace_id,
+            SUM(input_tokens)::text  AS input_tokens,
+            SUM(output_tokens)::text AS output_tokens,
+            SUM(requests)::text      AS requests
+       FROM llm_usage
+      WHERE workspace_id = ANY($1::text[]) AND day = $2
+      GROUP BY workspace_id`,
+    [workspaceIds, day],
+  );
+  for (const row of rows) {
+    out.set(row.workspace_id, {
+      inputTokens: Number(row.input_tokens),
+      outputTokens: Number(row.output_tokens),
+      requests: Number(row.requests),
+    });
+  }
+  return out;
+}
+
+/**
+ * Every workspace id the database has seen: anything with a source, a
+ * dashboard, an override or recorded usage. For the platform-admin view,
+ * whose claims name no particular workspace but whose bypass covers all.
+ */
+export async function knownWorkspaceIds(): Promise<string[]> {
+  const rows = await query<{ workspace_id: string }>(
+    `SELECT workspace_id FROM sources
+     UNION SELECT workspace_id FROM dashboards
+     UNION SELECT workspace_id FROM workspace_limits
+     UNION SELECT workspace_id FROM llm_usage
+     ORDER BY workspace_id`,
+  );
+  return rows.map((r) => r.workspace_id);
 }
 
 /** The `llm_usage` table as a {@link BudgetStore}. */

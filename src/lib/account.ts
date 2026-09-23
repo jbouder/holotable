@@ -59,6 +59,9 @@ export const CAPABILITIES: readonly { action: Action; own?: boolean; label: stri
   { action: "dashboard:delete", own: true, label: "Delete dashboards you created" },
   { action: "dashboard:delete", label: "Delete any dashboard" },
   { action: "source:manage", label: "Add, change and remove data sources" },
+  // No workspace role allows this, so it is listed under no role; it is here
+  // so every action has a description (test/account.test.ts).
+  { action: "workspace:limits", label: "Change a workspace's AI limits" },
 ];
 
 const PROBE_WORKSPACE = "probe";

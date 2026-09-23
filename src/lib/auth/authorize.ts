@@ -28,6 +28,7 @@ export const ACTIONS = [
   "dashboard:delete",
   "source:manage",
   "source:use",
+  "workspace:limits",
 ] as const;
 
 export type Action = (typeof ACTIONS)[number];
@@ -85,6 +86,14 @@ export function can(identity: Identity, action: Action, ctx: AuthzContext): bool
 
     case "source:manage":
       return hasWorkspaceRole(identity, workspaceId, "source-admin");
+
+    case "workspace:limits":
+      // Changing a workspace's LLM rate limit or token budget (#218). The
+      // limits protect provider spend, which the platform pays for, so no
+      // workspace role grants it: only the platform-admin bypass above does.
+      // A source-admin reads their workspace's limits through
+      // `source:manage` instead.
+      return false;
 
     default:
       return false;
