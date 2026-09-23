@@ -80,6 +80,10 @@ spec:
             # reconnect hint, the grace period — depends on it.
             - name: NEXT_MANUAL_SIG_HANDLE
               value: "true"
+            {{- if .Values.sourceSecrets.secretName }}
+            - name: SOURCE_SECRETS_DIR
+              value: {{ .Values.sourceSecrets.mountPath | quote }}
+            {{- end }}
             {{- with .Values.extraEnv }}
             {{- toYaml . | nindent 12 }}
             {{- end }}
@@ -121,6 +125,13 @@ spec:
               mountPath: /tmp
             - name: next-cache
               mountPath: /app/.next/cache
+            {{- if .Values.sourceSecrets.secretName }}
+            # Mounted whole, never with subPath: a subPath mount is a copy the
+            # kubelet does not refresh, which would bring the restart back.
+            - name: source-secrets
+              mountPath: {{ .Values.sourceSecrets.mountPath }}
+              readOnly: true
+            {{- end }}
             {{- with .Values.extraVolumeMounts }}
             {{- toYaml . | nindent 12 }}
             {{- end }}
@@ -129,6 +140,11 @@ spec:
           emptyDir: {}
         - name: next-cache
           emptyDir: {}
+        {{- if .Values.sourceSecrets.secretName }}
+        - name: source-secrets
+          secret:
+            secretName: {{ .Values.sourceSecrets.secretName }}
+        {{- end }}
         {{- with .Values.extraVolumes }}
         {{- toYaml . | nindent 8 }}
         {{- end }}

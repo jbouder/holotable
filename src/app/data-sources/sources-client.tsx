@@ -37,7 +37,8 @@ import { FIRST_DASHBOARD_DOCS_URL } from "@/lib/onboarding";
 import { apiErrorFromThrown, readApiError } from "@/lib/errors";
 import { buildSourceDescriptionStarters } from "@/lib/prompts/starters";
 import { SourceForm } from "./source-form";
-import { SecretRefBadge, useSecretRefReadinessMap } from "./secret-ref-status";
+import { type GrantedSecretRefsState, readinessIn } from "@/lib/secret-refs";
+import { SecretRefBadge, useGrantedSecretRefs } from "./secret-ref-status";
 import {
   DeleteSourceDialog,
   ImpactCell,
@@ -155,13 +156,11 @@ export function SourcesClient({
     if (workspaceId) void load(workspaceId);
   }
 
-  // Readiness for the refs the listed sources name, so a source whose
-  // credentials have gone missing is visible here rather than the next time
-  // someone opens a dashboard that depends on it.
-  const readiness = useSecretRefReadinessMap(
-    workspaceId,
-    (sources ?? []).map((source) => source.secretRef),
-  );
+  // The refs this workspace may use, each with whether it resolves: the rows'
+  // badges read it, so a source whose credentials have gone missing — or
+  // whose grant was withdrawn — is visible here rather than the next time
+  // someone opens a dashboard that depends on it, and the forms pick from it.
+  const secretRefs = useGrantedSecretRefs(workspaceId);
 
   // What each source is used by, so the count is in the row before anyone
   // presses Delete rather than in an error after.
@@ -311,9 +310,7 @@ export function SourcesClient({
                   />
                 </TableCell>
                 <TableCell>
-                  <SecretRefBadge
-                    readiness={readiness[source.secretRef] ?? { state: "checking" }}
-                  />
+                  <SecretRefBadge readiness={readinessIn(secretRefs, source.secretRef)} />
                 </TableCell>
                 <TableCell>
                   {source.tombstonedAt ? (
@@ -394,6 +391,7 @@ export function SourcesClient({
             key={`create-${workspaceId}`}
             workspaceId={workspaceId}
             existing={sources ?? []}
+            secretRefs={secretRefs}
             onCreated={() => {
               setCreating(false);
               setNotice("source created");
@@ -415,6 +413,7 @@ export function SourcesClient({
           <SourceForm
             mode="edit"
             workspaceId={sourceBeingEdited.workspaceId}
+            secretRefs={secretRefs}
             initial={{
               name: sourceBeingEdited.name,
               secretRef: sourceBeingEdited.secretRef,
@@ -449,12 +448,15 @@ export function SourcesClient({
 function CreateSourcePanel({
   workspaceId,
   existing,
+  secretRefs,
   onCreated,
   onCancel,
 }: {
   workspaceId: string;
   /** The workspace's current sources, which the drafter's examples are drawn from. */
   existing: SourceRecord[];
+  /** The refs the workspace may use, for the form's picker. */
+  secretRefs: GrantedSecretRefsState;
   onCreated: () => void;
   onCancel: () => void;
 }) {
@@ -482,6 +484,7 @@ function CreateSourcePanel({
             key={seedSeq}
             mode="create"
             workspaceId={workspaceId}
+            secretRefs={secretRefs}
             submitLabel="Create source"
             initial={seed}
             onSubmit={async ({ id, name, secretRef, config }) => {
@@ -552,8 +555,8 @@ function NaturalLanguageDrafter({
       <Label htmlFor="nl-source">Describe the source</Label>
       <p className="text-xs text-muted">
         Draft the connection and table catalog from plain English. Never include passwords
-        — credentials come from the <code>secret_ref</code> environment family. The draft
-        fills in the form below for you to review, adjust, and create.
+        — credentials come from a <code>secret_ref</code> granted to this workspace. The
+        draft fills in the form below for you to review, adjust, and create.
       </p>
       <div className="flex flex-wrap items-center gap-2">
         {presets.map((preset) => (

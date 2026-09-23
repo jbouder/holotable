@@ -150,7 +150,9 @@ through the config module.
 | \`AI_GATEWAY_API_KEY\` | AI SDK | Used when \`AI_PROVIDER=gateway\`. |
 | \`OIDC_ISSUER\`, \`OIDC_CLIENT_ID\`, \`OIDC_CLIENT_SECRET\`, \`OIDC_REDIRECT_URI\`, \`OIDC_SCOPE\` | \`src/lib/auth/oidc.ts\` | OIDC login flow. See [Keycloak setup](/operations/keycloak/). |
 | \`OIDC_JWKS_URL\`, \`OIDC_AUDIENCE\`, \`OIDC_GROUPS_CLAIM\` | \`src/lib/auth/session.ts\` | Token verification and the group claim name. |
-| \`<SECRET_REF>_USERNAME\` / \`<SECRET_REF>_PASSWORD\` | \`src/lib/registry.ts\` | Per-source credentials resolved at execution time. See [Source secret references](/operations/secret-references/). |
+| \`SOURCE_SECRET_REFS\` | \`src/lib/secrets/credentials.ts\` | Which workspaces may use which \`secret_ref\`: \`REF:ws1,ws2; OTHER:*\`. Unset grants nothing (an error in production). See [Source secret references](/operations/secret-references/). |
+| \`SOURCE_SECRETS_DIR\` | \`src/lib/secrets/credentials.ts\` | Directory of \`<SECRET_REF>_USERNAME\` / \`<SECRET_REF>_PASSWORD\` files, read on every connection before the environment. Optional. |
+| \`<SECRET_REF>_USERNAME\` / \`<SECRET_REF>_PASSWORD\` | \`src/lib/secrets/credentials.ts\` | Per-source credentials resolved at execution time. See [Source secret references](/operations/secret-references/). |
 | \`APP_VERSION\`, \`GIT_COMMIT\` | \`src/lib/version.ts\` | Build identity reported by \`GET /api/health\`. Optional. See [Health and readiness](/operations/health-checks/). |
 | \`METRICS_TOKEN\`, \`METRICS_ALLOWED_CIDRS\` | \`src/lib/metrics-access.ts\` | Who may scrape \`GET /api/metrics\`. Unset on both closes the endpoint. Read outside \`config.ts\` because that module reaches the browser bundle. See [Prometheus metrics](/operations/metrics/). |
 `;

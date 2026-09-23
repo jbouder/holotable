@@ -52,8 +52,23 @@ variable names verbatim:
 
 The last row is the one that is easy to miss. A source stores the *name*
 `TS_METRICS` and nothing else; the server resolves `TS_METRICS_USERNAME` and
-`TS_METRICS_PASSWORD` from its own environment when it executes a query. A
-source whose family is missing saves fine and fails on **Test**. See
+`TS_METRICS_PASSWORD` when it executes a query. Two things decide whether it
+can:
+
+- **`config.SOURCE_SECRET_REFS` must grant the ref to the source's
+  workspace**, e.g. `"TS_METRICS:ops; BILLING_RO:finance"` (`*` grants every
+  workspace). It is not a credential — just names — so it belongs in
+  `config`. Unset grants nothing, and the server refuses to start in
+  production; set it to `""` if there are no sources yet.
+- **The pair must be somewhere the server reads.** Either in the `envFrom`
+  Secret above — read once at start, so a new or rotated pair needs a restart
+  — or, better, in a Secret named by `sourceSecrets.secretName`, which is
+  mounted as files that the kubelet refreshes in place and the server reads
+  on every connection. A new source's credentials, or a rotated password,
+  then reach the running pods within about a minute.
+
+A source whose ref is granted but has no credentials saves fine and fails on
+**Test**. See
 [Source secret references](https://holotable-docs.beskar.workers.dev/operations/secret-references/).
 
 Three wirings, each a runnable values file in [`examples/`](examples):
@@ -208,6 +223,8 @@ alongside the release, with `bearerTokenSecret` pointing at the same Secret key.
 | `secrets.existingSecret` | `""` | Name of the Secret loaded with `envFrom`. |
 | `secrets.create` | `false` | Let the chart create it from `secrets.values`. Discouraged. |
 | `secrets.values` | `{}` | Contents of that Secret. Only read when `create` is true. |
+| `sourceSecrets.secretName` | `""` | Secret of `<REF>_USERNAME`/`<REF>_PASSWORD` keys, mounted as files and read per connection. Sets `SOURCE_SECRETS_DIR`. |
+| `sourceSecrets.mountPath` | `/var/run/holotable/source-secrets` | Where it is mounted. |
 
 ### Migrations
 
@@ -287,7 +304,23 @@ runs before the Deployment is touched either way.
 A change to `config` rolls the pods: the Deployment carries a checksum of the
 rendered ConfigMap, because `envFrom` is read once at container start. A change
 to a Secret the chart does not manage does **not** roll them — restart the
-Deployment yourself after rotating a credential.
+Deployment yourself after rotating a credential. Source credentials in
+`sourceSecrets.secretName` are the exception: they are files, refreshed in
+place, and need no restart.
+
+### Upgrading to workspace-scoped `secret_ref`s
+
+`SOURCE_SECRET_REFS` is new and required. Until it is set, no source resolves
+credentials, and a production server refuses to start with a message naming
+the variable. Before upgrading, list which workspace uses which ref:
+
+```sql
+SELECT DISTINCT secret_ref, workspace_id FROM sources WHERE tombstoned_at IS NULL;
+```
+
+and declare exactly those in `config.SOURCE_SECRET_REFS`. At startup the
+server also warns about any live source whose ref is not granted to its
+workspace.
 
 ## Uninstalling
 

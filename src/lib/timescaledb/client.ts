@@ -1,5 +1,6 @@
 import { Client, Query } from "pg";
-import { resolveCredentials, type SourceRecord } from "@/lib/registry";
+import type { SourceRecord } from "@/lib/registry";
+import { resolveCredentials } from "@/lib/secrets/credentials";
 import { config } from "@/lib/config";
 import type { ExecutablePlan } from "@/lib/sql/safety";
 import { ResultCollector } from "@/lib/timescaledb/result-cap";
@@ -9,7 +10,9 @@ import { isPlainIdentifier } from "@/lib/catalog/identifiers";
 import type { SourceTestResult, TestReadOnly, TestTable } from "@/lib/source-test";
 
 function clientFor(source: SourceRecord): Client {
-  const credentials = resolveCredentials(source.secretRef);
+  // Re-authorized on every connection: the ref must still be granted to the
+  // workspace this source belongs to, whatever it was granted when saved.
+  const credentials = resolveCredentials(source.secretRef, source.workspaceId);
   return new Client({
     host: source.config.host,
     port: source.config.port,

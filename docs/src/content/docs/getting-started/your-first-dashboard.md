@@ -40,16 +40,21 @@ plain English and let the drafter fill it for you — either way you review the
 values before they are saved.
 
 The one field that is not a connection detail is **secret reference**. It is a
-name, like `TS_METRICS`, not a credential. Holotable reads
-`TS_METRICS_USERNAME` and `TS_METRICS_PASSWORD` from the *server environment*
-at execution time. Nothing about your password is stored in the source, in a
-dashboard, or in anything sent to the browser. Set the two variables where the
-server can see them — your `.env`, your container environment, your Kubernetes
-secret — and restart if the server was already running.
+name, like `TS_METRICS`, not a credential, and you pick it from the references
+an operator has granted your workspace in `SOURCE_SECRET_REFS`. Holotable
+reads `TS_METRICS_USERNAME` and `TS_METRICS_PASSWORD` on the *server* at
+execution time. Nothing about your password is stored in the source, in a
+dashboard, or in anything sent to the browser.
 
-The form tells you, as you type the name, whether the server currently holds
-credentials for it. A green check means step 2 will work. A warning names the
-two variables to set.
+The operator sets those two values where the server can see them. As files in
+`SOURCE_SECRETS_DIR` (a mounted Kubernetes Secret), they take effect without a
+restart. In the environment (your `.env`, your container environment), they
+need a restart if the server was already running.
+
+The picker shows whether the server currently holds credentials for each
+reference. A green check means step 2 will work. A warning names the two
+variables to set. If the picker is empty, no reference is granted to this
+workspace yet; ask the operator to add one to `SOURCE_SECRET_REFS`.
 
 **This guards against:** a dashboard that carries a password. See
 [Source secret references](/operations/secret-references/).
@@ -112,10 +117,15 @@ saved version you now have to clean up.
 `AI_PROVIDER` and `AI_MODEL` must be set, with the matching key. See
 [AI provider](/operations/ai-provider/).
 
-**`credentials for secret_ref "X" are not configured in the environment`.** The
+**`credentials for secret_ref "X" are not configured on the server`.** The
 source names a secret reference the server has no values for. Set `X_USERNAME`
-and `X_PASSWORD` in the server's environment and restart it. See
+and `X_PASSWORD` as files in `SOURCE_SECRETS_DIR`, or in the server's
+environment and restart it. See
 [Source secret references](/operations/secret-references/).
+
+**`secret_ref "X" is not granted to workspace "w"`.** The reference exists, but
+not for this workspace. An operator adds the workspace to that reference's
+entry in `SOURCE_SECRET_REFS`.
 
 **"The catalog has never been checked against the database."** Step 2 was
 skipped. Press Refresh on the source. See

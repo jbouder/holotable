@@ -173,12 +173,24 @@ Viz selection (IMPORTANT — default to text/tabular output):
  * the live database (which is the source of truth for real columns) before it
  * is persisted. There is no source to authorize against yet, so unlike the
  * dashboard paths this prompt carries no catalog metadata.
+ *
+ * `grantedSecretRefs` are the refs the workspace may use — names the operator
+ * declared, never credentials — so the draft picks one that will resolve.
+ * The prompt is advice, not enforcement: creating the source is what refuses
+ * a ref the workspace is not granted.
  */
 export function streamSourceDraft(input: {
   prompt: string;
+  grantedSecretRefs: readonly string[];
   onFinish?: OnGenerationFinish;
 }) {
-  const { prompt, onFinish } = input;
+  const { prompt, grantedSecretRefs, onFinish } = input;
+  const refRule =
+    grantedSecretRefs.length > 0
+      ? `'secretRef' MUST be one of: ${grantedSecretRefs.map((r) => JSON.stringify(r)).join(", ")}.
+  Pick the one that best matches the description; do not invent another.`
+      : `No 'secretRef' is granted to this workspace yet. Use "TS_METRICS"; the
+  user will choose a granted one before creating the source.`;
   return streamObject({
     model: getModel(),
     onFinish: finish(onFinish),
@@ -194,9 +206,9 @@ NEVER emit data rows.
 
 CRITICAL security rules:
 - NEVER include a username, password, or connection string. Credentials are
-  resolved at runtime from an environment variable family named by 'secretRef'.
-  Choose a sensible UPPER_SNAKE 'secretRef' (e.g. "TS_METRICS"); do not invent
-  any credential value.
+  resolved at runtime on the server from the reference named by 'secretRef';
+  do not invent any credential value.
+- ${refRule}
 - If the description contains a password or secret, ignore it entirely.
 
 Field rules:

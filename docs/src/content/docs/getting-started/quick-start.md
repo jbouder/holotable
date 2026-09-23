@@ -41,9 +41,11 @@ Three things must be true, and each has its own failure mode:
    model. See [AI provider](/operations/ai-provider/).
 2. **A data source is registered** with a table catalog. Generation sends the
    model that catalog as metadata — it designs against a schema, not against data.
-3. **Credentials exist in the server environment** for the source's
-   `secret_ref`. A source whose `secret_ref` has no matching environment
-   variables saves fine but fails on **Test**. See
+3. **The source's `secret_ref` is granted to its workspace and has
+   credentials.** `SOURCE_SECRET_REFS` declares which workspace may use which
+   ref (the Docker Compose stack grants `TS_METRICS` to `demo`), and the
+   server needs `<REF>_USERNAME` / `<REF>_PASSWORD`. A source whose ref has no
+   credentials saves fine but fails on **Test**. See
    [Source secret references](/operations/secret-references/).
 
 ## Scripts

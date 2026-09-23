@@ -37,8 +37,8 @@ afterEach(() => {
 function stubDiscovery(body: unknown): { bodies: unknown[] } {
   const bodies: unknown[] = [];
   globalThis.fetch = (async (_input: string, init?: RequestInit) => {
-    // The form also checks `secret_ref` readiness; only a posted body is a
-    // discovery, and only those are what these tests are counting.
+    // Only a posted body is a discovery, and only those are what these tests
+    // are counting.
     if (init?.body !== undefined) bodies.push(JSON.parse(String(init.body)));
     return new Response(JSON.stringify(body), {
       status: 200,
@@ -96,6 +96,7 @@ async function renderForm(config: SourceConfig): Promise<Rendered> {
     <SourceForm
       mode="edit"
       workspaceId="ws-1"
+      secretRefs={{ state: "ready", refs: [{ ref: "TS_METRICS", configured: true }] }}
       submitLabel="Save"
       initial={{ name: "Metrics", secretRef: "TS_METRICS", config }}
       onSubmit={async (values) => {

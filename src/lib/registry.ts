@@ -1,16 +1,15 @@
 import { z } from "zod";
-import {
-  SECRET_REF_MESSAGE,
-  SECRET_REF_PATTERN,
-  secretRefEnvVars,
-} from "@/lib/secret-refs";
+import { SECRET_REF_MESSAGE, SECRET_REF_PATTERN } from "@/lib/secret-refs";
 
 /**
  * Source registry types.
  *
  * The registry owns the *safe* connection config and the catalog (the table +
  * column allowlist). Credentials are never stored; `secret_ref` names an
- * env-var family from which they are resolved at execution time.
+ * env-var family from which they are resolved at execution time, by
+ * `resolveCredentials` in `@/lib/secrets/credentials` — and only in a
+ * workspace `SOURCE_SECRET_REFS` grants the ref to. That half is server-only
+ * and lives apart because this module is also bundled for the browser.
  */
 
 /**
@@ -140,48 +139,6 @@ export interface SourceRecord {
   createdAt: string;
   updatedAt: string;
   tombstonedAt: string | null;
-}
-
-export interface SourceCredentials {
-  username: string;
-  password: string;
-}
-
-/**
- * Resolve credentials for a source from the environment using its secret_ref.
- * `secret_ref` "TS_METRICS" resolves TS_METRICS_USERNAME / TS_METRICS_PASSWORD.
- *
- * The read-only user is expected here; execution never uses a privileged user.
- */
-export function resolveCredentials(secretRef: string): SourceCredentials {
-  if (!SECRET_REF_PATTERN.test(secretRef)) {
-    throw new Error(`invalid secret_ref "${secretRef}"`);
-  }
-  const env = secretRefEnvVars(secretRef);
-  const username = process.env[env.username];
-  const password = process.env[env.password];
-  if (!username || password === undefined) {
-    throw new Error(
-      `credentials for secret_ref "${secretRef}" are not configured in the environment`,
-    );
-  }
-  return { username, password };
-}
-
-/**
- * Whether the server holds credentials for `secretRef` — a boolean, and only a
- * boolean. This is what the readiness indicator reports, so it is deliberately
- * the *same* call an execution makes rather than a second opinion about the
- * environment: whatever would make `resolveCredentials` throw is exactly what
- * makes this answer false, and no future divergence is possible.
- */
-export function hasCredentials(secretRef: string): boolean {
-  try {
-    resolveCredentials(secretRef);
-    return true;
-  } catch {
-    return false;
-  }
 }
 
 /**

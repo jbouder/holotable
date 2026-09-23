@@ -84,8 +84,11 @@ Important files:
   on the account page, derived from `can()`. `Identity.displayName` and
   `email` are display-only and must never feed an authorization decision
 - `src/lib/time.ts` — server-side time expression/range resolution
-- `src/lib/registry.ts` — source registry: safe connection config and
-  `secret_ref` resolution
+- `src/lib/registry.ts` — source registry: safe connection config and catalog
+- `src/lib/secrets/credentials.ts` — `secret_ref` resolution: the
+  `SOURCE_SECRET_REFS` workspace grant, checked on every connection, then the
+  credentials from `SOURCE_SECRETS_DIR` files or the environment. Server-only;
+  the browser-safe half (grant parsing, readiness) is `src/lib/secret-refs.ts`
 - `src/lib/security-headers.ts` and `src/proxy.ts` — the header baseline and
   the per-request Content-Security-Policy nonce; an inline `<script>` or
   `<style>` needs the nonce or the browser blocks it
@@ -114,10 +117,10 @@ Important files:
 - `SECURITY.md` — the trust model and the disclosure process
 - `CONTRIBUTING.md` — the human-facing version of this file
 
-The six paths with a `CODEOWNERS` entry (`src/lib/sql/`, `src/lib/auth/`,
-`ir.ts`, `time.ts`, `registry.ts`, `metrics-access.ts`) are the ones where a
-quiet regression stops being a bug and becomes a vulnerability. Changes there
-need a test.
+The seven paths with a `CODEOWNERS` entry (`src/lib/sql/`, `src/lib/auth/`,
+`src/lib/secrets/`, `ir.ts`, `time.ts`, `registry.ts`, `metrics-access.ts`) are
+the ones where a quiet regression stops being a bug and becomes a
+vulnerability. Changes there need a test.
 
 For `src/lib/sql/` that test is often already written for you:
 `test/sql-safety.fuzz.test.ts` generates statements from adversarial shapes and

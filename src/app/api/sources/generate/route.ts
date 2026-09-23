@@ -4,6 +4,8 @@ import { readJson, route } from "@/lib/http";
 import { type OnGenerationFinish, streamSourceDraft } from "@/lib/ai/generate";
 import { recordGeneration } from "@/lib/ai/log";
 import { enforceLlmLimits } from "@/lib/limits/llm";
+import { grantedRefs } from "@/lib/secret-refs";
+import { secretRefGrants } from "@/lib/secrets/credentials";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -56,6 +58,10 @@ export const POST = route("sources.draft", async (req: Request) => {
     });
   };
 
-  const result = streamSourceDraft({ prompt: body.prompt, onFinish });
+  const result = streamSourceDraft({
+    prompt: body.prompt,
+    grantedSecretRefs: grantedRefs(secretRefGrants(), body.workspaceId),
+    onFinish,
+  });
   return result.toTextStreamResponse();
 });
