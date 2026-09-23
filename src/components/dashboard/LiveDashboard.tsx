@@ -11,6 +11,7 @@ import type { ApiError } from "@/lib/errors";
 import { ConnectionIndicator } from "@/components/dashboard/ConnectionIndicator";
 import type { PanelData } from "@/components/charts/options";
 import { Button, ButtonLabel } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 import { TimeRangeFilter } from "@/components/dashboard/TimeRangeFilter";
 import {
   type ConnectionSignal,
@@ -239,33 +240,52 @@ export function LiveDashboard({
 
   return (
     <div>
-      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-        {header}
+      <div className="mb-4 space-y-3">
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0">{header}</div>
+          {actions && <div className="flex shrink-0 items-center gap-1">{actions}</div>}
+        </div>
         {/*
-          `shrink-0` only from `sm`. Below it the row has to be allowed to
-          shrink, or it sizes to max-content, its own `flex-wrap` never
-          engages, and seven controls push the page sideways (#78).
+          The stream controls get their own row under the title, left-aligned,
+          so they sit next to the data they control rather than competing with
+          the page actions on the right. The row wraps on a phone.
         */}
-        <div className="flex flex-wrap items-center gap-2 sm:shrink-0">
+        <div className="flex flex-wrap items-center gap-2">
+          <TimeRangeFilter value={timeRange} onChange={setTimeRange} />
           <ConnectionIndicator
             status={connection}
             onReconnect={() => setReconnectNonce((n) => n + 1)}
           />
-          <TimeRangeFilter value={timeRange} onChange={setTimeRange} />
-          <Button
-            variant="ghost"
-            size="sm"
-            aria-pressed={!live}
-            aria-label={live ? "Pause live updates" : "Resume live updates"}
-            title={live ? "Pause live updates" : "Resume live updates"}
-            collapse
-            className="text-muted hover:text-foreground"
-            onClick={togglePause}
-          >
-            {live ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
-            <ButtonLabel>{live ? "Pause" : "Resume"}</ButtonLabel>
-          </Button>
-          {actions}
+          {/*
+            Framed like the time picker so the two read as one set of stream
+            controls. Paused is a state worth noticing — the numbers on screen
+            have stopped moving — so it takes the warning tone the time picker
+            uses for a fixed window.
+          */}
+          <div className="flex items-center border border-border bg-surface p-1">
+            <Button
+              variant="ghost"
+              size="sm"
+              aria-pressed={!live}
+              aria-label={live ? "Pause live updates" : "Resume live updates"}
+              title={live ? "Pause live updates" : "Resume live updates"}
+              collapse
+              className={cn(
+                "h-7 gap-1.5 px-2 text-xs",
+                live
+                  ? "text-muted hover:text-foreground"
+                  : "text-warning hover:text-warning",
+              )}
+              onClick={togglePause}
+            >
+              {live ? (
+                <Pause className="h-3.5 w-3.5" />
+              ) : (
+                <Play className="h-3.5 w-3.5 fill-current" />
+              )}
+              <ButtonLabel>{live ? "Pause" : "Resume"}</ButtonLabel>
+            </Button>
+          </div>
         </div>
       </div>
 
