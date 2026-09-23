@@ -16,11 +16,7 @@ import {
 } from "@/lib/dashboard-list";
 import { catalogHealth } from "@/lib/catalog/health";
 import { onboardingState } from "@/lib/onboarding";
-import {
-  HOW_IT_WORKS_DISMISSED_COOKIE,
-  isDismissed,
-  SETUP_DISMISSED_COOKIE,
-} from "@/lib/dismissals";
+import { isDismissed, SETUP_DISMISSED_COOKIE } from "@/lib/dismissals";
 import type { ImportTarget } from "@/lib/dashboard-export";
 import { SignIn } from "@/components/sign-in";
 import { FirstRun } from "@/components/onboarding/first-run";
@@ -306,7 +302,6 @@ async function FirstRunSection({
     <FirstRun
       state={state}
       dismissed={isDismissed(jar.get(SETUP_DISMISSED_COOKIE)?.value)}
-      howItWorksDismissed={isDismissed(jar.get(HOW_IT_WORKS_DISMISSED_COOKIE)?.value)}
     />
   );
 }

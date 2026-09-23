@@ -2,14 +2,13 @@
 
 import * as React from "react";
 import Link from "next/link";
-import { ArrowRight, Check, ExternalLink, Lock, Sparkles, X } from "lucide-react";
+import { ArrowRight, Check, ExternalLink, Lock } from "lucide-react";
 import {
   FIRST_DASHBOARD_DOCS_URL,
-  HOW_IT_WORKS_DOCS_URL,
   type OnboardingState,
   type OnboardingStep,
 } from "@/lib/onboarding";
-import { HOW_IT_WORKS_DISMISSED_COOKIE, SETUP_DISMISSED_COOKIE } from "@/lib/dismissals";
+import { SETUP_DISMISSED_COOKIE } from "@/lib/dismissals";
 import { dismissHint } from "@/components/onboarding/actions";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -27,12 +26,10 @@ import { EmptyState } from "@/components/ui/empty-state";
 export function FirstRun({
   state,
   dismissed: initiallyDismissed,
-  howItWorksDismissed,
 }: {
   state: OnboardingState;
   /** Read from the cookie on the server, so a dismissed flow never flashes. */
   dismissed: boolean;
-  howItWorksDismissed: boolean;
 }) {
   const [dismissed, setLocalDismissed] = React.useState(initiallyDismissed);
 
@@ -85,9 +82,11 @@ export function FirstRun({
     );
   }
 
+  // Left-aligned with the page header rather than centred under it: on a wide
+  // screen a centred column reads as a modal floating over an empty page.
   return (
-    <div className="mx-auto max-w-3xl space-y-4">
-      <div>
+    <div className="space-y-4">
+      <div className="max-w-prose">
         <h2 className="text-xl font-semibold">Welcome to Holotable</h2>
         <p className="mt-1 text-sm text-muted">
           Three steps to a live dashboard. Progress is read from your workspace, so you
@@ -98,28 +97,28 @@ export function FirstRun({
         </p>
       </div>
 
-      {!howItWorksDismissed && <HowItWorks />}
+      <div className="max-w-5xl space-y-4">
+        <ol className="space-y-3">
+          {state.steps.map((step, index) => (
+            <li key={step.id}>
+              <StepCard step={step} index={index} />
+            </li>
+          ))}
+        </ol>
 
-      <ol className="space-y-3">
-        {state.steps.map((step, index) => (
-          <li key={step.id}>
-            <StepCard step={step} index={index} />
-          </li>
-        ))}
-      </ol>
-
-      <div className="flex flex-wrap items-center justify-between gap-3 text-sm">
-        <a
-          href={FIRST_DASHBOARD_DOCS_URL}
-          target="_blank"
-          rel="noreferrer"
-          className="inline-flex items-center gap-1.5 text-muted hover:text-foreground"
-        >
-          Read the walkthrough <ExternalLink className="h-3.5 w-3.5" />
-        </a>
-        <Button variant="ghost" size="sm" onClick={() => dismiss(true)}>
-          Skip for now
-        </Button>
+        <div className="flex flex-wrap items-center justify-between gap-3 text-sm">
+          <a
+            href={FIRST_DASHBOARD_DOCS_URL}
+            target="_blank"
+            rel="noreferrer"
+            className="inline-flex items-center gap-1.5 text-muted hover:text-foreground"
+          >
+            Read the walkthrough <ExternalLink className="h-3.5 w-3.5" />
+          </a>
+          <Button variant="ghost" size="sm" onClick={() => dismiss(true)}>
+            Skip for now
+          </Button>
+        </div>
       </div>
     </div>
   );
@@ -191,50 +190,5 @@ function StepMarker({
     >
       {index + 1}
     </span>
-  );
-}
-
-/**
- * The core idea, stated once and dismissible. It is the thing that makes every
- * other screen make sense — why there is a catalog, why generation can be
- * refused, why a dashboard keeps updating without the model running again.
- */
-function HowItWorks() {
-  const [hidden, setHidden] = React.useState(false);
-  if (hidden) return null;
-  return (
-    <Card className="border-primary/30 bg-surface-2">
-      <CardContent className="flex items-start gap-3">
-        <Sparkles className="mt-0.5 h-4 w-4 shrink-0 text-primary" aria-hidden="true" />
-        <div className="min-w-0 flex-1 text-sm">
-          <p className="font-medium">How it works</p>
-          <p className="mt-1 text-muted">
-            The model never sees your data. It reads the catalog — the tables and columns
-            you allowed — and writes a validated dashboard spec. The server runs the SQL,
-            enforces the time window, and streams the numbers back, on every refresh,
-            without asking the model again.{" "}
-            <a
-              href={HOW_IT_WORKS_DOCS_URL}
-              target="_blank"
-              rel="noreferrer"
-              className="inline-flex items-center gap-1 text-foreground underline underline-offset-2"
-            >
-              Read more <ExternalLink className="h-3 w-3" />
-            </a>
-          </p>
-        </div>
-        <Button
-          variant="ghost"
-          size="icon"
-          aria-label="Dismiss How it works"
-          onClick={() => {
-            setHidden(true);
-            void dismissHint(HOW_IT_WORKS_DISMISSED_COOKIE, true);
-          }}
-        >
-          <X className="h-4 w-4" />
-        </Button>
-      </CardContent>
-    </Card>
   );
 }
