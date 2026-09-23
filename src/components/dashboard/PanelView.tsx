@@ -379,7 +379,7 @@ function StatusBadge({ status, updatedAt }: { status: PanelStatus; updatedAt?: n
         // Below `sm` the header has room for the title and the actions and
         // nothing else, so the badge steps aside visually and stays readable
         // to a screen reader (#78).
-        "rounded-full px-2 py-0.5 text-xs font-medium capitalize max-sm:sr-only",
+        "px-2 py-0.5 text-xs font-medium capitalize max-sm:sr-only",
         STATUS_STYLES[status],
       )}
     >

@@ -47,12 +47,12 @@ function ChartSkeleton() {
               // Fixed decorative bars: never reordered, never keyed off state.
               // biome-ignore lint/suspicious/noArrayIndexKey: static decorative shapes
               key={i}
-              className="min-h-[4px] flex-1 rounded-sm"
+              className="min-h-[4px] flex-1"
               style={{ height: `${height}%` }}
             />
           ))}
         </div>
-        <Skeleton className="mt-2 h-2 w-full rounded-none" />
+        <Skeleton className="mt-2 h-2 w-full" />
       </div>
     </div>
   );
@@ -116,7 +116,7 @@ export function PanelCardSkeleton({
   return (
     <div
       className={cn(
-        "flex h-48 flex-col rounded-lg border border-border bg-surface shadow-sm",
+        "flex h-48 flex-col border border-border bg-surface shadow-sm",
         className,
       )}
     >
@@ -126,7 +126,7 @@ export function PanelCardSkeleton({
         ) : (
           <Skeleton className="h-3.5 w-32" />
         )}
-        <Skeleton className="h-4 w-12 rounded-full" />
+        <Skeleton className="h-4 w-12" />
       </div>
       <div className="min-h-0 flex-1 px-4 pb-3">
         <PanelSkeleton viz={viz} />

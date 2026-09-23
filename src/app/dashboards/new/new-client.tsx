@@ -272,7 +272,7 @@ export function NewDashboardClient({
         </div>
 
         <div
-          className="flex w-fit rounded-lg border border-border bg-surface p-1"
+          className="flex w-fit border border-border bg-surface p-1"
           role="tablist"
           aria-label="Dashboard workspace"
         >
@@ -285,7 +285,7 @@ export function NewDashboardClient({
               aria-controls={`new-dashboard-${tab}-panel`}
               id={`new-dashboard-${tab}-tab`}
               onClick={() => setActiveTab(tab)}
-              className={`rounded-md px-3 py-1.5 text-sm font-medium capitalize transition-colors ${
+              className={`px-3 py-1.5 text-sm font-medium capitalize transition-colors ${
                 activeTab === tab
                   ? "bg-surface-2 text-foreground"
                   : "text-muted hover:text-foreground"
@@ -369,7 +369,7 @@ export function NewDashboardClient({
                         type="button"
                         disabled={isLoading}
                         onClick={() => setPrompt(preset)}
-                        className="rounded-full border border-border bg-surface px-3 py-1 text-xs text-muted transition-colors hover:border-primary hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50"
+                        className="border border-border bg-surface px-3 py-1 text-xs text-muted transition-colors hover:border-primary hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50"
                       >
                         {preset}
                       </button>
@@ -468,7 +468,7 @@ export function NewDashboardClient({
                     return (
                       <li
                         key={turn.id}
-                        className={`flex items-start justify-between gap-3 rounded-lg border p-3 ${
+                        className={`flex items-start justify-between gap-3 border p-3 ${
                           active
                             ? "border-primary bg-surface-2"
                             : "border-border bg-surface"
@@ -568,7 +568,7 @@ export function NewDashboardClient({
                 <CardTitle>Generated config</CardTitle>
               </CardHeader>
               <CardContent>
-                <pre className="max-h-96 overflow-auto rounded-lg border border-border bg-surface p-4 text-xs text-muted">
+                <pre className="max-h-96 overflow-auto border border-border bg-surface p-4 text-xs text-muted">
                   {JSON.stringify(finalSpec, null, 2)}
                 </pre>
               </CardContent>

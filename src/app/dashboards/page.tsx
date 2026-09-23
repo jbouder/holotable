@@ -241,15 +241,13 @@ function PagerLink({
 }) {
   if (disabled) {
     return (
-      <span className="rounded-lg border border-border px-3 py-1.5 opacity-40">
-        {children}
-      </span>
+      <span className="border border-border px-3 py-1.5 opacity-40">{children}</span>
     );
   }
   return (
     <Link
       href={href}
-      className="rounded-lg border border-border px-3 py-1.5 text-foreground transition-colors hover:border-foreground/40 focus-visible:outline-2 focus-visible:outline-primary"
+      className="border border-border px-3 py-1.5 text-foreground transition-colors hover:border-foreground/40 focus-visible:outline-2 focus-visible:outline-primary"
     >
       {children}
     </Link>

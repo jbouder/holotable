@@ -142,7 +142,7 @@ export function ImportDashboard({ targets }: { targets: ImportTarget[] }) {
           </div>
 
           {file && (
-            <div className="rounded-lg border border-border bg-surface-2 p-3 text-sm">
+            <div className="border border-border bg-surface-2 p-3 text-sm">
               <div className="font-medium">{file.spec.title}</div>
               <div className="text-xs text-muted">
                 {file.spec.panels.length}{" "}

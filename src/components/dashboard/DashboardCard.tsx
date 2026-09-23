@@ -108,7 +108,7 @@ export function DashboardCard({
               aria-pressed={favorite}
               aria-label={favorite ? "Remove from favorites" : "Add to favorites"}
               title={favorite ? "Remove from favorites" : "Add to favorites"}
-              className="inline-flex h-7 w-7 cursor-pointer items-center justify-center rounded text-muted transition-colors hover:bg-surface-3 hover:text-foreground focus-visible:outline-2 focus-visible:outline-primary"
+              className="inline-flex h-7 w-7 cursor-pointer items-center justify-center text-muted transition-colors hover:bg-surface-3 hover:text-foreground focus-visible:outline-2 focus-visible:outline-primary"
             >
               <Star className={cn("h-4 w-4", favorite && "fill-primary text-primary")} />
             </button>
@@ -161,7 +161,7 @@ export function DashboardCard({
               <Link
                 key={tag}
                 href={dashboardListHref({ ...EMPTY_QUERY, tags: [tag] })}
-                className="inline-flex items-center gap-1 rounded-full border border-border px-2 py-0.5 text-[11px] text-muted transition-colors hover:border-primary/50 hover:text-foreground focus-visible:outline-2 focus-visible:outline-primary"
+                className="inline-flex items-center gap-1 border border-border px-2 py-0.5 text-[11px] text-muted transition-colors hover:border-primary/50 hover:text-foreground focus-visible:outline-2 focus-visible:outline-primary"
               >
                 <Tag className="h-2.5 w-2.5" aria-hidden /> {tag}
               </Link>

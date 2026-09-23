@@ -76,7 +76,7 @@ export function PanelList({
             e.preventDefault();
             drop(p.id);
           }}
-          className={`flex items-center gap-1 rounded pr-1 ${
+          className={`flex items-center gap-1 pr-1 ${
             p.id === selectedId ? "bg-surface-2" : "hover:bg-surface-2"
           } ${over === p.id && dragging !== p.id ? "outline-2 outline-primary" : ""} ${
             dragging === p.id ? "opacity-50" : ""

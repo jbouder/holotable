@@ -118,10 +118,7 @@ export function RepointPanelsDialog({
                 {reviewed.map((panel) => {
                   const verdict = verdictFor(panel.id);
                   return (
-                    <li
-                      key={panel.id}
-                      className="rounded-lg border border-border bg-surface-2 p-2"
-                    >
+                    <li key={panel.id} className="border border-border bg-surface-2 p-2">
                       <Checkbox
                         checked={selected.includes(panel.id)}
                         onCheckedChange={(checked) =>

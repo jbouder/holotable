@@ -73,7 +73,7 @@ export function ErrorDisplay({
     <div
       role="alert"
       className={cn(
-        "flex flex-wrap items-start gap-3 rounded-lg border border-danger/30 bg-danger/10 px-3 py-2 text-sm",
+        "flex flex-wrap items-start gap-3 border border-danger/30 bg-danger/10 px-3 py-2 text-sm",
         className,
       )}
     >

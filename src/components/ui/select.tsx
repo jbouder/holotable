@@ -36,7 +36,7 @@ export function Select({
       <BaseSelect.Trigger
         id={id}
         className={cn(
-          "flex h-10 min-w-40 items-center justify-between gap-2 rounded-lg border border-border bg-surface px-3 text-sm text-foreground focus-visible:outline-2 focus-visible:outline-primary data-[disabled]:cursor-not-allowed data-[disabled]:opacity-50",
+          "flex h-10 min-w-40 items-center justify-between gap-2 border border-border bg-surface px-3 text-sm text-foreground focus-visible:outline-2 focus-visible:outline-primary data-[disabled]:cursor-not-allowed data-[disabled]:opacity-50",
           className,
         )}
       >
@@ -51,12 +51,12 @@ export function Select({
       </BaseSelect.Trigger>
       <BaseSelect.Portal>
         <BaseSelect.Positioner sideOffset={4} className="z-50">
-          <BaseSelect.Popup className="max-h-64 overflow-auto rounded-lg border border-border bg-surface-2 p-1 shadow-lg">
+          <BaseSelect.Popup className="max-h-64 overflow-auto border border-border bg-surface-2 p-1 shadow-lg">
             {options.map((o) => (
               <BaseSelect.Item
                 key={o.value}
                 value={o.value}
-                className="flex cursor-pointer items-center justify-between gap-2 rounded px-2 py-1.5 text-sm text-foreground data-[highlighted]:bg-surface"
+                className="flex cursor-pointer items-center justify-between gap-2 px-2 py-1.5 text-sm text-foreground data-[highlighted]:bg-surface"
               >
                 <BaseSelect.ItemText>{o.label}</BaseSelect.ItemText>
                 <BaseSelect.ItemIndicator>

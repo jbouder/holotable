@@ -217,7 +217,7 @@ export function SourcesClient({
       </div>
 
       {notice && (
-        <div className="rounded-lg border border-border bg-surface px-3 py-2 text-sm text-muted">
+        <div className="border border-border bg-surface px-3 py-2 text-sm text-muted">
           {notice}
         </div>
       )}
@@ -237,7 +237,7 @@ export function SourcesClient({
         source becomes queryable.
       */}
       {nothingQueryable && (
-        <div className="rounded-lg border border-warning/40 bg-surface px-3 py-2 text-sm text-muted">
+        <div className="border border-warning/40 bg-surface px-3 py-2 text-sm text-muted">
           Next: press <span className="text-foreground">Test</span> to check the
           credentials resolve, then <span className="text-foreground">Refresh</span> to
           read the tables and columns. Until a refresh has run, generating against this
@@ -565,7 +565,7 @@ function NaturalLanguageDrafter({
             disabled={isLoading}
             onClick={() => setDescription(preset)}
             title={preset}
-            className="max-w-full truncate rounded-full border border-border bg-surface px-3 py-1 text-xs text-muted transition-colors hover:border-primary hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50"
+            className="max-w-full truncate border border-border bg-surface px-3 py-1 text-xs text-muted transition-colors hover:border-primary hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50"
           >
             {preset}
           </button>
@@ -620,7 +620,7 @@ function NaturalLanguageDrafter({
         />
       )}
       {isLoading && object && (
-        <pre className="max-h-40 overflow-auto rounded-lg border border-border bg-surface p-3 text-xs text-muted">
+        <pre className="max-h-40 overflow-auto border border-border bg-surface p-3 text-xs text-muted">
           {JSON.stringify(object, null, 2)}
         </pre>
       )}

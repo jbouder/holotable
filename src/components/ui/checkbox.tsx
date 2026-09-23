@@ -34,7 +34,7 @@ export function Checkbox({
         checked={checked}
         disabled={disabled}
         onCheckedChange={(next) => onCheckedChange(next)}
-        className="flex h-4 w-4 shrink-0 cursor-pointer items-center justify-center rounded border border-border bg-surface text-background focus-visible:outline-2 focus-visible:outline-primary data-[checked]:border-primary data-[checked]:bg-primary data-[disabled]:cursor-not-allowed data-[disabled]:opacity-50"
+        className="flex h-4 w-4 shrink-0 cursor-pointer items-center justify-center border border-border bg-surface text-background focus-visible:outline-2 focus-visible:outline-primary data-[checked]:border-primary data-[checked]:bg-primary data-[disabled]:cursor-not-allowed data-[disabled]:opacity-50"
       >
         <BaseCheckbox.Indicator className="flex">
           <Check className="h-3 w-3" strokeWidth={3} />

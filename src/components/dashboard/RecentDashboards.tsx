@@ -64,7 +64,7 @@ export function RecentDashboards() {
           <Link
             key={d.id}
             href={`/dashboards/${d.id}`}
-            className="rounded-lg border border-border bg-surface px-3 py-1.5 text-sm text-foreground transition-colors hover:border-foreground/40 focus-visible:outline-2 focus-visible:outline-primary"
+            className="border border-border bg-surface px-3 py-1.5 text-sm text-foreground transition-colors hover:border-foreground/40 focus-visible:outline-2 focus-visible:outline-primary"
           >
             {d.title}
           </Link>

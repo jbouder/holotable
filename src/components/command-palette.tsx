@@ -186,7 +186,7 @@ export function CommandPalette() {
         <BaseDialog.Backdrop className="fixed inset-0 z-40 bg-black/60" />
         <BaseDialog.Popup
           initialFocus={inputRef}
-          className="fixed inset-x-4 top-20 z-50 mx-auto w-auto max-w-xl overflow-hidden rounded-lg border border-border bg-surface shadow-xl focus:outline-none"
+          className="fixed inset-x-4 top-20 z-50 mx-auto w-auto max-w-xl overflow-hidden border border-border bg-surface shadow-xl focus:outline-none"
         >
           <BaseDialog.Title className="sr-only">Command palette</BaseDialog.Title>
           <div className="flex items-center gap-2 border-b border-border px-3">
@@ -248,7 +248,7 @@ export function CommandPalette() {
                       onClick={() => void run(command)}
                       onMouseMove={() => setActive(i)}
                       className={cn(
-                        "flex cursor-pointer items-center gap-2 rounded px-2 py-1.5 text-sm",
+                        "flex cursor-pointer items-center gap-2 px-2 py-1.5 text-sm",
                         i === active
                           ? "bg-surface-2 text-foreground"
                           : "text-muted hover:text-foreground",

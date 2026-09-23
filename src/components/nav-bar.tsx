@@ -107,7 +107,7 @@ export function NavBar() {
               key={href}
               href={href}
               aria-current={pathname === href ? "page" : undefined}
-              className="tap-target flex items-center gap-2 rounded-lg px-3 py-3 text-sm text-muted hover:bg-surface-2 hover:text-foreground aria-[current=page]:text-foreground"
+              className="tap-target flex items-center gap-2 px-3 py-3 text-sm text-muted hover:bg-surface-2 hover:text-foreground aria-[current=page]:text-foreground"
             >
               <Icon className="h-4 w-4" /> {label}
             </Link>

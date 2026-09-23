@@ -178,7 +178,7 @@ export function TemplatePicker({
                     return (
                       <li key={template.id}>
                         <div
-                          className={`flex items-start gap-2 rounded-lg border p-2 ${
+                          className={`flex items-start gap-2 border p-2 ${
                             active
                               ? "border-primary bg-surface-2"
                               : "border-border bg-surface"
@@ -244,7 +244,7 @@ export function TemplatePicker({
                     return (
                       <li
                         key={panel.id}
-                        className="rounded-lg border border-border bg-surface-2 p-2 text-xs"
+                        className="border border-border bg-surface-2 p-2 text-xs"
                       >
                         <span className="block font-medium text-foreground">
                           {panel.title}

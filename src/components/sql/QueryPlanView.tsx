@@ -15,7 +15,7 @@ import { summarizeLimits } from "@/lib/query-plan";
 export function QueryPlanView({ plan, stale }: { plan: Plan; stale?: boolean }) {
   return (
     <div className="space-y-3">
-      <div className="rounded-lg border border-border bg-surface-2">
+      <div className="border border-border bg-surface-2">
         <div className="border-b border-border px-3 py-2 text-xs font-medium text-muted">
           Statement sent to the database
         </div>

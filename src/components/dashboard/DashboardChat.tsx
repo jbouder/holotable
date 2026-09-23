@@ -125,7 +125,7 @@ export function DashboardChat({
         size="icon"
         aria-label="Ask about this dashboard"
         onClick={() => setOpen(true)}
-        className="fixed bottom-6 right-6 z-50 h-12 w-12 rounded-full shadow-lg"
+        className="fixed bottom-6 right-6 z-50 h-12 w-12 shadow-lg"
       >
         <MessageSquare className="h-5 w-5" />
       </Button>
@@ -139,7 +139,7 @@ export function DashboardChat({
     <div
       role="dialog"
       aria-label="Dashboard chat"
-      className="fixed bottom-6 right-6 z-50 flex h-[560px] max-h-[calc(100vh-3rem)] w-[380px] max-w-[calc(100vw-3rem)] flex-col overflow-hidden rounded-lg border border-border bg-surface shadow-lg"
+      className="fixed bottom-6 right-6 z-50 flex h-[560px] max-h-[calc(100vh-3rem)] w-[380px] max-w-[calc(100vw-3rem)] flex-col overflow-hidden border border-border bg-surface shadow-lg"
     >
       <header className="flex items-center justify-between border-b border-border px-4 py-3">
         <div className="flex min-w-0 items-center gap-2">
@@ -250,7 +250,7 @@ export function DashboardChat({
 function PendingAnswer() {
   return (
     <div className="flex flex-col items-start gap-1">
-      <div className="flex w-[85%] flex-col gap-1.5 rounded-lg bg-surface-2 px-3 py-2">
+      <div className="flex w-[85%] flex-col gap-1.5 bg-surface-2 px-3 py-2">
         <Skeleton className="h-2.5 w-full" />
         <Skeleton className="h-2.5 w-11/12" />
         <Skeleton className="h-2.5 w-2/3" />
@@ -299,7 +299,7 @@ function Suggestions({
           key={prompt}
           type="button"
           onClick={() => onPick(prompt)}
-          className="rounded-lg border border-border bg-surface-2 px-3 py-2 text-left text-xs text-foreground transition-colors hover:border-primary focus-visible:outline-2 focus-visible:outline-primary"
+          className="border border-border bg-surface-2 px-3 py-2 text-left text-xs text-foreground transition-colors hover:border-primary focus-visible:outline-2 focus-visible:outline-primary"
         >
           {prompt}
         </button>
@@ -331,7 +331,7 @@ function MessageBubble({
               // biome-ignore lint/suspicious/noArrayIndexKey: append-only stream parts
               key={i}
               className={cn(
-                "max-w-[85%] whitespace-pre-wrap rounded-lg px-3 py-2 text-sm",
+                "max-w-[85%] whitespace-pre-wrap px-3 py-2 text-sm",
                 isUser
                   ? "bg-primary text-primary-foreground"
                   : "bg-surface-2 text-foreground",
@@ -376,7 +376,7 @@ function MessageBubble({
  */
 function CitationFootnote({ citation }: { citation: ChatCitation }) {
   return (
-    <details className="max-w-[85%] rounded-lg border border-border bg-surface-2/60 text-xs">
+    <details className="max-w-[85%] border border-border bg-surface-2/60 text-xs">
       <summary className="flex cursor-pointer items-center gap-1.5 px-2.5 py-1.5 text-muted hover:text-foreground">
         <Database className="h-3 w-3 shrink-0" aria-hidden />
         <span className="truncate">
