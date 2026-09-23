@@ -58,12 +58,12 @@ export function DashboardListControls({
   return (
     <div className="mb-4 flex flex-col gap-3">
       {/*
-        The same column grid as the card list below, so the search box lines
-        up with the cards — three wide at four columns, two at three, one
-        below that — and the sort control sits in the last column.
+        One row at every width: the search takes whatever the controls leave,
+        and the controls never wrap below it. `min-w-0` lets the input shrink
+        past its intrinsic width on a phone instead of pushing the row wider.
       */}
-      <div className="grid grid-cols-1 items-center gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-        <div className="relative lg:col-span-2 xl:col-span-3">
+      <div className="flex items-center gap-2">
+        <div className="relative min-w-0 flex-1">
           <Search
             className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted"
             aria-hidden
@@ -76,30 +76,30 @@ export function DashboardListControls({
             onChange={(e) => setSearch(e.target.value)}
           />
         </div>
-        <div className="flex items-center justify-end gap-2 sm:col-start-2 lg:col-start-3 xl:col-start-4">
-          {isFiltered(query) && (
-            <Button
-              variant="ghost"
-              size="sm"
-              collapse
-              title="Clear filters"
-              onClick={() => go({ ...query, search: "", tags: [], page: 1 })}
-            >
-              <X className="h-4 w-4" /> <ButtonLabel>Clear</ButtonLabel>
-            </Button>
-          )}
-          <Label htmlFor="dashboard-sort" className="sr-only">
-            Sort dashboards
-          </Label>
-          <Select
-            id="dashboard-sort"
-            value={query.sort}
-            options={SORTS}
-            onValueChange={(value) =>
-              go({ ...query, sort: value as DashboardSort, page: 1 })
-            }
-          />
-        </div>
+        {isFiltered(query) && (
+          <Button
+            variant="ghost"
+            size="sm"
+            collapse
+            title="Clear filters"
+            className="shrink-0"
+            onClick={() => go({ ...query, search: "", tags: [], page: 1 })}
+          >
+            <X className="h-4 w-4" /> <ButtonLabel>Clear</ButtonLabel>
+          </Button>
+        )}
+        <Label htmlFor="dashboard-sort" className="sr-only">
+          Sort dashboards
+        </Label>
+        <Select
+          id="dashboard-sort"
+          className="shrink-0"
+          value={query.sort}
+          options={SORTS}
+          onValueChange={(value) =>
+            go({ ...query, sort: value as DashboardSort, page: 1 })
+          }
+        />
       </div>
 
       {tags.length > 0 && (
