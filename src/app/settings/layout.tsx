@@ -23,11 +23,11 @@ export default async function SettingsLayout({
   }));
 
   return (
-    <div className="mx-auto w-full max-w-5xl">
+    <div className="w-full">
       <h1 className="text-2xl font-semibold">Settings</h1>
       <div className="mt-6 flex flex-col gap-6 md:flex-row md:gap-10">
         <SettingsNav sections={sections} />
-        <div className="min-w-0 flex-1">{children}</div>
+        <div className="min-w-0 max-w-3xl flex-1">{children}</div>
       </div>
     </div>
   );

@@ -29,6 +29,7 @@ import { Input, Textarea, Label } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { PageHeader } from "@/components/ui/page-header";
 import { PreviewDashboard } from "@/components/dashboard/PreviewDashboard";
 import { GeneratingPanels } from "@/components/dashboard/GeneratingPanels";
 import { ErrorDisplay } from "@/components/ui/error-display";
@@ -248,9 +249,19 @@ export function NewDashboardClient({
     router.push(`/dashboards/${body.dashboard.id}`);
   }
 
+  const header = (actions?: React.ReactNode) => (
+    <PageHeader
+      title="New dashboard"
+      badge={model && <Badge title="Generation model">{model}</Badge>}
+      description="Describe the dashboard you want in plain English. The model generates a validated spec; refine it with follow-ups, then preview and save it as live panels."
+      actions={actions}
+    />
+  );
+
   if (sources.length === 0) {
     return (
-      <div className="mx-auto max-w-2xl">
+      <div className="space-y-6">
+        {header()}
         <NoSources canManageSources={canManageSources} />
       </div>
     );
@@ -258,19 +269,7 @@ export function NewDashboardClient({
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <div className="flex flex-wrap items-center gap-3">
-            <h1 className="text-2xl font-semibold">New dashboard</h1>
-            {model && <Badge title="Generation model">{model}</Badge>}
-          </div>
-          <p className="mt-1 text-sm text-muted">
-            Describe the dashboard you want in plain English. The model generates a
-            validated spec; refine it with follow-ups, then preview and save it as live
-            panels.
-          </p>
-        </div>
-
+      {header(
         <div
           className="flex w-fit border border-border bg-surface p-1"
           role="tablist"
@@ -294,8 +293,8 @@ export function NewDashboardClient({
               {tab}
             </button>
           ))}
-        </div>
-      </div>
+        </div>,
+      )}
 
       {activeTab === "chat" ? (
         <div

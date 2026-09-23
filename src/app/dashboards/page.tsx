@@ -29,6 +29,7 @@ import { RecentDashboards } from "@/components/dashboard/RecentDashboards";
 import { ImportDashboard } from "./import-dashboard";
 import { Button, ButtonLabel } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
+import { PageHeader } from "@/components/ui/page-header";
 
 export const dynamic = "force-dynamic";
 
@@ -129,12 +130,14 @@ export default async function DashboardsPage({
   // up" and "that search matched nothing".
   const emptyWorkspace = total === 0 && !isFiltered(query) && query.page === 1;
 
-  return (
-    <div>
-      <div className="mb-6 flex items-center justify-between">
-        <h1 className="text-2xl font-semibold">Dashboards</h1>
-        {canCreate && (
-          <div className="flex items-center gap-2">
+  const header = (
+    <PageHeader
+      className="mb-6"
+      title="Dashboards"
+      description="Live dashboards in your workspaces. Each panel is a guarded query the server runs against its data source."
+      actions={
+        canCreate && (
+          <>
             <ImportDashboard targets={importTargets} />
             <Link href="/dashboards/new">
               <Button collapse title="Create New Dashboard">
@@ -142,32 +145,44 @@ export default async function DashboardsPage({
                 <ButtonLabel>Create New Dashboard</ButtonLabel>
               </Button>
             </Link>
-          </div>
-        )}
-      </div>
+          </>
+        )
+      }
+    />
+  );
 
-      {startUnavailable && (
-        <div
-          role="status"
-          className="mb-4 flex items-start gap-2 border border-warning/40 bg-warning/10 px-3 py-2 text-sm"
-        >
-          <Info className="mt-0.5 h-4 w-4 shrink-0 text-warning" aria-hidden />
-          <p>
-            Your start dashboard is no longer available to you, so you are on the
-            dashboard list.{" "}
-            <Link href="/settings/preferences" className="text-primary hover:underline">
-              Choose another start page
-            </Link>
-            .
-          </p>
-          <DismissNotice param="notice" />
-        </div>
-      )}
+  const banner = startUnavailable && (
+    <div
+      role="status"
+      className="mb-4 flex items-start gap-2 border border-warning/40 bg-warning/10 px-3 py-2 text-sm"
+    >
+      <Info className="mt-0.5 h-4 w-4 shrink-0 text-warning" aria-hidden />
+      <p>
+        Your start dashboard is no longer available to you, so you are on the dashboard
+        list.{" "}
+        <Link href="/settings/preferences" className="text-primary hover:underline">
+          Choose another start page
+        </Link>
+        .
+      </p>
+      <DismissNotice param="notice" />
+    </div>
+  );
 
+  return (
+    <div>
       {emptyWorkspace ? (
-        <FirstRunSection identity={identity} workspaces={workspaces} />
+        // The guide replaces the header while it is up; see FirstRun.
+        <FirstRunSection
+          identity={identity}
+          workspaces={workspaces}
+          header={header}
+          banner={banner}
+        />
       ) : (
         <>
+          {header}
+          {banner}
           <DashboardListControls query={query} tags={tags} defaults={listDefaults} />
           {showSections && <RecentDashboards />}
 
@@ -326,9 +341,13 @@ function mergeTags(lists: { tag: string; count: number }[][]) {
 async function FirstRunSection({
   identity,
   workspaces,
+  header,
+  banner,
 }: {
   identity: Identity;
   workspaces: string[];
+  header: ReactNode;
+  banner: ReactNode;
 }) {
   const sourceLists = await Promise.all(workspaces.map((w) => listSources(w)));
   const jar = await cookies();
@@ -347,6 +366,8 @@ async function FirstRunSection({
     <FirstRun
       state={state}
       dismissed={isDismissed(jar.get(SETUP_DISMISSED_COOKIE)?.value)}
+      header={header}
+      banner={banner}
     />
   );
 }

@@ -10,6 +10,7 @@ import { Textarea, Label } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { PageHeader } from "@/components/ui/page-header";
 import { EChart } from "@/components/charts/EChart";
 import { buildChartOption, type PanelData } from "@/components/charts/options";
 import { useTimeDisplay } from "@/components/time-display";
@@ -139,23 +140,32 @@ export function ExploreClient({
   const starters = source?.starters ?? [];
   const sourceName = source?.name ?? sourceId;
 
+  const header = (
+    <PageHeader
+      title="Explore"
+      badge={model && <Badge title="Generation model">{model}</Badge>}
+      description={
+        <>
+          Ask a question in plain English. Results come back as text and tables; ask to
+          &ldquo;chart&rdquo;, &ldquo;plot&rdquo;, or &ldquo;graph&rdquo; something to get
+          a visualization.
+        </>
+      }
+    />
+  );
+
   if (sources.length === 0) {
-    return <NoSources canManageSources={canManageSources} />;
+    return (
+      <div className="w-full space-y-6">
+        {header}
+        <NoSources canManageSources={canManageSources} />
+      </div>
+    );
   }
 
   return (
     <div className="w-full space-y-6">
-      <div>
-        <div className="flex flex-wrap items-center gap-3">
-          <h1 className="text-2xl font-semibold">Explore</h1>
-          {model && <Badge title="Generation model">{model}</Badge>}
-        </div>
-        <p className="mt-1 text-sm text-muted">
-          Ask a question in plain English. Results come back as text and tables; ask to
-          &ldquo;chart&rdquo;, &ldquo;plot&rdquo;, or &ldquo;graph&rdquo; something to get
-          a visualization.
-        </p>
-      </div>
+      {header}
 
       <Card>
         <CardContent className="space-y-4">

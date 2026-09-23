@@ -19,6 +19,7 @@ import {
   storeForKey,
 } from "@/lib/local-data";
 import { PROMPT_HISTORY_PREFIX, promptHistoryKey } from "@/lib/prompt-history";
+import { MOTION_STORAGE_KEY } from "@/lib/motion";
 import { THEME_STORAGE_KEY } from "@/lib/theme";
 
 function memory(
@@ -81,6 +82,7 @@ function populated() {
     [RECENT_KEY]: JSON.stringify(["d1", "d2", "d3"]),
     [RECENTS_STORAGE_KEY]: JSON.stringify(["page:explore"]),
     [THEME_STORAGE_KEY]: "light",
+    [MOTION_STORAGE_KEY]: "reduce",
     "someone-elses-key": "untouched",
   });
 }
@@ -147,6 +149,7 @@ test("clear everything empties every store and nothing else", () => {
   clearAllLocalData(s, ctx());
   for (const store of LOCAL_STORES) assert.equal(store.count(s, ctx()), 0);
   assert.equal(s.data.get(THEME_STORAGE_KEY), "light");
+  assert.equal(s.data.get(MOTION_STORAGE_KEY), "reduce");
   assert.equal(s.data.get("someone-elses-key"), "untouched");
   assert.ok(s.data.has(draftKey("d1", "bob")));
 });
@@ -186,6 +189,7 @@ test("every storage key the app defines is registered or deliberately excluded",
     RECENT_KEY,
     RECENTS_STORAGE_KEY,
     THEME_STORAGE_KEY,
+    MOTION_STORAGE_KEY,
   ]) {
     const owned = storeForKey(key) !== null || exclusions.some((m) => keyMatches(m, key));
     assert.ok(owned, `${key} is neither a local-data store nor an exclusion`);
@@ -217,6 +221,7 @@ const STORAGE_WRITERS: Record<string, string> = {
   "lib/dashboard-list.ts": RECENT_KEY,
   "components/command-palette.tsx": RECENTS_STORAGE_KEY,
   "lib/theme.ts": THEME_STORAGE_KEY,
+  "lib/motion.ts": MOTION_STORAGE_KEY,
 };
 
 test("every file that writes browser storage is accounted for", () => {
