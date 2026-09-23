@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { parseCidr } from "@/lib/cidr";
+import { SECRET_REF_GRANTS_VAR, parseSecretRefGrants } from "@/lib/secret-refs";
 import { resolveTimeExpr, resolveTimeRange } from "@/lib/time";
 
 /**
@@ -337,6 +338,18 @@ const EnvSchema = z.object({
   CHAT_HISTORY_RETENTION_DAYS: blank(nonNegativeInt),
   GENERATION_LOG_RETENTION_DAYS: blank(nonNegativeInt),
   SHUTDOWN_GRACE_MS: blank(positiveInt),
+
+  // Not `blank()`: the empty string is a real declaration here ("no source
+  // may resolve credentials yet"), distinct from the variable being unset.
+  SOURCE_SECRET_REFS: z
+    .string()
+    .optional()
+    .superRefine((v, ctx) => {
+      if (v === undefined) return;
+      const parsed = parseSecretRefGrants(v);
+      if (!parsed.ok) ctx.addIssue({ code: "custom", message: parsed.error });
+    }),
+  SOURCE_SECRETS_DIR: blank(z.string().startsWith("/", "must be an absolute path")),
 });
 
 type Env = z.infer<typeof EnvSchema>;
@@ -372,6 +385,17 @@ export function validateConfig(
     missing(
       "DATABASE_URL",
       "is not set; the config store (workspaces, sources, dashboards) cannot be reached. Set it to the postgresql:// URL of the Holotable database.",
+    );
+  }
+
+  // --- Source credential grants -------------------------------------------
+  // Fail closed: unset grants no workspace any secret_ref, so every source
+  // stops resolving credentials. In production that is refused at boot rather
+  // than discovered one failed panel at a time.
+  if (env[SECRET_REF_GRANTS_VAR] === undefined) {
+    missing(
+      SECRET_REF_GRANTS_VAR,
+      'is not set, so no source can resolve credentials. Declare which workspaces may use each secret_ref, e.g. "TS_METRICS:demo,ops; BILLING_RO:finance" ("*" grants every workspace), or set it empty if no source is configured yet.',
     );
   }
 
@@ -560,33 +584,6 @@ function partialParse(env: Environment): Partial<Env> {
     if (r.success && r.data !== undefined) out[key] = r.data;
   }
   return out as Partial<Env>;
-}
-
-/**
- * Check that every registered source's `secret_ref` resolves to credentials.
- * Always a warning: sources are created at runtime, and a source whose
- * credentials arrive with the next deploy should not keep the whole server
- * from starting. The same failure still surfaces on Test and on execution.
- */
-export function validateSourceSecrets(
-  secretRefs: Iterable<string>,
-  env: Environment = process.env,
-): ConfigProblem[] {
-  const problems: ConfigProblem[] = [];
-  for (const ref of new Set(secretRefs)) {
-    for (const suffix of ["_USERNAME", "_PASSWORD"] as const) {
-      const variable = `${ref}${suffix}`;
-      const value = env[variable];
-      if (value === undefined || (suffix === "_USERNAME" && value === "")) {
-        problems.push({
-          variable,
-          message: `is not set; a registered source uses secret_ref "${ref}" and will fail on Test and on every query until it is.`,
-          severity: "warning",
-        });
-      }
-    }
-  }
-  return problems;
 }
 
 /** Render problems as one multi-line report, errors first. */

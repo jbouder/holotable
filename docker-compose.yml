@@ -58,6 +58,10 @@ services:
       APP_VERSION: ${APP_VERSION:-}
       DATABASE_URL: "postgresql://${POSTGRES_USER:-holotable}:${POSTGRES_PASSWORD:-holotable}@postgres:5432/holotable"
       SESSION_SECRET: ${SESSION_SECRET:?set a strong 32+ char SESSION_SECRET}
+      # Which workspaces may use which source secret_ref. The seeder registers
+      # the demo sources in the `demo` workspace; a ref not granted here never
+      # resolves, whatever credentials the environment holds.
+      SOURCE_SECRET_REFS: ${SOURCE_SECRET_REFS:-TS_METRICS:demo}
       # Credentials the app resolves for the 'TS_METRICS' source secret_ref.
       TS_METRICS_USERNAME: ${TS_METRICS_USERNAME:-metrics_ro}
       TS_METRICS_PASSWORD: ${TS_METRICS_PASSWORD:-readonly}
@@ -164,7 +168,9 @@ services:
     command: ["node", "node_modules/.bin/tsx", "scripts/smoke.ts"]
     environment:
       DATABASE_URL: "postgresql://${POSTGRES_USER:-holotable}:${POSTGRES_PASSWORD:-holotable}@postgres:5432/holotable"
-      # Resolved for the `TS_METRICS` secret_ref, exactly as the app resolves it.
+      # Resolved for the `TS_METRICS` secret_ref, exactly as the app resolves it
+      # — including the grant, which the demo workspace needs as well.
+      SOURCE_SECRET_REFS: ${SOURCE_SECRET_REFS:-TS_METRICS:demo}
       TS_METRICS_USERNAME: ${TS_METRICS_USERNAME:-metrics_ro}
       TS_METRICS_PASSWORD: ${TS_METRICS_PASSWORD:-readonly}
       SMOKE_TIMEOUT_MS: ${SMOKE_TIMEOUT_MS:-180000}

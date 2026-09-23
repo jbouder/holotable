@@ -2,6 +2,8 @@ import { z } from "zod";
 import { requireIdentity, assertAuthorized } from "@/lib/auth/authorize";
 import { json, readJson, route } from "@/lib/http";
 import { SourceConnection } from "@/lib/registry";
+import { SECRET_REF_MESSAGE, SECRET_REF_PATTERN } from "@/lib/secret-refs";
+import { requireGrantedSecretRef } from "@/lib/secrets/http";
 import { discoverTables } from "@/lib/timescaledb/catalog";
 
 export const runtime = "nodejs";
@@ -9,13 +11,12 @@ export const maxDuration = 30;
 
 // The connection half of a source plus the secret_ref that names its
 // credentials. No credential is ever carried here: the server resolves the
-// env family itself, so a caller can only introspect databases the operator
-// has already configured an account for (invariant 5).
+// env family itself, and only one granted to this workspace, so a caller can
+// only introspect with an account the operator has given their workspace
+// (invariant 5).
 const Body = z.object({
   workspaceId: z.string().min(1).max(128),
-  secretRef: z
-    .string()
-    .regex(/^[A-Z][A-Z0-9_]*$/, "secretRef must be an UPPER_SNAKE env family"),
+  secretRef: z.string().regex(SECRET_REF_PATTERN, SECRET_REF_MESSAGE),
   connection: SourceConnection,
 });
 
@@ -44,9 +45,14 @@ export const POST = route("sources.discover", async (req: Request) => {
   const body = await readJson(req, Body);
 
   assertAuthorized(identity, "source:manage", { workspaceId: body.workspaceId });
+  requireGrantedSecretRef(body.secretRef, body.workspaceId);
 
   try {
-    const tables = await discoverTables(body.connection, body.secretRef);
+    const tables = await discoverTables(
+      body.connection,
+      body.secretRef,
+      body.workspaceId,
+    );
     return json({ ok: true, tables });
   } catch (err) {
     return json({

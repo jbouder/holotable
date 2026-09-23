@@ -32,8 +32,15 @@ the safe connection config, the catalog (the table and column allowlist), and a
 ## 5. Credentials resolve from the environment
 
 Via `secret_ref`: `TS_METRICS` resolves `TS_METRICS_USERNAME` /
-`TS_METRICS_PASSWORD`. They are never stored in the database and never leave the
-server. The resolved user is the read-only TimescaleDB role.
+`TS_METRICS_PASSWORD`, as files in `SOURCE_SECRETS_DIR` or from the
+environment. They are never stored in the database and never leave the server.
+The resolved user is the read-only TimescaleDB role.
+
+A ref resolves only for a workspace `SOURCE_SECRET_REFS` grants it to, and
+unset grants nothing. The grant is checked in `resolveCredentials`
+(`src/lib/secrets/credentials.ts`) on every connection, not only when a source
+is saved, so one workspace cannot use another's database role by naming its
+ref. See [Source secret references](/operations/secret-references/).
 
 ## 6. Referenced sources are tombstoned, not hard-deleted
 

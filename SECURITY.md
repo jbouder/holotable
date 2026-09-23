@@ -109,9 +109,13 @@ the only place the platform-admin bypass applies. OIDC is the only way to
 authenticate; there is no local or development login path.
 
 **The server environment.** Database credentials live only in environment
-variables and are resolved at execution through a `secret_ref` name — `TS_METRICS`
-resolves `TS_METRICS_USERNAME` / `TS_METRICS_PASSWORD`. A `secret_ref` is a name,
-not a secret. Credentials are never written into a dashboard spec, a panel
+variables (or files in `SOURCE_SECRETS_DIR`) and are resolved at execution
+through a `secret_ref` name — `TS_METRICS` resolves `TS_METRICS_USERNAME` /
+`TS_METRICS_PASSWORD`. A `secret_ref` is a name, not a secret, and it resolves
+only for a workspace `SOURCE_SECRET_REFS` grants it to: an unset declaration
+grants nothing, and the grant is checked on every connection, so a
+`source-admin` in one workspace cannot borrow another workspace's database role
+by naming its ref. Credentials are never written into a dashboard spec, a panel
 config, a database row, or any client payload, and the resolved role is expected
 to be read-only in the database itself.
 

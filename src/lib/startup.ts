@@ -1,18 +1,22 @@
 import {
   formatConfigProblems,
   validateConfig,
-  validateSourceSecrets,
   type ConfigProblem,
   type Environment,
 } from "@/lib/config";
+import {
+  type SourceSecretUse,
+  validateSecretsDir,
+  validateSourceSecrets,
+} from "@/lib/secrets/credentials";
 
 /**
  * Startup checks, shared by `src/instrumentation.ts` (the Next 16 server
  * startup hook) and `scripts/config-check.ts` (`npm run config:check`).
  *
  * `validateConfig` is pure and covers the environment. This layer adds the
- * one check that needs the database, the registered sources' `secret_ref`s,
- * and turns the combined result into a report and a verdict. Deciding what
+ * the checks that need the filesystem (`SOURCE_SECRETS_DIR`) and the
+ * database (each live source's `secret_ref`, granted and resolving), and turns the combined result into a report and a verdict. Deciding what
  * to do with a failed verdict (exit, throw) is left to the caller.
  */
 
@@ -21,10 +25,11 @@ export interface StartupCheckOptions {
   /** Validate as production. Defaults to `NODE_ENV === "production"`. */
   production?: boolean;
   /**
-   * Load the `secret_ref`s of every live source. Defaults to a query against
-   * the config store; tests inject a stub. `null` skips the check.
+   * Load the `secret_ref` and workspace of every live source. Defaults to a
+   * query against the config store; tests inject a stub. `null` skips the
+   * check.
    */
-  loadSecretRefs?: (() => Promise<string[]>) | null;
+  loadSecretRefs?: (() => Promise<SourceSecretUse[]>) | null;
 }
 
 export interface StartupCheckResult {
@@ -41,12 +46,12 @@ export interface StartupCheckResult {
  */
 const SECRET_REF_QUERY_TIMEOUT_MS = 5_000;
 
-async function loadSecretRefsFromDatabase(): Promise<string[]> {
+async function loadSecretRefsFromDatabase(): Promise<SourceSecretUse[]> {
   const { query } = await import("@/lib/db/pg");
-  const rows = await query<{ secret_ref: string }>(
-    "SELECT DISTINCT secret_ref FROM sources WHERE tombstoned_at IS NULL",
+  const rows = await query<{ secret_ref: string; workspace_id: string }>(
+    "SELECT DISTINCT secret_ref, workspace_id FROM sources WHERE tombstoned_at IS NULL",
   );
-  return rows.map((r) => r.secret_ref);
+  return rows.map((r) => ({ secretRef: r.secret_ref, workspaceId: r.workspace_id }));
 }
 
 function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
@@ -86,7 +91,7 @@ export async function runStartupChecks(
 ): Promise<StartupCheckResult> {
   const env = opts.env ?? process.env;
   const production = opts.production ?? env.NODE_ENV === "production";
-  const problems = validateConfig(env, { production });
+  const problems = [...validateConfig(env, { production }), ...validateSecretsDir(env)];
 
   // Only ask the database when the URL is well-formed: a missing or malformed
   // DATABASE_URL is already reported above, and the query could only add noise.

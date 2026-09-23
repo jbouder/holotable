@@ -16,7 +16,7 @@ at once.
 Configuration is invalid (2 errors, 1 warning); refusing to start.
   error    SESSION_SECRET: is the placeholder from .env.example, which is public. Generate a unique value with `openssl rand -base64 32`.
   error    AI_MODEL: is not set; every generate request would fail. Set the model id for your AI_PROVIDER (see .env.example).
-  warning  TS_METRICS_PASSWORD: is not set; a registered source uses secret_ref "TS_METRICS" and will fail on Test and on every query until it is.
+  warning  SOURCE_SECRET_REFS: does not grant secret_ref "TS_METRICS" to workspace "ops"; its sources there will fail on Test and on every query until it does.
 ```
 
 ## Where it runs
@@ -75,11 +75,18 @@ not enforced. The full list of variables is in
 
 ## Source credentials
 
-After the environment passes, the server reads the `secret_ref` of every live
-source from the config store and checks that `<SECRET_REF>_USERNAME` and
-`<SECRET_REF>_PASSWORD` exist. A missing pair is a **warning**, never an error:
-sources are created at runtime, and a source whose credentials arrive with the
-next deploy should not keep the whole server down. The same failure still
+`SOURCE_SECRET_REFS` is part of the environment check: unset is an error in
+production and a warning in development, and a malformed value is an error in
+both. `SOURCE_SECRETS_DIR`, when set, must be an absolute path, and a warning
+is printed if it is not a readable directory.
+
+After the environment passes, the server reads the `secret_ref` and workspace
+of every live source from the config store and checks two things: that
+`SOURCE_SECRET_REFS` grants the ref to that workspace, and that
+`<SECRET_REF>_USERNAME` and `<SECRET_REF>_PASSWORD` resolve, as files in
+`SOURCE_SECRETS_DIR` or from the environment. Either failure is a **warning**,
+never an error: sources are created at runtime, and a source whose credentials
+arrive with the next deploy should not keep the whole server down. The same failure still
 surfaces on **Test** and on every query, see
 [Source secret references](/operations/secret-references/).
 
