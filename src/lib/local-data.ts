@@ -8,6 +8,7 @@ import {
   countPromptHistory,
   PROMPT_HISTORY_PREFIX,
 } from "@/lib/prompt-history";
+import { MOTION_STORAGE_KEY } from "@/lib/motion";
 import { THEME_STORAGE_KEY } from "@/lib/theme";
 
 /**
@@ -99,6 +100,11 @@ export const LOCAL_STORAGE_EXCLUSIONS: readonly { key: KeyMatch; reason: string 
   {
     key: { exact: THEME_STORAGE_KEY },
     reason: "The theme is a preference, changed under Appearance, not remembered data.",
+  },
+  {
+    key: { exact: MOTION_STORAGE_KEY },
+    reason:
+      "Reduced motion is a preference, changed under Appearance, not remembered data.",
   },
 ];
 
