@@ -58,7 +58,12 @@ protects provider spend, not data.
 
 The `workspace_limits` table overrides the environment for one workspace. A
 `NULL` column inherits the global value; `0` disables that limit for the
-workspace. There is no UI for it yet; set it directly:
+workspace.
+
+A platform admin sets and clears overrides in **Settings → Workspaces**, which
+also shows today's usage against the effective limits. Source-admins see their
+own workspaces there read-only. Each change is written to the log as an audit
+line. The table can still be edited directly, for example from automation:
 
 ```sql
 INSERT INTO workspace_limits (workspace_id, rate_per_minute, daily_token_budget)

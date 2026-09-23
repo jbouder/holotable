@@ -186,6 +186,7 @@ default single-instance setup these are the same TimescaleDB database.
 | `/dashboards/[id]` | Live viewer (SSE) with a Live/Pause toggle and a read-only dashboard chat assistant | viewer |
 | `/dashboards/[id]/edit` | Panel CRUD/layout, single-panel NL edits, version save | editor |
 | `/explore` | Ad-hoc NL questions against editable sources (with sample-question chips); streams one panel spec, then runs it through guarded query preview | editor |
+| `/settings` | Account, appearance, preferences, local data, keyboard shortcuts, and (for admins) workspace AI limits. Reached from the account menu in the top bar | signed in |
 | `/data-sources` | Source CRUD / test / refresh; a structured connection form with live table discovery (JSON behind an Advanced toggle), plus a natural-language drafter that seeds it from a plain-English description | source-admin |
 
 ## API

@@ -67,6 +67,12 @@ OIDC_SCOPE=openid profile email groups
 ```
 
 - `OIDC_JWKS_URL` enables RS256 verification of Keycloak-issued tokens.
+- The `profile` and `email` scopes put `name` and `email` in the id_token. The
+  account menu and **Settings → Account** display them; they are never used
+  for authorization, and a token without them still signs in.
+- `OIDC_ACCOUNT_URL` (optional) is linked from **Settings → Account** so people
+  can manage what Keycloak owns. For Keycloak it is the issuer followed by
+  `/account`, e.g. `http://localhost:8080/realms/holotable/account`.
 - The login flow lives at `/api/auth/login` → Keycloak → `/api/auth/callback`,
   which verifies the token and mints a first-party session cookie.
 

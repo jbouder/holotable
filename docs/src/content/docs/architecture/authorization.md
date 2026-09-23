@@ -34,6 +34,8 @@ paths):
 | Dashboard delete | owner, source-admin, or platform-admin |
 | Source CRUD / test / refresh | source-admin |
 | Source use (list for a picker) | viewer |
+| Workspace AI limits (read) | source-admin |
+| Workspace AI limits (change, `workspace:limits`) | platform-admin only; no workspace role grants it |
 
 ## One decision point
 
@@ -57,7 +59,14 @@ verification strategies are selected by environment:
 2. **Locally-signed session tokens** (HS256 via `SESSION_SECRET`): used by the
    OIDC callback to mint a first-party session.
 
-Either way, only the validated `sub` and `groups` claims are ever trusted.
+Either way, only the validated `sub` and `groups` claims are ever trusted for
+authorization. `name` and `email` are carried into the session as display-only
+fields for the account menu and **Settings → Account**; `can()` never reads
+them, and `test/account.test.ts` holds it to that.
+
+**Settings → Account** describes each role by asking `can()` about a probe
+identity that holds exactly that role, so the description cannot drift from
+the rule.
 
 The session cookie is `httpOnly`, `Secure` in production, `SameSite=Lax`,
 path `/`, with an 8-hour lifetime.

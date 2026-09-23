@@ -71,6 +71,18 @@ Important files:
 - `src/lib/sql/safety.ts` — the SQL guard every generated query passes through
 - `src/lib/sql/ast.ts` — the PostgreSQL parse-tree walk the guard is built on
 - `src/lib/auth/authorize.ts` — the central `can()` check
+- `src/lib/settings.ts` — the `/settings` sections as data. A new section is
+  an entry here and a page under `src/app/settings/<id>/`; a gated section
+  also calls `notFound()` from its page, because hiding the link is never the
+  only check. The header's account menu (`src/components/profile-menu.tsx`)
+  links into it
+- `src/lib/preferences.ts` — the per-user preferences stored server-side in
+  `user_preferences`. Theme and motion are deliberately not in it: they are
+  applied by the root layout's inline script before first paint and stay in
+  `localStorage`. The file header records which choices sync and why
+- `src/lib/account.ts` — the `GET /api/me` summary and the role descriptions
+  on the account page, derived from `can()`. `Identity.displayName` and
+  `email` are display-only and must never feed an authorization decision
 - `src/lib/time.ts` — server-side time expression/range resolution
 - `src/lib/registry.ts` — source registry: safe connection config and
   `secret_ref` resolution

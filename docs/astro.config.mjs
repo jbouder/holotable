@@ -46,6 +46,7 @@ export default defineConfig({
               slug: "getting-started/your-first-dashboard",
             },
             { label: "Demo data", slug: "getting-started/demo-data" },
+            { label: "Settings and your account", slug: "getting-started/settings" },
           ],
         },
         {
