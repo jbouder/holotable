@@ -19,6 +19,8 @@ import { PANEL_EXIT_SHORTCUT } from "@/lib/shortcuts";
 import { supportsImageExport } from "@/lib/panel-export";
 import { brushedRange, supportsTimeBrush } from "@/lib/time-range";
 import { cn } from "@/lib/utils";
+import { type Box, DURATION_SLOW_MS, EASE_EMPHASIZED, flipFrom } from "@/lib/motion";
+import { useReducedMotion } from "@/components/motion-preference";
 
 export type PanelStatus = "loading" | "live" | "stale" | "error" | "tombstoned";
 
@@ -141,11 +143,51 @@ export function PanelView({
  * Fullscreen as a piece of state, with the keyboard contract that makes it a
  * dialog rather than a big card: Escape closes it, and focus goes into the
  * panel on the way in and back to whatever opened it on the way out.
+ *
+ * The card grows and shrinks between its two boxes rather than jumping
+ * (#238): a single-element FLIP, measured here because `useFlip` only knows
+ * position. The box is taken just before the state changes and compared in
+ * a layout effect just after, and the difference is played back with WAAPI
+ * on `translate` and `scale` only, so the chart inside is never remounted
+ * and `EChart`'s `ResizeObserver` resizes it to the final box.
  */
 function useExpanded() {
   const [expanded, setExpanded] = React.useState(false);
   const ref = React.useRef<HTMLDivElement>(null);
   const opener = React.useRef<Element | null>(null);
+  const motion = !useReducedMotion();
+  /** The card's box from just before the last change, consumed by the layout effect. */
+  const first = React.useRef<Box | null>(null);
+
+  const change = React.useCallback(
+    (next: boolean) => {
+      first.current = motion && ref.current ? ref.current.getBoundingClientRect() : null;
+      setExpanded(next);
+    },
+    [motion],
+  );
+
+  // `expanded` is not read in the body: the box recorded by `change` is what
+  // matters, and this must run right after the render that changed it.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: deliberate re-run trigger, not a read
+  React.useLayoutEffect(() => {
+    const el = ref.current;
+    const from = first.current;
+    first.current = null;
+    if (!el || !from || typeof el.animate !== "function") return;
+    const keyframe = flipFrom(from, el.getBoundingClientRect());
+    if (!keyframe) return;
+    el.animate(
+      [
+        { ...keyframe, transformOrigin: "0 0" },
+        { translate: "0 0", scale: "1 1", transformOrigin: "0 0" },
+      ],
+      {
+        duration: DURATION_SLOW_MS,
+        easing: EASE_EMPHASIZED,
+      },
+    );
+  }, [expanded]);
 
   React.useEffect(() => {
     if (!expanded) return;
@@ -154,31 +196,31 @@ function useExpanded() {
     // opened fullscreen closes on its own Escape, and the focus may be
     // anywhere inside by the time the next one arrives.
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === PANEL_EXIT_SHORTCUT.key) setExpanded(false);
+      if (e.key === PANEL_EXIT_SHORTCUT.key) change(false);
     };
     document.addEventListener("keydown", onKey);
     return () => document.removeEventListener("keydown", onKey);
-  }, [expanded]);
+  }, [expanded, change]);
 
-  const collapse = React.useCallback(() => setExpanded(false), []);
+  const collapse = React.useCallback(() => change(false), [change]);
 
   return {
     expanded,
     ref,
     collapse,
-    toggle: () =>
-      setExpanded((was) => {
-        if (was) {
-          // Returning focus is the half of "Esc closes it" that is easy to
-          // forget and impossible to work around with a keyboard.
-          (opener.current as HTMLElement | null)?.focus?.();
-          return false;
-        }
-        opener.current = document.activeElement;
-        return true;
-      }),
+    toggle: () => {
+      if (expanded) {
+        // Returning focus is the half of "Esc closes it" that is easy to
+        // forget and impossible to work around with a keyboard.
+        (opener.current as HTMLElement | null)?.focus?.();
+        change(false);
+        return;
+      }
+      opener.current = document.activeElement;
+      change(true);
+    },
     onKeyDown: (e: React.KeyboardEvent) => {
-      if (e.key === PANEL_EXIT_SHORTCUT.key) setExpanded(false);
+      if (e.key === PANEL_EXIT_SHORTCUT.key) change(false);
     },
   };
 }
