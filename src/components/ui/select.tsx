@@ -51,7 +51,12 @@ export function Select({
       </BaseSelect.Trigger>
       <BaseSelect.Portal>
         <BaseSelect.Positioner sideOffset={4} className="z-50">
-          <BaseSelect.Popup className="max-h-64 overflow-auto border border-border bg-surface-2 p-1 shadow-lg">
+          {/*
+            Fade and settle from 98% about the anchor (#235). A select's popup
+            lines its chosen item up with the trigger rather than sitting on
+            one side of it, so there is no side to nudge from.
+          */}
+          <BaseSelect.Popup className="max-h-64 origin-(--transform-origin) overflow-auto border border-border bg-surface-2 p-1 shadow-lg transition-[opacity,scale] duration-(--duration-fast) ease-standard data-starting-style:opacity-0 data-starting-style:scale-[0.98] data-ending-style:opacity-0 data-ending-style:scale-[0.98]">
             {options.map((o) => (
               <BaseSelect.Item
                 key={o.value}

@@ -185,12 +185,12 @@ export function WorkspaceLimitsCard({
           </div>
           <p role="status" className="mt-2 text-xs">
             {status.kind === "saved" && (
-              <span className="text-success">
+              <span className="fade-in text-success">
                 Saved. The next model call uses the new limits.
               </span>
             )}
             {status.kind === "error" && (
-              <span className="text-danger">{status.message}</span>
+              <span className="fade-in text-danger">{status.message}</span>
             )}
           </p>
         </form>

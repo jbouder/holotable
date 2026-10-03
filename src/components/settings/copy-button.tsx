@@ -42,11 +42,10 @@ export function CopyButton({ value, label }: { value: string; label: string }) {
         )}
       </Button>
       <span role="status" className="text-xs text-muted">
-        {state === "copied"
-          ? "Copied"
-          : state === "failed"
-            ? "Could not reach the clipboard"
-            : ""}
+        {state === "copied" && <span className="fade-in">Copied</span>}
+        {state === "failed" && (
+          <span className="fade-in">Could not reach the clipboard</span>
+        )}
       </span>
     </span>
   );

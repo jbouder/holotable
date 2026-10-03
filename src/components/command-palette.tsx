@@ -185,10 +185,11 @@ export function CommandPalette() {
   return (
     <BaseDialog.Root open={open} onOpenChange={setOpen}>
       <BaseDialog.Portal>
-        <BaseDialog.Backdrop className="fixed inset-0 z-40 bg-black/60" />
+        {/* The same enter/exit as `ui/dialog.tsx` (#235); this dialog is hand-built for its combobox. */}
+        <BaseDialog.Backdrop className="fixed inset-0 z-40 bg-black/60 transition-opacity duration-(--duration-base) ease-standard data-starting-style:opacity-0 data-ending-style:opacity-0" />
         <BaseDialog.Popup
           initialFocus={inputRef}
-          className="fixed inset-x-4 top-20 z-50 mx-auto w-auto max-w-xl overflow-hidden border border-border bg-surface shadow-xl focus:outline-none"
+          className="fixed inset-x-4 top-20 z-50 mx-auto w-auto max-w-xl overflow-hidden border border-border bg-surface shadow-xl transition-[opacity,scale] duration-(--duration-base) ease-emphasized focus:outline-none data-starting-style:opacity-0 data-starting-style:scale-[0.98] data-ending-style:opacity-0 data-ending-style:scale-[0.98]"
         >
           <BaseDialog.Title className="sr-only">Command palette</BaseDialog.Title>
           <div className="flex items-center gap-2 border-b border-border px-3">

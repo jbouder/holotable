@@ -258,7 +258,9 @@ before first paint (#212). The rules:
   `EASE_EMPHASIZED` / `DURATION_BASE_MS` from `src/lib/motion.ts`.
 - **Animate `opacity` and `transform` only** (`translate`, `scale`). A
   position or size change goes through FLIP or a view transition, never a
-  transition on `top`, `height`, or `margin`.
+  transition on `top`, `height`, or `margin`. The one sanctioned height
+  transition is Base UI's Collapsible, which measures the panel into
+  `--collapsible-panel-height` for you (the nav-bar mobile menu).
 - **One switch.** Every motion rule keys off `:root[data-motion]`; never
   `motion-safe:`, `motion-reduce:`, or `@media (prefers-reduced-motion)`
   directly, because "Allow" deliberately beats the OS. The global reduce rule
@@ -271,7 +273,11 @@ before first paint (#212). The rules:
 - **Overlays use Base UI's hooks.** Enter and exit are
   `data-starting-style:` / `data-ending-style:` variants on the popup; Base UI
   keeps the element mounted until `transitionend`, which is why the reduce
-  rule clamps to `0.01ms` rather than `0`.
+  rule clamps to `0.01ms` rather than `0`. Something that is not a Base UI
+  popup uses the `fade-in` utility (enter only, it just unmounts) or, when
+  the exit is worth seeing, `src/components/notice.tsx` over the `notice`
+  utility, which stays mounted and toggles `data-open`. A two-branch render
+  (`DashboardChat`) runs `animateOut` before flipping its state.
 - **Scope view-transition names.** `withViewTransition(update, enabled, type)`
   puts `type` on `<html data-vt>` for the life of the transition; a
   `view-transition-name` is always written as `html[data-vt="<type>"] .thing`

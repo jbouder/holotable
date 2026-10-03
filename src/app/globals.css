@@ -196,6 +196,49 @@ body {
 }
 
 /*
+ * Enter-only fade for something that appears in place: a status line, a
+ * backdrop, a result block. Nothing animates its exit; it just unmounts.
+ */
+@utility fade-in {
+  opacity: 1;
+  transition: opacity var(--duration-base) var(--ease-standard);
+
+  @starting-style {
+    opacity: 0;
+  }
+}
+
+/*
+ * An inline notice or banner that enters and leaves in place (#235). The
+ * element stays mounted and toggles `data-open`, so the exit can play before
+ * `display: none` lands — `allow-discrete` holds the display change until
+ * the transition ends. Rendered through `src/components/notice.tsx`, which
+ * also keeps the last content on screen while the notice fades. A browser
+ * without `allow-discrete` cuts straight to hidden, which is what it did
+ * before.
+ */
+@utility notice {
+  display: none;
+  opacity: 0;
+  translate: 0 -8px;
+  transition:
+    opacity var(--duration-base) var(--ease-emphasized),
+    translate var(--duration-base) var(--ease-emphasized),
+    display var(--duration-base) allow-discrete;
+
+  &[data-open] {
+    display: block;
+    opacity: 1;
+    translate: 0 0;
+
+    @starting-style {
+      opacity: 0;
+      translate: 0 -8px;
+    }
+  }
+}
+
+/*
  * Press feedback for buttons: a quick dip on `:active`, and the transition
  * that carries it along with the color changes a hover already makes. One
  * utility so every button agrees on the duration and curve.

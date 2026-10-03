@@ -87,7 +87,7 @@ export function PanelView({
       */}
       {expansion.expanded && (
         <div
-          className="fixed inset-0 z-40 bg-black/70"
+          className="fade-in fixed inset-0 z-40 bg-black/70"
           onClick={expansion.collapse}
           aria-hidden
         />

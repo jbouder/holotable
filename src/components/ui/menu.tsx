@@ -46,6 +46,10 @@ export function Menu({
           <BaseMenu.Popup
             className={cn(
               "min-w-44 border border-border bg-surface p-1 shadow-xl focus:outline-none",
+              // Fade with a 4px nudge from the anchor side (#235): the popup
+              // starts and ends slightly towards its trigger. Base UI puts the
+              // resolved side on the popup, so a flip to `top` nudges the other way.
+              "transition-[opacity,translate] duration-(--duration-fast) ease-standard data-starting-style:opacity-0 data-ending-style:opacity-0 data-[side=bottom]:data-starting-style:-translate-y-1 data-[side=bottom]:data-ending-style:-translate-y-1 data-[side=top]:data-starting-style:translate-y-1 data-[side=top]:data-ending-style:translate-y-1",
               panelClassName,
             )}
           >

@@ -56,6 +56,7 @@ import { appendTemplate, type Template } from "@/lib/templates";
 import { SaveAsTemplate } from "@/components/templates/SaveAsTemplate";
 import { TemplatePicker } from "@/components/templates/TemplatePicker";
 import { DraftBanner } from "@/components/editor/DraftBanner";
+import { Notice } from "@/components/notice";
 import { Dialog } from "@/components/ui/dialog";
 import { LeaveGuardDialog } from "@/components/editor/LeaveGuardDialog";
 import { ShortcutsDialog } from "@/components/editor/ShortcutsDialog";
@@ -776,14 +777,16 @@ export function EditDashboardClient({
         />
       )}
 
-      {offer.kind !== "none" && (
-        <DraftBanner
-          offer={offer}
-          now={now || offer.draft.savedAt}
-          onRestore={restoreDraft}
-          onDiscard={discardDraft}
-        />
-      )}
+      <Notice open={offer.kind !== "none"}>
+        {offer.kind !== "none" && (
+          <DraftBanner
+            offer={offer}
+            now={now || offer.draft.savedAt}
+            onRestore={restoreDraft}
+            onDiscard={discardDraft}
+          />
+        )}
+      </Notice>
 
       {missingSources.map((sourceId) => {
         const affected = panelsUsingSource(spec.panels, sourceId);

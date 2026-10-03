@@ -3,8 +3,10 @@
 import * as React from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { Collapsible } from "@base-ui/react/collapsible";
 import { LayoutDashboard, Database, Compass, Menu as MenuIcon, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 import { NavSlot } from "@/components/nav-slot";
 import { ProfileMenu, type ProfileMenuAccount } from "@/components/profile-menu";
 
@@ -21,7 +23,10 @@ const LINKS = [
  *
  * A disclosure rather than a menu popup: the links stay real `<Link>`s, so
  * prefetching, middle-click and "open in new tab" keep working, and the panel
- * is ordinary markup rather than a portal over the page.
+ * is ordinary markup rather than a portal over the page. Base UI's
+ * Collapsible does the bookkeeping (#235): it measures the panel into
+ * `--collapsible-panel-height` so the height can transition, and keeps it
+ * mounted until the closing transition ends.
  *
  * The account menu (#210) stays in the bar at every width and carries Sign
  * out, Settings and the theme. `account` is null for a signed-out visitor,
@@ -40,7 +45,12 @@ export function NavBar({ account }: { account: ProfileMenuAccount | null }) {
   }, [pathname]);
 
   return (
-    <header className="border-b border-border bg-surface">
+    <Collapsible.Root
+      open={open}
+      onOpenChange={setOpen}
+      render={<header />}
+      className="border-b border-border bg-surface"
+    >
       <div className="flex items-center justify-between gap-2 px-4 py-3 sm:px-6">
         <nav className="flex min-w-0 items-center gap-6" aria-label="Main">
           <Link
@@ -66,26 +76,36 @@ export function NavBar({ account }: { account: ProfileMenuAccount | null }) {
         <div className="flex shrink-0 items-center gap-2">
           <NavSlot />
           {account && <ProfileMenu account={account} />}
-          <Button
-            variant="ghost"
-            size="icon"
+          <Collapsible.Trigger
+            render={<Button variant="ghost" size="icon" />}
             className="tap-target md:hidden"
-            aria-expanded={open}
-            aria-controls="main-menu"
             aria-label={open ? "Close menu" : "Open menu"}
-            onClick={() => setOpen((was) => !was)}
           >
-            {open ? <X className="h-5 w-5" /> : <MenuIcon className="h-5 w-5" />}
-          </Button>
+            {/* Both icons stay mounted and crossfade, so the swap is a motion, not a cut. */}
+            <span className="relative block h-5 w-5">
+              <MenuIcon
+                className={cn(
+                  "absolute inset-0 h-5 w-5 transition-[opacity,scale] duration-(--duration-fast) ease-standard",
+                  open && "scale-75 opacity-0",
+                )}
+              />
+              <X
+                className={cn(
+                  "absolute inset-0 h-5 w-5 transition-[opacity,scale] duration-(--duration-fast) ease-standard",
+                  !open && "scale-75 opacity-0",
+                )}
+              />
+            </span>
+          </Collapsible.Trigger>
         </div>
       </div>
 
-      {open && (
-        <nav
-          id="main-menu"
-          aria-label="Main menu"
-          className="flex flex-col border-t border-border px-2 py-1 md:hidden"
-        >
+      <Collapsible.Panel
+        id="main-menu"
+        render={<nav aria-label="Main menu" />}
+        className="h-(--collapsible-panel-height) overflow-hidden transition-[height,opacity] duration-(--duration-base) ease-emphasized data-starting-style:h-0 data-starting-style:opacity-0 data-ending-style:h-0 data-ending-style:opacity-0 md:hidden"
+      >
+        <div className="flex flex-col border-t border-border px-2 py-1">
           {LINKS.map(({ href, label, Icon }) => (
             <Link
               key={href}
@@ -96,8 +116,8 @@ export function NavBar({ account }: { account: ProfileMenuAccount | null }) {
               <Icon className="h-4 w-4" /> {label}
             </Link>
           ))}
-        </nav>
-      )}
-    </header>
+        </div>
+      </Collapsible.Panel>
+    </Collapsible.Root>
   );
 }

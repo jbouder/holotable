@@ -22,6 +22,8 @@ import { ErrorDisplay } from "@/components/ui/error-display";
 import { Skeleton } from "@/components/ui/skeleton";
 import { apiErrorFromThrown } from "@/lib/errors";
 import { type ChatCitation, citationsFromMessage } from "@/lib/chat-history";
+import { animateOut } from "@/lib/motion";
+import { useReducedMotion } from "@/components/motion-preference";
 
 /** What the chat needs to know about a panel: enough to cite it, nothing more. */
 export type ChatPanel = Pick<Panel, "title" | "query">;
@@ -57,6 +59,8 @@ export function DashboardChat({
   const [open, setOpen] = React.useState(false);
   const [input, setInput] = React.useState("");
   const [loadedHistory, setLoadedHistory] = React.useState(false);
+  const panelRef = React.useRef<HTMLDivElement>(null);
+  const reduced = useReducedMotion();
 
   const { messages, sendMessage, setMessages, status, stop, error, regenerate } = useChat(
     {
@@ -118,6 +122,13 @@ export function DashboardChat({
     setInput("");
   }
 
+  // The panel and the button are two render branches, so the exit has to
+  // play before `open` flips (#235); the entrance is `@starting-style` below.
+  async function close() {
+    if (panelRef.current) await animateOut(panelRef.current, !reduced);
+    setOpen(false);
+  }
+
   if (!open) {
     return (
       <Button
@@ -125,7 +136,7 @@ export function DashboardChat({
         size="icon"
         aria-label="Ask about this dashboard"
         onClick={() => setOpen(true)}
-        className="fixed bottom-6 right-6 z-50 h-12 w-12 rounded-full shadow-lg"
+        className="fixed bottom-6 right-6 z-50 h-12 w-12 rounded-full shadow-lg transition-[opacity,scale,background-color,color,border-color] duration-(--duration-base) ease-emphasized starting:scale-75 starting:opacity-0"
       >
         <MessageSquare className="h-5 w-5" />
       </Button>
@@ -137,9 +148,10 @@ export function DashboardChat({
 
   return (
     <div
+      ref={panelRef}
       role="dialog"
       aria-label="Dashboard chat"
-      className="fixed bottom-6 right-6 z-50 flex h-[560px] max-h-[calc(100vh-3rem)] w-[380px] max-w-[calc(100vw-3rem)] flex-col overflow-hidden border border-border bg-surface shadow-lg"
+      className="fixed bottom-6 right-6 z-50 flex h-[560px] max-h-[calc(100vh-3rem)] w-[380px] max-w-[calc(100vw-3rem)] flex-col overflow-hidden border border-border bg-surface shadow-lg transition-[opacity,translate] duration-(--duration-base) ease-emphasized starting:translate-y-3 starting:opacity-0"
     >
       <header className="flex items-center justify-between border-b border-border px-4 py-3">
         <div className="flex min-w-0 items-center gap-2">
@@ -166,7 +178,7 @@ export function DashboardChat({
             variant="ghost"
             size="icon"
             aria-label="Close chat"
-            onClick={() => setOpen(false)}
+            onClick={() => void close()}
           >
             <X className="h-4 w-4" />
           </Button>

@@ -38,6 +38,7 @@ import { apiErrorFromThrown, readApiError } from "@/lib/errors";
 import { buildSourceDescriptionStarters } from "@/lib/prompts/starters";
 import { SourceForm } from "./source-form";
 import { type GrantedSecretRefsState, readinessIn } from "@/lib/secret-refs";
+import { Notice } from "@/components/notice";
 import { SecretRefBadge, useGrantedSecretRefs } from "./secret-ref-status";
 import {
   DeleteSourceDialog,
@@ -213,11 +214,12 @@ export function SourcesClient({
         }
       />
 
-      {notice && (
-        <div className="border border-border bg-surface px-3 py-2 text-sm text-muted">
-          {notice}
-        </div>
-      )}
+      <Notice
+        open={notice !== null}
+        className="border border-border bg-surface px-3 py-2 text-sm text-muted"
+      >
+        {notice}
+      </Notice>
 
       {testResult && (
         <SourceTestReport
