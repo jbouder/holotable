@@ -20,6 +20,8 @@ import {
 import { PALETTE_SHORTCUT } from "@/lib/shortcuts";
 import { setThemeWithTransition } from "@/lib/theme-transition";
 import { isMotionActive } from "@/lib/motion";
+import { useReducedMotion } from "@/components/motion-preference";
+import { useFlip } from "@/components/use-flip";
 import { cn } from "@/lib/utils";
 
 const ICONS: Record<CommandKind, typeof Search> = {
@@ -53,6 +55,9 @@ export function CommandPalette() {
   const [notice, setNotice] = React.useState<string | null>(null);
   const inputRef = React.useRef<HTMLInputElement>(null);
   const listRef = React.useRef<HTMLDivElement>(null);
+  // Re-ranking while typing slides the options rather than re-dealing them
+  // (#237); fast, because 350ms would lag the next keystroke.
+  useFlip(listRef, !useReducedMotion(), { durationMs: 100 });
 
   const commands = React.useMemo(
     () =>
@@ -249,6 +254,7 @@ export function CommandPalette() {
                     <div
                       key={command.id}
                       id={`command-option-${i}`}
+                      data-flip-id={command.id}
                       role="option"
                       aria-selected={i === active}
                       tabIndex={-1}

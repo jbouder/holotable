@@ -1,7 +1,9 @@
 "use client";
 
-import type * as React from "react";
+import * as React from "react";
 import type { Panel } from "@/lib/ir";
+import { useReducedMotion } from "@/components/motion-preference";
+import { useFlip } from "@/components/use-flip";
 import { GRID_COLUMNS } from "@/lib/layout";
 import {
   PanelErrorBoundary,
@@ -28,6 +30,11 @@ import { cn } from "@/lib/utils";
  * Every panel is wrapped in a {@link PanelErrorBoundary} here rather than at
  * each call site, so the live viewer, the preview and any future surface get
  * the same isolation without having to remember to ask for it.
+ *
+ * When a panel is added, removed or re-flowed, the others slide to their new
+ * cells (#237): `useFlip` transforms each panel's wrapper, so the chart
+ * inside is never remounted (invariant 11) and `EChart`'s own
+ * `ResizeObserver` picks up the final size.
  */
 export function DashboardGrid({
   panels,
@@ -36,6 +43,7 @@ export function DashboardGrid({
   responsive = true,
   onPanelError,
   empty,
+  pinnedId = null,
 }: {
   panels: Panel[];
   renderPanel: (panel: Panel) => React.ReactNode;
@@ -54,7 +62,16 @@ export function DashboardGrid({
    * — an editor is offered the editor, a preview is simply still empty.
    */
   empty?: React.ReactNode;
+  /**
+   * A panel that must not slide: the one the arranger is dragging, which
+   * follows the pointer and would lag it if every snap were animated. It
+   * slides again once released.
+   */
+  pinnedId?: string | null;
 }) {
+  const grid = React.useRef<HTMLDivElement>(null);
+  useFlip(grid, !useReducedMotion());
+
   if (panels.length === 0) return empty ?? null;
 
   // A non-responsive surface renders the authored grid at every width; the
@@ -77,6 +94,7 @@ export function DashboardGrid({
 
   return (
     <div
+      ref={grid}
       className={cn(
         "grid gap-4",
         "[grid-auto-rows:var(--row-sm)] md:[grid-auto-rows:var(--row-md)] lg:[grid-auto-rows:var(--row-lg)]",
@@ -93,6 +111,7 @@ export function DashboardGrid({
       {panels.map((panel, i) => (
         <div
           key={panel.id}
+          data-flip-id={panel.id === pinnedId ? undefined : panel.id}
           style={
             {
               "--area-sm": gridArea(layouts.sm[i], columns.sm),

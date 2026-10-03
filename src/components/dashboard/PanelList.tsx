@@ -12,8 +12,11 @@ import {
   Trash2,
 } from "lucide-react";
 import type { Panel } from "@/lib/ir";
+import { animateOut } from "@/lib/motion";
 import { canMove, type PanelMove } from "@/lib/panel-list";
 import { Menu, MenuItem, MenuSeparator } from "@/components/ui/menu";
+import { useReducedMotion } from "@/components/motion-preference";
+import { useFlip } from "@/components/use-flip";
 
 /**
  * The editor's panel list: select, reorder, duplicate and delete.
@@ -50,6 +53,22 @@ export function PanelList({
   const [dragging, setDragging] = React.useState<string | null>(null);
   const [over, setOver] = React.useState<string | null>(null);
 
+  // Rows slide to their new place on reorder, duplicate and delete (#237);
+  // the deleted row leaves first, so the others slide into a real gap.
+  const motion = !useReducedMotion();
+  const list = React.useRef<HTMLUListElement>(null);
+  const rows = React.useRef(new Map<string, HTMLLIElement>());
+  useFlip(list, motion);
+
+  function remove(id: string) {
+    const row = rows.current.get(id);
+    if (!motion || !row) {
+      onDelete(id);
+      return;
+    }
+    void animateOut(row, true).then(() => onDelete(id));
+  }
+
   function endDrag() {
     setDragging(null);
     setOver(null);
@@ -62,10 +81,15 @@ export function PanelList({
   }
 
   return (
-    <ul className="space-y-1">
+    <ul ref={list} className="space-y-1">
       {panels.map((p, i) => (
         <li
           key={p.id}
+          data-flip-id={p.id}
+          ref={(el) => {
+            if (el) rows.current.set(p.id, el);
+            else rows.current.delete(p.id);
+          }}
           onDragOver={(e) => {
             if (!dragging) return;
             // Without this the drop is refused by the browser.
@@ -140,7 +164,7 @@ export function PanelList({
               <ArrowDownToLine className="h-4 w-4" /> Move to bottom
             </MenuItem>
             <MenuSeparator />
-            <MenuItem danger onClick={() => onDelete(p.id)}>
+            <MenuItem danger onClick={() => remove(p.id)}>
               <Trash2 className="h-4 w-4" /> Delete
             </MenuItem>
           </Menu>

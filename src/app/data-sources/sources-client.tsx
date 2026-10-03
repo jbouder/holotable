@@ -39,6 +39,8 @@ import { buildSourceDescriptionStarters } from "@/lib/prompts/starters";
 import { SourceForm } from "./source-form";
 import { type GrantedSecretRefsState, readinessIn } from "@/lib/secret-refs";
 import { Notice } from "@/components/notice";
+import { useReducedMotion } from "@/components/motion-preference";
+import { animateOut } from "@/lib/motion";
 import { SecretRefBadge, useGrantedSecretRefs } from "./secret-ref-status";
 import {
   DeleteSourceDialog,
@@ -62,6 +64,7 @@ export function SourcesClient({
   // Workspace switching is hidden for now; pin to the first accessible workspace.
   const [workspaceId] = React.useState<string | null>(workspaces[0] ?? null);
   const [sources, setSources] = React.useState<SourceRecord[] | null>(null);
+  const motion = !useReducedMotion();
   // Decided by the server (the staleness threshold is an environment setting),
   // keyed by source id, and replaced wholesale on every reload.
   const [catalog, setCatalog] = React.useState<Record<string, CatalogHealth>>({});
@@ -154,6 +157,10 @@ export function SourcesClient({
     setNotice(res.ok ? `${id}: ${body.outcome}` : `${id}: delete failed`);
     setBusy(null);
     setConfirmingDelete(null);
+    // The row leaves before the list reloads without it (#237). It is found
+    // by the anchor id the row already carries for the command palette.
+    const row = res.ok ? document.getElementById(`source-${id}`) : null;
+    if (row) await animateOut(row, motion);
     if (workspaceId) void load(workspaceId);
   }
 
@@ -291,7 +298,7 @@ export function SourcesClient({
               <TableRow
                 key={source.id}
                 id={`source-${source.id}`}
-                className="scroll-mt-24 target:bg-surface-2"
+                className="fade-in target-reveal scroll-mt-24 target:bg-surface-2"
               >
                 <TableCell>
                   <div className="font-medium">{source.name}</div>
