@@ -247,6 +247,22 @@ html[data-vt="tab"] [role="tab"][aria-selected="true"] {
  * `drop-in` is the same from above, for an alert. `pop-in` is a scale pop for
  * an icon that just swapped because something happened.
  */
+/*
+ * The route entrance: `src/app/template.tsx` renders every page inside
+ * `.page`, which is a new element on each navigation, so this plays once per
+ * page. A page therefore never adds its own whole-page entrance on top.
+ */
+.page {
+  animation: holotable-page-in var(--duration-slow) var(--ease-emphasized) backwards;
+}
+
+@keyframes holotable-page-in {
+  from {
+    opacity: 0;
+    translate: 0 12px;
+  }
+}
+
 @utility stagger-in {
   animation: holotable-rise-in var(--duration-slow) var(--ease-emphasized) backwards;
   animation-delay: calc(min(var(--i, 0), 8) * 50ms);

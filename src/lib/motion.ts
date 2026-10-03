@@ -92,6 +92,43 @@ export function isMotionActive(): boolean {
 
 /* ---------- Web Animations API ---------- */
 
+/** The part of a `DOMRect` a FLIP needs; a plain object so it can be tested. */
+export interface Box {
+  left: number;
+  top: number;
+  width: number;
+  height: number;
+}
+
+/**
+ * The first keyframe of a single-element FLIP from `first` to `last`: the
+ * `translate` and `scale` that make the element at `last` look like it still
+ * sits at `first`, measured from the top-left corner. `null` when nothing
+ * moved or the new box has no area, so the caller skips the animation.
+ */
+export function flipFrom(
+  first: Box,
+  last: Box,
+): { translate: string; scale: string } | null {
+  if (last.width <= 0 || last.height <= 0) return null;
+  const dx = first.left - last.left;
+  const dy = first.top - last.top;
+  const sx = first.width / last.width;
+  const sy = first.height / last.height;
+  if (
+    Math.abs(dx) < 0.5 &&
+    Math.abs(dy) < 0.5 &&
+    Math.abs(sx - 1) < 0.001 &&
+    Math.abs(sy - 1) < 0.001
+  ) {
+    return null;
+  }
+  return { translate: `${dx}px ${dy}px`, scale: `${sx} ${sy}` };
+}
+
+/** `--duration-slow` from `globals.css`, in milliseconds. */
+export const DURATION_SLOW_MS = 350;
+
 /** `--ease-emphasized` from `globals.css`, for WAAPI calls that cannot read a CSS variable. */
 export const EASE_EMPHASIZED = "cubic-bezier(0.2, 0, 0, 1)";
 

@@ -59,6 +59,21 @@ g.cancelAnimationFrame = dom.window.cancelAnimationFrame.bind(dom.window);
 // computed style to do it — asynchronously, so a missing global surfaces as an
 // unhandled rejection after the test has already passed.
 g.getComputedStyle = dom.window.getComputedStyle.bind(dom.window);
+
+// jsdom has no matchMedia; the motion and theme preferences only need
+// `matches` and the listener pair. A test with its own stub overrides this.
+(dom.window as unknown as Record<string, unknown>).matchMedia = (query: string) => ({
+  matches: false,
+  media: query,
+  addEventListener() {},
+  removeEventListener() {},
+});
+
+// The harness is a browser with Reduce on: `useReducedMotion()` reads this
+// attribute, so a component's exit and slide paths take their synchronous
+// fallbacks, and jsdom (which has no `Element.animate`) is never asked to
+// animate. A test of the motion itself passes `enabled` or sets `allow`.
+dom.window.document.documentElement.dataset.motion = "reduce";
 // ECharts and the chart wrapper observe their container; jsdom has no
 // ResizeObserver and the panels under test never need a real one.
 g.ResizeObserver = class {

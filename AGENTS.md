@@ -292,7 +292,13 @@ before first paint (#212). The rules:
   nothing is held after. No `--i` on a stream (chat messages): the newest
   item must not wait behind the others.
 - **Charts merge, never recreate.** FLIP a panel's card, never its chart;
-  `EChart`'s `ResizeObserver` picks up the final size.
+  `EChart`'s `ResizeObserver` picks up the final size. The fullscreen expand
+  in `PanelView` is the one single-element size FLIP (`flipFrom` in
+  `src/lib/motion.ts`): `translate` and `scale` on the same card element.
+- **Pages enter through `src/app/template.tsx`.** Its `.page` element is new
+  on every navigation and carries the only whole-page entrance; a page never
+  adds another. Next's `experimental.viewTransition` is off on purpose; see
+  #238 for what has to hold before it goes on.
 - **Spinners freezing under Reduce is intended.** `animate-spin` and
   `animate-pulse` become a single frame at `0.01ms`; do not "fix" it.
 

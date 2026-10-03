@@ -7,6 +7,7 @@ import {
   DEFAULT_MOTION,
   DURATION_BASE_MS,
   EASE_EMPHASIZED,
+  flipFrom,
   isMotion,
   isMotionActive,
   MOTIONS,
@@ -214,4 +215,23 @@ test("animateOut fades, slides and holds the final frame when enabled", async ()
   const frames = recorded[0].keyframes as Record<string, string | number>[];
   assert.equal(frames[0].opacity, 1);
   assert.equal(frames.at(-1)?.opacity, 0);
+});
+
+/* ---------- Single-element FLIP (#238) ---------- */
+
+test("flipFrom turns the old box into the keyframe that makes the new box look unmoved", () => {
+  const first = { left: 100, top: 200, width: 300, height: 150 };
+  const last = { left: 20, top: 40, width: 600, height: 600 };
+  assert.deepEqual(flipFrom(first, last), { translate: "80px 160px", scale: "0.5 0.25" });
+});
+
+test("flipFrom is null when nothing moved or the new box has no area", () => {
+  const box = { left: 10, top: 10, width: 100, height: 50 };
+  assert.equal(flipFrom(box, { ...box }), null);
+  assert.equal(
+    flipFrom(box, { ...box, left: 10.2 }),
+    null,
+    "sub-pixel noise is not a move",
+  );
+  assert.equal(flipFrom(box, { ...box, width: 0 }), null);
 });

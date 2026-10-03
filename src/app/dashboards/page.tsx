@@ -178,7 +178,7 @@ export default async function DashboardsPage({
   );
 
   return (
-    <div className="stagger-in">
+    <div>
       {emptyWorkspace ? (
         // The guide replaces the header while it is up; see FirstRun.
         <FirstRunSection
