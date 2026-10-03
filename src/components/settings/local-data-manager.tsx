@@ -109,7 +109,7 @@ export function LocalDataManager({
       )}
 
       {loading && (
-        <p role="status" className="text-sm text-muted">
+        <p role="status" className="fade-in text-sm text-muted">
           Reading this browser's storage…
         </p>
       )}
@@ -228,7 +228,11 @@ export function LocalDataManager({
           Clear everything on this device
         </Button>
         <span role="status" className="text-sm text-muted">
-          {notice ?? ""}
+          {notice && (
+            <span key={notice} className="fade-in">
+              {notice}
+            </span>
+          )}
         </span>
       </div>
 

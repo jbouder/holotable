@@ -129,11 +129,13 @@ export function PreferencesForm({
   return (
     <div className="flex flex-col gap-6">
       <p role="status" className="min-h-5 text-sm">
-        {state.kind === "saving" && <span className="text-muted">Saving…</span>}
+        {state.kind === "saving" && <span className="fade-in text-muted">Saving…</span>}
         {state.kind === "saved" && (
-          <span className="text-success">Saved to your account.</span>
+          <span className="fade-in text-success">Saved to your account.</span>
         )}
-        {state.kind === "error" && <span className="text-danger">{state.message}</span>}
+        {state.kind === "error" && (
+          <span className="fade-in text-danger">{state.message}</span>
+        )}
       </p>
 
       <Card>
