@@ -104,7 +104,9 @@ export const DURATION_BASE_MS = 200;
  * final frame until it does.
  */
 export function animateOut(el: HTMLElement, enabled: boolean): Promise<void> {
-  if (!enabled) {
+  // The `animate` check is for jsdom and the odd browser without WAAPI: a
+  // delete must still go through, just without the slide.
+  if (!enabled || typeof el.animate !== "function") {
     return Promise.resolve();
   }
   const animation = el.animate(

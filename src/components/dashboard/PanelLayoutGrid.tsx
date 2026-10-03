@@ -144,6 +144,9 @@ export function PanelLayoutGrid({
           panels={shown}
           responsive={false}
           rowHeight={ARRANGE_ROW_HEIGHT}
+          // The displaced tiles slide as the dragged one pushes them; the
+          // dragged tile itself snaps with the pointer (#237).
+          pinnedId={drag?.id ?? null}
           renderPanel={(panel) => {
             const { x, y, w, h } = panel.layout;
             const active = drag?.id === panel.id;

@@ -25,6 +25,7 @@ import { SignIn } from "@/components/sign-in";
 import { DismissNotice } from "@/components/dashboard/DismissNotice";
 import { FirstRun } from "@/components/onboarding/first-run";
 import { DashboardCard } from "@/components/dashboard/DashboardCard";
+import { FlipGroup } from "@/components/flip-group";
 import { DashboardListControls } from "@/components/dashboard/DashboardListControls";
 import { RecentDashboards } from "@/components/dashboard/RecentDashboards";
 import { ImportDashboard } from "./import-dashboard";
@@ -100,27 +101,32 @@ export default async function DashboardsPage({
       ).flatMap((p) => p.dashboards)
     : [];
 
-  // The wrapper carries the staggered entrance (#236): `--i` is the card's
-  // position, which the `stagger-in` utility turns into a 50ms-per-card delay.
-  const renderCard = (dashboard: DashboardSummary, i: number) => (
-    <div
-      key={dashboard.id}
-      className="stagger-in h-full"
-      style={{ "--i": i } as React.CSSProperties}
-    >
-      <DashboardCard
-        dashboard={dashboard}
-        canEdit={can(identity, "dashboard:update", {
-          workspaceId: dashboard.workspaceId,
-        })}
-        canDelete={can(identity, "dashboard:delete", {
-          workspaceId: dashboard.workspaceId,
-          ownerSub: dashboard.createdBy,
-        })}
-        tagSuggestions={tags.map((t) => t.tag)}
-      />
-    </div>
-  );
+  // The wrapper carries the staggered entrance (#236) — `--i` is the card's
+  // position, which `stagger-in` turns into a 50ms-per-card delay — and is
+  // what slides when the list reorders or filters (#237). A favorite is on
+  // screen twice on the first page, so its two cards carry distinct flip ids
+  // rather than fighting over one.
+  const renderCard =
+    (section: "fav" | "all") => (dashboard: DashboardSummary, i: number) => (
+      <div
+        key={dashboard.id}
+        className="stagger-in h-full"
+        style={{ "--i": i } as React.CSSProperties}
+        data-flip-id={`${section}:${dashboard.id}`}
+      >
+        <DashboardCard
+          dashboard={dashboard}
+          canEdit={can(identity, "dashboard:update", {
+            workspaceId: dashboard.workspaceId,
+          })}
+          canDelete={can(identity, "dashboard:delete", {
+            workspaceId: dashboard.workspaceId,
+            ownerSub: dashboard.createdBy,
+          })}
+          tagSuggestions={tags.map((t) => t.tag)}
+        />
+      </div>
+    );
 
   // The import dialog needs to know which sources each workspace offers, and
   // it needs it before the user picks a workspace. Projecting to an id and a
@@ -194,45 +200,51 @@ export default async function DashboardsPage({
           <DashboardListControls query={query} tags={tags} defaults={listDefaults} />
           {showSections && <RecentDashboards />}
 
-          {favorites.length > 0 && (
-            <section className="mb-6">
-              <h2 className="mb-2 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-muted">
-                <Star className="h-3.5 w-3.5" aria-hidden /> Favorites
-              </h2>
-              <DashboardGridSection>{favorites.map(renderCard)}</DashboardGridSection>
-            </section>
-          )}
+          <FlipGroup>
+            {favorites.length > 0 && (
+              <section className="mb-6">
+                <h2 className="mb-2 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-muted">
+                  <Star className="h-3.5 w-3.5" aria-hidden /> Favorites
+                </h2>
+                <DashboardGridSection>
+                  {favorites.map(renderCard("fav"))}
+                </DashboardGridSection>
+              </section>
+            )}
 
-          <section>
-            {showSections && favorites.length > 0 && (
-              <h2 className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted">
-                All dashboards
-              </h2>
-            )}
-            {dashboards.length === 0 ? (
-              <EmptyState
-                icon={<SearchX className="h-6 w-6" />}
-                title="Nothing matches"
-                description={
-                  query.favorites && !query.search && query.tags.length === 0
-                    ? "You have not starred any dashboards yet. Star one from its card, or show all dashboards."
-                    : "No dashboard in your workspaces matches this search and these tags."
-                }
-                action={
-                  <Link
-                    href={dashboardListHref(
-                      { ...query, search: "", tags: [], favorites: false, page: 1 },
-                      listDefaults,
-                    )}
-                  >
-                    <Button variant="secondary">Clear filters</Button>
-                  </Link>
-                }
-              />
-            ) : (
-              <DashboardGridSection>{dashboards.map(renderCard)}</DashboardGridSection>
-            )}
-          </section>
+            <section>
+              {showSections && favorites.length > 0 && (
+                <h2 className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted">
+                  All dashboards
+                </h2>
+              )}
+              {dashboards.length === 0 ? (
+                <EmptyState
+                  icon={<SearchX className="h-6 w-6" />}
+                  title="Nothing matches"
+                  description={
+                    query.favorites && !query.search && query.tags.length === 0
+                      ? "You have not starred any dashboards yet. Star one from its card, or show all dashboards."
+                      : "No dashboard in your workspaces matches this search and these tags."
+                  }
+                  action={
+                    <Link
+                      href={dashboardListHref(
+                        { ...query, search: "", tags: [], favorites: false, page: 1 },
+                        listDefaults,
+                      )}
+                    >
+                      <Button variant="secondary">Clear filters</Button>
+                    </Link>
+                  }
+                />
+              ) : (
+                <DashboardGridSection>
+                  {dashboards.map(renderCard("all"))}
+                </DashboardGridSection>
+              )}
+            </section>
+          </FlipGroup>
 
           <Pager
             page={query.page}

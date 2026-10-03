@@ -337,6 +337,23 @@ html[data-vt="tab"] [role="tab"][aria-selected="true"] {
 }
 
 /*
+ * A row jumped to from a link (`#source-<id>`): the static `target:`
+ * highlight marks it, and under Allow it is nudged once as well, so the eye
+ * finds it (#237). The highlight does not depend on the nudge.
+ */
+@utility target-reveal {
+  &:target {
+    animation: holotable-reveal var(--duration-slow) var(--ease-emphasized) 2;
+  }
+}
+
+@keyframes holotable-reveal {
+  50% {
+    translate: 6px 0;
+  }
+}
+
+/*
  * Press feedback for buttons: a quick dip on `:active`, and the transition
  * that carries it along with the color changes a hover already makes. One
  * utility so every button agrees on the duration and curve.

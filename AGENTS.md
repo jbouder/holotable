@@ -291,6 +291,13 @@ before first paint (#212). The rules:
   so they can share an element with `transition-colors`; `backwards` fill so
   nothing is held after. No `--i` on a stream (chat messages): the newest
   item must not wait behind the others.
+- **Lists FLIP, deletes leave first.** A list that reorders, reflows or
+  filters calls `useFlip(containerRef, enabled)` from
+  `src/components/use-flip.ts` and marks each item with `data-flip-id`
+  (`FlipGroup` wraps a server-rendered list). A delete runs `animateOut` on
+  the row before the dispatch or `router.refresh()`, so the others slide
+  into a real gap. Never FLIP the thing under the pointer; `DashboardGrid`
+  takes `pinnedId` for that.
 - **Charts merge, never recreate.** FLIP a panel's card, never its chart;
   `EChart`'s `ResizeObserver` picks up the final size.
 - **Spinners freezing under Reduce is intended.** `animate-spin` and

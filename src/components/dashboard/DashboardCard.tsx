@@ -11,7 +11,9 @@ import { ErrorDisplay } from "@/components/ui/error-display";
 import { type ApiError, readApiError } from "@/lib/errors";
 import type { DashboardSummary } from "@/lib/dashboard-metadata";
 import { dashboardListHref, EMPTY_QUERY } from "@/lib/dashboard-list";
+import { animateOut } from "@/lib/motion";
 import { cn } from "@/lib/utils";
+import { useReducedMotion } from "@/components/motion-preference";
 import { DashboardDetailsDialog } from "./DashboardDetailsDialog";
 
 /**
@@ -39,6 +41,8 @@ export function DashboardCard({
   const [favorite, setFavorite] = React.useState(dashboard.favorite);
   const [busy, setBusy] = React.useState(false);
   const [error, setError] = React.useState<ApiError | null>(null);
+  const card = React.useRef<HTMLDivElement>(null);
+  const motion = !useReducedMotion();
 
   async function toggleFavorite() {
     // Optimistic: a star that waits for a round trip feels broken, and the
@@ -84,11 +88,17 @@ export function DashboardCard({
       setBusy(false);
       return;
     }
+    // The card leaves before the list is refreshed, so the others slide into
+    // a real gap rather than the card vanishing under them (#237).
+    if (card.current) await animateOut(card.current, motion);
     router.refresh();
   }
 
   return (
-    <Card className="relative h-full transition-colors hover:border-foreground/40">
+    <Card
+      ref={card}
+      className="relative h-full transition-colors hover:border-foreground/40"
+    >
       <CardContent className="flex h-full flex-col gap-2">
         <div className="flex items-start justify-between gap-1">
           {/*
