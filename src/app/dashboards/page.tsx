@@ -1,3 +1,4 @@
+import type React from "react";
 import type { ReactNode } from "react";
 import Link from "next/link";
 import { cookies } from "next/headers";
@@ -99,19 +100,26 @@ export default async function DashboardsPage({
       ).flatMap((p) => p.dashboards)
     : [];
 
-  const renderCard = (dashboard: DashboardSummary) => (
-    <DashboardCard
+  // The wrapper carries the staggered entrance (#236): `--i` is the card's
+  // position, which the `stagger-in` utility turns into a 50ms-per-card delay.
+  const renderCard = (dashboard: DashboardSummary, i: number) => (
+    <div
       key={dashboard.id}
-      dashboard={dashboard}
-      canEdit={can(identity, "dashboard:update", {
-        workspaceId: dashboard.workspaceId,
-      })}
-      canDelete={can(identity, "dashboard:delete", {
-        workspaceId: dashboard.workspaceId,
-        ownerSub: dashboard.createdBy,
-      })}
-      tagSuggestions={tags.map((t) => t.tag)}
-    />
+      className="stagger-in h-full"
+      style={{ "--i": i } as React.CSSProperties}
+    >
+      <DashboardCard
+        dashboard={dashboard}
+        canEdit={can(identity, "dashboard:update", {
+          workspaceId: dashboard.workspaceId,
+        })}
+        canDelete={can(identity, "dashboard:delete", {
+          workspaceId: dashboard.workspaceId,
+          ownerSub: dashboard.createdBy,
+        })}
+        tagSuggestions={tags.map((t) => t.tag)}
+      />
+    </div>
   );
 
   // The import dialog needs to know which sources each workspace offers, and
@@ -170,7 +178,7 @@ export default async function DashboardsPage({
   );
 
   return (
-    <div>
+    <div className="stagger-in">
       {emptyWorkspace ? (
         // The guide replaces the header while it is up; see FirstRun.
         <FirstRunSection

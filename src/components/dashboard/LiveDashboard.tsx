@@ -263,7 +263,11 @@ export function LiveDashboard({
         )}
         onClick={togglePause}
       >
-        {live ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4 fill-current" />}
+        {live ? (
+          <Pause className="pop-in h-4 w-4" />
+        ) : (
+          <Play className="pop-in h-4 w-4 fill-current" />
+        )}
       </Button>
       <TimeRangeFilter value={timeRange} onChange={setTimeRange} />
     </>

@@ -100,7 +100,7 @@ export function PanelView({
         aria-label={expansion.expanded ? `${panel.title}, fullscreen` : undefined}
         onKeyDown={expansion.onKeyDown}
         className={cn(
-          "flex h-full flex-col",
+          "flex h-full flex-col transition-opacity duration-(--duration-base) ease-standard",
           status === "stale" && "opacity-60",
           expansion.expanded && "fixed inset-3 z-50 h-auto sm:inset-8",
         )}
@@ -220,7 +220,6 @@ function PanelBody({
   crosshairGroup?: string;
   onSelectTimeRange?: (range: TimeRange) => void;
 }) {
-  const display = useTimeDisplay();
   if (state?.status === "tombstoned") {
     // A tombstone is the `conflict` kind: the source is gone, and the fix is to
     // repoint the panel. Routing it through ErrorDisplay is what gets it that
@@ -257,6 +256,36 @@ function PanelBody({
     );
   }
 
+  // One wrapper for every content shape, so the first rows rise in over the
+  // skeleton's place (#236). It mounts once, when the rows first land, and
+  // stays: the chart inside is never remounted (invariant 11).
+  return (
+    <div className="stagger-in h-full min-h-0">
+      <PanelContent
+        panel={panel}
+        data={data}
+        chartRef={chartRef}
+        crosshairGroup={crosshairGroup}
+        onSelectTimeRange={onSelectTimeRange}
+      />
+    </div>
+  );
+}
+
+function PanelContent({
+  panel,
+  data,
+  chartRef,
+  crosshairGroup,
+  onSelectTimeRange,
+}: {
+  panel: Panel;
+  data: PanelData;
+  chartRef?: React.RefObject<EChartHandle | null>;
+  crosshairGroup?: string;
+  onSelectTimeRange?: (range: TimeRange) => void;
+}) {
+  const display = useTimeDisplay();
   switch (panel.viz) {
     case "stat":
       return <StatView panel={panel} data={data} />;

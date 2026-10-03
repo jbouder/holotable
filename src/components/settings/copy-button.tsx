@@ -36,7 +36,7 @@ export function CopyButton({ value, label }: { value: string; label: string }) {
         onClick={() => void copy()}
       >
         {state === "copied" ? (
-          <Check className="h-4 w-4" />
+          <Check className="pop-in h-4 w-4" />
         ) : (
           <Copy className="h-4 w-4" />
         )}

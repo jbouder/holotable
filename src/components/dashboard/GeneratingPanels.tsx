@@ -1,3 +1,4 @@
+import type React from "react";
 import type { Panel } from "@/lib/ir";
 import { PanelCardSkeleton } from "@/components/dashboard/PanelSkeleton";
 
@@ -36,14 +37,16 @@ export function GeneratingPanels({
     <>
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         {Array.from({ length: count }, (_, i) => (
-          <PanelCardSkeleton
+          <div
             // Positional by nature: card `i` is "the i-th panel of this spec",
             // and the stream only ever appends.
             // biome-ignore lint/suspicious/noArrayIndexKey: positions in a streaming spec
             key={i}
-            title={known[i]?.title}
-            viz={known[i]?.viz}
-          />
+            className="stagger-in"
+            style={{ "--i": i } as React.CSSProperties}
+          >
+            <PanelCardSkeleton title={known[i]?.title} viz={known[i]?.viz} />
+          </div>
         ))}
       </div>
       <span role="status" className="sr-only">

@@ -60,11 +60,12 @@ export function RecentDashboards() {
         <History className="h-3.5 w-3.5" aria-hidden /> Recent
       </h2>
       <div className="flex flex-wrap gap-2">
-        {recent.map((d) => (
+        {recent.map((d, i) => (
           <Link
             key={d.id}
             href={`/dashboards/${d.id}`}
-            className="border border-border bg-surface px-3 py-1.5 text-sm text-foreground transition-colors hover:border-foreground/40 focus-visible:outline-2 focus-visible:outline-primary"
+            className="stagger-in border border-border bg-surface px-3 py-1.5 text-sm text-foreground transition-colors hover:border-foreground/40 focus-visible:outline-2 focus-visible:outline-primary"
+            style={{ "--i": i } as React.CSSProperties}
           >
             {d.title}
           </Link>

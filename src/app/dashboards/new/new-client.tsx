@@ -42,6 +42,8 @@ import {
 import { type Template, templateSpec } from "@/lib/templates";
 import { TemplatePicker } from "@/components/templates/TemplatePicker";
 import { NoSources } from "@/components/onboarding/no-sources";
+import { withViewTransition } from "@/lib/view-transition";
+import { useReducedMotion } from "@/components/motion-preference";
 
 interface SourceOption {
   id: string;
@@ -73,6 +75,7 @@ export function NewDashboardClient({
 }) {
   const router = useRouter();
   const [activeTab, setActiveTab] = React.useState<"chat" | "preview">("chat");
+  const reducedMotion = useReducedMotion();
   const [sourceId, setSourceId] = React.useState<string | null>(sources[0]?.id ?? null);
   const [prompt, setPrompt] = React.useState("");
   const [history, setHistory] = React.useState<TurnHistory>(EMPTY_HISTORY);
@@ -283,7 +286,9 @@ export function NewDashboardClient({
               aria-selected={activeTab === tab}
               aria-controls={`new-dashboard-${tab}-panel`}
               id={`new-dashboard-${tab}-tab`}
-              onClick={() => setActiveTab(tab)}
+              onClick={() =>
+                withViewTransition(() => setActiveTab(tab), !reducedMotion, "tab")
+              }
               className={`px-3 py-1.5 text-sm font-medium capitalize transition-colors ${
                 activeTab === tab
                   ? "bg-surface-2 text-foreground"
@@ -301,7 +306,7 @@ export function NewDashboardClient({
           role="tabpanel"
           id="new-dashboard-chat-panel"
           aria-labelledby="new-dashboard-chat-tab"
-          className="space-y-4"
+          className="tab-panel space-y-4"
         >
           <Card>
             <CardContent className="space-y-4">
@@ -579,6 +584,7 @@ export function NewDashboardClient({
           role="tabpanel"
           id="new-dashboard-preview-panel"
           aria-labelledby="new-dashboard-preview-tab"
+          className="tab-panel"
         >
           {finalSpec ? (
             <PreviewDashboard spec={finalSpec} />

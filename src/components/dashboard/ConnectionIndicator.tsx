@@ -78,7 +78,12 @@ export function ConnectionIndicator({
         </span>
       </div>
       {offerReconnect && (
-        <Button variant="secondary" size="sm" onClick={onReconnect}>
+        <Button
+          variant="secondary"
+          size="sm"
+          className="stagger-in"
+          onClick={onReconnect}
+        >
           <RefreshCw className="h-3.5 w-3.5" /> Reconnect
         </Button>
       )}
