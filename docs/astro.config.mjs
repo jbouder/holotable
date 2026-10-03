@@ -67,6 +67,7 @@ export default defineConfig({
             { label: "Authorization model", slug: "architecture/authorization" },
             { label: "Scaling and the poller", slug: "architecture/scaling" },
             { label: "Data model", slug: "architecture/data-model" },
+            { label: "Motion", slug: "architecture/motion" },
           ],
         },
         {
