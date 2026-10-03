@@ -220,6 +220,10 @@ Match the surrounding code rather than importing conventions from elsewhere.
   `src/app/globals.css`. Reuse the primitives in `src/components/ui/` before
   adding new ones, and `cn()` from `src/lib/utils.ts` for composition.
 - Domain logic belongs in `src/lib/`, not inside page components.
+- Motion is platform-only (View Transitions, WAAPI, `@starting-style`, FLIP)
+  and keys off `<html data-motion>`, never the OS media query directly.
+  Durations and curves come from the tokens in `globals.css`; the full rules
+  are the "Motion rules" section of `AGENTS.md`.
 - This is Next.js 16 and React 19. Check the installed docs in
   `node_modules/next/dist/docs/` or the existing repository patterns before
   relying on behavior you remember from an older version, and do not introduce

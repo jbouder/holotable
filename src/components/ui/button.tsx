@@ -40,7 +40,9 @@ export const Button = React.forwardRef<HTMLElement, ButtonProps>(
         // `tap-target` is the coarse-pointer minimum (#78): on a touch screen
         // every button grows to 44px in both directions, and on a mouse-driven
         // screen the compact sizes below are left exactly as they were.
-        "tap-target inline-flex items-center justify-center gap-2 font-medium transition-colors cursor-pointer disabled:cursor-not-allowed focus-visible:outline-2 focus-visible:outline-primary",
+        // `press` is the shared transition and the 4% dip on `:active` (#234);
+        // it keys off `<html data-motion>` like every other motion rule.
+        "tap-target press inline-flex items-center justify-center gap-2 font-medium cursor-pointer disabled:cursor-not-allowed focus-visible:outline-2 focus-visible:outline-primary",
         VARIANTS[variant],
         SIZES[size],
         collapse && "max-sm:aspect-square max-sm:px-0",

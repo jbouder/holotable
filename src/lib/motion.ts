@@ -1,11 +1,18 @@
 /**
  * The reduced-motion preference (#212), shaped like the theme in
- * `src/lib/theme.ts` and for the same reasons.
+ * `src/lib/theme.ts` and for the same reasons, and the platform-only motion
+ * helpers that honor it (#234): the Web Animations API here, View Transitions
+ * in `src/lib/view-transition.ts`, no library.
  *
  * The choice is stored per browser and resolved to `reduce` or `allow` on
  * `<html data-motion>` before first paint by the root layout's bootstrap
  * script, so CSS and the chart wrapper read one attribute instead of each
  * re-deciding. "system" follows `prefers-reduced-motion`.
+ *
+ * This module is reached by Server Components (`src/lib/bootstrap.ts` builds
+ * the inline script from its constants), so nothing here may import React or
+ * `react-dom`. `withViewTransition`, which needs `flushSync`, lives in
+ * `src/lib/view-transition.ts` for that reason.
  */
 
 export const MOTIONS = ["system", "reduce", "allow"] as const;
@@ -71,4 +78,41 @@ export function setMotion(motion: Motion) {
     // The choice still applies for this page when storage is unavailable.
   }
   window.dispatchEvent(new CustomEvent<Motion>(MOTION_EVENT, { detail: motion }));
+}
+
+/**
+ * The non-React answer to "is motion on right now". Components take the same
+ * answer from `!useReducedMotion()` in `src/components/motion-preference.tsx`
+ * so they re-render when it changes; this is for modules with no render, like
+ * `src/lib/theme.ts`.
+ */
+export function isMotionActive(): boolean {
+  return currentMotion() === "allow";
+}
+
+/* ---------- Web Animations API ---------- */
+
+/** `--ease-emphasized` from `globals.css`, for WAAPI calls that cannot read a CSS variable. */
+export const EASE_EMPHASIZED = "cubic-bezier(0.2, 0, 0, 1)";
+
+/** `--duration-base` from `globals.css`, in milliseconds. */
+export const DURATION_BASE_MS = 200;
+
+/**
+ * Animate an element out, resolving when done (immediately when disabled).
+ * The caller removes the element afterwards; `fill: "forwards"` holds the
+ * final frame until it does.
+ */
+export function animateOut(el: HTMLElement, enabled: boolean): Promise<void> {
+  if (!enabled) {
+    return Promise.resolve();
+  }
+  const animation = el.animate(
+    [
+      { opacity: 1, translate: "0 0", scale: "1" },
+      { opacity: 0, translate: "24px 0", scale: "0.98" },
+    ],
+    { duration: DURATION_BASE_MS, easing: EASE_EMPHASIZED, fill: "forwards" },
+  );
+  return animation.finished.then(() => undefined);
 }
