@@ -243,6 +243,45 @@ When working on charts/panels:
 Note: design tokens are authored in OKLCH and may need runtime conversion before
 being passed to ECharts.
 
+### Motion rules
+
+Motion is platform-only and gated by the preference in `src/lib/motion.ts`,
+which the root layout resolves onto `<html data-motion="reduce|allow">`
+before first paint (#212). The rules:
+
+- **Platform only.** View Transitions, the Web Animations API,
+  `@starting-style`, and FLIP. No framer-motion, motion, react-spring,
+  auto-animate, or tw-animate-css.
+- **Tokens, not literals.** Durations are `duration-(--duration-fast|base|slow)`
+  and curves are `ease-standard` / `ease-emphasized`, all from `globals.css`.
+  No `duration-150`, no `ease-in-out`. JS that cannot read a CSS variable uses
+  `EASE_EMPHASIZED` / `DURATION_BASE_MS` from `src/lib/motion.ts`.
+- **Animate `opacity` and `transform` only** (`translate`, `scale`). A
+  position or size change goes through FLIP or a view transition, never a
+  transition on `top`, `height`, or `margin`.
+- **One switch.** Every motion rule keys off `:root[data-motion]`; never
+  `motion-safe:`, `motion-reduce:`, or `@media (prefers-reduced-motion)`
+  directly, because "Allow" deliberately beats the OS. The global reduce rule
+  in `globals.css` stills CSS; the JS helpers (`animateOut` in
+  `src/lib/motion.ts`, `withViewTransition` in `src/lib/view-transition.ts`)
+  take `enabled` from `!useReducedMotion()` in a component or
+  `isMotionActive()` outside React. `view-transition.ts` imports `flushSync`
+  and so is client-only; `motion.ts` is reached by Server Components through
+  `src/lib/bootstrap.ts` and must stay free of React imports.
+- **Overlays use Base UI's hooks.** Enter and exit are
+  `data-starting-style:` / `data-ending-style:` variants on the popup; Base UI
+  keeps the element mounted until `transitionend`, which is why the reduce
+  rule clamps to `0.01ms` rather than `0`.
+- **Scope view-transition names.** `withViewTransition(update, enabled, type)`
+  puts `type` on `<html data-vt>` for the life of the transition; a
+  `view-transition-name` is always written as `html[data-vt="<type>"] .thing`
+  (the `html` type selector, not `:root`, so the reduce rule outranks it).
+  Types in use: `default`.
+- **Charts merge, never recreate.** FLIP a panel's card, never its chart;
+  `EChart`'s `ResizeObserver` picks up the final size.
+- **Spinners freezing under Reduce is intended.** `animate-spin` and
+  `animate-pulse` become a single frame at `0.01ms`; do not "fix" it.
+
 ---
 
 ## Data, auth, and infra conventions
