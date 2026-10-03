@@ -6,10 +6,10 @@ import {
   applyTheme,
   DEFAULT_THEME,
   savedTheme,
-  setTheme as storeTheme,
   type Theme,
   THEME_EVENT,
 } from "@/lib/theme";
+import { applyThemeWithTransition, setThemeWithTransition } from "@/lib/theme-transition";
 import { cn } from "@/lib/utils";
 
 export const THEME_OPTIONS: { value: Theme; label: string; Icon: typeof Sun }[] = [
@@ -48,7 +48,7 @@ export function useThemePreference(): [Theme, (value: Theme) => void] {
   React.useEffect(() => {
     if (theme !== "system") return;
     const media = window.matchMedia("(prefers-color-scheme: dark)");
-    const handleChange = () => applyTheme("system");
+    const handleChange = () => applyThemeWithTransition("system");
     media.addEventListener("change", handleChange);
     return () => media.removeEventListener("change", handleChange);
   }, [theme]);
@@ -61,7 +61,7 @@ export function useThemePreference(): [Theme, (value: Theme) => void] {
 
   const update = React.useCallback((value: Theme) => {
     setTheme(value);
-    storeTheme(value);
+    setThemeWithTransition(value);
   }, []);
 
   return [theme, update];

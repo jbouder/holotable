@@ -282,7 +282,15 @@ before first paint (#212). The rules:
   puts `type` on `<html data-vt>` for the life of the transition; a
   `view-transition-name` is always written as `html[data-vt="<type>"] .thing`
   (the `html` type selector, not `:root`, so the reduce rule outranks it).
-  Types in use: `default`.
+  Types in use: `theme` (`src/lib/theme-transition.ts`, the only way client
+  code changes the theme) and `tab` (the Editor/Preview and Chat/Preview tab
+  lists; `.tab-panel` on exactly one element per tab).
+- **Entrances are keyframes.** `stagger-in` (with `--i` inline for a list),
+  `drop-in` (alerts) and `pop-in` (an icon that swapped because something
+  happened) in `globals.css`. Keyframes, not `@starting-style` transitions,
+  so they can share an element with `transition-colors`; `backwards` fill so
+  nothing is held after. No `--i` on a stream (chat messages): the newest
+  item must not wait behind the others.
 - **Charts merge, never recreate.** FLIP a panel's card, never its chart;
   `EChart`'s `ResizeObserver` picks up the final size.
 - **Spinners freezing under Reduce is intended.** `animate-spin` and

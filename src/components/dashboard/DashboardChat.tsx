@@ -22,7 +22,7 @@ import { ErrorDisplay } from "@/components/ui/error-display";
 import { Skeleton } from "@/components/ui/skeleton";
 import { apiErrorFromThrown } from "@/lib/errors";
 import { type ChatCitation, citationsFromMessage } from "@/lib/chat-history";
-import { animateOut } from "@/lib/motion";
+import { animateOut, isMotionActive } from "@/lib/motion";
 import { useReducedMotion } from "@/components/motion-preference";
 
 /** What the chat needs to know about a panel: enough to cite it, nothing more. */
@@ -105,7 +105,13 @@ export function DashboardChat({
   // biome-ignore lint/correctness/useExhaustiveDependencies: deliberate re-run triggers, not reads
   React.useEffect(() => {
     if (open) {
-      listRef.current?.scrollTo({ top: listRef.current.scrollHeight });
+      // Smooth only between turns: a smooth scroll restarted on every
+      // streamed token lags behind the text. The reduce rule forces CSS
+      // `scroll-behavior: auto`, but a JS scroll's option bypasses it.
+      listRef.current?.scrollTo({
+        top: listRef.current.scrollHeight,
+        behavior: isMotionActive() && status !== "streaming" ? "smooth" : "auto",
+      });
     }
   }, [messages, status, open]);
 
@@ -306,12 +312,13 @@ function Suggestions({
   if (suggestions.length === 0) return null;
   return (
     <fieldset className="flex flex-col gap-2" aria-label="Suggested questions">
-      {suggestions.map((prompt) => (
+      {suggestions.map((prompt, i) => (
         <button
           key={prompt}
           type="button"
           onClick={() => onPick(prompt)}
-          className="border border-border bg-surface-2 px-3 py-2 text-left text-xs text-foreground transition-colors hover:border-primary focus-visible:outline-2 focus-visible:outline-primary"
+          className="stagger-in border border-border bg-surface-2 px-3 py-2 text-left text-xs text-foreground transition-colors hover:border-primary focus-visible:outline-2 focus-visible:outline-primary"
+          style={{ "--i": i } as React.CSSProperties}
         >
           {prompt}
         </button>
@@ -333,7 +340,14 @@ function MessageBubble({
   const citations = isUser ? [] : citationsFromMessage(message, panels);
 
   return (
-    <div className={cn("flex flex-col gap-1", isUser ? "items-end" : "items-start")}>
+    // No `--i`: a message rises in when it arrives, and the latest one must
+    // not wait behind the ones already there.
+    <div
+      className={cn(
+        "stagger-in flex flex-col gap-1",
+        isUser ? "items-end" : "items-start",
+      )}
+    >
       {message.parts.map((part, i) => {
         if (part.type === "text") {
           if (!part.text) return null;

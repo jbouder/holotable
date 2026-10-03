@@ -62,6 +62,8 @@ import { LeaveGuardDialog } from "@/components/editor/LeaveGuardDialog";
 import { ShortcutsDialog } from "@/components/editor/ShortcutsDialog";
 import { DashboardDetailsDialog } from "@/components/dashboard/DashboardDetailsDialog";
 import { useHistory } from "@/lib/editor/use-history";
+import { withViewTransition } from "@/lib/view-transition";
+import { useReducedMotion } from "@/components/motion-preference";
 import { formatShortcut, useIsMac, useShortcuts } from "@/lib/editor/use-shortcuts";
 import { bindShortcuts, EDITOR_SHORTCUTS } from "@/lib/shortcuts";
 import {
@@ -177,6 +179,7 @@ export function EditDashboardClient({
       null,
   );
   const [activeTab, setActiveTab] = React.useState<"editor" | "preview">("editor");
+  const reducedMotion = useReducedMotion();
   const [saving, setSaving] = React.useState(false);
   const [error, setError] = React.useState<ApiError | null>(null);
   const [nlPrompt, setNlPrompt] = React.useState("");
@@ -831,7 +834,11 @@ export function EditDashboardClient({
             aria-selected={activeTab === tab}
             aria-controls={`edit-dashboard-${tab}-panel`}
             id={`edit-dashboard-${tab}-tab`}
-            onClick={() => setActiveTab(tab)}
+            // A view transition: the panel crossfades and the selected
+            // highlight slides to this tab (`globals.css`, `data-vt="tab"`).
+            onClick={() =>
+              withViewTransition(() => setActiveTab(tab), !reducedMotion, "tab")
+            }
             className={`px-3 py-1.5 text-sm font-medium capitalize transition-colors ${
               activeTab === tab
                 ? "bg-surface-2 text-foreground"
@@ -849,6 +856,7 @@ export function EditDashboardClient({
             role="tabpanel"
             id="edit-dashboard-editor-panel"
             aria-labelledby="edit-dashboard-editor-tab"
+            className="tab-panel"
           >
             <CardContent className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-4">
               <div>
@@ -1097,6 +1105,7 @@ export function EditDashboardClient({
           role="tabpanel"
           id="edit-dashboard-preview-panel"
           aria-labelledby="edit-dashboard-preview-tab"
+          className="tab-panel"
         >
           <PreviewDashboard spec={spec} />
         </section>

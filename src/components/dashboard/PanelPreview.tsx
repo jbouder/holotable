@@ -176,7 +176,10 @@ export function PanelPreview({
       </div>
 
       {check?.ok && (
-        <p role="status" className="flex items-center gap-2 text-xs text-success">
+        <p
+          role="status"
+          className="stagger-in flex items-center gap-2 text-xs text-success"
+        >
           <CheckCircle2 className="h-3.5 w-3.5 shrink-0" />
           This SQL passes the guard for the selected source.
         </p>
@@ -190,7 +193,11 @@ export function PanelPreview({
         />
       )}
 
-      {plan?.outcome.ok && <QueryPlanView plan={plan.outcome.plan} stale={plan.stale} />}
+      {plan?.outcome.ok && (
+        <div className="stagger-in">
+          <QueryPlanView plan={plan.outcome.plan} stale={plan.stale} />
+        </div>
+      )}
       {plan && !plan.outcome.ok && (
         <ErrorDisplay
           error={plan.outcome.error}
@@ -201,7 +208,7 @@ export function PanelPreview({
       )}
 
       {result && (
-        <div className="space-y-1">
+        <div className="stagger-in space-y-1">
           <div className="h-64">
             <PanelView panel={panel} state={previewState(result)} onRetry={preview.run} />
           </div>

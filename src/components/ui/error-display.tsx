@@ -46,7 +46,7 @@ export function ErrorDisplay({
       <div
         role="alert"
         className={cn(
-          "flex h-full flex-col items-center justify-center gap-2 px-3 text-center text-sm",
+          "drop-in flex h-full flex-col items-center justify-center gap-2 px-3 text-center text-sm",
           className,
         )}
       >
@@ -73,7 +73,7 @@ export function ErrorDisplay({
     <div
       role="alert"
       className={cn(
-        "flex flex-wrap items-start gap-3 border border-danger/30 bg-danger/10 px-3 py-2 text-sm",
+        "drop-in flex flex-wrap items-start gap-3 border border-danger/30 bg-danger/10 px-3 py-2 text-sm",
         className,
       )}
     >

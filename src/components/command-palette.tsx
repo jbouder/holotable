@@ -18,7 +18,8 @@ import {
   STATIC_COMMANDS,
 } from "@/lib/command-palette";
 import { PALETTE_SHORTCUT } from "@/lib/shortcuts";
-import { setTheme } from "@/lib/theme";
+import { setThemeWithTransition } from "@/lib/theme-transition";
+import { isMotionActive } from "@/lib/motion";
 import { cn } from "@/lib/utils";
 
 const ICONS: Record<CommandKind, typeof Search> = {
@@ -119,9 +120,12 @@ export function CommandPalette() {
   }, [ordered.length]);
 
   React.useEffect(() => {
-    listRef.current
-      ?.querySelector(`#command-option-${active}`)
-      ?.scrollIntoView({ block: "nearest" });
+    // The reduce rule forces `scroll-behavior: auto` in CSS, but a JS
+    // scroll's own option bypasses CSS, so the preference is passed here.
+    listRef.current?.querySelector(`#command-option-${active}`)?.scrollIntoView({
+      block: "nearest",
+      behavior: isMotionActive() ? "smooth" : "auto",
+    });
   }, [active]);
 
   function remember(id: string) {
@@ -142,7 +146,7 @@ export function CommandPalette() {
         router.push(command.action.href);
         return;
       case "theme":
-        setTheme(command.action.theme);
+        setThemeWithTransition(command.action.theme);
         setOpen(false);
         return;
       case "refresh-catalog": {

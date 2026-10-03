@@ -143,8 +143,10 @@ body {
 :root[data-motion="reduce"] *::before,
 :root[data-motion="reduce"] *::after {
   animation-duration: 0.01ms;
+  animation-delay: 0s;
   animation-iteration-count: 1;
   transition-duration: 0.01ms;
+  transition-delay: 0s;
   scroll-behavior: auto;
 }
 
@@ -181,6 +183,102 @@ body {
   background-repeat: no-repeat;
   background-size: 200% 100%;
   animation: holotable-shimmer 1.6s linear infinite;
+}
+
+/*
+ * View transitions (#236). `withViewTransition` (`src/lib/view-transition.ts`)
+ * puts its type on `<html data-vt>` for the life of the transition, so each
+ * element is only snapshotted separately while its own transition runs. The
+ * root snapshot never animates on its own: everything that should move has a
+ * name. These selectors are `html[data-vt]` (0,1,2), never `:root`, so the
+ * reduce rule above (0,2,1) outranks them.
+ */
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation: none;
+  mix-blend-mode: normal;
+}
+
+/* Theme: the whole page is one snapshot, and the new one fades in over the old. */
+html[data-vt="theme"]::view-transition-new(root) {
+  animation: holotable-theme-fade var(--duration-base) var(--ease-standard) both;
+}
+
+@keyframes holotable-theme-fade {
+  from {
+    opacity: 0;
+  }
+}
+
+/*
+ * Tabs: the panel crossfades and the selected tab's highlight slides from
+ * the old tab to the new one. Only one element may carry a name at a time,
+ * so `.tab-panel` goes on exactly one element per tab.
+ */
+html[data-vt="tab"] .tab-panel {
+  view-transition-name: tab-panel;
+}
+
+html[data-vt="tab"] [role="tab"][aria-selected="true"] {
+  view-transition-name: tab-active;
+}
+
+::view-transition-old(tab-panel),
+::view-transition-new(tab-panel) {
+  animation-duration: var(--duration-base);
+  animation-timing-function: var(--ease-emphasized);
+}
+
+::view-transition-group(tab-active) {
+  animation-duration: var(--duration-slow);
+  animation-timing-function: var(--ease-emphasized);
+}
+
+/*
+ * Entrances (#236). Keyframe animations rather than `@starting-style`
+ * transitions so they can sit on an element that already has
+ * `transition-colors` for its hover: an element has one transition list, but
+ * animations and transitions do not compete. `backwards` fills only the
+ * delay, so nothing is held afterwards and a later inline `translate` (FLIP)
+ * still shows through.
+ *
+ * `stagger-in` rises into place; `--i`, set inline, delays a list by 50ms per
+ * item and is capped here so a long list does not keep its tail waiting.
+ * `drop-in` is the same from above, for an alert. `pop-in` is a scale pop for
+ * an icon that just swapped because something happened.
+ */
+@utility stagger-in {
+  animation: holotable-rise-in var(--duration-slow) var(--ease-emphasized) backwards;
+  animation-delay: calc(min(var(--i, 0), 8) * 50ms);
+}
+
+@utility drop-in {
+  animation: holotable-drop-in var(--duration-base) var(--ease-emphasized) backwards;
+}
+
+@utility pop-in {
+  animation: holotable-pop-in var(--duration-base) var(--ease-emphasized) backwards;
+}
+
+@keyframes holotable-rise-in {
+  from {
+    opacity: 0;
+    translate: 0 10px;
+  }
+}
+
+@keyframes holotable-drop-in {
+  from {
+    opacity: 0;
+    translate: 0 -8px;
+  }
+}
+
+@keyframes holotable-pop-in {
+  from {
+    opacity: 0;
+    scale: 0.4;
+  }
 }
 
 /*
