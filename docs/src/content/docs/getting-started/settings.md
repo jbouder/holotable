@@ -46,9 +46,10 @@ The same information is available to scripts from `GET /api/me`.
 ### Appearance
 
 **Motion** has three choices. *Follow system* respects the operating system's
-reduced-motion setting. *Reduce* stops transitions, loading shimmer and chart
-animation whatever the system says. *Allow* keeps them on. Charts update in
-place either way.
+reduced-motion setting. *Reduce* stops transitions, entrances and slides, the
+theme crossfade, loading shimmer and chart animation whatever the system says:
+every change is a cut. *Allow* keeps them on, even when the system asks for
+less. Charts update in place either way.
 
 ### Preferences
 

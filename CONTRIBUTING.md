@@ -125,6 +125,29 @@ intent is visible), `useExhaustiveDependencies`, `noExplicitAny`, and
 than suppressing it; if a suppression is
 genuinely right, use a scoped `// biome-ignore` with a reason on the line.
 
+If you touch anything that moves (an overlay, a list, a theme or tab switch,
+a panel's fullscreen), check it by hand as well: there is no browser test
+harness, and sign-in goes through Keycloak, so the one test that would prove
+the gating (`document.getAnimations()` empty under Reduce, non-empty under
+Allow) cannot run in CI. That is a deliberate decision, revisited only if an
+end-to-end harness is wanted for more than motion. The checklist, in Chromium
+and Safari, under Settings → Appearance → Motion set to *Reduce*, then *Allow*,
+then *Follow system* with the OS reduce-motion setting toggled both ways:
+
+- open and close a dialog, a card's `⋯` menu, the time-range popover and a
+  select;
+- switch the theme from the account menu;
+- flip Editor/Preview in the editor;
+- reorder and delete a panel in the editor's list;
+- expand and collapse a panel;
+- navigate between two pages.
+
+Under *Reduce* nothing moves and every overlay still opens, closes and
+unmounts. Under *Allow* everything above animates, whatever the OS says.
+The unit tests cover the rest: `npm test` pins the helpers' fallbacks, the
+overlay primitives' enter/exit classes, and the rules themselves (no
+`motion-safe:`, no literal durations, no animation library).
+
 If you touch database code, consider whether `npm run migrate` or `npm run seed`
 behavior changes too. Migrations should be additive and safe to apply to an
 existing database.
