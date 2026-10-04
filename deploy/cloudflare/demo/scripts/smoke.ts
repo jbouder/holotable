@@ -39,7 +39,8 @@ async function enter(): Promise<string> {
   const res = await fetch(`${base}/api/auth/login?next=/`, { redirect: "manual" });
   const cookie = res.headers
     .getSetCookie()
-    .find((c) => c.startsWith("holotable_session="));
+    // `__Host-` prefixed, since the demo's cookie is Secure (#26).
+    .find((c) => /^(__Host-)?holotable_session=/.test(c));
   if (res.status !== 302 || !cookie) {
     fail(`demo sign-in answered ${res.status} without a session cookie`);
   }

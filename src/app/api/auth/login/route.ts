@@ -30,8 +30,9 @@ export const GET = route("auth.login", async (req: Request) => {
     path: "/",
     maxAge: 600,
   };
-  store.set("holotable_oidc_state", state, opts);
-  store.set("holotable_oidc_nonce", nonce, opts);
+  // `__Host-` prefixed when Secure (#26), like the session cookie.
+  store.set(config.oidcStateCookieName, state, opts);
+  store.set(config.oidcNonceCookieName, nonce, opts);
 
   const url = await buildAuthorizeUrl(origin, state, nonce);
   return Response.redirect(url, 302);

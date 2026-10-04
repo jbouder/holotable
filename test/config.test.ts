@@ -246,6 +246,33 @@ test("SHUTDOWN_GRACE_MS is a positive number of milliseconds or unset", () => {
   }
 });
 
+test("SESSION_COOKIE_NAME may not carry a prefix: it is added when Secure (#26)", () => {
+  for (const name of ["__Host-holotable_session", "__secure-x"]) {
+    const problems = validateConfig({ SESSION_COOKIE_NAME: name }, { production: false });
+    assert.deepEqual(variables(errors(problems)), ["SESSION_COOKIE_NAME"], name);
+  }
+  assert.deepEqual(
+    variables(
+      errors(
+        validateConfig({ SESSION_COOKIE_NAME: "my_session" }, { production: false }),
+      ),
+    ),
+    [],
+  );
+});
+
+test("ALLOWED_ORIGINS holds exact origins (#25)", () => {
+  const ok = validateConfig(
+    { ALLOWED_ORIGINS: "https://grafana.example.com, http://localhost:8080" },
+    { production: false },
+  );
+  assert.deepEqual(variables(errors(ok)), []);
+  for (const bad of ["https://grafana.example.com/", "grafana.example.com", "*"]) {
+    const problems = validateConfig({ ALLOWED_ORIGINS: bad }, { production: false });
+    assert.deepEqual(variables(errors(problems)), ["ALLOWED_ORIGINS"], bad);
+  }
+});
+
 test("SSE_REAUTH_INTERVAL_MS is a positive number of milliseconds or unset", () => {
   for (const value of ["5000", "60000", ""]) {
     const ok = validateConfig(
@@ -357,6 +384,7 @@ test("malformed values are errors regardless of environment", () => {
     SSE_REAUTH_INTERVAL_MS: "0",
     DEFAULT_TIME_FROM: "yesterday-ish",
     SESSION_COOKIE_NAME: "has space",
+    ALLOWED_ORIGINS: "https://ok.example.com https://bad.example.com/path",
   };
   const problems = validateConfig(env, { production: false });
   const e = variables(errors(problems)).sort();

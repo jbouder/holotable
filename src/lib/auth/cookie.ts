@@ -1,7 +1,11 @@
 import { cookies } from "next/headers";
 import { config } from "@/lib/config";
 
-/** Set the session cookie (httpOnly, secure in production, SameSite=Lax). */
+/**
+ * Set the session cookie (httpOnly, secure in production, SameSite=Lax). When
+ * `Secure`, its name carries `__Host-` (#26), which the browser honors only on
+ * a cookie with `Path=/` and no `Domain` — so neither may ever be added here.
+ */
 export async function setSessionCookie(token: string, maxAgeSeconds = 60 * 60 * 8) {
   const store = await cookies();
   store.set(config.sessionCookieName, token, {
@@ -22,7 +26,8 @@ export async function setSessionCookie(token: string, maxAgeSeconds = 60 * 60 * 
 export const SESSION_ID_PATH = "/api/auth";
 
 export function sessionIdCookieName(): string {
-  return `${config.sessionCookieName}_renew`;
+  // `__Secure-`, not `__Host-`, when Secure: `__Host-` requires `Path=/` (#26).
+  return config.renewCookieName;
 }
 
 export async function setSessionIdCookie(sessionId: string, maxAgeSeconds: number) {

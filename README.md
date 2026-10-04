@@ -354,6 +354,11 @@ npm run smoke    # end-to-end check of the self-monitoring dashboard
 - Keycloak tokens are verified with RS256 via JWKS (`OIDC_JWKS_URL`).
 - Authorization is centralized in `can()` and never derived from a request's
   workspace field; the source is re-authorized on every execution.
+- A state-changing request (anything but GET, HEAD or OPTIONS) from another
+  origin is refused with a 403 before any handler runs, independently of the
+  session cookie's `SameSite=Lax`. `ALLOWED_ORIGINS` names any others.
+- A `Secure` session cookie is named `__Host-<SESSION_COOKIE_NAME>`, so the
+  browser refuses one set by a subdomain or for another path.
 
 The full trust model — what is trusted, what is not, and the known
 limitations — is in [SECURITY.md](SECURITY.md), along with how to report a

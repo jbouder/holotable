@@ -145,12 +145,13 @@ export const LOCAL_COOKIES: readonly {
 export const COOKIE_EXCLUSIONS: readonly { name: string; reason: string }[] = [
   {
     name: "holotable_session",
-    reason: "The session cookie (SESSION_COOKIE_NAME); Sign out clears it.",
+    reason:
+      "The session cookie (SESSION_COOKIE_NAME, __Host- prefixed when Secure); Sign out clears it.",
   },
   {
     name: "holotable_session_renew",
     reason:
-      "The session's renewal id (#27), scoped to /api/auth; Sign out clears it and the stored refresh token.",
+      "The session's renewal id (#27), scoped to /api/auth and __Secure- prefixed when Secure; Sign out clears it and the stored refresh token.",
   },
   { name: "holotable_oidc_state", reason: "Sign-in handshake, deleted by the callback." },
   { name: "holotable_oidc_nonce", reason: "Sign-in handshake, short-lived." },

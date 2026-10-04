@@ -123,6 +123,17 @@ only a random id for it, in an `httpOnly` cookie scoped to `/api/auth`, whose
 SHA-256 is what the table stores. Sign-out deletes the row; a refused renewal
 deletes it too.
 
+**Cookies and cross-origin requests.** The session cookie is `httpOnly` and
+`SameSite=Lax`. When it is `Secure`, its name is `__Host-` prefixed, so the
+browser accepts it only from this host with `Path=/` and no `Domain`; a sibling
+subdomain cannot plant or overwrite it. Independently of `SameSite`, every
+state-changing request is refused with a 403 before any handler runs unless it
+came from this app's own origin (by `Sec-Fetch-Site`, or `Origin` where the
+browser sends no Fetch Metadata) or from one listed in `ALLOWED_ORIGINS`. A
+request with neither header did not come from a page and is left to
+authentication. See
+[Authorization](docs/src/content/docs/architecture/authorization.md#requests-from-other-origins).
+
 **Back-channel logout.** When the realm ends a session it POSTs a signed
 logout token to `/api/auth/backchannel-logout`. The token's signature (realm
 JWKS only), issuer, audience (this client), age (five minutes) and `events`

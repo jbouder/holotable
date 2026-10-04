@@ -27,9 +27,9 @@ export const GET = route("auth.callback", async (req: Request) => {
   if (!code || !state) throw new HttpError(400, "missing code/state");
 
   const store = await cookies();
-  const expected = store.get("holotable_oidc_state")?.value;
+  const expected = store.get(config.oidcStateCookieName)?.value;
   if (!expected || expected !== state) throw new HttpError(400, "invalid state");
-  store.delete("holotable_oidc_state");
+  store.delete(config.oidcStateCookieName);
 
   const tokens = await exchangeCode(url.origin, code);
   const identity = await verifySessionToken(tokens.id_token);
