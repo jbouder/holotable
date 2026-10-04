@@ -10,11 +10,11 @@ import { PanelSqlDialog } from "@/components/dashboard/PanelSqlDialog";
 import { PanelActions } from "@/components/dashboard/PanelActions";
 import { LoadingLabel, PanelSkeleton } from "@/components/dashboard/PanelSkeleton";
 import { Popover } from "@/components/ui/popover";
-import { buildChartOption, type PanelData } from "@/components/charts/options";
+import type { PanelData } from "@/components/charts/options";
+import { panelRenderer } from "@/components/panels/registry";
 import { formatClockTime } from "@/lib/connection";
 import { useTimeDisplay } from "@/components/time-display";
 import type { ApiError } from "@/lib/errors";
-import { formatValue } from "@/lib/format";
 import { PANEL_EXIT_SHORTCUT } from "@/lib/shortcuts";
 import { supportsImageExport } from "@/lib/panel-export";
 import { brushedRange, supportsTimeBrush } from "@/lib/time-range";
@@ -345,104 +345,35 @@ function PanelContent({
   onSelectTimeRange?: (range: TimeRange) => void;
 }) {
   const display = useTimeDisplay();
-  switch (panel.viz) {
-    case "stat":
-      return <StatView panel={panel} data={data} />;
-    case "table":
-      return <TableView data={data} />;
-    default:
-      return (
-        <EChart
-          ref={chartRef}
-          option={buildChartOption(panel, data, display)}
-          crosshairGroup={crosshairGroup}
-          onBrush={
-            onSelectTimeRange && supportsTimeBrush(panel)
-              ? ({ startIndex, endIndex }) => {
-                  // A brush names a stretch of history, and the rows behind
-                  // the chart are what give the indices a meaning. An
-                  // unreadable selection — a gap in the data, a timestamp the
-                  // driver serialized as something unexpected — leaves the
-                  // window alone rather than guessing at one.
-                  const range = brushedRange(
-                    data.rows,
-                    panel.query.timeField,
-                    startIndex,
-                    endIndex,
-                  );
-                  if (range) onSelectTimeRange(range);
-                }
-              : undefined
-          }
-        />
-      );
+  // The registry decides how the kind is drawn (#61); nothing here names one.
+  const renderer = panelRenderer(panel.viz);
+  if (renderer.type === "html") {
+    return <renderer.Body panel={panel} data={data} />;
   }
-}
-
-function StatView({ panel, data }: { panel: Panel; data: PanelData }) {
-  const last = data.rows[data.rows.length - 1];
-  const valueKey =
-    data.columns.find(
-      (c) => c !== panel.query.timeField && typeof last?.[c] === "number",
-    ) ?? data.columns[data.columns.length - 1];
-  const value = last?.[valueKey];
   return (
-    <div className="flex h-full items-center justify-center">
-      {/* Shrinks with the viewport: a 4xl number is most of a phone panel. */}
-      <span className="text-3xl font-semibold tabular-nums sm:text-4xl">
-        {value === undefined ? "—" : formatValue(value, panel.format)}
-      </span>
-    </div>
-  );
-}
-
-/**
- * The first column is sticky and the table scrolls sideways under it, so a
- * narrow screen keeps the label of the row it is reading (#78). `w-max` rather
- * than `w-full`: the table is allowed to be wider than the panel — that is
- * what gives it something to scroll — and stretches to fill when it is not.
- */
-function TableView({ data }: { data: PanelData }) {
-  return (
-    <div className="max-h-full overflow-auto">
-      <table className="w-max min-w-full text-left text-sm">
-        <thead className="sticky top-0 z-10 bg-surface-2 text-muted">
-          <tr>
-            {data.columns.map((c, i) => (
-              <th
-                key={c}
-                className={cn(
-                  "px-2 py-1 font-medium",
-                  i === 0 && "sticky left-0 z-10 bg-surface-2",
-                )}
-              >
-                {c}
-              </th>
-            ))}
-          </tr>
-        </thead>
-        <tbody>
-          {data.rows.slice(-100).map((r, i) => (
-            // Query result rows carry no stable identity, and the table is
-            // render-only — nothing is reordered, edited or keyed off state.
-            // biome-ignore lint/suspicious/noArrayIndexKey: result rows have no id
-            <tr key={i} className="border-t border-border">
-              {data.columns.map((c, col) => (
-                <td
-                  key={c}
-                  className={cn(
-                    "px-2 py-1 tabular-nums",
-                    col === 0 && "sticky left-0 bg-surface",
-                  )}
-                >
-                  {String(r[c] ?? "")}
-                </td>
-              ))}
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
+    <EChart
+      ref={chartRef}
+      option={renderer.option(panel, data, display)}
+      crosshairGroup={crosshairGroup}
+      onBrush={
+        onSelectTimeRange && supportsTimeBrush(panel)
+          ? ({ startIndex, endIndex }) => {
+              // A brush names a stretch of history, and the rows behind
+              // the chart are what give the indices a meaning. An
+              // unreadable selection — a gap in the data, a timestamp the
+              // driver serialized as something unexpected — leaves the
+              // window alone rather than guessing at one.
+              const range = brushedRange(
+                data.rows,
+                panel.query.timeField,
+                startIndex,
+                endIndex,
+              );
+              if (range) onSelectTimeRange(range);
+            }
+          : undefined
+      }
+    />
   );
 }
 

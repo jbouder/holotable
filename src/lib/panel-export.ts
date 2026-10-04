@@ -1,4 +1,5 @@
 import type { VizType } from "@/lib/ir";
+import { panelKind } from "@/lib/panels/registry";
 
 /**
  * Taking a panel's contents out of the browser (#76).
@@ -15,12 +16,13 @@ import type { VizType } from "@/lib/ir";
  * Which vizzes can be exported as a picture.
  *
  * A PNG comes out of the ECharts instance, so it exists exactly when there is
- * one. A stat is a number and a table is a table: neither renders on a canvas,
- * and a screenshot of one is a worse version of its CSV — so those panels are
- * offered the CSV alone rather than a PNG that would have to be faked.
+ * one: the kind's `canvas` in the panel registry. A stat is a number and a
+ * table is a table: neither renders on a canvas, and a screenshot of one is a
+ * worse version of its CSV — so those panels are offered the CSV alone rather
+ * than a PNG that would have to be faked.
  */
 export function supportsImageExport(viz: VizType): boolean {
-  return viz !== "stat" && viz !== "table";
+  return panelKind(viz).canvas;
 }
 
 /**

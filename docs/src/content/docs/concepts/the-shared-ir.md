@@ -59,6 +59,12 @@ changing dashboard structure means changing the Zod schema *first* and updating
 every producer and consumer together — parallel ad-hoc types would reintroduce
 exactly the drift this design removes.
 
+The `viz` values follow the same rule from the other end. They are not written
+out in `ir.ts`: `VizType` is built from the panel registry
+(`src/lib/panels/registry.ts`), which also builds the prompt's list of kinds and
+is the key to the client's renderers. See
+[Panel kinds](/concepts/streaming-and-rendering/#panel-kinds).
+
 ## Time expressions
 
 `TimeExpr` accepts a relative form (`now`, `now-15m`, `now-1h`, `now-24h`,

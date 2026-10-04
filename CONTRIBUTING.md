@@ -206,7 +206,9 @@ The short version, five rules:
    be inferred from it. Do not introduce a parallel TypeScript-only interface
    that can drift. A change that would stop a saved spec parsing bumps
    `SPEC_VERSION` and adds an upgrader to `src/lib/ir/upgrade.ts` (see
-   AGENTS.md).
+   AGENTS.md). Panel kinds are registered in `src/lib/panels/registry.ts`,
+   not listed in `ir.ts`; the docs page "Streaming and rendering" says how to
+   add one.
 2. **The model generates specs, never data.** The LLM may produce a
    specification and SQL. It must never produce metric values, and the client
    must never render data that did not come from server-side query execution.

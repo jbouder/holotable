@@ -2,7 +2,8 @@
  * Generate reference pages from the application source.
  *
  * The configuration table is derived from `src/lib/config.ts` and the
- * visualization list from `VizType` in `src/lib/ir.ts`, so neither can drift
+ * visualization list from the panel registry in `src/lib/panels/`, so neither
+ * can drift
  * from the code the way a hand-maintained list does. Run by `npm run build`
  * and `npm run dev`; the output files are gitignored.
  *
@@ -10,7 +11,7 @@
  * can no longer be extracted, the docs build breaks rather than silently
  * publishing a stale or empty reference.
  */
-import { readFileSync, writeFileSync, mkdirSync } from "node:fs";
+import { readFileSync, readdirSync, writeFileSync, mkdirSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -97,10 +98,51 @@ function parseEnum(source, name) {
 }
 
 /* -------------------------------------------------------------------------- */
+/* Panel kinds, from src/lib/panels/                                          */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * The registered kinds, in registry order, each with its `summary`. Every
+ * `export const x = definePanelKind({ kind: "...", summary: "..." })` under
+ * `src/lib/panels/kinds/` is read, and `PANEL_KINDS` in the registry says
+ * which of them are registered and in what order.
+ */
+function parsePanelKinds() {
+  const string = String.raw`"((?:[^"\\]|\\.)*)"`;
+  const declared = new Map();
+  const kindsDir = "src/lib/panels/kinds";
+  for (const file of readdirSync(join(repoRoot, kindsDir))) {
+    if (!file.endsWith(".ts")) continue;
+    const source = read(`${kindsDir}/${file}`);
+    const re = new RegExp(
+      String.raw`export const (\w+) = definePanelKind\(\{\s*kind:\s*${string},\s*summary:\s*${string}`,
+      "g",
+    );
+    for (const m of source.matchAll(re)) {
+      declared.set(m[1], { kind: m[2], summary: m[3].replace(/\\"/g, '"') });
+    }
+  }
+  const registry = read("src/lib/panels/registry.ts");
+  const list = registry.match(/export const PANEL_KINDS = \[([\s\S]*?)\]/);
+  if (!list) fail("could not locate `export const PANEL_KINDS = [...]` in src/lib/panels/registry.ts");
+  const names = list[1].split(",").map((n) => n.trim()).filter(Boolean);
+  if (names.length === 0) fail("parsed zero panel kinds from PANEL_KINDS");
+  return names.map((name) => {
+    const kind = declared.get(name);
+    if (!kind) {
+      fail(
+        `PANEL_KINDS lists \`${name}\`, but no \`export const ${name} = definePanelKind({ kind, summary, ... })\` was found in ${kindsDir}/ (kind and summary must come first, as string literals)`,
+      );
+    }
+    return kind;
+  });
+}
+
+/* -------------------------------------------------------------------------- */
 
 const config = parseConfig();
 const ir = read("src/lib/ir.ts");
-const vizTypes = parseEnum(ir, "VizType");
+const panelKinds = parsePanelKinds();
 const valueFormats = parseEnum(ir, "ValueFormat");
 
 const banner = (sourceFile) =>
@@ -159,20 +201,8 @@ through the config module.
 
 /* ---- reference/visualization-types.md ---- */
 
-const VIZ_NOTES = {
-  line: "Time series as a continuous line. Requires `query.timeField`.",
-  area: "Filled time series. Requires `query.timeField`.",
-  bar: "Bars over time or across a categorical dimension.",
-  scatter: "Relationship between two numeric dimensions.",
-  stat: "A single scalar value, formatted per `panel.format`. Omits `query.timeField`.",
-  table: "The result rows as an HTML table.",
-  heatmap: "Two dimensions against a numeric intensity.",
-  pie: "Proportional breakdown across a small set of categories. Omits `query.timeField`.",
-  donut: "A pie with an inner radius. Omits `query.timeField`.",
-};
-
-const vizRows = vizTypes
-  .map((v) => `| \`${v}\` | ${VIZ_NOTES[v] ?? "—"} |`)
+const vizRows = panelKinds
+  .map(({ kind, summary }) => `| \`${kind}\` | ${summary} |`)
   .join("\n");
 
 const formatRows = valueFormats
@@ -180,14 +210,16 @@ const formatRows = valueFormats
   .join("\n");
 
 const vizPage =
-  banner("`VizType` and `ValueFormat` in `src/lib/ir.ts`")
+  banner("the panel registry in `src/lib/panels/` and `ValueFormat` in `src/lib/ir.ts`")
     .replace("TITLE", "Visualization types")
     .replace("DESCRIPTION", "The panel visualization kinds and value formats defined by the shared IR.")
   + `
-A panel's \`viz\` field selects its renderer. This list is generated from
-\`VizType\` in [\`src/lib/ir.ts\`](https://github.com/jbouder/holotable/blob/main/src/lib/ir.ts),
-which is the single definition shared by the model's output schema, the API,
-persistence, and the client.
+A panel's \`viz\` field selects its kind. This list is generated from the
+panel registry,
+[\`src/lib/panels/registry.ts\`](https://github.com/jbouder/holotable/blob/main/src/lib/panels/registry.ts),
+which \`VizType\` in \`src/lib/ir.ts\` is built from: the same list is the
+model's output schema, the generation prompt's choices, the API's validation,
+and the client's renderers.
 
 ## \`viz\`
 
@@ -195,9 +227,9 @@ persistence, and the client.
 | --- | --- |
 ${vizRows}
 
-\`stat\` and \`table\` are rendered as HTML by \`PanelView\`; every other kind is
-built into an ECharts option by \`buildChartOption\` in
-\`src/components/charts/options.ts\`.
+\`stat\` and \`table\` are drawn as HTML; every other kind is an ECharts chart.
+[Adding a panel kind](/concepts/streaming-and-rendering/#panel-kinds) says
+where each one is declared.
 
 ## \`format\`
 
@@ -215,5 +247,5 @@ writeFileSync(join(outDir, "visualization-types.md"), vizPage);
 
 console.log(
   `generate-reference: ${config.length} config variables, ` +
-    `${vizTypes.length} viz types, ${valueFormats.length} value formats`,
+    `${panelKinds.length} viz types, ${valueFormats.length} value formats`,
 );

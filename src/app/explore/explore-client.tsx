@@ -13,7 +13,8 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { PageHeader } from "@/components/ui/page-header";
 import { EChart } from "@/components/charts/EChart";
-import { buildChartOption, type PanelData } from "@/components/charts/options";
+import type { PanelData } from "@/components/charts/options";
+import { panelRenderer } from "@/components/panels/registry";
 import { useTimeDisplay } from "@/components/time-display";
 import { ErrorDisplay } from "@/components/ui/error-display";
 import { type ApiError, apiErrorFromThrown } from "@/lib/errors";
@@ -51,7 +52,6 @@ interface Result {
   error?: ApiError;
 }
 
-const CHART_VIZ = new Set(["line", "bar", "heatmap", "pie", "donut"]);
 const MAX_TABLE_ROWS = 500;
 const TIME_PRESETS: { value: string; label: string }[] = [
   { value: "now-15m", label: "Last 15 minutes" },
@@ -421,10 +421,13 @@ function ResultBody({
     return <p className="text-sm text-muted">No rows returned for this window.</p>;
   }
 
-  if (CHART_VIZ.has(panel.viz)) {
+  // Every chart kind is plotted, from the panel registry (#61); the HTML kinds
+  // get explore's own wider stat and table below.
+  const renderer = panelRenderer(panel.viz);
+  if (renderer.type === "chart") {
     return (
       <div className="h-96 border border-border bg-surface p-2">
-        <EChart option={buildChartOption(panel, data, display)} />
+        <EChart option={renderer.option(panel, data, display)} />
       </div>
     );
   }

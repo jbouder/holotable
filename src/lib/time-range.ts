@@ -1,4 +1,5 @@
 import { type Panel, TimeRange } from "@/lib/ir";
+import { panelKind } from "@/lib/panels/registry";
 import { resolveTimeRange } from "@/lib/time";
 import {
   formatDateTime,
@@ -309,16 +310,14 @@ export function rangeSearch(range: TimeRange, dashboardDefault: TimeRange): stri
 }
 
 /**
- * Vizzes whose x-axis is the panel's time field laid out left to right, and so
- * the ones where dragging across the chart means "this stretch of time".
- * `scatter` plots two numeric columns, `pie`/`donut` have no axis at all, and a
- * `heatmap`'s x categories are not necessarily ordered.
+ * Whether a brush over this panel can name a window: its kind lays the time
+ * field out left to right (`timeBrush` in the panel registry), and the panel
+ * says which column that is. `scatter` plots two numeric columns, `pie`/`donut`
+ * have no axis at all, and a `heatmap`'s x categories are not necessarily
+ * ordered.
  */
-const BRUSHABLE_VIZ = new Set(["line", "area", "bar"]);
-
-/** Whether a brush over this panel can name a window. */
 export function supportsTimeBrush(panel: Panel): boolean {
-  return BRUSHABLE_VIZ.has(panel.viz) && panel.query.timeField !== undefined;
+  return panelKind(panel.viz).timeBrush && panel.query.timeField !== undefined;
 }
 
 /**

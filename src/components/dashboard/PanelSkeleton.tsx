@@ -1,5 +1,7 @@
 import type * as React from "react";
 import type { VizType } from "@/lib/ir";
+import { findPanelKind, panelKind } from "@/lib/panels/registry";
+import type { PanelSkeletonShape } from "@/lib/panels/types";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 
@@ -16,15 +18,18 @@ import { cn } from "@/lib/utils";
  * the caller is what announces that the panel is loading.
  */
 export function PanelSkeleton({ viz }: { viz: VizType }) {
-  switch (viz) {
+  return <SkeletonShape shape={panelKind(viz).skeleton} />;
+}
+
+function SkeletonShape({ shape }: { shape: PanelSkeletonShape }) {
+  switch (shape) {
     case "stat":
       return <StatSkeleton />;
     case "table":
       return <TableSkeleton />;
-    case "pie":
-    case "donut":
+    case "radial":
       return <RadialSkeleton />;
-    default:
+    case "chart":
       return <ChartSkeleton />;
   }
 }
@@ -105,12 +110,16 @@ function RadialSkeleton() {
  */
 export function PanelCardSkeleton({
   title,
-  viz = "line",
+  viz,
   className,
 }: {
   /** The title if the stream has produced one; a placeholder bar if not. */
   title?: string;
-  viz?: VizType;
+  /**
+   * The kind, as far as the stream has written it. A string still arriving
+   * (`"do"` on its way to `"donut"`) is not a kind yet, and draws as a chart.
+   */
+  viz?: string;
   className?: string;
 }) {
   return (
@@ -129,7 +138,7 @@ export function PanelCardSkeleton({
         <Skeleton className="h-4 w-12" />
       </div>
       <div className="min-h-0 flex-1 px-4 pb-3">
-        <PanelSkeleton viz={viz} />
+        <SkeletonShape shape={findPanelKind(viz)?.skeleton ?? "chart"} />
       </div>
     </div>
   );

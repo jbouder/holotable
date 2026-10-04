@@ -1,7 +1,9 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import type { Panel } from "@/lib/ir";
-import { buildChartOption, type PanelData } from "@/components/charts/options";
+import { lineChart, type PanelData } from "@/components/charts/options";
+import { PANEL_RENDERERS } from "@/components/panels/registry";
+import { LOCAL_TIME_DISPLAY } from "@/lib/time-display";
 
 function panel(overrides: Partial<Panel> = {}): Panel {
   return {
@@ -21,7 +23,12 @@ function panel(overrides: Partial<Panel> = {}): Panel {
  * so every shape below is reachable in principle.
  */
 
-const VIZ: Panel["viz"][] = ["line", "area", "bar", "scatter", "pie", "donut", "heatmap"];
+/** Every chart kind in the registry, so a new one is covered by being registered. */
+const CHARTS = Object.entries(PANEL_RENDERERS).flatMap(([viz, renderer]) =>
+  renderer.type === "chart"
+    ? [{ viz: viz as Panel["viz"], option: renderer.option }]
+    : [],
+);
 
 const JUNK: PanelData[] = [
   { columns: [], rows: [] },
@@ -41,11 +48,18 @@ const JUNK: PanelData[] = [
   { columns: ["ts", "v"], rows: [{ ts: BigInt(10), v: BigInt(5) }] },
 ];
 
-for (const viz of VIZ) {
-  test(`buildChartOption does not throw on unexpected row shapes (${viz})`, () => {
+test("every chart kind is covered", () => {
+  assert.deepEqual(
+    CHARTS.map((c) => c.viz),
+    ["line", "area", "bar", "scatter", "heatmap", "pie", "donut"],
+  );
+});
+
+for (const { viz, option } of CHARTS) {
+  test(`a chart's option builder does not throw on unexpected row shapes (${viz})`, () => {
     for (const data of JUNK) {
       assert.doesNotThrow(
-        () => buildChartOption(panel({ viz }), data),
+        () => option(panel({ viz }), data, LOCAL_TIME_DISPLAY),
         `viz=${viz} data=${JSON.stringify(data, (_k, v) => (typeof v === "bigint" || typeof v === "symbol" ? String(v) : v))}`,
       );
     }
@@ -53,21 +67,33 @@ for (const viz of VIZ) {
 }
 
 test("non-object rows are dropped rather than rendered", () => {
-  const option = buildChartOption(panel(), {
-    columns: ["ts", "v"],
-    rows: [{ ts: "t0", v: 1 }, null, { ts: "t1", v: 2 }] as unknown as PanelData["rows"],
-  });
+  const option = lineChart(
+    panel(),
+    {
+      columns: ["ts", "v"],
+      rows: [
+        { ts: "t0", v: 1 },
+        null,
+        { ts: "t1", v: 2 },
+      ] as unknown as PanelData["rows"],
+    },
+    LOCAL_TIME_DISPLAY,
+  );
   assert.deepEqual((option.xAxis as { data: string[] }).data, ["t0", "t1"]);
 });
 
 test("a well-formed line panel is unchanged by the normalization", () => {
-  const option = buildChartOption(panel(), {
-    columns: ["ts", "v"],
-    rows: [
-      { ts: "t0", v: 1 },
-      { ts: "t1", v: 2 },
-    ],
-  });
+  const option = lineChart(
+    panel(),
+    {
+      columns: ["ts", "v"],
+      rows: [
+        { ts: "t0", v: 1 },
+        { ts: "t1", v: 2 },
+      ],
+    },
+    LOCAL_TIME_DISPLAY,
+  );
   assert.deepEqual((option.xAxis as { data: string[] }).data, ["t0", "t1"]);
   const series = option.series as { name: string; data: number[] }[];
   assert.equal(series.length, 1);

@@ -1,7 +1,7 @@
 import type { EChartsOption } from "echarts";
 import type { Panel } from "@/lib/ir";
 import { chartPalette } from "@/lib/color/oklch";
-import { formatDateTime, LOCAL_TIME_DISPLAY, type TimeDisplay } from "@/lib/time-display";
+import { formatDateTime, type TimeDisplay } from "@/lib/time-display";
 
 export interface PanelData {
   columns: string[];
@@ -113,61 +113,67 @@ const BASE: EChartsOption = {
   backgroundColor: "transparent",
 };
 
-/**
- * Build an ECharts option from a panel spec + current (bounded) data. Only
- * line/area/bar/scatter/heatmap/pie/donut map to ECharts; stat/table are rendered as HTML.
- *
- * `display` is how the viewer wants times shown; the time field's axis labels
- * (and so the axis tooltip, which repeats them) follow it.
- */
-export function buildChartOption(
+/** One kind's chart: a panel spec and its current (bounded) rows as an ECharts option. */
+export type ChartOptionBuilder = (
   panel: Panel,
-  raw: PanelData,
-  display: TimeDisplay = LOCAL_TIME_DISPLAY,
-): EChartsOption {
-  const data = normalize(raw);
-  const x = xKey(panel, data);
-  const keys = seriesKeys(panel, data);
-  const xValues = data.rows.map((r) => r[x]);
-  const categories =
-    panel.query.timeField === x ? timeAxisLabels(xValues, display) : xValues.map(toText);
+  data: PanelData,
+  display: TimeDisplay,
+) => EChartsOption;
 
-  if (panel.viz === "heatmap") {
-    return buildHeatmap(panel, data, display);
-  }
+/**
+ * A builder that is handed only well-formed rows, whatever arrived. Every
+ * builder below goes through this, so none of them has to defend itself.
+ */
+function normalized(build: ChartOptionBuilder): ChartOptionBuilder {
+  return (panel, data, display) => build(panel, normalize(data), display);
+}
 
-  if (panel.viz === "pie" || panel.viz === "donut") {
-    return buildPie(panel, data);
-  }
-
-  if (panel.viz === "scatter") {
-    return buildScatter(data);
-  }
-
-  const type = panel.viz === "bar" ? "bar" : "line";
-  return {
-    ...BASE,
-    xAxis: {
-      type: "category",
-      data: categories,
-      axisLabel: { color: "#9aa0aa", hideOverlap: true },
-      axisLine: { lineStyle: { color: "#3a3f4b" } },
-    },
-    yAxis: {
-      type: "value",
-      axisLabel: { color: "#9aa0aa" },
-      splitLine: { lineStyle: { color: "#2a2f3a" } },
-    },
-    series: keys.map((k) => ({
-      name: k,
-      type,
-      showSymbol: false,
-      smooth: type === "line",
-      areaStyle: panel.viz === "area" ? {} : undefined,
-      data: data.rows.map((r) => toNumber(r[k])),
-    })),
+/**
+ * Numeric columns against the x key, one series per column: `line`, `area`
+ * and `bar`. The x key's labels follow the viewer's time display when it is
+ * the panel's time field.
+ */
+function buildSeries(type: "line" | "bar", area: boolean): ChartOptionBuilder {
+  return (panel, data, display) => {
+    const x = xKey(panel, data);
+    const keys = seriesKeys(panel, data);
+    const xValues = data.rows.map((r) => r[x]);
+    const categories =
+      panel.query.timeField === x
+        ? timeAxisLabels(xValues, display)
+        : xValues.map(toText);
+    return {
+      ...BASE,
+      xAxis: {
+        type: "category",
+        data: categories,
+        axisLabel: { color: "#9aa0aa", hideOverlap: true },
+        axisLine: { lineStyle: { color: "#3a3f4b" } },
+      },
+      yAxis: {
+        type: "value",
+        axisLabel: { color: "#9aa0aa" },
+        splitLine: { lineStyle: { color: "#2a2f3a" } },
+      },
+      series: keys.map((k) => ({
+        name: k,
+        type,
+        showSymbol: false,
+        smooth: type === "line",
+        areaStyle: area ? {} : undefined,
+        data: data.rows.map((r) => toNumber(r[k])),
+      })),
+    };
   };
 }
+
+export const lineChart = normalized(buildSeries("line", false));
+export const areaChart = normalized(buildSeries("line", true));
+export const barChart = normalized(buildSeries("bar", false));
+export const scatterChart = normalized((_panel, data) => buildScatter(data));
+export const heatmapChart = normalized(buildHeatmap);
+export const pieChart = normalized((panel, data) => buildPie(panel, data, false));
+export const donutChart = normalized((panel, data) => buildPie(panel, data, true));
 
 function buildScatter(data: PanelData): EChartsOption {
   const numericColumns = data.columns.filter((column) => isNumeric(data.rows, column));
@@ -202,10 +208,10 @@ function buildScatter(data: PanelData): EChartsOption {
  * is the panel's x key (timeField or first column); the value is the first
  * numeric column that isn't the category.
  */
-function buildPie(panel: Panel, data: PanelData): EChartsOption {
+function buildPie(panel: Panel, data: PanelData, donut: boolean): EChartsOption {
   const x = xKey(panel, data);
   const valueKey = seriesKeys(panel, data)[0] ?? data.columns.find((c) => c !== x) ?? x;
-  const radius = panel.viz === "donut" ? ["48%", "72%"] : "72%";
+  const radius = donut ? ["48%", "72%"] : "72%";
   return {
     color: palette,
     backgroundColor: "transparent",
