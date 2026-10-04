@@ -49,6 +49,15 @@ export type PollerEvent =
       mode: "append" | "replace";
       columns: string[];
       rows: Record<string, unknown>[];
+      /**
+       * On a time-series `append`: the rows cover every timestamp from `since`
+       * on, so the browser drops what it holds from `since` and appends these
+       * in its place. That is how the newest bucket of a bucketed series —
+       * still filling while its minute runs — is updated rather than frozen
+       * at its first value. `timeField` names the column `since` applies to.
+       */
+      since?: string;
+      timeField?: string;
     }
   | { type: "panel-error"; panelId: string; error: string; kind: ErrorKind }
   | { type: "dashboard-error"; error: string; kind: ErrorKind }
@@ -73,8 +82,15 @@ export interface TimeWindow {
 
 /**
  * Pure delta computation. Given the full result of a query and the previous
- * cursor, returns only the newer rows and the advanced cursor. Exported for
- * unit testing.
+ * cursor, returns the rows from the cursor on and the advanced cursor.
+ * Exported for unit testing.
+ *
+ * From the cursor ON, not after it: the rows AT the cursor are sent again
+ * every time. A time-bucketed series (`date_trunc('minute', ts)`) keeps
+ * changing its newest bucket until the minute is over, and a cursor that
+ * skipped its own timestamp froze that bucket at whatever it held when first
+ * seen. The browser replaces rather than appends from the cursor
+ * (`mergePanelRows`), so a re-sent row is never a duplicate.
  */
 export function computeDelta(
   rows: Record<string, unknown>[],
@@ -85,7 +101,9 @@ export function computeDelta(
   cursor: string | undefined;
   mode: "append" | "replace";
 } {
-  const fresh = prevCursor ? rows.filter((r) => String(r[timeField]) > prevCursor) : rows;
+  const fresh = prevCursor
+    ? rows.filter((r) => String(r[timeField]) >= prevCursor)
+    : rows;
   const cursor = rows.reduce<string | undefined>((acc, r) => {
     const v = String(r[timeField]);
     return acc === undefined || v > acc ? v : acc;
@@ -277,11 +295,14 @@ class DashboardPoller {
       this.send(sub, event);
       return;
     }
-    const delta = computeDelta(event.rows, timeField, sub.cursors.get(panel.id));
+    const since = sub.cursors.get(panel.id);
+    const delta = computeDelta(event.rows, timeField, since);
     if (delta.cursor !== undefined) sub.cursors.set(panel.id, delta.cursor);
     this.send(
       sub,
-      { ...event, mode: delta.mode, rows: delta.fresh },
+      delta.mode === "append"
+        ? { ...event, mode: "append", rows: delta.fresh, since, timeField }
+        : { ...event, mode: "replace", rows: delta.fresh },
       encodeResumeToken(this.version, sub.cursors),
     );
   }

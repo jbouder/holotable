@@ -7,6 +7,8 @@ import {
   MAX_RESUME_TOKEN_CHARS,
 } from "@/lib/poller/resume";
 import { eventFrame, HEARTBEAT_FRAME } from "@/lib/sse";
+import { mergePanelRows } from "@/lib/stream-merge";
+import type { PanelData } from "@/components/charts/options";
 import type { Dashboard } from "@/lib/ir";
 
 /**
@@ -70,7 +72,12 @@ function growingSource() {
   const add = (...ns: number[]) => {
     for (const n of ns) table.push({ ts: ts(n), v: n });
   };
-  return { executor, add };
+  /** The newest bucket is still filling: its value changes in place. */
+  const bump = (v: number) => {
+    const last = table.at(-1);
+    if (last) last.v = v;
+  };
+  return { executor, add, bump };
 }
 
 interface Seen {
@@ -88,15 +95,13 @@ function viewer(): Seen & { listener: (e: PollerEvent, id?: string) => void } {
   });
 }
 
-/** The series rows a viewer holds, merged the way LiveDashboard merges them. */
+/** The series values a viewer holds, merged exactly as LiveDashboard merges them. */
 function seriesRows(seen: Seen): number[] {
-  let rows: number[] = [];
+  let data: PanelData | undefined;
   for (const e of seen.events) {
-    if (e.type !== "panel" || e.panelId !== "series") continue;
-    const values = e.rows.map((r) => Number(r.v));
-    rows = e.mode === "replace" ? values : [...rows, ...values];
+    if (e.type === "panel" && e.panelId === "series") data = mergePanelRows(data, e, 720);
   }
-  return rows;
+  return (data?.rows ?? []).map((r) => Number(r.v));
 }
 
 function panelEvents(seen: Seen, panelId: string) {
@@ -251,6 +256,34 @@ test("a reconnect after the spec changed version, or with a bad id, gets a full 
     assert.deepEqual(seriesRows(b), [1, 2]);
     off();
   }
+});
+
+test("the newest bucket updates in place while it fills, without duplicating", async () => {
+  mock.timers.enable({ apis: ["setTimeout"] });
+  const { executor, add, bump } = growingSource();
+  add(1, 2);
+  const id = dashboardId();
+  const a = viewer();
+  let unsub = getPoller(id, 1, "ws", spec(), executor).subscribe(a.listener);
+  await settle();
+  assert.deepEqual(seriesRows(a), [1, 2]);
+
+  // The bucket at ts(2) keeps counting: 2 → 20 → 25.
+  bump(20);
+  await nextTick();
+  assert.deepEqual(seriesRows(a), [1, 20]);
+  bump(25);
+  add(3);
+  await nextTick();
+  assert.deepEqual(seriesRows(a), [1, 25, 3]);
+
+  // A resume overlaps at the cursor's bucket; that is an update too.
+  unsub();
+  bump(30);
+  unsub = getPoller(id, 1, "ws", spec(), executor).subscribe(a.listener, a.lastId);
+  await settle();
+  assert.deepEqual(seriesRows(a), [1, 25, 30]);
+  unsub();
 });
 
 /* -------------------------------------------------------------------------- */

@@ -9,7 +9,6 @@ import { PanelView, type PanelState } from "@/components/dashboard/PanelView";
 import { ErrorDisplay } from "@/components/ui/error-display";
 import type { ApiError } from "@/lib/errors";
 import { ConnectionIndicator } from "@/components/dashboard/ConnectionIndicator";
-import type { PanelData } from "@/components/charts/options";
 import { NavPortal } from "@/components/nav-slot";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -22,6 +21,7 @@ import {
 } from "@/lib/connection";
 import { DRAIN_EVENT, SESSION_ENDED_EVENT } from "@/lib/sse";
 import { renewSession } from "@/lib/session-renewal";
+import { mergePanelRows } from "@/lib/stream-merge";
 import { HIDDEN_STREAM_GRACE_MS } from "@/lib/stream-idle";
 import { isRolling, rangeSearch } from "@/lib/time-range";
 import { Notice } from "@/components/notice";
@@ -177,7 +177,7 @@ export function LiveDashboard({
           };
         }
         // event.type === "panel"
-        const next = mergeData(cur?.data, event, maxWindowPoints);
+        const next = mergePanelRows(cur?.data, event, maxWindowPoints);
         return {
           ...prev,
           [event.panelId]: { data: next, status: "live", updatedAt: at },
@@ -400,22 +400,4 @@ export function LiveDashboard({
       />
     </div>
   );
-}
-
-function mergeData(
-  prev: PanelData | undefined,
-  event: Extract<PollerEvent, { type: "panel" }>,
-  maxWindowPoints: number,
-): PanelData {
-  if (event.mode === "replace" || !prev) {
-    return {
-      columns: event.columns.length ? event.columns : (prev?.columns ?? []),
-      rows: event.rows.slice(-maxWindowPoints),
-    };
-  }
-  const rows = [...prev.rows, ...event.rows];
-  return {
-    columns: event.columns.length ? event.columns : prev.columns,
-    rows: rows.slice(-maxWindowPoints),
-  };
 }

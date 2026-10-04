@@ -51,15 +51,19 @@ test("computeDelta replaces on first fetch and reports the max cursor", () => {
   assert.equal(d.cursor, "2024-01-01 00:00:03");
 });
 
-test("computeDelta appends only rows newer than the cursor", () => {
+test("computeDelta sends the rows from the cursor on, the cursor's own included", () => {
   const rows = [
     { ts: "2024-01-01 00:00:02" },
-    { ts: "2024-01-01 00:00:03" },
+    { ts: "2024-01-01 00:00:03", v: 7 },
     { ts: "2024-01-01 00:00:04" },
   ];
   const d = computeDelta(rows, "ts", "2024-01-01 00:00:03");
   assert.equal(d.mode, "append");
-  assert.deepEqual(d.fresh, [{ ts: "2024-01-01 00:00:04" }]);
+  // The bucket at the cursor may have changed since it was sent; it goes again.
+  assert.deepEqual(d.fresh, [
+    { ts: "2024-01-01 00:00:03", v: 7 },
+    { ts: "2024-01-01 00:00:04" },
+  ]);
   assert.equal(d.cursor, "2024-01-01 00:00:04");
 });
 
