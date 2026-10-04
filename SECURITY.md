@@ -111,6 +111,18 @@ nothing. `can()` in `src/lib/auth/authorize.ts` is the single decision point and
 the only place the platform-admin bypass applies. OIDC is the only way to
 authenticate a real user; there is no local or development login path.
 
+**Sessions, and their renewal.** A session is a first-party HS256 token signed
+with `SESSION_SECRET`, minted only from a verified realm id_token. When the
+realm issues a refresh token, the session token is short-lived (half the
+refresh token's idle lifetime, at most 8 hours) and `POST /api/auth/refresh`
+renews it by asking the realm again and re-deriving the groups from the fresh
+id_token, so a removed group stops working within one token lifetime. The
+refresh token never reaches the browser: it is stored in `sessions` sealed with
+AES-256-GCM under a key derived from `SESSION_SECRET`, and the browser holds
+only a random id for it, in an `httpOnly` cookie scoped to `/api/auth`, whose
+SHA-256 is what the table stores. Sign-out deletes the row; a refused renewal
+deletes it too.
+
 **Demo mode is outside this trust model.** `AUTH_MODE=demo` hands every
 visitor a session with no login, so anyone who can reach the server is a
 member of the `DEMO_GROUPS` workspaces. The server refuses to boot it beside

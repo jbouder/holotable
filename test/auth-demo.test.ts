@@ -9,6 +9,7 @@ import { can } from "@/lib/auth/authorize";
 import { config } from "@/lib/config";
 import { accountOrigin } from "@/lib/account";
 import { GET as callback } from "@/app/api/auth/callback/route";
+import { POST as refresh } from "@/app/api/auth/refresh/route";
 import { proxy, config as proxyConfig } from "@/proxy";
 import { NextRequest } from "next/server";
 
@@ -103,9 +104,18 @@ test("the OIDC callback is a 404 in demo mode", async () => {
   assert.equal(res.status, 404);
 });
 
-test("there are still exactly three auth routes", () => {
+test("session renewal is a 404 in demo mode: there is no realm to ask", async () => {
+  const res = await refresh(
+    new Request("http://localhost/api/auth/refresh", { method: "POST" }),
+  );
+  assert.equal(res.status, 404);
+});
+
+// The fourth is session renewal (#27), which mints only from a realm-issued
+// id_token. Anything else here is a new way in and needs the same scrutiny.
+test("there are still exactly four auth routes", () => {
   const dir = new URL("../src/app/api/auth", import.meta.url);
-  assert.deepEqual(readdirSync(dir).sort(), ["callback", "login", "logout"]);
+  assert.deepEqual(readdirSync(dir).sort(), ["callback", "login", "logout", "refresh"]);
 });
 
 test("a cookie-less page request is sent through demo login; an API request is not", () => {

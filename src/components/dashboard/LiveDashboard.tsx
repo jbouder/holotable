@@ -21,6 +21,7 @@ import {
   reduceConnection,
 } from "@/lib/connection";
 import { DRAIN_EVENT } from "@/lib/sse";
+import { renewSession } from "@/lib/session-renewal";
 import { HIDDEN_STREAM_GRACE_MS } from "@/lib/stream-idle";
 import { isRolling, rangeSearch } from "@/lib/time-range";
 import { Notice } from "@/components/notice";
@@ -111,6 +112,10 @@ export function LiveDashboard({
   // shortcut, so the socket has to be replaced rather than nudged.
   const [reconnectNonce, setReconnectNonce] = React.useState(0);
   const lastTickRef = React.useRef<number>(0);
+  // One renewal per closed stream (#27): a stream the server refused because
+  // the session expired gets a fresh session and one more try; a second
+  // refusal is something else, and is left to the Reconnect button.
+  const renewTriedRef = React.useRef(false);
   const rolling = isRolling(timeRange);
   const streamUrl = React.useMemo(() => {
     const params = new URLSearchParams(timeRange);
@@ -186,6 +191,7 @@ export function LiveDashboard({
     lastTickRef.current = Date.now();
     const es = new EventSource(streamUrl);
     es.onopen = () => {
+      renewTriedRef.current = false;
       setStates({});
       setDashboardError(null);
       signal({ type: "open" });
@@ -219,7 +225,17 @@ export function LiveDashboard({
       // cannot fix by itself but must still be distinguishable from a retry
       // already in flight.
       setStates(markStale);
-      signal({ type: "error", closed: es.readyState === EventSource.CLOSED });
+      const closed = es.readyState === EventSource.CLOSED;
+      signal({ type: "error", closed });
+      // EventSource cannot see the status code, so a closed stream is treated
+      // as a possible expiry: renew once and, if that worked, reconnect. If
+      // the session is over, the keepalive banner asks for a sign-in.
+      if (closed && !renewTriedRef.current) {
+        renewTriedRef.current = true;
+        void renewSession().then((result) => {
+          if (result.ok) setReconnectNonce((n) => n + 1);
+        });
+      }
     };
     // The server sends this just before it stops, along with an SSE `retry:`
     // hint that EventSource honours: the reconnect lands on a healthy instance

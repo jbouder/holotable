@@ -2,6 +2,7 @@ import { LayoutDashboard, LogIn } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { config } from "@/lib/config";
+import { ResumeSession } from "@/components/resume-session";
 
 /**
  * Sign-in surface. Starts the Keycloak OIDC flow — the only way in, so the one
@@ -9,7 +10,8 @@ import { config } from "@/lib/config";
  * (#251) the same link mints a demo session instead; a visitor normally never
  * sees this, because `src/proxy.ts` sends a cookie-less page request there
  * first, but an expired or invalid cookie still lands here. A Server Component
- * on purpose: the mode is read on the server, where `AUTH_MODE` exists.
+ * on purpose: the mode is read on the server, where `AUTH_MODE` exists. With
+ * a realm, it first tries to renew a session that has only expired (#27).
  */
 export function SignIn() {
   const demo = config.authMode === "demo";
@@ -40,6 +42,7 @@ export function SignIn() {
                 <LogIn className="h-4 w-4" /> {demo ? "Enter the demo" : "Sign in"}
               </Button>
             </a>
+            {!demo && <ResumeSession />}
             <p className="text-center text-xs text-muted">
               {demo
                 ? "No account needed. Everyone shares one demo workspace."

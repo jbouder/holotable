@@ -1,7 +1,9 @@
 import { cookies } from "next/headers";
 import { exchangeCode } from "@/lib/auth/oidc";
-import { verifySessionToken, signSessionToken } from "@/lib/auth/session";
-import { setSessionCookie } from "@/lib/auth/cookie";
+import { verifySessionToken } from "@/lib/auth/session";
+import { setSessionCookie, setSessionIdCookie } from "@/lib/auth/cookie";
+import { startSession } from "@/lib/auth/renewal";
+import { renewalDeps } from "@/lib/auth/session-store";
 import { HttpError } from "@/lib/auth/authorize";
 import { config } from "@/lib/config";
 import { route } from "@/lib/http";
@@ -12,7 +14,8 @@ export const runtime = "nodejs";
  * Keycloak OIDC callback. Verifies state, exchanges the code, validates the
  * id_token via JWKS (RS256) — only the validated sub + groups are trusted for
  * authorization — and mints a first-party session cookie. The display name and
- * email are carried over as display-only claims (#208). A 404 in demo mode.
+ * email are carried over as display-only claims (#208). When the realm issued a
+ * refresh token the session is renewable (#27). A 404 in demo mode.
  */
 export const GET = route("auth.callback", async (req: Request) => {
   // Demo mode has no realm to come back from (#251).
@@ -27,20 +30,18 @@ export const GET = route("auth.callback", async (req: Request) => {
   if (!expected || expected !== state) throw new HttpError(400, "invalid state");
   store.delete("holotable_oidc_state");
 
-  const { id_token } = await exchangeCode(url.origin, code);
-  const identity = await verifySessionToken(id_token);
+  const tokens = await exchangeCode(url.origin, code);
+  const identity = await verifySessionToken(tokens.id_token);
   if (!identity) throw new HttpError(401, "id_token verification failed");
 
-  const groups = Object.entries(identity.workspaces).map(
-    ([ws, role]) => `/workspaces/${ws}/${role}`,
-  );
-  if (identity.platformAdmin) groups.push("/platform-admins");
-
-  const session = await signSessionToken(identity.sub, groups, {
-    displayName: identity.displayName,
-    email: identity.email,
-  });
-  await setSessionCookie(session);
+  // With a refresh token the session is short-lived and renewable (#27); the
+  // refresh token itself stays on the server and the browser gets only an
+  // opaque id for it.
+  const issued = await startSession(renewalDeps, identity, tokens);
+  await setSessionCookie(issued.sessionToken, issued.tokenTtl);
+  if (issued.renewal) {
+    await setSessionIdCookie(issued.renewal.sessionId, issued.renewal.ttl);
+  }
 
   // Redirect relative to the browser's current origin. Deriving an absolute
   // URL from url.origin is unsafe here: behind the container the server

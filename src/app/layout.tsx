@@ -1,12 +1,14 @@
 import type { Metadata } from "next";
 import { Chakra_Petch, JetBrains_Mono } from "next/font/google";
-import { headers } from "next/headers";
+import { cookies, headers } from "next/headers";
 import "./globals.css";
 import { NavBar } from "@/components/nav-bar";
 import { CommandPalette } from "@/components/command-palette";
 import { DemoBanner } from "@/components/demo-banner";
+import { SessionKeepalive } from "@/components/session-keepalive";
 import { config } from "@/lib/config";
 import { getIdentity } from "@/lib/auth/authorize";
+import { tokenExpiry } from "@/lib/auth/session";
 import { timeDisplayOf } from "@/lib/preferences";
 import { requestPreferences } from "@/lib/preferences-server";
 import { LOCAL_TIME_DISPLAY } from "@/lib/time-display";
@@ -49,6 +51,13 @@ export default async function RootLayout({
   const account = identity
     ? { displayName: identity.displayName ?? null, email: identity.email ?? null }
     : null;
+  // When this session's token expires, so the browser can renew it first
+  // (#27). Only for a realm session; a demo session has nothing to renew with.
+  const sessionToken = (await cookies()).get(config.sessionCookieName)?.value;
+  const sessionExpiresAt =
+    identity && config.authMode !== "demo" && sessionToken
+      ? tokenExpiry(sessionToken)
+      : null;
   // How this person wants times shown (#214). Signed out it is browser-local;
   // a database that does not answer yields the same, never an error page.
   const timeDisplay = identity
@@ -85,6 +94,7 @@ export default async function RootLayout({
         <TimeDisplayProvider value={timeDisplay}>
           <NavBar account={account} />
           {config.authMode === "demo" && <DemoBanner />}
+          {sessionExpiresAt !== null && <SessionKeepalive expiresAt={sessionExpiresAt} />}
           <main className="flex-1 px-4 py-6 sm:px-6">{children}</main>
           {signedIn && <CommandPalette />}
         </TimeDisplayProvider>

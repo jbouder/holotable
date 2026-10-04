@@ -3,6 +3,7 @@ import { clearRecents, parseRecents, RECENTS_STORAGE_KEY } from "@/lib/command-p
 import { clearRecent, readRecent, RECENT_KEY } from "@/lib/dashboard-list";
 import { DEMO_BANNER_KEY } from "@/lib/demo-banner";
 import { SETUP_DISMISSED_COOKIE } from "@/lib/dismissals";
+import { RESUME_ATTEMPT_KEY, SESSION_EXPIRY_KEY } from "@/lib/session-renewal";
 import { clearDrafts, DRAFT_KEY_PREFIX, listDrafts } from "@/lib/editor/drafts";
 import {
   clearAllPromptHistory,
@@ -112,6 +113,16 @@ export const LOCAL_STORAGE_EXCLUSIONS: readonly { key: KeyMatch; reason: string 
     reason:
       "Reduced motion is a preference, changed under Appearance, not remembered data.",
   },
+  {
+    key: { exact: SESSION_EXPIRY_KEY },
+    reason:
+      "When this session next needs renewing, shared between tabs; a timestamp, rewritten on every renewal.",
+  },
+  {
+    key: { exact: RESUME_ATTEMPT_KEY },
+    reason:
+      "Session storage: stops the sign-in page retrying a silent renewal in a loop. Gone with the tab.",
+  },
 ];
 
 /** Cookies this section can reset, through the allowlisted dismissal action. */
@@ -135,6 +146,11 @@ export const COOKIE_EXCLUSIONS: readonly { name: string; reason: string }[] = [
   {
     name: "holotable_session",
     reason: "The session cookie (SESSION_COOKIE_NAME); Sign out clears it.",
+  },
+  {
+    name: "holotable_session_renew",
+    reason:
+      "The session's renewal id (#27), scoped to /api/auth; Sign out clears it and the stored refresh token.",
   },
   { name: "holotable_oidc_state", reason: "Sign-in handshake, deleted by the callback." },
   { name: "holotable_oidc_nonce", reason: "Sign-in handshake, short-lived." },

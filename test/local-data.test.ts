@@ -22,6 +22,7 @@ import { PROMPT_HISTORY_PREFIX, promptHistoryKey } from "@/lib/prompt-history";
 import { MOTION_STORAGE_KEY } from "@/lib/motion";
 import { DEMO_BANNER_KEY } from "@/lib/demo-banner";
 import { THEME_STORAGE_KEY } from "@/lib/theme";
+import { RESUME_ATTEMPT_KEY, SESSION_EXPIRY_KEY } from "@/lib/session-renewal";
 
 function memory(
   initial: Record<string, string> = {},
@@ -225,6 +226,8 @@ const STORAGE_WRITERS: Record<string, string> = {
   "lib/theme.ts": THEME_STORAGE_KEY,
   "lib/motion.ts": MOTION_STORAGE_KEY,
   "lib/demo-banner.ts": DEMO_BANNER_KEY,
+  "lib/session-renewal.ts": SESSION_EXPIRY_KEY,
+  "components/resume-session.tsx": RESUME_ATTEMPT_KEY,
 };
 
 test("every file that writes browser storage is accounted for", () => {
@@ -253,7 +256,7 @@ test("every file that writes browser storage is accounted for", () => {
  * something else still has to import `cookies` from `next/headers`.
  */
 const COOKIE_WRITERS: Record<string, string[]> = {
-  "lib/auth/cookie.ts": ["holotable_session"],
+  "lib/auth/cookie.ts": ["holotable_session", "holotable_session_renew"],
   "app/api/auth/login/route.ts": ["holotable_oidc_state", "holotable_oidc_nonce"],
   "components/onboarding/actions.ts": [...DISMISSIBLE],
 };
