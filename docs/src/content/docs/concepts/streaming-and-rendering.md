@@ -33,7 +33,43 @@ Server side (`.../stream/route.ts` and `src/lib/poller/registry.ts`):
      Non-time panels are sent as a full `replace` snapshot.
 
 Events go to every subscriber's stream. The event types are `panel`
-(`append`/`replace`), `panel-error`, `dashboard-error`, `tombstone`, and `tick`.
+(`append`/`replace`), `panel-error`, `panel-degraded`, `dashboard-error`,
+`tombstone`, and `tick`.
+
+### When a panel keeps failing
+
+A failed execution used to be retried on the next tick, forever. A source
+that was down, or a statement that always timed out, was hit again every
+refresh by every dashboard showing it. The poller now counts each panel's
+consecutive failures (`src/lib/poller/backoff.ts`):
+
+- **Under `POLLER_FAILURE_THRESHOLD`** (default 3), nothing changes. The
+  failure is a `panel-error` and the next tick tries again, so a single blip
+  costs one refresh.
+- **From the threshold on**, the panel sits out until its `retryAt`. The wait
+  is twice the refresh interval and doubles with each further failure, up to
+  `POLLER_MAX_BACKOFF_MS` (default 5 minutes): 30s, 60s, 120s, 240s, then 5
+  minutes on a fifteen-second dashboard. The viewer gets a `panel-degraded`
+  frame with the error, the count and `retryAt`, and the panel shows when it
+  is tried next.
+- **One success clears it**, and the panel is back on the refresh interval at
+  once.
+
+Only failures that reached the source count. A statement the guard refuses or
+a missing row-filter claim never runs, so it puts no load on the source to
+back off from.
+
+**Retry now** on a degraded panel posts to
+`/api/dashboards/[id]/panels/[panelId]/retry`, which runs it at once on every
+poller showing the dashboard. The poller ignores a retry within
+`MIN_REFRESH_INTERVAL_MS` of the panel's last attempt, and a failed retry
+counts like any other failure, so the button can't run a failing statement
+faster than a refresh would.
+
+The state is per panel, per poller. Two dashboards on the same failing source
+each back off on their own. A source-wide breaker would stop a down source
+being tried by every panel that reads it, and is a follow-up if it turns out
+to be needed.
 
 ### Joining and resuming
 
@@ -98,7 +134,8 @@ Client side (`LiveDashboard.tsx` → `PanelView.tsx` → `EChart.tsx`):
 
 - `append` rows are concatenated into a **bounded rolling window**
   (`MAX_WINDOW_POINTS`, default 720) — old points fall off the front.
-- `replace` swaps the window; `panel-error` and `tombstone` flip panel status.
+- `replace` swaps the window; `panel-error`, `panel-degraded` and `tombstone`
+  flip panel status.
 - `dashboard-error` belongs to no panel: it renders as a banner above the grid,
   marks every panel stale, and clears on the next completed `tick`.
 - A **staleness watchdog** marks panels `stale` if no `tick` arrives within

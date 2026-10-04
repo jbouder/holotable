@@ -355,6 +355,8 @@ test("malformed values are errors regardless of environment", () => {
     CATALOG_STALE_AFTER_DAYS: "-1",
     SHUTDOWN_GRACE_MS: "forever",
     SSE_REAUTH_INTERVAL_MS: "0",
+    POLLER_FAILURE_THRESHOLD: "0",
+    POLLER_MAX_BACKOFF_MS: "soon",
     DEFAULT_TIME_FROM: "yesterday-ish",
     SESSION_COOKIE_NAME: "has space",
   };

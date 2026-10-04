@@ -48,13 +48,13 @@ rather than a rewrite.
   connections (default 5), reused across ticks. A busy dashboard waits for a
   free connection rather than opening more, so it cannot use up the metrics
   database's `max_connections` on its own.
+- **Panels that keep failing.** After `POLLER_FAILURE_THRESHOLD` failures in
+  a row (default 3), a panel stops running on every tick and backs off,
+  doubling from the refresh interval up to `POLLER_MAX_BACKOFF_MS` (default 5
+  minutes). A source that is down is tried a few times an hour, not every
+  fifteen seconds. See
+  [Streaming and rendering](/concepts/streaming-and-rendering/#when-a-panel-keeps-failing).
 - **Idle viewers.** A hidden tab closes its stream after a grace period
   (`src/lib/stream-idle.ts`), and a poller with no subscribers stops.
 - **The public demo** sits behind a Worker with per-IP limits
   (`deploy/cloudflare/demo/`).
-
-## Open work that matters on one instance
-
-| Issue | Work |
-| --- | --- |
-| [#44](https://github.com/jbouder/holotable/issues/44) | Poller backoff and a circuit breaker, so a down source is not re-hit every tick |

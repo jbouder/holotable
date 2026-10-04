@@ -22,7 +22,13 @@ import { cn } from "@/lib/utils";
 import { type Box, DURATION_SLOW_MS, EASE_EMPHASIZED, flipFrom } from "@/lib/motion";
 import { useReducedMotion } from "@/components/motion-preference";
 
-export type PanelStatus = "loading" | "live" | "stale" | "error" | "tombstoned";
+export type PanelStatus =
+  | "loading"
+  | "live"
+  | "stale"
+  | "error"
+  | "degraded"
+  | "tombstoned";
 
 export interface PanelState {
   data: PanelData;
@@ -34,6 +40,14 @@ export interface PanelState {
    * ago" is not the answer for any individual panel.
    */
   updatedAt?: number;
+  /**
+   * A `degraded` panel (#44): how many times it has failed in a row, and when
+   * the server tries it next. `retrying` is set while a viewer's "Retry now"
+   * waits for the result, which replaces the whole state when it arrives.
+   */
+  failures?: number;
+  retryAt?: number;
+  retrying?: boolean;
 }
 
 const EMPTY: PanelData = { columns: [], rows: [] };
@@ -285,6 +299,9 @@ function PanelBody({
       />
     );
   }
+  if (state?.status === "degraded") {
+    return <DegradedBody state={state} onRetry={onRetry} />;
+  }
   if (data.rows.length === 0 && (!state || state.status === "loading")) {
     // A skeleton in the panel's own shape rather than a centred spinner: the
     // panel already occupies its final grid cell, and filling it with the
@@ -429,11 +446,35 @@ function TableView({ data }: { data: PanelData }) {
   );
 }
 
+/**
+ * A panel the server has stopped running every tick because it keeps failing
+ * (#44): the last error, how long it has been failing, and when it is tried
+ * next, so a viewer can tell "paused on purpose" from "still hammering away".
+ */
+function DegradedBody({ state, onRetry }: { state: PanelState; onRetry?: () => void }) {
+  const display = useTimeDisplay();
+  const next =
+    state.retryAt === undefined
+      ? "It will be tried again shortly."
+      : `Next attempt at ${formatClockTime(state.retryAt, display)}.`;
+  return (
+    <ErrorDisplay
+      layout="block"
+      error={state.error ?? { error: "Query failed", kind: "statement" }}
+      note={`Failed ${state.failures ?? 0} times in a row, so it is retried less often. ${next}`}
+      onRetry={onRetry}
+      retryLabel={state.retrying ? "Retrying…" : "Retry now"}
+      disabled={state.retrying}
+    />
+  );
+}
+
 const STATUS_STYLES: Record<PanelStatus, string> = {
   loading: "bg-surface-2 text-muted",
   live: "bg-success/20 text-success",
   stale: "bg-surface-2 text-muted",
   error: "bg-danger/20 text-danger",
+  degraded: "bg-warning/20 text-warning",
   tombstoned: "bg-danger/20 text-danger",
 };
 

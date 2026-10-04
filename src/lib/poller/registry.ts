@@ -9,6 +9,13 @@ import { executePlan, QueryExecutionError } from "@/lib/timescaledb/client";
 import { config } from "@/lib/config";
 import { type ErrorKind, OPAQUE_MESSAGE } from "@/lib/errors";
 import { log } from "@/lib/log";
+import {
+  type BackoffPolicy,
+  canRetryNow,
+  isDue,
+  type PanelHealth,
+  recordFailure,
+} from "@/lib/poller/backoff";
 import { decodeResumeToken, encodeResumeToken } from "@/lib/poller/resume";
 import {
   forgetDashboard,
@@ -62,6 +69,19 @@ export type PollerEvent =
       timeField?: string;
     }
   | { type: "panel-error"; panelId: string; error: string; kind: ErrorKind }
+  /**
+   * The panel has failed `failures` times in a row and is not run again until
+   * `retryAt` (epoch ms), unless a viewer retries it sooner (#44). `error` and
+   * `kind` are the last failure's, classified as for `panel-error`.
+   */
+  | {
+      type: "panel-degraded";
+      panelId: string;
+      error: string;
+      kind: ErrorKind;
+      failures: number;
+      retryAt: number;
+    }
   | { type: "dashboard-error"; error: string; kind: ErrorKind }
   | { type: "tombstone"; panelId: string; sourceId: string }
   | { type: "tick"; at: number };
@@ -260,6 +280,11 @@ export function describeTickError(
 /** Default executor used in production. */
 export const defaultPanelExecutor: PanelExecutor = makePanelExecutor();
 
+/** The backoff policy from `POLLER_FAILURE_THRESHOLD` and `POLLER_MAX_BACKOFF_MS`. */
+export function configuredBackoff(): BackoffPolicy {
+  return { threshold: config.pollerFailureThreshold, maxMs: config.pollerMaxBackoffMs };
+}
+
 class DashboardPoller {
   private subscribers = new Set<Subscriber>();
   /** Each panel's last result, error or tombstone: what a joiner is sent first. */
@@ -270,6 +295,10 @@ class DashboardPoller {
   private timer: NodeJS.Timeout | null = null;
   private running = false;
   private ticking = false;
+  /** Panels whose last execution failed (#44). A healthy panel has no entry. */
+  private health = new Map<string, PanelHealth>();
+  /** Panels executing right now, so a tick and a manual retry never overlap. */
+  private executing = new Set<string>();
 
   constructor(
     readonly dashboardId: string,
@@ -278,7 +307,13 @@ class DashboardPoller {
     private spec: Dashboard,
     private readonly scope: RowScope = {},
     private executor: PanelExecutor = defaultPanelExecutor,
+    private readonly backoff: BackoffPolicy = configuredBackoff(),
   ) {}
+
+  /** The dashboard's refresh interval, never below the server's floor. */
+  private get intervalMs(): number {
+    return Math.max(config.minRefreshIntervalMs, this.spec.refreshIntervalMs);
+  }
 
   /**
    * Attach a listener. `resumeToken` is the SSE event id the browser last saw
@@ -423,8 +458,91 @@ class DashboardPoller {
     // assume it runs once per tick: a second live timer would double the
     // dashboard's query rate for the life of the poller.
     if (this.timer) clearTimeout(this.timer);
-    const interval = Math.max(config.minRefreshIntervalMs, this.spec.refreshIntervalMs);
-    this.timer = setTimeout(() => this.runTick(), interval);
+    this.timer = setTimeout(() => this.runTick(), this.intervalMs);
+  }
+
+  /**
+   * Execute one panel and publish what came of it.
+   *
+   * Never rejects. A thrown failure is counted against the panel (#44): under
+   * the threshold it is broadcast as a `panel-error` as before, and from the
+   * threshold on as a `panel-degraded` carrying when the panel runs next. What
+   * the executor returns, including a refusal it reports as a `panel-error`
+   * (an invalid statement, a missing row-filter claim), clears the count:
+   * those never reached the source, so they put no load on it to back off from.
+   */
+  private async runPanel(panel: Panel, window: TimeWindow): Promise<void> {
+    this.executing.add(panel.id);
+    const startedAt = Date.now();
+    try {
+      const events = await this.executor(
+        panel,
+        window,
+        this.dashboardWorkspaceId,
+        this.scope,
+      );
+      this.health.delete(panel.id);
+      for (const e of events) this.publish(panel, e);
+    } catch (err) {
+      const described = describePanelError(err);
+      const health = recordFailure(
+        this.health.get(panel.id),
+        startedAt,
+        Date.now(),
+        this.intervalMs,
+        this.backoff,
+      );
+      this.health.set(panel.id, health);
+      if (health.retryAt === null) {
+        this.publish(panel, { type: "panel-error", panelId: panel.id, ...described });
+      } else {
+        log.warn("poller.panel_backing_off", {
+          dashboardId: this.dashboardId,
+          panelId: panel.id,
+          failures: health.failures,
+          retryAt: new Date(health.retryAt).toISOString(),
+        });
+        this.publish(panel, {
+          type: "panel-degraded",
+          panelId: panel.id,
+          ...described,
+          failures: health.failures,
+          retryAt: health.retryAt,
+        });
+      }
+    } finally {
+      this.executing.delete(panel.id);
+    }
+  }
+
+  /**
+   * A viewer's "retry now" on a panel that is backing off (#44): run it at
+   * once instead of at its `retryAt`. Returns whether it was started.
+   *
+   * Refused for a panel that is healthy or still under the threshold (the next
+   * tick runs it anyway), for one already executing, and within
+   * `MIN_REFRESH_INTERVAL_MS` of its last attempt, so the button cannot run a
+   * failing statement faster than a dashboard's own refresh could. A failed
+   * retry counts like any other failure and lengthens the wait.
+   */
+  retryPanel(panelId: string): boolean {
+    if (!this.running) return false;
+    const panel = this.spec.panels.find((p) => p.id === panelId);
+    if (!panel || this.executing.has(panelId)) return false;
+    if (!canRetryNow(this.health.get(panelId), Date.now(), config.minRefreshIntervalMs)) {
+      return false;
+    }
+    let window: TimeWindow;
+    try {
+      window = resolveTimeRange(this.spec.timeRange);
+    } catch {
+      // The tick reports a range that will not resolve; nothing to retry here.
+      return false;
+    }
+    this.runPanel(panel, window).catch((err) => {
+      log.error("poller.retry_crashed", { dashboardId: this.dashboardId, panelId, err });
+    });
+    return true;
   }
 
   /**
@@ -444,24 +562,14 @@ class DashboardPoller {
     try {
       const startedAt = performance.now();
       const window = resolveTimeRange(this.spec.timeRange);
+      const now = Date.now();
+      // A panel backing off (#44) sits out until its `retryAt`, and keeps the
+      // `panel-degraded` it last published, which is what a joiner is sent.
+      // One a viewer is retrying is already running.
       await Promise.all(
-        this.spec.panels.map(async (p) => {
-          try {
-            const events = await this.executor(
-              p,
-              window,
-              this.dashboardWorkspaceId,
-              this.scope,
-            );
-            for (const e of events) this.publish(p, e);
-          } catch (err) {
-            this.publish(p, {
-              type: "panel-error",
-              panelId: p.id,
-              ...describePanelError(err),
-            });
-          }
-        }),
+        this.spec.panels
+          .filter((p) => isDue(this.health.get(p.id), now) && !this.executing.has(p.id))
+          .map((p) => this.runPanel(p, window)),
       );
       // Every panel is executed and broadcast by this point, so the tick's cost
       // is the whole cycle — not one query — which is what a refresh interval
@@ -537,6 +645,20 @@ export function getPoller(
   );
   registry.set(key, poller);
   return poller;
+}
+
+/**
+ * Retry a panel that is backing off, on every poller showing the dashboard
+ * (#44). Returns how many started. Every poller, not only the caller's: one
+ * viewer's retry runs the panel for each set of rows it is shown to, and each
+ * result goes only to that poller's own subscribers.
+ */
+export function retryPanel(dashboardId: string, panelId: string): number {
+  let started = 0;
+  for (const poller of registry.values()) {
+    if (poller.dashboardId === dashboardId && poller.retryPanel(panelId)) started++;
+  }
+  return started;
 }
 
 /** Drop a poller (e.g. after a new version is saved). */

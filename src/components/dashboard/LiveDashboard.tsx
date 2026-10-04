@@ -171,6 +171,19 @@ export function LiveDashboard({
             },
           };
         }
+        if (event.type === "panel-degraded") {
+          return {
+            ...prev,
+            [event.panelId]: {
+              data: cur?.data ?? { columns: [], rows: [] },
+              status: "degraded",
+              error: { error: event.error, kind: event.kind },
+              failures: event.failures,
+              retryAt: event.retryAt,
+              updatedAt: cur?.updatedAt,
+            },
+          };
+        }
         if (event.type === "tombstone") {
           return {
             ...prev,
@@ -190,6 +203,37 @@ export function LiveDashboard({
       });
     },
     [maxWindowPoints],
+  );
+
+  /**
+   * "Retry now" on a panel the server is backing off from (#44). The button
+   * stays disabled until the result arrives on the stream, which replaces the
+   * panel's state; if the server started nothing (too soon after the last
+   * attempt, or the panel recovered meanwhile) it is enabled again at once.
+   */
+  const retryPanel = React.useCallback(
+    async (panelId: string) => {
+      const setRetrying = (retrying: boolean) =>
+        setStates((prev) => {
+          const cur = prev[panelId];
+          return cur?.status === "degraded"
+            ? { ...prev, [panelId]: { ...cur, retrying } }
+            : prev;
+        });
+      setRetrying(true);
+      let started = 0;
+      try {
+        const res = await fetch(
+          `/api/dashboards/${dashboardId}/panels/${encodeURIComponent(panelId)}/retry`,
+          { method: "POST" },
+        );
+        if (res.ok) started = ((await res.json()) as { started?: number }).started ?? 0;
+      } catch {
+        // The stream's own error handling reports a lost connection.
+      }
+      if (started === 0) setRetrying(false);
+    },
+    [dashboardId],
   );
 
   // `reconnectNonce` is listed as a dependency but never read in the body —
@@ -426,6 +470,11 @@ export function LiveDashboard({
           <PanelView
             panel={panel}
             state={states[panel.id]}
+            onRetry={
+              states[panel.id]?.status === "degraded" && live
+                ? () => void retryPanel(panel.id)
+                : undefined
+            }
             paused={!live}
             timeRange={timeRange}
             dashboardTitle={spec.title}
