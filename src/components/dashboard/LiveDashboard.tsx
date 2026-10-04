@@ -21,7 +21,10 @@ import {
   reduceConnection,
 } from "@/lib/connection";
 import { DRAIN_EVENT } from "@/lib/sse";
+import { HIDDEN_STREAM_GRACE_MS } from "@/lib/stream-idle";
 import { isRolling, rangeSearch } from "@/lib/time-range";
+import { Notice } from "@/components/notice";
+import { useHiddenFor, useIdle } from "@/components/dashboard/use-stream-idle";
 
 /**
  * A panel that was live is now only as fresh as its last frame. Used on a
@@ -51,6 +54,10 @@ function markStale(prev: Record<string, PanelState>): Record<string, PanelState>
  * Connection state is tracked separately from panel state, in the reducer in
  * `lib/connection.ts`: `EventSource` retries forever and says nothing, so
  * without it a dead stream and a paused one are the same grey dot.
+ *
+ * The stream is closed while nobody is looking (#263, `lib/stream-idle.ts`):
+ * a tab hidden past a grace period suspends it until the tab is shown, and
+ * with `idlePauseMs` (demo mode) a visible tab nobody touches is paused.
  */
 export function LiveDashboard({
   dashboardId,
@@ -60,6 +67,7 @@ export function LiveDashboard({
   header,
   actions,
   empty,
+  idlePauseMs,
 }: {
   dashboardId: string;
   spec: Dashboard;
@@ -74,9 +82,21 @@ export function LiveDashboard({
   actions?: React.ReactNode;
   /** Shown in place of the grid when the spec carries no panels. */
   empty?: React.ReactNode;
+  /**
+   * Pause live updates after this long without interaction. Set in demo mode
+   * only, so an abandoned tab lets the demo's container sleep; undefined
+   * never pauses a visible tab.
+   */
+  idlePauseMs?: number;
 }) {
   const [states, setStates] = React.useState<Record<string, PanelState>>({});
   const [live, setLive] = React.useState(true);
+  // Set when the idle timer, not the user, paused the stream, so the page can
+  // say why the numbers stopped.
+  const [idlePaused, setIdlePaused] = React.useState(false);
+  // Hidden past the grace period: the stream is closed until the tab is shown.
+  // Separate from `live`, which is the user's choice and survives this.
+  const suspended = useHiddenFor(HIDDEN_STREAM_GRACE_MS);
   const [timeRange, setTimeRange] = React.useState<TimeRange>(
     initialTimeRange ?? spec.timeRange,
   );
@@ -162,7 +182,7 @@ export function LiveDashboard({
   // replace an EventSource, whose own retry schedule a page cannot reach.
   // biome-ignore lint/correctness/useExhaustiveDependencies: the nonce exists to force a fresh EventSource
   React.useEffect(() => {
-    if (!live) return;
+    if (!live || suspended) return;
     lastTickRef.current = Date.now();
     const es = new EventSource(streamUrl);
     es.onopen = () => {
@@ -214,7 +234,7 @@ export function LiveDashboard({
       es.removeEventListener(DRAIN_EVENT, onDraining);
       es.close();
     };
-  }, [applyEvent, live, signal, streamUrl, reconnectNonce]);
+  }, [applyEvent, live, suspended, signal, streamUrl, reconnectNonce]);
 
   // Staleness watchdog. Disabled while paused — a paused dashboard is not stale.
   // An absolute window is frozen by definition: the poller keeps ticking, but
@@ -237,7 +257,14 @@ export function LiveDashboard({
   function togglePause() {
     signal({ type: live ? "pause" : "resume" });
     setLive(!live);
+    setIdlePaused(false);
   }
+
+  useIdle(idlePauseMs, live && !suspended, () => {
+    signal({ type: "pause" });
+    setLive(false);
+    setIdlePaused(true);
+  });
 
   // Rendered in two places — the top bar from `lg`, the page body below it —
   // and only one is ever displayed, so the hidden copy is out of the
@@ -290,6 +317,20 @@ export function LiveDashboard({
         </div>
       </div>
       <NavPortal>{streamControls}</NavPortal>
+
+      <Notice open={idlePaused && !live} role="status">
+        <div className="mb-4 flex flex-wrap items-center gap-3 border border-border bg-surface px-3 py-2 text-sm">
+          <p className="flex-1 text-muted">
+            Live updates paused after{" "}
+            {idlePauseMs !== undefined ? Math.round(idlePauseMs / 60_000) : 0} minutes
+            without activity.
+          </p>
+          <Button variant="secondary" size="sm" onClick={togglePause}>
+            <Play className="h-3.5 w-3.5 fill-current" aria-hidden />
+            Resume
+          </Button>
+        </div>
+      </Notice>
 
       {dashboardError && <ErrorDisplay error={dashboardError} className="mb-4" />}
 
