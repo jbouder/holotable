@@ -18,6 +18,9 @@ you must add a group-membership mapper.
    - Valid redirect URIs: `http://localhost:3000/api/auth/callback`
      (add your production origin too).
    - Standard flow: enabled.
+   - Advanced → **Proof Key for Code Exchange Code Challenge Method**:
+     `S256`. Holotable sends a PKCE challenge on every sign-in; with this set,
+     the realm also refuses a code exchange that lacks the verifier.
 3. Create the groups that encode roles. Group **paths** must match exactly:
 
    ```

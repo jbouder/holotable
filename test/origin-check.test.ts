@@ -232,6 +232,7 @@ test("a Secure cookie carries the prefix the browser enforces", () => {
     renew: "__Secure-holotable_session_renew",
     oidcState: "__Host-holotable_oidc_state",
     oidcNonce: "__Host-holotable_oidc_nonce",
+    oidcVerifier: "__Host-holotable_oidc_verifier",
   });
 });
 
@@ -241,6 +242,7 @@ test("without Secure the names stay bare, so plain-HTTP sign-in still works", ()
     renew: "holotable_session_renew",
     oidcState: "holotable_oidc_state",
     oidcNonce: "holotable_oidc_nonce",
+    oidcVerifier: "holotable_oidc_verifier",
   });
 });
 

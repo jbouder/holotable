@@ -1,5 +1,7 @@
+import { codeChallenge, type Handshake } from "@/lib/auth/sign-in";
+
 /**
- * Minimal Keycloak OIDC (authorization code) helper.
+ * Minimal Keycloak OIDC (authorization code, with PKCE) helper.
  *
  * Only what we need: discover endpoints, build the authorize URL, exchange the
  * code for tokens, and trade a refresh token for new ones (#27). The returned id_token is verified via JWKS by
@@ -33,17 +35,27 @@ export function redirectUri(origin: string): string {
   return process.env.OIDC_REDIRECT_URI || `${origin}/api/auth/callback`;
 }
 
-export async function buildAuthorizeUrl(origin: string, state: string, nonce: string) {
-  const ep = await discover();
-  const params = new URLSearchParams({
+/**
+ * The authorize request's query. Carries the nonce the id_token must echo and
+ * the S256 challenge for the PKCE verifier (#281); the verifier itself stays
+ * in the browser's cookie until the code exchange.
+ */
+export function authorizeParams(origin: string, handshake: Handshake): URLSearchParams {
+  return new URLSearchParams({
     client_id: requireEnv("OIDC_CLIENT_ID"),
     response_type: "code",
     scope: process.env.OIDC_SCOPE || "openid profile email groups",
     redirect_uri: redirectUri(origin),
-    state,
-    nonce,
+    state: handshake.state,
+    nonce: handshake.nonce,
+    code_challenge: codeChallenge(handshake.verifier),
+    code_challenge_method: "S256",
   });
-  return `${ep.authorization_endpoint}?${params.toString()}`;
+}
+
+export async function buildAuthorizeUrl(origin: string, handshake: Handshake) {
+  const ep = await discover();
+  return `${ep.authorization_endpoint}?${authorizeParams(origin, handshake).toString()}`;
 }
 
 /**
@@ -65,11 +77,17 @@ export interface TokenSet {
  */
 export class OidcGrantRefused extends Error {}
 
-export async function exchangeCode(origin: string, code: string): Promise<TokenSet> {
+/** Redeem an authorization code, proving with `verifier` who started it (#281). */
+export async function exchangeCode(
+  origin: string,
+  code: string,
+  verifier: string,
+): Promise<TokenSet> {
   return tokenRequest({
     grant_type: "authorization_code",
     code,
     redirect_uri: redirectUri(origin),
+    code_verifier: verifier,
   });
 }
 

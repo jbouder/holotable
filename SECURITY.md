@@ -108,7 +108,11 @@ the realm JWKS with issuer and audience checks. The validated `sub` and `groups`
 claims are the *only* source of roles: `/workspaces/{id}/{viewer|editor|source-admin}`
 and `/platform-admins`. Group parsing fails closed — a malformed group grants
 nothing. `can()` in `src/lib/auth/authorize.ts` is the single decision point and
-the only place the platform-admin bypass applies. OIDC is the only way to
+the only place the platform-admin bypass applies. A sign-in is bound to the
+browser that started it: the callback requires the `state` it set, redeems the
+code with a PKCE (S256) verifier only that browser holds, and refuses an
+id_token whose `nonce` is not the one it sent, so an authorization code taken
+from someone else's sign-in cannot be used to become them. OIDC is the only way to
 authenticate a real user; there is no local or development login path.
 
 **Sessions, and their renewal.** A session is a first-party HS256 token signed

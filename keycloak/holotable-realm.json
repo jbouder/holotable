@@ -22,6 +22,7 @@
       "frontchannelLogout": false,
       "attributes": {
         "backchannel.logout.url": "http://host.docker.internal:3000/api/auth/backchannel-logout",
+        "pkce.code.challenge.method": "S256",
         "backchannel.logout.session.required": "true",
         "backchannel.logout.revoke.offline.tokens": "false"
       },

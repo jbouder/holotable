@@ -72,6 +72,7 @@ export function cookieNames(base: string, secure: boolean) {
     renew: secure ? `__Secure-${base}_renew` : `${base}_renew`,
     oidcState: host("holotable_oidc_state"),
     oidcNonce: host("holotable_oidc_nonce"),
+    oidcVerifier: host("holotable_oidc_verifier"),
   };
 }
 
@@ -248,9 +249,11 @@ export const config = {
   sessionCookieName: COOKIES.session,
   /** The renewal cookie (#27), `__Secure-` prefixed when `Secure`. */
   renewCookieName: COOKIES.renew,
-  /** The sign-in handshake's state and nonce cookies. */
+  /** The sign-in handshake's state, nonce and PKCE verifier cookies. */
   oidcStateCookieName: COOKIES.oidcState,
   oidcNonceCookieName: COOKIES.oidcNonce,
+  /** The sign-in's PKCE code verifier (#281). */
+  oidcVerifierCookieName: COOKIES.oidcVerifier,
   /** Whether the session and sign-in cookies are `Secure`; see {@link cookieSecure}. */
   sessionCookieSecure: cookieSecure(process.env),
 
