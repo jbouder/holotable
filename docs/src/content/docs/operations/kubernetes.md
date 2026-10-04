@@ -177,9 +177,8 @@ The poller lives in the Node process and is keyed by dashboard in a
 process-local map. A second replica polls every dashboard it has a subscriber
 for a second time: the load on TimescaleDB multiplies by the replica count, and
 two people looking at one dashboard can see different data because each replica
-keeps its own cursor. [Scaling and the poller](/architecture/scaling/) has the
-detail and the issues that fix it —
-[#40](https://github.com/jbouder/holotable/issues/40) first.
+keeps its own cursor. One instance is the supported topology;
+[Scaling and the poller](/architecture/scaling/) has the detail.
 
 The HPA and PodDisruptionBudget templates exist because a chart without them is
 incomplete, not because scaling out works today. `NOTES.txt` repeats the

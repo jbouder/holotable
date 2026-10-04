@@ -11,8 +11,8 @@ nameOverride: ""
 fullnameOverride: ""
 
 # -- Number of app replicas. Keep this at 1: the poller is process-local, so a
-# second replica polls every dashboard a second time
-# (https://github.com/jbouder/holotable/issues/40). See "Replicas" in the README.
+# second replica polls every dashboard a second time. One instance is the
+# supported topology; see "Replicas" in the README.
 replicaCount: 1
 
 image:
@@ -238,8 +238,7 @@ resources:
 
 autoscaling:
   # -- Leave this off. An HPA scales the app horizontally, and horizontal is
-  # exactly what the poller is not yet safe for
-  # (https://github.com/jbouder/holotable/issues/40).
+  # exactly what the process-local poller is not safe for.
   enabled: false
   minReplicas: 1
   maxReplicas: 3

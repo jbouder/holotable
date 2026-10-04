@@ -84,9 +84,8 @@ Two of these are per-instance, not per-deployment. `holotable_sse_subscribers`
 and `holotable_pollers_active` count what *this* process is doing, because the
 poller is per-process — see [Scaling and the
 poller](/architecture/scaling/). Sum across instances; do not expect one
-instance to know the whole picture. A distributed poller lease
-([#42](https://github.com/jbouder/holotable/issues/42)) will add a metric for
-lease ownership.
+instance to know the whole picture. One instance is the supported topology, so
+in practice the two are the same.
 
 ## Label cardinality
 
