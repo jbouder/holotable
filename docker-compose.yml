@@ -138,6 +138,8 @@ services:
       TS_METRICS_HOST: postgres
       TS_METRICS_PORT: "5432"
       SEED_INTERVAL_MS: "2000"
+      # History to write before streaming (#252), e.g. 6h. Empty writes none.
+      SEED_BACKFILL: ${SEED_BACKFILL:-}
     depends_on:
       postgres:
         condition: service_healthy

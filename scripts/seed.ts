@@ -5,24 +5,30 @@ import {
   selfMonitoringConfig,
   selfMonitoringSpec,
 } from "@/lib/self-monitoring/dashboard";
+import {
+  backfillChunks,
+  backfillStart,
+  type HttpRequestRow,
+  httpRequestRows,
+  parseBackfill,
+  type SystemMetricRow,
+  systemMetricRows,
+} from "./lib/seed-data";
 
 /**
  * Looping seeder.
  *
  * 1. (once) ensures a demo workspace source + dashboard exist in Postgres so the
  *    app has something to show.
- * 2. (loop) continuously inserts synthetic http_requests rows into TimescaleDB
+ * 2. (once, with SEED_BACKFILL) inserts the history the loop would have
+ *    written across that window, so a fresh database does not start with
+ *    empty charts (#252).
+ * 3. (loop) continuously inserts synthetic http_requests rows into TimescaleDB
  *    so the live dashboard streams fresh data.
  *
  * Uses the privileged TimescaleDB connection for inserts — distinct
  * from the app's read-only query user.
  */
-
-const SERVICES = ["api", "web", "worker"];
-const ROUTES = ["/login", "/checkout", "/search", "/profile", "/health"];
-
-const HOSTS = ["host-01", "host-02", "host-03", "host-04"];
-const REGIONS = ["us-east", "us-west", "eu-central"];
 
 function metricsClient() {
   const connectionString = process.env.TIMESCALEDB_URL || process.env.DATABASE_URL;
@@ -271,77 +277,126 @@ function systemSpec() {
   };
 }
 
-async function insertBatch(client: Client) {
-  const now = Date.now();
-  const rows = Array.from({ length: 50 }, () => {
-    const roll = Math.random();
-    const status = roll < 0.9 ? 200 : roll < 0.97 ? 404 : 500;
-    return {
-      ts: new Date(now - Math.floor(Math.random() * 1000)),
-      service: SERVICES[Math.floor(Math.random() * SERVICES.length)],
-      route: ROUTES[Math.floor(Math.random() * ROUTES.length)],
-      status,
-      duration_ms: Math.max(1, 40 + Math.random() * 200 + (status >= 500 ? 300 : 0)),
-      bytes: Math.floor(200 + Math.random() * 20000),
-    };
-  });
-  const values = rows.flatMap((row) => [
-    row.ts,
-    row.service,
-    row.route,
-    row.status,
-    row.duration_ms,
-    row.bytes,
-  ]);
+/** One multi-row insert; the caller keeps `rows` within the parameter limit. */
+async function insertRows<T>(
+  client: Client,
+  table: string,
+  columns: readonly (keyof T & string)[],
+  rows: readonly T[],
+) {
+  if (rows.length === 0) return;
+  const values = rows.flatMap((row) => columns.map((c) => row[c]));
   const placeholders = rows
     .map((_, index) => {
-      const first = index * 6 + 1;
-      return `($${first}, $${first + 1}, $${first + 2}, $${first + 3}, $${first + 4}, $${first + 5})`;
+      const first = index * columns.length + 1;
+      return `(${columns.map((_, c) => `$${first + c}`).join(", ")})`;
     })
     .join(", ");
   await client.query(
-    `INSERT INTO metrics.http_requests
-       (ts, service, route, status, duration_ms, bytes)
-     VALUES ${placeholders}`,
+    `INSERT INTO ${table} (${columns.join(", ")}) VALUES ${placeholders}`,
     values,
   );
 }
 
-async function insertSystemBatch(client: Client) {
-  const now = Date.now();
-  // One reading per host so every host stays present in each window.
-  const rows = HOSTS.map((host, index) => ({
-    ts: new Date(now - Math.floor(Math.random() * 1000)),
-    host,
-    region: REGIONS[index % REGIONS.length],
-    cpu_pct: Math.min(100, Math.max(1, 30 + Math.random() * 50)),
-    mem_pct: Math.min(100, Math.max(1, 40 + Math.random() * 40)),
-    disk_pct: Math.min(100, Math.max(1, 50 + Math.random() * 30)),
-    net_in_bytes: Math.floor(10_000 + Math.random() * 5_000_000),
-    net_out_bytes: Math.floor(10_000 + Math.random() * 5_000_000),
-  }));
-  const values = rows.flatMap((row) => [
-    row.ts,
-    row.host,
-    row.region,
-    row.cpu_pct,
-    row.mem_pct,
-    row.disk_pct,
-    row.net_in_bytes,
-    row.net_out_bytes,
-  ]);
-  const placeholders = rows
-    .map((_, index) => {
-      const first = index * 8 + 1;
-      return `($${first}, $${first + 1}, $${first + 2}, $${first + 3}, $${first + 4}, $${first + 5}, $${first + 6}, $${first + 7})`;
-    })
-    .join(", ");
-  await client.query(
-    `INSERT INTO metrics.system_metrics
-       (ts, host, region, cpu_pct, mem_pct, disk_pct, net_in_bytes, net_out_bytes)
-     VALUES ${placeholders}`,
-    values,
+const HTTP_COLUMNS = [
+  "ts",
+  "service",
+  "route",
+  "status",
+  "duration_ms",
+  "bytes",
+] as const;
+const SYSTEM_COLUMNS = [
+  "ts",
+  "host",
+  "region",
+  "cpu_pct",
+  "mem_pct",
+  "disk_pct",
+  "net_in_bytes",
+  "net_out_bytes",
+] as const;
+
+const insertHttpRows = (client: Client, rows: readonly HttpRequestRow[]) =>
+  insertRows(client, "metrics.http_requests", HTTP_COLUMNS, rows);
+const insertSystemRows = (client: Client, rows: readonly SystemMetricRow[]) =>
+  insertRows(client, "metrics.system_metrics", SYSTEM_COLUMNS, rows);
+
+/** The newest row's time in a demo table, or null when it is empty. */
+async function newestRow(client: Client, table: string): Promise<number | null> {
+  const { rows } = await client.query<{ newest: Date | null }>(
+    `SELECT max(ts) AS newest FROM ${table}`,
   );
+  return rows[0]?.newest ? rows[0].newest.getTime() : null;
+}
+
+/**
+ * Fill `metrics.http_requests` and `metrics.system_metrics` back across the
+ * window, at the live cadence, in chunks of at most 5 000 rows (#252).
+ *
+ * Each table starts at the window start or just after its newest existing
+ * row, whichever is later, so a second start on a mounted volume fills only
+ * the gap it was down for and never doubles the history. Then the
+ * `http_requests_1m` continuous aggregate is refreshed over what was written,
+ * so it is populated now rather than after its policy's first run.
+ * `metrics.holotable_self` is never backfilled: real samples from boot are the
+ * point of that source.
+ */
+async function backfill(client: Client, windowMs: number, intervalMs: number) {
+  const now = Date.now();
+  const httpFrom = await backfillTable(
+    client,
+    "metrics.http_requests",
+    httpRequestRows,
+    insertHttpRows,
+    { windowMs, intervalMs, now },
+  );
+  await backfillTable(
+    client,
+    "metrics.system_metrics",
+    systemMetricRows,
+    insertSystemRows,
+    { windowMs, intervalMs, now },
+  );
+  if (httpFrom === null) return;
+  try {
+    await client.query(
+      "CALL refresh_continuous_aggregate('metrics.http_requests_1m', $1::timestamptz, now())",
+      [new Date(httpFrom)],
+    );
+    console.log("backfill: refreshed metrics.http_requests_1m");
+  } catch (err) {
+    // Not fatal: the aggregate's own policy catches up within its schedule.
+    console.warn(
+      "backfill: aggregate refresh skipped:",
+      err instanceof Error ? err.message : err,
+    );
+  }
+}
+
+/** Backfill one table; returns where it started, or null when it was current. */
+async function backfillTable<T>(
+  client: Client,
+  table: string,
+  make: (at: number, random: () => number, floor: number) => T[],
+  insert: (client: Client, rows: readonly T[]) => Promise<void>,
+  { windowMs, intervalMs, now }: { windowMs: number; intervalMs: number; now: number },
+): Promise<number | null> {
+  const from = backfillStart(windowMs, now, await newestRow(client, table));
+  if (from >= now - intervalMs) {
+    console.log(`backfill ${table}: already current, nothing to fill`);
+    return null;
+  }
+  let written = 0;
+  for (const chunk of backfillChunks(make, from, now, intervalMs)) {
+    await insert(client, chunk);
+    written += chunk.length;
+    console.log(`backfill ${table}: ${written} rows`);
+  }
+  console.log(
+    `backfill ${table}: done, ${written} rows from ${new Date(from).toISOString()}`,
+  );
+  return from;
 }
 
 /**
@@ -367,6 +422,16 @@ async function ensureMetricsTables(client: Client) {
 }
 
 async function main() {
+  // Checked before anything is written, so a typo fails fast and loudly
+  // instead of quietly seeding no history.
+  let backfillMs: number | null;
+  try {
+    backfillMs = parseBackfill(process.env.SEED_BACKFILL);
+  } catch (err) {
+    console.error(err instanceof Error ? err.message : err);
+    process.exit(1);
+  }
+
   await ensureDemo().catch((e) => console.warn("demo seed skipped:", e.message));
 
   const intervalMs = Number(process.env.SEED_INTERVAL_MS || 2000);
@@ -375,11 +440,17 @@ async function main() {
   await ensureMetricsTables(client).catch((e) =>
     console.warn("ensure metrics tables skipped:", e.message),
   );
+  if (backfillMs !== null) {
+    await backfill(client, backfillMs, intervalMs).catch((e) =>
+      console.warn("backfill failed:", e instanceof Error ? e.message : e),
+    );
+  }
   console.log(`seeding metrics every ${intervalMs}ms — Ctrl+C to stop`);
   for (;;) {
     try {
-      await insertBatch(client);
-      await insertSystemBatch(client);
+      const now = Date.now();
+      await insertHttpRows(client, httpRequestRows(now));
+      await insertSystemRows(client, systemMetricRows(now));
       process.stdout.write(".");
     } catch (err) {
       console.warn("\ninsert failed:", err instanceof Error ? err.message : err);
