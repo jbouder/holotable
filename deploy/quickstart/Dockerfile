@@ -65,7 +65,13 @@ COPY deploy/quickstart/entrypoint.sh /usr/local/bin/holotable-quickstart
 # outside the container. SESSION_SECRET and METRICS_TOKEN are generated at boot
 # when unset. The model is optional: pass AI_MODEL and OPENAI_API_KEY (and
 # OPENAI_BASE_URL / OPENAI_API) with -e to turn on generation.
+#
+# NO_TS_TUNE skips the base image's 001_timescaledb_tune.sh. On a host that
+# advertises cgroup v2 without a memory.max file (Cloudflare Containers), the
+# script computes "0MB" and timescaledb-tune panics, which aborts initdb. The
+# stock settings are plenty for a demo-sized database.
 ENV NODE_ENV=production \
+    NO_TS_TUNE=true \
     NEXT_TELEMETRY_DISABLED=1 \
     NEXT_MANUAL_SIG_HANDLE=true \
     PORT=3000 \
