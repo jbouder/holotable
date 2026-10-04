@@ -4,6 +4,7 @@ import { readJson, json, route } from "@/lib/http";
 import { assertRowFilterSavable } from "@/lib/row-scope";
 import { audit } from "@/lib/audit";
 import { getSourceById, updateSource, deleteSource } from "@/lib/db/repo";
+import { dropSourcePool } from "@/lib/timescaledb/pool";
 import { SourceConfig } from "@/lib/registry";
 import { sourceListing } from "@/lib/source-listing";
 import { SECRET_REF_MESSAGE, SECRET_REF_PATTERN } from "@/lib/secret-refs";
@@ -89,6 +90,9 @@ export const DELETE = route(
       { type: "source", id },
     );
     const outcome = await deleteSource(source.workspaceId, id);
+    // Its connections would close at the idle timeout anyway; nothing will
+    // check them out again, so close them now.
+    await dropSourcePool(id);
     audit({
       actor: identity,
       action: "source.delete",

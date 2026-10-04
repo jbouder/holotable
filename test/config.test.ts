@@ -351,6 +351,7 @@ test("malformed values are errors regardless of environment", () => {
     MAX_QUERY_ROWS: "lots",
     MAX_RESULT_BYTES: "0",
     QUERY_TIMEOUT_SECONDS: "-5",
+    MAX_POOL_PER_SOURCE: "0",
     CATALOG_STALE_AFTER_DAYS: "-1",
     SHUTDOWN_GRACE_MS: "forever",
     SSE_REAUTH_INTERVAL_MS: "0",

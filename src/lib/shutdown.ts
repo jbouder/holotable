@@ -142,7 +142,10 @@ export interface ShutdownOptions {
   graceMs?: number;
   /** Stop every poller. Defaults to the in-process poller registry. */
   stopPollers?: () => void | Promise<void>;
-  /** Close the config-store pool. Defaults to the shared `pg` pool. */
+  /**
+   * Close the connection pools. Defaults to the config store's shared pool and
+   * every metrics source's pool (#13).
+   */
   closePool?: () => Promise<void>;
   /**
    * Where the one-line progress report goes. Defaults to the structured
@@ -157,8 +160,11 @@ async function defaultStopPollers(): Promise<void> {
 }
 
 async function defaultClosePool(): Promise<void> {
-  const { closePool } = await import("@/lib/db/pg");
-  await closePool();
+  const [{ closePool }, { closeSourcePools }] = await Promise.all([
+    import("@/lib/db/pg"),
+    import("@/lib/timescaledb/pool"),
+  ]);
+  await Promise.all([closePool(), closeSourcePools()]);
 }
 
 /**

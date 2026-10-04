@@ -43,6 +43,11 @@ rather than a rewrite.
 
 - **LLM spend.** The generation and chat routes are rate limited and budgeted
   per workspace (`src/lib/limits/llm.ts`).
+- **Connections to a metrics source.** Each source has one pool
+  (`src/lib/timescaledb/pool.ts`) of at most `MAX_POOL_PER_SOURCE`
+  connections (default 5), reused across ticks. A busy dashboard waits for a
+  free connection rather than opening more, so it cannot use up the metrics
+  database's `max_connections` on its own.
 - **Idle viewers.** A hidden tab closes its stream after a grace period
   (`src/lib/stream-idle.ts`), and a poller with no subscribers stops.
 - **The public demo** sits behind a Worker with per-IP limits
@@ -52,5 +57,4 @@ rather than a rewrite.
 
 | Issue | Work |
 | --- | --- |
-| [#13](https://github.com/jbouder/holotable/issues/13) | A per-source connection pool and a query concurrency ceiling, in place of a new `pg.Client` per execution |
 | [#44](https://github.com/jbouder/holotable/issues/44) | Poller backoff and a circuit breaker, so a down source is not re-hit every tick |
