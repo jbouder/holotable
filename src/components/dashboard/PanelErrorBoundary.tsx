@@ -38,8 +38,8 @@ interface Props {
   children: React.ReactNode;
   /**
    * Called once per caught error. Deliberately a prop rather than a direct
-   * call into a reporting client: shipping errors off the browser is #55, and
-   * this component should not grow a transport. `src/lib/log.ts` is
+   * call into a reporting client: this component should not grow a transport,
+   * and shipping errors off the browser is not planned. `src/lib/log.ts` is
    * server-only (`node:async_hooks`), so there is nothing to log to here yet.
    */
   onError?: (report: PanelErrorReport) => void;

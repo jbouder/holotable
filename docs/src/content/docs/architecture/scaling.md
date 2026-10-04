@@ -1,13 +1,21 @@
 ---
 title: Scaling and the poller
-description: Why the poller is correct for one instance, what breaks with more, and what extraction would take.
+description: Why Holotable runs as one instance by design, what breaks with more, and what extraction would take if it is ever needed.
 sidebar:
   order: 3
 ---
 
-The poller lives in the Node process (`src/lib/poller/registry.ts`). It is
-correct and efficient for a **single app instance**: one poller per dashboard,
-shared by all subscribers on that instance.
+Holotable runs as a **single app instance by design**. The poller lives in the
+Node process (`src/lib/poller/registry.ts`). It is correct and efficient for one
+instance: one poller per dashboard, shared by every subscriber on that
+instance. The Helm chart defaults to `replicaCount: 1` with autoscaling off,
+and that is the supported topology, not a stopgap.
+
+Multi-instance work (a pub/sub fan-out, a distributed lease, cross-dashboard
+query dedupe, load-test numbers to size it) was planned and then dropped as
+premature. Nothing about the current workload needs it, and each piece adds a
+moving part next to the security checks. It comes back when a real deployment
+outgrows one instance, with numbers from that deployment.
 
 ## What breaks with multiple replicas
 
@@ -23,34 +31,27 @@ process.
 
 ## What extraction would take
 
-To scale horizontally, the poller moves behind a shared runtime — a dedicated
-poller service, or a pub/sub fan-out such as Redis — with web instances
-subscribing rather than polling directly.
+To scale horizontally, the poller would move behind a shared runtime: a
+dedicated poller service, or a pub/sub fan-out such as Redis, with web
+instances subscribing rather than polling directly.
 
-The code is already shaped for this: `computeDelta` is pure, and the
-`PanelExecutor` abstraction is injectable, which is what makes the extraction
-straightforward rather than a rewrite.
+The code is already shaped for this. `computeDelta` is pure and the
+`PanelExecutor` abstraction is injectable, which keeps an extraction a move
+rather than a rewrite.
 
-The open work, in order:
+## Load already bounded on one instance
+
+- **LLM spend.** The generation and chat routes are rate limited and budgeted
+  per workspace (`src/lib/limits/llm.ts`).
+- **Idle viewers.** A hidden tab closes its stream after a grace period
+  (`src/lib/stream-idle.ts`), and a poller with no subscribers stops.
+- **The public demo** sits behind a Worker with per-IP limits
+  (`deploy/cloudflare/demo/`).
+
+## Open work that matters on one instance
 
 | Issue | Work |
 | --- | --- |
-| [#40](https://github.com/jbouder/holotable/issues/40) | Decide the topology — standalone service versus pub/sub fan-out |
-| [#41](https://github.com/jbouder/holotable/issues/41) | Delta fan-out so replicas share one producer |
-| [#42](https://github.com/jbouder/holotable/issues/42) | Distributed lease so exactly one process polls a dashboard |
-| [#43](https://github.com/jbouder/holotable/issues/43) | SSE resume via `Last-Event-ID` |
-| [#44](https://github.com/jbouder/holotable/issues/44) | Poller backoff and circuit breaker |
-
-## Other known limits
-
-- **No rate limiting** on the LLM routes yet
-  ([#18](https://github.com/jbouder/holotable/issues/18)) — one editor can burn
-  unbounded provider spend.
-- **No subscriber caps** per dashboard or per instance
-  ([#48](https://github.com/jbouder/holotable/issues/48)).
-- **New connection per query.** `executePlan` opens a fresh `pg.Client` per
-  execution with no pooling or concurrency ceiling
-  ([#13](https://github.com/jbouder/holotable/issues/13)).
-- **No published load numbers** yet
-  ([#49](https://github.com/jbouder/holotable/issues/49)); the caveat above is
-  qualitative until they exist.
+| [#13](https://github.com/jbouder/holotable/issues/13) | A per-source connection pool and a query concurrency ceiling, in place of a new `pg.Client` per execution |
+| [#43](https://github.com/jbouder/holotable/issues/43) | Resume a stream after a reconnect, and give a viewer who joins a running poller its history |
+| [#44](https://github.com/jbouder/holotable/issues/44) | Poller backoff and a circuit breaker, so a down source is not re-hit every tick |

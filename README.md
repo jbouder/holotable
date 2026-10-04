@@ -152,8 +152,8 @@ It deploys neither TimescaleDB nor Keycloak, and it holds no credentials: those
 come from a Secret you name, and the chart refuses to render if one is set as
 plain config. Migrations run as a pre-upgrade hook, so a failed migration aborts
 the release instead of rolling out code against a schema it cannot use. Keep
-`replicaCount` at 1 until [#40](https://github.com/jbouder/holotable/issues/40)
-makes the poller topology-aware.
+`replicaCount` at 1: the poller is process-local, and one instance is the
+supported topology ([Scaling and the poller](https://holotable-docs.beskar.workers.dev/architecture/scaling/)).
 
 See [Deploying on Kubernetes](https://holotable-docs.beskar.workers.dev/operations/kubernetes/)
 and the [chart README](deploy/helm/holotable/README.md).

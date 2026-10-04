@@ -162,11 +162,10 @@ and two viewers of one dashboard can drift apart because each replica keeps its
 own cursor.
 
 The HPA and PDB templates are here because a chart without them is incomplete,
-not because scaling out is supported today. That waits on
-[#40](https://github.com/jbouder/holotable/issues/40) (topology),
-[#41](https://github.com/jbouder/holotable/issues/41) (delta fan-out), and
-[#42](https://github.com/jbouder/holotable/issues/42) (a distributed lease).
-`NOTES.txt` says so again after any install that raises the replica count.
+not because scaling out is supported. One instance is the supported topology;
+[Scaling and the poller](https://holotable-docs.beskar.workers.dev/architecture/scaling/)
+says why and what an extraction would take. `NOTES.txt` says so again after any
+install that raises the replica count.
 
 A `PodDisruptionBudget` with `minAvailable: 1` over a single replica blocks
 `kubectl drain` forever. Use `maxUnavailable: 1` if you want one at all.
