@@ -1,4 +1,5 @@
 import type { Environment } from "@/lib/config";
+import { aiConfigProblem } from "@/lib/ai/configured";
 import { isDraining } from "@/lib/shutdown";
 
 /**
@@ -189,20 +190,15 @@ async function checkIdentityProvider(deps: ReadinessDeps): Promise<DependencyChe
  * failure worth finding before a user does.
  */
 function checkAiProvider(deps: ReadinessDeps): DependencyCheck {
-  const env = deps.env ?? process.env;
-  if (!env.AI_MODEL) return { status: "failed", reason: "AI_MODEL is not set" };
-  const provider = env.AI_PROVIDER || "openai-compatible";
-  if (provider === "gateway") {
-    return env.AI_GATEWAY_API_KEY
-      ? { status: "ok" }
-      : { status: "failed", reason: "AI_GATEWAY_API_KEY is not set" };
-  }
-  if (provider === "openai-compatible") {
-    return env.OPENAI_API_KEY
-      ? { status: "ok" }
-      : { status: "failed", reason: "OPENAI_API_KEY is not set" };
-  }
-  return { status: "failed", reason: "AI_PROVIDER is not recognized" };
+  const problem = aiConfigProblem(deps.env ?? process.env);
+  if (!problem) return { status: "ok" };
+  return {
+    status: "failed",
+    reason:
+      problem === "AI_PROVIDER"
+        ? "AI_PROVIDER is not recognized"
+        : `${problem} is not set`,
+  };
 }
 
 /* -------------------------------------------------------------------------- */

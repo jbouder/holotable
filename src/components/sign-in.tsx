@@ -1,12 +1,18 @@
 import { LayoutDashboard, LogIn } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { config } from "@/lib/config";
 
 /**
  * Sign-in surface. Starts the Keycloak OIDC flow — the only way in, so the one
- * action here is a link to `/api/auth/login` and nothing else.
+ * action here is a link to `/api/auth/login` and nothing else. In demo mode
+ * (#251) the same link mints a demo session instead; a visitor normally never
+ * sees this, because `src/proxy.ts` sends a cookie-less page request there
+ * first, but an expired or invalid cookie still lands here. A Server Component
+ * on purpose: the mode is read on the server, where `AUTH_MODE` exists.
  */
 export function SignIn() {
+  const demo = config.authMode === "demo";
   return (
     <div className="flex min-h-[70vh] items-center justify-center">
       <Card className="w-full max-w-sm">
@@ -19,7 +25,9 @@ export function SignIn() {
               >
                 <LayoutDashboard className="h-5 w-5" />
               </span>
-              <h1 className="text-xl font-semibold">Sign in to Holotable</h1>
+              <h1 className="text-xl font-semibold">
+                {demo ? "Holotable demo" : "Sign in to Holotable"}
+              </h1>
             </div>
             <p className="mt-3 text-sm text-muted">
               Natural-language dashboards for your monitoring data.
@@ -29,11 +37,13 @@ export function SignIn() {
           <div className="space-y-4">
             <a href="/api/auth/login" className="block">
               <Button className="w-full">
-                <LogIn className="h-4 w-4" /> Sign in
+                <LogIn className="h-4 w-4" /> {demo ? "Enter the demo" : "Sign in"}
               </Button>
             </a>
             <p className="text-center text-xs text-muted">
-              Single sign-on through your organization&apos;s Keycloak.
+              {demo
+                ? "No account needed. Everyone shares one demo workspace."
+                : "Single sign-on through your organization's Keycloak."}
             </p>
           </div>
         </CardContent>

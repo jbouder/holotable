@@ -1,6 +1,12 @@
 import { ExternalLink, ShieldCheck, Users } from "lucide-react";
 import { getIdentity } from "@/lib/auth/authorize";
-import { accountSummary, ROLE_LABELS, roleCapabilities, roleGuide } from "@/lib/account";
+import {
+  accountOrigin,
+  accountSummary,
+  ROLE_LABELS,
+  roleCapabilities,
+  roleGuide,
+} from "@/lib/account";
 import { config } from "@/lib/config";
 import { settingsSection } from "@/lib/settings";
 import { SignIn } from "@/components/sign-in";
@@ -30,7 +36,10 @@ export default async function AccountSettings() {
   const identity = await getIdentity();
   if (!identity) return <SignIn />;
   const account = accountSummary(identity);
-  const accountUrl = config.oidcAccountUrl;
+  const demo = config.authMode === "demo";
+  // No identity provider in demo mode, so no account page to link to.
+  const accountUrl = demo ? "" : config.oidcAccountUrl;
+  const origin = accountOrigin(config.authMode, accountUrl);
 
   return (
     <SettingsSectionPage section={settingsSection("account")}>
@@ -59,12 +68,7 @@ export default async function AccountSettings() {
               <CopyButton value={account.sub} label="Copy user id" />
             </dd>
           </dl>
-          <p className="mt-4 text-xs text-muted">
-            Your name, email and password belong to your identity provider.
-            {accountUrl
-              ? " Change them there."
-              : " Ask your administrator to change them."}
-          </p>
+          <p className="mt-4 text-xs text-muted">{origin.profile}</p>
           {accountUrl && (
             <a
               href={accountUrl}
@@ -81,8 +85,7 @@ export default async function AccountSettings() {
       <div>
         <h3 className="text-sm font-semibold">Workspaces</h3>
         <p className="mt-1 text-sm text-muted">
-          Roles come from your groups in the identity provider. A change there takes
-          effect the next time you sign in.
+          {origin.roles}
           {account.platformAdmin &&
             " As a platform admin you can also reach every workspace, including ones not listed here."}
         </p>

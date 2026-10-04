@@ -330,11 +330,23 @@ Prefer additive, migration-safe changes.
 
 ### Auth
 
-Keycloak OIDC is the **only** way to authenticate. There is no local login, no
-dev-login bypass, and no seeded user — `src/app/api/auth/` has exactly three
-routes (`login`, `callback`, `logout`), and running the app locally still needs
-a realm. Do not add a development-only authentication path; make the local
-Keycloak work instead.
+Keycloak OIDC is the **only** way to authenticate a real user. There is no
+local login, no password store, no dev-login bypass, and no seeded user —
+`src/app/api/auth/` has exactly three routes (`login`, `callback`, `logout`).
+Do not add a development-only authentication path; make the local Keycloak
+work instead.
+
+The one exception is `AUTH_MODE=demo` (#251), for evaluation and the public
+demo only. In it `/api/auth/login` mints an ordinary first-party session for
+every visitor, with no login screen, holding `DEMO_GROUPS`; `callback` is a
+404. The exception is in *minting*, never in *verification*:
+`verifySessionToken`, the claims parser and `can()` are unchanged, and a demo
+session is checked exactly like any other. Its guards are boot errors in
+`validateConfig` and must stay that way: demo mode refuses any `OIDC_*`
+variable, and refuses `DEMO_GROUPS` that reach `source-admin` or
+`/platform-admins`. It is **not** a way to develop auth code. Anything that
+touches `src/lib/auth/`, the session or the claims still runs against the
+realm.
 
 Authorization is derived exclusively from the validated identity token's
 `groups` claim and is centralized in `can()` (`src/lib/auth/authorize.ts`).

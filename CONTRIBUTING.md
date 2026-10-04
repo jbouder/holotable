@@ -54,11 +54,19 @@ its own and the token has a local default;
 `docker compose --profile smoke run --rm smoke` then checks the whole path end
 to end.
 
-Authentication is OIDC-only — there is no local or dev login path — so you need
-the Keycloak from `docker compose` (or your own realm) even when running the app
-with `npm run dev`. See
+Authentication is OIDC-only for real users — there is no local or dev login
+path — so you need the Keycloak from `docker compose` (or your own realm) when
+running the app with `npm run dev`. See
 [Keycloak setup](docs/src/content/docs/operations/keycloak.md) for the
 group-mapper configuration that produces the roles the app authorizes against.
+
+The one exception is `AUTH_MODE=demo`, which gives every visitor a session with
+no login, for evaluating Holotable and for the public demo. It refuses to boot
+beside any `OIDC_*` variable or with `DEMO_GROUPS` above editor. It is fine for
+working on dashboards, panels and charts. It is **not** for working on
+authentication or authorization: anything under `src/lib/auth/`, the session or
+the claims is tested against the realm. See
+[Demo mode](docs/src/content/docs/operations/demo-mode.md).
 
 The documentation site is a separate Astro project with its own
 `package.json`:

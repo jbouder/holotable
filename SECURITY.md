@@ -106,7 +106,18 @@ claims are the *only* source of roles: `/workspaces/{id}/{viewer|editor|source-a
 and `/platform-admins`. Group parsing fails closed — a malformed group grants
 nothing. `can()` in `src/lib/auth/authorize.ts` is the single decision point and
 the only place the platform-admin bypass applies. OIDC is the only way to
-authenticate; there is no local or development login path.
+authenticate a real user; there is no local or development login path.
+
+**Demo mode is outside this trust model.** `AUTH_MODE=demo` hands every
+visitor a session with no login, so anyone who can reach the server is a
+member of the `DEMO_GROUPS` workspaces. The server refuses to boot it beside
+any OIDC configuration or with groups that reach `source-admin` or
+`/platform-admins`, so a visitor can never register a source. That fences it;
+it does not make it safe for real data. Never run demo mode on an instance that
+holds a real source, a real credential, or anything you would not publish. A
+report that demo mode lets a visitor do what its documented editor role
+allows is not a vulnerability; one that lets a visitor exceed that role, or
+reach a demo session from an `oidc` deployment, is.
 
 **The server environment.** Database credentials live only in environment
 variables (or files in `SOURCE_SECRETS_DIR`) and are resolved at execution

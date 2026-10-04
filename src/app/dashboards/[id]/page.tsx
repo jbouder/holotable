@@ -14,6 +14,7 @@ import { Button, ButtonLabel } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
 import { dashboardListHref, EMPTY_QUERY } from "@/lib/dashboard-list";
 import { chatSuggestions } from "@/lib/chat-history";
+import { aiUnavailable } from "@/lib/ai/configured";
 import { rangeFromParams } from "@/lib/time-range";
 
 export const dynamic = "force-dynamic";
@@ -167,6 +168,7 @@ export default async function DashboardViewPage({
         dashboardTitle={dashboard.spec.title}
         panels={dashboard.spec.panels.map((p) => ({ title: p.title, query: p.query }))}
         suggestions={chatSuggestions(dashboard.spec)}
+        aiUnavailable={aiUnavailable()}
       />
     </div>
   );

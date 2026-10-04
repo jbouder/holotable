@@ -4,6 +4,8 @@ import { headers } from "next/headers";
 import "./globals.css";
 import { NavBar } from "@/components/nav-bar";
 import { CommandPalette } from "@/components/command-palette";
+import { DemoBanner } from "@/components/demo-banner";
+import { config } from "@/lib/config";
 import { getIdentity } from "@/lib/auth/authorize";
 import { timeDisplayOf } from "@/lib/preferences";
 import { requestPreferences } from "@/lib/preferences-server";
@@ -82,6 +84,7 @@ export default async function RootLayout({
       <body className="min-h-full flex flex-col">
         <TimeDisplayProvider value={timeDisplay}>
           <NavBar account={account} />
+          {config.authMode === "demo" && <DemoBanner />}
           <main className="flex-1 px-4 py-6 sm:px-6">{children}</main>
           {signedIn && <CommandPalette />}
         </TimeDisplayProvider>

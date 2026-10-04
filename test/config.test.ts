@@ -623,3 +623,131 @@ test("a production server that logs nothing, or logs for a human, is warned abou
     [],
   );
 });
+
+/* -------------------------------------------------------------------------- */
+/* AUTH_MODE=demo (#251)                                                       */
+/* -------------------------------------------------------------------------- */
+
+/** A production demo deployment: no realm, no model. */
+const VALID_DEMO: Environment = {
+  AUTH_MODE: "demo",
+  SOURCE_SECRET_REFS: "TS_METRICS:demo",
+  DATABASE_URL: "postgresql://holotable:pw@db.internal:5432/holotable",
+  SESSION_SECRET: "k3Jd9sLq2mZx8vBn4tRw7yUa1cFe6hGp0oIiPlKj",
+};
+
+test("AUTH_MODE accepts only oidc or demo", () => {
+  for (const value of ["oidc", "demo", ""]) {
+    const env = value === "demo" ? VALID_DEMO : { ...VALID_PRODUCTION, AUTH_MODE: value };
+    assert.deepEqual(errors(validateConfig(env, { production: true })), [], value);
+  }
+  const bad = validateConfig(
+    { ...VALID_PRODUCTION, AUTH_MODE: "none" },
+    { production: true },
+  );
+  assert.deepEqual(variables(errors(bad)), ["AUTH_MODE"]);
+  assert.match(bad[0].message, /"oidc".*"demo"/);
+});
+
+test("demo mode in production needs no realm and boots with the model as a warning", () => {
+  const problems = validateConfig(VALID_DEMO, { production: true });
+  assert.deepEqual(errors(problems), []);
+  assert.deepEqual(variables(warnings(problems)).sort(), ["AI_MODEL", "OPENAI_API_KEY"]);
+});
+
+test("demo mode with a model configured has no problems at all", () => {
+  const problems = validateConfig(
+    { ...VALID_DEMO, AI_MODEL: "openai/gpt-4o-mini", OPENAI_API_KEY: "sk-test" },
+    { production: true },
+  );
+  assert.deepEqual(problems, []);
+});
+
+test("demo mode beside any OIDC variable refuses to boot, naming both", () => {
+  for (const variable of [
+    "OIDC_ISSUER",
+    "OIDC_CLIENT_ID",
+    "OIDC_CLIENT_SECRET",
+    "OIDC_JWKS_URL",
+  ]) {
+    for (const production of [true, false]) {
+      const problems = validateConfig(
+        { ...VALID_DEMO, [variable]: VALID_PRODUCTION[variable] },
+        { production },
+      );
+      const errs = errors(problems).filter((p) => p.variable === variable);
+      assert.equal(errs.length, 1, `${variable} production=${production}`);
+      assert.match(errs[0].message, /AUTH_MODE is demo/);
+    }
+  }
+});
+
+test("demo mode still requires the session secret, database and grants in production", () => {
+  for (const variable of ["SESSION_SECRET", "DATABASE_URL", "SOURCE_SECRET_REFS"]) {
+    const env = { ...VALID_DEMO, [variable]: undefined };
+    assert.ok(
+      variables(errors(validateConfig(env, { production: true }))).includes(variable),
+      variable,
+    );
+  }
+});
+
+test("DEMO_GROUPS may never reach source-admin or platform admin", () => {
+  for (const groups of [
+    "/workspaces/demo/source-admin",
+    "/workspaces/demo/editor,/workspaces/ops/source-admin",
+    "/platform-admins",
+    "platform-admins",
+    "/workspaces/demo/viewer /platform-admins",
+  ]) {
+    for (const production of [true, false]) {
+      const problems = validateConfig(
+        { ...VALID_DEMO, DEMO_GROUPS: groups },
+        { production },
+      );
+      assert.ok(
+        variables(errors(problems)).includes("DEMO_GROUPS"),
+        `${groups} production=${production}`,
+      );
+    }
+  }
+});
+
+test("DEMO_GROUPS that grant no workspace are an error", () => {
+  const problems = validateConfig(
+    { ...VALID_DEMO, DEMO_GROUPS: "/workspaces/demo/owner,/teams/x" },
+    { production: true },
+  );
+  assert.ok(variables(errors(problems)).includes("DEMO_GROUPS"));
+});
+
+test("viewer and editor DEMO_GROUPS, on one or more workspaces, are accepted", () => {
+  for (const groups of [
+    "/workspaces/demo/viewer",
+    "/workspaces/demo/editor",
+    "/workspaces/demo/editor, /workspaces/sandbox/viewer",
+  ]) {
+    const problems = validateConfig(
+      { ...VALID_DEMO, DEMO_GROUPS: groups },
+      { production: true },
+    );
+    assert.deepEqual(errors(problems), [], groups);
+  }
+});
+
+test("oidc mode is unchanged: the realm and the model stay required in production", () => {
+  const { OIDC_ISSUER: _i, AI_MODEL: _m, ...env } = VALID_PRODUCTION;
+  const errs = variables(errors(validateConfig(env, { production: true })));
+  assert.ok(errs.includes("OIDC_ISSUER"));
+  assert.ok(errs.includes("AI_MODEL"));
+});
+
+test("DEMO_GROUPS outside demo mode is ignored with a warning", () => {
+  const problems = validateConfig(
+    { ...VALID_PRODUCTION, DEMO_GROUPS: "/workspaces/demo/editor" },
+    { production: true },
+  );
+  assert.deepEqual(errors(problems), []);
+  assert.deepEqual(variables(warnings(problems)), ["DEMO_GROUPS"]);
+  assert.match(warnings(problems)[0].message, /ignored unless AUTH_MODE=demo/);
+});

@@ -26,6 +26,7 @@ import { PromptHistoryMenu, usePromptHistory } from "@/components/prompt-history
 import { PROMPT_MAX_LENGTH } from "@/lib/prompt-history";
 import { Button } from "@/components/ui/button";
 import { Input, Textarea, Label } from "@/components/ui/input";
+import { AiUnavailable } from "@/components/ai-unavailable";
 import { Select } from "@/components/ui/select";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -63,10 +64,16 @@ interface SourceOption {
 export function NewDashboardClient({
   sources,
   model,
+  aiUnavailable,
   canManageSources,
 }: {
   sources: SourceOption[];
   model: string;
+  /**
+   * Why generation cannot be attempted on this server (no model configured),
+   * or null. Decided on the server, which is the only side with the env.
+   */
+  aiUnavailable: string | null;
   /**
    * Whether this caller holds `source:manage` anywhere, which decides whether
    * the no-source empty state offers to add one or names who can.
@@ -162,7 +169,7 @@ export function NewDashboardClient({
   }
 
   function generate() {
-    if (!sourceId || !prompt.trim() || isLoading) return;
+    if (!sourceId || !prompt.trim() || isLoading || aiUnavailable) return;
     prompts.remember(prompt);
     // A follow-up sends the previewed spec back as context and gets the whole
     // dashboard again; one model call either way. Nothing is persisted until
@@ -180,7 +187,7 @@ export function NewDashboardClient({
    */
   function regenerate() {
     const turn = history.turns[history.index];
-    if (!turn || isLoading) return;
+    if (!turn || isLoading || aiUnavailable) return;
     const note = feedback.trim();
     const instruction = note
       ? `${turn.prompt}\n\nAdditional feedback: ${note}`.slice(0, PROMPT_MAX_LENGTH)
@@ -380,9 +387,11 @@ export function NewDashboardClient({
                     ))}
                   </div>
                 )}
+                {aiUnavailable && <AiUnavailable message={aiUnavailable} />}
                 <div className="relative">
                   <Textarea
                     id="prompt"
+                    disabled={aiUnavailable !== null}
                     rows={3}
                     className="pr-14"
                     placeholder={
@@ -404,7 +413,7 @@ export function NewDashboardClient({
                   <Button
                     size="icon"
                     onClick={generate}
-                    disabled={isLoading || !prompt.trim()}
+                    disabled={isLoading || !prompt.trim() || aiUnavailable !== null}
                     aria-label={refining ? "Refine" : "Generate"}
                     title={refining ? "Refine" : "Generate"}
                     className="absolute bottom-4 right-2"

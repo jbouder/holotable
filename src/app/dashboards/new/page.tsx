@@ -4,6 +4,7 @@ import { listSources } from "@/lib/db/repo";
 import { catalogHealth } from "@/lib/catalog/health";
 import { buildStarters } from "@/lib/prompts/starters";
 import { config } from "@/lib/config";
+import { aiUnavailable } from "@/lib/ai/configured";
 import { SignIn } from "@/components/sign-in";
 import { NewDashboardClient } from "./new-client";
 
@@ -36,6 +37,7 @@ export default async function NewDashboardPage() {
     <NewDashboardClient
       sources={sources}
       model={config.aiModel}
+      aiUnavailable={aiUnavailable()}
       canManageSources={authorizedWorkspaces(identity, "source:manage").length > 0}
     />
   );

@@ -7,6 +7,7 @@ import { Loader2, SendHorizontal, Compass, Save, ArrowUpRight } from "lucide-rea
 import { Panel, type TimeRange } from "@/lib/ir";
 import { Button } from "@/components/ui/button";
 import { Textarea, Label } from "@/components/ui/input";
+import { AiUnavailable } from "@/components/ai-unavailable";
 import { Select } from "@/components/ui/select";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -63,12 +64,18 @@ const TIME_PRESETS: { value: string; label: string }[] = [
 export function ExploreClient({
   sources,
   model,
+  aiUnavailable,
   canManageSources,
   defaultTimeRange,
   defaultRefreshIntervalMs,
 }: {
   sources: SourceOption[];
   model: string;
+  /**
+   * Why generation cannot be attempted on this server (no model configured),
+   * or null. Decided on the server, which is the only side with the env.
+   */
+  aiUnavailable: string | null;
   /**
    * Whether this caller holds `source:manage` anywhere, which decides whether
    * the no-source empty state offers to add one or names who can.
@@ -119,7 +126,7 @@ export function ExploreClient({
   });
 
   function generate() {
-    if (!sourceId || !prompt.trim()) return;
+    if (!sourceId || !prompt.trim() || aiUnavailable) return;
     prompts.remember(prompt);
     setPanel(null);
     setResult(null);
@@ -230,9 +237,11 @@ export function ExploreClient({
                 ))}
               </div>
             )}
+            {aiUnavailable && <AiUnavailable message={aiUnavailable} />}
             <div className="relative">
               <Textarea
                 id="prompt"
+                disabled={aiUnavailable !== null}
                 rows={3}
                 className="pr-14"
                 placeholder={
@@ -252,7 +261,7 @@ export function ExploreClient({
               <Button
                 size="icon"
                 onClick={generate}
-                disabled={isLoading || !prompt.trim()}
+                disabled={isLoading || !prompt.trim() || aiUnavailable !== null}
                 aria-label="Explore"
                 title="Explore"
                 className="absolute bottom-4 right-2"

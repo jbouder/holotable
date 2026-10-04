@@ -6,6 +6,7 @@ import {
   WORKSPACE_ROLES,
   type WorkspaceRole,
 } from "@/lib/auth/claims";
+import type { AuthMode } from "@/lib/config";
 
 /**
  * What a signed-in person can learn about themselves (#208, #211).
@@ -94,4 +95,30 @@ export function roleGuide(): { role: WorkspaceRole; label: string; allows: strin
     label: ROLE_LABELS[role],
     allows: roleCapabilities(role),
   }));
+}
+
+/**
+ * Where this person's profile and roles come from, in words, for the account
+ * page. In demo mode (#251) there is no identity provider and no account: the
+ * session was minted on arrival, and every visitor holds the same role.
+ */
+export function accountOrigin(
+  mode: AuthMode,
+  accountUrl: string,
+): { profile: string; roles: string } {
+  if (mode === "demo") {
+    return {
+      profile:
+        "You are a demo visitor. There is no account behind this session: it was created when you arrived and lasts eight hours, and your settings stay with it.",
+      roles:
+        "Every demo visitor gets the same role, set by the server, so the dashboards here are shared with everyone else trying the demo.",
+    };
+  }
+  return {
+    profile: `Your name, email and password belong to your identity provider.${
+      accountUrl ? " Change them there." : " Ask your administrator to change them."
+    }`,
+    roles:
+      "Roles come from your groups in the identity provider. A change there takes effect the next time you sign in.",
+  };
 }

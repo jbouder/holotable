@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { parseGroups, PLATFORM_ADMIN_GROUP } from "@/lib/auth/claims";
 import { parseCidr } from "@/lib/cidr";
 import { SECRET_REF_GRANTS_VAR, parseSecretRefGrants } from "@/lib/secret-refs";
 import { resolveTimeExpr, resolveTimeRange } from "@/lib/time";
@@ -21,6 +22,18 @@ function num(name: string, fallback: number): number {
 function str(name: string, fallback: string): string {
   const raw = process.env[name];
   return raw === undefined || raw === "" ? fallback : raw;
+}
+
+/** `AUTH_MODE` values. `oidc` is Keycloak, the default and the only real one. */
+export const AUTH_MODES = ["oidc", "demo"] as const;
+export type AuthMode = (typeof AUTH_MODES)[number];
+
+/** What a demo visitor is granted when `DEMO_GROUPS` is unset. */
+export const DEFAULT_DEMO_GROUPS = "/workspaces/demo/editor";
+
+/** `DEMO_GROUPS` as group paths: comma- or whitespace-separated. */
+export function splitGroups(raw: string): string[] {
+  return raw.split(/[\s,]+/).filter(Boolean);
 }
 
 function bool(name: string, fallback: boolean): boolean {
@@ -128,6 +141,24 @@ export const config = {
    * hides the link.
    */
   oidcAccountUrl: str("OIDC_ACCOUNT_URL", ""),
+
+  /**
+   * How people sign in (#251). `oidc` is Keycloak and the default. `demo` is
+   * for evaluation and the public demo only: `/api/auth/login` mints a session
+   * for every visitor with no login screen, holding {@link demoGroups}.
+   * Anything but the exact string `demo` is `oidc`, so a typo fails closed
+   * (and `validateConfig` refuses to boot on it). Server-only in practice:
+   * the browser bundle has no `AUTH_MODE` and always reads `oidc`, so a client
+   * component is handed the mode as a prop instead of reading it here.
+   */
+  authMode: (process.env.AUTH_MODE === "demo" ? "demo" : "oidc") as AuthMode,
+  /**
+   * The groups every demo visitor's session carries, in the same
+   * `/workspaces/{id}/{role}` form as a Keycloak `groups` claim, parsed by the
+   * same parser. Never source-admin, never platform admin: `validateConfig`
+   * refuses both. Ignored unless {@link authMode} is `demo`.
+   */
+  demoGroups: splitGroups(str("DEMO_GROUPS", DEFAULT_DEMO_GROUPS)),
 
   /** Cookie name used for the session JWT. */
   sessionCookieName: str("SESSION_COOKIE_NAME", "holotable_session"),
@@ -304,6 +335,13 @@ const EnvSchema = z.object({
   LLM_RATE_PER_MINUTE: blank(nonNegativeInt),
   LLM_DAILY_TOKEN_BUDGET: blank(nonNegativeInt),
 
+  AUTH_MODE: blank(
+    z.enum(AUTH_MODES, {
+      error: 'must be "oidc" (Keycloak, the default) or "demo" (evaluation only)',
+    }),
+  ),
+  DEMO_GROUPS: blank(z.string()),
+
   OIDC_ISSUER: blank(
     httpUrl("the realm issuer, e.g. https://kc.example.com/realms/holotable"),
   ),
@@ -379,6 +417,7 @@ export function validateConfig(
   // below treats an absent field as unset, so a malformed value is reported
   // once (for its shape) rather than twice.
   const values: Partial<Env> = parsed.success ? parsed.data : partialParse(env);
+  const demo = values.AUTH_MODE === "demo";
 
   // --- Config store -------------------------------------------------------
   if (!values.DATABASE_URL) {
@@ -473,21 +512,25 @@ export function validateConfig(
   }
 
   // --- AI provider --------------------------------------------------------
+  // In demo mode the model is optional: the seeded dashboards, the viewer and
+  // the SQL editor need no key, and the generate, chat and Explore pages say
+  // what is missing instead of failing a request (src/lib/ai/configured.ts).
+  const aiMissing = demo ? warning : missing;
   if (!values.AI_MODEL) {
-    missing(
+    aiMissing(
       "AI_MODEL",
       "is not set; every generate request would fail. Set the model id for your AI_PROVIDER (see .env.example).",
     );
   }
   const provider = values.AI_PROVIDER ?? "openai-compatible";
   if (provider === "openai-compatible" && !values.OPENAI_API_KEY) {
-    missing(
+    aiMissing(
       "OPENAI_API_KEY",
       "is not set but AI_PROVIDER is openai-compatible; the provider will reject every request. Set the API key for OPENAI_BASE_URL.",
     );
   }
   if (provider === "gateway" && !values.AI_GATEWAY_API_KEY) {
-    missing(
+    aiMissing(
       "AI_GATEWAY_API_KEY",
       "is not set but AI_PROVIDER is gateway; the gateway will reject every request.",
     );
@@ -512,22 +555,73 @@ export function validateConfig(
     );
   }
 
+  // --- Demo mode ----------------------------------------------------------
+  // The one exception to "Keycloak is the only way in" (#251), fenced so it is
+  // useless for anything but evaluation. Every visitor gets a session holding
+  // DEMO_GROUPS with no login, so the groups must never reach source-admin (a
+  // visitor could register a source pointing at any host this server can
+  // reach) or platform admin, and the mode must never share a deployment with
+  // a real realm, where it would hand out sessions beside real ones.
+  const oidcVariables = [
+    "OIDC_ISSUER",
+    "OIDC_CLIENT_ID",
+    "OIDC_CLIENT_SECRET",
+    "OIDC_JWKS_URL",
+  ] as const;
+  if (demo) {
+    for (const variable of oidcVariables) {
+      if (env[variable]) {
+        error(
+          variable,
+          "is set while AUTH_MODE is demo. Demo mode hands every visitor a session without a login and must never run beside a real identity provider; unset it, or set AUTH_MODE=oidc.",
+        );
+      }
+    }
+    const groups = splitGroups(values.DEMO_GROUPS ?? DEFAULT_DEMO_GROUPS);
+    const identity = parseGroups("demo", groups);
+    if (identity.platformAdmin || groups.includes(PLATFORM_ADMIN_GROUP)) {
+      error(
+        "DEMO_GROUPS",
+        `contains ${PLATFORM_ADMIN_GROUP}; a demo visitor must never be a platform admin. Grant /workspaces/<id>/viewer or /workspaces/<id>/editor.`,
+      );
+    }
+    const admin = Object.entries(identity.workspaces).find(
+      ([, role]) => role === "source-admin",
+    );
+    if (admin) {
+      error(
+        "DEMO_GROUPS",
+        `grants source-admin on workspace "${admin[0]}"; a demo visitor could then register a source pointing at any host this server can reach. Use viewer or editor.`,
+      );
+    } else if (!identity.platformAdmin && Object.keys(identity.workspaces).length === 0) {
+      error(
+        "DEMO_GROUPS",
+        "grants no workspace role, so every demo visitor would see an empty app. Use paths like /workspaces/demo/editor.",
+      );
+    }
+  } else if (env.DEMO_GROUPS) {
+    warning("DEMO_GROUPS", "is set but ignored unless AUTH_MODE=demo.");
+  }
+
   // --- OIDC ---------------------------------------------------------------
-  // Keycloak is the only way to sign in, so in production the confidential
-  // client must be configured completely. OIDC_REDIRECT_URI is optional: it
-  // is derived from the request origin when unset.
-  const oidcRequired: Array<[keyof Env, string]> = [
-    ["OIDC_ISSUER", "the realm URL; login and token verification both need it"],
-    ["OIDC_CLIENT_ID", "the Keycloak client id; login cannot start without it"],
-    [
-      "OIDC_CLIENT_SECRET",
-      "the confidential client's secret; the code exchange fails without it",
-    ],
-    [
-      "OIDC_JWKS_URL",
-      "the realm's JWKS endpoint; Keycloak-issued tokens cannot be verified without it",
-    ],
-  ];
+  // Keycloak is the only way to sign in outside demo mode, so in production
+  // the confidential client must be configured completely.
+  // OIDC_REDIRECT_URI is optional: it is derived from the request origin when
+  // unset. Demo mode has no realm, and the block above refuses one.
+  const oidcRequired: Array<[keyof Env, string]> = demo
+    ? []
+    : [
+        ["OIDC_ISSUER", "the realm URL; login and token verification both need it"],
+        ["OIDC_CLIENT_ID", "the Keycloak client id; login cannot start without it"],
+        [
+          "OIDC_CLIENT_SECRET",
+          "the confidential client's secret; the code exchange fails without it",
+        ],
+        [
+          "OIDC_JWKS_URL",
+          "the realm's JWKS endpoint; Keycloak-issued tokens cannot be verified without it",
+        ],
+      ];
   for (const [variable, why] of oidcRequired) {
     if (values[variable]) continue;
     if (production) {
