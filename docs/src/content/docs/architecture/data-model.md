@@ -26,7 +26,9 @@ silently.
 than inside it: `config` is the allowlist its author owns and the browser is
 shown, while these two are what the last introspection found. They are what
 [catalog health](/concepts/generating-a-panel/) is computed from, and only
-`POST /api/sources/[id]/refresh` writes them.
+the apply step of `POST /api/sources/[id]/refresh` writes them. A refresh is
+previewed as a diff first, and applied only if a second introspection still
+matches the digest the preview handed out.
 
 ### `dashboards`
 

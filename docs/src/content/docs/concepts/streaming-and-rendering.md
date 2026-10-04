@@ -180,8 +180,9 @@ comes back, and a result is by construction somewhere the identity could
 already go. A source is projected to its id, name and workspace —
 `SourceRecord` carries the connection config and the catalog, and neither has
 any business in a search result (invariant 5). The one action that is not
-navigation posts to the same guarded `/api/sources/[id]/refresh` the source
-list already uses, which checks `source:manage` for itself.
+navigation opens the same reviewed refresh the source list uses: a diff from
+the guarded `/api/sources/[id]/refresh`, and nothing written until it is
+applied. The route checks `source:manage` for itself.
 
 Matching and ordering live in `src/lib/command-palette.ts` as pure functions
 over a payload and a query, which is what makes them testable. Actions are

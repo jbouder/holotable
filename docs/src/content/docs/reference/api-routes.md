@@ -60,13 +60,16 @@ hand.
 
 | Route | Method | Min role | Notes |
 | --- | --- | --- | --- |
-| `/api/sources` | GET | viewer | List sources in a workspace, each with its catalog health |
+| `/api/sources` | GET | viewer | List sources in a workspace, each with its catalog health. A source admin gets full records; anyone else gets a listing (id, name, schema, table count, status) with no connection details, `secret_ref` or catalog. `canManage` says which |
 | `/api/sources` | POST | source-admin | Create |
 | `/api/sources/generate` | POST | editor | Streams a validated `SourceDraft` — never credentials. Rate limited and budgeted |
-| `/api/sources/[id]` | GET/PUT/DELETE | source-admin | Delete tombstones when referenced |
+| `/api/sources/[id]` | GET | viewer | The full record for a source admin, the listing for anyone else |
+| `/api/sources/[id]` | PUT/DELETE | source-admin | Delete tombstones when referenced |
+| `/api/sources/[id]/catalog` | GET | viewer | The catalog browser's view: every column with its `exposed` flag for a source admin, exposed columns only for anyone else, plus catalog health |
+| `/api/sources/[id]/catalog` | PATCH | source-admin | Hide or expose one column, `{ table, column, exposed }`. Takes effect on the next generation and execution |
 | `/api/sources/[id]/impact` | GET | source-admin | Dashboards and panels currently referencing the source, scoped to its workspace |
 | `/api/sources/[id]/test` | POST | source-admin | Connectivity, latency, server and role identity, a **read-only proof**, and per-table reachability. All of it inside one rolled-back read-only transaction |
-| `/api/sources/[id]/refresh` | POST | source-admin | Re-introspect the catalog; records freshness and any allowlisted table the database no longer has |
+| `/api/sources/[id]/refresh` | POST | source-admin | Re-introspect the catalog. With `{}` it is a preview: it writes nothing and answers with the diff and a `digest`. With `{ digest }` it introspects again and writes only if the result matches, recording freshness and any allowlisted table the database no longer has; otherwise 409 with the new diff and digest |
 
 ## Search
 

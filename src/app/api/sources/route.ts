@@ -1,9 +1,10 @@
 import { z } from "zod";
-import { requireIdentity, assertAuthorized, HttpError } from "@/lib/auth/authorize";
+import { requireIdentity, assertAuthorized, can, HttpError } from "@/lib/auth/authorize";
 import { readJson, json, route } from "@/lib/http";
 import { listSources, createSource } from "@/lib/db/repo";
 import { catalogHealth } from "@/lib/catalog/health";
 import { SourceDraft } from "@/lib/registry";
+import { sourceListing } from "@/lib/source-listing";
 import { requireGrantedSecretRef } from "@/lib/secrets/http";
 
 export const runtime = "nodejs";
@@ -16,6 +17,11 @@ export const runtime = "nodejs";
  * `catalogHealth` is decided here rather than in the browser so the list, the
  * pickers and the refusal in `/api/generate` all read the same judgement from
  * the same `CATALOG_STALE_AFTER_DAYS`.
+ *
+ * A source admin gets the full records, which the edit form needs. Anyone else
+ * gets `sourceListing()`: no connection details, no `secret_ref`, and no
+ * catalog, so no column an admin hid (#123). `canManage` says which shape
+ * this is.
  */
 export const GET = route("sources.list", async (req: Request) => {
   const identity = await requireIdentity();
@@ -23,9 +29,11 @@ export const GET = route("sources.list", async (req: Request) => {
   if (!workspaceId) throw new HttpError(400, "workspaceId is required");
 
   assertAuthorized(identity, "source:use", { workspaceId });
+  const canManage = can(identity, "source:manage", { workspaceId });
   const sources = await listSources(workspaceId);
   return json({
-    sources,
+    canManage,
+    sources: canManage ? sources : sources.map(sourceListing),
     catalogHealth: Object.fromEntries(sources.map((s) => [s.id, catalogHealth(s)])),
   });
 });

@@ -70,11 +70,18 @@ answers one question: can the server actually reach this database as this role?
 A failure here is a credential or a network problem, and it is much easier to
 read now than as a broken panel later.
 
-**Refresh** introspects the schema and records the columns and types of every
-allowlisted table. This is what the model is shown. Refresh does not widen
-anything — it never adds a table you did not list, it only makes what you did
-list accurate. A table you allowed that the database no longer has is reported
-as missing rather than quietly kept.
+**Refresh** introspects the schema and shows what would change: columns added,
+removed or retyped, and any allowlisted table the database no longer has.
+Nothing is written until you press **Apply**. What it records is the columns
+and types of every allowlisted table, and that is what the model is shown.
+Refresh does not widen anything — it never adds a table you did not list, it
+only makes what you did list accurate. A table you allowed that the database no
+longer has is reported as missing rather than quietly kept.
+
+**Catalog** opens the source's tables and columns as a searchable tree, with
+the catalog's freshness at the top. Untick **Exposed** on any column the model
+should not be told about and generated SQL may not read, such as an email
+address or an IP. New columns found by a refresh start exposed.
 
 **This guards against:** SQL written against columns that do not exist. Until a
 refresh has run, generating against the source is *refused* rather than

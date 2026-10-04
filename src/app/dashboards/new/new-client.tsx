@@ -352,9 +352,7 @@ export function NewDashboardClient({
                   source={source}
                   health={catalog.health[source.id]}
                   canRefresh={source.canRefresh}
-                  busy={catalog.busy === source.id}
-                  error={catalog.error[source.id] || null}
-                  onRefresh={() => void catalog.refresh(source.id)}
+                  onRefreshed={(health) => catalog.update(source.id, health)}
                 />
               )}
               <div>

@@ -23,6 +23,7 @@ import { isMotionActive } from "@/lib/motion";
 import { useReducedMotion } from "@/components/motion-preference";
 import { useFlip } from "@/components/use-flip";
 import { cn } from "@/lib/utils";
+import { RefreshCatalogDialog } from "@/components/sources/catalog-refresh";
 
 const ICONS: Record<CommandKind, typeof Search> = {
   dashboard: LayoutDashboard,
@@ -37,8 +38,9 @@ const ICONS: Record<CommandKind, typeof Search> = {
  * It is a navigator, not a second API surface: every result is somewhere the
  * identity can already go, decided by `GET /api/search` from the validated
  * claims. The one thing it does that is not navigation — refreshing a catalog
- * — is the same guarded POST the source list already offers, and the route
- * re-checks `source:manage` for itself.
+ * — opens the same reviewed refresh the source list offers (#123): the diff
+ * first, nothing written until it is applied, and the route re-checks
+ * `source:manage` for itself.
  *
  * The listbox is hand-rolled rather than built on a menu primitive: the
  * keyboard focus has to stay in the text field while the *selection* moves,
@@ -53,6 +55,10 @@ export function CommandPalette() {
   const [recents, setRecents] = React.useState<string[]>([]);
   const [active, setActive] = React.useState(0);
   const [notice, setNotice] = React.useState<string | null>(null);
+  // The source whose refresh is in review, once the palette has closed.
+  const [reviewing, setReviewing] = React.useState<{ id: string; name: string } | null>(
+    null,
+  );
   const inputRef = React.useRef<HTMLInputElement>(null);
   const listRef = React.useRef<HTMLDivElement>(null);
   // Re-ranking while typing slides the options rather than re-dealing them
@@ -156,14 +162,8 @@ export function CommandPalette() {
         return;
       case "refresh-catalog": {
         const { sourceId, name } = command.action;
-        setNotice(`Refreshing the catalog for ${name}…`);
-        const res = await fetch(`/api/sources/${sourceId}/refresh`, { method: "POST" });
-        setNotice(
-          res.ok
-            ? `Catalog refreshed for ${name}.`
-            : `Could not refresh the catalog for ${name}.`,
-        );
-        router.refresh();
+        setOpen(false);
+        setReviewing({ id: sourceId, name });
         return;
       }
     }
@@ -192,106 +192,116 @@ export function CommandPalette() {
   let index = -1;
 
   return (
-    <BaseDialog.Root open={open} onOpenChange={setOpen}>
-      <BaseDialog.Portal>
-        {/* The same enter/exit as `ui/dialog.tsx` (#235); this dialog is hand-built for its combobox. */}
-        <BaseDialog.Backdrop className="fixed inset-0 z-40 bg-black/60 transition-opacity duration-(--duration-base) ease-standard data-starting-style:opacity-0 data-ending-style:opacity-0" />
-        <BaseDialog.Popup
-          initialFocus={inputRef}
-          className="fixed inset-x-4 top-20 z-50 mx-auto w-auto max-w-xl overflow-hidden border border-border bg-surface shadow-xl transition-[opacity,scale] duration-(--duration-base) ease-emphasized focus:outline-none data-starting-style:opacity-0 data-starting-style:scale-[0.98] data-ending-style:opacity-0 data-ending-style:scale-[0.98]"
-        >
-          <BaseDialog.Title className="sr-only">Command palette</BaseDialog.Title>
-          <div className="flex items-center gap-2 border-b border-border px-3">
-            <Search className="h-4 w-4 shrink-0 text-muted" aria-hidden />
-            <input
-              ref={inputRef}
-              type="text"
-              role="combobox"
-              aria-expanded
-              aria-controls="command-palette-list"
-              aria-activedescendant={
-                ordered[active] ? `command-option-${active}` : undefined
-              }
-              aria-label="Search dashboards, sources and actions"
-              placeholder="Search dashboards, sources and actions…"
-              value={query}
-              onChange={(e) => {
-                setQuery(e.target.value);
-                setActive(0);
-              }}
-              onKeyDown={onKeyDown}
-              className="h-12 w-full bg-transparent text-sm text-foreground placeholder:text-muted focus:outline-none"
-            />
-          </div>
-
-          <div
-            ref={listRef}
-            id="command-palette-list"
-            // The APG combobox pattern: the listbox is a sibling of the input
-            // that owns it, and real focus never leaves the input.
-            role="listbox"
-            aria-label="Results"
-            className="max-h-80 overflow-y-auto p-2"
+    <>
+      <BaseDialog.Root open={open} onOpenChange={setOpen}>
+        <BaseDialog.Portal>
+          {/* The same enter/exit as `ui/dialog.tsx` (#235); this dialog is hand-built for its combobox. */}
+          <BaseDialog.Backdrop className="fixed inset-0 z-40 bg-black/60 transition-opacity duration-(--duration-base) ease-standard data-starting-style:opacity-0 data-ending-style:opacity-0" />
+          <BaseDialog.Popup
+            initialFocus={inputRef}
+            className="fixed inset-x-4 top-20 z-50 mx-auto w-auto max-w-xl overflow-hidden border border-border bg-surface shadow-xl transition-[opacity,scale] duration-(--duration-base) ease-emphasized focus:outline-none data-starting-style:opacity-0 data-starting-style:scale-[0.98] data-ending-style:opacity-0 data-ending-style:scale-[0.98]"
           >
-            {ordered.length === 0 && (
-              <p className="px-2 py-6 text-center text-sm text-muted">
-                Nothing matches “{query}”.
-              </p>
-            )}
-            {sections.map((section) => (
-              <div key={section.kind} className="mb-2 last:mb-0">
-                <p className="px-2 py-1 text-[11px] font-medium uppercase tracking-wide text-muted">
-                  {section.label}
+            <BaseDialog.Title className="sr-only">Command palette</BaseDialog.Title>
+            <div className="flex items-center gap-2 border-b border-border px-3">
+              <Search className="h-4 w-4 shrink-0 text-muted" aria-hidden />
+              <input
+                ref={inputRef}
+                type="text"
+                role="combobox"
+                aria-expanded
+                aria-controls="command-palette-list"
+                aria-activedescendant={
+                  ordered[active] ? `command-option-${active}` : undefined
+                }
+                aria-label="Search dashboards, sources and actions"
+                placeholder="Search dashboards, sources and actions…"
+                value={query}
+                onChange={(e) => {
+                  setQuery(e.target.value);
+                  setActive(0);
+                }}
+                onKeyDown={onKeyDown}
+                className="h-12 w-full bg-transparent text-sm text-foreground placeholder:text-muted focus:outline-none"
+              />
+            </div>
+
+            <div
+              ref={listRef}
+              id="command-palette-list"
+              // The APG combobox pattern: the listbox is a sibling of the input
+              // that owns it, and real focus never leaves the input.
+              role="listbox"
+              aria-label="Results"
+              className="max-h-80 overflow-y-auto p-2"
+            >
+              {ordered.length === 0 && (
+                <p className="px-2 py-6 text-center text-sm text-muted">
+                  Nothing matches “{query}”.
                 </p>
-                {section.commands.map((command) => {
-                  index += 1;
-                  const i = index;
-                  const Icon = ICONS[command.kind];
-                  return (
-                    // A listbox option, not a button: the input keeps focus and
-                    // `aria-activedescendant` points here.
-                    // biome-ignore lint/a11y/useKeyWithClickEvents: the keyboard path is the input's onKeyDown — an option in this pattern is never focused
-                    <div
-                      key={command.id}
-                      id={`command-option-${i}`}
-                      data-flip-id={command.id}
-                      role="option"
-                      aria-selected={i === active}
-                      tabIndex={-1}
-                      onClick={() => void run(command)}
-                      onMouseMove={() => setActive(i)}
-                      className={cn(
-                        "flex cursor-pointer items-center gap-2 px-2 py-1.5 text-sm",
-                        i === active
-                          ? "bg-surface-2 text-foreground"
-                          : "text-muted hover:text-foreground",
-                      )}
-                    >
-                      <Icon className="h-4 w-4 shrink-0" aria-hidden />
-                      <span className="min-w-0 flex-1 truncate text-foreground">
-                        {command.title}
-                      </span>
-                      {command.subtitle && (
-                        <span className="shrink-0 truncate text-xs text-muted">
-                          {command.subtitle}
+              )}
+              {sections.map((section) => (
+                <div key={section.kind} className="mb-2 last:mb-0">
+                  <p className="px-2 py-1 text-[11px] font-medium uppercase tracking-wide text-muted">
+                    {section.label}
+                  </p>
+                  {section.commands.map((command) => {
+                    index += 1;
+                    const i = index;
+                    const Icon = ICONS[command.kind];
+                    return (
+                      // A listbox option, not a button: the input keeps focus and
+                      // `aria-activedescendant` points here.
+                      // biome-ignore lint/a11y/useKeyWithClickEvents: the keyboard path is the input's onKeyDown — an option in this pattern is never focused
+                      <div
+                        key={command.id}
+                        id={`command-option-${i}`}
+                        data-flip-id={command.id}
+                        role="option"
+                        aria-selected={i === active}
+                        tabIndex={-1}
+                        onClick={() => void run(command)}
+                        onMouseMove={() => setActive(i)}
+                        className={cn(
+                          "flex cursor-pointer items-center gap-2 px-2 py-1.5 text-sm",
+                          i === active
+                            ? "bg-surface-2 text-foreground"
+                            : "text-muted hover:text-foreground",
+                        )}
+                      >
+                        <Icon className="h-4 w-4 shrink-0" aria-hidden />
+                        <span className="min-w-0 flex-1 truncate text-foreground">
+                          {command.title}
                         </span>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-            ))}
-          </div>
+                        {command.subtitle && (
+                          <span className="shrink-0 truncate text-xs text-muted">
+                            {command.subtitle}
+                          </span>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              ))}
+            </div>
 
-          <div
-            className="flex items-center justify-between gap-3 border-t border-border px-3 py-2 text-[11px] text-muted"
-            aria-live="polite"
-          >
-            <span>{notice ?? "↑↓ to move · ↵ to run · Esc to close"}</span>
-            <span className="shrink-0">⌘K</span>
-          </div>
-        </BaseDialog.Popup>
-      </BaseDialog.Portal>
-    </BaseDialog.Root>
+            <div
+              className="flex items-center justify-between gap-3 border-t border-border px-3 py-2 text-[11px] text-muted"
+              aria-live="polite"
+            >
+              <span>{notice ?? "↑↓ to move · ↵ to run · Esc to close"}</span>
+              <span className="shrink-0">⌘K</span>
+            </div>
+          </BaseDialog.Popup>
+        </BaseDialog.Portal>
+      </BaseDialog.Root>
+      <RefreshCatalogDialog
+        source={reviewing}
+        onClose={() => setReviewing(null)}
+        onApplied={() => {
+          setReviewing(null);
+          router.refresh();
+        }}
+      />
+    </>
   );
 }
