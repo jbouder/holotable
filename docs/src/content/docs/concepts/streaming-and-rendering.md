@@ -26,8 +26,11 @@ Server side (`.../stream/route.ts` and `src/lib/poller/registry.ts`):
   3. **Remembers the result and computes each subscriber's delta.** The
      poller keeps every panel's last result. For a time-series panel each
      **subscriber** has its own cursor (the newest timestamp it has been
-     sent), and `computeDelta` sends it only the rows newer than that as an
-     `append`. Non-time panels are sent as a full `replace` snapshot.
+     sent), and `computeDelta` sends it the rows from that timestamp on as
+     an `append` carrying `since`. The browser drops what it holds from
+     `since` and puts these in its place, so the newest bucket of a series,
+     still filling, is updated rather than frozen at its first value.
+     Non-time panels are sent as a full `replace` snapshot.
 
 Events go to every subscriber's stream. The event types are `panel`
 (`append`/`replace`), `panel-error`, `dashboard-error`, `tombstone`, and `tick`.
