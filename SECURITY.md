@@ -134,6 +134,14 @@ The revocation list is in memory (one instance by design), so a restart
 forgets it; a revoked token then works until it expires, at most one session
 token lifetime, and cannot be renewed.
 
+**Open streams.** A dashboard stream is authorized when it connects and
+then held to the session it connected with: it is closed at that session
+token's expiry, on revocation, and when a re-check every
+`SSE_REAUTH_INTERVAL_MS` (60s) finds the dashboard deleted or outside the
+viewer's workspaces. A browser reconnects with its renewed session, which is
+authorized afresh, so a group removed in the realm stops a stream within one
+session-token lifetime.
+
 **Demo mode is outside this trust model.** `AUTH_MODE=demo` hands every
 visitor a session with no login, so anyone who can reach the server is a
 member of the `DEMO_GROUPS` workspaces. The server refuses to boot it beside

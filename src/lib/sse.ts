@@ -1,8 +1,8 @@
 /**
  * Server-Sent Events framing shared by the dashboard stream.
  *
- * The poller's events, the shutdown and session-ended frames, and the
- * heartbeat.
+ * The poller's events, the terminal frames (shutdown, and a session that
+ * ended, expired or lost access), and the heartbeat.
  */
 
 /** Named so a client can react without it looking like a poller event. */
@@ -41,6 +41,28 @@ export const SESSION_ENDED_EVENT = "session-ended";
  */
 export function sessionEndedFrame(): string {
   return `event: ${SESSION_ENDED_EVENT}\ndata: {"reason":"revoked"}\n\n`;
+}
+
+/**
+ * The session token the stream was opened with has expired (#32). Not an
+ * error: the client renews (or finds its session already renewed) and opens
+ * the stream again with its last event id, which resumes where this one
+ * stopped. No `retry:`, for the same reason as above.
+ */
+export const SESSION_EXPIRED_EVENT = "session-expired";
+
+export function sessionExpiredFrame(): string {
+  return `event: ${SESSION_EXPIRED_EVENT}\ndata: {"reason":"expired"}\n\n`;
+}
+
+/**
+ * The subscriber may no longer view this dashboard, or it was deleted (#32).
+ * The client stops; renewing would not change the answer.
+ */
+export const ACCESS_ENDED_EVENT = "access-ended";
+
+export function accessEndedFrame(): string {
+  return `event: ${ACCESS_ENDED_EVENT}\ndata: {"reason":"forbidden"}\n\n`;
 }
 
 /**

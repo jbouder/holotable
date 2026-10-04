@@ -32,7 +32,12 @@ import {
   tokenRef,
   verifySessionToken,
 } from "@/lib/auth/session";
-import { readRenewResponse, renewalDelay } from "@/lib/session-renewal";
+import {
+  ensureSession,
+  readRenewResponse,
+  renewalDelay,
+  SESSION_EXPIRY_KEY,
+} from "@/lib/session-renewal";
 
 /**
  * Session renewal (#27): the refresh token at rest, the lifetimes, and every
@@ -486,4 +491,45 @@ test("only a 401 means the session is over", async () => {
     ok: false,
     ended: false,
   });
+});
+
+test("a stream whose token expired reconnects without renewing when another renewal already has", async () => {
+  // A minimal browser: storage another tab writes to, and the window event.
+  const store = new Map<string, string>();
+  const g = globalThis as unknown as { window?: unknown };
+  const hadWindow = "window" in g;
+  g.window = {
+    localStorage: {
+      getItem: (k: string) => store.get(k) ?? null,
+      setItem: (k: string, v: string) => store.set(k, v),
+    },
+    dispatchEvent: () => true,
+  };
+  let posts = 0;
+  globalThis.fetch = (async () => {
+    posts++;
+    return Response.json({ expiresAt: NOW + 15 * 60_000 });
+  }) as typeof fetch;
+  try {
+    // The keepalive renewed a minute ago: just reconnect.
+    store.set(SESSION_EXPIRY_KEY, String(NOW + 14 * 60_000));
+    assert.deepEqual(await ensureSession(NOW), {
+      ok: true,
+      expiresAt: NOW + 14 * 60_000,
+    });
+    assert.equal(posts, 0);
+
+    // Nothing renewed it, or barely: renew now, once.
+    store.set(SESSION_EXPIRY_KEY, String(NOW + 5_000));
+    assert.deepEqual(await ensureSession(NOW), {
+      ok: true,
+      expiresAt: NOW + 15 * 60_000,
+    });
+    assert.equal(posts, 1);
+    store.clear();
+    assert.equal((await ensureSession(NOW)).ok, true);
+    assert.equal(posts, 2);
+  } finally {
+    if (!hadWindow) delete g.window;
+  }
 });

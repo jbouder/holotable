@@ -166,7 +166,10 @@ browser keeps a bounded rolling window (`MAX_WINDOW_POINTS`).
 ## 12. SSE is cookie-authenticated
 
 The stream handler verifies the session cookie and re-authorizes the dashboard's
-workspace before subscribing.
+workspace before subscribing. The stream then stays authorized only as long as
+that session: it ends at the token's expiry and on revocation, and every
+`SSE_REAUTH_INTERVAL_MS` the token is verified again and the dashboard
+re-authorized (#32, `src/lib/auth/stream-guard.ts`).
 
 ## 13. OKLCH tokens are resolved before reaching ECharts
 
