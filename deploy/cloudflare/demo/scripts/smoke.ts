@@ -80,16 +80,24 @@ const { dashboard } = await json<{ dashboard: { spec: { panels: Panel[] } } }>(
 const panel = dashboard.spec.panels.find((p) => p.query.timeField);
 if (!panel) fail("the seeded dashboard has no time-series panel");
 
-const result = await json<{ rows: unknown[] }>("/api/query", cookie, {
-  method: "POST",
-  body: JSON.stringify({
-    sourceId: panel.query.sourceId,
-    sql: panel.query.sql,
-    timeField: panel.query.timeField,
-    timeRange: { from: "now-1h", to: "now" },
-  }),
-});
-if (result.rows.length === 0) fail(`"${panel.title}" returned no rows`);
-console.log(`smoke: OK, "${panel.title}" returned ${result.rows.length} rows`);
+// The seeder runs beside the server rather than before it, so /api/ready can
+// answer before the backfill's first rows land. Poll until they do.
+let rows = 0;
+while (true) {
+  const result = await json<{ rows: unknown[] }>("/api/query", cookie, {
+    method: "POST",
+    body: JSON.stringify({
+      sourceId: panel.query.sourceId,
+      sql: panel.query.sql,
+      timeField: panel.query.timeField,
+      timeRange: { from: "now-1h", to: "now" },
+    }),
+  });
+  rows = result.rows.length;
+  if (rows > 0) break;
+  if (Date.now() >= deadline) fail(`"${panel.title}" returned no rows`);
+  await new Promise((r) => setTimeout(r, 3_000));
+}
+console.log(`smoke: OK, "${panel.title}" returned ${rows} rows`);
 
 export {};
