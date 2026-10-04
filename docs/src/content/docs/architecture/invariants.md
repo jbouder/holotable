@@ -153,9 +153,10 @@ successful injection.
 ## 10. One poller per dashboard
 
 Shared across independently authorized subscribers. Each browser opens **one**
-`EventSource`. The poller executes each panel once per tick, tracks a per-panel
-delta cursor, and broadcasts only newer rows (`append`) or full snapshots
-(`replace`).
+`EventSource`. The poller executes each panel once per tick, keeps a delta
+cursor per subscriber and panel, and sends each subscriber only the rows newer
+than its cursor (`append`) or full snapshots (`replace`). A subscriber that
+joins or resumes is caught up from the last results without another query.
 
 ## 11. Charts merge, never recreate
 

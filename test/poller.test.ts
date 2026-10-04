@@ -51,15 +51,19 @@ test("computeDelta replaces on first fetch and reports the max cursor", () => {
   assert.equal(d.cursor, "2024-01-01 00:00:03");
 });
 
-test("computeDelta appends only rows newer than the cursor", () => {
+test("computeDelta sends the rows from the cursor on, the cursor's own included", () => {
   const rows = [
     { ts: "2024-01-01 00:00:02" },
-    { ts: "2024-01-01 00:00:03" },
+    { ts: "2024-01-01 00:00:03", v: 7 },
     { ts: "2024-01-01 00:00:04" },
   ];
   const d = computeDelta(rows, "ts", "2024-01-01 00:00:03");
   assert.equal(d.mode, "append");
-  assert.deepEqual(d.fresh, [{ ts: "2024-01-01 00:00:04" }]);
+  // The bucket at the cursor may have changed since it was sent; it goes again.
+  assert.deepEqual(d.fresh, [
+    { ts: "2024-01-01 00:00:03", v: 7 },
+    { ts: "2024-01-01 00:00:04" },
+  ]);
   assert.equal(d.cursor, "2024-01-01 00:00:04");
 });
 
@@ -175,7 +179,6 @@ test("makePanelExecutor emits tombstone for a cross-workspace source (never exec
   const events = await executor(
     panel,
     { from: new Date("2024-01-01"), to: new Date("2024-01-02") },
-    new Map(),
     DASHBOARD_WORKSPACE,
   );
 
@@ -239,7 +242,6 @@ test("makePanelExecutor allows execution when source workspace matches dashboard
     await executor(
       panel,
       { from: new Date("2024-01-01"), to: new Date("2024-01-02") },
-      new Map(),
       WORKSPACE,
     );
   } catch {
@@ -323,7 +325,6 @@ test("a rejected query is reported as the statement it is", async () => {
   const events = await executor(
     spec().panels[0],
     { from: new Date(0), to: new Date(1) },
-    new Map(),
     "w1",
   );
   assert.equal(events.length, 1);

@@ -8,7 +8,13 @@ import { isRevoked, onRevoke } from "@/lib/auth/revocation";
 import { getDashboardById } from "@/lib/db/repo";
 import { getPoller, type PollerEvent } from "@/lib/poller/registry";
 import { TimeRange } from "@/lib/ir";
-import { drainFrame, sessionEndedFrame } from "@/lib/sse";
+import {
+  drainFrame,
+  eventFrame,
+  HEARTBEAT_FRAME,
+  HEARTBEAT_MS,
+  sessionEndedFrame,
+} from "@/lib/sse";
 import { onDrain } from "@/lib/shutdown";
 import { route } from "@/lib/http";
 
@@ -50,21 +56,33 @@ export const GET = route(
       ? { ...dashboard.spec, timeRange: parsedRange.data }
       : dashboard.spec;
     const poller = getPoller(id, dashboard.version, dashboard.workspaceId, spec);
+    // Where the browser got to before it lost the stream (#43). `EventSource`
+    // sends the header itself when it reconnects; a page that builds a new
+    // one passes it in the query. Untrusted, and decoded by the poller, which
+    // falls back to a full snapshot on anything it does not like.
+    const resumeToken =
+      req.headers.get("last-event-id") ?? url.searchParams.get("lastEventId");
     const encoder = new TextEncoder();
 
     const stream = new ReadableStream<Uint8Array>({
       start(controller) {
-        const send = (event: PollerEvent) => {
+        const write = (frame: string) => {
           try {
-            controller.enqueue(encoder.encode(`data: ${JSON.stringify(event)}\n\n`));
+            controller.enqueue(encoder.encode(frame));
           } catch {
             /* controller closed */
           }
         };
+        const send = (event: PollerEvent, eventId?: string) => {
+          write(eventFrame(JSON.stringify(event), eventId));
+        };
         // Prime the stream so the connection opens promptly.
-        controller.enqueue(encoder.encode(": connected\n\n"));
+        write(": connected\n\n");
 
-        const unsubscribe = poller.subscribe(send);
+        const unsubscribe = poller.subscribe(send, resumeToken);
+        // A comment every so often, so a proxy that closes quiet connections
+        // does not close one whose dashboard refreshes slowly (#43).
+        const heartbeat = setInterval(() => write(HEARTBEAT_FRAME), HEARTBEAT_MS);
 
         // Graceful shutdown (#47): hand the browser a reconnect delay before
         // the socket goes away, so it comes back to a healthy instance on a
@@ -75,6 +93,7 @@ export const GET = route(
         let unregisterRevoke = () => {};
 
         const close = () => {
+          clearInterval(heartbeat);
           unsubscribe();
           unregisterDrain();
           unregisterRevoke();
