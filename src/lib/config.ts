@@ -36,6 +36,19 @@ export function splitGroups(raw: string): string[] {
   return raw.split(/[\s,]+/).filter(Boolean);
 }
 
+/**
+ * Whether session cookies carry `Secure`: `SESSION_COOKIE_SECURE` when set,
+ * otherwise production. A browser drops a `Secure` cookie on plain `http://`
+ * (Safari even on localhost, every browser on a LAN address), so the quick-start
+ * image, which serves plain HTTP in production mode, turns it off (#253).
+ */
+export function cookieSecure(env: Environment): boolean {
+  const raw = env.SESSION_COOKIE_SECURE;
+  if (raw === "true") return true;
+  if (raw === "false") return false;
+  return env.NODE_ENV === "production";
+}
+
 function bool(name: string, fallback: boolean): boolean {
   const raw = process.env[name];
   if (raw === undefined || raw === "") return fallback;
@@ -162,6 +175,8 @@ export const config = {
 
   /** Cookie name used for the session JWT. */
   sessionCookieName: str("SESSION_COOKIE_NAME", "holotable_session"),
+  /** Whether the session and sign-in cookies are `Secure`; see {@link cookieSecure}. */
+  sessionCookieSecure: cookieSecure(process.env),
 
   /**
    * Send the Content-Security-Policy as `Content-Security-Policy-Report-Only`,
@@ -282,6 +297,9 @@ const EnvSchema = z.object({
     z
       .string()
       .regex(/^[A-Za-z0-9_-]+$/, "must be a valid cookie name (letters, digits, _ or -)"),
+  ),
+  SESSION_COOKIE_SECURE: blank(
+    z.enum(["true", "false"], { error: 'must be "true" or "false"' }),
   ),
   CSP_REPORT_ONLY: blank(
     z.enum(["true", "false"], { error: 'must be "true" or "false"' }),
@@ -461,6 +479,20 @@ export function validateConfig(
     error(
       "SESSION_SECRET",
       `uses fewer than ${MIN_SESSION_SECRET_DISTINCT_CHARS} distinct characters and is guessable. Generate one with \`openssl rand -base64 32\`.`,
+    );
+  }
+
+  // A session cookie without `Secure` can be read off any plain-HTTP hop. The
+  // quick-start image sets this on purpose and runs in demo mode, where there
+  // is nothing worth stealing; a real deployment should hear about it.
+  if (
+    production &&
+    values.SESSION_COOKIE_SECURE === "false" &&
+    values.AUTH_MODE !== "demo"
+  ) {
+    warning(
+      "SESSION_COOKIE_SECURE",
+      "is false; session cookies will be sent over plain HTTP. Serve the app over HTTPS and leave it unset.",
     );
   }
 

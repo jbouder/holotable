@@ -23,7 +23,7 @@ export const GET = route("auth.login", async (req: Request) => {
   const store = await cookies();
   const opts = {
     httpOnly: true,
-    secure: config.isProduction,
+    secure: config.sessionCookieSecure,
     sameSite: "lax" as const,
     path: "/",
     maxAge: 600,

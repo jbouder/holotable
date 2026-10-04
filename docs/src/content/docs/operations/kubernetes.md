@@ -38,6 +38,10 @@ under one image name, told apart by a `-migrate` suffix:
 `latest` moves only on a release, never on a merge. Every image reports its
 commit from `GET /api/health`.
 
+The all-in-one quick-start image, which is not for Kubernetes, is published
+under the same name with a `-quickstart` suffix. Its floating `quickstart` tag
+follows `main`, so `docker run` and the hosted demo show the newest build.
+
 The chart defaults both tags to its `appVersion`, which is the release tag. Until
 the first release is cut, set both explicitly: `image.tag` to `main` or a
 `sha-<short>`, and `migrations.image.tag` to the same value with `-migrate`

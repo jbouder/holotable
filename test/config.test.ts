@@ -2,6 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import {
+  cookieSecure,
   formatConfigProblems,
   validateConfig,
   type ConfigProblem,
@@ -87,11 +88,32 @@ test("a report-only CSP in production boots with a warning that names the risk",
 test("development defaults: .env.example boots with warnings only", () => {
   const problems = validateConfig(EXAMPLE_ENV, { production: false });
   assert.deepEqual(errors(problems), [], formatConfigProblems(problems));
-  // The example leaves the deployment-specific values blank on purpose, and
-  // each of those is called out so the developer knows what will not work yet.
-  for (const v of ["DATABASE_URL", "AI_MODEL", "OPENAI_API_KEY"]) {
+  // The model is left blank on purpose, and called out so the developer knows
+  // what will not work yet. The database points at the Compose Postgres, which
+  // is what the `npm run dev:demo` loop runs against (#253).
+  for (const v of ["AI_MODEL", "OPENAI_API_KEY"]) {
     assert.ok(variables(warnings(problems)).includes(v), `expected a warning for ${v}`);
   }
+  assert.equal(
+    EXAMPLE_ENV.DATABASE_URL,
+    "postgresql://holotable:holotable@localhost:5432/holotable",
+  );
+});
+
+test("the dev:demo loop boots on .env.example with no errors", () => {
+  // `npm run dev:demo` sets these on top of the file; keep the two in step.
+  const script = JSON.parse(
+    readFileSync(new URL("../package.json", import.meta.url), "utf8"),
+  ).scripts["dev:demo"] as string;
+  const overrides: Record<string, string> = {};
+  for (const [, key, value] of script.matchAll(/([A-Z_]+)=(\S*)/g))
+    overrides[key] = value;
+  assert.equal(overrides.AUTH_MODE, "demo");
+  const problems = validateConfig(
+    { ...EXAMPLE_ENV, ...overrides },
+    { production: false },
+  );
+  assert.deepEqual(errors(problems), [], formatConfigProblems(problems));
 });
 
 test("an empty environment in development boots with warnings only", () => {
@@ -750,4 +772,50 @@ test("DEMO_GROUPS outside demo mode is ignored with a warning", () => {
   assert.deepEqual(errors(problems), []);
   assert.deepEqual(variables(warnings(problems)), ["DEMO_GROUPS"]);
   assert.match(warnings(problems)[0].message, /ignored unless AUTH_MODE=demo/);
+});
+
+/* -------------------------------------------------------------------------- */
+/* SESSION_COOKIE_SECURE (#253)                                                */
+/* -------------------------------------------------------------------------- */
+
+test("session cookies are Secure in production unless SESSION_COOKIE_SECURE says otherwise", () => {
+  assert.equal(cookieSecure({ NODE_ENV: "production" }), true);
+  assert.equal(cookieSecure({ NODE_ENV: "development" }), false);
+  assert.equal(
+    cookieSecure({ NODE_ENV: "production", SESSION_COOKIE_SECURE: "false" }),
+    false,
+  );
+  assert.equal(
+    cookieSecure({ NODE_ENV: "development", SESSION_COOKIE_SECURE: "true" }),
+    true,
+  );
+  assert.equal(cookieSecure({ NODE_ENV: "production", SESSION_COOKIE_SECURE: "" }), true);
+});
+
+test("SESSION_COOKIE_SECURE must be a boolean literal", () => {
+  const bad = validateConfig(
+    { ...VALID_PRODUCTION, SESSION_COOKIE_SECURE: "no" },
+    { production: true },
+  );
+  assert.deepEqual(variables(errors(bad)), ["SESSION_COOKIE_SECURE"]);
+});
+
+test("insecure session cookies warn in production, except in demo mode", () => {
+  const oidc = validateConfig(
+    { ...VALID_PRODUCTION, SESSION_COOKIE_SECURE: "false" },
+    { production: true },
+  );
+  assert.deepEqual(errors(oidc), []);
+  assert.deepEqual(variables(warnings(oidc)), ["SESSION_COOKIE_SECURE"]);
+
+  const demo = validateConfig(
+    {
+      ...VALID_DEMO,
+      AI_MODEL: "m",
+      OPENAI_API_KEY: "k",
+      SESSION_COOKIE_SECURE: "false",
+    },
+    { production: true },
+  );
+  assert.deepEqual(demo, []);
 });

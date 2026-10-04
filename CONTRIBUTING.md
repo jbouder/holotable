@@ -19,6 +19,21 @@ a problem with [@jbouder](https://github.com/jbouder) directly.
 
 Either path works. Docker is the shorter one.
 
+### The shortest loop: demo mode
+
+No Keycloak, just Node 22+ and Docker:
+
+```bash
+npm install
+cp .env.example .env               # the first lines are all this loop needs
+docker compose up -d postgres seed # TimescaleDB, migrations, demo data
+npm run dev:demo                   # http://localhost:3000, demo sign-in
+```
+
+`npm run dev:demo` runs `next dev` with `AUTH_MODE=demo` and the Keycloak
+variables blanked. It is right for dashboards, panels, charts and the SQL
+guard. It is not for auth work; see the note on authentication below.
+
 ### Docker
 
 ```bash

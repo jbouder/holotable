@@ -75,7 +75,34 @@ doesn't already reference. Statement-level query failures (bad column, syntax,
 timeout) surface as actionable messages with a one-click retry; connection and
 infrastructure errors stay generic.
 
-## Quick start (Docker)
+## Quick start
+
+Three steps, from trying it to running it.
+
+**1. Evaluate: one command.** TimescaleDB, the app, six hours of demo history
+and the live seeder in one container, with no sign-in and no `.env`:
+
+```bash
+docker run -p 3000:3000 ghcr.io/jbouder/holotable:quickstart
+```
+
+Open <http://localhost:3000>; the seeded dashboards are live within seconds.
+Generation, Explore and chat need a model, passed with `-e`:
+
+```bash
+docker run -p 3000:3000 \
+  -e AI_MODEL=openai/gpt-4o-mini \
+  -e OPENAI_BASE_URL=https://openrouter.ai/api/v1 -e OPENAI_API_KEY=sk-... \
+  ghcr.io/jbouder/holotable:quickstart
+```
+
+Everyone who reaches it shares one demo workspace, and the data lives in the
+container unless you mount `-v holotable-data:/var/lib/postgresql/data`. It is
+for trying Holotable, never for real data: see
+[Demo mode](https://holotable-docs.beskar.workers.dev/operations/demo-mode/).
+
+**2. Integrate: Docker Compose.** Separate services, a Keycloak realm, real
+OIDC sign-in and your own `.env`:
 
 ```bash
 cp .env.example .env
@@ -86,26 +113,27 @@ docker compose up                  # timescaledb, keycloak, migrate, app, seed
 `docker compose up` pulls the published images,
 `ghcr.io/jbouder/holotable:main` and `:main-migrate`, so nothing is built
 locally. Set `HOLOTABLE_TAG` to pin a release instead of following `main`, or
-run `docker compose up --build` to build this checkout under the same names,
-which is what you want when changing the code. Both images are multi-arch
-(`linux/amd64`, `linux/arm64`).
+run `docker compose up --build` to build this checkout under the same names.
+Every image is multi-arch (`linux/amd64`, `linux/arm64`). The `seed` service
+continuously inserts demo metrics and, once, creates the `demo` workspace's
+sources and dashboards; see [Seeding demo data](#seeding-demo-data).
 
-The `seed` service continuously inserts demo metrics and (once) creates the demo
-`demo` workspace sources + dashboards. Open <http://localhost:3000>. See
-[Seeding demo data](#seeding-demo-data) for what it creates and how to tune it.
+**3. Run it: Helm.** See [Deploying (Kubernetes)](#deploying-kubernetes).
 
-## Quick start (local)
+### Developing
 
-Requirements: Node 22+ and a TimescaleDB instance.
+The shortest loop needs Node 22+ and Docker, and no Keycloak:
 
 ```bash
 npm install
-cp .env.example .env               # edit DATABASE_URL, TIMESCALEDB_URL, secrets, AI_*
-psql "$DATABASE_URL" -f timescaledb/init/001_schema.sql
-npm run migrate                    # apply Postgres migrations
-npm run seed                       # looping metrics seeder (+ demo source/dashboard)
-npm run dev                        # http://localhost:3000
+cp .env.example .env               # the first lines are all this loop needs
+docker compose up -d postgres seed # TimescaleDB, migrations, demo data
+npm run dev:demo                   # http://localhost:3000, demo sign-in
 ```
+
+`npm run dev:demo` is `npm run dev` in [demo mode](https://holotable-docs.beskar.workers.dev/operations/demo-mode/).
+Work on sign-in or authorization runs `npm run dev` against the Compose realm
+instead; see [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## Deploying (Kubernetes)
 
@@ -288,6 +316,7 @@ See [`.env.example`](.env.example) for the complete list.
 
 ```bash
 npm run dev      # dev server
+npm run dev:demo # dev server in demo mode, no Keycloak
 npm run build    # production build
 npm run start    # run the production build
 npm run lint     # biome check (lint + format, no writes)

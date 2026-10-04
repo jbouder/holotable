@@ -5,6 +5,7 @@
   "license": "Apache-2.0",
   "scripts": {
     "dev": "next dev",
+    "dev:demo": "AUTH_MODE=demo OIDC_ISSUER= OIDC_CLIENT_ID= OIDC_CLIENT_SECRET= OIDC_JWKS_URL= next dev",
     "build": "next build",
     "start": "NEXT_MANUAL_SIG_HANDLE=true next start",
     "lint": "biome check",
