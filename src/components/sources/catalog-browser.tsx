@@ -1,8 +1,19 @@
 "use client";
 
 import * as React from "react";
-import { ChevronRight, Clock, Loader2, RefreshCw, Search } from "lucide-react";
 import {
+  AlertTriangle,
+  ChevronRight,
+  Clock,
+  Loader2,
+  RefreshCw,
+  Search,
+} from "lucide-react";
+import Link from "next/link";
+import {
+  type ColumnImpact,
+  describeHideImpact,
+  fetchHideImpact,
   type CatalogView,
   fetchCatalogView,
   searchCatalog,
@@ -83,8 +94,12 @@ export function CatalogBrowser({
   const [query, setQuery] = React.useState("");
   const [expanded, setExpanded] = React.useState<ReadonlySet<string>>(new Set());
   const [refreshing, setRefreshing] = React.useState(false);
-  // The column whose toggle is in flight, as `table.column`.
-  const [pending, setPending] = React.useState<string | null>(null);
+  // The column whose toggle is in flight, as `table.column`, and what it is doing.
+  const [pending, setPending] = React.useState<{ key: string; label: string } | null>(
+    null,
+  );
+  // A hide that would break panels, waiting for the admin to confirm it (#267).
+  const [confirming, setConfirming] = React.useState<ColumnImpact | null>(null);
   const [toggleError, setToggleError] = React.useState<ApiError | null>(null);
   const [notice, setNotice] = React.useState<string | null>(null);
 
@@ -135,10 +150,32 @@ export function CatalogBrowser({
     );
   }
 
+  // Hiding asks first (#267): the server dry-runs the guard over every current
+  // panel on this source, and only a hide that would break none goes straight
+  // through. Exposing never breaks anything, so it never asks.
   async function toggle(table: string, column: string, exposed: boolean) {
-    setPending(`${table}.${column}`);
     setToggleError(null);
     setNotice(null);
+    if (!exposed) {
+      setPending({ key: `${table}.${column}`, label: "Checking…" });
+      const checked = await fetchHideImpact(source.id, table, column);
+      if (!checked.ok) {
+        setPending(null);
+        setToggleError(checked.error);
+        return;
+      }
+      if (describeHideImpact(checked.impact)) {
+        setPending(null);
+        setConfirming(checked.impact);
+        return;
+      }
+    }
+    await apply(table, column, exposed);
+  }
+
+  async function apply(table: string, column: string, exposed: boolean) {
+    setConfirming(null);
+    setPending({ key: `${table}.${column}`, label: "Saving…" });
     const result = await updateColumnExposure(source.id, { table, column, exposed });
     setPending(null);
     if (!result.ok) {
@@ -199,6 +236,9 @@ export function CatalogBrowser({
               missing={missing.has(table.name)}
               canManage={view.canManage}
               pending={pending}
+              confirming={confirming?.table === table.name ? confirming : null}
+              onConfirmHide={(impact) => void apply(impact.table, impact.column, false)}
+              onCancelHide={() => setConfirming(null)}
               onToggleOpen={() =>
                 setExpanded((prev) => {
                   const next = new Set(prev);
@@ -271,6 +311,9 @@ function TableNode({
   missing,
   canManage,
   pending,
+  confirming,
+  onConfirmHide,
+  onCancelHide,
   onToggleOpen,
   onToggleExposed,
 }: {
@@ -279,7 +322,11 @@ function TableNode({
   open: boolean;
   missing: boolean;
   canManage: boolean;
-  pending: string | null;
+  pending: { key: string; label: string } | null;
+  /** A hide on this table awaiting confirmation. */
+  confirming: ColumnImpact | null;
+  onConfirmHide: (impact: ColumnImpact) => void;
+  onCancelHide: () => void;
   onToggleOpen: () => void;
   onToggleExposed: (column: string, exposed: boolean) => void;
 }) {
@@ -357,13 +404,20 @@ function TableNode({
                 {canManage && (
                   <Checkbox
                     checked={exposed}
-                    disabled={pending !== null}
+                    disabled={pending !== null || confirming !== null}
                     onCheckedChange={(next) => onToggleExposed(column.name, next)}
                     label={
                       <span className="text-xs text-muted">
-                        {pending === key ? "Saving…" : "Exposed"}
+                        {pending?.key === key ? pending.label : "Exposed"}
                       </span>
                     }
+                  />
+                )}
+                {confirming?.column === column.name && (
+                  <HideImpactConfirm
+                    impact={confirming}
+                    onConfirm={() => onConfirmHide(confirming)}
+                    onCancel={onCancelHide}
                   />
                 )}
               </li>
@@ -372,5 +426,56 @@ function TableNode({
         </ul>
       )}
     </li>
+  );
+}
+
+/**
+ * The warning before a hide that would break panels: which ones, linked, and
+ * an explicit choice. Inline under the column rather than a second dialog,
+ * because it is about that row.
+ */
+function HideImpactConfirm({
+  impact,
+  onConfirm,
+  onCancel,
+}: {
+  impact: ColumnImpact;
+  onConfirm: () => void;
+  onCancel: () => void;
+}) {
+  return (
+    <div
+      role="alert"
+      className="drop-in basis-full space-y-2 border border-warning/40 bg-warning/5 px-3 py-2 text-xs"
+    >
+      <p className="flex items-start gap-1.5 text-warning">
+        <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden />
+        {describeHideImpact(impact)}
+      </p>
+      <ul className="space-y-1 pl-5">
+        {impact.dashboards.map((dashboard) => (
+          <li key={dashboard.id}>
+            <Link
+              href={`/dashboards/${encodeURIComponent(dashboard.id)}`}
+              className="text-foreground underline underline-offset-2"
+            >
+              {dashboard.title}
+            </Link>
+            <span className="text-muted">
+              {" "}
+              · {dashboard.panels.map((panel) => panel.title).join(", ")}
+            </span>
+          </li>
+        ))}
+      </ul>
+      <div className="flex flex-wrap justify-end gap-2">
+        <Button variant="ghost" size="sm" onClick={onCancel}>
+          Keep exposed
+        </Button>
+        <Button variant="danger" size="sm" onClick={onConfirm}>
+          Hide anyway
+        </Button>
+      </div>
+    </div>
   );
 }

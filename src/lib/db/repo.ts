@@ -13,6 +13,7 @@ import type { BudgetStore } from "@/lib/limits/budget";
 import type { WorkspaceLimits } from "@/lib/limits/llm";
 import type { WorkspaceUsage } from "@/lib/workspace-limits";
 import type { ImpactDashboard, SourceImpact } from "@/lib/source-impact";
+import type { PanelStatement } from "@/lib/catalog/hide-impact";
 import type { StoredChatMessage } from "@/lib/chat-history";
 import type { GenerationLogEntry, GenerationLogRow } from "@/lib/ai/log";
 import { type Template, TemplateBody, TemplateKind } from "@/lib/templates";
@@ -201,6 +202,48 @@ export async function sourceImpact(
     // confirmation can say which of the two outcomes a delete will produce.
     referencedByAnyVersion: await isSourceReferenced(sourceId),
   };
+}
+
+/**
+ * Every panel in the current version of a live dashboard in this workspace
+ * that points at the source, with its SQL, in the same order as
+ * {@link sourceImpact}.
+ *
+ * Server-only input to `hiddenColumnImpact()` (#267). The SQL is what the
+ * dry run checks and must not be forwarded to a client; the impact payload is
+ * built from the ids and titles alone.
+ */
+export async function sourcePanelStatements(
+  workspaceId: string,
+  sourceId: string,
+): Promise<PanelStatement[]> {
+  const rows = await query<{
+    dashboard_id: string;
+    dashboard_title: string;
+    panel_id: string | null;
+    panel_title: string | null;
+    sql: string | null;
+  }>(
+    `SELECT d.id AS dashboard_id, d.title AS dashboard_title,
+            panel->>'id' AS panel_id, panel->>'title' AS panel_title,
+            panel->'query'->>'sql' AS sql
+     FROM dashboards d
+     JOIN dashboard_versions dv ON dv.id = d.current_version_id
+     CROSS JOIN LATERAL jsonb_array_elements(dv.spec->'panels')
+       WITH ORDINALITY AS t(panel, ord)
+     WHERE d.workspace_id = $1
+       AND d.deleted_at IS NULL
+       AND panel->'query'->>'sourceId' = $2
+     ORDER BY d.title, d.id, t.ord`,
+    [workspaceId, sourceId],
+  );
+  return rows.map((row) => ({
+    dashboardId: row.dashboard_id,
+    dashboardTitle: row.dashboard_title,
+    panelId: row.panel_id ?? "",
+    panelTitle: row.panel_title ?? row.panel_id ?? "",
+    sql: row.sql ?? "",
+  }));
 }
 
 /**
