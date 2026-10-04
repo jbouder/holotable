@@ -1,9 +1,8 @@
 /**
  * Server-Sent Events framing shared by the dashboard stream.
  *
- * Only the shutdown and session-ended frames live here. The poller's own events are serialized
- * inline by the route; this one has a policy attached to it and a test, so it
- * is worth a module of its own.
+ * The poller's events, the shutdown and session-ended frames, and the
+ * heartbeat.
  */
 
 /** Named so a client can react without it looking like a poller event. */
@@ -43,3 +42,18 @@ export const SESSION_ENDED_EVENT = "session-ended";
 export function sessionEndedFrame(): string {
   return `event: ${SESSION_ENDED_EVENT}\ndata: {"reason":"revoked"}\n\n`;
 }
+
+/**
+ * A poller event as a frame. `id` is the resume token (#43): the browser keeps
+ * the last one it saw and hands it back on reconnect. SSE ids may not contain
+ * a newline; the token is base64url, and anything else is dropped rather than
+ * allowed to split the frame.
+ */
+export function eventFrame(data: string, id?: string): string {
+  const idLine = id && !/[\r\n\0]/.test(id) ? `id: ${id}\n` : "";
+  return `${idLine}data: ${data}\n\n`;
+}
+
+/** A comment line: ignored by `EventSource`, but traffic to a proxy. */
+export const HEARTBEAT_FRAME = ": keepalive\n\n";
+export const HEARTBEAT_MS = 15_000;

@@ -175,7 +175,6 @@ test("makePanelExecutor emits tombstone for a cross-workspace source (never exec
   const events = await executor(
     panel,
     { from: new Date("2024-01-01"), to: new Date("2024-01-02") },
-    new Map(),
     DASHBOARD_WORKSPACE,
   );
 
@@ -239,7 +238,6 @@ test("makePanelExecutor allows execution when source workspace matches dashboard
     await executor(
       panel,
       { from: new Date("2024-01-01"), to: new Date("2024-01-02") },
-      new Map(),
       WORKSPACE,
     );
   } catch {
@@ -323,7 +321,6 @@ test("a rejected query is reported as the statement it is", async () => {
   const events = await executor(
     spec().panels[0],
     { from: new Date(0), to: new Date(1) },
-    new Map(),
     "w1",
   );
   assert.equal(events.length, 1);

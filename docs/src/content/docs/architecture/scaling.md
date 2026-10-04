@@ -53,5 +53,4 @@ rather than a rewrite.
 | Issue | Work |
 | --- | --- |
 | [#13](https://github.com/jbouder/holotable/issues/13) | A per-source connection pool and a query concurrency ceiling, in place of a new `pg.Client` per execution |
-| [#43](https://github.com/jbouder/holotable/issues/43) | Resume a stream after a reconnect, and give a viewer who joins a running poller its history |
 | [#44](https://github.com/jbouder/holotable/issues/44) | Poller backoff and a circuit breaker, so a down source is not re-hit every tick |

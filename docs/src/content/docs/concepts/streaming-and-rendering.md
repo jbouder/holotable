@@ -23,12 +23,34 @@ Server side (`.../stream/route.ts` and `src/lib/poller/registry.ts`):
      emits a `tombstone` event. All three cases look identical, so a crafted
      spec cannot probe for cross-workspace sources.
   2. Re-runs `validateSql`, builds the guarded plan, and executes it.
-  3. **Computes a delta.** For time-series panels, `computeDelta` tracks the
-     last emitted timestamp per panel and broadcasts only newer rows as an
+  3. **Remembers the result and computes each subscriber's delta.** The
+     poller keeps every panel's last result. For a time-series panel each
+     **subscriber** has its own cursor (the newest timestamp it has been
+     sent), and `computeDelta` sends it only the rows newer than that as an
      `append`. Non-time panels are sent as a full `replace` snapshot.
 
-Events are broadcast to every subscriber's stream. The event types are `panel`
+Events go to every subscriber's stream. The event types are `panel`
 (`append`/`replace`), `panel-error`, `dashboard-error`, `tombstone`, and `tick`.
+
+### Joining and resuming
+
+A subscriber that joins a poller already running — a second viewer, or a
+reconnect while someone else is watching — is caught up at once from the
+poller's last results: a `replace` per panel and the last `tick`, without
+waiting for the next cycle (#43).
+
+Each time-series frame carries an SSE `id:`, the subscriber's cursors and the
+spec version (`src/lib/poller/resume.ts`). `EventSource` sends the last one
+back as `Last-Event-ID` when it reconnects by itself; `LiveDashboard` passes it
+as `?lastEventId=` when it builds a new `EventSource` for the same window (a
+manual Reconnect, a tab shown again). The subscriber then gets only the rows
+it missed, and the panels keep their history. An id from another spec version,
+or one that does not decode, is ignored and the subscriber gets a full
+snapshot. The id is not trusted: the worst a forged one can do is ask for rows
+the viewer could already see.
+
+The stream also sends a comment every 15 seconds, so a proxy that closes quiet
+connections does not close one whose dashboard refreshes slowly.
 
 A `tick` is sent only when the whole cycle completed. A cycle that failed
 before the panels — an unresolvable time range, say — sends a
@@ -54,7 +76,9 @@ Client side (`LiveDashboard.tsx` → `PanelView.tsx` → `EChart.tsx`):
   marks every panel stale, and clears on the next completed `tick`.
 - A **staleness watchdog** marks panels `stale` if no `tick` arrives within
   roughly two refresh intervals, and on an `EventSource` transport error — which
-  auto-reconnects.
+  auto-reconnects and resumes.
+- Panels are cleared only when a stream starts over (first load, or a new time
+  window). A resumed stream keeps them.
 - Each panel records **when its data arrived**; the status badge reports it, so
   panels that go stale independently can be told apart.
 

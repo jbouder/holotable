@@ -116,6 +116,11 @@ export function LiveDashboard({
   // the session expired gets a fresh session and one more try; a second
   // refusal is something else, and is left to the Reconnect button.
   const renewTriedRef = React.useRef(false);
+  // The last SSE event id this page saw, and the stream it came from (#43).
+  // It is the server's record of what has been sent, so a new EventSource for
+  // the same window — a manual Reconnect, a tab shown again, a reconnect after
+  // renewal — resumes from it instead of starting over.
+  const lastEventIdRef = React.useRef<{ url: string; id: string } | null>(null);
   const rolling = isRolling(timeRange);
   const streamUrl = React.useMemo(() => {
     const params = new URLSearchParams(timeRange);
@@ -189,14 +194,28 @@ export function LiveDashboard({
   React.useEffect(() => {
     if (!live || suspended) return;
     lastTickRef.current = Date.now();
-    const es = new EventSource(streamUrl);
+    const last = lastEventIdRef.current;
+    const resuming = last !== null && last.url === streamUrl;
+    const es = new EventSource(
+      resuming ? `${streamUrl}&lastEventId=${encodeURIComponent(last.id)}` : streamUrl,
+    );
+    // Only a stream that starts over clears the panels: a new window, or the
+    // first load. A resumed one — this EventSource reconnecting by itself
+    // with `Last-Event-ID`, or a new one carrying it — is sent only what the
+    // panels are missing, so wiping them would throw away their history.
+    let fresh = !resuming;
     es.onopen = () => {
       renewTriedRef.current = false;
-      setStates({});
+      if (fresh) {
+        fresh = false;
+        setStates({});
+      }
       setDashboardError(null);
       signal({ type: "open" });
     };
     es.onmessage = (msg) => {
+      if (msg.lastEventId)
+        lastEventIdRef.current = { url: streamUrl, id: msg.lastEventId };
       try {
         const event = JSON.parse(msg.data) as PollerEvent;
         if (event.type === "tick") {
