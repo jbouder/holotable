@@ -5,9 +5,13 @@ name: CI
 # path filter never reports a conclusion — GitHub then blocks the pull request
 # forever waiting for a run that will not happen. docs.yml can filter by path
 # precisely because none of its jobs are required.
+#
+# A `v*` tag runs the whole pipeline too: `publish` below releases the images,
+# and it only runs once every check has passed on that exact commit.
 on:
   push:
     branches: [main]
+    tags: ["v*"]
   pull_request:
 
 concurrency:
@@ -296,15 +300,18 @@ jobs:
     # would fail here too. Waiting for `build` reports that failure once,
     # against the faster job, instead of burning a second runner on it.
     needs: build
+    # Pull requests only. On `main` and on a release tag `publish` builds the
+    # same targets for both architectures and pushes them, so building them a
+    # third time here would prove nothing new.
+    if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
 
       - uses: docker/setup-buildx-action@v3
 
-      # Build only — never pushed. This job exists to prove the Dockerfile
-      # still produces a working standalone image, not to publish one.
-      # Releasing the image is #97.
+      # Build only — never pushed. A pull request runs with a read-only token
+      # and may come from a fork; publishing is `publish` below, on `main`.
       - name: Build image
         uses: docker/build-push-action@v6
         with:
@@ -328,6 +335,151 @@ jobs:
           load: false
           tags: holotable:ci-migrate
           cache-from: type=gha
+
+  # Publishes ghcr.io/<owner>/holotable (#250). Each target is built natively
+  # on an amd64 and an arm64 runner and pushed by digest, then
+  # `publish-manifest` stitches the two digests into one multi-arch tag. Native
+  # runners rather than QEMU because `npm ci` and `next build` under emulation
+  # take several times as long.
+  #
+  # Tags, one image name for both targets (the Helm chart's convention):
+  #
+  #   on main      sha-<short>          sha-<short>-migrate
+  #                main                 main-migrate
+  #   on v1.2.3    1.2.3                1.2.3-migrate
+  #                latest, runtime      latest-migrate, migrate
+  #
+  # Gated on every check, so nothing is published from a commit that fails
+  # lint, types, tests or the build.
+  publish:
+    name: Publish ${{ matrix.target }} (${{ matrix.arch }})
+    if: github.event_name == 'push'
+    needs: [lint, typecheck, test, build]
+    strategy:
+      fail-fast: true
+      matrix:
+        target: [runtime, migrate]
+        arch: [amd64, arm64]
+    runs-on: ${{ matrix.arch == 'arm64' && 'ubuntu-24.04-arm' || 'ubuntu-24.04' }}
+    permissions:
+      contents: read
+      packages: write
+    env:
+      IMAGE: ghcr.io/${{ github.repository }}
+    steps:
+      - uses: actions/checkout@v4
+
+      # `/api/health` reports package.json's version (src/lib/version.ts). A
+      # tag that disagrees with it would publish `1.2.3` reporting `1.2.2`.
+      - name: Check the tag matches package.json
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: |
+          version="$(node -p "require('./package.json').version")"
+          if [ "v${version}" != "${GITHUB_REF_NAME}" ]; then
+            echo "::error::Tag ${GITHUB_REF_NAME} does not match package.json version ${version}"
+            exit 1
+          fi
+
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # Labels only; the tags are applied to the multi-arch index in
+      # `publish-manifest`. `org.opencontainers.image.source` is what links
+      # the GHCR package to this repository.
+      - name: Image labels
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.IMAGE }}
+
+      - name: Build and push by digest
+        id: build
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          target: ${{ matrix.target }}
+          platforms: linux/${{ matrix.arch }}
+          labels: ${{ steps.meta.outputs.labels }}
+          # Stamped into GET /api/health.
+          build-args: GIT_COMMIT=${{ github.sha }}
+          outputs: type=image,name=${{ env.IMAGE }},push-by-digest=true,name-canonical=true,push=true
+          cache-from: type=gha,scope=publish-${{ matrix.target }}-${{ matrix.arch }}
+          cache-to: type=gha,scope=publish-${{ matrix.target }}-${{ matrix.arch }},mode=max
+
+      - name: Record the digest
+        run: |
+          mkdir -p "${RUNNER_TEMP}/digests"
+          digest="${{ steps.build.outputs.digest }}"
+          touch "${RUNNER_TEMP}/digests/${digest#sha256:}"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: digests-${{ matrix.target }}-${{ matrix.arch }}
+          path: ${{ runner.temp }}/digests/*
+          if-no-files-found: error
+          retention-days: 1
+
+  publish-manifest:
+    name: Publish ${{ matrix.target }} manifest
+    needs: publish
+    strategy:
+      matrix:
+        target: [runtime, migrate]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    env:
+      IMAGE: ghcr.io/${{ github.repository }}
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: ${{ runner.temp }}/digests
+          pattern: digests-${{ matrix.target }}-*
+          merge-multiple: true
+
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # `latest` is written explicitly, only on a release tag, so a merge to
+      # `main` never moves it. The suffix keeps both targets under one image
+      # name; `value=<target>,suffix=` is the floating `runtime` / `migrate`
+      # alias for the newest release.
+      - name: Tags
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.IMAGE }}
+          flavor: |
+            latest=false
+            suffix=${{ matrix.target == 'migrate' && '-migrate' || '' }},onlatest=true
+          tags: |
+            type=sha,prefix=sha-,format=short
+            type=raw,value=main,enable={{is_default_branch}}
+            type=semver,pattern={{version}}
+            type=raw,value=latest,enable=${{ startsWith(github.ref, 'refs/tags/v') }}
+            type=raw,value=${{ matrix.target }},suffix=,enable=${{ startsWith(github.ref, 'refs/tags/v') }}
+
+      - name: Create the multi-arch manifest
+        working-directory: ${{ runner.temp }}/digests
+        run: |
+          mapfile -t tags < <(jq -r '.tags[] | "-t", .' <<< "$DOCKER_METADATA_OUTPUT_JSON")
+          sources=()
+          for digest in *; do sources+=("${IMAGE}@sha256:${digest}"); done
+          docker buildx imagetools create "${tags[@]}" "${sources[@]}"
+
+      - name: Inspect
+        run: docker buildx imagetools inspect "$(jq -r '.tags[0]' <<< "$DOCKER_METADATA_OUTPUT_JSON")"
 
   smoke:
     name: Self-monitoring smoke test
@@ -373,7 +525,7 @@ jobs:
       # scraped out of the running app, through the same guard and executor
       # POST /api/query uses.
       - name: Smoke
-        run: docker compose --profile smoke run --rm smoke
+        run: docker compose --profile smoke run --build --rm smoke
 
       - name: Logs
         if: failure()

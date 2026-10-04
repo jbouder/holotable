@@ -6,6 +6,15 @@
 # .env — `openssl rand -hex 32` — for anything reachable from anywhere else.
 x-metrics-token: &metrics-token ${METRICS_TOKEN:-holotable-local-demo-scrape}
 
+# The published images (#250). `docker compose up` pulls these; `docker compose
+# up --build` builds them from this checkout instead, under the same names, which
+# is what a contributor wants. HOLOTABLE_TAG picks the published tag: `main`
+# (the default) follows the main branch, a version such as `0.1.0` pins a
+# release. The job services (migrate, seed, self-metrics, smoke) share the
+# `migrate` target, so they share one image.
+x-runtime-image: &runtime-image ghcr.io/jbouder/holotable:${HOLOTABLE_TAG:-main}
+x-migrate-image: &migrate-image ghcr.io/jbouder/holotable:${HOLOTABLE_TAG:-main}-migrate
+
 services:
   postgres:
     image: timescale/timescaledb:2.17.2-pg16
@@ -38,6 +47,7 @@ services:
       - ./keycloak:/opt/keycloak/data/import:ro
 
   migrate:
+    image: *migrate-image
     build:
       context: .
       target: migrate
@@ -48,6 +58,7 @@ services:
         condition: service_healthy
 
   app:
+    image: *runtime-image
     build:
       context: .
       args:
@@ -116,6 +127,7 @@ services:
         condition: service_completed_successfully
 
   seed:
+    image: *migrate-image
     build:
       context: .
       target: migrate
@@ -139,6 +151,7 @@ services:
   # Holotable reads SQL, not PromQL, so something has to land the samples in a
   # table, and a ~100-line collector is the smaller honest answer.
   self-metrics:
+    image: *migrate-image
     build:
       context: .
       target: migrate
@@ -162,6 +175,7 @@ services:
   # the same guard and executor POST /api/query uses, and fails otherwise.
   smoke:
     profiles: ["smoke"]
+    image: *migrate-image
     build:
       context: .
       target: migrate

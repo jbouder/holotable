@@ -24,21 +24,34 @@ obvious.
 
 ## Images
 
-No image is published yet
-([#97](https://github.com/jbouder/holotable/issues/97)). Build both targets of
-the repository `Dockerfile` and push them to a registry the cluster can pull
-from:
+CI publishes both targets of the repository `Dockerfile` to
+`ghcr.io/jbouder/holotable`, for `linux/amd64` and `linux/arm64`, once every
+check has passed. `runtime` is the Next.js standalone server; `migrate` is the
+one-shot job image that carries `tsx`, `scripts/`, and `migrations/`. Both live
+under one image name, told apart by a `-migrate` suffix:
+
+| Published on | `runtime` tags | `migrate` tags |
+| --- | --- | --- |
+| every push to `main` | `sha-<short>`, `main` | `sha-<short>-migrate`, `main-migrate` |
+| a `v1.2.3` tag | `1.2.3`, `latest`, `runtime` | `1.2.3-migrate`, `latest-migrate`, `migrate` |
+
+`latest` moves only on a release, never on a merge. Every image reports its
+commit from `GET /api/health`.
+
+The chart defaults both tags to its `appVersion`, which is the release tag. Until
+the first release is cut, set both explicitly: `image.tag` to `main` or a
+`sha-<short>`, and `migrations.image.tag` to the same value with `-migrate`
+appended. Or pin `image.digest` and `migrations.image.digest`; a digest wins over
+a tag, the same way the Dockerfile pins its own base.
+
+To run your own build, push both targets to a registry the cluster can pull from
+and point `image.repository` and `migrations.image.repository` at it:
 
 ```bash
 docker build -t <registry>/holotable:0.1.0 \
   --build-arg GIT_COMMIT="$(git rev-parse HEAD)" .
 docker build -t <registry>/holotable:0.1.0-migrate --target migrate .
 ```
-
-`runtime` is the Next.js standalone server; `migrate` is the one-shot job image
-that carries `tsx`, `scripts/`, and `migrations/`. Point `image.repository` and
-`migrations.image.repository` at them, or pin `image.digest` — a digest wins
-over a tag, the same way the Dockerfile pins its own base.
 
 ## Credentials never enter the chart
 

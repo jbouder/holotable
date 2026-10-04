@@ -15,10 +15,13 @@ helm install holotable deploy/helm/holotable \
 
 ## Before you install
 
-1. **Images.** Nothing is published yet
-   ([#97](https://github.com/jbouder/holotable/issues/97)), so build and push
-   both targets of the repository `Dockerfile` and point `image.repository` and
-   `migrations.image.repository` at your registry:
+1. **Images.** CI publishes both targets to `ghcr.io/jbouder/holotable`,
+   multi-arch: `<version>` and `<version>-migrate` on a release tag, `main`
+   and `main-migrate` on every merge to `main`. The tags default to the chart's
+   `appVersion`; until a release exists, set `image.tag: main` and
+   `migrations.image.tag: main-migrate`. To run your own
+   build instead, push both targets of the repository `Dockerfile` and point
+   `image.repository` and `migrations.image.repository` at your registry:
 
    ```bash
    docker build -t <registry>/holotable:0.1.0 \

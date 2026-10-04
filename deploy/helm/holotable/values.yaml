@@ -17,8 +17,8 @@ replicaCount: 1
 
 image:
   # -- Image repository for the `runtime` target of the repository Dockerfile.
-  # No image is published yet (https://github.com/jbouder/holotable/issues/97),
-  # so point this at a registry you build into.
+  # CI publishes it here, multi-arch: `<version>` on a release tag, `main` and
+  # `sha-<short>` on every merge to main.
   repository: ghcr.io/jbouder/holotable
   # -- Image tag. Defaults to the chart's appVersion.
   tag: ""
