@@ -109,7 +109,10 @@ test("there are still exactly three auth routes", () => {
 });
 
 test("a cookie-less page request is sent through demo login; an API request is not", () => {
-  const page = proxy(new NextRequest("http://localhost/dashboards?tag=x"));
+  const navigation = { "sec-fetch-dest": "document" };
+  const page = proxy(
+    new NextRequest("http://localhost/dashboards?tag=x", { headers: navigation }),
+  );
   assert.equal(page.status, 307);
   const location = new URL(page.headers.get("location") ?? "");
   assert.equal(location.origin, "http://localhost");
@@ -122,6 +125,7 @@ test("a cookie-less page request is sent through demo login; an API request is n
   const proxied = proxy(
     new NextRequest("http://0.0.0.0:3000/explore", {
       headers: {
+        ...navigation,
         host: "0.0.0.0:3000",
         "x-forwarded-host": "demo.example.com",
         "x-forwarded-proto": "https",
@@ -134,7 +138,7 @@ test("a cookie-less page request is sent through demo login; an API request is n
   );
   const hosted = proxy(
     new NextRequest("http://0.0.0.0:3000/explore", {
-      headers: { host: "localhost:3000" },
+      headers: { ...navigation, host: "localhost:3000" },
     }),
   );
   assert.equal(
@@ -144,17 +148,40 @@ test("a cookie-less page request is sent through demo login; an API request is n
 
   const withCookie = proxy(
     new NextRequest("http://localhost/dashboards", {
-      headers: { cookie: `${config.sessionCookieName}=anything` },
+      headers: { ...navigation, cookie: `${config.sessionCookieName}=anything` },
     }),
   );
   assert.notEqual(withCookie.status, 307);
 
   const prefetch = proxy(
     new NextRequest("http://localhost/dashboards", {
-      headers: { "next-router-prefetch": "1" },
+      headers: { ...navigation, "next-router-prefetch": "1" },
     }),
   );
   assert.notEqual(prefetch.status, 307);
+
+  // A browser without Fetch Metadata still navigates with Accept: text/html.
+  const oldBrowser = proxy(
+    new NextRequest("http://localhost/dashboards", {
+      headers: { accept: "text/html,application/xhtml+xml,*/*;q=0.8" },
+    }),
+  );
+  assert.equal(oldBrowser.status, 307);
+
+  // A cookie-less non-navigation would loop between the page and login, so it
+  // gets the page: a health check, a script, Cloudflare's container probe.
+  const probes: Record<string, string>[] = [
+    {},
+    { accept: "*/*" },
+    { "sec-fetch-dest": "empty" },
+  ];
+  for (const headers of probes) {
+    assert.notEqual(
+      proxy(new NextRequest("http://localhost/", { headers })).status,
+      307,
+      JSON.stringify(headers),
+    );
+  }
 
   // `/api` is outside the matcher, so API routes keep answering 401.
   const pattern = new RegExp(`^${proxyConfig.matcher[0]}$`);

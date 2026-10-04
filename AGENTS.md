@@ -64,7 +64,10 @@ Key locations:
 - `deploy/` — the Helm chart (`deploy/helm/holotable/`, with runnable example
   values under `examples/`), a reference Argo CD `Application`, and the
   all-in-one quick-start image (`deploy/quickstart/`: TimescaleDB, the server
-  and the demo jobs under one `entrypoint.sh`, in demo mode)
+  and the demo jobs under one `entrypoint.sh`, in demo mode), and the hosted
+  demo (`deploy/cloudflare/demo/`: a Worker with per-IP limits fronting one
+  Cloudflare Container on that image; its own `package.json`, excluded from the
+  root `tsconfig`, checked by `.github/workflows/demo.yml`)
 - `.github/` — CI workflows, issue forms, the pull request template, `CODEOWNERS`
 
 Important files:

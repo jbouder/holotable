@@ -1,0 +1,142 @@
+name: Demo
+
+# The public demo at https://holotable-demo.vibeproject.workers.dev (#254):
+# deploy/cloudflare/demo, a Worker fronting one Cloudflare Container that runs
+# the quick-start image.
+#
+# Deploys only after CI has passed on main, because CI is what publishes the
+# image this deploy pins (`sha-<short>-quickstart`). A pull request that touches
+# the Worker gets the checks and no deploy.
+on:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+    branches: [main]
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - "deploy/cloudflare/**"
+      - ".github/workflows/demo.yml"
+
+# Deploys queue rather than cancel: a cancelled `wrangler deploy` can leave a
+# container rollout half done.
+concurrency:
+  group: demo-${{ github.event_name == 'pull_request' && github.ref || 'deploy' }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    name: Check
+    if: github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: deploy/cloudflare/demo
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: deploy/cloudflare/demo/package-lock.json
+
+      - name: Install
+        run: npm ci
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Test
+        run: npm test
+
+  deploy:
+    name: Deploy
+    needs: check
+    if: github.event_name == 'workflow_dispatch' || github.event_name == 'workflow_run'
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: deploy/cloudflare/demo
+    env:
+      DEMO_URL: ${{ vars.DEMO_URL || 'https://holotable-demo.vibeproject.workers.dev' }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+
+      # Until the repository has the demo's secrets this job reports why and
+      # stops, rather than failing every push to main.
+      - name: Check configuration
+        id: config
+        env:
+          HAS_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN != '' && secrets.CLOUDFLARE_ACCOUNT_ID != '' }}
+          HAS_SESSION_SECRET: ${{ secrets.DEMO_SESSION_SECRET != '' }}
+        run: |
+          if [ "$HAS_TOKEN" != "true" ] || [ "$HAS_SESSION_SECRET" != "true" ]; then
+            echo "::warning::Demo not deployed: set CLOUDFLARE_API_TOKEN, CLOUDFLARE_ACCOUNT_ID and DEMO_SESSION_SECRET. See docs/operations/cloudflare-demo."
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - uses: actions/setup-node@v4
+        if: steps.config.outputs.ready == 'true'
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: deploy/cloudflare/demo/package-lock.json
+
+      - name: Install
+        if: steps.config.outputs.ready == 'true'
+        run: npm ci
+
+      # The exact image CI published for this commit, so a later merge cannot
+      # change what this run deploys. A manual run takes `quickstart`, which
+      # follows main.
+      - name: Pin the image
+        if: steps.config.outputs.ready == 'true'
+        env:
+          SHA: ${{ github.event.workflow_run.head_sha }}
+        run: |
+          if [ -n "$SHA" ]; then
+            image="ghcr.io/${GITHUB_REPOSITORY}:sha-${SHA::7}-quickstart"
+          else
+            image="ghcr.io/${GITHUB_REPOSITORY}:quickstart"
+          fi
+          sed -i "s|^ARG QUICKSTART_IMAGE=.*|ARG QUICKSTART_IMAGE=${image}|" Dockerfile
+          echo "deploying ${image}"
+          grep -n "^ARG QUICKSTART_IMAGE" Dockerfile
+
+      # Secrets go up with the deploy from a file that never leaves the
+      # runner's temp directory. Only the ones that are set are written, so an
+      # unset model secret leaves the demo without a model rather than failing.
+      - name: Deploy
+        if: steps.config.outputs.ready == 'true'
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          SESSION_SECRET: ${{ secrets.DEMO_SESSION_SECRET }}
+          AI_MODEL: ${{ secrets.DEMO_AI_MODEL }}
+          OPENAI_API_KEY: ${{ secrets.DEMO_OPENAI_API_KEY }}
+          OPENAI_BASE_URL: ${{ secrets.DEMO_OPENAI_BASE_URL }}
+          OPENAI_API: ${{ secrets.DEMO_OPENAI_API }}
+        run: |
+          secrets="${RUNNER_TEMP}/demo-secrets.json"
+          umask 077
+          node -e '
+            const names = ["SESSION_SECRET", "AI_MODEL", "OPENAI_API_KEY", "OPENAI_BASE_URL", "OPENAI_API"];
+            const out = Object.fromEntries(names.filter((n) => process.env[n]).map((n) => [n, process.env[n]]));
+            require("node:fs").writeFileSync(process.argv[1], JSON.stringify(out));
+          ' "$secrets"
+          npx wrangler deploy --secrets-file "$secrets"
+          rm -f "$secrets"
+
+      - name: Smoke
+        if: steps.config.outputs.ready == 'true'
+        run: npm run smoke

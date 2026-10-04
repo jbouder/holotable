@@ -75,6 +75,7 @@ export default defineConfig({
           items: [
             { label: "Keycloak setup", slug: "operations/keycloak" },
             { label: "Demo mode", slug: "operations/demo-mode" },
+            { label: "Hosted demo on Cloudflare", slug: "operations/cloudflare-demo" },
             { label: "Source secret references", slug: "operations/secret-references" },
             { label: "AI provider", slug: "operations/ai-provider" },
             { label: "Startup validation", slug: "operations/startup-validation" },
