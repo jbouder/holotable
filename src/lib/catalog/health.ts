@@ -1,5 +1,5 @@
 import { config } from "@/lib/config";
-import type { CatalogTable, SourceRecord } from "@/lib/registry";
+import { type CatalogTable, exposedTable, type SourceRecord } from "@/lib/registry";
 
 /**
  * Whether a source's catalog can still be believed.
@@ -70,6 +70,19 @@ export function liveCatalogTables(source: CatalogSubject): CatalogTable[] {
   if (source.catalogMissingTables.length === 0) return source.config.tables;
   const missing = new Set(source.catalogMissingTables);
   return source.config.tables.filter((table) => !missing.has(table.name));
+}
+
+/**
+ * The live tables as they may be described: each with only its exposed
+ * columns. This is what the prompt, the starter prompts and the built-in
+ * templates are built from, so a column the author hid is never named to the
+ * model and never written into a suggestion the guard would then refuse.
+ *
+ * Health is judged on {@link liveCatalogTables} instead: hiding a column is a
+ * choice about what may be read, not evidence that the catalog is wrong.
+ */
+export function exposedCatalogTables(source: CatalogSubject): CatalogTable[] {
+  return liveCatalogTables(source).map(exposedTable);
 }
 
 /** The state of a source's catalog, and everything the wording below needs. */

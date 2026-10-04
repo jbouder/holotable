@@ -1225,3 +1225,165 @@ test("fuzz: a timeField that is not a bare identifier is refused before it reach
     }),
   );
 });
+
+// --- Columns ---------------------------------------------------------------------
+
+/**
+ * Per-column exposure (#12). A source whose `users` table hides `email` and
+ * `ssn`, and a generator that puts one column access — by name under every
+ * qualification and casing, by `*`, by the whole row, through a function —
+ * into every position a column can appear, over every way of naming the
+ * table. An access that can read a hidden value is poisoned; the rest must be
+ * accepted. The oracle walks the raw tree and holds any accepted statement to
+ * "no column reference names a hidden column, a `*`, or the table's row".
+ */
+
+const columnSource = SourceConfig.parse({
+  ...source,
+  tables: [
+    ...source.tables,
+    {
+      name: "users",
+      columns: [
+        { name: "id", type: "integer" },
+        { name: "team", type: "text" },
+        { name: "Email", type: "text" },
+        { name: "email", type: "text", exposed: false },
+        { name: "ssn", type: "text", exposed: false },
+      ],
+    },
+  ],
+});
+
+/** How the FROM clause names the table, and what a qualifier must then be. */
+const USERS_FROM: Array<{ from: string; q: string; full?: string }> = [
+  { from: "users u", q: "u" },
+  { from: "users AS u", q: "u" },
+  { from: "users", q: "users", full: "metrics.users" },
+  { from: "metrics.users", q: "users", full: "metrics.users" },
+  { from: '"users" AS "u"', q: '"u"' },
+];
+
+const recasedHidden = fc.constantFrom("email", "EMAIL", "Email", "eMaIl", "ssn", "SSN");
+
+function columnAccess(q: string, full?: string): fc.Arbitrary<Frag> {
+  return fc.oneof(
+    // Poisoned: a hidden column by name. Unquoted names fold to lowercase.
+    recasedHidden.map((name) => bad(`hidden column ${name}`, name)),
+    recasedHidden.map((name) => bad(`hidden column ${q}.${name}`, `${q}.${name}`)),
+    fc
+      .constantFrom('"email"', '"ssn"')
+      .map((n) => bad(`hidden column ${n}`, `${q}.${n}`)),
+    fc
+      .constantFrom(...(full ? [`${full}.email`, `${full}.ssn`] : ["email"]))
+      .map((n) => bad(`hidden column ${n}`, n)),
+    // Poisoned: the whole row, which carries every column.
+    pick(
+      bad("whole row", q),
+      bad("whole row", `(${q}).team`),
+      bad("whole row", `row_to_json(${q})`),
+      bad("whole row", `to_jsonb(${q})`),
+      bad("whole row", `email(${q})`),
+      bad("whole row", `${q}::text`),
+      bad("star", `${q}.*`),
+      bad("star", `count(${q}.*)`),
+      bad("star", `(${q}.*).id`),
+      bad("star", "*"),
+    ),
+    // Benign: exposed columns, and a quoted name that differs only in case.
+    pick(
+      ok("id"),
+      ok(`${q}.id`),
+      ok("team"),
+      ok(`lower(${q}.team)`),
+      ok('"Email"'),
+      ok(`${q}."Email"`),
+      ok("count(*)"),
+      ok("1"),
+    ),
+  );
+}
+
+/** Every position a column access can take, with `$E` for it and `$F` for the FROM. */
+const COLUMN_POSITIONS = [
+  "SELECT $E FROM $F",
+  "SELECT id FROM $F WHERE $E IS NOT NULL",
+  "SELECT id FROM $F ORDER BY $E",
+  "SELECT count(*) FROM $F GROUP BY $E",
+  "SELECT id, row_number() OVER (PARTITION BY $E) FROM $F",
+  "SELECT CASE WHEN $E IS NULL THEN 0 ELSE 1 END FROM $F",
+  "WITH c AS (SELECT $E FROM $F) SELECT 1 FROM c",
+  "SELECT 1 FROM (SELECT $E FROM $F) s",
+  "SELECT (SELECT $E FROM $F LIMIT 1)",
+  "SELECT status FROM http_requests WHERE EXISTS (SELECT 1 FROM $F WHERE $E IS NOT NULL)",
+  "SELECT r.status FROM http_requests r JOIN $F ON $E IS NOT NULL",
+  "SELECT r.status FROM http_requests r, LATERAL (SELECT $E FROM $F) l",
+  "SELECT status FROM http_requests UNION ALL SELECT $E FROM $F",
+];
+
+const columnStatement: fc.Arbitrary<Rendered> = fc
+  .tuple(fc.constantFrom(...USERS_FROM), fc.constantFrom(...COLUMN_POSITIONS))
+  .chain(([users, position]) =>
+    columnAccess(users.q, users.full).map((access) => ({
+      sql: position.replaceAll("$F", users.from).replaceAll("$E", access.toks.join(" ")),
+      poison: access.poison,
+    })),
+  );
+
+const HIDDEN_COLUMNS = new Set(["email", "ssn"]);
+const USERS_ROW_NAMES = new Set(["u", "users"]);
+
+/** What an accepted statement over `columnSource` must never contain. */
+async function columnOracle(sql: string): Promise<string[]> {
+  const problems: string[] = [];
+  const visit = (value: unknown): void => {
+    if (Array.isArray(value)) {
+      for (const item of value) visit(item);
+      return;
+    }
+    if (typeof value !== "object" || value === null) return;
+    const record = value as Record<string, unknown>;
+    const ref = record.ColumnRef as
+      | { fields?: Array<Record<string, unknown>> }
+      | undefined;
+    if (ref) {
+      const fields = ref.fields ?? [];
+      if (fields.some((f) => "A_Star" in f)) problems.push("a * column reference");
+      const names = fields.flatMap((f) => {
+        const s = f.String as { sval?: string } | undefined;
+        return s?.sval === undefined ? [] : [s.sval];
+      });
+      const last = names[names.length - 1];
+      if (last !== undefined && HIDDEN_COLUMNS.has(last)) problems.push(`column ${last}`);
+      if (last !== undefined && USERS_ROW_NAMES.has(last)) problems.push(`row ${last}`);
+    }
+    for (const child of Object.values(record)) visit(child);
+  };
+  visit((await parse(sql)).stmts);
+  return problems;
+}
+
+test("fuzz: a statement that reads a hidden column is always rejected", async () => {
+  await run(
+    fc.asyncProperty(
+      columnStatement.filter((s) => s.poison !== null),
+      async ({ sql, poison }) => {
+        const r = await validateSql(sql, columnSource);
+        assert.equal(r.ok, false, `accepted ${poison}: ${JSON.stringify(sql)}`);
+      },
+    ),
+  );
+});
+
+test("fuzz: a statement over exposed columns of a restricted table is always accepted", async () => {
+  await run(
+    fc.asyncProperty(
+      columnStatement.filter((s) => s.poison === null),
+      async ({ sql }) => {
+        const r = await validateSql(sql, columnSource);
+        assert.equal(r.ok, true, `rejected with "${r.error}": ${JSON.stringify(sql)}`);
+        assert.deepEqual(await columnOracle(sql), [], JSON.stringify(sql));
+      },
+    ),
+  );
+});
