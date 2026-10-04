@@ -77,6 +77,12 @@ Important files:
   earlier `specVersion` up to the current one before it is validated
 - `src/lib/sql/safety.ts` — the SQL guard every generated query passes through
 - `src/lib/sql/ast.ts` — the PostgreSQL parse-tree walk the guard is built on
+- `src/lib/sql/row-filter.ts` — row-level filters (#31): every real table a
+  statement reads is spliced, at the parser's byte offsets, into a subquery
+  narrowed to the viewer's rows, and the result is re-parsed and verified.
+  `buildExecutablePlan` takes `rowFilter` as a required input; bind it with
+  `rowFilterFor`/`rowFilterInScope` (`src/lib/row-scope.ts`), which refuse a
+  viewer without the claim. Pollers are keyed by the claim values (`RowScope`)
 - `src/lib/auth/authorize.ts` — the central `can()` check
 - `src/lib/auth/renewal.ts` — session renewal (#27): the realm's refresh token
   is sealed in `sessions` (`refresh-token.ts`) and never reaches the browser,
@@ -147,7 +153,7 @@ Important files:
 
 The paths with a `CODEOWNERS` entry (`src/lib/sql/`, `src/lib/auth/`,
 `src/lib/secrets/`, `ir.ts` and `ir/`, `time.ts`, `registry.ts`,
-`metrics-access.ts`) are
+`metrics-access.ts`, `row-scope.ts`) are
 the ones where a quiet regression stops being a bug and becomes a
 vulnerability. Changes there need a test.
 

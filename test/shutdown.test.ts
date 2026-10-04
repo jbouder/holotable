@@ -216,8 +216,8 @@ describe("stopAllPollers", () => {
   };
 
   it("stops every poller so no query is issued after the drain begins", () => {
-    const a = getPoller("dash-drain-a", 1, "ws1", spec, async () => []);
-    const b = getPoller("dash-drain-b", 1, "ws1", spec, async () => []);
+    const a = getPoller("dash-drain-a", 1, "ws1", spec, {}, async () => []);
+    const b = getPoller("dash-drain-b", 1, "ws1", spec, {}, async () => []);
     a.subscribe(() => {});
     b.subscribe(() => {});
     assert.equal(a.isRunning, true);

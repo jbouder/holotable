@@ -8,7 +8,8 @@ import {
 import { tokenExpiry, tokenRef, verifySessionToken } from "@/lib/auth/session";
 import { guardStream, type StreamEnd } from "@/lib/auth/stream-guard";
 import { config } from "@/lib/config";
-import { getDashboardById } from "@/lib/db/repo";
+import { getDashboardById, getSourceById } from "@/lib/db/repo";
+import { rowScopeFor } from "@/lib/row-scope";
 import { getPoller, type PollerEvent } from "@/lib/poller/registry";
 import { TimeRange } from "@/lib/ir";
 import {
@@ -73,7 +74,28 @@ export const GET = route(
     const spec = parsedRange?.data
       ? { ...dashboard.spec, timeRange: parsedRange.data }
       : dashboard.spec;
-    const poller = getPoller(id, dashboard.version, dashboard.workspaceId, spec);
+    // The viewer's row-filter claim values for this dashboard's filtered
+    // sources (#31), which pick the poller: viewers who would see the same
+    // rows share one, and no one is handed another tenant's poller. Sources
+    // outside the dashboard's workspace are left out here and refused by the
+    // executor, as they always were.
+    const sources = (
+      await Promise.all(
+        [...new Set(spec.panels.map((p) => p.query.sourceId))].map((s) =>
+          getSourceById(s),
+        ),
+      )
+    ).filter(
+      (s): s is NonNullable<typeof s> =>
+        s !== null && !s.tombstonedAt && s.workspaceId === dashboard.workspaceId,
+    );
+    const poller = getPoller(
+      id,
+      dashboard.version,
+      dashboard.workspaceId,
+      spec,
+      rowScopeFor(identity, sources),
+    );
     // Where the browser got to before it lost the stream (#43). `EventSource`
     // sends the header itself when it reconnects; a page that builds a new
     // one passes it in the query. Untrusted, and decoded by the poller, which

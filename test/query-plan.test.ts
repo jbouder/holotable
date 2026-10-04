@@ -24,7 +24,7 @@ function view(sql: string, timeField?: string) {
     sql,
     timeField,
     timeRange: RANGE,
-    plan: buildExecutablePlan({ sql, timeField, from: FROM, to: TO }),
+    plan: buildExecutablePlan({ sql, timeField, from: FROM, to: TO, rowFilter: null }),
     session: sessionStatements("metrics"),
     limits: LIMITS,
   });
@@ -100,7 +100,12 @@ test("nothing that was not passed in can appear in the view", () => {
   const plan = buildQueryPlanView({
     sql: "SELECT 1 AS v",
     timeRange: RANGE,
-    plan: buildExecutablePlan({ sql: "SELECT 1 AS v", from: FROM, to: TO }),
+    plan: buildExecutablePlan({
+      sql: "SELECT 1 AS v",
+      from: FROM,
+      to: TO,
+      rowFilter: null,
+    }),
     session: sessionStatements("public"),
     limits: LIMITS,
     // @ts-expect-error — a caller spreading a source would have to add a field.

@@ -1,5 +1,11 @@
 import { z } from "zod";
-import { parseGroups, PLATFORM_ADMIN_GROUP } from "@/lib/auth/claims";
+import {
+  CLAIM_NAME,
+  parseGroups,
+  PLATFORM_ADMIN_GROUP,
+  RESERVED_CLAIMS,
+  splitClaimNames,
+} from "@/lib/auth/claims";
 import { parseCidr } from "@/lib/cidr";
 import { SECRET_REF_GRANTS_VAR, parseSecretRefGrants } from "@/lib/secret-refs";
 import { resolveTimeExpr, resolveTimeRange } from "@/lib/time";
@@ -181,6 +187,14 @@ export const config = {
    * refuses both. Ignored unless {@link authMode} is `demo`.
    */
   demoGroups: splitGroups(str("DEMO_GROUPS", DEFAULT_DEMO_GROUPS)),
+
+  /**
+   * Realm claims carried from the id_token into the session (#31), for a
+   * source's row filter to read: `rowFilter.claim` names one of these, or
+   * `sub`. Comma- or whitespace-separated. Empty (the default) carries none,
+   * and a source that filters on anything but `sub` then refuses every query.
+   */
+  rowFilterClaims: splitClaimNames(str("ROW_FILTER_CLAIMS", "")),
 
   /** Cookie name used for the session JWT. */
   sessionCookieName: str("SESSION_COOKIE_NAME", "holotable_session"),
@@ -368,6 +382,7 @@ const EnvSchema = z.object({
     }),
   ),
   DEMO_GROUPS: blank(z.string()),
+  ROW_FILTER_CLAIMS: blank(z.string()),
 
   OIDC_ISSUER: blank(
     httpUrl("the realm issuer, e.g. https://kc.example.com/realms/holotable"),
@@ -643,6 +658,29 @@ export function validateConfig(
     }
   } else if (env.DEMO_GROUPS) {
     warning("DEMO_GROUPS", "is set but ignored unless AUTH_MODE=demo.");
+  }
+
+  // --- Row-filter claims (#31) ---------------------------------------------
+  // Each name is written back into the first-party session token beside the
+  // claims it already uses, so one of those names would overwrite them.
+  const groupsClaim = env.OIDC_GROUPS_CLAIM || "groups";
+  for (const name of splitClaimNames(values.ROW_FILTER_CLAIMS ?? "")) {
+    if (!CLAIM_NAME.test(name)) {
+      error(
+        "ROW_FILTER_CLAIMS",
+        `"${name.slice(0, 64)}" is not a claim name: use letters, digits and _ . : / -, starting with a letter or _.`,
+      );
+    } else if (name === "sub") {
+      error(
+        "ROW_FILTER_CLAIMS",
+        'lists "sub", which a row filter can always use; remove it.',
+      );
+    } else if (RESERVED_CLAIMS.has(name) || name === groupsClaim) {
+      error(
+        "ROW_FILTER_CLAIMS",
+        `lists "${name}", which the session token uses for itself. Map the value to another claim name in the realm.`,
+      );
+    }
   }
 
   // --- OIDC ---------------------------------------------------------------

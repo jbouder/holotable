@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { requireIdentity, assertAuthorized, HttpError } from "@/lib/auth/authorize";
 import { json, readJson, route } from "@/lib/http";
+import { assertRowFilterSavable } from "@/lib/row-scope";
 import { audit } from "@/lib/audit";
 import { getSourceById, updateSource } from "@/lib/db/repo";
 import { catalogHealth } from "@/lib/catalog/health";
@@ -70,6 +71,8 @@ export const POST = route(
       );
     }
 
+    // A table that lost the filter column would refuse every query on it.
+    assertRowFilterSavable(refresh.config);
     const updated = await updateSource(source.workspaceId, id, {
       config: refresh.config,
       catalogRefreshedAt: new Date(),

@@ -5,7 +5,9 @@ import {
   type FuncCall,
   type JoinExpr,
   type Node,
+  type ParseResult,
   parse,
+  parseSync,
   type RangeVar,
   type SQLValueFunction,
   scan,
@@ -173,6 +175,8 @@ export interface RelationUse {
   alias?: string;
   /** `users AS u(a, b)`: the alias renames the table's columns by position. */
   renamesColumns: boolean;
+  /** Byte offset of the relation name in the statement (UTF-8, as the parser counts). */
+  location: number;
 }
 
 /** A join, and the ways it can match on or rename the columns beneath it. */
@@ -217,6 +221,11 @@ type Scope = ReadonlySet<string>;
 interface Context {
   ctes: Scope;
   from: TableRef[];
+  /**
+   * Accept `$n`. Only ever set when re-reading SQL the server itself wrote
+   * (the row-filter rewrite, #31); untrusted SQL never carries a parameter.
+   */
+  params?: boolean;
 }
 
 class Rejected extends Error {}
@@ -299,6 +308,7 @@ function visitNode(
       out.keywords.push(sqlValueKeyword(node as SQLValueFunction));
       return;
     case "ParamRef":
+      if (ctx.params) return;
       reject("query parameters are reserved by the server");
       break;
     case "LockingClause":
@@ -317,7 +327,11 @@ function visitSelect(stmt: SelectStmt, ctx: Context, out: SelectAnalysis): void 
   if (stmt.intoClause) reject("disallowed keyword: into");
 
   const ctes = stmt.withClause ? visitWith(stmt.withClause, ctx, out) : ctx.ctes;
-  const inner: Context = { ctes, from: directTables(stmt.fromClause, ctes) };
+  const inner: Context = {
+    ctes,
+    from: directTables(stmt.fromClause, ctes),
+    params: ctx.params,
+  };
 
   for (const [key, field] of Object.entries(stmt)) {
     if (key === "withClause" || key === "larg" || key === "rarg") continue;
@@ -370,7 +384,7 @@ function visitWith(clause: WithClause, ctx: Context, out: SelectAnalysis): Scope
     const visible: Scope = clause.recursive
       ? all
       : new Set([...scope, ...names.slice(0, index)]);
-    walk(cte, { ctes: visible, from: ctx.from }, out);
+    walk(cte, { ctes: visible, from: ctx.from, params: ctx.params }, out);
   });
 
   return all;
@@ -394,6 +408,7 @@ function visitRangeVar(rv: RangeVar, ctx: Context, out: SelectAnalysis): void {
     table,
     alias: rv.alias?.aliasname,
     renamesColumns: (rv.alias?.colnames?.length ?? 0) > 0,
+    location: rv.location ?? -1,
   });
 }
 
@@ -489,14 +504,43 @@ function sqlValueKeyword(node: SQLValueFunction): string {
  * allowlist is rejected with a reason.
  */
 export async function analyzeSelect(sql: string): Promise<AnalyzeResult> {
-  let stmts: Node[];
+  let parsed: ParseResult;
   try {
-    const parsed = await parse(sql);
-    stmts = (parsed.stmts ?? []).flatMap((raw) => (raw.stmt ? [raw.stmt] : []));
+    parsed = await parse(sql);
   } catch (err) {
-    const detail = err instanceof Error && err.message ? `: ${err.message}` : "";
-    return { ok: false, error: `only SELECT/WITH queries are allowed${detail}` };
+    return unparseable(err);
   }
+  return analyzeParsed(parsed, false);
+}
+
+/**
+ * {@link analyzeSelect}, synchronously, for the row-filter rewrite (#31),
+ * which runs inside `buildExecutablePlan`. The parser must already be loaded,
+ * which it always is by then: `validateSql` ran first. If it somehow is not,
+ * this throws, and the plan is not built.
+ *
+ * `params` accepts `$n`, for re-reading the server's own rewritten SQL.
+ */
+export function analyzeSelectSync(
+  sql: string,
+  opts: { params?: boolean } = {},
+): AnalyzeResult {
+  let parsed: ParseResult;
+  try {
+    parsed = parseSync(sql);
+  } catch (err) {
+    return unparseable(err);
+  }
+  return analyzeParsed(parsed, opts.params ?? false);
+}
+
+function unparseable(err: unknown): AnalyzeResult {
+  const detail = err instanceof Error && err.message ? `: ${err.message}` : "";
+  return { ok: false, error: `only SELECT/WITH queries are allowed${detail}` };
+}
+
+function analyzeParsed(parsed: ParseResult, params: boolean): AnalyzeResult {
+  const stmts = (parsed.stmts ?? []).flatMap((raw) => (raw.stmt ? [raw.stmt] : []));
 
   if (stmts.length === 0) return { ok: false, error: "empty SQL" };
   if (stmts.length > 1)
@@ -517,7 +561,11 @@ export async function analyzeSelect(sql: string): Promise<AnalyzeResult> {
     strings: [],
   };
   try {
-    visitSelect(wrapped[1] as SelectStmt, { ctes: new Set(), from: [] }, analysis);
+    visitSelect(
+      wrapped[1] as SelectStmt,
+      { ctes: new Set(), from: [], params },
+      analysis,
+    );
   } catch (err) {
     if (err instanceof Rejected) return { ok: false, error: err.message };
     throw err;

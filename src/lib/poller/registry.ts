@@ -1,7 +1,9 @@
 import type { Dashboard, Panel } from "@/lib/ir";
 import { getSourceById } from "@/lib/db/repo";
 import type { SourceRecord } from "@/lib/registry";
-import { validateSql, buildExecutablePlan } from "@/lib/sql/safety";
+import { validateSql, buildExecutablePlan, type ExecutablePlan } from "@/lib/sql/safety";
+import { RowFilterDenied, RowFilterError } from "@/lib/sql/row-filter";
+import { rowFilterInScope, type RowScope } from "@/lib/row-scope";
 import { resolveTimeRange, TimeRangeError } from "@/lib/time";
 import { executePlan, QueryExecutionError } from "@/lib/timescaledb/client";
 import { config } from "@/lib/config";
@@ -119,11 +121,16 @@ export function computeDelta(
  * the resolved source belongs to that workspace; a crafted jsonb spec that
  * names a cross-workspace sourceId is surfaced as a tombstone (indistinguishable
  * from a deleted source to prevent information disclosure).
+ *
+ * `scope` is the claim values this poller's subscribers share (#31); a
+ * row-filtered source is narrowed to the rows they match, and a panel whose
+ * source needs a claim the scope lacks is refused, never run unfiltered.
  */
 export type PanelExecutor = (
   panel: Panel,
   window: TimeWindow,
   dashboardWorkspaceId: string,
+  scope: RowScope,
 ) => Promise<PollerEvent[]>;
 
 /**
@@ -134,7 +141,7 @@ export type PanelExecutor = (
 export function makePanelExecutor(
   getSource: (id: string) => Promise<SourceRecord | null> = getSourceById,
 ): PanelExecutor {
-  return async (panel, window, dashboardWorkspaceId) => {
+  return async (panel, window, dashboardWorkspaceId, scope) => {
     // Re-resolve the source on every execution.
     const source = await getSource(panel.query.sourceId);
 
@@ -158,12 +165,40 @@ export function makePanelExecutor(
       ];
     }
 
-    const plan = buildExecutablePlan({
-      sql: panel.query.sql,
-      timeField: panel.query.timeField,
-      from: window.from,
-      to: window.to,
-    });
+    let plan: ExecutablePlan;
+    try {
+      plan = buildExecutablePlan({
+        sql: panel.query.sql,
+        timeField: panel.query.timeField,
+        from: window.from,
+        to: window.to,
+        // Re-bound every tick from the source as it is now, so a filter
+        // added since the poller started applies at once.
+        rowFilter: rowFilterInScope(source, scope),
+      });
+    } catch (err) {
+      if (err instanceof RowFilterDenied) {
+        return [
+          {
+            type: "panel-error",
+            panelId: panel.id,
+            error: "You have no access to this source's rows.",
+            kind: "authorization",
+          },
+        ];
+      }
+      if (err instanceof RowFilterError) {
+        return [
+          {
+            type: "panel-error",
+            panelId: panel.id,
+            error: err.message,
+            kind: "statement",
+          },
+        ];
+      }
+      throw err;
+    }
     const result = await executePlan(source, plan);
 
     // The whole result, always. Each subscriber's delta is cut from it by the
@@ -241,6 +276,7 @@ class DashboardPoller {
     readonly version: number,
     readonly dashboardWorkspaceId: string,
     private spec: Dashboard,
+    private readonly scope: RowScope = {},
     private executor: PanelExecutor = defaultPanelExecutor,
   ) {}
 
@@ -411,7 +447,12 @@ class DashboardPoller {
       await Promise.all(
         this.spec.panels.map(async (p) => {
           try {
-            const events = await this.executor(p, window, this.dashboardWorkspaceId);
+            const events = await this.executor(
+              p,
+              window,
+              this.dashboardWorkspaceId,
+              this.scope,
+            );
             for (const e of events) this.publish(p, e);
           } catch (err) {
             this.publish(p, {
@@ -456,15 +497,27 @@ const registry = new Map<string, DashboardPoller>();
  * database record. It is stored on the poller and passed to every panel
  * execution so sources are always validated against the dashboard workspace,
  * regardless of subscriber identity.
+ *
+ * `scope` is the subscriber's row-filter claim values (#31, `rowScopeFor`),
+ * and is part of the key: subscribers share a poller only when they would see
+ * the same rows. A dashboard with no row-filtered source has an empty scope,
+ * and every viewer shares one poller as before.
  */
 export function getPoller(
   dashboardId: string,
   version: number,
   workspaceId: string,
   spec: Dashboard,
+  scope: RowScope,
   executor: PanelExecutor = defaultPanelExecutor,
 ): DashboardPoller {
-  const key = JSON.stringify([dashboardId, spec.timeRange.from, spec.timeRange.to]);
+  const scopeKey = Object.entries(scope).sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0));
+  const key = JSON.stringify([
+    dashboardId,
+    spec.timeRange.from,
+    spec.timeRange.to,
+    scopeKey,
+  ]);
   const existing = registry.get(key);
   if (existing?.isStalled) {
     // Sharing it would hand this subscriber a poller that never ticks again.
@@ -474,7 +527,14 @@ export function getPoller(
     if (existing.version >= version) return existing;
     existing.stop();
   }
-  const poller = new DashboardPoller(dashboardId, version, workspaceId, spec, executor);
+  const poller = new DashboardPoller(
+    dashboardId,
+    version,
+    workspaceId,
+    spec,
+    scope,
+    executor,
+  );
   registry.set(key, poller);
   return poller;
 }

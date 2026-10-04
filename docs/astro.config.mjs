@@ -77,6 +77,7 @@ export default defineConfig({
             { label: "Demo mode", slug: "operations/demo-mode" },
             { label: "Hosted demo on Cloudflare", slug: "operations/cloudflare-demo" },
             { label: "Source secret references", slug: "operations/secret-references" },
+            { label: "Row-level filters", slug: "operations/row-level-filters" },
             { label: "AI provider", slug: "operations/ai-provider" },
             { label: "Startup validation", slug: "operations/startup-validation" },
             { label: "Security headers", slug: "operations/security-headers" },

@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { requireIdentity, assertAuthorized, can, HttpError } from "@/lib/auth/authorize";
 import { readJson, json, route } from "@/lib/http";
+import { assertRowFilterSavable } from "@/lib/row-scope";
 import { audit } from "@/lib/audit";
 import { getSourceById, updateSource, deleteSource } from "@/lib/db/repo";
 import { SourceConfig } from "@/lib/registry";
@@ -58,6 +59,7 @@ export const PUT = route(
     if (patch.secretRef !== undefined && patch.secretRef !== source.secretRef) {
       requireGrantedSecretRef(patch.secretRef, source.workspaceId);
     }
+    if (patch.config) assertRowFilterSavable(patch.config);
     const updated = await updateSource(source.workspaceId, id, patch);
     if (!updated) throw new HttpError(409, "source is tombstoned and cannot be edited");
     audit({

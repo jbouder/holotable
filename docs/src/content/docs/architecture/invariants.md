@@ -129,6 +129,26 @@ savepoint inside a transaction that is always rolled back, and Postgres makes
 DDL transactional, so it cannot leave anything behind even in the case where
 the server allows it.
 
+## 8a. A row-filtered source returns only the viewer's rows
+
+The time window is not the only predicate the server owns. A source with a
+`rowFilter` (#31) narrows **every table a statement reads** to the rows whose
+filter column equals the viewer's claim. The predicate is applied where each
+table is read, not on the wrapper that carries the time bounds, because a
+wrapper predicate filters only the output, and the output can claim any
+tenant. `applyRowFilter` (`src/lib/sql/row-filter.ts`) replaces each real-table
+reference, found with the guard's own CTE scoping, with
+`(SELECT * FROM t AS _holo_rf WHERE _holo_rf.<column> = $n)`. It then
+re-parses its own output and refuses any statement it cannot prove is fully
+narrowed. The value is a bound parameter read from the verified identity
+(`bindRowFilter`), never from the request or the model.
+
+`buildExecutablePlan` takes `rowFilter` as a **required** input, `null` only
+for a source without one, so a call site cannot leave it out. A viewer without
+the claim is refused, never served unfiltered, and that includes a platform
+admin. Pollers are keyed by the claim values they run with, so tenants never
+share one. See [Row-level filters](/operations/row-level-filters/).
+
 ## 9. The catalog prompt is metadata only, and that metadata is untrusted
 
 Table and column names and types for a **single selected, authorized source per

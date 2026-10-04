@@ -131,6 +131,7 @@ export const POST = route("dashboards.chat", async (req: Request, ctx: RoutePara
   const result = await streamDashboardChat({
     dashboard: dashboard.spec,
     sources,
+    identity,
     messages: incoming,
     onUsage: usage.record,
     // Each statement the model runs is the reader's execution, on their

@@ -194,10 +194,11 @@ jobs:
           npm run migrate:verify
 
       # The advisory lock that serializes two migrate Jobs from one rollout,
-      # and the audit log's append-only triggers (in a scratch schema).
+      # the audit log's append-only triggers, and row filters against two
+      # tenants' rows (both in scratch schemas).
       # Skipped in the required Test job, which has no database.
       - name: Against a real server
-        run: LOG_LEVEL=silent node --test --import tsx test/migrations.test.ts test/audit.test.ts
+        run: LOG_LEVEL=silent node --test --import tsx test/migrations.test.ts test/audit.test.ts test/row-filter.test.ts
         env:
           MIGRATE_TEST_DATABASE_URL: ${{ env.DATABASE_URL }}
 

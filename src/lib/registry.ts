@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { CLAIM_NAME } from "@/lib/auth/claims";
 import { SECRET_REF_MESSAGE, SECRET_REF_PATTERN } from "@/lib/secret-refs";
 
 /**
@@ -67,9 +68,29 @@ export const SourceConnection = z
   .strict();
 export type SourceConnection = z.infer<typeof SourceConnection>;
 
+/**
+ * A mandatory tenant predicate (#31): every table this source reads is
+ * narrowed to the rows whose `column` equals the viewer's `claim`, before any
+ * statement sees them. `column` is a bare identifier, checked exactly as a
+ * `timeField` is, and must be a column of every table in the catalog.
+ * `claim` is `sub` or a name listed in `ROW_FILTER_CLAIMS`; the value always
+ * comes from the verified identity, never from a request or the model.
+ */
+export const RowFilter = z
+  .object({
+    column: z
+      .string()
+      .regex(/^[A-Za-z_][A-Za-z0-9_]*$/, "must be a bare column name")
+      .max(63),
+    claim: z.string().regex(CLAIM_NAME, "must be a claim name"),
+  })
+  .strict();
+export type RowFilter = z.infer<typeof RowFilter>;
+
 export const SourceConfig = SourceConnection.extend({
   /** The table allowlist. Only these tables may be referenced by any SQL. */
   tables: z.array(CatalogTable).min(1).max(MAX_TABLES),
+  rowFilter: RowFilter.optional(),
 }).strict();
 export type SourceConfig = z.infer<typeof SourceConfig>;
 
@@ -105,6 +126,15 @@ export const SourceDraft = z
   })
   .strict();
 export type SourceDraft = z.infer<typeof SourceDraft>;
+
+/**
+ * What the model may draft: a {@link SourceDraft} without a row filter. Which
+ * rows a tenant may see is a person's decision (#31), so the model is never
+ * shown the field, and a draft that somehow carries one fails to parse.
+ */
+export const ModelSourceDraft = SourceDraft.extend({
+  config: SourceConfig.omit({ rowFilter: true }).strict(),
+}).strict();
 
 /**
  * The part of a source that may be sent to a browser: the schema name and the

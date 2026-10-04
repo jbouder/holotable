@@ -5,6 +5,7 @@ import { audit } from "@/lib/audit";
 import { getSourceById } from "@/lib/db/repo";
 import { validateSql, buildExecutablePlan } from "@/lib/sql/safety";
 import { resolveTimeRange } from "@/lib/time";
+import { rowFilterFor, rowFilterHttpError } from "@/lib/row-scope";
 import { executePlan, QueryExecutionError } from "@/lib/timescaledb/client";
 import { TimeRange } from "@/lib/ir";
 
@@ -65,6 +66,8 @@ export const POST = route("query", async (req: Request) => {
         timeField: body.timeField,
         from: range.from,
         to: range.to,
+        // The caller's own rows, when the source filters them (#31).
+        rowFilter: rowFilterFor(source, identity),
       });
       result = await executePlan(source, plan);
     } catch (err) {
@@ -80,6 +83,9 @@ export const POST = route("query", async (req: Request) => {
     if (err instanceof QueryExecutionError) {
       throw new HttpError(400, err.message, {}, "statement");
     }
+    // A statement the row filter cannot narrow is the author's to fix too.
+    const mapped = rowFilterHttpError(err);
+    if (mapped !== err) throw mapped;
     // Everything else is `route()`'s to classify, log, and answer.
     throw err;
   }

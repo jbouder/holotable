@@ -1,6 +1,7 @@
 import { SignJWT, jwtVerify, createRemoteJWKSet, decodeJwt, type JWTPayload } from "jose";
 import { config } from "@/lib/config";
 import {
+  attributesFromClaims,
   parseGroups,
   profileFromClaims,
   type Identity,
@@ -21,7 +22,9 @@ import { isRevoked, type TokenRef } from "@/lib/auth/revocation";
  *     OIDC callback to mint a first-party session, and by dev-only login.
  *
  * Either way authorization only ever trusts the validated `sub` and `groups`
- * claims. `name` and `email` are read too, as display-only profile fields.
+ * claims. `name` and `email` are read too, as display-only profile fields, and
+ * the claims `ROW_FILTER_CLAIMS` names, which decide which rows a row-filtered
+ * source returns (#31) and nothing else.
  */
 
 const GROUPS_CLAIM = process.env.OIDC_GROUPS_CLAIM || "groups";
@@ -77,9 +80,14 @@ function identityFromPayload(payload: JWTPayload): Identity | null {
   // A session the realm ended by back-channel logout (#28) is refused here,
   // on every request, rather than at its expiry.
   if (isRevoked(refFromPayload(payload, sub))) return null;
+  const attributes = attributesFromClaims(
+    payload as Record<string, unknown>,
+    config.rowFilterClaims,
+  );
   return {
     ...parseGroups(sub, extractGroups(payload)),
     ...profileFromClaims(payload as Record<string, unknown>),
+    ...(Object.keys(attributes).length > 0 ? { attributes } : {}),
   };
 }
 
@@ -114,20 +122,28 @@ export async function verifySessionToken(token: string): Promise<Identity | null
 }
 
 /**
+ * What a first-party token carries beside `sub` and the groups: the display
+ * profile, and the row-filter attributes read from the realm's token.
+ */
+export type TokenProfile = Profile & Pick<Identity, "attributes">;
+
+/**
  * Mint a first-party HS256 session token. Used by the OIDC callback, after the
  * Keycloak token is validated. The profile rides along under the standard
- * `name` and `email` claim names so {@link verifySessionToken} reads it back
- * with the same code it uses for a Keycloak token.
+ * `name` and `email` claim names, and each row-filter attribute under its own
+ * realm claim name, so {@link verifySessionToken} reads them back with the
+ * same code it uses for a Keycloak token. `validateConfig` keeps those names
+ * clear of the ones set here.
  */
 export async function signSessionToken(
   sub: string,
   groups: string[],
-  profile: Profile = {},
+  profile: TokenProfile = {},
   ttlSeconds = 60 * 60 * 8,
   /** The realm session id, so a back-channel logout can name this token (#28). */
   sid?: string,
 ): Promise<string> {
-  const claims: JWTPayload = { [GROUPS_CLAIM]: groups };
+  const claims: JWTPayload = { ...profile.attributes, [GROUPS_CLAIM]: groups };
   if (sid) claims.sid = sid;
   if (profile.displayName) claims.name = profile.displayName;
   if (profile.email) claims.email = profile.email;

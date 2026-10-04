@@ -231,6 +231,7 @@ test("every panel builds an executable plan with the server's time range", () =>
       timeField: panel.query.timeField,
       from: range.from,
       to: range.to,
+      rowFilter: null,
     });
     assert.match(plan.sql, /LIMIT \d+$/);
     // A panel that declares a time field is filtered by the server, never by
