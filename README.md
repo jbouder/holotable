@@ -80,8 +80,15 @@ infrastructure errors stay generic.
 ```bash
 cp .env.example .env
 # set a strong SESSION_SECRET and your AI_PROVIDER/AI_MODEL (+ keys)
-docker compose up --build          # timescaledb, keycloak, migrate, app, seed
+docker compose up                  # timescaledb, keycloak, migrate, app, seed
 ```
+
+`docker compose up` pulls the published images,
+`ghcr.io/jbouder/holotable:main` and `:main-migrate`, so nothing is built
+locally. Set `HOLOTABLE_TAG` to pin a release instead of following `main`, or
+run `docker compose up --build` to build this checkout under the same names,
+which is what you want when changing the code. Both images are multi-arch
+(`linux/amd64`, `linux/arm64`).
 
 The `seed` service continuously inserts demo metrics and (once) creates the demo
 `demo` workspace sources + dashboards. Open <http://localhost:3000>. See

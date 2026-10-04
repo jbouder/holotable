@@ -10,11 +10,30 @@ sidebar:
 ```bash
 cp .env.example .env
 # set a strong SESSION_SECRET and your AI_PROVIDER/AI_MODEL (+ keys)
-docker compose up --build          # timescaledb, keycloak, migrate, app, seed
+docker compose up                  # timescaledb, keycloak, migrate, app, seed
 ```
 
 This brings up TimescaleDB, Keycloak, a one-shot migration job, the app, and the
-seeder. The `seed` service continuously inserts demo metrics and, once, creates
+seeder.
+
+Nothing is built on your machine: the app and job services run the published
+images, which are multi-arch (`linux/amd64`, `linux/arm64`), so Apple Silicon
+pulls a native build.
+
+| Image | What it is |
+| --- | --- |
+| `ghcr.io/jbouder/holotable:main` | The app, following the `main` branch. |
+| `ghcr.io/jbouder/holotable:main-migrate` | The job image that runs migrations, the seeder and the self-monitoring collector. |
+
+`HOLOTABLE_TAG` in `.env` picks the tag. Leave it unset to follow `main`, or set
+a release version such as `0.1.0` to pin one; see
+[Images](/operations/kubernetes/#images) for every tag that is published. To run
+your own changes, build them instead of pulling:
+
+```bash
+docker compose up --build          # builds this checkout under the same image names
+```
+ The `seed` service continuously inserts demo metrics and, once, creates
 the demo `demo` workspace sources and dashboards.
 
 Open `http://localhost:3000`. See [Demo data](/getting-started/demo-data/) for
