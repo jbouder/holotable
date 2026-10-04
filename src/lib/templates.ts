@@ -1,7 +1,8 @@
 import { z } from "zod";
 import { appendPanel } from "@/lib/explore-save";
 import { type ApiError, apiErrorFromThrown, readApiError } from "@/lib/errors";
-import { Dashboard, Panel, type TimeRange } from "@/lib/ir";
+import { Dashboard, Panel, SPEC_VERSION, type TimeRange } from "@/lib/ir";
+import { migratePanel, migrateSpec } from "@/lib/ir/upgrade";
 
 /**
  * Panel and dashboard templates.
@@ -46,10 +47,44 @@ export type TemplateKind = z.infer<typeof TemplateKind>;
  * a React prop, into the `templates.kind` column that a CHECK constraint keeps
  * equal to this tag.
  */
-export const TemplateBody = z.discriminatedUnion("kind", [
-  z.object({ kind: z.literal("panel"), panel: Panel }).strict(),
+const TemplateBodyShape = z.discriminatedUnion("kind", [
+  z
+    .object({
+      kind: z.literal("panel"),
+      /** A dashboard records its own IR version; a lone panel records it here. */
+      specVersion: z.literal(SPEC_VERSION),
+      panel: Panel,
+    })
+    .strict(),
   z.object({ kind: z.literal("dashboard"), dashboard: Dashboard }).strict(),
 ]);
+
+/**
+ * A stored body is brought up to the current IR version before it is
+ * validated, the same way a stored dashboard is (#58): a template saved before
+ * a breaking IR change still applies after it. A panel body saved before the
+ * version was recorded is version 1.
+ */
+function upgradeTemplateBody(input: unknown, ctx: z.RefinementCtx): unknown {
+  if (typeof input !== "object" || input === null) return input;
+  const body = input as Record<string, unknown>;
+  const migrated =
+    body.kind === "panel"
+      ? migratePanel(body.panel, body.specVersion)
+      : body.kind === "dashboard"
+        ? migrateSpec(body.dashboard)
+        : null;
+  if (!migrated) return input;
+  if (!migrated.ok) {
+    ctx.addIssue({ code: "custom", message: migrated.error });
+    return z.NEVER;
+  }
+  return body.kind === "panel"
+    ? { ...body, specVersion: SPEC_VERSION, panel: migrated.spec }
+    : { ...body, dashboard: migrated.spec };
+}
+
+export const TemplateBody = z.preprocess(upgradeTemplateBody, TemplateBodyShape);
 export type TemplateBody = z.infer<typeof TemplateBody>;
 
 /** Where a template came from: this workspace, or shipped with the app. */
@@ -126,7 +161,7 @@ export function retargetTemplate(body: TemplateBody, sourceId: string): Template
     query: { ...panel.query, sourceId },
   });
   return body.kind === "panel"
-    ? { kind: "panel", panel: retarget(body.panel) }
+    ? { ...body, panel: retarget(body.panel) }
     : {
         kind: "dashboard",
         dashboard: { ...body.dashboard, panels: body.dashboard.panels.map(retarget) },
@@ -151,6 +186,7 @@ export function templateSpec(
     return { ...retargeted.dashboard, title };
   }
   return {
+    specVersion: SPEC_VERSION,
     title,
     timeRange: TEMPLATE_TIME_RANGE,
     refreshIntervalMs: TEMPLATE_REFRESH_MS,
@@ -184,6 +220,7 @@ export function appendTemplate(
 export function panelTemplateBody(panel: Panel): TemplateBody {
   return {
     kind: "panel",
+    specVersion: SPEC_VERSION,
     panel: Panel.parse({ ...panel, layout: { ...panel.layout, x: 0, y: 0 } }),
   };
 }

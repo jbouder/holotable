@@ -65,6 +65,7 @@ const FROM = new Date("2026-07-11T11:00:00.000Z");
 const TO = new Date("2026-07-11T12:00:00.000Z");
 
 const dashboard = parseDashboard({
+  specVersion: 1,
   title: "Traffic",
   timeRange: { from: FROM.toISOString(), to: TO.toISOString() },
   refreshIntervalMs: 15_000,

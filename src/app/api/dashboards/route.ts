@@ -8,7 +8,7 @@ import { readJson, json, route } from "@/lib/http";
 import { listDashboards, createDashboard } from "@/lib/db/repo";
 import { resolveAndValidateDashboard } from "@/lib/dashboard-service";
 import { PAGE_SIZE, pageOffset, parseDashboardQuery } from "@/lib/dashboard-list";
-import { Dashboard } from "@/lib/ir";
+import { StoredDashboard } from "@/lib/ir/upgrade";
 
 export const runtime = "nodejs";
 
@@ -67,7 +67,11 @@ export const GET = route("dashboards.list", async (req: Request) => {
   });
 });
 
-const CreateBody = z.object({ spec: Dashboard });
+/**
+ * Upgraded, not just validated: a tab opened before a deploy saves the spec it
+ * was holding, and the version row is written at the current version (#58).
+ */
+const CreateBody = z.object({ spec: StoredDashboard });
 
 /**
  * Create a dashboard. The workspace is derived from the trusted source records

@@ -13,7 +13,8 @@ import { catalogHealth, catalogRefusal } from "@/lib/catalog/health";
 import { recordGeneration } from "@/lib/ai/log";
 import { buildCatalogPrompt } from "@/lib/timescaledb/catalog";
 import { enforceLlmLimits } from "@/lib/limits/llm";
-import { Dashboard, Panel } from "@/lib/ir";
+import { Panel } from "@/lib/ir";
+import { StoredDashboard } from "@/lib/ir/upgrade";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -28,7 +29,8 @@ const Body = z.discriminatedUnion("mode", [
     mode: z.literal("dashboard-refine"),
     sourceId: z.string().min(1),
     prompt: z.string().min(1).max(4000),
-    current: Dashboard,
+    // A tab opened before a deploy sends the spec it has; upgrade it (#58).
+    current: StoredDashboard,
   }),
   z.object({
     mode: z.literal("panel"),

@@ -1,7 +1,8 @@
 import { z } from "zod";
 import type { BrowserStorage } from "@/lib/browser-storage";
 import { browserStorage } from "@/lib/browser-storage";
-import { Dashboard } from "@/lib/ir";
+import type { Dashboard } from "@/lib/ir";
+import { StoredDashboard } from "@/lib/ir/upgrade";
 import { specFingerprint } from "@/lib/editor/session";
 
 /**
@@ -47,7 +48,8 @@ export const DraftEnvelope = z
     baseVersion: z.number().int().min(0),
     /** Epoch ms of the last autosave. */
     savedAt: z.number().int().min(0),
-    spec: Dashboard,
+    /** A draft can outlive a deploy, so it is upgraded like a stored spec. */
+    spec: StoredDashboard,
   })
   .strict();
 export type DraftEnvelope = z.infer<typeof DraftEnvelope>;

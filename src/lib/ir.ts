@@ -90,34 +90,81 @@ export const Panel = z
   .strict();
 export type Panel = z.infer<typeof Panel>;
 
+/**
+ * The IR version this build writes, and the only one {@link Dashboard}
+ * accepts.
+ *
+ * A saved spec is the one piece of state that cannot be regenerated, so a
+ * breaking change to the shapes above does not get to strand the ones already
+ * stored. It bumps this number instead, and adds the upgrader that carries a
+ * spec of the previous version forward to `src/lib/ir/upgrade.ts`. Everything
+ * that reads a spec it did not just build — a stored version row, a template,
+ * an export file, a draft, a request from a tab opened before the deploy —
+ * reads it through `StoredDashboard` there, which applies the chain in memory
+ * and then validates against this schema.
+ */
+export const SPEC_VERSION = 1;
+
+const DashboardFields = {
+  title: z.string().min(1).max(200),
+  timeRange: TimeRange,
+  refreshIntervalMs: z.number().int().min(1_000).max(3_600_000),
+  panels: z.array(Panel).min(1).max(50),
+};
+
+function uniquePanelIds(dash: { panels: Panel[] }, ctx: z.RefinementCtx): void {
+  const ids = new Set<string>();
+  dash.panels.forEach((p, i) => {
+    if (ids.has(p.id)) {
+      ctx.addIssue({
+        code: "custom",
+        message: `duplicate panel id "${p.id}"`,
+        path: ["panels", i, "id"],
+      });
+    }
+    ids.add(p.id);
+  });
+}
+
 export const Dashboard = z
   .object({
-    title: z.string().min(1).max(200),
-    timeRange: TimeRange,
-    refreshIntervalMs: z.number().int().min(1_000).max(3_600_000),
-    panels: z.array(Panel).min(1).max(50),
+    specVersion: z.literal(SPEC_VERSION, {
+      error: `specVersion must be ${SPEC_VERSION}; an older spec is read through StoredDashboard, which upgrades it`,
+    }),
+    ...DashboardFields,
   })
   .strict()
-  .superRefine((dash, ctx) => {
-    const ids = new Set<string>();
-    dash.panels.forEach((p, i) => {
-      if (ids.has(p.id)) {
-        ctx.addIssue({
-          code: "custom",
-          message: `duplicate panel id "${p.id}"`,
-          path: ["panels", i, "id"],
-        });
-      }
-      ids.add(p.id);
-    });
-  });
+  .superRefine(uniquePanelIds);
 export type Dashboard = z.infer<typeof Dashboard>;
 
 /**
- * The schema the LLM is asked to produce. It is exactly the Dashboard IR: the
- * model authors a validated viz spec, never data rows.
+ * The schema the LLM is asked to produce: the Dashboard IR minus
+ * `specVersion`. The model authors a validated viz spec, never data rows, and
+ * never the version — which shape a spec is in is a fact about this build, not
+ * something a model gets to assert. `.strict()` means a model that offers one
+ * anyway is refused, and {@link fromGenerated} stamps the current version on
+ * what it did produce.
  */
-export const DashboardGenerationSchema = Dashboard;
+export const DashboardGenerationSchema = z
+  .object(DashboardFields)
+  .strict()
+  .superRefine(uniquePanelIds);
+export type GeneratedDashboard = z.infer<typeof DashboardGenerationSchema>;
+
+/**
+ * A generated dashboard as a spec of this build's version. Only for output of
+ * {@link DashboardGenerationSchema}, which was produced against exactly these
+ * shapes; anything older goes through `StoredDashboard`.
+ */
+export function fromGenerated(generated: GeneratedDashboard): Dashboard {
+  return { specVersion: SPEC_VERSION, ...generated };
+}
+
+/** A spec as the model is shown it, when it is asked to change one. */
+export function forGeneration(spec: Dashboard): GeneratedDashboard {
+  const { specVersion: _, ...rest } = spec;
+  return rest;
+}
 
 export function parseDashboard(input: unknown): Dashboard {
   return Dashboard.parse(input);

@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { type ApiError, apiErrorFromThrown, readApiError } from "@/lib/errors";
 import { Dashboard, type Panel } from "@/lib/ir";
+import { StoredDashboard } from "@/lib/ir/upgrade";
 
 /**
  * The door a dashboard leaves and enters by.
@@ -32,9 +33,10 @@ export const EXPORT_FORMAT = "holotable.dashboard";
 /**
  * The version of the ENVELOPE, not of any one dashboard.
  *
- * The IR itself carries no version today, so this is the hook a future
- * migration would key on: bump it, and a reader knows both what shape to
- * expect and that an older reader should refuse rather than misread.
+ * The spec inside carries its own `specVersion` and is upgraded on import like
+ * any stored spec (#58), so a file exported by an older build imports into a
+ * newer one without this changing. Bump it only when the envelope itself
+ * changes shape.
  */
 export const EXPORT_FORMAT_VERSION = 1;
 
@@ -73,7 +75,7 @@ export const DashboardExportFile = z
     }),
     exportedAt: z.string().max(64).optional(),
     manifest: ExportManifest.optional(),
-    spec: Dashboard,
+    spec: StoredDashboard,
   })
   .strict();
 export type DashboardExportFile = z.infer<typeof DashboardExportFile>;

@@ -54,6 +54,7 @@ const NOW = 1_700_000_000_000;
 
 function spec(patch: Partial<Dashboard> = {}): Dashboard {
   return {
+    specVersion: 1,
     title: "Ops",
     timeRange: { from: "now-1h", to: "now" },
     refreshIntervalMs: 30_000,

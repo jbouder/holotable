@@ -1,4 +1,4 @@
-import type { Dashboard } from "@/lib/ir";
+import { type Dashboard, fromGenerated, type GeneratedDashboard } from "@/lib/ir";
 import { autoLayoutPanels, DEFAULT_COLUMNS } from "@/lib/layout";
 
 /**
@@ -46,15 +46,19 @@ export const EMPTY_HISTORY: TurnHistory = { turns: [], index: -1, nextId: 1 };
 /**
  * Normalize a freshly generated spec the way the initial generation does: the
  * model's raw {x,y,w,h} guesses often overlap, so panels are re-flowed two-up.
+ * The model never states the IR version, so this is where it is stamped.
  */
 export function normalizeTurn(
   prompt: string,
-  spec: Dashboard,
+  spec: GeneratedDashboard,
   model?: string,
 ): TurnDraft {
   return {
     prompt,
-    spec: { ...spec, panels: autoLayoutPanels(spec.panels, DEFAULT_COLUMNS) },
+    spec: fromGenerated({
+      ...spec,
+      panels: autoLayoutPanels(spec.panels, DEFAULT_COLUMNS),
+    }),
     ...(model ? { model } : {}),
   };
 }

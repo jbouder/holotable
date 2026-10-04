@@ -1,5 +1,6 @@
 import "./lib/env";
 import { Client } from "pg";
+import { type Dashboard, parseDashboard, SPEC_VERSION } from "@/lib/ir";
 import {
   SELF_SOURCE_ID,
   selfMonitoringConfig,
@@ -141,8 +142,13 @@ async function ensureDemo() {
   }
 }
 
-/** Insert a demo dashboard (and its initial version) if one with that title doesn't exist. */
-async function ensureDashboard(pg: Client, spec: { title: string }) {
+/**
+ * Insert a demo dashboard (and its initial version) if one with that title
+ * doesn't exist. Validated first, so a seeded row is a current-version spec
+ * like any the app writes.
+ */
+async function ensureDashboard(pg: Client, input: unknown) {
+  const spec: Dashboard = parseDashboard(input);
   const existing = await pg.query(
     "SELECT id FROM dashboards WHERE workspace_id = 'demo' AND title = $1 AND deleted_at IS NULL",
     [spec.title],
@@ -167,6 +173,7 @@ async function ensureDashboard(pg: Client, spec: { title: string }) {
 
 function demoSpec() {
   return {
+    specVersion: SPEC_VERSION,
     title: "Demo service health",
     timeRange: { from: "now-1h", to: "now" },
     refreshIntervalMs: 15000,
@@ -223,6 +230,7 @@ function demoSpec() {
 
 function systemSpec() {
   return {
+    specVersion: SPEC_VERSION,
     title: "Demo infrastructure",
     timeRange: { from: "now-1h", to: "now" },
     refreshIntervalMs: 15000,

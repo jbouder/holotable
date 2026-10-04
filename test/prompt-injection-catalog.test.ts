@@ -226,6 +226,7 @@ test("a source whose catalog carries a hostile column still backs a valid, guard
 // --- dashboard chat system prompt -----------------------------------------------
 
 const hostileDashboard = parseDashboard({
+  specVersion: 1,
   title: `Traffic${FAKE_END}`,
   timeRange: { from: "now-1h", to: "now" },
   refreshIntervalMs: 15_000,
@@ -279,6 +280,7 @@ test("several sources share one catalog block in the chat prompt", () => {
 
 test("renderPanels clamps every panel field to its IR maximum", () => {
   const dashboard = parseDashboard({
+    specVersion: 1,
     title: "T",
     timeRange: { from: "now-1h", to: "now" },
     refreshIntervalMs: 15_000,

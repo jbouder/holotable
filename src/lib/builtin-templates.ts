@@ -1,6 +1,6 @@
 import { exposedCatalogTables, type CatalogSubject } from "@/lib/catalog/health";
 import { isPlainIdentifier, timeColumn } from "@/lib/catalog/identifiers";
-import type { Panel, ValueFormat } from "@/lib/ir";
+import { type Panel, SPEC_VERSION, type ValueFormat } from "@/lib/ir";
 import type { CatalogColumn, CatalogTable } from "@/lib/registry";
 import type { Template, TemplateKind } from "@/lib/templates";
 
@@ -252,7 +252,7 @@ export function buildBuiltinTemplates(
           kind: "panel",
           name: `${signal[0].toUpperCase()}${signal.slice(1)} — ${built.label}`,
           description: built.panel.description,
-          body: { kind: "panel", panel: built.panel },
+          body: { kind: "panel", specVersion: SPEC_VERSION, panel: built.panel },
         });
       }
     }
@@ -268,6 +268,7 @@ export function buildBuiltinTemplates(
         body: {
           kind: "dashboard",
           dashboard: {
+            specVersion: SPEC_VERSION,
             title: `${table.name} golden signals`,
             timeRange: { from: "now-1h", to: "now" },
             refreshIntervalMs: 30_000,
