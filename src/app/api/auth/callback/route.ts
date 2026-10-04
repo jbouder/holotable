@@ -1,6 +1,7 @@
 import { cookies } from "next/headers";
-import { exchangeCode } from "@/lib/auth/oidc";
-import { verifySessionToken } from "@/lib/auth/session";
+import { exchangeCode, OidcGrantRefused } from "@/lib/auth/oidc";
+import { identityFromPayload, realmJwks } from "@/lib/auth/session";
+import { completeSignIn, SignInRefused } from "@/lib/auth/sign-in";
 import { setSessionCookie, setSessionIdCookie } from "@/lib/auth/cookie";
 import { startSession } from "@/lib/auth/renewal";
 import { renewalDeps } from "@/lib/auth/session-store";
@@ -12,8 +13,9 @@ import { audit } from "@/lib/audit";
 export const runtime = "nodejs";
 
 /**
- * Keycloak OIDC callback. Verifies state, exchanges the code, validates the
- * id_token via JWKS (RS256) — only the validated sub + groups are trusted for
+ * Keycloak OIDC callback. Verifies state, exchanges the code with its PKCE
+ * verifier, validates the id_token via the realm's JWKS (RS256) and requires
+ * its nonce to be this browser's (#281) — only the validated sub + groups are trusted for
  * authorization — and mints a first-party session cookie. The display name and
  * email are carried over as display-only claims (#208). When the realm issued a
  * refresh token the session is renewable (#27). A 404 in demo mode.
@@ -22,17 +24,47 @@ export const GET = route("auth.callback", async (req: Request) => {
   // Demo mode has no realm to come back from (#251).
   if (config.authMode === "demo") throw new HttpError(404, "not found");
   const url = new URL(req.url);
-  const code = url.searchParams.get("code");
-  const state = url.searchParams.get("state");
-  if (!code || !state) throw new HttpError(400, "missing code/state");
 
+  // Read once and deleted at once, whatever happens next: each value is good
+  // for exactly one attempt.
   const store = await cookies();
-  const expected = store.get(config.oidcStateCookieName)?.value;
-  if (!expected || expected !== state) throw new HttpError(400, "invalid state");
+  const handshake = {
+    state: store.get(config.oidcStateCookieName)?.value,
+    nonce: store.get(config.oidcNonceCookieName)?.value,
+    verifier: store.get(config.oidcVerifierCookieName)?.value,
+  };
   store.delete(config.oidcStateCookieName);
+  store.delete(config.oidcNonceCookieName);
+  store.delete(config.oidcVerifierCookieName);
 
-  const tokens = await exchangeCode(url.origin, code);
-  const identity = await verifySessionToken(tokens.id_token);
+  let signIn: Awaited<ReturnType<typeof completeSignIn>>;
+  try {
+    signIn = await completeSignIn(
+      { code: url.searchParams.get("code"), state: url.searchParams.get("state") },
+      handshake,
+      {
+        exchange: (code, verifier) => exchangeCode(url.origin, code, verifier),
+        keys: realmJwks(),
+        issuer: process.env.OIDC_ISSUER,
+        audience: process.env.OIDC_AUDIENCE || undefined,
+      },
+    );
+  } catch (err) {
+    if (err instanceof SignInRefused) {
+      throw err.reason === "id_token"
+        ? new HttpError(401, "id_token verification failed")
+        : new HttpError(400, `invalid sign-in ${err.reason}`);
+    }
+    // The realm refused the code: expired, already used, or not redeemable
+    // with this browser's PKCE verifier, which is where a code taken from
+    // someone else's sign-in ends (#281). The browser's to retry, not ours.
+    if (err instanceof OidcGrantRefused) {
+      throw new HttpError(400, "invalid sign-in code");
+    }
+    throw err;
+  }
+  const { tokens } = signIn;
+  const identity = identityFromPayload(signIn.claims);
   if (!identity) throw new HttpError(401, "id_token verification failed");
 
   // With a refresh token the session is short-lived and renewable (#27); the

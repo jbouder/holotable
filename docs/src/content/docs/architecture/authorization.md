@@ -68,6 +68,17 @@ them, and `test/account.test.ts` holds it to that.
 identity that holds exactly that role, so the description cannot drift from
 the rule.
 
+A sign-in is bound to the browser that started it (#281,
+`src/lib/auth/sign-in.ts`). `/api/auth/login` sets three short-lived cookies: the
+OAuth `state`, the OIDC `nonce`, and a PKCE code verifier whose S256 challenge
+goes to the realm. The callback deletes all three whatever happens. Before the
+code is sent anywhere it needs all three and a matching `state`. It redeems the
+code with the verifier, verifies the id_token against the realm's keys only,
+and refuses it unless its `nonce` is the cookie's. Someone who has obtained
+another person's authorization code therefore cannot paste it into their own
+sign-in: the realm refuses it without that person's verifier, and the
+id_token would carry that person's nonce.
+
 The session cookie is `httpOnly`, `Secure` in production, `SameSite=Lax`,
 path `/`. It lives as long as the token in it.
 

@@ -74,7 +74,12 @@ function refFromPayload(payload: JWTPayload, sub: string): TokenRef {
   };
 }
 
-function identityFromPayload(payload: JWTPayload): Identity | null {
+/**
+ * The identity a verified token's claims describe, or null when it has no
+ * subject or its realm session was revoked. Exported for the sign-in callback,
+ * which verifies the realm's id_token itself (#281).
+ */
+export function identityFromPayload(payload: JWTPayload): Identity | null {
   const sub = typeof payload.sub === "string" ? payload.sub : null;
   if (!sub) return null;
   // A session the realm ended by back-channel logout (#28) is refused here,

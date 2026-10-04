@@ -257,7 +257,11 @@ test("every file that writes browser storage is accounted for", () => {
  */
 const COOKIE_WRITERS: Record<string, string[]> = {
   "lib/auth/cookie.ts": ["holotable_session", "holotable_session_renew"],
-  "app/api/auth/login/route.ts": ["holotable_oidc_state", "holotable_oidc_nonce"],
+  "app/api/auth/login/route.ts": [
+    "holotable_oidc_state",
+    "holotable_oidc_nonce",
+    "holotable_oidc_verifier",
+  ],
   "components/onboarding/actions.ts": [...DISMISSIBLE],
 };
 

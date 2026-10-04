@@ -154,7 +154,11 @@ export const COOKIE_EXCLUSIONS: readonly { name: string; reason: string }[] = [
       "The session's renewal id (#27), scoped to /api/auth and __Secure- prefixed when Secure; Sign out clears it and the stored refresh token.",
   },
   { name: "holotable_oidc_state", reason: "Sign-in handshake, deleted by the callback." },
-  { name: "holotable_oidc_nonce", reason: "Sign-in handshake, short-lived." },
+  { name: "holotable_oidc_nonce", reason: "Sign-in handshake, deleted by the callback." },
+  {
+    name: "holotable_oidc_verifier",
+    reason: "Sign-in handshake (PKCE verifier), deleted by the callback.",
+  },
 ];
 
 export function keyMatches(match: KeyMatch, key: string): boolean {

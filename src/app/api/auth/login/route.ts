@@ -1,6 +1,6 @@
 import { cookies } from "next/headers";
-import { randomBytes } from "node:crypto";
 import { buildAuthorizeUrl } from "@/lib/auth/oidc";
+import { newHandshake } from "@/lib/auth/sign-in";
 import { demoLogin } from "@/lib/auth/demo";
 import { setSessionCookie } from "@/lib/auth/cookie";
 import { verifySessionToken } from "@/lib/auth/session";
@@ -19,8 +19,9 @@ export const GET = route("auth.login", async (req: Request) => {
   if (config.authMode === "demo") return demoSession(req);
 
   const origin = new URL(req.url).origin;
-  const state = randomBytes(16).toString("hex");
-  const nonce = randomBytes(16).toString("hex");
+  // Checked by the callback (#281): the state, the nonce the id_token must
+  // echo, and the PKCE verifier the code exchange must present.
+  const handshake = newHandshake();
 
   const store = await cookies();
   const opts = {
@@ -31,10 +32,11 @@ export const GET = route("auth.login", async (req: Request) => {
     maxAge: 600,
   };
   // `__Host-` prefixed when Secure (#26), like the session cookie.
-  store.set(config.oidcStateCookieName, state, opts);
-  store.set(config.oidcNonceCookieName, nonce, opts);
+  store.set(config.oidcStateCookieName, handshake.state, opts);
+  store.set(config.oidcNonceCookieName, handshake.nonce, opts);
+  store.set(config.oidcVerifierCookieName, handshake.verifier, opts);
 
-  const url = await buildAuthorizeUrl(origin, state, nonce);
+  const url = await buildAuthorizeUrl(origin, handshake);
   return Response.redirect(url, 302);
 });
 
