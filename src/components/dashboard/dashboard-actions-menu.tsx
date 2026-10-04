@@ -6,6 +6,7 @@ import {
   BookmarkPlus,
   Check,
   Download,
+  History,
   Loader2,
   MoreHorizontal,
   Trash2,
@@ -17,8 +18,8 @@ import { ErrorDisplay } from "@/components/ui/error-display";
 import { Menu, MenuItem, MenuSeparator } from "@/components/ui/menu";
 
 /**
- * The dashboard view's occasional actions — export, save as template,
- * delete — behind one trigger, so the action row keeps only what is used
+ * The dashboard view's occasional actions — version history, export, save as
+ * template, delete — behind one trigger, so the action row keeps only what is used
  * while watching a dashboard. Rendered only when at least one item is
  * available; each item appears only for a caller already authorized for it
  * on the server, and every route behind them re-checks.
@@ -62,6 +63,9 @@ export function DashboardActionsMenu({
           A plain link, not a fetch: the route answers with a
           `Content-Disposition`, so the browser saves the file itself.
         */}
+        <MenuItem href={`/dashboards/${dashboardId}/versions`}>
+          <History className="h-4 w-4" /> Version history
+        </MenuItem>
         <MenuItem href={`/api/dashboards/${dashboardId}/export`} download>
           <Download className="h-4 w-4" /> Export
         </MenuItem>

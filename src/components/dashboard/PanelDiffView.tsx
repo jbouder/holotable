@@ -29,7 +29,7 @@ const LINE_MARKS: Record<SqlLine["kind"], string> = {
   context: " ",
 };
 
-function FieldRow({
+export function FieldRow({
   label,
   before,
   after,
@@ -57,6 +57,26 @@ function FieldRow({
         <span className="text-foreground">{before}</span>
       )}
     </div>
+  );
+}
+
+/** SQL as a line diff; also used for whole-panel adds and removals in history. */
+export function SqlDiffLines({ lines }: { lines: Pick<SqlLine, "kind" | "text">[] }) {
+  return (
+    <pre className="max-h-72 overflow-auto border border-border bg-background p-2 font-mono text-xs leading-relaxed">
+      {lines.map((line, i) => (
+        <div
+          // Line numbers repeat across kinds, so position is the only
+          // stable key here; the list is rebuilt wholesale anyway.
+          // biome-ignore lint/suspicious/noArrayIndexKey: positional diff rows
+          key={i}
+          className={cn("whitespace-pre px-1", LINE_STYLES[line.kind])}
+        >
+          <span className="select-none pr-2 text-muted/60">{LINE_MARKS[line.kind]}</span>
+          {line.text}
+        </div>
+      ))}
+    </pre>
   );
 }
 
@@ -179,22 +199,7 @@ export function PanelDiffView({
             <span>unchanged</span>
           )}
         </div>
-        <pre className="max-h-72 overflow-auto border border-border bg-background p-2 font-mono text-xs leading-relaxed">
-          {diff.sql.lines.map((line, i) => (
-            <div
-              // Line numbers repeat across kinds, so position is the only
-              // stable key here; the list is rebuilt wholesale anyway.
-              // biome-ignore lint/suspicious/noArrayIndexKey: positional diff rows
-              key={i}
-              className={cn("whitespace-pre px-1", LINE_STYLES[line.kind])}
-            >
-              <span className="select-none pr-2 text-muted/60">
-                {LINE_MARKS[line.kind]}
-              </span>
-              {line.text}
-            </div>
-          ))}
-        </pre>
+        <SqlDiffLines lines={diff.sql.lines} />
       </div>
 
       <div className="flex flex-wrap items-end gap-2 border-t border-border pt-3">

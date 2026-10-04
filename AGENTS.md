@@ -180,6 +180,9 @@ type) is a **breaking** change:
   the pre-versioning fixture in `test/fixtures/specs/` loading
 - read any spec you did not just build (a database row, a template, a file, a
   draft, a request body) through `StoredDashboard`, never `Dashboard` directly
+- check the SQL that reads raw `spec` jsonb without upgrading it: the version
+  history's panel count (`VERSION_COLUMNS` in `src/lib/db/repo.ts`) and the
+  source-impact queries assume `panels` is a top-level array
 
 An additive, optional field needs none of this.
 
