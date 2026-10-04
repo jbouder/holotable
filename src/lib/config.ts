@@ -6,6 +6,7 @@ import {
   RESERVED_CLAIMS,
   splitClaimNames,
 } from "@/lib/auth/claims";
+import { isOrigin, splitOrigins } from "@/lib/auth/origin";
 import { parseCidr } from "@/lib/cidr";
 import { SECRET_REF_GRANTS_VAR, parseSecretRefGrants } from "@/lib/secret-refs";
 import { resolveTimeExpr, resolveTimeRange } from "@/lib/time";
@@ -54,6 +55,30 @@ export function cookieSecure(env: Environment): boolean {
   if (raw === "false") return false;
   return env.NODE_ENV === "production";
 }
+
+/**
+ * The names of the cookies the app sets (#26). A `Secure` cookie gets a
+ * prefix the browser enforces: `__Host-` means it was set over HTTPS with
+ * `Path=/` and no `Domain`, so a sibling subdomain cannot plant or overwrite
+ * it. The renewal cookie is scoped to `/api/auth`, which `__Host-` forbids, so
+ * it gets `__Secure-`, which requires only `Secure`. Without `Secure` (plain
+ * HTTP in development, or the quick-start image) the browser would refuse a
+ * prefixed cookie outright, so the names stay bare.
+ */
+export function cookieNames(base: string, secure: boolean) {
+  const host = (name: string) => (secure ? `__Host-${name}` : name);
+  return {
+    session: host(base),
+    renew: secure ? `__Secure-${base}_renew` : `${base}_renew`,
+    oidcState: host("holotable_oidc_state"),
+    oidcNonce: host("holotable_oidc_nonce"),
+  };
+}
+
+const COOKIES = cookieNames(
+  str("SESSION_COOKIE_NAME", "holotable_session"),
+  cookieSecure(process.env),
+);
 
 function bool(name: string, fallback: boolean): boolean {
   const raw = process.env[name];
@@ -209,8 +234,23 @@ export const config = {
    */
   rowFilterClaims: splitClaimNames(str("ROW_FILTER_CLAIMS", "")),
 
-  /** Cookie name used for the session JWT. */
-  sessionCookieName: str("SESSION_COOKIE_NAME", "holotable_session"),
+  /**
+   * Origins besides this app's own that may send it a state-changing request
+   * with the session cookie (#25). Exact origins, comma- or
+   * whitespace-separated; empty (the default) allows only the app itself.
+   */
+  allowedOrigins: splitOrigins(str("ALLOWED_ORIGINS", "")),
+
+  /**
+   * Cookie name used for the session JWT: `SESSION_COOKIE_NAME`, with
+   * `__Host-` in front when the cookie is `Secure` (#26).
+   */
+  sessionCookieName: COOKIES.session,
+  /** The renewal cookie (#27), `__Secure-` prefixed when `Secure`. */
+  renewCookieName: COOKIES.renew,
+  /** The sign-in handshake's state and nonce cookies. */
+  oidcStateCookieName: COOKIES.oidcState,
+  oidcNonceCookieName: COOKIES.oidcNonce,
   /** Whether the session and sign-in cookies are `Secure`; see {@link cookieSecure}. */
   sessionCookieSecure: cookieSecure(process.env),
 
@@ -332,7 +372,11 @@ const EnvSchema = z.object({
   SESSION_COOKIE_NAME: blank(
     z
       .string()
-      .regex(/^[A-Za-z0-9_-]+$/, "must be a valid cookie name (letters, digits, _ or -)"),
+      .regex(/^[A-Za-z0-9_-]+$/, "must be a valid cookie name (letters, digits, _ or -)")
+      .refine((name) => !/^__(host|secure)-/i.test(name), {
+        message:
+          "must not start with __Host- or __Secure-: the prefix is added for you when the cookie is Secure",
+      }),
   ),
   SESSION_COOKIE_SECURE: blank(
     z.enum(["true", "false"], { error: 'must be "true" or "false"' }),
@@ -396,6 +440,7 @@ const EnvSchema = z.object({
   ),
   DEMO_GROUPS: blank(z.string()),
   ROW_FILTER_CLAIMS: blank(z.string()),
+  ALLOWED_ORIGINS: blank(z.string()),
 
   OIDC_ISSUER: blank(
     httpUrl("the realm issuer, e.g. https://kc.example.com/realms/holotable"),
@@ -695,6 +740,18 @@ export function validateConfig(
       error(
         "ROW_FILTER_CLAIMS",
         `lists "${name}", which the session token uses for itself. Map the value to another claim name in the realm.`,
+      );
+    }
+  }
+
+  // --- Allowed origins (#25) ----------------------------------------------
+  // Matched exactly against a request's `Origin`, which never has a path or a
+  // trailing slash, so an entry with either would silently match nothing.
+  for (const origin of splitOrigins(values.ALLOWED_ORIGINS ?? "")) {
+    if (!isOrigin(origin)) {
+      error(
+        "ALLOWED_ORIGINS",
+        `"${origin.slice(0, 80)}" is not an origin: give scheme, host and port only, e.g. https://grafana.example.com`,
       );
     }
   }

@@ -1,4 +1,5 @@
 import { type NextRequest, NextResponse } from "next/server";
+import { publicOrigin } from "@/lib/auth/origin";
 import { config as appConfig } from "@/lib/config";
 import {
   contentSecurityPolicy,
@@ -69,18 +70,7 @@ export function proxy(request: NextRequest): NextResponse {
  * spoofed one only redirects the request's own sender.
  */
 function requestOrigin(request: NextRequest): string {
-  const forwardedHost = request.headers.get("x-forwarded-host")?.split(",")[0]?.trim();
-  const host = forwardedHost || request.headers.get("host") || request.nextUrl.host;
-  const forwardedProto = request.headers.get("x-forwarded-proto")?.split(",")[0]?.trim();
-  const proto =
-    forwardedProto === "https" || forwardedProto === "http"
-      ? forwardedProto
-      : request.nextUrl.protocol.replace(/:$/, "");
-  try {
-    return new URL(`${proto}://${host}`).origin;
-  } catch {
-    return request.nextUrl.origin;
-  }
+  return publicOrigin(request.headers, new URL(request.nextUrl.href));
 }
 
 /**

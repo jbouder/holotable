@@ -71,6 +71,37 @@ the rule.
 The session cookie is `httpOnly`, `Secure` in production, `SameSite=Lax`,
 path `/`. It lives as long as the token in it.
 
+When it is `Secure`, its name is `__Host-<SESSION_COOKIE_NAME>` (#26), and the
+sign-in handshake's cookies are `__Host-` prefixed too. A browser accepts a
+`__Host-` cookie only if it was set over HTTPS with `Path=/` and no `Domain`, so
+a page on a sibling subdomain can't plant a session or overwrite one.
+`SESSION_COOKIE_SECURE=false` (plain HTTP, as in the quick-start image) keeps
+the bare name, since the browser would refuse a prefixed cookie without
+`Secure`. A session cookie under the old name is ignored after an upgrade, and
+its holder signs in again.
+
+### Requests from other origins
+
+`SameSite=Lax` stops a cross-site page from sending a POST with the cookie. It
+does not stop a page on a sibling subdomain, which is the same *site*, and it
+would stop nothing if the cookie ever became `SameSite=None` for embedding
+(#65). So every state-changing request (anything but GET, HEAD and OPTIONS) is
+also checked for where it came from, in the `route()` wrapper, before any
+handler runs (#25, `src/lib/auth/origin.ts`):
+
+| The request says | Result |
+| --- | --- |
+| `Sec-Fetch-Site: same-origin` or `none` | Allowed: our own page, or the person acting directly |
+| `Origin` is listed in `ALLOWED_ORIGINS` | Allowed |
+| `Sec-Fetch-Site: same-site` or `cross-site`, or `Origin: null` | 403 |
+| No Fetch Metadata; `Origin` equals the origin the request was addressed to (forwarded host and scheme behind a proxy) | Allowed; any other `Origin` is a 403 |
+| Neither header | Allowed. No page sent it (a script, `curl`, the realm's back-channel logout), so it is left to authentication |
+
+A browser sets `Sec-Fetch-Site` and `Origin` itself, and a page cannot forge
+either. The check is in the wrapper so that a new route is covered without
+anyone adding it, and a test holds every POST, PUT, PATCH and DELETE handler
+to going through `route()`.
+
 ### Renewal
 
 When the realm issues a refresh token at sign-in, the session is renewable
@@ -82,7 +113,8 @@ When the realm issues a refresh token at sign-in, the session is renewable
 - The refresh token is stored server-side in `sessions`, sealed with
   AES-256-GCM under a key derived from `SESSION_SECRET`. The browser gets only
   a random session id, in a second `httpOnly` cookie
-  (`<SESSION_COOKIE_NAME>_renew`) scoped to `/api/auth`, so it travels with
+  (`<SESSION_COOKIE_NAME>_renew`, or `__Secure-<SESSION_COOKIE_NAME>_renew`
+  when `Secure`, since `__Host-` requires `Path=/`) scoped to `/api/auth`, so it travels with
   nothing but sign-in, renewal and sign-out.
 - `POST /api/auth/refresh` asks the realm for a fresh token set, verifies the
   new id_token, checks its `sub` is the one that signed in, and mints a new

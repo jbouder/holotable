@@ -1,5 +1,7 @@
 import type { z } from "zod";
 import { HttpError, errorResponse } from "@/lib/auth/authorize";
+import { checkOrigin } from "@/lib/auth/origin";
+import { config } from "@/lib/config";
 import { log, newRequestContext, runWithRequest } from "@/lib/log";
 
 export interface ReadJsonOptions {
@@ -100,10 +102,31 @@ export interface RouteOptions {
 }
 
 /**
+ * Refuse a state-changing request that a page on another origin sent (#25).
+ * Logged with the headers that decided it, which name only origins, never a
+ * path or a query.
+ */
+function assertSameOrigin(req: Request): void {
+  const verdict = checkOrigin(req.method, req.url, req.headers, config.allowedOrigins);
+  if (verdict.ok) return;
+  log.warn("request.cross_origin", {
+    reason: verdict.reason,
+    origin: req.headers.get("origin"),
+    secFetchSite: req.headers.get("sec-fetch-site"),
+  });
+  throw new HttpError(403, "cross-origin request rejected");
+}
+
+/**
  * Wrap an API route handler.
  *
- * Three things happen here so that no handler has to do them.
+ * Four things happen here so that no handler has to do them.
  *
+ * - A state-changing request (anything but GET, HEAD and OPTIONS) from
+ *   another origin is refused with a 403 before the handler runs, so before
+ *   any authorization or database work (#25, `src/lib/auth/origin.ts`). It is
+ *   here rather than in each handler so that a new route is covered without
+ *   anyone remembering to add it.
  * - A request context is entered ({@link runWithRequest}), so every log line
  *   written anywhere beneath this handler carries the request id, the route,
  *   and — once `requireIdentity`/`assertAuthorized` have run — the subject and
@@ -136,6 +159,7 @@ export function route<A extends unknown[]>(
       const startedAt = Date.now();
       let response: Response;
       try {
+        assertSameOrigin(req);
         response = await handler(req, ...args);
       } catch (err) {
         response = errorResponse(err);
