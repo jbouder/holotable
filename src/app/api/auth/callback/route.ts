@@ -3,6 +3,7 @@ import { exchangeCode } from "@/lib/auth/oidc";
 import { verifySessionToken, signSessionToken } from "@/lib/auth/session";
 import { setSessionCookie } from "@/lib/auth/cookie";
 import { HttpError } from "@/lib/auth/authorize";
+import { config } from "@/lib/config";
 import { route } from "@/lib/http";
 
 export const runtime = "nodejs";
@@ -11,9 +12,11 @@ export const runtime = "nodejs";
  * Keycloak OIDC callback. Verifies state, exchanges the code, validates the
  * id_token via JWKS (RS256) — only the validated sub + groups are trusted for
  * authorization — and mints a first-party session cookie. The display name and
- * email are carried over as display-only claims (#208).
+ * email are carried over as display-only claims (#208). A 404 in demo mode.
  */
 export const GET = route("auth.callback", async (req: Request) => {
+  // Demo mode has no realm to come back from (#251).
+  if (config.authMode === "demo") throw new HttpError(404, "not found");
   const url = new URL(req.url);
   const code = url.searchParams.get("code");
   const state = url.searchParams.get("state");

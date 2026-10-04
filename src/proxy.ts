@@ -23,8 +23,25 @@ import {
  * The static headers (`Referrer-Policy`, HSTS, …) are not set here: they are
  * the same for every response, so `next.config.ts` attaches them to API and
  * asset responses as well.
+ *
+ * In demo mode (#251) a page request with no session cookie is sent to
+ * `/api/auth/login?next=<path>` first, which mints a session and comes
+ * straight back, so a visitor never sees a sign-in screen. Cookie *presence*
+ * only: nothing is verified here, and a forged cookie is still refused by
+ * `getIdentity()` on the page. `/api` is outside the matcher, so API routes
+ * keep answering 401.
  */
 export function proxy(request: NextRequest): NextResponse {
+  if (appConfig.authMode === "demo" && needsDemoSession(request)) {
+    const { pathname, search } = request.nextUrl;
+    const login = new URL("/api/auth/login", requestOrigin(request));
+    login.searchParams.set("next", `${pathname}${search}`);
+    const response = NextResponse.redirect(login, 307);
+    // Per visitor and per Host header; nothing in between may reuse it.
+    response.headers.set("Cache-Control", "no-store");
+    return response;
+  }
+
   const nonce = generateNonce();
   const policy = contentSecurityPolicy({
     nonce,
@@ -41,6 +58,46 @@ export function proxy(request: NextRequest): NextResponse {
   const response = NextResponse.next({ request: { headers: requestHeaders } });
   response.headers.set(header, policy);
   return response;
+}
+
+/**
+ * The origin the browser used. The proxy runtime requires an absolute
+ * `Location`, and `request.nextUrl` names the server's own bind address, not
+ * the host behind a reverse proxy or a Cloudflare Worker, so a redirect built
+ * from it would move the visitor off the origin their cookie is set on. The
+ * forwarded headers, then `Host`, say where the visitor actually is; a
+ * spoofed one only redirects the request's own sender.
+ */
+function requestOrigin(request: NextRequest): string {
+  const forwardedHost = request.headers.get("x-forwarded-host")?.split(",")[0]?.trim();
+  const host = forwardedHost || request.headers.get("host") || request.nextUrl.host;
+  const forwardedProto = request.headers.get("x-forwarded-proto")?.split(",")[0]?.trim();
+  const proto =
+    forwardedProto === "https" || forwardedProto === "http"
+      ? forwardedProto
+      : request.nextUrl.protocol.replace(/:$/, "");
+  try {
+    return new URL(`${proto}://${host}`).origin;
+  } catch {
+    return request.nextUrl.origin;
+  }
+}
+
+/**
+ * A document navigation with no session cookie. A prefetch is left alone: it
+ * cannot follow a redirect that sets a cookie on the visitor's behalf, and the
+ * navigation it precedes will redirect anyway.
+ */
+function needsDemoSession(request: NextRequest): boolean {
+  if (request.method !== "GET") return false;
+  if (request.cookies.has(appConfig.sessionCookieName)) return false;
+  if (
+    request.headers.get("next-router-prefetch") ||
+    request.headers.get("purpose") === "prefetch"
+  ) {
+    return false;
+  }
+  return true;
 }
 
 export const config = {

@@ -20,6 +20,7 @@ import {
 } from "@/lib/local-data";
 import { PROMPT_HISTORY_PREFIX, promptHistoryKey } from "@/lib/prompt-history";
 import { MOTION_STORAGE_KEY } from "@/lib/motion";
+import { DEMO_BANNER_KEY } from "@/lib/demo-banner";
 import { THEME_STORAGE_KEY } from "@/lib/theme";
 
 function memory(
@@ -190,6 +191,7 @@ test("every storage key the app defines is registered or deliberately excluded",
     RECENTS_STORAGE_KEY,
     THEME_STORAGE_KEY,
     MOTION_STORAGE_KEY,
+    DEMO_BANNER_KEY,
   ]) {
     const owned = storeForKey(key) !== null || exclusions.some((m) => keyMatches(m, key));
     assert.ok(owned, `${key} is neither a local-data store nor an exclusion`);
@@ -222,6 +224,7 @@ const STORAGE_WRITERS: Record<string, string> = {
   "components/command-palette.tsx": RECENTS_STORAGE_KEY,
   "lib/theme.ts": THEME_STORAGE_KEY,
   "lib/motion.ts": MOTION_STORAGE_KEY,
+  "lib/demo-banner.ts": DEMO_BANNER_KEY,
 };
 
 test("every file that writes browser storage is accounted for", () => {

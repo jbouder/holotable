@@ -74,6 +74,7 @@ export default defineConfig({
           label: "Operations",
           items: [
             { label: "Keycloak setup", slug: "operations/keycloak" },
+            { label: "Demo mode", slug: "operations/demo-mode" },
             { label: "Source secret references", slug: "operations/secret-references" },
             { label: "AI provider", slug: "operations/ai-provider" },
             { label: "Startup validation", slug: "operations/startup-validation" },

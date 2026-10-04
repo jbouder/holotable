@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 import { getIdentity, can } from "@/lib/auth/authorize";
 import { sourceCatalog } from "@/lib/registry";
 import { config } from "@/lib/config";
+import { aiUnavailable } from "@/lib/ai/configured";
 import { getDashboardById, listDashboardTags, listSources } from "@/lib/db/repo";
 import { SignIn } from "@/components/sign-in";
 import { EditDashboardClient } from "./edit-client";
@@ -60,6 +61,7 @@ export default async function EditDashboardPage({
       metadata={{ description: dashboard.description, tags: dashboard.tags }}
       tagSuggestions={tagSuggestions}
       model={config.aiModel}
+      aiUnavailable={aiUnavailable()}
     />
   );
 }

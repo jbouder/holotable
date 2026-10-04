@@ -1,6 +1,7 @@
 import type { BrowserStorage } from "@/lib/browser-storage";
 import { clearRecents, parseRecents, RECENTS_STORAGE_KEY } from "@/lib/command-palette";
 import { clearRecent, readRecent, RECENT_KEY } from "@/lib/dashboard-list";
+import { DEMO_BANNER_KEY } from "@/lib/demo-banner";
 import { SETUP_DISMISSED_COOKIE } from "@/lib/dismissals";
 import { clearDrafts, DRAFT_KEY_PREFIX, listDrafts } from "@/lib/editor/drafts";
 import {
@@ -100,6 +101,11 @@ export const LOCAL_STORAGE_EXCLUSIONS: readonly { key: KeyMatch; reason: string 
   {
     key: { exact: THEME_STORAGE_KEY },
     reason: "The theme is a preference, changed under Appearance, not remembered data.",
+  },
+  {
+    key: { exact: DEMO_BANNER_KEY },
+    reason:
+      "Demo mode only: whether the shared-workspace banner was dismissed. Clearing site data brings it back.",
   },
   {
     key: { exact: MOTION_STORAGE_KEY },

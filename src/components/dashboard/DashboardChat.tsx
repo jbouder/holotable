@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 import type { Panel } from "@/lib/ir";
 import { cn } from "@/lib/utils";
+import { AiUnavailable } from "@/components/ai-unavailable";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/input";
 import { ErrorDisplay } from "@/components/ui/error-display";
@@ -45,6 +46,7 @@ export function DashboardChat({
   dashboardTitle,
   panels,
   suggestions,
+  aiUnavailable,
 }: {
   dashboardId: string;
   dashboardTitle: string;
@@ -55,6 +57,12 @@ export function DashboardChat({
   panels: ChatPanel[];
   /** Derived from the spec on the server; no model call produced them. */
   suggestions: string[];
+  /**
+   * Why no model can answer on this server, or null. Decided on the server,
+   * which is the only side with the env; the chat then says so instead of
+   * sending a question that can only fail.
+   */
+  aiUnavailable: string | null;
 }) {
   const [open, setOpen] = React.useState(false);
   const [input, setInput] = React.useState("");
@@ -116,7 +124,7 @@ export function DashboardChat({
   }, [messages, status, open]);
 
   function ask(text: string) {
-    if (!text.trim() || busy) return;
+    if (!text.trim() || busy || aiUnavailable) return;
     // Fire and forget: useChat surfaces a failed send through `error`, which is
     // rendered below, so awaiting the promise here would handle it twice.
     void sendMessage({ text: text.trim() });
@@ -214,9 +222,11 @@ export function DashboardChat({
       </div>
 
       <div className="border-t border-border p-3">
+        {aiUnavailable && <AiUnavailable message={aiUnavailable} className="mb-2" />}
         <div className="flex items-end gap-2">
           <Textarea
             value={input}
+            disabled={aiUnavailable !== null}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={(e) => {
               if (e.key === "Enter" && !e.shiftKey) {

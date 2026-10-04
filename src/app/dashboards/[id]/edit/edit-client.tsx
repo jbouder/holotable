@@ -34,6 +34,7 @@ import {
 } from "@/lib/panel-list";
 import { isStarterSql, starterPanel } from "@/lib/panel-starter";
 import { clampLayout } from "@/lib/grid-layout";
+import { AiUnavailable } from "@/components/ai-unavailable";
 import { Button, ButtonLabel } from "@/components/ui/button";
 import { Input, Textarea, Label } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
@@ -127,6 +128,7 @@ export function EditDashboardClient({
   metadata,
   tagSuggestions = [],
   model,
+  aiUnavailable,
 }: {
   dashboardId: string;
   /** The dashboard's own workspace: where a template is saved and read from. */
@@ -151,6 +153,11 @@ export function EditDashboardClient({
   tagSuggestions?: string[];
   /** The configured generation model, shown on a proposal so its cost is visible. */
   model: string;
+  /**
+   * Why generation cannot be attempted on this server (no model configured),
+   * or null. Decided on the server, which is the only side with the env.
+   */
+  aiUnavailable: string | null;
 }) {
   const router = useRouter();
   const mac = useIsMac();
@@ -459,6 +466,7 @@ export function EditDashboardClient({
    * the model's own output.
    */
   function generatePanel(base: Panel, prompt: string, feedback = "") {
+    if (aiUnavailable) return;
     const instruction = feedback.trim()
       ? `${prompt}\n\nAdditional feedback: ${feedback.trim()}`.slice(0, 4000)
       : prompt;
@@ -968,9 +976,9 @@ export function EditDashboardClient({
                     variant="secondary"
                     size="sm"
                     onClick={() => addPanel(true)}
-                    disabled={sources.length === 0}
+                    disabled={sources.length === 0 || aiUnavailable !== null}
                     collapse
-                    title="Add a panel and describe it to the model"
+                    title={aiUnavailable ?? "Add a panel and describe it to the model"}
                   >
                     <Sparkles className="h-4 w-4" /> <ButtonLabel>Describe</ButtonLabel>
                   </Button>
@@ -1050,9 +1058,11 @@ export function EditDashboardClient({
                         onPick={setNlPrompt}
                       />
                     </div>
+                    {aiUnavailable && <AiUnavailable message={aiUnavailable} />}
                     <div className="relative">
                       <Textarea
                         id="nl"
+                        disabled={aiUnavailable !== null}
                         rows={2}
                         className="pr-14"
                         placeholder="e.g. change to a bar chart grouped by status code"
@@ -1062,7 +1072,7 @@ export function EditDashboardClient({
                       <Button
                         size="icon"
                         onClick={runNlEdit}
-                        disabled={isLoading || !nlPrompt.trim()}
+                        disabled={isLoading || !nlPrompt.trim() || aiUnavailable !== null}
                         aria-label="Apply NL edit"
                         title={`Apply NL edit${hint("run")}`}
                         className="absolute bottom-4 right-2"
