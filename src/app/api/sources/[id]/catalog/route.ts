@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { assertAuthorized, can, HttpError, requireIdentity } from "@/lib/auth/authorize";
 import { json, readJson, route } from "@/lib/http";
+import { audit } from "@/lib/audit";
 import { getSourceById, updateSource } from "@/lib/db/repo";
 import { catalogView, setColumnExposure } from "@/lib/catalog/browse";
 import { catalogHealth } from "@/lib/catalog/health";
@@ -27,7 +28,7 @@ export const GET = route(
     if (!source) throw new HttpError(404, "source not found");
 
     const scope = { workspaceId: source.workspaceId };
-    assertAuthorized(identity, "source:use", scope);
+    assertAuthorized(identity, "source:use", scope, { type: "source", id });
     const canManage = can(identity, "source:manage", scope);
     return json(
       { view: catalogView(source, catalogHealth(source), canManage) },
@@ -61,7 +62,12 @@ export const PATCH = route(
     const source = await getSourceById(id);
     if (!source) throw new HttpError(404, "source not found");
 
-    assertAuthorized(identity, "source:manage", { workspaceId: source.workspaceId });
+    assertAuthorized(
+      identity,
+      "source:manage",
+      { workspaceId: source.workspaceId },
+      { type: "source", id },
+    );
     const { table, column, exposed } = await readJson(req, ExposureBody);
 
     const next = setColumnExposure(source.config, table, column, exposed);
@@ -70,6 +76,14 @@ export const PATCH = route(
       config: SourceConfig.parse(next),
     });
     if (!updated) throw new HttpError(409, "source is tombstoned and cannot be edited");
+    // Hiding a column changes what every generation and execution may read.
+    audit({
+      actor: identity,
+      action: "source.update",
+      workspaceId: source.workspaceId,
+      resource: { type: "source", id },
+      detail: { fields: ["catalog"], table, column, exposed },
+    });
     return json(
       { view: catalogView(updated, catalogHealth(updated), true) },
       { headers: NO_STORE },

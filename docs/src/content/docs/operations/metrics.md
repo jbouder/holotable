@@ -72,6 +72,7 @@ process and Node.js collectors (`holotable_process_cpu_seconds_total`,
 | `holotable_llm_tokens_total` | counter | `workspace`, `model`, `direction` | Tokens billed to a workspace. `direction` is `input` or `output` |
 | `holotable_llm_requests_total` | counter | `route`, `outcome` | Model requests at the admission gate. `outcome` is `admitted`, `rate_limited` or `over_budget` |
 | `holotable_sql_validation_rejections_total` | counter | `reason` | Statements refused by the SQL guard |
+| `holotable_audit_write_failures_total` | counter | — | Audit log rows lost because they could not be written. Anything above zero is a gap in `audit_log`; see [the audit log](/operations/audit-log/) |
 
 `reason` comes from a fixed enum, not the error message: `empty`, `structure`,
 `comment`, `keyword`, `function`, `time`, `catalog`, `column`. The message

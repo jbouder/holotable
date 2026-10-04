@@ -22,6 +22,7 @@ import {
 } from "@/lib/sse";
 import { onDrain } from "@/lib/shutdown";
 import { route } from "@/lib/http";
+import { audit } from "@/lib/audit";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -52,9 +53,12 @@ export const GET = route(
     const dashboard = await getDashboardById(id);
     if (!dashboard) throw new HttpError(404, "dashboard not found");
 
-    assertAuthorized(identity, "dashboard:view", {
-      workspaceId: dashboard.workspaceId,
-    });
+    assertAuthorized(
+      identity,
+      "dashboard:view",
+      { workspaceId: dashboard.workspaceId },
+      { type: "dashboard", id },
+    );
 
     const url = new URL(req.url);
     const from = url.searchParams.get("from");
@@ -76,6 +80,28 @@ export const GET = route(
     // falls back to a full snapshot on anything it does not like.
     const resumeToken =
       req.headers.get("last-event-id") ?? url.searchParams.get("lastEventId");
+    // Opening the stream is when this viewer's statements start running, so
+    // it is the execution the audit log records (#30): each panel's source
+    // and a digest of its statement, at the version that will run. The
+    // poller's refreshes are the same statements on a timer and are not
+    // recorded one by one. A resume is recorded too, since it is a new
+    // authorization; `resumed` tells it apart.
+    audit({
+      actor: identity,
+      action: "dashboard.stream",
+      workspaceId: dashboard.workspaceId,
+      resource: { type: "dashboard", id },
+      detail: {
+        version: dashboard.version,
+        timeRange: spec.timeRange,
+        resumed: resumeToken !== null,
+        queries: spec.panels.map((p) => ({
+          panelId: p.id,
+          sourceId: p.query.sourceId,
+          sql: p.query.sql,
+        })),
+      },
+    });
     const encoder = new TextEncoder();
 
     const stream = new ReadableStream<Uint8Array>({

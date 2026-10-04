@@ -193,10 +193,11 @@ jobs:
           psql "$DATABASE_URL" -q -c 'DROP SCHEMA public CASCADE; CREATE SCHEMA public;'
           npm run migrate:verify
 
-      # The advisory lock that serializes two migrate Jobs from one rollout.
+      # The advisory lock that serializes two migrate Jobs from one rollout,
+      # and the audit log's append-only triggers (in a scratch schema).
       # Skipped in the required Test job, which has no database.
-      - name: Advisory lock
-        run: LOG_LEVEL=silent node --test --import tsx test/migrations.test.ts
+      - name: Against a real server
+        run: LOG_LEVEL=silent node --test --import tsx test/migrations.test.ts test/audit.test.ts
         env:
           MIGRATE_TEST_DATABASE_URL: ${{ env.DATABASE_URL }}
 

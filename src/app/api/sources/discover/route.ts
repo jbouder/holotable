@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { requireIdentity, assertAuthorized } from "@/lib/auth/authorize";
 import { json, readJson, route } from "@/lib/http";
+import { audit } from "@/lib/audit";
 import { SourceConnection } from "@/lib/registry";
 import { SECRET_REF_MESSAGE, SECRET_REF_PATTERN } from "@/lib/secret-refs";
 import { requireGrantedSecretRef } from "@/lib/secrets/http";
@@ -47,14 +48,32 @@ export const POST = route("sources.discover", async (req: Request) => {
   assertAuthorized(identity, "source:manage", { workspaceId: body.workspaceId });
   requireGrantedSecretRef(body.secretRef, body.workspaceId);
 
+  // Discovery connects to a server the author named before any source
+  // exists, so where it pointed is the part worth keeping (#30).
+  const record = (outcome: "success" | "failure") =>
+    audit({
+      actor: identity,
+      action: "source.discover",
+      workspaceId: body.workspaceId,
+      outcome,
+      detail: {
+        host: body.connection.host,
+        port: body.connection.port,
+        database: body.connection.database,
+        secretRef: body.secretRef,
+      },
+    });
+
   try {
     const tables = await discoverTables(
       body.connection,
       body.secretRef,
       body.workspaceId,
     );
+    record("success");
     return json({ ok: true, tables });
   } catch (err) {
+    record("failure");
     return json({
       ok: false,
       error: err instanceof Error ? err.message : String(err),

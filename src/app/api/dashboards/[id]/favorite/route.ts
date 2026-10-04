@@ -20,9 +20,12 @@ async function authorizeFavorite(id: string) {
   const identity = await requireIdentity();
   const dashboard = await getDashboardById(id);
   if (!dashboard) throw new HttpError(404, "dashboard not found");
-  assertAuthorized(identity, "dashboard:view", {
-    workspaceId: dashboard.workspaceId,
-  });
+  assertAuthorized(
+    identity,
+    "dashboard:view",
+    { workspaceId: dashboard.workspaceId },
+    { type: "dashboard", id },
+  );
   return identity;
 }
 

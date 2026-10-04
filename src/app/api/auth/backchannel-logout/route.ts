@@ -5,6 +5,7 @@ import { realmJwks } from "@/lib/auth/session";
 import { removeSessionsFor } from "@/lib/auth/session-store";
 import { config } from "@/lib/config";
 import { route } from "@/lib/http";
+import { audit } from "@/lib/audit";
 import { log } from "@/lib/log";
 
 export const runtime = "nodejs";
@@ -63,6 +64,14 @@ export const POST = route("auth.backchannel_logout", async (req: Request) => {
     sub: claims.sub,
     bySession: claims.sid !== undefined,
     rows,
+  });
+  // The realm is the actor; the subject is the person whose sessions ended,
+  // when the token names one, as it is validated by the realm's signature.
+  audit({
+    actor: { kind: "realm", sub: claims.sub ?? "realm" },
+    action: "auth.backchannel_logout",
+    workspaceId: null,
+    detail: { bySession: claims.sid !== undefined, sessions: rows },
   });
   return new Response(null, { status: 200, headers: { "Cache-Control": "no-store" } });
 });

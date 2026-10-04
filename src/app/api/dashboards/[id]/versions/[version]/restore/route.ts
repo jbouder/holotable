@@ -1,5 +1,6 @@
 import { requireIdentity, assertAuthorized, HttpError } from "@/lib/auth/authorize";
 import { json, route } from "@/lib/http";
+import { audit } from "@/lib/audit";
 import {
   getDashboardById,
   getDashboardVersion,
@@ -36,9 +37,12 @@ export const POST = route(
     const existing = await getDashboardById(id);
     if (!existing) throw new HttpError(404, "dashboard not found");
 
-    assertAuthorized(identity, "dashboard:update", {
-      workspaceId: existing.workspaceId,
-    });
+    assertAuthorized(
+      identity,
+      "dashboard:update",
+      { workspaceId: existing.workspaceId },
+      { type: "dashboard", id },
+    );
 
     const version = VersionNumber.safeParse(raw);
     if (!version.success) throw new HttpError(400, "invalid version");
@@ -61,6 +65,13 @@ export const POST = route(
       note: restoreNote(version.data),
     });
     invalidatePoller(id);
+    audit({
+      actor: identity,
+      action: "dashboard.update",
+      workspaceId,
+      resource: { type: "dashboard", id },
+      detail: { version: record.version, restoredFrom: version.data },
+    });
     const { spec: _spec, ...summary } = record;
     return json({ dashboard: summary });
   },

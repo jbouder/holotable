@@ -22,6 +22,7 @@ import type {
   VersionSummary,
 } from "@/lib/dashboard-versions";
 import type { GenerationLogEntry, GenerationLogRow } from "@/lib/ai/log";
+import type { AuditEntry, AuditQuery, AuditRow } from "@/lib/audit";
 import { type Template, TemplateBody, TemplateKind } from "@/lib/templates";
 
 /* -------------------------------------------------------------------------- */
@@ -994,6 +995,97 @@ export async function listGenerationLog(
     inputTokens: row.input_tokens,
     outputTokens: row.output_tokens,
     error: row.error,
+  }));
+}
+
+/* -------------------------------------------------------------------------- */
+/* Audit log (#30)                                                            */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * Append one audit row. Every value has already been through `auditRow`; no
+ * redaction happens here, so that function is the one place to read to know
+ * what reaches the table. There is no update or delete counterpart, and the
+ * table's trigger refuses both.
+ */
+export async function insertAuditRow(row: AuditRow): Promise<void> {
+  await query(
+    `INSERT INTO audit_log
+       (workspace_id, actor_sub, actor_kind, action, resource_type, resource_id,
+        outcome, request_id, detail)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9::jsonb)`,
+    [
+      row.workspaceId,
+      row.actorSub,
+      row.actorKind,
+      row.action,
+      row.resourceType,
+      row.resourceId,
+      row.outcome,
+      row.requestId,
+      JSON.stringify(row.detail),
+    ],
+  );
+}
+
+type AuditEntryRow = {
+  id: string;
+  at: Date;
+  workspace_id: string | null;
+  actor_sub: string;
+  actor_kind: AuditRow["actorKind"];
+  action: AuditRow["action"];
+  resource_type: AuditRow["resourceType"];
+  resource_id: string | null;
+  outcome: AuditRow["outcome"];
+  request_id: string | null;
+  detail: Record<string, unknown>;
+};
+
+/**
+ * A page of audit rows, newest first.
+ *
+ * `workspaceIds` comes from `auditScope`: an empty list is an empty answer,
+ * and `null` (every row, global ones included) is only ever a platform
+ * admin's. Paged by id rather than by time: ids are unique and only grow, so
+ * a page boundary can never split two rows that share a timestamp.
+ */
+export async function listAuditLog(q: AuditQuery): Promise<AuditEntry[]> {
+  if (q.workspaceIds !== null && q.workspaceIds.length === 0) return [];
+  const rows = await query<AuditEntryRow>(
+    `SELECT id::text AS id, at, workspace_id, actor_sub, actor_kind, action,
+            resource_type, resource_id, outcome, request_id, detail
+       FROM audit_log
+      WHERE ($1::text[] IS NULL OR workspace_id = ANY($1))
+        AND ($2::timestamptz IS NULL OR at >= $2)
+        AND ($3::timestamptz IS NULL OR at < $3)
+        AND ($4::text IS NULL OR action = $4)
+        AND ($5::text IS NULL OR outcome = $5)
+        AND ($6::bigint IS NULL OR id < $6)
+      ORDER BY id DESC
+      LIMIT $7`,
+    [
+      q.workspaceIds,
+      q.from,
+      q.to,
+      q.action,
+      q.outcome,
+      q.before === null ? null : q.before.toString(),
+      q.limit,
+    ],
+  );
+  return rows.map((row) => ({
+    id: row.id,
+    at: new Date(row.at).toISOString(),
+    workspaceId: row.workspace_id,
+    actorSub: row.actor_sub,
+    actorKind: row.actor_kind,
+    action: row.action,
+    resourceType: row.resource_type,
+    resourceId: row.resource_id,
+    outcome: row.outcome,
+    requestId: row.request_id,
+    detail: row.detail,
   }));
 }
 

@@ -200,6 +200,15 @@ Queryable source catalogs (metadata only — never the underlying data):
 ${catalogs}`;
 }
 
+/** One statement the model asked to run, as the audit log records it. */
+export interface ChatQueryOutcome {
+  sourceId: string;
+  sql: string;
+  outcome: "success" | "failure";
+  /** Where a failure happened: refused by the guard, or failed on the source. */
+  stage?: string;
+}
+
 /**
  * Run one chat turn. Returns the streaming result; the route serializes it with
  * `.toUIMessageStreamResponse()`.
@@ -211,13 +220,19 @@ export async function streamDashboardChat(input: {
   /** Receives the usage summed over every step of the turn. */
   onUsage?: (usage: LanguageModelUsage) => void;
   /**
+   * Told about every statement the model asked to run, once it was refused,
+   * failed or ran: the route writes it to the audit log (#30), which this
+   * module has no identity for.
+   */
+  onQuery?: (query: ChatQueryOutcome) => void;
+  /**
    * The request's own signal. A browser that stops a generation aborts the
    * fetch, which aborts this, which cancels the model call — without it the
    * provider keeps generating (and billing) for an answer nobody is reading.
    */
   abortSignal?: AbortSignal;
 }) {
-  const { dashboard, sources, messages, onUsage, abortSignal } = input;
+  const { dashboard, sources, messages, onUsage, onQuery, abortSignal } = input;
   const modelMessages = await convertToModelMessages(messages);
 
   return streamText({
@@ -249,9 +264,15 @@ export async function streamDashboardChat(input: {
         }),
         execute: async (args) => {
           const built = await buildChatQueryPlan({ dashboard, sources, args });
-          if (!built.ok) return { error: built.error };
+          const report = (outcome: ChatQueryOutcome["outcome"], stage?: string) =>
+            onQuery?.({ sourceId: args.sourceId, sql: args.sql, outcome, stage });
+          if (!built.ok) {
+            report("failure", "validate");
+            return { error: built.error };
+          }
           try {
             const result = await executePlan(built.source, built.plan);
+            report("success");
             return {
               columns: result.columns,
               rows: result.rows.slice(0, MAX_TOOL_ROWS),
@@ -259,6 +280,7 @@ export async function streamDashboardChat(input: {
               truncated: result.rows.length > MAX_TOOL_ROWS,
             };
           } catch (err) {
+            report("failure", "execute");
             // Statement-level errors are the query's fault and safe to surface so
             // the model can correct itself; anything else is infra — log it and
             // return a generic message rather than leaking internals.

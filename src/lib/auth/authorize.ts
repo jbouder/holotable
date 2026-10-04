@@ -1,4 +1,5 @@
 import { cookies } from "next/headers";
+import { audit, type AuditResource } from "@/lib/audit";
 import { config } from "@/lib/config";
 import { accessibleWorkspaces, hasWorkspaceRole, type Identity } from "@/lib/auth/claims";
 import { tokenRef, verifySessionToken } from "@/lib/auth/session";
@@ -168,15 +169,31 @@ export async function requireIdentity(): Promise<Identity> {
   return identity;
 }
 
-/** Assert the identity may perform the action, or throw 403. */
+/**
+ * Assert the identity may perform the action, or throw 403.
+ *
+ * A refusal is written to the audit log (#30) as `authz.denied`, with the
+ * permission that was missing, the route, and `resource` when the caller
+ * names what was being acted on. The resource is a record of the attempt
+ * only: it plays no part in the decision, which is {@link can}'s alone.
+ */
 export function assertAuthorized(
   identity: Identity,
   action: Action,
   ctx: AuthzContext,
+  resource?: AuditResource,
 ): void {
   amendRequest({ workspaceId: ctx.workspaceId });
   if (!can(identity, action, ctx)) {
     log.warn("authz.denied", { action, platformAdmin: identity.platformAdmin });
+    audit({
+      actor: identity,
+      action: "authz.denied",
+      workspaceId: ctx.workspaceId,
+      resource,
+      outcome: "denied",
+      detail: { permission: action, route: currentRequest()?.route },
+    });
     throw new HttpError(403, `not authorized for ${action}`);
   }
 }

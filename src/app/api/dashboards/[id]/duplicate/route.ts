@@ -1,5 +1,6 @@
 import { requireIdentity, assertAuthorized, HttpError } from "@/lib/auth/authorize";
 import { json, route } from "@/lib/http";
+import { audit } from "@/lib/audit";
 import { createDashboard, getDashboardById } from "@/lib/db/repo";
 import { resolveAndValidateDashboard } from "@/lib/dashboard-service";
 import { copyDashboardTitle } from "@/lib/dashboard-metadata";
@@ -32,9 +33,12 @@ export const POST = route(
 
     const existing = await getDashboardById(id);
     if (!existing) throw new HttpError(404, "dashboard not found");
-    assertAuthorized(identity, "dashboard:view", {
-      workspaceId: existing.workspaceId,
-    });
+    assertAuthorized(
+      identity,
+      "dashboard:view",
+      { workspaceId: existing.workspaceId },
+      { type: "dashboard", id },
+    );
 
     const spec = {
       ...existing.spec,
@@ -55,6 +59,13 @@ export const POST = route(
       // step people forget.
       description: existing.description,
       tags: existing.tags,
+    });
+    audit({
+      actor: identity,
+      action: "dashboard.create",
+      workspaceId,
+      resource: { type: "dashboard", id: record.id },
+      detail: { via: "duplicate", from: id },
     });
     return json({ dashboard: record }, { status: 201 });
   },

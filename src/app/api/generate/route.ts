@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { requireIdentity, assertAuthorized, HttpError } from "@/lib/auth/authorize";
 import { readJson, route } from "@/lib/http";
+import { audit } from "@/lib/audit";
 import { getSourceById } from "@/lib/db/repo";
 import {
   streamDashboard,
@@ -67,9 +68,12 @@ export const POST = route("generate", async (req: Request) => {
     throw new HttpError(400, "unknown or removed source");
   }
 
-  assertAuthorized(identity, "dashboard:generate", {
-    workspaceId: source.workspaceId,
-  });
+  assertAuthorized(
+    identity,
+    "dashboard:generate",
+    { workspaceId: source.workspaceId },
+    { type: "source", id: source.id },
+  );
 
   const refusal = catalogRefusal(source, catalogHealth(source));
   if (refusal) throw new HttpError(400, refusal);
@@ -97,6 +101,16 @@ export const POST = route("generate", async (req: Request) => {
       model: event.modelId,
       usage: event.usage,
       error: event.error,
+    });
+    // The generation log keeps the redacted prompt and the spec; the audit
+    // row says who asked and how it went, with the prompt as a digest.
+    audit({
+      actor: identity,
+      action: "dashboard.generate",
+      workspaceId: source.workspaceId,
+      resource: { type: "source", id: source.id },
+      outcome: event.error || !event.object ? "failure" : "success",
+      detail: { mode: body.mode, prompt: body.prompt, model: event.modelId },
     });
   };
 

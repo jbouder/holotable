@@ -18,9 +18,12 @@ export const GET = route(
     const dashboard = await getDashboardById(id);
     if (!dashboard) throw new HttpError(404, "dashboard not found");
 
-    assertAuthorized(identity, "dashboard:view", {
-      workspaceId: dashboard.workspaceId,
-    });
+    assertAuthorized(
+      identity,
+      "dashboard:view",
+      { workspaceId: dashboard.workspaceId },
+      { type: "dashboard", id },
+    );
 
     const version = VersionNumber.safeParse(raw);
     if (!version.success) throw new HttpError(400, "invalid version");

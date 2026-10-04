@@ -21,7 +21,12 @@ export const GET = route(
     const source = await getSourceById(id);
     if (!source) throw new HttpError(404, "source not found");
 
-    assertAuthorized(identity, "source:manage", { workspaceId: source.workspaceId });
+    assertAuthorized(
+      identity,
+      "source:manage",
+      { workspaceId: source.workspaceId },
+      { type: "source", id },
+    );
     const impact = await sourceImpact(source.workspaceId, id);
     return json({ impact }, { headers: { "cache-control": "no-store" } });
   },

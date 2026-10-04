@@ -154,6 +154,25 @@ There is deliberately no foreign key to `sources`: a log entry outliving the
 source it names is the normal case, and a cascade would erase exactly the
 history someone came looking for.
 
+### `audit_log`
+
+One row per event ([#30](https://github.com/jbouder/holotable/issues/30)):
+`at`, `workspace_id`, `actor_sub`, `actor_kind`, `action`, `resource_type`,
+`resource_id`, `outcome`, `request_id`, `detail`. Who signed in and out, what
+was created, changed, deleted or run, and every refusal; the list is
+`AUDIT_ACTIONS` in `src/lib/audit.ts` and the
+[audit log](/operations/audit-log/) page.
+
+It is **append-only**: triggers refuse `UPDATE`, `DELETE` and `TRUNCATE` for
+every role, the owner included, because the app and the migrations share one
+role and a grant cannot bind a table's owner. `detail` goes through the log's
+redaction pass on the way in, with SQL and prompts reduced to a digest and
+any result-shaped key dropped. Written fire-and-forget by `audit()`, so a failed
+write is logged and counted rather than failing the request. Read only through
+`GET /api/audit`. Nothing removes rows; pruning is a documented maintenance
+step. Like `generation_log`, it has no foreign keys: a row outliving the
+dashboard or source it names is the point.
+
 ### `llm_usage`
 
 Token counters per `(workspace_id, day, route, model)`: `input_tokens`,

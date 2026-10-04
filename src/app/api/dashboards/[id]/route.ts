@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { requireIdentity, assertAuthorized, HttpError } from "@/lib/auth/authorize";
 import { readJson, json, route } from "@/lib/http";
+import { audit } from "@/lib/audit";
 import {
   getDashboardById,
   saveDashboardVersion,
@@ -24,9 +25,12 @@ export const GET = route(
     const dashboard = await getDashboardById(id);
     if (!dashboard) throw new HttpError(404, "dashboard not found");
 
-    assertAuthorized(identity, "dashboard:view", {
-      workspaceId: dashboard.workspaceId,
-    });
+    assertAuthorized(
+      identity,
+      "dashboard:view",
+      { workspaceId: dashboard.workspaceId },
+      { type: "dashboard", id },
+    );
     return json({ dashboard });
   },
 );
@@ -59,7 +63,12 @@ export const PUT = route(
     if (workspaceId !== existing.workspaceId) {
       throw new HttpError(400, "panels reference a different workspace");
     }
-    assertAuthorized(identity, "dashboard:update", { workspaceId });
+    assertAuthorized(
+      identity,
+      "dashboard:update",
+      { workspaceId },
+      { type: "dashboard", id },
+    );
 
     const record = await saveDashboardVersion({
       dashboardId: id,
@@ -68,6 +77,13 @@ export const PUT = route(
       note: note?.trim() || null,
     });
     invalidatePoller(id);
+    audit({
+      actor: identity,
+      action: "dashboard.update",
+      workspaceId,
+      resource: { type: "dashboard", id },
+      detail: { version: record.version },
+    });
     return json({ dashboard: record });
   },
 );
@@ -101,7 +117,12 @@ export const PATCH = route(
     // The workspace comes from the stored row, never from the body, and both
     // halves below are gated on the same one edit permission.
     const { workspaceId } = existing;
-    assertAuthorized(identity, "dashboard:update", { workspaceId });
+    assertAuthorized(
+      identity,
+      "dashboard:update",
+      { workspaceId },
+      { type: "dashboard", id },
+    );
 
     const patch = await readJson(req, PatchBody);
     let record = { ...existing };
@@ -133,6 +154,13 @@ export const PATCH = route(
       record = { ...record, ...updated };
     }
 
+    audit({
+      actor: identity,
+      action: "dashboard.update",
+      workspaceId,
+      resource: { type: "dashboard", id },
+      detail: { fields: Object.keys(patch), version: record.version },
+    });
     const { spec: _spec, ...summary } = record;
     return json({ dashboard: summary });
   },
@@ -147,13 +175,22 @@ export const DELETE = route(
     const existing = await getDashboardById(id);
     if (!existing) throw new HttpError(404, "dashboard not found");
 
-    assertAuthorized(identity, "dashboard:delete", {
-      workspaceId: existing.workspaceId,
-      ownerSub: existing.createdBy,
-    });
+    assertAuthorized(
+      identity,
+      "dashboard:delete",
+      { workspaceId: existing.workspaceId, ownerSub: existing.createdBy },
+      { type: "dashboard", id },
+    );
 
     await softDeleteDashboard(id);
     invalidatePoller(id);
+    audit({
+      actor: identity,
+      action: "dashboard.delete",
+      workspaceId: existing.workspaceId,
+      resource: { type: "dashboard", id },
+      detail: { version: existing.version },
+    });
     return json({ ok: true });
   },
 );
