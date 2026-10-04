@@ -16,6 +16,11 @@ import type { WorkspaceUsage } from "@/lib/workspace-limits";
 import type { ImpactDashboard, SourceImpact } from "@/lib/source-impact";
 import type { PanelStatement } from "@/lib/catalog/hide-impact";
 import type { StoredChatMessage } from "@/lib/chat-history";
+import type {
+  VersionDetail,
+  VersionPage,
+  VersionSummary,
+} from "@/lib/dashboard-versions";
 import type { GenerationLogEntry, GenerationLogRow } from "@/lib/ai/log";
 import { type Template, TemplateBody, TemplateKind } from "@/lib/templates";
 
@@ -620,6 +625,78 @@ export async function saveDashboardVersion(input: {
       spec,
     };
   });
+}
+
+type VersionRow = {
+  version: number;
+  created_by: string;
+  created_at: string | Date;
+  note: string | null;
+  panel_count: number;
+};
+
+/*
+ * The panel count is read off the stored row rather than its upgraded spec, so
+ * the list never parses a spec. It assumes `panels` stays a top-level array; an
+ * upgrader that moves it (#58) has to change this query in the same PR.
+ */
+const VERSION_COLUMNS = `version, created_by, created_at, note,
+  CASE jsonb_typeof(spec->'panels')
+    WHEN 'array' THEN jsonb_array_length(spec->'panels') ELSE 0
+  END AS panel_count`;
+
+function mapVersion(row: VersionRow): VersionSummary {
+  return {
+    version: row.version,
+    createdBy: row.created_by,
+    // `pg` hands back a Date for a timestamptz; the wire shape is a string.
+    createdAt: new Date(row.created_at).toISOString(),
+    note: row.note,
+    panelCount: row.panel_count,
+  };
+}
+
+/**
+ * A page of a dashboard's versions, newest first, without their specs (#73).
+ * Keyset-paginated on the version number: `before` is the oldest version the
+ * caller already has. Authorization is the caller's, as for every read here.
+ */
+export async function listDashboardVersions(
+  dashboardId: string,
+  opts: { limit: number; before?: number },
+): Promise<VersionPage> {
+  const rows = await query<VersionRow>(
+    `SELECT ${VERSION_COLUMNS}
+     FROM dashboard_versions
+     WHERE dashboard_id = $1 AND ($2::int IS NULL OR version < $2)
+     ORDER BY version DESC
+     LIMIT $3`,
+    [dashboardId, opts.before ?? null, opts.limit + 1],
+  );
+  const page = rows.slice(0, opts.limit).map(mapVersion);
+  return {
+    versions: page,
+    nextBefore: rows.length > opts.limit ? page[page.length - 1].version : null,
+  };
+}
+
+/**
+ * One version of a dashboard with its spec, upgraded in memory to the current
+ * IR version like every other stored spec (#58); the row is never rewritten.
+ */
+export async function getDashboardVersion(
+  dashboardId: string,
+  version: number,
+): Promise<VersionDetail | null> {
+  const rows = await query<VersionRow & { spec: unknown }>(
+    `SELECT ${VERSION_COLUMNS}, spec
+     FROM dashboard_versions
+     WHERE dashboard_id = $1 AND version = $2`,
+    [dashboardId, version],
+  );
+  const r = rows[0];
+  if (!r) return null;
+  return { ...mapVersion(r), spec: upgradeSpec(r.spec) };
 }
 
 export async function softDeleteDashboard(id: string): Promise<boolean> {

@@ -5,8 +5,8 @@ sidebar:
   order: 6
 ---
 
-The editor (`src/app/dashboards/[id]/edit/`) is the only place a dashboard spec
-changes. Everything it does happens in the browser until you press Save; a save
+The editor (`src/app/dashboards/[id]/edit/`) is where a dashboard spec is
+edited; the only other writers are a rename and a restore from the history. Everything it does happens in the browser until you press Save; a save
 is the one moment a new `dashboard_versions` row is written, and it is the only
 moment the server re-validates the spec and re-checks every statement through
 the SQL guard.
@@ -28,13 +28,29 @@ Both take the optional **version note** next to the buttons: a short line about
 what changed, stored on the `dashboard_versions` row. Nothing reads it — it is
 not part of the spec, it never reaches the model, and it has no effect on
 execution. It is there so a version history reads as a sequence of intentions
-rather than a column of timestamps. (The history UI that surfaces it is
-[#73](https://github.com/jbouder/holotable/issues/73); until it lands the note
-is stored and not yet displayed.)
+rather than a column of timestamps, and the history page shows it beside each
+version.
 
 A failed save leaves you exactly where you were, with the error and every
 change still in the editor. Nothing about a failure is recoverable by retrying
 from a different place, so the editor does not send you to one.
+
+## Version history and restore
+
+**Version history** in the dashboard's **More actions** menu opens
+`/dashboards/[id]/versions`: every saved version with its author, time and note.
+Pick one to see what changed between it and the current version, panel by panel
+with SQL as a line diff, or to preview it. The preview runs each panel's query
+once through the same guarded `/api/query` as the editor's preview and saves
+nothing. Viewers can read the history too, since every version in it is a spec
+they could have seen when it was current.
+
+An editor can **restore** a version. Restore does not edit anything or move the
+dashboard back to an old row. It saves a new version that copies the old spec,
+noted `restored from vN`, so the restore shows up in the history like any other
+save and can itself be undone the same way. The copy is re-checked like a save:
+if a source, table or column the old version reads has since been removed or
+hidden, the restore is refused and the current version stays.
 
 ## Details, which are not the spec
 

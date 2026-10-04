@@ -69,9 +69,10 @@ written in the editor and displayed as-is. A new row is written on every save;
 existing rows are never mutated.
 
 This is the property that makes viewing and polling pure replays of a fixed
-spec, and it means a saved dashboard is a stable, auditable artifact. The full
-history already exists in the database — surfacing it is
-[#73](https://github.com/jbouder/holotable/issues/73).
+spec, and it means a saved dashboard is a stable, auditable artifact. The
+history is readable at `/dashboards/[id]/versions`, and **restore** follows the
+same rule: it appends a new row copying the old spec (noted `restored from vN`)
+rather than moving `current_version_id` back.
 
 :::note[Stored specs are versioned]
 Each spec carries `specVersion`, and every IR object is `.strict()`. A row is

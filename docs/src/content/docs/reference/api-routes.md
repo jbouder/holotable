@@ -22,6 +22,9 @@ All routes run on the Node runtime. Every one resolves identity with
 | `/api/dashboards/[id]/duplicate` | POST | viewer + editor | Copies the current spec into a new dashboard at version 1, titled `"… (copy)"`. Re-validates the spec, so a copy of a dashboard whose source was tombstoned fails loudly |
 | `/api/dashboards/[id]/favorite` | PUT / DELETE | viewer | Star or unstar it **for the caller**. No body: the subject is always the session's own |
 | `/api/dashboards/[id]/export` | GET | viewer | Downloads the current spec as a JSON file (`Content-Disposition: attachment`). Carries source **ids** only — no workspace, author, or connection detail |
+| `/api/dashboards/[id]/versions` | GET | viewer | The version history, newest first, **without specs**: number, author `sub`, time, note, panel count. Keyset-paginated with `?before=<version>&limit=` (default 20, max 100); also returns `current` |
+| `/api/dashboards/[id]/versions/[version]` | GET | viewer | One version with its spec, upgraded in memory to the current `specVersion` |
+| `/api/dashboards/[id]/versions/[version]/restore` | POST | editor | Appends a **new version** copying that version's spec, noted `restored from vN`. Never repoints or edits an old row. The copy goes through the same source and SQL checks as a save, so a version reading a since-removed source, table or hidden column is refused (400) |
 | `/api/dashboards/import` | POST | editor | Creates a dashboard at version 1 from an exported file. The target workspace is a request field re-checked by `can()`; source ids are re-pointed by an **explicit** mapping and any still unresolved refuse the whole import |
 | `/api/dashboards/[id]/stream` | GET | viewer | SSE deltas, cookie-authenticated |
 | `/api/dashboards/[id]/chat` | POST | viewer | Read-only chat with a guarded `runQuery` tool. Rate limited and budgeted. The turn is persisted for the **caller's own** subject and the request's abort signal cancels the model call |
