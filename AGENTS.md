@@ -73,6 +73,8 @@ Key locations:
 Important files:
 
 - `src/lib/ir.ts` — the canonical shared dashboard IR schema
+- `src/lib/ir/upgrade.ts` — the upgrader chain that brings a stored spec of any
+  earlier `specVersion` up to the current one before it is validated
 - `src/lib/sql/safety.ts` — the SQL guard every generated query passes through
 - `src/lib/sql/ast.ts` — the PostgreSQL parse-tree walk the guard is built on
 - `src/lib/auth/authorize.ts` — the central `can()` check
@@ -122,8 +124,9 @@ Important files:
 - `SECURITY.md` — the trust model and the disclosure process
 - `CONTRIBUTING.md` — the human-facing version of this file
 
-The seven paths with a `CODEOWNERS` entry (`src/lib/sql/`, `src/lib/auth/`,
-`src/lib/secrets/`, `ir.ts`, `time.ts`, `registry.ts`, `metrics-access.ts`) are
+The paths with a `CODEOWNERS` entry (`src/lib/sql/`, `src/lib/auth/`,
+`src/lib/secrets/`, `ir.ts` and `ir/`, `time.ts`, `registry.ts`,
+`metrics-access.ts`) are
 the ones where a quiet regression stops being a bug and becomes a
 vulnerability. Changes there need a test.
 
@@ -164,6 +167,21 @@ expressions:
 - do not create parallel ad hoc shapes that drift from the IR
 
 Avoid “temporary” incompatible types.
+
+Saved specs cannot be regenerated, so a change that would make a stored spec
+fail to parse (a renamed or removed field, a new required one, a dropped viz
+type) is a **breaking** change:
+
+- bump `SPEC_VERSION` in `src/lib/ir.ts`
+- append the upgrader from the previous version to `UPGRADERS` in
+  `src/lib/ir/upgrade.ts`: a pure function on plain JSON that imports nothing
+  from `ir.ts`
+- test it against a fixture of the previous version; `test/ir.test.ts` keeps
+  the pre-versioning fixture in `test/fixtures/specs/` loading
+- read any spec you did not just build (a database row, a template, a file, a
+  draft, a request body) through `StoredDashboard`, never `Dashboard` directly
+
+An additive, optional field needs none of this.
 
 ### 2) The model must not generate data
 

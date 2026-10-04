@@ -30,6 +30,7 @@ function panel(overrides: Partial<Panel> = {}): Panel {
 
 function dashboard(panels: Panel[]): Dashboard {
   return {
+    specVersion: 1,
     title: "Service health",
     timeRange: { from: "now-1h", to: "now" },
     refreshIntervalMs: 15_000,

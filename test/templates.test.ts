@@ -29,6 +29,7 @@ function panel(overrides: Partial<Panel> = {}): Panel {
 
 function dashboard(overrides: Partial<Dashboard> = {}): Dashboard {
   return {
+    specVersion: 1,
     title: "Service",
     timeRange: { from: "now-6h", to: "now" },
     refreshIntervalMs: 60_000,

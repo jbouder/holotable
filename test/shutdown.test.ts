@@ -208,6 +208,7 @@ describe("shutdown", () => {
 
 describe("stopAllPollers", () => {
   const spec: Dashboard = {
+    specVersion: 1,
     title: "shutdown",
     timeRange: { from: "now-1h", to: "now" },
     refreshIntervalMs: 60_000,

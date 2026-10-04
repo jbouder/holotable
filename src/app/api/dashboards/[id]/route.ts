@@ -10,6 +10,7 @@ import {
 import { resolveAndValidateDashboard } from "@/lib/dashboard-service";
 import { invalidatePoller } from "@/lib/poller/registry";
 import { Dashboard } from "@/lib/ir";
+import { StoredDashboard } from "@/lib/ir/upgrade";
 import { DashboardDescription, DashboardTags } from "@/lib/dashboard-metadata";
 import { VERSION_NOTE_MAX } from "@/lib/editor/session";
 
@@ -33,10 +34,11 @@ export const GET = route(
 /**
  * `note` is the author's own "what changed" for the version row (#117). It is
  * optional, bounded, and never interpreted: it is stored and displayed, and
- * nothing in execution or authorization reads it.
+ * nothing in execution or authorization reads it. The spec is upgraded like
+ * any other from before a deploy, so the new row is at the current version.
  */
 const UpdateBody = z.object({
-  spec: Dashboard,
+  spec: StoredDashboard,
   note: z.string().max(VERSION_NOTE_MAX).optional(),
 });
 

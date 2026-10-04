@@ -147,6 +147,7 @@ test("a duplicated dashboard still satisfies the IR's unique-id rule", () => {
   const out = duplicatePanel(three, "b");
   assert.ok(out);
   const parsed = Dashboard.safeParse({
+    specVersion: 1,
     title: "d",
     timeRange: { from: "now-1h", to: "now" },
     refreshIntervalMs: 30_000,

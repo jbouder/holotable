@@ -20,6 +20,10 @@
 # persistence, and the client. A change here changes all four.
 /src/lib/ir.ts                  @jbouder
 
+# The upgrader chain every stored spec is read through. A wrong upgrader
+# rewrites every saved dashboard as it is read.
+/src/lib/ir/                    @jbouder
+
 # Server-side time resolution and range injection. The server, not the client
 # or the model, decides what window a panel actually queries.
 /src/lib/time.ts                @jbouder

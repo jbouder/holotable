@@ -1,5 +1,5 @@
 import type { Dashboard } from "@/lib/ir";
-import { parseDashboard } from "@/lib/ir";
+import { parseDashboard, SPEC_VERSION } from "@/lib/ir";
 import type { CatalogTable, SourceConfig, SourceConnection } from "@/lib/registry";
 
 /**
@@ -142,6 +142,7 @@ export const PANEL_METRIC_FAMILIES: readonly string[] = [
  */
 function spec(): unknown {
   return {
+    specVersion: SPEC_VERSION,
     title: SELF_DASHBOARD_TITLE,
     timeRange: { from: "now-1h", to: "now" },
     refreshIntervalMs: 15_000,

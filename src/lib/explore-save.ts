@@ -1,5 +1,11 @@
 import { type ApiError, apiErrorFromThrown, readApiError } from "@/lib/errors";
-import { type Dashboard, type Panel, safeParseDashboard, type TimeRange } from "@/lib/ir";
+import {
+  type Dashboard,
+  type Panel,
+  SPEC_VERSION,
+  safeParseDashboard,
+  type TimeRange,
+} from "@/lib/ir";
 
 /**
  * Pinning an Explore answer to a dashboard.
@@ -81,6 +87,7 @@ export function newDashboardSpec(input: {
 }): Dashboard {
   const { panel } = input;
   return {
+    specVersion: SPEC_VERSION,
     title: input.title.trim(),
     timeRange: input.timeRange,
     refreshIntervalMs: input.refreshIntervalMs,

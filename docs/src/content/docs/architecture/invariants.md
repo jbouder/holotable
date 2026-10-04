@@ -15,13 +15,26 @@ Viewing and ticking replay the stored spec.
 
 ## 2. The LLM emits a validated spec, never data
 
-`streamObject` is bound to the shared IR (`DashboardGenerationSchema`). Output is
-re-parsed with Zod before it is trusted.
+`streamObject` is bound to the shared IR (`DashboardGenerationSchema`, which is
+the `Dashboard` schema without `specVersion`: the version is stamped by the
+app, never asserted by the model). Output is re-parsed with Zod before it is
+trusted.
 
 ## 3. Specs are immutable and versioned
 
 Each save inserts a new `dashboard_versions` row containing the whole spec as
 `jsonb`. Specs are never mutated in place.
+
+Every spec records the IR version it was written in as `specVersion`, and
+`Dashboard` accepts only the current one (`SPEC_VERSION` in `src/lib/ir.ts`).
+A breaking IR change bumps that number and appends an upgrader, a pure
+function from version N to N+1, to `src/lib/ir/upgrade.ts`. Anything that
+reads a spec it did not just build reads it through `StoredDashboard`: a
+version row, a template, an export file, a browser draft, or a save from a tab
+opened before a deploy. That applies the chain in memory and then validates.
+A spec with no `specVersion` predates the field and is version 1. Reads never
+write back, so a row keeps the version it was saved at and the next save writes
+the current one. A spec from a newer build is refused rather than guessed at.
 
 ## 4. Panels carry only a stable `sourceId`
 

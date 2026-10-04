@@ -1,7 +1,12 @@
 import { type LanguageModelUsage, streamObject } from "ai";
 import { getModel } from "@/lib/ai/provider";
 import { buildCatalogPrompt } from "@/lib/timescaledb/catalog";
-import { Dashboard, Panel } from "@/lib/ir";
+import {
+  type Dashboard,
+  DashboardGenerationSchema,
+  forGeneration,
+  Panel,
+} from "@/lib/ir";
 import { config } from "@/lib/config";
 import { SourceDraft, type SourceRecord } from "@/lib/registry";
 
@@ -121,7 +126,7 @@ export function streamDashboard(input: {
   return streamObject({
     model: getModel(),
     onFinish: finish(onFinish),
-    schema: Dashboard,
+    schema: DashboardGenerationSchema,
     schemaName: "Dashboard",
     schemaDescription: "A monitoring dashboard specification (viz spec, not data).",
     system: baseSystem(source),
@@ -267,12 +272,12 @@ export function streamDashboardRefinement(input: {
   return streamObject({
     model: getModel(),
     onFinish: finish(onFinish),
-    schema: Dashboard,
+    schema: DashboardGenerationSchema,
     schemaName: "Dashboard",
     schemaDescription: "A monitoring dashboard specification (viz spec, not data).",
     system: baseSystem(source),
     prompt: `Here is the current dashboard spec:
-${JSON.stringify(current, null, 2)}
+${JSON.stringify(forGeneration(current), null, 2)}
 
 Apply this change and return the FULL updated dashboard:
 """${prompt}"""

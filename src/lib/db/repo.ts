@@ -9,6 +9,7 @@ import {
 import { log } from "@/lib/log";
 import { SourceConfig, type SourceRecord } from "@/lib/registry";
 import { type Dashboard, parseDashboard } from "@/lib/ir";
+import { upgradeSpec } from "@/lib/ir/upgrade";
 import type { BudgetStore } from "@/lib/limits/budget";
 import type { WorkspaceLimits } from "@/lib/limits/llm";
 import type { WorkspaceUsage } from "@/lib/workspace-limits";
@@ -511,7 +512,9 @@ export async function getDashboardById(id: string): Promise<DashboardRecord | nu
   );
   const r = rows[0];
   if (!r || r.spec == null) return null;
-  return { ...mapSummary(r), spec: parseDashboard(r.spec) };
+  // Upgraded in memory to the current IR version; the row keeps the version it
+  // was saved at (invariant 3, #58).
+  return { ...mapSummary(r), spec: upgradeSpec(r.spec) };
 }
 
 export async function createDashboard(input: {

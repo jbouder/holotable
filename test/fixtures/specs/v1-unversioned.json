@@ -1,0 +1,30 @@
+{
+  "title": "Service health",
+  "timeRange": { "from": "now-1h", "to": "now" },
+  "refreshIntervalMs": 15000,
+  "panels": [
+    {
+      "id": "rps",
+      "title": "Requests / min",
+      "description": "Request rate across every route.",
+      "viz": "line",
+      "query": {
+        "sourceId": "ts-metrics",
+        "timeField": "minute",
+        "sql": "SELECT time_bucket('1 minute', ts) AS minute, count(*) AS requests FROM http_requests GROUP BY minute ORDER BY minute"
+      },
+      "format": "number",
+      "layout": { "x": 0, "y": 0, "w": 6, "h": 4 }
+    },
+    {
+      "id": "by-route",
+      "title": "Requests by route",
+      "viz": "table",
+      "query": {
+        "sourceId": "ts-metrics",
+        "sql": "SELECT route, count(*) AS requests FROM http_requests GROUP BY route ORDER BY requests DESC"
+      },
+      "layout": { "x": 6, "y": 0, "w": 6, "h": 4 }
+    }
+  ]
+}

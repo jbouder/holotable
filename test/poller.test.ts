@@ -20,6 +20,7 @@ import type { SourceRecord } from "@/lib/registry";
 
 function spec(overrides: Partial<Dashboard> = {}): Dashboard {
   return {
+    specVersion: 1,
     title: "t",
     timeRange: { from: "now-1h", to: "now" },
     refreshIntervalMs: 60_000,

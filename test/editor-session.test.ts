@@ -14,6 +14,7 @@ import {
 
 function spec(patch: Partial<Dashboard> = {}): Dashboard {
   return {
+    specVersion: 1,
     title: "Ops",
     timeRange: { from: "now-1h", to: "now" },
     refreshIntervalMs: 30_000,
@@ -43,6 +44,7 @@ test("an unchanged spec is not dirty, whatever order its keys were built in", ()
     refreshIntervalMs: a.refreshIntervalMs,
     timeRange: { to: a.timeRange.to, from: a.timeRange.from },
     title: a.title,
+    specVersion: a.specVersion,
   };
   assert.equal(specFingerprint(a), specFingerprint(b));
   assert.equal(isDirty(a, b), false);

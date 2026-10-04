@@ -12,7 +12,7 @@ import {
   RotateCcw,
   Undo2,
 } from "lucide-react";
-import { Dashboard, safeParseDashboard } from "@/lib/ir";
+import { type Dashboard, DashboardGenerationSchema, safeParseDashboard } from "@/lib/ir";
 import {
   activeSpec,
   appendTurn,
@@ -124,7 +124,7 @@ export function NewDashboardClient({
 
   const { object, submit, isLoading, error, stop } = useObject({
     api: "/api/generate",
-    schema: Dashboard,
+    schema: DashboardGenerationSchema,
     onFinish({ object }) {
       if (!object) return;
       const turn = normalizeTurn(running.current.prompt, object, model);

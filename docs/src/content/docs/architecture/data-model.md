@@ -73,11 +73,13 @@ spec, and it means a saved dashboard is a stable, auditable artifact. The full
 history already exists in the database — surfacing it is
 [#73](https://github.com/jbouder/holotable/issues/73).
 
-:::caution
-Stored specs are parsed against the **current** schema, and every IR object is
-`.strict()`. Until the IR carries a version field and an upgrader chain
-([#58](https://github.com/jbouder/holotable/issues/58)), the first breaking IR
-change would invalidate every saved dashboard on read.
+:::note[Stored specs are versioned]
+Each spec carries `specVersion`, and every IR object is `.strict()`. A row is
+read through the upgrader chain in `src/lib/ir/upgrade.ts`, which brings it up
+to the current version in memory before it is validated. The row itself is
+never rewritten, so a breaking IR change does not strand saved dashboards. A
+row with no `specVersion` predates the field and is version 1. See
+[invariant 3](/architecture/invariants/#3-specs-are-immutable-and-versioned).
 :::
 
 ### `templates`
@@ -86,7 +88,9 @@ A reusable spec: `workspace_id`, `kind` (`panel` or `dashboard`), `name`,
 `description`, and `body` as `jsonb`. The body **is** the IR — a `Panel` or a
 `Dashboard` tagged with which one — so it is validated against the same schema
 on write and on read, and it carries no connection detail or credential for the
-same reason a dashboard version does not.
+same reason a dashboard version does not. A stored body is upgraded the same
+way a version row is. A dashboard records its own `specVersion`, and a panel
+body records it beside the panel.
 
 Two constraints hold the row together: `kind = body->>'kind'`, so the column
 can be filtered on without becoming a second opinion about the contents, and

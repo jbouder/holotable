@@ -204,7 +204,9 @@ The short version, five rules:
    used by model output, API validation, persistence, and the client. If
    dashboard or panel structure changes, change the schema first and let types
    be inferred from it. Do not introduce a parallel TypeScript-only interface
-   that can drift.
+   that can drift. A change that would stop a saved spec parsing bumps
+   `SPEC_VERSION` and adds an upgrader to `src/lib/ir/upgrade.ts` (see
+   AGENTS.md).
 2. **The model generates specs, never data.** The LLM may produce a
    specification and SQL. It must never produce metric values, and the client
    must never render data that did not come from server-side query execution.
@@ -250,8 +252,8 @@ issue and make the case first, rather than arriving with it already written.
   function with a plain test.
 - **Draft PRs** are fine and encouraged for work you want early eyes on.
 
-Files under `src/lib/sql/`, `src/lib/auth/`, `src/lib/ir.ts`, and
-`src/lib/metrics-access.ts` have a code owner and will always be reviewed
+Files under `src/lib/sql/`, `src/lib/auth/`, `src/lib/ir.ts`, `src/lib/ir/`,
+and `src/lib/metrics-access.ts` have a code owner and will always be reviewed
 before merge.
 
 ## Style
