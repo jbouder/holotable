@@ -1,5 +1,6 @@
 import { requireIdentity, assertAuthorized, HttpError } from "@/lib/auth/authorize";
 import { readJson, json, route } from "@/lib/http";
+import { audit } from "@/lib/audit";
 import {
   createTemplate,
   DuplicateTemplateName,
@@ -94,6 +95,12 @@ export const POST = route("templates.create", async (req: Request) => {
       description: body.description,
       body: body.body,
       createdBy: identity.sub,
+    });
+    audit({
+      actor: identity,
+      action: "template.create",
+      workspaceId,
+      resource: { type: "template", id: template.id },
     });
     return json({ template }, { status: 201 });
   } catch (err) {

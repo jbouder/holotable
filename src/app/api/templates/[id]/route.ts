@@ -1,5 +1,6 @@
 import { requireIdentity, assertAuthorized, HttpError } from "@/lib/auth/authorize";
 import { json, route } from "@/lib/http";
+import { audit } from "@/lib/audit";
 import { deleteTemplate, getTemplateById } from "@/lib/db/repo";
 
 export const runtime = "nodejs";
@@ -30,12 +31,20 @@ export const DELETE = route(
     const template = await getTemplateById(id);
     if (!template?.workspaceId) throw new HttpError(404, "template not found");
 
-    assertAuthorized(identity, "dashboard:delete", {
-      workspaceId: template.workspaceId,
-      ownerSub: template.createdBy,
-    });
+    assertAuthorized(
+      identity,
+      "dashboard:delete",
+      { workspaceId: template.workspaceId, ownerSub: template.createdBy },
+      { type: "template", id },
+    );
 
     await deleteTemplate(template.workspaceId, id);
+    audit({
+      actor: identity,
+      action: "template.delete",
+      workspaceId: template.workspaceId,
+      resource: { type: "template", id },
+    });
     return json({ ok: true });
   },
 );

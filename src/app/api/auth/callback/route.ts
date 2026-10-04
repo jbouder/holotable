@@ -7,6 +7,7 @@ import { renewalDeps } from "@/lib/auth/session-store";
 import { HttpError } from "@/lib/auth/authorize";
 import { config } from "@/lib/config";
 import { route } from "@/lib/http";
+import { audit } from "@/lib/audit";
 
 export const runtime = "nodejs";
 
@@ -42,6 +43,13 @@ export const GET = route("auth.callback", async (req: Request) => {
   if (issued.renewal) {
     await setSessionIdCookie(issued.renewal.sessionId, issued.renewal.ttl);
   }
+  // A sign-in belongs to no one workspace, so its row has none (#30).
+  audit({
+    actor: identity,
+    action: "auth.login",
+    workspaceId: null,
+    detail: { mode: "oidc", renewable: issued.renewal !== undefined },
+  });
 
   // Redirect relative to the browser's current origin. Deriving an absolute
   // URL from url.origin is unsafe here: behind the container the server

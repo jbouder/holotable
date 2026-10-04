@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { requireIdentity, assertAuthorized, can, HttpError } from "@/lib/auth/authorize";
 import { readJson, json, route } from "@/lib/http";
+import { audit } from "@/lib/audit";
 import { listSources, createSource } from "@/lib/db/repo";
 import { catalogHealth } from "@/lib/catalog/health";
 import { SourceDraft } from "@/lib/registry";
@@ -59,6 +60,13 @@ export const POST = route("sources.create", async (req: Request) => {
     config: body.config,
     secretRef: body.secretRef,
     createdBy: identity.sub,
+  });
+  audit({
+    actor: identity,
+    action: "source.create",
+    workspaceId: body.workspaceId,
+    resource: { type: "source", id: source.id },
+    detail: { secretRef: body.secretRef },
   });
   return json({ source }, { status: 201 });
 });

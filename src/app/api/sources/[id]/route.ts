@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { requireIdentity, assertAuthorized, can, HttpError } from "@/lib/auth/authorize";
 import { readJson, json, route } from "@/lib/http";
+import { audit } from "@/lib/audit";
 import { getSourceById, updateSource, deleteSource } from "@/lib/db/repo";
 import { SourceConfig } from "@/lib/registry";
 import { sourceListing } from "@/lib/source-listing";
@@ -23,7 +24,7 @@ export const GET = route(
     if (!source) throw new HttpError(404, "source not found");
 
     const scope = { workspaceId: source.workspaceId };
-    assertAuthorized(identity, "source:use", scope);
+    assertAuthorized(identity, "source:use", scope, { type: "source", id });
     return json({
       source: can(identity, "source:manage", scope) ? source : sourceListing(source),
     });
@@ -44,7 +45,12 @@ export const PUT = route(
     const source = await getSourceById(id);
     if (!source) throw new HttpError(404, "source not found");
 
-    assertAuthorized(identity, "source:manage", { workspaceId: source.workspaceId });
+    assertAuthorized(
+      identity,
+      "source:manage",
+      { workspaceId: source.workspaceId },
+      { type: "source", id },
+    );
 
     const patch = await readJson(req, UpdateBody);
     // Only a changed ref is checked here: an unrelated edit to a source whose
@@ -54,6 +60,13 @@ export const PUT = route(
     }
     const updated = await updateSource(source.workspaceId, id, patch);
     if (!updated) throw new HttpError(409, "source is tombstoned and cannot be edited");
+    audit({
+      actor: identity,
+      action: "source.update",
+      workspaceId: source.workspaceId,
+      resource: { type: "source", id },
+      detail: { fields: Object.keys(patch), secretRef: patch.secretRef },
+    });
     return json({ source: updated });
   },
 );
@@ -67,8 +80,21 @@ export const DELETE = route(
     const source = await getSourceById(id);
     if (!source) throw new HttpError(404, "source not found");
 
-    assertAuthorized(identity, "source:manage", { workspaceId: source.workspaceId });
+    assertAuthorized(
+      identity,
+      "source:manage",
+      { workspaceId: source.workspaceId },
+      { type: "source", id },
+    );
     const outcome = await deleteSource(source.workspaceId, id);
+    audit({
+      actor: identity,
+      action: "source.delete",
+      workspaceId: source.workspaceId,
+      resource: { type: "source", id },
+      // Removed outright, or tombstoned because a dashboard still uses it.
+      detail: { effect: outcome },
+    });
     return json({ outcome });
   },
 );

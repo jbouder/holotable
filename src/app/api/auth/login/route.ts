@@ -3,8 +3,10 @@ import { randomBytes } from "node:crypto";
 import { buildAuthorizeUrl } from "@/lib/auth/oidc";
 import { demoLogin } from "@/lib/auth/demo";
 import { setSessionCookie } from "@/lib/auth/cookie";
+import { verifySessionToken } from "@/lib/auth/session";
 import { config } from "@/lib/config";
 import { route } from "@/lib/http";
+import { audit } from "@/lib/audit";
 
 export const runtime = "nodejs";
 
@@ -42,7 +44,20 @@ async function demoSession(req: Request): Promise<Response> {
     store.get(config.sessionCookieName)?.value,
     config.demoGroups,
   );
-  if (session) await setSessionCookie(session);
+  if (session) {
+    await setSessionCookie(session);
+    // Only a session minted here is a sign-in; a visitor who still held one
+    // is just being redirected.
+    const identity = await verifySessionToken(session);
+    if (identity) {
+      audit({
+        actor: identity,
+        action: "auth.login",
+        workspaceId: null,
+        detail: { mode: "demo" },
+      });
+    }
+  }
   // Relative, for the same reason as the OIDC callback: behind a container
   // the server's own origin is its bind address, not the host the browser
   // used, and an absolute redirect would drop the cookie just set.

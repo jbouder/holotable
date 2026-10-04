@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { requireIdentity, assertAuthorized } from "@/lib/auth/authorize";
 import { readJson, route } from "@/lib/http";
+import { audit } from "@/lib/audit";
 import { type OnGenerationFinish, streamSourceDraft } from "@/lib/ai/generate";
 import { recordGeneration } from "@/lib/ai/log";
 import { enforceLlmLimits } from "@/lib/limits/llm";
@@ -55,6 +56,13 @@ export const POST = route("sources.draft", async (req: Request) => {
       model: event.modelId,
       usage: event.usage,
       error: event.error,
+    });
+    audit({
+      actor: identity,
+      action: "source.draft",
+      workspaceId: body.workspaceId,
+      outcome: event.error || !event.object ? "failure" : "success",
+      detail: { prompt: body.prompt, model: event.modelId },
     });
   };
 

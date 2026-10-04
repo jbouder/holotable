@@ -44,9 +44,12 @@ export const POST = route("sql.plan", async (req: Request) => {
   if (!source || source.tombstonedAt) {
     throw new HttpError(400, "unknown or removed source");
   }
-  assertAuthorized(identity, "dashboard:generate", {
-    workspaceId: source.workspaceId,
-  });
+  assertAuthorized(
+    identity,
+    "dashboard:generate",
+    { workspaceId: source.workspaceId },
+    { type: "source", id: source.id },
+  );
 
   const check = await validateSql(body.sql, source.config);
   if (!check.ok) throw new HttpError(400, check.error ?? "invalid sql", {}, "statement");

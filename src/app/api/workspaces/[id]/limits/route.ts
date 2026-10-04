@@ -2,6 +2,7 @@ import { assertAuthorized, HttpError, requireIdentity } from "@/lib/auth/authori
 import { config } from "@/lib/config";
 import { saveWorkspaceLimits, usageForDay } from "@/lib/db/repo";
 import { json, readJson, route } from "@/lib/http";
+import { audit } from "@/lib/audit";
 import { utcDay } from "@/lib/limits/budget";
 import { log } from "@/lib/log";
 import {
@@ -32,7 +33,12 @@ export const PATCH = route(
     const { id } = await ctx.params;
     const workspaceId = WorkspaceId.safeParse(id);
     if (!workspaceId.success) throw new HttpError(400, "invalid workspace id");
-    assertAuthorized(identity, "workspace:limits", { workspaceId: workspaceId.data });
+    assertAuthorized(
+      identity,
+      "workspace:limits",
+      { workspaceId: workspaceId.data },
+      { type: "workspace", id: workspaceId.data },
+    );
 
     const patch = await readJson(req, WorkspaceLimitsPatch, { maxBytes: 1_024 });
     const { before, after } = await saveWorkspaceLimits(workspaceId.data, (current) =>
@@ -42,6 +48,13 @@ export const PATCH = route(
       workspaceId: workspaceId.data,
       before,
       after,
+    });
+    audit({
+      actor: identity,
+      action: "workspace.limits.update",
+      workspaceId: workspaceId.data,
+      resource: { type: "workspace", id: workspaceId.data },
+      detail: { before, after },
     });
 
     const now = new Date();

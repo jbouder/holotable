@@ -31,7 +31,12 @@ export const GET = route(
     const source = await getSourceById(id);
     if (!source) throw new HttpError(404, "source not found");
 
-    assertAuthorized(identity, "source:manage", { workspaceId: source.workspaceId });
+    assertAuthorized(
+      identity,
+      "source:manage",
+      { workspaceId: source.workspaceId },
+      { type: "source", id },
+    );
 
     const search = new URL(req.url).searchParams;
     const parsed = Params.safeParse({

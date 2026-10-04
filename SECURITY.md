@@ -142,6 +142,18 @@ viewer's workspaces. A browser reconnects with its renewed session, which is
 authorized afresh, so a group removed in the realm stops a stream within one
 session-token lifetime.
 
+**The audit log.** Sign-ins, sign-outs, every change to a dashboard, source,
+template or workspace limit, every statement a person runs, and every request
+`assertAuthorized` refuses are written to `audit_log`. The actor is the
+verified identity and the workspace is the one the action was authorized in.
+`detail` passes through the log's redaction, so SQL and prompts are kept as a
+digest, and keys shaped like query results are dropped. Triggers refuse
+`UPDATE`, `DELETE` and `TRUNCATE` for every role, including the table's owner.
+That stops anything able to issue only DML, but not an owner deliberately
+running DDL. Read through `GET /api/audit`: a workspace source-admin sees their
+own workspaces, and a platform admin sees everything. See
+[Audit log](docs/src/content/docs/operations/audit-log.md).
+
 **Demo mode is outside this trust model.** `AUTH_MODE=demo` hands every
 visitor a session with no login, so anyone who can reach the server is a
 member of the `DEMO_GROUPS` workspaces. The server refuses to boot it beside

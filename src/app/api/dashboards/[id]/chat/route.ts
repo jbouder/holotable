@@ -2,6 +2,7 @@ import { z } from "zod";
 import type { UIMessage } from "ai";
 import { requireIdentity, assertAuthorized, HttpError } from "@/lib/auth/authorize";
 import { json, readJson, route } from "@/lib/http";
+import { audit } from "@/lib/audit";
 import {
   appendChatMessages,
   clearChatMessages,
@@ -46,9 +47,12 @@ async function authorizedDashboard(ctx: RouteParams) {
   const { id } = await ctx.params;
   const dashboard = await getDashboardById(id);
   if (!dashboard) throw new HttpError(404, "dashboard not found");
-  assertAuthorized(identity, "dashboard:view", {
-    workspaceId: dashboard.workspaceId,
-  });
+  assertAuthorized(
+    identity,
+    "dashboard:view",
+    { workspaceId: dashboard.workspaceId },
+    { type: "dashboard", id },
+  );
   return { identity, id, dashboard };
 }
 
@@ -116,11 +120,30 @@ export const POST = route("dashboards.chat", async (req: Request, ctx: RoutePara
   const stored = await listChatMessages(id, identity.sub, retention());
   const storedIds = stored.map((m) => m.id);
 
+  audit({
+    actor: identity,
+    action: "dashboard.chat",
+    workspaceId: dashboard.workspaceId,
+    resource: { type: "dashboard", id },
+    detail: { messageCount: incoming.length },
+  });
+
   const result = await streamDashboardChat({
     dashboard: dashboard.spec,
     sources,
     messages: incoming,
     onUsage: usage.record,
+    // Each statement the model runs is the reader's execution, on their
+    // authority, so it is audited as theirs (#30).
+    onQuery: (q) =>
+      audit({
+        actor: identity,
+        action: "query.execute",
+        workspaceId: dashboard.workspaceId,
+        resource: { type: "source", id: q.sourceId },
+        outcome: q.outcome,
+        detail: { via: "chat", dashboardId: id, sql: q.sql, stage: q.stage },
+      }),
     abortSignal: req.signal,
   });
 

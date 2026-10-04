@@ -5,6 +5,7 @@ import {
   authorizedWorkspaces,
 } from "@/lib/auth/authorize";
 import { readJson, json, route } from "@/lib/http";
+import { audit } from "@/lib/audit";
 import { listDashboards, createDashboard } from "@/lib/db/repo";
 import { resolveAndValidateDashboard } from "@/lib/dashboard-service";
 import { PAGE_SIZE, pageOffset, parseDashboardQuery } from "@/lib/dashboard-list";
@@ -89,6 +90,12 @@ export const POST = route("dashboards.create", async (req: Request) => {
     workspaceId,
     createdBy: identity.sub,
     spec,
+  });
+  audit({
+    actor: identity,
+    action: "dashboard.create",
+    workspaceId,
+    resource: { type: "dashboard", id: record.id },
   });
   return json({ dashboard: record }, { status: 201 });
 });

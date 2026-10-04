@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { requireIdentity, assertAuthorized, HttpError } from "@/lib/auth/authorize";
 import { json, readJson, route } from "@/lib/http";
+import { audit } from "@/lib/audit";
 import { getSourceById, updateSource } from "@/lib/db/repo";
 import { catalogHealth } from "@/lib/catalog/health";
 import { diffCatalog } from "@/lib/catalog/refresh";
@@ -41,7 +42,12 @@ export const POST = route(
     const source = await getSourceById(id);
     if (!source) throw new HttpError(404, "source not found");
 
-    assertAuthorized(identity, "source:manage", { workspaceId: source.workspaceId });
+    assertAuthorized(
+      identity,
+      "source:manage",
+      { workspaceId: source.workspaceId },
+      { type: "source", id },
+    );
     const { digest: confirmed } = await readJson(req, Body);
 
     const refresh = await refreshCatalog(source);
@@ -70,6 +76,14 @@ export const POST = route(
       catalogMissingTables: refresh.missingTables,
     });
     if (!updated) throw new HttpError(409, "source is tombstoned");
+    // Only an applied refresh changes anything; a preview is a read.
+    audit({
+      actor: identity,
+      action: "source.refresh",
+      workspaceId: source.workspaceId,
+      resource: { type: "source", id },
+      detail: { digest, missingTables: refresh.missingTables.length },
+    });
     return json({ diff, catalogHealth: catalogHealth(updated) });
   },
 );

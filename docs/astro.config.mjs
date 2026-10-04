@@ -84,6 +84,7 @@ export default defineConfig({
             { label: "Health, readiness, and shutdown", slug: "operations/health-checks" },
             { label: "Prometheus metrics", slug: "operations/metrics" },
             { label: "Structured logging", slug: "operations/logging" },
+            { label: "Audit log", slug: "operations/audit-log" },
             { label: "Database migrations", slug: "operations/migrations" },
             { label: "Deploying on Kubernetes", slug: "operations/kubernetes" },
           ],

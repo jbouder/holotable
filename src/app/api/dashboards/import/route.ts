@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { requireIdentity, assertAuthorized, HttpError } from "@/lib/auth/authorize";
 import { readJson, json, route } from "@/lib/http";
+import { audit } from "@/lib/audit";
 import { listSources, createDashboard } from "@/lib/db/repo";
 import { resolveAndValidateDashboard } from "@/lib/dashboard-service";
 import {
@@ -93,6 +94,13 @@ export const POST = route("dashboards.import", async (req: Request) => {
     workspaceId,
     createdBy: identity.sub,
     spec,
+  });
+  audit({
+    actor: identity,
+    action: "dashboard.create",
+    workspaceId,
+    resource: { type: "dashboard", id: record.id },
+    detail: { via: "import" },
   });
   return json({ dashboard: record }, { status: 201 });
 });

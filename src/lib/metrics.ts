@@ -76,6 +76,7 @@ interface Instruments {
   llmTokens: Counter<"workspace" | "model" | "direction">;
   llmRequests: Counter<"route" | "outcome">;
   sqlRejections: Counter<"reason">;
+  auditWriteFailures: Counter<string>;
   /** One set of seen values per bounded label, keyed `metric/label`. */
   seenLabelValues: Map<string, Set<string>>;
 }
@@ -136,6 +137,11 @@ function build(): Instruments {
       name: "holotable_sql_validation_rejections_total",
       help: "Statements refused by the SQL guard, by the kind of rule that refused them.",
       labelNames: ["reason"],
+      registers: [registry],
+    }),
+    auditWriteFailures: new Counter({
+      name: "holotable_audit_write_failures_total",
+      help: "Audit log rows that could not be built or written, and so are missing from audit_log.",
       registers: [registry],
     }),
     seenLabelValues: new Map(),
@@ -248,6 +254,14 @@ export function recordLlmRequest(route: string, outcome: LlmRequestOutcome): voi
 /** Record one statement refused by the SQL guard. */
 export function recordSqlRejection(reason: SqlRejectionReason): void {
   instruments().sqlRejections.inc({ reason });
+}
+
+/**
+ * Record an audit row that was lost (#30). The request it described carried
+ * on; this is what an alert on a gap in the audit log watches.
+ */
+export function recordAuditWriteFailure(): void {
+  instruments().auditWriteFailures.inc();
 }
 
 /** The scrape body, in the Prometheus text exposition format. */

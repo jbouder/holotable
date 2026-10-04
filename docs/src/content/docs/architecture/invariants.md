@@ -217,3 +217,14 @@ Over either, the request is a `429` naming the limit and its reset before the
 model is invoked. Keys come from the validated identity and a trusted record,
 never the request body, and platform admins are not exempt. See
 [LLM rate limits and budgets](/operations/llm-limits/).
+
+## 18. Every change and every refusal is audited, and the audit log is append-only
+
+Each event in `AUDIT_ACTIONS` (`src/lib/audit.ts`) writes one `audit_log` row
+naming the verified actor, the workspace the action was authorized in, the
+action and its outcome; `assertAuthorized` writes one for every refusal. Rows
+are built by `auditRow` alone, which runs `detail` through the log's redaction
+pass and drops anything shaped like a result, so no credential and no metric
+value is stored. The table's triggers refuse `UPDATE`, `DELETE` and `TRUNCATE`
+for every role. Writing never blocks or fails the request it describes. See
+[Audit log](/operations/audit-log/).

@@ -93,6 +93,12 @@ Important files:
   re-check every `SSE_REAUTH_INTERVAL_MS` finds the dashboard no longer
   viewable. A stream cannot see a renewed cookie, so expiry ends it and the
   browser reconnects and resumes
+- `src/lib/audit.ts` — the append-only audit log (#30). `audit()` is
+  fire-and-forget and never fails a request; `auditRow` is the one place a row
+  is built and redacted. A new mutating route, or a new kind of execution,
+  records its event here and adds it to `AUDIT_ACTIONS`; `test/audit.test.ts`
+  holds each action to the route that emits it. `assertAuthorized` records
+  refusals itself, and takes the resource as an optional fourth argument
 - `src/lib/settings.ts` — the `/settings` sections as data. A new section is
   an entry here and a page under `src/app/settings/<id>/`; a gated section
   also calls `notFound()` from its page, because hiding the link is never the

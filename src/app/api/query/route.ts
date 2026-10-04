@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { requireIdentity, assertAuthorized, HttpError } from "@/lib/auth/authorize";
 import { readJson, json, route } from "@/lib/http";
+import { audit } from "@/lib/audit";
 import { getSourceById } from "@/lib/db/repo";
 import { validateSql, buildExecutablePlan } from "@/lib/sql/safety";
 import { resolveTimeRange } from "@/lib/time";
@@ -31,21 +32,46 @@ export const POST = route("query", async (req: Request) => {
     if (!source || source.tombstonedAt) {
       throw new HttpError(400, "unknown or removed source");
     }
-    assertAuthorized(identity, "dashboard:generate", {
-      workspaceId: source.workspaceId,
-    });
+    assertAuthorized(
+      identity,
+      "dashboard:generate",
+      { workspaceId: source.workspaceId },
+      { type: "source", id: source.id },
+    );
+
+    // One audit row per statement someone asked to run (#30), whichever way
+    // it went: refused by the guard, failed on the source, or ran.
+    const record = (outcome: "success" | "failure", stage?: string) =>
+      audit({
+        actor: identity,
+        action: "query.execute",
+        workspaceId: source.workspaceId,
+        resource: { type: "source", id: source.id },
+        outcome,
+        detail: { via: "preview", sql: body.sql, stage },
+      });
 
     const check = await validateSql(body.sql, source.config);
-    if (!check.ok) throw new HttpError(400, check.error ?? "invalid sql");
+    if (!check.ok) {
+      record("failure", "validate");
+      throw new HttpError(400, check.error ?? "invalid sql");
+    }
 
     const range = resolveTimeRange(body.timeRange);
-    const plan = buildExecutablePlan({
-      sql: body.sql,
-      timeField: body.timeField,
-      from: range.from,
-      to: range.to,
-    });
-    const result = await executePlan(source, plan);
+    let result: Awaited<ReturnType<typeof executePlan>>;
+    try {
+      const plan = buildExecutablePlan({
+        sql: body.sql,
+        timeField: body.timeField,
+        from: range.from,
+        to: range.to,
+      });
+      result = await executePlan(source, plan);
+    } catch (err) {
+      record("failure", "execute");
+      throw err;
+    }
+    record("success");
     return json(result);
   } catch (err) {
     // A failed statement is the user's query to fix — surface it as a 400 with
