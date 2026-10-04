@@ -69,6 +69,13 @@ export const config = {
   defaultRefreshIntervalMs: num("DEFAULT_REFRESH_INTERVAL_MS", 15_000),
   /** Minimum refresh cadence enforced server-side to protect the metrics store. */
   minRefreshIntervalMs: num("MIN_REFRESH_INTERVAL_MS", 2_000),
+  /**
+   * Consecutive failed executions before the poller stops running a panel on
+   * every tick and backs off (#44).
+   */
+  pollerFailureThreshold: num("POLLER_FAILURE_THRESHOLD", 3),
+  /** The longest the poller waits between attempts at a failing panel (#44). */
+  pollerMaxBackoffMs: num("POLLER_MAX_BACKOFF_MS", 300_000),
 
   /**
    * Default relative time range applied to new dashboards. Documented default:
@@ -413,6 +420,8 @@ const EnvSchema = z.object({
 
   DEFAULT_REFRESH_INTERVAL_MS: blank(positiveInt),
   MIN_REFRESH_INTERVAL_MS: blank(positiveInt),
+  POLLER_FAILURE_THRESHOLD: blank(positiveInt),
+  POLLER_MAX_BACKOFF_MS: blank(positiveInt),
   DEFAULT_TIME_FROM: blank(timeExpr),
   DEFAULT_TIME_TO: blank(timeExpr),
   MAX_QUERY_ROWS: blank(positiveInt),

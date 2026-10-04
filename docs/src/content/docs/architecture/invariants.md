@@ -219,8 +219,8 @@ translate it to a `400` with the real message so an editor can fix and retry;
 connection and socket failures stay a generic `500` and are never surfaced.
 
 The split is carried, not inferred. Every error body names a `kind`
-(`src/lib/errors.ts`), and the SSE path honours it too: a `panel-error` frame
-carries the real message only for a statement failure, and
+(`src/lib/errors.ts`), and the SSE path honours it too: a `panel-error` or
+`panel-degraded` frame carries the real message only for a statement failure, and
 `describePanelError` reduces anything else to the generic sentence with the
 cause going to the log. `describeTickError` makes the same split for a
 `dashboard-error`: a `TimeRangeError` keeps its message because the range is

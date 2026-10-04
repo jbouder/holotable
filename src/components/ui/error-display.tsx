@@ -21,6 +21,7 @@ export function ErrorDisplay({
   error,
   onRetry,
   retryLabel = "Retry",
+  note,
   disabled,
   layout = "inline",
   className,
@@ -28,6 +29,8 @@ export function ErrorDisplay({
   error: ApiError | ErrorPresentation;
   onRetry?: () => void;
   retryLabel?: string;
+  /** A sentence about the failure's state, shown under the hint. */
+  note?: string;
   disabled?: boolean;
   layout?: "inline" | "block";
   className?: string;
@@ -53,6 +56,7 @@ export function ErrorDisplay({
         <Icon className={cn("h-5 w-5 shrink-0", tone)} />
         <p className="line-clamp-3 break-words text-foreground">{shown.message}</p>
         <Hint shown={shown} className="line-clamp-2" />
+        {note && <p className="text-xs text-muted">{note}</p>}
         <RequestId shown={shown} />
         {retry && (
           <Button
@@ -81,6 +85,7 @@ export function ErrorDisplay({
       <div className="min-w-0 flex-1 space-y-0.5">
         <p className="break-words text-danger">{shown.message}</p>
         <Hint shown={shown} />
+        {note && <p className="text-xs text-muted">{note}</p>}
         <RequestId shown={shown} />
       </div>
       {retry && (
