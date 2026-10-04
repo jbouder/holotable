@@ -81,7 +81,9 @@ longer has is reported as missing rather than quietly kept.
 **Catalog** opens the source's tables and columns as a searchable tree, with
 the catalog's freshness at the top. Untick **Exposed** on any column the model
 should not be told about and generated SQL may not read, such as an email
-address or an IP. New columns found by a refresh start exposed.
+address or an IP. If saved panels already read that column, the browser lists
+them and asks before hiding it, because hiding it breaks them. New columns
+found by a refresh start exposed.
 
 **This guards against:** SQL written against columns that do not exist. Until a
 refresh has run, generating against the source is *refused* rather than

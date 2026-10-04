@@ -1,5 +1,6 @@
+import { z } from "zod";
 import type { CatalogHealth } from "@/lib/catalog/health";
-import { type ApiError, readApiError } from "@/lib/errors";
+import { type ApiError, apiErrorFromThrown, readApiError } from "@/lib/errors";
 import {
   type CatalogColumn,
   type CatalogTable,
@@ -7,6 +8,7 @@ import {
   type SourceRecord,
   sourceCatalog,
 } from "@/lib/registry";
+import { ImpactDashboard, impactCounts } from "@/lib/source-impact";
 
 /**
  * The per-source catalog browser (#123): what it is sent, how it searches, and
@@ -154,4 +156,63 @@ export async function updateColumnExposure(
       body: JSON.stringify(change),
     }),
   );
+}
+
+// --- Hiding a column that panels read (#267) --------------------------------------
+
+/**
+ * What hiding one column would break: the current panels the guard would
+ * start refusing. Ids and titles only, the same shape as a source's impact
+ * (#125). Never a panel's SQL.
+ */
+export const ColumnImpact = z
+  .object({
+    table: z.string(),
+    column: z.string(),
+    dashboards: z.array(ImpactDashboard),
+  })
+  .strict();
+export type ColumnImpact = z.infer<typeof ColumnImpact>;
+
+/** The warning shown before hiding, or null when nothing would break. */
+export function describeHideImpact(impact: ColumnImpact): string | null {
+  const counts = impactCounts({
+    sourceId: "",
+    dashboards: impact.dashboards,
+    referencedByAnyVersion: false,
+  });
+  if (counts.panels === 0) return null;
+  const panels = `${counts.panels} panel${counts.panels === 1 ? "" : "s"}`;
+  const dashboards = `${counts.dashboards} dashboard${counts.dashboards === 1 ? "" : "s"}`;
+  return `Hiding ${impact.table}.${impact.column} will break ${panels} across ${dashboards}: their SQL reads it, and the guard will refuse it until they are changed.`;
+}
+
+export type ColumnImpactResult =
+  | { ok: true; impact: ColumnImpact }
+  | { ok: false; error: ApiError };
+
+export async function fetchHideImpact(
+  sourceId: string,
+  table: string,
+  column: string,
+): Promise<ColumnImpactResult> {
+  const params = new URLSearchParams({ table, column });
+  try {
+    const res = await fetch(`${catalogUrl(sourceId)}/impact?${params}`, {
+      cache: "no-store",
+    });
+    if (!res.ok) return { ok: false, error: await readApiError(res) };
+    const body: unknown = await res.json();
+    const parsed = ColumnImpact.safeParse(
+      (body as { impact?: unknown } | null)?.impact ?? null,
+    );
+    return parsed.success
+      ? { ok: true, impact: parsed.data }
+      : {
+          ok: false,
+          error: { error: "the impact result was malformed", kind: "unknown" },
+        };
+  } catch (err) {
+    return { ok: false, error: apiErrorFromThrown(err) };
+  }
 }

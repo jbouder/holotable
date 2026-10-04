@@ -72,15 +72,15 @@ export interface ValidationResult {
 }
 
 /**
- * Refuse a statement: build the result and count it.
+ * Refuse a statement.
  *
- * Every rejection below goes through here, so the
+ * Every rejection below goes through here, so a new rule that forgets the
+ * `reason` would not compile. Counting happens once, in {@link validateSql},
+ * on whatever {@link checkSql} returned, so the
  * `holotable_sql_validation_rejections_total` counter cannot drift from the
- * guard — a new rule that returns its own object would be a missing metric,
- * and a new rule that forgets the `reason` would not compile.
+ * guard either.
  */
 function reject(reason: SqlRejectionReason, error: string): ValidationResult {
-  recordSqlRejection(reason);
   return { ok: false, error, reason };
 }
 
@@ -103,9 +103,30 @@ function timeFunctionError(fn: string): ValidationResult {
 }
 
 /**
- * Validate an untrusted SELECT against the selected source's catalog.
+ * Validate an untrusted SELECT against the selected source's catalog, and
+ * count a rejection. Every path that is about to execute a statement, or is
+ * reporting on one an author wrote, goes through here.
  */
 export async function validateSql(
+  sql: string,
+  source: SourceConfig,
+): Promise<ValidationResult> {
+  const result = await checkSql(sql, source);
+  if (!result.ok && result.reason) recordSqlRejection(result.reason);
+  return result;
+}
+
+/**
+ * The same verdict as {@link validateSql}, uncounted.
+ *
+ * For a *what if*: asking whether a stored statement would still pass against
+ * a catalog nobody has saved yet (#267). A hypothetical is not a refusal, and
+ * counting it would put a spike in the rejection metric every time an admin
+ * opened a preview. Nothing that executes SQL may use this instead of
+ * `validateSql`; the two return the same result, so the only thing lost would
+ * be the metric.
+ */
+export async function checkSql(
   sql: string,
   source: SourceConfig,
 ): Promise<ValidationResult> {

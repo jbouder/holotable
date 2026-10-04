@@ -148,7 +148,11 @@ test("an admin's toggle sends exactly that column's change and shows the result"
   const calls = stub((call) =>
     call.method === "PATCH"
       ? respond(200, { view: view(true, false) })
-      : respond(200, { view: view(true) }),
+      : call.url.includes("/catalog/impact")
+        ? respond(200, {
+            impact: { table: "http_requests", column: "status", dashboards: [] },
+          })
+        : respond(200, { view: view(true) }),
   );
   const changed: CatalogHealth[] = [];
   const harness = await open((h) => changed.push(h));
@@ -167,6 +171,15 @@ test("an admin's toggle sends exactly that column's change and shows the result"
     column: "status",
     exposed: false,
   });
+  // Nothing reads it, so the hide went straight through after the check.
+  assert.deepEqual(
+    calls.map((c) => c.method),
+    ["GET", "GET", "PATCH"],
+  );
+  assert.equal(
+    calls[1].url,
+    "/api/sources/src-1/catalog/impact?table=http_requests&column=status",
+  );
   assert.match(harness.text(), /http_requests\.status is hidden/);
   assert.match(harness.text(), /1 hidden/);
   assert.equal(changed.length, 1);
@@ -242,5 +255,99 @@ test("a refresh writes nothing until Apply, and re-reviews when the database mov
   );
   assert.equal(changed.length, 1);
   assert.match(harness.text(), /Catalog refreshed\. 1 column added/);
+  harness.unmount();
+});
+
+const BROKEN = {
+  table: "http_requests",
+  column: "status",
+  dashboards: [
+    {
+      id: "dash-1",
+      title: "API health",
+      panels: [
+        { id: "p1", title: "Errors" },
+        { id: "p2", title: "Status mix" },
+      ],
+    },
+  ],
+};
+
+function stubWithImpact(): Call[] {
+  return stub((call) =>
+    call.method === "PATCH"
+      ? respond(200, { view: view(true, false) })
+      : call.url.includes("/catalog/impact")
+        ? respond(200, { impact: BROKEN })
+        : respond(200, { view: view(true) }),
+  );
+}
+
+async function untickStatus() {
+  const harness = await open();
+  harness.click(button(harness.container, "http_requests"));
+  harness.click(harness.container.querySelectorAll('[role="checkbox"]')[1]);
+  await settle();
+  return harness;
+}
+
+test("hiding a column that panels read lists them and waits for a confirmation", async () => {
+  const calls = stubWithImpact();
+  const harness = await untickStatus();
+
+  assert.equal(calls.filter((c) => c.method === "PATCH").length, 0, "hid without asking");
+  assert.match(harness.text(), /will break 2 panels across 1 dashboard/);
+  assert.match(harness.text(), /API health/);
+  assert.match(harness.text(), /Errors, Status mix/);
+  const link = harness.container.querySelector('a[href="/dashboards/dash-1"]');
+  assert.ok(link, "the affected dashboard is linked");
+  // Nothing else can be toggled while the question is open.
+  for (const box of harness.container.querySelectorAll('[role="checkbox"]')) {
+    assert.notEqual(box.getAttribute("data-disabled"), null, "a checkbox stayed enabled");
+  }
+
+  harness.click(button(harness.container, "Hide anyway"));
+  await settle();
+  const patch = calls.find((c) => c.method === "PATCH");
+  assert.deepEqual(patch?.body, {
+    table: "http_requests",
+    column: "status",
+    exposed: false,
+  });
+  assert.doesNotMatch(harness.text(), /will break/);
+  assert.match(harness.text(), /http_requests\.status is hidden/);
+  harness.unmount();
+});
+
+test("keeping the column exposed sends nothing", async () => {
+  const calls = stubWithImpact();
+  const harness = await untickStatus();
+
+  harness.click(button(harness.container, "Keep exposed"));
+  await settle();
+  assert.equal(calls.filter((c) => c.method === "PATCH").length, 0);
+  assert.doesNotMatch(harness.text(), /will break/);
+  harness.unmount();
+});
+
+test("exposing a column never asks", async () => {
+  const calls = stub((call) =>
+    call.method === "PATCH"
+      ? respond(200, { view: view(true) })
+      : respond(200, { view: view(true, false) }),
+  );
+  const harness = await open();
+  harness.click(button(harness.container, "http_requests"));
+  harness.click(harness.container.querySelectorAll('[role="checkbox"]')[1]);
+  await settle();
+  assert.deepEqual(
+    calls.map((c) => c.method),
+    ["GET", "PATCH"],
+  );
+  assert.deepEqual(calls[1].body, {
+    table: "http_requests",
+    column: "status",
+    exposed: true,
+  });
   harness.unmount();
 });

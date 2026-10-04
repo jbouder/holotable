@@ -66,6 +66,7 @@ hand.
 | `/api/sources/[id]` | GET | viewer | The full record for a source admin, the listing for anyone else |
 | `/api/sources/[id]` | PUT/DELETE | source-admin | Delete tombstones when referenced |
 | `/api/sources/[id]/catalog` | GET | viewer | The catalog browser's view: every column with its `exposed` flag for a source admin, exposed columns only for anyone else, plus catalog health |
+| `/api/sources/[id]/catalog/impact` | GET | source-admin | `?table=&column=`: the current panels on this source that hiding the column would break, decided by a dry run of the guard. Ids and titles only, never SQL, scoped to the source's workspace |
 | `/api/sources/[id]/catalog` | PATCH | source-admin | Hide or expose one column, `{ table, column, exposed }`. Takes effect on the next generation and execution |
 | `/api/sources/[id]/impact` | GET | source-admin | Dashboards and panels currently referencing the source, scoped to its workspace |
 | `/api/sources/[id]/test` | POST | source-admin | Connectivity, latency, server and role identity, a **read-only proof**, and per-table reachability. All of it inside one rolled-back read-only transaction |
