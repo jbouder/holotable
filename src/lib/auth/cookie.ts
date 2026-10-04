@@ -6,7 +6,7 @@ export async function setSessionCookie(token: string, maxAgeSeconds = 60 * 60 * 
   const store = await cookies();
   store.set(config.sessionCookieName, token, {
     httpOnly: true,
-    secure: config.isProduction,
+    secure: config.sessionCookieSecure,
     sameSite: "lax",
     path: "/",
     maxAge: maxAgeSeconds,

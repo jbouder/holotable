@@ -62,7 +62,9 @@ Key locations:
   content under `docs/src/content/docs/`)
 - `timescaledb/` — database bootstrap/schema assets
 - `deploy/` — the Helm chart (`deploy/helm/holotable/`, with runnable example
-  values under `examples/`) and a reference Argo CD `Application`
+  values under `examples/`), a reference Argo CD `Application`, and the
+  all-in-one quick-start image (`deploy/quickstart/`: TimescaleDB, the server
+  and the demo jobs under one `entrypoint.sh`, in demo mode)
 - `.github/` — CI workflows, issue forms, the pull request template, `CODEOWNERS`
 
 Important files:
@@ -369,6 +371,7 @@ Use the existing package scripts:
 
 ```bash
 npm run dev        # dev server
+npm run dev:demo   # dev server in AUTH_MODE=demo, Keycloak variables blanked
 npm run build      # production build
 npm run start      # run the production build
 npm run lint       # biome check (lint + format, no writes)

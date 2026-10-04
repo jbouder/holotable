@@ -336,6 +336,20 @@ jobs:
           tags: holotable:ci-migrate
           cache-from: type=gha
 
+      # The all-in-one quick-start image (#253): TimescaleDB, the server and
+      # the demo jobs, built on Alpine from its own Dockerfile. Built, never
+      # run here; the boot is verified by hand and recorded in its PR.
+      - name: Build quick-start image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: deploy/quickstart/Dockerfile
+          push: false
+          load: false
+          tags: holotable:ci-quickstart
+          cache-from: type=gha,scope=quickstart
+          cache-to: type=gha,scope=quickstart,mode=max
+
   # Publishes ghcr.io/<owner>/holotable (#250). Each target is built natively
   # on an amd64 and an arm64 runner and pushed by digest, then
   # `publish-manifest` stitches the two digests into one multi-arch tag. Native
@@ -349,6 +363,12 @@ jobs:
   #   on v1.2.3    1.2.3                1.2.3-migrate
   #                latest, runtime      latest-migrate, migrate
   #
+  # The quick-start image (#253) follows the same scheme with a `-quickstart`
+  # suffix, except that its floating `quickstart` tag moves on every push to
+  # main rather than on a release: it is the evaluation image behind
+  # `docker run ghcr.io/jbouder/holotable:quickstart` and the hosted demo, both
+  # of which should show what is on main.
+  #
   # Gated on every check, so nothing is published from a commit that fails
   # lint, types, tests or the build.
   publish:
@@ -358,7 +378,7 @@ jobs:
     strategy:
       fail-fast: true
       matrix:
-        target: [runtime, migrate]
+        target: [runtime, migrate, quickstart]
         arch: [amd64, arm64]
     runs-on: ${{ matrix.arch == 'arm64' && 'ubuntu-24.04-arm' || 'ubuntu-24.04' }}
     permissions:
@@ -402,6 +422,7 @@ jobs:
         uses: docker/build-push-action@v6
         with:
           context: .
+          file: ${{ matrix.target == 'quickstart' && 'deploy/quickstart/Dockerfile' || 'Dockerfile' }}
           target: ${{ matrix.target }}
           platforms: linux/${{ matrix.arch }}
           labels: ${{ steps.meta.outputs.labels }}
@@ -429,7 +450,7 @@ jobs:
     needs: publish
     strategy:
       matrix:
-        target: [runtime, migrate]
+        target: [runtime, migrate, quickstart]
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -462,13 +483,14 @@ jobs:
           images: ${{ env.IMAGE }}
           flavor: |
             latest=false
-            suffix=${{ matrix.target == 'migrate' && '-migrate' || '' }},onlatest=true
+            suffix=${{ matrix.target != 'runtime' && format('-{0}', matrix.target) || '' }},onlatest=true
           tags: |
             type=sha,prefix=sha-,format=short
             type=raw,value=main,enable={{is_default_branch}}
             type=semver,pattern={{version}}
             type=raw,value=latest,enable=${{ startsWith(github.ref, 'refs/tags/v') }}
-            type=raw,value=${{ matrix.target }},suffix=,enable=${{ startsWith(github.ref, 'refs/tags/v') }}
+            type=raw,value=${{ matrix.target }},suffix=,enable=${{ startsWith(github.ref, 'refs/tags/v') && matrix.target != 'quickstart' }}
+            type=raw,value=quickstart,suffix=,enable=${{ matrix.target == 'quickstart' && github.ref == 'refs/heads/main' }}
 
       - name: Create the multi-arch manifest
         working-directory: ${{ runner.temp }}/digests
