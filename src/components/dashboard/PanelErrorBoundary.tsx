@@ -11,7 +11,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
  *
  * `PanelView` already handles every *data* failure — error, stale, tombstoned
  * all render as a card. What it cannot handle is a *render* failure: a
- * malformed row reaching `buildChartOption()`, an option ECharts rejects, a
+ * malformed row reaching a chart option builder, an option ECharts rejects, a
  * throw inside `StatView` or `TableView`. React unwinds to the nearest
  * boundary, and without one that is the route, so a single bad panel blanks
  * the whole dashboard while every other panel was streaming fine.

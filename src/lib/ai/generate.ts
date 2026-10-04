@@ -8,6 +8,7 @@ import {
   Panel,
 } from "@/lib/ir";
 import { config } from "@/lib/config";
+import { PANEL_KINDS } from "@/lib/panels/registry";
 import { ModelSourceDraft, type SourceRecord } from "@/lib/registry";
 
 /**
@@ -91,6 +92,20 @@ saying WHAT the query computes — the measure, the grouping and the unit — ph
 as intent. NEVER state, estimate or invent a result value, a threshold or a
 trend; you have not seen the data.`;
 
+/**
+ * The kinds a panel can be, one line each, built from the panel registry
+ * (#61): a kind that is registered is offered to the model, and one that is
+ * not cannot be, because the list and the IR's enum are the same list.
+ */
+export const VIZ_GUIDE = PANEL_KINDS.map((k) => `- '${k.kind}': ${k.promptHint}`).join(
+  "\n",
+);
+
+/** The kinds explore may plot when a question asks for a chart. */
+const CHART_KINDS = PANEL_KINDS.filter((k) => k.canvas)
+  .map((k) => `"${k.kind}"`)
+  .join(", ");
+
 function baseSystem(source: SourceRecord): string {
   return `You design monitoring dashboards as a strict JSON spec.
 You NEVER return data rows — only a viz specification (SQL + layout).
@@ -107,14 +122,12 @@ ${DESCRIPTION_RULE}
 
 Layout: a 12-column grid. By DEFAULT place two panels side by side (w=6 each)
 and 4 rows tall (h=4), laid out left-to-right, top-to-bottom, without overlaps.
-Use a wider or taller panel only when a request clearly calls for it. Choose viz
-types from: line, area, bar,
-scatter, stat, table, heatmap, pie, donut. Use 'area' for a filled time series
-and 'scatter' for relationships between two numeric dimensions. Use
-'pie'/'donut' for a proportional breakdown of a
-small set of categories (one label column + one numeric value column; OMIT
-'query.timeField' — these are not time-series). Use 'format'
-(number|bytes|percent|ms) where meaningful.`;
+Use a wider or taller panel only when a request clearly calls for it.
+
+Choose each panel's 'viz' from these kinds, and no other:
+${VIZ_GUIDE}
+
+Use 'format' (number|bytes|percent|ms) where meaningful.`;
 }
 
 export function streamDashboard(input: {
@@ -163,7 +176,7 @@ Return one Panel. Give it a concise title, use id "explore", and set layout to
 Viz selection (IMPORTANT — default to text/tabular output):
 - Default to viz "table" and return the relevant rows/columns.
 - Use "stat" only when the question asks for a single scalar value.
-- Use a chart viz ("line", "area", "bar", "scatter", "heatmap", "pie", "donut") ONLY when the
+- Use a chart viz (${CHART_KINDS}) ONLY when the
   request explicitly asks to chart/plot/graph/visualize the data or to see a
   trend over time. Use "pie"/"donut" for share/proportion/breakdown questions
   across a small set of categories.`,

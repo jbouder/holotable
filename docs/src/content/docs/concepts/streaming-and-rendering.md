@@ -146,12 +146,50 @@ Client side (`LiveDashboard.tsx` → `PanelView.tsx` → `EChart.tsx`):
 - Each panel records **when its data arrived**; the status badge reports it, so
   panels that go stale independently can be told apart.
 
-`PanelView` picks a renderer from `panel.viz`:
+`PanelView` looks `panel.viz` up in the panel registry and draws what it
+finds:
 
 - `stat` → the last numeric value, run through `formatValue` per `panel.format`.
 - `table` → an HTML table of the windowed rows.
-- every other kind → `buildChartOption` (`src/components/charts/options.ts`)
-  builds an ECharts option, drawn by `EChart`.
+- every other kind → the kind's option builder (`src/components/charts/options.ts`)
+  makes an ECharts option, drawn by `EChart`.
+
+## Panel kinds
+
+The kinds a panel can be are registered in one list,
+`PANEL_KINDS` in `src/lib/panels/registry.ts` (#61). Each kind is a small
+module under `src/lib/panels/kinds/` that says, in plain data:
+
+| Field | Used by |
+| --- | --- |
+| `kind` | `panel.viz`. `VizType` in `src/lib/ir.ts` is built from the registered names, so an unregistered one fails validation with the list of valid kinds. |
+| `summary` | The [Visualization types](/reference/visualization-types/) reference, generated from it. |
+| `promptHint` | The generation prompt, whose list of kinds is built from the hints. |
+| `canvas` | PNG export, and whether the explore page plots the panel. |
+| `timeBrush` | Whether a drag across the chart selects a time range. |
+| `skeleton` | The shape the panel shows while it loads. |
+
+How a kind is drawn is the browser half, `PANEL_RENDERERS` in
+`src/components/panels/registry.ts`: either `{ type: "chart", option }`, an
+ECharts option builder, or `{ type: "html", Body }`, a component. It is kept
+apart because `src/lib/ir.ts` imports the registry, and the server and the
+prompt must not pull React in with it. The renderer map is typed as
+`Record<VizType, PanelRenderer>`, so a kind registered without a renderer does
+not compile.
+
+Adding a kind is therefore:
+
+1. a module under `src/lib/panels/kinds/` and one line in `PANEL_KINDS`;
+2. its renderer (an option builder, or a component under
+   `src/components/panels/`) and one line in `PANEL_RENDERERS`.
+
+Registration is an import. Nothing is loaded at runtime, so there is no way
+for a request to add a kind.
+
+A new kind is an additive change to the IR: every spec saved before it still
+parses, so it needs no `specVersion` bump (see
+[invariant 3](/architecture/invariants/)). Renaming or removing a kind does
+need one, with an upgrader that rewrites the old name.
 
 `EChart` is the invariant that keeps charts smooth: the ECharts instance is
 created **once**, and every update is `setOption(option, { notMerge: false })`.

@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { PANEL_KIND_NAMES } from "@/lib/panels/registry";
 
 /**
  * Shared Intermediate Representation (IR).
@@ -9,17 +10,17 @@ import { z } from "zod";
  * against these schemas so the contract cannot drift.
  */
 
-export const VizType = z.enum([
-  "line",
-  "area",
-  "bar",
-  "scatter",
-  "stat",
-  "table",
-  "heatmap",
-  "pie",
-  "donut",
-]);
+/**
+ * The panel kinds, as registered in `src/lib/panels/registry.ts` (#61). The
+ * list lives there, with each kind's prompt hint and capabilities, so adding a
+ * kind is not an edit to this file.
+ */
+export const VizType = z.enum(PANEL_KIND_NAMES, {
+  error: (issue) =>
+    typeof issue.input === "string"
+      ? `unknown panel kind ${JSON.stringify(issue.input.slice(0, 64))}; viz must be one of: ${PANEL_KIND_NAMES.join(", ")}`
+      : undefined,
+});
 export type VizType = z.infer<typeof VizType>;
 
 export const ValueFormat = z.enum(["number", "bytes", "percent", "ms"]);

@@ -75,6 +75,11 @@ Important files:
 - `src/lib/ir.ts` — the canonical shared dashboard IR schema
 - `src/lib/ir/upgrade.ts` — the upgrader chain that brings a stored spec of any
   earlier `specVersion` up to the current one before it is validated
+- `src/lib/panels/registry.ts` — the panel kinds (#61). `VizType`, the
+  generation prompt's viz list and the docs reference are built from it; each
+  kind is a module under `src/lib/panels/kinds/`, and its renderer is one line
+  in `src/components/panels/registry.ts`, which does not compile without one.
+  Never add a `switch` on `panel.viz`: register the kind instead
 - `src/lib/sql/safety.ts` — the SQL guard every generated query passes through
 - `src/lib/sql/ast.ts` — the PostgreSQL parse-tree walk the guard is built on
 - `src/lib/sql/row-filter.ts` — row-level filters (#31): every real table a
