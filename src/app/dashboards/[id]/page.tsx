@@ -16,6 +16,7 @@ import { dashboardListHref, EMPTY_QUERY } from "@/lib/dashboard-list";
 import { chatSuggestions } from "@/lib/chat-history";
 import { aiUnavailable } from "@/lib/ai/configured";
 import { rangeFromParams } from "@/lib/time-range";
+import { DEMO_IDLE_PAUSE_MS } from "@/lib/stream-idle";
 
 export const dynamic = "force-dynamic";
 
@@ -60,6 +61,9 @@ export default async function DashboardViewPage({
         dashboardId={id}
         spec={dashboard.spec}
         maxWindowPoints={config.maxWindowPoints}
+        // The demo's container sleeps only when no stream is open, so an
+        // abandoned tab there pauses itself (#263).
+        idlePauseMs={config.authMode === "demo" ? DEMO_IDLE_PAUSE_MS : undefined}
         // A shared link carries the window it was shared for. It is parsed
         // against the IR here and falls back to the dashboard's own range, so
         // a mangled `?from=` opens the dashboard rather than an error — and

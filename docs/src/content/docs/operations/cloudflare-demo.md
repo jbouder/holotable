@@ -22,9 +22,15 @@ container, which holds TimescaleDB, the server and the demo jobs.
 The container sleeps after 30 minutes without a request, and its disk does not
 survive a sleep. The next visit starts a fresh container: a new database, the
 seeded dashboards and six hours of backfilled history. Anything a visitor built
-is gone. The demo banner says so. An open dashboard tab keeps its live stream
-open, which counts as activity, so the demo stays awake while someone is
-watching.
+is gone. The demo banner says so.
+
+An open live stream counts as a request in flight, so a dashboard tab keeps the
+demo awake. A forgotten tab doesn't keep it awake forever. A tab hidden for 5
+minutes closes its stream, and reopens it when it's shown again. In demo mode, a
+visible tab with no pointer, keyboard, wheel or touch activity for 10 minutes
+pauses live updates and offers Resume. So the container sleeps within 40 minutes
+of the last visitor walking away. A script can still hold a stream open;
+`max_instances: 1` caps what that costs.
 
 A cold start serves a page that refreshes every three seconds until the app
 answers. Locally it takes about 10 seconds; Cloudflare adds the image pull on a
@@ -57,7 +63,9 @@ groups above editor. See [Demo mode](/operations/demo-mode/).
 ## Cost
 
 At published Workers Paid rates, roughly $5 a month while it mostly sleeps and
-$50–60 a month if it never sleeps, on a `standard-1` instance (½ vCPU, 4 GiB).
+$35–60 a month if it never sleeps, on a `standard-1` instance (½ vCPU, 4 GiB).
+Memory and disk are billed while the container is awake and CPU only while it's
+used, so the range depends on how busy it is.
 `max_instances: 1` is the ceiling: more traffic keeps the one container awake,
 it never starts a second. Model spend is separate and capped by the budget
 above.
