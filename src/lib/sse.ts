@@ -1,7 +1,7 @@
 /**
  * Server-Sent Events framing shared by the dashboard stream.
  *
- * Only the shutdown frame lives here. The poller's own events are serialized
+ * Only the shutdown and session-ended frames live here. The poller's own events are serialized
  * inline by the route; this one has a policy attached to it and a test, so it
  * is worth a module of its own.
  */
@@ -30,4 +30,16 @@ const RECONNECT_SPREAD_MS = 8_000;
 export function drainFrame(random: () => number = Math.random): string {
   const retryMs = RECONNECT_BASE_MS + Math.floor(random() * RECONNECT_SPREAD_MS);
   return `retry: ${retryMs}\nevent: ${DRAIN_EVENT}\ndata: {"reason":"shutdown"}\n\n`;
+}
+
+/** Named, like the drain frame, so it never looks like a poller event. */
+export const SESSION_ENDED_EVENT = "session-ended";
+
+/**
+ * The frame a stream sends when the session that opened it was revoked (#28),
+ * just before the server closes it. No `retry:`: the client closes the
+ * EventSource itself, because a reconnect would only be refused.
+ */
+export function sessionEndedFrame(): string {
+  return `event: ${SESSION_ENDED_EVENT}\ndata: {"reason":"revoked"}\n\n`;
 }

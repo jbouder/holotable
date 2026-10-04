@@ -1,7 +1,8 @@
 import { cookies } from "next/headers";
 import { config } from "@/lib/config";
 import { accessibleWorkspaces, hasWorkspaceRole, type Identity } from "@/lib/auth/claims";
-import { verifySessionToken } from "@/lib/auth/session";
+import { tokenRef, verifySessionToken } from "@/lib/auth/session";
+import type { TokenRef } from "@/lib/auth/revocation";
 import { type ErrorKind, kindFromStatus, OPAQUE_MESSAGE } from "@/lib/errors";
 import { amendRequest, currentRequest, log } from "@/lib/log";
 
@@ -128,6 +129,16 @@ export async function getIdentity(): Promise<Identity | null> {
   const token = store.get(config.sessionCookieName)?.value;
   if (!token) return null;
   return verifySessionToken(token);
+}
+
+/**
+ * What a back-channel logout would name this request's session by (#28): its
+ * subject, realm session id and issue time. Read from the cookie after
+ * {@link getIdentity} has verified it; null when there is none.
+ */
+export async function getSessionRef(): Promise<TokenRef | null> {
+  const token = (await cookies()).get(config.sessionCookieName)?.value;
+  return token ? tokenRef(token) : null;
 }
 
 /** Verify a token string directly (used by the SSE handler with NextRequest). */

@@ -66,6 +66,8 @@ export function groupsOf(identity: Identity): string[] {
 
 export interface StoredSession {
   sub: string;
+  /** The realm's session id from sign-in, when its id_token carried one. */
+  oidcSid: string | null;
   refreshToken: Uint8Array;
   expiresAt: Date;
 }
@@ -103,6 +105,7 @@ export interface RenewalDeps {
     groups: string[],
     profile: { displayName?: string; email?: string },
     ttlSeconds: number,
+    sid?: string,
   ): Promise<string>;
   now?: () => number;
 }
@@ -116,12 +119,22 @@ export interface IssuedSession {
   renewal?: { sessionId: string; ttl: number };
 }
 
-function mint(deps: RenewalDeps, identity: Identity, tokenTtl: number): Promise<string> {
+/**
+ * The token carries the realm's session id as `sid`, which is what a
+ * back-channel logout names (#28).
+ */
+function mint(
+  deps: RenewalDeps,
+  identity: Identity,
+  tokenTtl: number,
+  oidcSid: string | null,
+): Promise<string> {
   return deps.signSessionToken(
     identity.sub,
     groupsOf(identity),
     { displayName: identity.displayName, email: identity.email },
     tokenTtl,
+    oidcSid ?? undefined,
   );
 }
 
@@ -147,6 +160,7 @@ export async function startSession(
   tokens: TokenSet,
 ): Promise<IssuedSession> {
   const now = (deps.now ?? Date.now)();
+  const oidcSid = oidcSidOf(tokens.id_token);
   if (tokens.refresh_token) {
     const { tokenTtl, rowTtl } = sessionLifetimes(tokens.refresh_expires_in);
     const sessionId = newSessionId();
@@ -154,12 +168,12 @@ export async function startSession(
       await deps.store.create({
         idHash: hashSessionId(sessionId),
         sub: identity.sub,
-        oidcSid: oidcSidOf(tokens.id_token),
+        oidcSid,
         refreshToken: sealRefreshToken(tokens.refresh_token),
         expiresAt: new Date(now + rowTtl * 1000),
       });
       return {
-        sessionToken: await mint(deps, identity, tokenTtl),
+        sessionToken: await mint(deps, identity, tokenTtl, oidcSid),
         tokenTtl,
         expiresAt: now + tokenTtl * 1000,
         renewal: { sessionId, ttl: rowTtl },
@@ -171,7 +185,7 @@ export async function startSession(
     }
   }
   return {
-    sessionToken: await mint(deps, identity, UNRENEWABLE_TTL_SECONDS),
+    sessionToken: await mint(deps, identity, UNRENEWABLE_TTL_SECONDS, oidcSid),
     tokenTtl: UNRENEWABLE_TTL_SECONDS,
     expiresAt: now + UNRENEWABLE_TTL_SECONDS * 1000,
   };
@@ -229,7 +243,12 @@ export async function renewSession(
       });
       return {
         ok: true,
-        sessionToken: await mint(deps, identity, tokenTtl),
+        sessionToken: await mint(
+          deps,
+          identity,
+          tokenTtl,
+          oidcSidOf(tokens.id_token) ?? session.row.oidcSid,
+        ),
         tokenTtl,
         expiresAt: now + tokenTtl * 1000,
         renewal: { sessionId, ttl: rowTtl },

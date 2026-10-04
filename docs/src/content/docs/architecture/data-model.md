@@ -184,7 +184,7 @@ and drops or defaults anything stale, so an old row never breaks a page. Only
 
 One row per renewable session (#27): `id_hash` (SHA-256 of the opaque id in
 the `/api/auth` cookie, never the id itself), `sub`, `oidc_sid` (the realm's
-session id, for back-channel logout, #28), `refresh_token` (AES-256-GCM
+session id, which back-channel logout deletes by, #28), `refresh_token` (AES-256-GCM
 ciphertext under a key derived from `SESSION_SECRET`), `created_at`,
 `refreshed_at` and `expires_at`. Written at sign-in, rewritten at each renewal
 under a row lock (so concurrent renewals take turns with a rotating refresh

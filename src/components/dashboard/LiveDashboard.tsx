@@ -20,7 +20,7 @@ import {
   INITIAL_CONNECTION,
   reduceConnection,
 } from "@/lib/connection";
-import { DRAIN_EVENT } from "@/lib/sse";
+import { DRAIN_EVENT, SESSION_ENDED_EVENT } from "@/lib/sse";
 import { renewSession } from "@/lib/session-renewal";
 import { HIDDEN_STREAM_GRACE_MS } from "@/lib/stream-idle";
 import { isRolling, rangeSearch } from "@/lib/time-range";
@@ -246,8 +246,22 @@ export function LiveDashboard({
       signal({ type: "error", closed: false });
     };
     es.addEventListener(DRAIN_EVENT, onDraining);
+    // The realm ended this session (#28). Close rather than let EventSource
+    // retry into a 401; the renewal that follows is refused too, and that
+    // refusal is what raises the keepalive's sign-in banner.
+    const onSessionEnded = () => {
+      es.close();
+      setStates(markStale);
+      signal({ type: "error", closed: true });
+      renewTriedRef.current = true;
+      void renewSession().then((result) => {
+        if (result.ok) setReconnectNonce((n) => n + 1);
+      });
+    };
+    es.addEventListener(SESSION_ENDED_EVENT, onSessionEnded);
     return () => {
       es.removeEventListener(DRAIN_EVENT, onDraining);
+      es.removeEventListener(SESSION_ENDED_EVENT, onSessionEnded);
       es.close();
     };
   }, [applyEvent, live, suspended, signal, streamUrl, reconnectNonce]);

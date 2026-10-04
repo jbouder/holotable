@@ -113,3 +113,26 @@ The realm's session settings decide the lengths:
 The refresh token is stored encrypted in the config database and never sent to
 the browser. If the client does not issue refresh tokens, sessions last 8 hours
 and end there, as before.
+
+## Back-channel logout
+
+So that ending a session in Keycloak ends it in Holotable straight away, set on
+the client (**Clients → holotable → Settings → Logout settings**):
+
+- **Backchannel logout URL**: `https://<holotable host>/api/auth/backchannel-logout`.
+  Keycloak calls it server to server, so it must be reachable from Keycloak,
+  not just from browsers.
+- **Backchannel logout session required**: on. The logout token then names the
+  realm session (`sid`), and only that session ends. Off, it names only the
+  person, and every one of their Holotable sessions ends.
+- **Front channel logout**: off. Holotable does not implement it.
+
+The realm in `keycloak/holotable-realm.json` already sets these for local
+development, pointing at `http://host.docker.internal:3000/…` (the Compose file
+maps that name to the host for the Keycloak container). A realm imported
+before this change keeps its old client settings; recreate the container
+(`docker compose up -d --force-recreate keycloak`) to import it again.
+
+A logout is checked against the realm's keys, issuer and this client id before
+anything happens, and it takes effect at once: the session token stops
+verifying, any open dashboard streams for it close, and it cannot be renewed.

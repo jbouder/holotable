@@ -19,6 +19,12 @@
         "http://localhost:3000/*"
       ],
       "webOrigins": ["http://localhost:3000"],
+      "frontchannelLogout": false,
+      "attributes": {
+        "backchannel.logout.url": "http://host.docker.internal:3000/api/auth/backchannel-logout",
+        "backchannel.logout.session.required": "true",
+        "backchannel.logout.revoke.offline.tokens": "false"
+      },
       "protocolMappers": [
         {
           "name": "groups",

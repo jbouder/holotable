@@ -1,8 +1,14 @@
-import { requireIdentity, assertAuthorized, HttpError } from "@/lib/auth/authorize";
+import {
+  requireIdentity,
+  assertAuthorized,
+  getSessionRef,
+  HttpError,
+} from "@/lib/auth/authorize";
+import { isRevoked, onRevoke } from "@/lib/auth/revocation";
 import { getDashboardById } from "@/lib/db/repo";
 import { getPoller, type PollerEvent } from "@/lib/poller/registry";
 import { TimeRange } from "@/lib/ir";
-import { drainFrame } from "@/lib/sse";
+import { drainFrame, sessionEndedFrame } from "@/lib/sse";
 import { onDrain } from "@/lib/shutdown";
 import { route } from "@/lib/http";
 
@@ -20,6 +26,8 @@ export const GET = route(
   "dashboards.stream",
   async (req: Request, ctx: RouteContext<"/api/dashboards/[id]/stream">) => {
     const identity = await requireIdentity();
+    // What a back-channel logout would name this subscriber by (#28).
+    const session = await getSessionRef();
     const { id } = await ctx.params;
     const dashboard = await getDashboardById(id);
     if (!dashboard) throw new HttpError(404, "dashboard not found");
@@ -64,10 +72,12 @@ export const GET = route(
         // hook is unregistered on close, or the set would grow by one entry
         // for every connection the instance ever served.
         let unregisterDrain = () => {};
+        let unregisterRevoke = () => {};
 
         const close = () => {
           unsubscribe();
           unregisterDrain();
+          unregisterRevoke();
           try {
             controller.close();
           } catch {
@@ -78,6 +88,21 @@ export const GET = route(
         unregisterDrain = onDrain(() => {
           try {
             controller.enqueue(encoder.encode(drainFrame()));
+          } catch {
+            /* controller closed */
+          }
+          close();
+        });
+
+        // Back-channel logout (#28): a stream is authorized once, when it
+        // opens, so a session the realm ends would otherwise keep receiving
+        // until the socket happened to drop. Every revocation is checked
+        // against this stream's session; only a match closes it, so the
+        // other subscribers on the same poller carry on.
+        unregisterRevoke = onRevoke(() => {
+          if (!session || !isRevoked(session)) return;
+          try {
+            controller.enqueue(encoder.encode(sessionEndedFrame()));
           } catch {
             /* controller closed */
           }

@@ -96,6 +96,31 @@ When the realm issues a refresh token at sign-in, the session is renewable
 - A request is still authenticated by verifying the session token alone; the
   table is read only by renewal and sign-out.
 
+### Ending a session early
+
+A session token names its realm session in a `sid` claim (#28). When Keycloak
+ends that session — an admin signs the person out, they sign out of another
+app on the realm, or the session is revoked — it calls
+`POST /api/auth/backchannel-logout` with a signed logout token, and:
+
+- the session is added to an in-memory revocation list that
+  `verifySessionToken` checks on every request, so the token stops working
+  immediately rather than at its expiry;
+- every open dashboard stream opened with that session receives a
+  `session-ended` event and is closed, while other viewers of the same
+  dashboard carry on;
+- its `sessions` rows are deleted, so it cannot be renewed.
+
+A logout token naming only the person (`sub`, no `sid`) ends all of their
+sessions. Signing out in Holotable revokes that one session the same way, so a
+copy of the cookie stops working too, without signing the person out of their
+other devices.
+
+The list lives in the process, which is the supported topology (one instance).
+A restart forgets it: a revoked token then verifies again until it expires,
+which is at most one session-token lifetime, and it cannot be renewed because
+its row is gone.
+
 :::note
 OIDC is the only way to authenticate; there is no local or development login
 path. Setup for the Keycloak side is in [Keycloak setup](/operations/keycloak/).

@@ -45,6 +45,11 @@ services:
       - "8080:8080"
     volumes:
       - ./keycloak:/opt/keycloak/data/import:ro
+    # Back-channel logout (#28): the realm POSTs to the app at
+    # host.docker.internal:3000, which reaches the published port whether the
+    # app runs in this stack or as `npm run dev` on the host.
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
 
   migrate:
     image: *migrate-image
