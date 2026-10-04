@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import { AlertTriangle, Check, Clock, Loader2, RefreshCw } from "lucide-react";
+import { RefreshCatalogDialog } from "@/components/sources/catalog-refresh";
 import {
   type CatalogHealth,
   type CatalogSubject,
@@ -71,23 +72,23 @@ export function CatalogHealthBadge({
  *
  * `canRefresh` is the caller's `source:manage` decision. Without it the reader
  * still gets told what is wrong; they just get told to ask an admin instead of
- * being handed a button that would come back 403.
+ * being handed a button that would come back 403. With it, Refresh opens the
+ * same reviewed refresh as the source list (#123): the diff first, and nothing
+ * written until it is applied.
  */
 export function CatalogHealthNotice({
   source,
   health,
   canRefresh,
-  onRefresh,
-  busy = false,
-  error,
+  onRefreshed,
 }: {
   source: Named;
   health: CatalogHealth | undefined;
   canRefresh: boolean;
-  onRefresh: () => void;
-  busy?: boolean;
-  error?: string | null;
+  /** After an applied refresh, with the state it produced. */
+  onRefreshed: (health: CatalogHealth) => void;
 }) {
+  const [reviewing, setReviewing] = React.useState(false);
   if (!health || health.state === "ok") return null;
 
   return (
@@ -112,55 +113,35 @@ export function CatalogHealthNotice({
           type="button"
           variant="ghost"
           size="sm"
-          disabled={busy}
-          onClick={onRefresh}
+          onClick={() => setReviewing(true)}
         >
-          {busy ? (
-            <Loader2 className="h-4 w-4 animate-spin" />
-          ) : (
-            <RefreshCw className="h-4 w-4" />
-          )}
+          <RefreshCw className="h-4 w-4" />
           Refresh catalog
         </Button>
       )}
-      {error && <span className="text-muted">{error}</span>}
+      <RefreshCatalogDialog
+        source={reviewing ? source : null}
+        onClose={() => setReviewing(false)}
+        onApplied={({ catalogHealth }) => {
+          setReviewing(false);
+          onRefreshed(catalogHealth);
+        }}
+      />
     </div>
   );
 }
 
 /**
- * The Refresh a picker offers: one call, and the fresh state it produced.
+ * The catalog states a picker shows, corrected in place by a refresh from it.
  *
  * The pickers render sources the server projected once at page load, so after
  * a refresh they would otherwise still be showing the state the page was built
- * with. The hook keeps the corrections it has made in this session and hands
- * them back keyed by source id.
+ * with. The hook keeps the corrections made in this session, keyed by source id.
  */
 export function useCatalogRefresh(initial: Record<string, CatalogHealth>) {
   const [health, setHealth] = React.useState(initial);
-  const [busy, setBusy] = React.useState<string | null>(null);
-  const [error, setError] = React.useState<Record<string, string>>({});
-
-  const refresh = React.useCallback(async (sourceId: string) => {
-    setBusy(sourceId);
-    setError((e) => ({ ...e, [sourceId]: "" }));
-    try {
-      const res = await fetch(`/api/sources/${encodeURIComponent(sourceId)}/refresh`, {
-        method: "POST",
-      });
-      const body: unknown = await res.json().catch(() => null);
-      if (!res.ok) {
-        const message =
-          (body as { error?: string } | null)?.error ?? "the refresh failed";
-        setError((e) => ({ ...e, [sourceId]: message }));
-        return;
-      }
-      const next = (body as { catalogHealth?: CatalogHealth } | null)?.catalogHealth;
-      if (next) setHealth((h) => ({ ...h, [sourceId]: next }));
-    } finally {
-      setBusy(null);
-    }
+  const update = React.useCallback((sourceId: string, next: CatalogHealth) => {
+    setHealth((h) => ({ ...h, [sourceId]: next }));
   }, []);
-
-  return { health, busy, error, refresh };
+  return { health, update };
 }

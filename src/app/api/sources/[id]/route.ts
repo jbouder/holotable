@@ -1,13 +1,19 @@
 import { z } from "zod";
-import { requireIdentity, assertAuthorized, HttpError } from "@/lib/auth/authorize";
+import { requireIdentity, assertAuthorized, can, HttpError } from "@/lib/auth/authorize";
 import { readJson, json, route } from "@/lib/http";
 import { getSourceById, updateSource, deleteSource } from "@/lib/db/repo";
 import { SourceConfig } from "@/lib/registry";
+import { sourceListing } from "@/lib/source-listing";
 import { SECRET_REF_MESSAGE, SECRET_REF_PATTERN } from "@/lib/secret-refs";
 import { requireGrantedSecretRef } from "@/lib/secrets/http";
 
 export const runtime = "nodejs";
 
+/**
+ * One source. The full record for a source admin, and the same listing the
+ * list route gives anyone else: no connection details, `secret_ref` or hidden
+ * columns. The catalog itself is `GET /api/sources/[id]/catalog`.
+ */
 export const GET = route(
   "sources.get",
   async (_req: Request, ctx: RouteContext<"/api/sources/[id]">) => {
@@ -16,8 +22,11 @@ export const GET = route(
     const source = await getSourceById(id);
     if (!source) throw new HttpError(404, "source not found");
 
-    assertAuthorized(identity, "source:use", { workspaceId: source.workspaceId });
-    return json({ source });
+    const scope = { workspaceId: source.workspaceId };
+    assertAuthorized(identity, "source:use", scope);
+    return json({
+      source: can(identity, "source:manage", scope) ? source : sourceListing(source),
+    });
   },
 );
 

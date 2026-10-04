@@ -136,7 +136,7 @@ npm run seed     # looping metrics seeder
 | `/dashboards/[id]` | Live viewer (SSE) with Live/Pause and a read-only chat assistant | viewer |
 | `/dashboards/[id]/edit` | Panel CRUD/layout, single-panel NL edits, version save | editor |
 | `/explore` | Ad-hoc NL questions against editable sources | editor |
-| `/data-sources` | Source CRUD / test / refresh, a structured form with table discovery, plus a natural-language drafter | source-admin |
+| `/data-sources` | Source CRUD / test / reviewed refresh, a catalog browser with per-column exposure, a structured form with table discovery, plus a natural-language drafter. Viewers get the list and the catalog browser read-only, without connection details or hidden columns | source-admin (read-only: viewer) |
 
 Roles come from Keycloak group membership — see
 [Authorization model](/architecture/authorization/).

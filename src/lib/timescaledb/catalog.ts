@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { Client } from "pg";
 import { fenceUntrustedBlock, sanitizePromptField } from "@/lib/ai/untrusted";
 import { exposedCatalogTables } from "@/lib/catalog/health";
@@ -236,4 +237,20 @@ export async function refreshCatalog(source: SourceRecord): Promise<CatalogRefre
   } finally {
     await client.end();
   }
+}
+
+/**
+ * A digest of exactly what a refresh would store: the catalog and the missing
+ * list. The preview hands it out, and the apply step writes only if a second
+ * introspection produces the same one. So nothing reaches the database that
+ * the author has not reviewed, and the browser never sends the catalog itself.
+ * An exposure toggle between the two steps also changes it, because the
+ * refreshed config carries the flags forward.
+ */
+export function refreshDigest(refresh: CatalogRefresh): string {
+  return createHash("sha256")
+    .update(
+      JSON.stringify({ config: refresh.config, missingTables: refresh.missingTables }),
+    )
+    .digest("hex");
 }

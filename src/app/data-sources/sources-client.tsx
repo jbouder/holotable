@@ -12,8 +12,13 @@ import {
   SendHorizontal,
   Database,
   ExternalLink,
+  ListTree,
 } from "lucide-react";
 import { SourceDraft, type SourceRecord } from "@/lib/registry";
+import { type SourceListing, sourceListing } from "@/lib/source-listing";
+import { summarizeCatalogDiff } from "@/lib/catalog/refresh";
+import { CatalogBrowserDialog } from "@/components/sources/catalog-browser";
+import { RefreshCatalogDialog } from "@/components/sources/catalog-refresh";
 import { type CatalogHealth, describeCatalogHealth } from "@/lib/catalog/health";
 import { CatalogHealthBadge } from "@/components/sources/catalog-health";
 import { SourceTestReport } from "@/components/sources/SourceTestReport";
@@ -49,11 +54,21 @@ import {
   useSourceImpactMap,
 } from "./source-impact";
 
+/**
+ * One row of the list. `record` is the full source and is present only for a
+ * source admin: the list route sends anyone else the listing alone.
+ */
+type Row = SourceListing & { record?: SourceRecord };
+
 export function SourcesClient({
   workspaces,
+  manageable,
   startCreating = false,
 }: {
+  /** Every workspace the identity may see, the manageable ones first. */
   workspaces: string[];
+  /** The workspaces where the identity is a source admin. */
+  manageable: string[];
   /**
    * Open the Add source dialog on arrival. Set by `?new=1`, which is where the
    * first-run flow's "Connect a data source" step points: the step lands on the
@@ -63,7 +78,10 @@ export function SourcesClient({
 }) {
   // Workspace switching is hidden for now; pin to the first accessible workspace.
   const [workspaceId] = React.useState<string | null>(workspaces[0] ?? null);
-  const [sources, setSources] = React.useState<SourceRecord[] | null>(null);
+  // Decides what is rendered, not what is allowed: every action's route checks
+  // `source:manage` itself, and the list route decides what a row carries.
+  const canManage = workspaceId !== null && manageable.includes(workspaceId);
+  const [sources, setSources] = React.useState<Row[] | null>(null);
   const motion = !useReducedMotion();
   // Decided by the server (the staleness threshold is an environment setting),
   // keyed by source id, and replaced wholesale on every reload.
@@ -83,11 +101,14 @@ export function SourcesClient({
   // confirmation; both are ids so a reload cannot leave a stale copy open.
   const [showingImpact, setShowingImpact] = React.useState<string | null>(null);
   const [confirmingDelete, setConfirmingDelete] = React.useState<string | null>(null);
+  // The source whose catalog is open, and the one whose refresh is in review.
+  const [browsing, setBrowsing] = React.useState<string | null>(null);
+  const [refreshing, setRefreshing] = React.useState<string | null>(null);
 
   const load = React.useCallback(async (ws: string) => {
     const res = await fetch(`/api/sources?workspaceId=${encodeURIComponent(ws)}`);
     const body = await res.json();
-    setSources(res.ok ? body.sources : []);
+    setSources(res.ok ? rowsFrom(body) : []);
     setCatalog(res.ok ? (body.catalogHealth ?? {}) : {});
   }, []);
 
@@ -100,7 +121,7 @@ export function SourcesClient({
       );
       const body = await res.json();
       if (!active) return;
-      setSources(res.ok ? body.sources : []);
+      setSources(res.ok ? rowsFrom(body) : []);
       setCatalog(res.ok ? (body.catalogHealth ?? {}) : {});
     })();
     return () => {
@@ -130,23 +151,17 @@ export function SourcesClient({
     setBusy(null);
   }
 
-  // A refresh reports what it found, not merely that it ran: a table the
-  // database no longer has is the whole reason to press this button, and the
-  // old "catalog refreshed" said the same thing whether one had gone or not.
-  async function refresh(id: string) {
-    setBusy(id);
-    const res = await fetch(`/api/sources/${id}/refresh`, { method: "POST" });
-    const body = await res.json().catch(() => null);
-    const health: CatalogHealth | undefined = body?.catalogHealth;
+  // A refresh is reviewed before it is written (#123), so the button opens the
+  // diff rather than writing. The notice afterwards says what changed and
+  // where the catalog now stands, because "catalog refreshed" said the same
+  // thing whether a table had gone or not.
+  function refreshed(id: string, diff: string, health: CatalogHealth) {
     const source = sources?.find((s) => s.id === id);
     setNotice(
-      !res.ok
-        ? `${id}: refresh failed`
-        : health && source
-          ? describeCatalogHealth(source, health)
-          : `${id}: catalog refreshed`,
+      source && health.state !== "ok"
+        ? `${diff} ${describeCatalogHealth(source, health)}`
+        : `${source?.name ?? id}: ${diff}`,
     );
-    setBusy(null);
     if (workspaceId) void load(workspaceId);
   }
 
@@ -168,19 +183,21 @@ export function SourcesClient({
   // badges read it, so a source whose credentials have gone missing — or
   // whose grant was withdrawn — is visible here rather than the next time
   // someone opens a dashboard that depends on it, and the forms pick from it.
-  const secretRefs = useGrantedSecretRefs(workspaceId);
+  // Both read admin-only routes, so a viewer does not ask.
+  const secretRefs = useGrantedSecretRefs(canManage ? workspaceId : null);
 
   // What each source is used by, so the count is in the row before anyone
   // presses Delete rather than in an error after.
-  const impact = useSourceImpactMap((sources ?? []).map((source) => source.id));
+  const impact = useSourceImpactMap(
+    canManage ? (sources ?? []).map((source) => source.id) : [],
+  );
 
   if (workspaces.length === 0) {
     return (
       <div className="mx-auto max-w-2xl">
         <Card>
           <CardContent className="text-sm text-muted">
-            You need the <code>source-admin</code> role in a workspace to manage data
-            sources.
+            You need a role in a workspace to see its data sources.
           </CardContent>
         </Card>
       </div>
@@ -194,9 +211,12 @@ export function SourcesClient({
     sources.length > 0 &&
     sources.every((source) => catalog[source.id]?.blocked === true);
 
-  const sourceBeingEdited = sources?.find((source) => source.id === editing);
+  const sourceBeingEdited = sources?.find((source) => source.id === editing)?.record;
   const sourceShowingImpact = sources?.find((source) => source.id === showingImpact);
   const sourceBeingDeleted = sources?.find((source) => source.id === confirmingDelete);
+  const sourceBeingBrowsed = sources?.find((source) => source.id === browsing) ?? null;
+  const sourceBeingRefreshed =
+    sources?.find((source) => source.id === refreshing) ?? null;
 
   return (
     <div className="space-y-6">
@@ -204,8 +224,13 @@ export function SourcesClient({
           workspace. Restore it among the actions to switch workspaces. */}
       <PageHeader
         title="Data sources"
-        description="Manage the connections that dashboards and Explore query against. Sources are scoped to a workspace and referenced by stable IDs."
+        description={
+          canManage
+            ? "Manage the connections that dashboards and Explore query against. Sources are scoped to a workspace and referenced by stable IDs."
+            : "The sources dashboards and Explore query against in this workspace. Browse a catalog to see the tables and columns you can query."
+        }
         actions={
+          canManage &&
           sources !== null && (
             <Button
               collapse
@@ -242,7 +267,7 @@ export function SourcesClient({
         once for the whole list rather than per row, and gone the moment any
         source becomes queryable.
       */}
-      {nothingQueryable && (
+      {canManage && nothingQueryable && (
         <div className="border border-warning/40 bg-surface px-3 py-2 text-sm text-muted">
           Next: press <span className="text-foreground">Test</span> to check the
           credentials resolve, then <span className="text-foreground">Refresh</span> to
@@ -258,34 +283,42 @@ export function SourcesClient({
           icon={<Database className="h-6 w-6" />}
           title="No sources in this workspace yet"
           description={
-            <>
-              A source names the database, the schema and the tables Holotable may read.
-              Its credentials stay in the server environment under a secret reference —
-              they are never stored here.{" "}
-              <a
-                href={FIRST_DASHBOARD_DOCS_URL}
-                target="_blank"
-                rel="noreferrer"
-                className="inline-flex items-center gap-1 text-foreground underline underline-offset-2"
-              >
-                The walkthrough <ExternalLink className="h-3 w-3" />
-              </a>{" "}
-              has the whole sequence.
-            </>
+            !canManage ? (
+              "A source admin for this workspace adds them."
+            ) : (
+              <>
+                A source names the database, the schema and the tables Holotable may read.
+                Its credentials stay in the server environment under a secret reference —
+                they are never stored here.{" "}
+                <a
+                  href={FIRST_DASHBOARD_DOCS_URL}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="inline-flex items-center gap-1 text-foreground underline underline-offset-2"
+                >
+                  The walkthrough <ExternalLink className="h-3 w-3" />
+                </a>{" "}
+                has the whole sequence.
+              </>
+            )
           }
-          action={<Button onClick={() => setCreating(true)}>Add source</Button>}
+          action={
+            canManage ? (
+              <Button onClick={() => setCreating(true)}>Add source</Button>
+            ) : undefined
+          }
         />
       ) : (
         <Table>
           <TableHead>
             <TableRow>
               <TableHeader>Name</TableHeader>
-              <TableHeader>Endpoint</TableHeader>
+              {canManage && <TableHeader>Endpoint</TableHeader>}
               <TableHeader>Schema</TableHeader>
               <TableHeader>Tables</TableHeader>
               <TableHeader>Catalog</TableHeader>
-              <TableHeader>Used by</TableHeader>
-              <TableHeader>Credentials</TableHeader>
+              {canManage && <TableHeader>Used by</TableHeader>}
+              {canManage && <TableHeader>Credentials</TableHeader>}
               <TableHeader>Status</TableHeader>
               <TableHeader className="text-right">Actions</TableHeader>
             </TableRow>
@@ -304,23 +337,32 @@ export function SourcesClient({
                   <div className="font-medium">{source.name}</div>
                   <div className="text-xs text-muted">{source.id}</div>
                 </TableCell>
-                <TableCell className="whitespace-nowrap">
-                  {source.config.host}:{source.config.port}/{source.config.database}
-                </TableCell>
-                <TableCell>{source.config.schema}</TableCell>
-                <TableCell>{source.config.tables.length}</TableCell>
+                {source.record && (
+                  <TableCell className="whitespace-nowrap">
+                    {source.record.config.host}:{source.record.config.port}/
+                    {source.record.config.database}
+                  </TableCell>
+                )}
+                <TableCell>{source.schema}</TableCell>
+                <TableCell>{source.tableCount}</TableCell>
                 <TableCell>
                   <CatalogHealthBadge source={source} health={catalog[source.id]} />
                 </TableCell>
-                <TableCell>
-                  <ImpactCell
-                    state={impact[source.id]}
-                    onOpen={() => setShowingImpact(source.id)}
-                  />
-                </TableCell>
-                <TableCell>
-                  <SecretRefBadge readiness={readinessIn(secretRefs, source.secretRef)} />
-                </TableCell>
+                {source.record && (
+                  <TableCell>
+                    <ImpactCell
+                      state={impact[source.id]}
+                      onOpen={() => setShowingImpact(source.id)}
+                    />
+                  </TableCell>
+                )}
+                {source.record && (
+                  <TableCell>
+                    <SecretRefBadge
+                      readiness={readinessIn(secretRefs, source.record.secretRef)}
+                    />
+                  </TableCell>
+                )}
                 <TableCell>
                   {source.tombstonedAt ? (
                     <span className="text-danger">Tombstoned</span>
@@ -333,41 +375,58 @@ export function SourcesClient({
                     <Button
                       variant="ghost"
                       size="sm"
-                      disabled={busy === source.id}
-                      onClick={() => test(source.id)}
-                    >
-                      <Plug className="h-4 w-4" /> Test
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      disabled={busy === source.id}
-                      onClick={() => refresh(source.id)}
-                    >
-                      <RefreshCw className="h-4 w-4" /> Refresh
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      disabled={busy === source.id || !!source.tombstonedAt}
                       onClick={() => {
                         setNotice(null);
-                        setEditing(source.id);
+                        setBrowsing(source.id);
                       }}
                     >
-                      <Pencil className="h-4 w-4" /> Edit
+                      <ListTree className="h-4 w-4" /> Catalog
                     </Button>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      disabled={busy === source.id}
-                      onClick={() => {
-                        setNotice(null);
-                        setConfirmingDelete(source.id);
-                      }}
-                    >
-                      <Trash2 className="h-4 w-4 text-danger" />
-                    </Button>
+                    {source.record && (
+                      <>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          disabled={busy === source.id}
+                          onClick={() => test(source.id)}
+                        >
+                          <Plug className="h-4 w-4" /> Test
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          disabled={busy === source.id}
+                          onClick={() => {
+                            setNotice(null);
+                            setRefreshing(source.id);
+                          }}
+                        >
+                          <RefreshCw className="h-4 w-4" /> Refresh
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          disabled={busy === source.id || !!source.tombstonedAt}
+                          onClick={() => {
+                            setNotice(null);
+                            setEditing(source.id);
+                          }}
+                        >
+                          <Pencil className="h-4 w-4" /> Edit
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          disabled={busy === source.id}
+                          onClick={() => {
+                            setNotice(null);
+                            setConfirmingDelete(source.id);
+                          }}
+                        >
+                          <Trash2 className="h-4 w-4 text-danger" />
+                        </Button>
+                      </>
+                    )}
                   </div>
                 </TableCell>
               </TableRow>
@@ -375,6 +434,22 @@ export function SourcesClient({
           </TableBody>
         </Table>
       )}
+
+      <CatalogBrowserDialog
+        source={sourceBeingBrowsed}
+        onClose={() => setBrowsing(null)}
+        onChanged={(id, health) => setCatalog((prev) => ({ ...prev, [id]: health }))}
+      />
+
+      <RefreshCatalogDialog
+        source={sourceBeingRefreshed}
+        onClose={() => setRefreshing(null)}
+        onApplied={({ diff, catalogHealth }) => {
+          const id = refreshing;
+          setRefreshing(null);
+          if (id) refreshed(id, summarizeCatalogDiff(diff), catalogHealth);
+        }}
+      />
 
       {sourceShowingImpact && (
         <SourceImpactDialog
@@ -394,12 +469,12 @@ export function SourcesClient({
         />
       )}
 
-      {workspaceId && (
+      {workspaceId && canManage && (
         <Dialog open={creating} onOpenChange={setCreating} title="Add source">
           <CreateSourcePanel
             key={`create-${workspaceId}`}
             workspaceId={workspaceId}
-            existing={sources ?? []}
+            existing={(sources ?? []).flatMap((row) => (row.record ? [row.record] : []))}
             secretRefs={secretRefs}
             onCreated={() => {
               setCreating(false);
@@ -636,4 +711,15 @@ function NaturalLanguageDrafter({
       )}
     </div>
   );
+}
+
+/**
+ * The list route's answer as rows. A source admin gets full records, and the
+ * listing is derived from each; anyone else gets the listing alone.
+ */
+function rowsFrom(body: { canManage?: boolean; sources?: unknown[] }): Row[] {
+  const sources = body.sources ?? [];
+  return body.canManage
+    ? (sources as SourceRecord[]).map((record) => ({ ...sourceListing(record), record }))
+    : (sources as SourceListing[]);
 }

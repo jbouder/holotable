@@ -32,8 +32,8 @@ paths):
 | Dashboard list / get | viewer |
 | Dashboard create / update / generate | editor |
 | Dashboard delete | owner, source-admin, or platform-admin |
-| Source CRUD / test / refresh | source-admin |
-| Source use (list for a picker) | viewer |
+| Source CRUD / test / refresh / column exposure | source-admin |
+| Source use (list for a picker, browse the exposed catalog) | viewer |
 | Workspace AI limits (read) | source-admin |
 | Workspace AI limits (change, `workspace:limits`) | platform-admin only; no workspace role grants it |
 
