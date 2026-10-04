@@ -1,7 +1,9 @@
 import {
   type A_Const,
+  type ColumnRef,
   type CommonTableExpr,
   type FuncCall,
+  type JoinExpr,
   type Node,
   parse,
   type RangeVar,
@@ -40,6 +42,14 @@ import {
  * inside a subquery is not visible outside it. Getting this wrong in the
  * lenient direction is a bypass — `WITH a AS (SELECT * FROM b), b AS (SELECT
  * 1)` reads the real table `b` — so the rules are exact, not approximate.
+ *
+ * Columns: every `ColumnRef` is reported with its name parts, and every alias
+ * that could rename or re-expose a table's columns — a table alias, a join
+ * alias, a column alias list, `USING`, `NATURAL` — is reported beside it, so
+ * the guard can enforce the per-column catalog. An unqualified `*` carries the
+ * tables its own SELECT reads directly, which is exactly what it expands to;
+ * a `*` over a subquery or a CTE expands only what that body already selected,
+ * and that body is walked and checked on its own.
  */
 
 /** The tag of any node the parser can emit, e.g. `"SelectStmt"`. */
@@ -143,8 +153,49 @@ export interface FunctionRef {
   name: string;
 }
 
+/** A column reference — `email`, `u.email`, `u.*`, `*`, or a bare relation name. */
+export interface ColumnUse {
+  /** The name parts as the server will resolve them, without a trailing `*`. */
+  path: string[];
+  /** True for `*` and `x.*`. */
+  star: boolean;
+  /**
+   * For an unqualified `*`, the tables its SELECT reads directly — through
+   * joins and `TABLESAMPLE`, but not into a subquery or a CTE. Empty otherwise.
+   */
+  from: TableRef[];
+}
+
+/** A relation a FROM clause reads, with the name the statement gives it. */
+export interface RelationUse {
+  table: TableRef;
+  /** `users AS u` → `u`. */
+  alias?: string;
+  /** `users AS u(a, b)`: the alias renames the table's columns by position. */
+  renamesColumns: boolean;
+}
+
+/** A join, and the ways it can match on or rename the columns beneath it. */
+export interface JoinUse {
+  /** The tables either side reads directly, as for {@link ColumnUse.from}. */
+  tables: TableRef[];
+  /** `NATURAL JOIN` matches on every column name the two sides share. */
+  natural: boolean;
+  /** The `USING (…)` column names. */
+  using: string[];
+  /** `(… JOIN …) AS j` and `USING (…) AS j`. */
+  aliases: string[];
+  /** `(… JOIN …) AS j(a, b)` renames the join's columns by position. */
+  renamesColumns: boolean;
+}
+
 export interface SelectAnalysis {
   tables: TableRef[];
+  /** Every column reference, in any position. */
+  columns: ColumnUse[];
+  /** Every read of a real table — a CTE name in scope is not one. */
+  relations: RelationUse[];
+  joins: JoinUse[];
   functions: FunctionRef[];
   /**
    * Parenless SQL value keywords — `current_timestamp`, `current_user`,
@@ -161,6 +212,12 @@ export type AnalyzeResult =
   | { ok: false; error: string };
 
 type Scope = ReadonlySet<string>;
+
+/** What a node can see: the CTE names in scope, and its SELECT's own tables. */
+interface Context {
+  ctes: Scope;
+  from: TableRef[];
+}
 
 class Rejected extends Error {}
 
@@ -187,16 +244,16 @@ function asWrappedNode(value: unknown): [NodeTag, Record<string, unknown>] | nul
   return [tag as NodeTag, inner];
 }
 
-function walk(value: unknown, scope: Scope, out: SelectAnalysis): void {
+function walk(value: unknown, ctx: Context, out: SelectAnalysis): void {
   if (Array.isArray(value)) {
-    for (const item of value) walk(item, scope, out);
+    for (const item of value) walk(item, ctx, out);
     return;
   }
   if (!isRecord(value)) return;
 
   const wrapped = asWrappedNode(value);
   if (wrapped) {
-    visitNode(wrapped[0], wrapped[1], scope, out);
+    visitNode(wrapped[0], wrapped[1], ctx, out);
     return;
   }
 
@@ -204,28 +261,34 @@ function walk(value: unknown, scope: Scope, out: SelectAnalysis): void {
   // place the grammar emits a SelectStmt without its wrapper; they normally
   // reach visitSelect directly, and this is the safety net for any other path.
   if (typeof value.op === "string" && value.op.startsWith("SETOP_")) {
-    visitSelect(value as SelectStmt, scope, out);
+    visitSelect(value as SelectStmt, ctx, out);
     return;
   }
   for (const [key, field] of Object.entries(value)) {
     if (key === "intoClause") reject("disallowed keyword: into");
-    walk(field, scope, out);
+    walk(field, ctx, out);
   }
 }
 
 function visitNode(
   tag: NodeTag,
   node: Record<string, unknown>,
-  scope: Scope,
+  ctx: Context,
   out: SelectAnalysis,
 ): void {
   switch (tag) {
     case "SelectStmt":
-      visitSelect(node as SelectStmt, scope, out);
+      visitSelect(node as SelectStmt, ctx, out);
       return;
     case "RangeVar":
-      visitRangeVar(node as RangeVar, scope, out);
+      visitRangeVar(node as RangeVar, ctx, out);
       return;
+    case "ColumnRef":
+      visitColumnRef(node as ColumnRef, ctx, out);
+      return;
+    case "JoinExpr":
+      visitJoin(node as JoinExpr, ctx, out);
+      break;
     case "FuncCall":
       visitFuncCall(node as FuncCall, out);
       break;
@@ -245,15 +308,16 @@ function visitNode(
       if (tag.endsWith("Stmt")) reject("only SELECT/WITH queries are allowed");
       if (!ALLOWED_NODES.has(tag)) reject(`unsupported SQL construct: ${tag}`);
   }
-  walk(node, scope, out);
+  walk(node, ctx, out);
 }
 
-function visitSelect(stmt: SelectStmt, scope: Scope, out: SelectAnalysis): void {
+function visitSelect(stmt: SelectStmt, ctx: Context, out: SelectAnalysis): void {
   // `SELECT … INTO table` creates a table; it is the one write a SelectStmt
   // can express, and it lives in a plain field rather than a node.
   if (stmt.intoClause) reject("disallowed keyword: into");
 
-  const inner = stmt.withClause ? visitWith(stmt.withClause, scope, out) : scope;
+  const ctes = stmt.withClause ? visitWith(stmt.withClause, ctx, out) : ctx.ctes;
+  const inner: Context = { ctes, from: directTables(stmt.fromClause, ctes) };
 
   for (const [key, field] of Object.entries(stmt)) {
     if (key === "withClause" || key === "larg" || key === "rarg") continue;
@@ -263,8 +327,38 @@ function visitSelect(stmt: SelectStmt, scope: Scope, out: SelectAnalysis): void 
   if (stmt.rarg) visitSelect(stmt.rarg, inner, out);
 }
 
+/**
+ * The real tables a FROM list reads directly: through joins and
+ * `TABLESAMPLE`, but not into a subquery, a function or a CTE, whose output
+ * columns are whatever their own body selected.
+ */
+function directTables(items: unknown, ctes: Scope): TableRef[] {
+  const out: TableRef[] = [];
+  const visit = (item: unknown): void => {
+    if (Array.isArray(item)) {
+      for (const each of item) visit(each);
+      return;
+    }
+    const wrapped = asWrappedNode(item);
+    if (!wrapped) return;
+    const [tag, node] = wrapped;
+    if (tag === "RangeVar") {
+      const ref = tableRef(node as RangeVar, ctes);
+      if (ref) out.push(ref);
+    } else if (tag === "JoinExpr") {
+      visit(node.larg);
+      visit(node.rarg);
+    } else if (tag === "RangeTableSample") {
+      visit(node.relation);
+    }
+  };
+  visit(items);
+  return out;
+}
+
 /** Walks every CTE body with the names PostgreSQL would let it see; returns the scope for the statement body. */
-function visitWith(clause: WithClause, scope: Scope, out: SelectAnalysis): Scope {
+function visitWith(clause: WithClause, ctx: Context, out: SelectAnalysis): Scope {
+  const scope = ctx.ctes;
   const ctes = clause.ctes ?? [];
   const names = ctes.map(cteName);
   const all: Scope = new Set([...scope, ...names]);
@@ -276,7 +370,7 @@ function visitWith(clause: WithClause, scope: Scope, out: SelectAnalysis): Scope
     const visible: Scope = clause.recursive
       ? all
       : new Set([...scope, ...names.slice(0, index)]);
-    walk(cte, visible, out);
+    walk(cte, { ctes: visible, from: ctx.from }, out);
   });
 
   return all;
@@ -292,7 +386,19 @@ function cteName(node: Node): string {
   return name;
 }
 
-function visitRangeVar(rv: RangeVar, scope: Scope, out: SelectAnalysis): void {
+function visitRangeVar(rv: RangeVar, ctx: Context, out: SelectAnalysis): void {
+  const table = tableRef(rv, ctx.ctes);
+  if (!table) return;
+  out.tables.push(table);
+  out.relations.push({
+    table,
+    alias: rv.alias?.aliasname,
+    renamesColumns: (rv.alias?.colnames?.length ?? 0) > 0,
+  });
+}
+
+/** The real table a RangeVar names, or null when it names a CTE in scope. */
+function tableRef(rv: RangeVar, ctes: Scope): TableRef | null {
   const name = rv.relname;
   if (!name) reject("invalid table reference");
   if (rv.catalogname) {
@@ -304,8 +410,49 @@ function visitRangeVar(rv: RangeVar, scope: Scope, out: SelectAnalysis): void {
   }
   // An unqualified name that a WITH clause in scope defines is that CTE, not a
   // table. A schema-qualified name is always a real relation.
-  if (!rv.schemaname && scope.has(name)) return;
-  out.tables.push({ schema: rv.schemaname, name });
+  if (!rv.schemaname && ctes.has(name)) return null;
+  return { schema: rv.schemaname, name };
+}
+
+function visitColumnRef(ref: ColumnRef, ctx: Context, out: SelectAnalysis): void {
+  const path: string[] = [];
+  let star = false;
+  for (const field of ref.fields ?? []) {
+    const wrapped = asWrappedNode(field);
+    // The grammar only puts names and a final `*` here; anything else fails
+    // closed rather than being skipped.
+    if (star) reject("invalid column reference");
+    if (wrapped?.[0] === "A_Star") {
+      star = true;
+    } else if (wrapped?.[0] === "String" && typeof wrapped[1].sval === "string") {
+      path.push(wrapped[1].sval);
+    } else {
+      reject("invalid column reference");
+    }
+  }
+  if (path.length === 0 && !star) reject("invalid column reference");
+  out.columns.push({ path, star, from: star && path.length === 0 ? ctx.from : [] });
+}
+
+function visitJoin(join: JoinExpr, ctx: Context, out: SelectAnalysis): void {
+  const names = (list: Node[] | undefined): string[] =>
+    (list ?? []).map((item) => {
+      const wrapped = asWrappedNode(item);
+      const sval = wrapped?.[1].sval;
+      if (wrapped?.[0] !== "String" || typeof sval !== "string") {
+        reject("invalid join column");
+      }
+      return sval;
+    });
+  out.joins.push({
+    tables: directTables([join.larg, join.rarg], ctx.ctes),
+    natural: join.isNatural === true,
+    using: names(join.usingClause),
+    aliases: [join.alias?.aliasname, join.join_using_alias?.aliasname].filter(
+      (alias): alias is string => typeof alias === "string",
+    ),
+    renamesColumns: (join.alias?.colnames?.length ?? 0) > 0,
+  });
 }
 
 function visitFuncCall(fn: FuncCall, out: SelectAnalysis): void {
@@ -362,12 +509,15 @@ export async function analyzeSelect(sql: string): Promise<AnalyzeResult> {
 
   const analysis: SelectAnalysis = {
     tables: [],
+    columns: [],
+    relations: [],
+    joins: [],
     functions: [],
     keywords: [],
     strings: [],
   };
   try {
-    visitSelect(wrapped[1] as SelectStmt, new Set(), analysis);
+    visitSelect(wrapped[1] as SelectStmt, { ctes: new Set(), from: [] }, analysis);
   } catch (err) {
     if (err instanceof Rejected) return { ok: false, error: err.message };
     throw err;

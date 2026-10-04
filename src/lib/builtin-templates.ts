@@ -1,4 +1,4 @@
-import { liveCatalogTables, type CatalogSubject } from "@/lib/catalog/health";
+import { exposedCatalogTables, type CatalogSubject } from "@/lib/catalog/health";
 import { isPlainIdentifier, timeColumn } from "@/lib/catalog/identifiers";
 import type { Panel, ValueFormat } from "@/lib/ir";
 import type { CatalogColumn, CatalogTable } from "@/lib/registry";
@@ -232,7 +232,7 @@ export function buildBuiltinTemplates(
   kind?: TemplateKind,
 ): Template[] {
   const out: Template[] = [];
-  const tables = liveCatalogTables(source)
+  const tables = exposedCatalogTables(source)
     .filter((t) => isPlainIdentifier(t.name) && t.columns.length > 0 && timeColumn(t))
     .slice(0, MAX_TABLES);
 

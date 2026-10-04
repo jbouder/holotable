@@ -1,7 +1,17 @@
 import { config } from "@/lib/config";
 import { recordSqlRejection, type SqlRejectionReason } from "@/lib/metrics";
-import { allowedTables, type SourceConfig } from "@/lib/registry";
-import { analyzeSelect, containsComment } from "@/lib/sql/ast";
+import {
+  allowedTables,
+  type CatalogTable,
+  type SourceConfig,
+  unexposedColumns,
+} from "@/lib/registry";
+import {
+  analyzeSelect,
+  containsComment,
+  type SelectAnalysis,
+  type TableRef,
+} from "@/lib/sql/ast";
 import {
   FORBIDDEN_FUNCTION_SET,
   FORBIDDEN_FUNCTIONS,
@@ -31,6 +41,8 @@ import {
  *     reference in a nested CTE, a lateral subquery, a set-operation arm or a
  *     LIMIT expression is checked the same as one in the top-level FROM, and a
  *     CTE alias is recognised as the CTE it names.
+ *   - No column the catalog marks unexposed may be read, in any position, by
+ *     name or wholesale (see {@link checkColumns}).
  *
  * At execution the server wraps the validated query and injects the dashboard
  * time range on the declared `timeField` using bound query parameters, plus
@@ -143,6 +155,9 @@ export async function validateSql(
     }
   }
 
+  const columns = checkColumns(analyzed.analysis, source);
+  if (columns) return reject("column", columns);
+
   // Second layer: the same function denylists over the raw text, independent
   // of the parser.
   for (const fn of FORBIDDEN_FUNCTIONS) {
@@ -155,6 +170,109 @@ export async function validateSql(
   }
 
   return { ok: true };
+}
+
+/**
+ * The per-column half of the catalog: why the statement reads a column its
+ * author marked unexposed, or null when it reads none.
+ *
+ * Runs after the table check, so every table here is allowlisted. A source
+ * with no unexposed column on any table the statement reads is untouched.
+ * Otherwise the rule is deliberately name-based and errs toward refusing:
+ *
+ *   - A column reference whose last name part is unexposed on *any* table the
+ *     statement reads is refused, however it is qualified and wherever it
+ *     appears — select list, WHERE, ORDER BY, a join condition, a CTE. Filtering
+ *     on a hidden column is reading it one bit at a time. The cost is that
+ *     `s.email` on an exposed `signups.email` is refused when the statement
+ *     also reads a `users` table whose `email` is hidden; the author can split
+ *     the query or ask for the column to be exposed.
+ *   - `*` is refused when its SELECT reads such a table directly, and `x.*`
+ *     when `x` names one. `*` over a subquery or a CTE is fine: it can only
+ *     expand to what that body selected, and the body is checked on its own.
+ *   - A whole-row reference — `u`, `metrics.users`, `row_to_json(u)`, `(u).ssn`,
+ *     the functional `ssn(u)` — is refused when it names such a table, because
+ *     the row carries every column. PostgreSQL prefers a column over a relation
+ *     of the same name, so this can refuse a column that merely shares a name
+ *     with a restricted table or alias; it never lets a row through.
+ *   - A column alias list on such a table (`users AS u(a, b)`) renames columns
+ *     by position, and `NATURAL JOIN` matches on every shared column name
+ *     without naming one, so both are refused there; `USING` names its columns
+ *     and is checked like any other reference.
+ *
+ * Exported for testing; `validateSql` is the only caller.
+ */
+export function checkColumns(
+  analysis: SelectAnalysis,
+  source: SourceConfig,
+): string | null {
+  const catalogTable = (ref: TableRef): CatalogTable | undefined =>
+    source.tables.find(
+      (t) => t.name === ref.name && (!ref.schema || ref.schema === source.schema),
+    );
+
+  // Every unexposed column of every table the statement reads, by name.
+  const hidden = new Map<string, string>();
+  const restricted = (ref: TableRef): CatalogTable | null => {
+    const table = catalogTable(ref);
+    return table && unexposedColumns(table).size > 0 ? table : null;
+  };
+  for (const ref of analysis.tables) {
+    const table = restricted(ref);
+    if (!table) continue;
+    for (const column of unexposedColumns(table)) {
+      if (!hidden.has(column)) hidden.set(column, table.name);
+    }
+  }
+  if (hidden.size === 0) return null;
+
+  // Every name the statement could use to mean a restricted table's whole row.
+  const rows = new Map<string, string>();
+  for (const relation of analysis.relations) {
+    const table = restricted(relation.table);
+    if (!table) continue;
+    if (relation.renamesColumns) {
+      return `column aliases on ${table.name} are not allowed: it has unexposed columns`;
+    }
+    rows.set(table.name, table.name);
+    if (relation.alias) rows.set(relation.alias, table.name);
+  }
+  for (const join of analysis.joins) {
+    const table = join.tables.map(restricted).find((t) => t !== null);
+    for (const column of join.using) {
+      const owner = hidden.get(column);
+      if (owner) return `column not exposed: ${owner}.${column}`;
+    }
+    if (!table) continue;
+    if (join.natural) {
+      return `NATURAL JOIN on ${table.name} is not allowed: it has unexposed columns; join with ON or USING instead`;
+    }
+    if (join.renamesColumns) {
+      return `column aliases on a join over ${table.name} are not allowed: it has unexposed columns`;
+    }
+    for (const alias of join.aliases) rows.set(alias, table.name);
+  }
+
+  for (const column of analysis.columns) {
+    const last = column.path[column.path.length - 1];
+    if (column.star) {
+      const table =
+        last === undefined
+          ? column.from.map(restricted).find((t) => t !== null)?.name
+          : rows.get(last);
+      if (table) {
+        return `SELECT * is not allowed on ${table}: it has unexposed columns; name the columns instead`;
+      }
+      continue;
+    }
+    const owner = hidden.get(last);
+    if (owner) return `column not exposed: ${owner}.${last}`;
+    const row = rows.get(last);
+    if (row) {
+      return `whole-row reference to ${row} is not allowed: it has unexposed columns; name the columns instead`;
+    }
+  }
+  return null;
 }
 
 export interface ExecutablePlan {

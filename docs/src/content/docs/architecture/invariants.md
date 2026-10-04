@@ -119,7 +119,9 @@ the server allows it.
 ## 9. The catalog prompt is metadata only, and that metadata is untrusted
 
 Table and column names and types for a **single selected, authorized source per
-call**. No sample rows are sent.
+call**. No sample rows are sent, and no column the catalog marks
+`"exposed": false`: the guard refuses any read of one, so naming it to the
+model would only produce SQL that fails.
 
 The names come from `information_schema.columns` of a database the operator may
 not control, and a column called `-- ignore previous instructions` is a prompt

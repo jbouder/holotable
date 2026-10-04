@@ -1,6 +1,6 @@
 import { Client } from "pg";
 import { fenceUntrustedBlock, sanitizePromptField } from "@/lib/ai/untrusted";
-import { liveCatalogTables } from "@/lib/catalog/health";
+import { exposedCatalogTables } from "@/lib/catalog/health";
 import {
   CatalogColumn,
   CatalogTable,
@@ -40,6 +40,10 @@ const MAX = {
  * dropped table turns into confident SQL against a relation that is gone. It
  * stays in the allowlist — only the author edits that — so nothing here
  * widens what the guard permits.
+ *
+ * An unexposed column is omitted too, and so is a `timeField` that names one.
+ * Leaving it out of the prompt is the courtesy; `validateSql` refusing it is
+ * the control.
  */
 export function renderCatalog(source: SourceRecord): string {
   const f = sanitizePromptField;
@@ -50,7 +54,7 @@ export function renderCatalog(source: SourceRecord): string {
   lines.push(`Database: ${f(source.config.database, MAX.database)}`);
   lines.push(`Schema: ${f(source.config.schema, MAX.schema)}`);
   lines.push("Tables (only these may be queried):");
-  for (const table of liveCatalogTables(source)) {
+  for (const table of exposedCatalogTables(source)) {
     const description = table.description
       ? ` -- ${f(table.description, MAX.tableDescription)}`
       : "";
@@ -149,6 +153,36 @@ export async function discoverTables(
   }
 }
 
+/** One row of `information_schema.columns`, as a refresh reads it. */
+export interface IntrospectedColumn {
+  column_name: string;
+  data_type: string;
+}
+
+/**
+ * The columns a refresh stores for a table: the database's names, order and
+ * types, carrying forward what the author said about each column by name — its
+ * description and whether it is exposed. A refresh that reset `exposed` would
+ * quietly re-expose every hidden column on the next click of "Refresh", so the
+ * flag is the author's and survives. A column the database has gained since
+ * has no prior entry and starts exposed, like every column of a new source.
+ */
+export function refreshedColumns(
+  existing: CatalogColumn[],
+  rows: IntrospectedColumn[],
+): CatalogColumn[] {
+  const previous = new Map(existing.map((column) => [column.name, column]));
+  return rows.map((row) => {
+    const prior = previous.get(row.column_name);
+    return {
+      ...(prior?.description !== undefined ? { description: prior.description } : {}),
+      ...(prior?.exposed !== undefined ? { exposed: prior.exposed } : {}),
+      name: row.column_name,
+      type: row.data_type,
+    };
+  });
+}
+
 /** What a refresh found: the re-read catalog, and what it could not find. */
 export interface CatalogRefresh {
   config: SourceConfig;
@@ -180,7 +214,7 @@ export async function refreshCatalog(source: SourceRecord): Promise<CatalogRefre
     const tables: CatalogTable[] = [];
     const missingTables: string[] = [];
     for (const existing of source.config.tables) {
-      const result = await client.query<{ column_name: string; data_type: string }>(
+      const result = await client.query<IntrospectedColumn>(
         `SELECT column_name, data_type
            FROM information_schema.columns
           WHERE table_catalog = $1 AND table_schema = $2 AND table_name = $3
@@ -194,10 +228,7 @@ export async function refreshCatalog(source: SourceRecord): Promise<CatalogRefre
         timeField: existing.timeField,
         columns:
           result.rows.length > 0
-            ? result.rows.map((column) => ({
-                name: column.column_name,
-                type: column.data_type,
-              }))
+            ? refreshedColumns(existing.columns, result.rows)
             : existing.columns,
       });
     }

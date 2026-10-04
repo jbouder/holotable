@@ -25,6 +25,14 @@ export const CatalogColumn = z
     name: z.string().min(1).max(128),
     type: z.string().min(1).max(64),
     description: z.string().max(500).optional(),
+    /**
+     * Whether generated SQL may reference this column and the model may be
+     * told it exists. Absent means exposed, so every config stored before the
+     * flag existed reads exactly as it did. `false` keeps the column out of
+     * the prompt and the editor, and `validateSql` refuses any statement that
+     * names it, selects `*` over its table, or reads its table's whole row.
+     */
+    exposed: z.boolean().optional(),
   })
   .strict();
 export type CatalogColumn = z.infer<typeof CatalogColumn>;
@@ -112,7 +120,7 @@ export type SourceDraft = z.infer<typeof SourceDraft>;
 export type SourceCatalog = Pick<SourceConfig, "schema" | "tables">;
 
 export function sourceCatalog(cfg: SourceConfig): SourceCatalog {
-  return { schema: cfg.schema, tables: cfg.tables };
+  return { schema: cfg.schema, tables: cfg.tables.map(exposedTable) };
 }
 
 export interface SourceRecord {
@@ -159,4 +167,38 @@ export function allowedTables(cfg: SourceCatalog): Set<string> {
     set.add(`${cfg.schema}.${t.name}`);
   }
   return set;
+}
+
+/** A column is exposed unless its author said otherwise. */
+export function isExposed(column: CatalogColumn): boolean {
+  return column.exposed !== false;
+}
+
+/** The columns of a table that generated SQL may reference. */
+export function exposedColumns(table: CatalogTable): CatalogColumn[] {
+  return table.columns.filter(isExposed);
+}
+
+/** The names of a table's unexposed columns, exactly as the catalog spells them. */
+export function unexposedColumns(table: CatalogTable): Set<string> {
+  return new Set(table.columns.filter((c) => !isExposed(c)).map((c) => c.name));
+}
+
+/**
+ * A table as it may be described — to the model, to the editor, or to a
+ * catalog-derived suggestion: its exposed columns only, and no `timeField`
+ * when that column is unexposed, since a query could not select it.
+ *
+ * The result is a view, not a valid `CatalogTable`: a table whose every
+ * column is unexposed comes back with none. It must never be stored.
+ */
+export function exposedTable(table: CatalogTable): CatalogTable {
+  const hidden = unexposedColumns(table);
+  if (hidden.size === 0) return table;
+  const { timeField, ...rest } = table;
+  return {
+    ...rest,
+    ...(timeField && !hidden.has(timeField) ? { timeField } : {}),
+    columns: exposedColumns(table),
+  };
 }

@@ -59,6 +59,18 @@ against allowlisted tables:
   a set-operation arm, or a `LIMIT` expression alike. CTE names are resolved
   with PostgreSQL's scoping rules first, so `FROM b` after `WITH b AS (…)` is
   the CTE, while a name a later or sibling CTE defines is a real table.
+- **Column exposure**: a catalog column marked `"exposed": false` cannot be
+  read. A statement that reads a table with such a column is refused if it
+  names the column anywhere (select list, `WHERE`, `ORDER BY`, a join
+  condition, `USING`), selects `*` or `t.*` directly over the table, references
+  the table's whole row (`u`, `row_to_json(u)`, `(u).col`), renames its
+  columns with an alias list (`users AS u(a, b)`), or `NATURAL JOIN`s it. The
+  rule is name-based across the statement, so it can refuse an exposed column
+  of another table that happens to share the hidden column's name; it never
+  lets a hidden one through. `*` over a subquery or a CTE is still fine,
+  because it expands only to what that body selected. Unexposed columns are
+  also left out of the model's prompt, the editor, the starter prompts and the
+  built-in templates, and a catalog refresh keeps each column's flag.
 
 The function denylists also run over the raw text after the parse-tree pass, as
 a cheap second layer that does not depend on the parser.
@@ -104,7 +116,7 @@ control, never a prerequisite for it.
 
 What it knows comes from the selected source's catalog, projected for the
 browser by `sourceCatalog` (`src/lib/registry.ts`): the schema name, the
-allowlisted tables and their columns, and nothing that says how to reach the
+allowlisted tables and their exposed columns, and nothing that says how to reach the
 database. The host, port, database, TLS setting and `secret_ref` stay on the
 server.
 

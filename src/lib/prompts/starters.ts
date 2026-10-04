@@ -1,5 +1,10 @@
-import { liveCatalogTables, type CatalogSubject } from "@/lib/catalog/health";
-import type { CatalogColumn, CatalogTable, SourceRecord } from "@/lib/registry";
+import { exposedCatalogTables, type CatalogSubject } from "@/lib/catalog/health";
+import {
+  type CatalogColumn,
+  type CatalogTable,
+  exposedColumns,
+  type SourceRecord,
+} from "@/lib/registry";
 import { isTimestampType } from "@/lib/source-form";
 
 /**
@@ -17,9 +22,10 @@ import { isTimestampType } from "@/lib/source-form";
  * - **No model call.** This is templates over the catalog, so the chips are
  *   free, instant, and the same every render. A suggestion that costs a token
  *   budget is a suggestion nobody ships on an empty state.
- * - **Only live tables.** The source of tables is {@link liveCatalogTables},
- *   so a table the last refresh could not find never becomes a suggestion. A
- *   starter that is guaranteed to fail is worse than no starter.
+ * - **Only live tables and exposed columns.** The source of tables is
+ *   {@link exposedCatalogTables}, so a table the last refresh could not find,
+ *   or a column its author hid, never becomes a suggestion. A starter that is
+ *   guaranteed to fail is worse than no starter.
  * - **Only plain identifiers.** Catalog names come from a database the
  *   operator may not control, and a chip's whole job is to put text into the
  *   prompt box. Anything that is not an ordinary SQL identifier is skipped
@@ -182,7 +188,7 @@ export function buildStarters(
   const limit = opts.limit ?? DEFAULT_STARTER_LIMIT;
   if (limit <= 0) return [];
 
-  const perTable = liveCatalogTables(source)
+  const perTable = exposedCatalogTables(source)
     .filter(usableTable)
     .map((table) => tableStarters(table, kind));
 
@@ -225,7 +231,7 @@ export function buildSourceDescriptionStarters(
     const table = cfg.tables.find(usableTable);
     if (!table || !isHostLike(cfg.host) || !isPlainIdentifier(cfg.database)) continue;
     if (!isPlainIdentifier(cfg.schema)) continue;
-    const columns = table.columns
+    const columns = exposedColumns(table)
       .filter((column) => isPlainIdentifier(column.name))
       .slice(0, 4)
       .map((column) => column.name);

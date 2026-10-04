@@ -220,6 +220,32 @@ test("every rule reports the class of rule that refused the statement", async ()
   }
 });
 
+test("an unexposed column is refused under its own reason", async () => {
+  const restricted = SourceConfig.parse({
+    ...source,
+    tables: [
+      {
+        ...source.tables[0],
+        columns: [
+          ...source.tables[0].columns,
+          { name: "client_ip", type: "inet", exposed: false },
+        ],
+      },
+    ],
+  });
+  for (const sql of [
+    "SELECT client_ip FROM http_requests",
+    "SELECT * FROM http_requests",
+    "SELECT r FROM http_requests r",
+  ]) {
+    const r = await validateSql(sql, restricted);
+    assert.equal(r.ok, false, sql);
+    assert.equal(r.reason, "column", `${sql} -> ${r.error}`);
+  }
+  const named = await validateSql("SELECT ts, status FROM http_requests", restricted);
+  assert.equal(named.ok, true, named.error);
+});
+
 test("an accepted statement carries no rejection reason", async () => {
   const r = await validateSql("SELECT ts FROM http_requests", source);
   assert.equal(r.ok, true, r.error);

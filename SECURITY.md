@@ -63,9 +63,12 @@ before anything reads them. Generated SQL goes through `validateSql`
 allowlisted constructs — no other statement type anywhere in the tree, no
 `SELECT INTO`, no row locking, no comments — with a function denylist applied
 to every call in the tree, a ban on time and non-deterministic functions,
-keywords and literals, and an allowlist check that every relation the tree
-reads appears in the selected source's catalog. It is then wrapped by `buildExecutablePlan` as a
-subquery, so the validated text cannot escape the wrapper.
+keywords and literals, an allowlist check that every relation the tree
+reads appears in the selected source's catalog, and a column check that no
+column the catalog marks unexposed is read — by name, by `*`, by the table's
+whole row, or through a column alias list or `NATURAL JOIN`. It is then
+wrapped by `buildExecutablePlan` as a subquery, so the validated text cannot
+escape the wrapper.
 
 **User prompts.** A prompt reaches the model, and the model's output is
 untrusted regardless of what the prompt asked for. Every guard above applies

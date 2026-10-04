@@ -74,8 +74,8 @@ process and Node.js collectors (`holotable_process_cpu_seconds_total`,
 | `holotable_sql_validation_rejections_total` | counter | `reason` | Statements refused by the SQL guard |
 
 `reason` comes from a fixed enum, not the error message: `empty`, `structure`,
-`comment`, `keyword`, `function`, `time`, `catalog`. The message names the
-offending table or function and is therefore attacker-influenced text; only the
+`comment`, `keyword`, `function`, `time`, `catalog`, `column`. The message
+names the offending table, column or function and is therefore attacker-influenced text; only the
 reason is safe as a label.
 
 Two of these are per-instance, not per-deployment. `holotable_sse_subscribers`
