@@ -90,6 +90,12 @@ export const config = {
   maxWindowPoints: num("MAX_WINDOW_POINTS", 720),
   /** Statement timeout (seconds) applied to every metrics query. */
   queryTimeoutSeconds: num("QUERY_TIMEOUT_SECONDS", 20),
+  /**
+   * Most connections this process holds open to any one metrics source (#13).
+   * Executions beyond it wait for a free connection, for up to the query
+   * timeout plus five seconds.
+   */
+  maxPoolPerSource: num("MAX_POOL_PER_SOURCE", 5),
 
   /**
    * How long a source's catalog may go without being checked against the live
@@ -413,6 +419,7 @@ const EnvSchema = z.object({
   MAX_RESULT_BYTES: blank(positiveInt),
   MAX_WINDOW_POINTS: blank(positiveInt),
   QUERY_TIMEOUT_SECONDS: blank(positiveInt),
+  MAX_POOL_PER_SOURCE: blank(positiveInt),
   CATALOG_STALE_AFTER_DAYS: blank(nonNegativeInt),
   CHAT_HISTORY_MAX_MESSAGES: blank(positiveInt),
   CHAT_HISTORY_RETENTION_DAYS: blank(nonNegativeInt),

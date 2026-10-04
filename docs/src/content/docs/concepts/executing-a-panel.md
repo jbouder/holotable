@@ -191,6 +191,14 @@ against the allowlisted schema. Credentials are resolved from the environment
 via the source's `secret_ref`; they are never stored in the spec and never leave
 the server.
 
+The connection comes from the source's pool (`src/lib/timescaledb/pool.ts`), at
+most `MAX_POOL_PER_SOURCE` connections per source (default 5). The
+`secret_ref` grant is still checked on every execution. Changing the source's
+host, database, TLS settings or credentials replaces the pool. The transaction
+is always rolled back before the connection goes back, which also undoes the
+`SET LOCAL`. A connection whose statement failed for any reason other than a
+SQL error, or whose rollback failed, is closed instead of reused.
+
 Net effect: the model controls *what to compute*, but not the time window, not
 resource usage, and not which credentials or tables it can touch.
 

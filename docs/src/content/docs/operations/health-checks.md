@@ -109,9 +109,10 @@ rather than an exit. The sequence lives in `src/lib/shutdown.ts`:
    randomized per stream (2–10s) so a terminating instance does not send all
    of its viewers back at the same moment, to the replacement that is least
    able to absorb them.
-4. **In-flight queries are awaited.** Metric queries open a short-lived client
-   each and are counted explicitly; config-store work is awaited by
-   `pool.end()`, which waits for every checked-out client to be released.
+4. **In-flight queries are awaited.** Metric queries are counted explicitly
+   and awaited first; then the config store's pool and every metrics source's
+   pool are closed with `pool.end()`, which waits for every checked-out client
+   to be released.
 5. **The process exits 0**, whether it drained or ran out of budget. A slow
    query should not make an orchestrator report a failed shutdown.
 

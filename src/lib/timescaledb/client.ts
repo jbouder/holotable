@@ -1,15 +1,22 @@
-import { Client, Query } from "pg";
+import { Client, type ClientBase, type PoolClient, Query } from "pg";
 import type { SourceRecord } from "@/lib/registry";
 import { resolveCredentials } from "@/lib/secrets/credentials";
 import { config } from "@/lib/config";
 import type { ExecutablePlan } from "@/lib/sql/safety";
+import { sourcePool } from "@/lib/timescaledb/pool";
 import { ResultCollector } from "@/lib/timescaledb/result-cap";
 import { observeQuery } from "@/lib/metrics";
 import { trackInFlight } from "@/lib/shutdown";
 import { isPlainIdentifier } from "@/lib/catalog/identifiers";
 import type { SourceTestResult, TestReadOnly, TestTable } from "@/lib/source-test";
 
-function clientFor(source: SourceRecord): Client {
+/**
+ * A connection of its own, outside the source's pool, for the connection test
+ * only: it reports how long a connect takes and what a fresh session looks
+ * like, neither of which a reused pooled client could answer. Queries go
+ * through {@link sourcePool}.
+ */
+function testClient(source: SourceRecord): Client {
   // Re-authorized on every connection: the ref must still be granted to the
   // workspace this source belongs to, whatever it was granted when saved.
   const credentials = resolveCredentials(source.secretRef, source.workspaceId);
@@ -121,7 +128,7 @@ function serializableRow(row: Record<string, unknown>): Record<string, unknown> 
  * limit instead of an oversized payload (or an out-of-memory crash) later on.
  */
 function collectResult(
-  client: Client,
+  client: ClientBase,
   plan: ExecutablePlan,
   maxBytes: number,
 ): Promise<QueryResult> {
@@ -149,11 +156,10 @@ function collectResult(
 /**
  * Execute a guarded plan in a read-only transaction.
  *
- * Counted as in flight so graceful shutdown (#47) waits for it: each execution
- * opens its own short-lived `Client`, so there is no pool whose `end()` would
- * do the waiting for us.
+ * Runs on a client checked out of the source's pool (#13). Counted as in
+ * flight so graceful shutdown (#47) waits for it before the pools are closed.
  *
- * Timed for `/api/metrics` (#51). The measurement spans connect, the
+ * Timed for `/api/metrics` (#51). The measurement spans the checkout, the
  * read-only transaction and the rollback, not just the statement, because
  * that is the latency a panel actually waits out. The source id is the only
  * label; the statement and the error message never become one.
@@ -185,16 +191,25 @@ export function executePlan(
 }
 
 async function runPlan(source: SourceRecord, plan: ExecutablePlan): Promise<QueryResult> {
-  const client = clientFor(source);
+  let client: PoolClient | undefined;
   let transactionStarted = false;
+  // Whether the client may go back to the pool. Only a client known to be idle
+  // outside any transaction is returned; anything in doubt is destroyed.
+  let reusable = true;
   try {
-    await client.connect();
+    client = await sourcePool(source).connect();
     const [transaction, searchPath] = sessionStatements(source.config.schema);
     await client.query(transaction);
     transactionStarted = true;
     await client.query(searchPath);
     return await collectResult(client, plan, config.maxResultBytes);
   } catch (err) {
+    // A statement the server refused leaves the connection healthy and the
+    // transaction for the rollback below. Anything else (a dropped socket, a
+    // protocol error) may have left it in a state nobody should inherit.
+    if (!isPostgresStatementError(err) && !(err instanceof QueryExecutionError)) {
+      reusable = false;
+    }
     if (isMissingTimeFieldError(err, plan.timeField)) {
       throw new QueryExecutionError(
         `time column "${plan.timeField}" is not produced by this query. Set the ` +
@@ -210,10 +225,17 @@ async function runPlan(source: SourceRecord, plan: ExecutablePlan): Promise<Quer
     }
     throw err;
   } finally {
-    if (transactionStarted) {
-      await client.query("ROLLBACK").catch(() => undefined);
+    if (client) {
+      // The rollback is what undoes `SET LOCAL search_path` and anything else
+      // the transaction touched, so a client whose rollback fails never goes
+      // back to the pool.
+      if (transactionStarted) {
+        await client.query("ROLLBACK").catch(() => {
+          reusable = false;
+        });
+      }
+      client.release(!reusable);
     }
-    await client.end().catch(() => undefined);
   }
 }
 
@@ -272,7 +294,7 @@ async function inSavepoint<T>(
 }
 
 async function runSourceTest(source: SourceRecord): Promise<SourceTestResult> {
-  const client = clientFor(source);
+  const client = testClient(source);
   let connected = false;
   try {
     const startedAt = Date.now();
