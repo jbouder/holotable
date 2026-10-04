@@ -180,6 +180,18 @@ and drops or defaults anything stale, so an old row never breaks a page. Only
 `sub`. Theme and motion are deliberately not here; see
 [Settings and your account](/getting-started/settings/).
 
+### `sessions`
+
+One row per renewable session (#27): `id_hash` (SHA-256 of the opaque id in
+the `/api/auth` cookie, never the id itself), `sub`, `oidc_sid` (the realm's
+session id, for back-channel logout, #28), `refresh_token` (AES-256-GCM
+ciphertext under a key derived from `SESSION_SECRET`), `created_at`,
+`refreshed_at` and `expires_at`. Written at sign-in, rewritten at each renewal
+under a row lock (so concurrent renewals take turns with a rotating refresh
+token), and deleted at sign-out, on a refused renewal, or once expired.
+Nothing on the request path reads it. Rotating `SESSION_SECRET` makes every
+stored token unreadable, which ends every session.
+
 ## Metrics store (TimescaleDB)
 
 - `metrics.http_requests` is a hypertable containing raw request events (see

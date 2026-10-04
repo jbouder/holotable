@@ -69,7 +69,32 @@ identity that holds exactly that role, so the description cannot drift from
 the rule.
 
 The session cookie is `httpOnly`, `Secure` in production, `SameSite=Lax`,
-path `/`, with an 8-hour lifetime.
+path `/`. It lives as long as the token in it.
+
+### Renewal
+
+When the realm issues a refresh token at sign-in, the session is renewable
+(#27):
+
+- The session token lives for half of the refresh token's idle lifetime, at
+  most 8 hours: 15 minutes against a default Keycloak realm, whose idle timeout
+  is 30 minutes. Without a refresh token it is the 8 hours it always was.
+- The refresh token is stored server-side in `sessions`, sealed with
+  AES-256-GCM under a key derived from `SESSION_SECRET`. The browser gets only
+  a random session id, in a second `httpOnly` cookie
+  (`<SESSION_COOKIE_NAME>_renew`) scoped to `/api/auth`, so it travels with
+  nothing but sign-in, renewal and sign-out.
+- `POST /api/auth/refresh` asks the realm for a fresh token set, verifies the
+  new id_token, checks its `sub` is the one that signed in, and mints a new
+  session token from **its** groups. A group removed in Keycloak stops working
+  at the next renewal.
+- The browser renews about a minute before the token expires, and again when a
+  tab comes back into view after its renewal was due. A live dashboard whose
+  stream is refused renews once and reconnects. When the realm refuses the
+  refresh, both cookies are cleared, the row is deleted, and a banner asks the
+  person to sign in again.
+- A request is still authenticated by verifying the session token alone; the
+  table is read only by renewal and sign-out.
 
 :::note
 OIDC is the only way to authenticate; there is no local or development login

@@ -78,6 +78,11 @@ Important files:
 - `src/lib/sql/safety.ts` — the SQL guard every generated query passes through
 - `src/lib/sql/ast.ts` — the PostgreSQL parse-tree walk the guard is built on
 - `src/lib/auth/authorize.ts` — the central `can()` check
+- `src/lib/auth/renewal.ts` — session renewal (#27): the realm's refresh token
+  is sealed in `sessions` (`refresh-token.ts`) and never reaches the browser,
+  which holds only an opaque id in a cookie scoped to `/api/auth`. Renewal
+  re-derives the groups from the realm's fresh id_token; it is not on the
+  request path, which still verifies the stateless session token alone
 - `src/lib/settings.ts` — the `/settings` sections as data. A new section is
   an entry here and a page under `src/app/settings/<id>/`; a gated section
   also calls `notFound()` from its page, because hiding the link is never the
@@ -358,7 +363,9 @@ Prefer additive, migration-safe changes.
 
 Keycloak OIDC is the **only** way to authenticate a real user. There is no
 local login, no password store, no dev-login bypass, and no seeded user —
-`src/app/api/auth/` has exactly three routes (`login`, `callback`, `logout`).
+`src/app/api/auth/` has exactly four routes (`login`, `callback`, `logout`,
+and `refresh`, which renews a session only from a fresh realm-issued id_token
+and never mints one on its own; #27).
 Do not add a development-only authentication path; make the local Keycloak
 work instead.
 

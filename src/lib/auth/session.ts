@@ -1,4 +1,4 @@
-import { SignJWT, jwtVerify, createRemoteJWKSet, type JWTPayload } from "jose";
+import { SignJWT, jwtVerify, createRemoteJWKSet, decodeJwt, type JWTPayload } from "jose";
 import { config } from "@/lib/config";
 import {
   parseGroups,
@@ -33,7 +33,12 @@ function getJwks() {
   return jwks;
 }
 
-function sessionSecret(): Uint8Array {
+/**
+ * The raw `SESSION_SECRET` bytes. Signs the session token, and is the input
+ * key material the refresh-token encryption key is derived from
+ * (`src/lib/auth/refresh-token.ts`), under its own HKDF label.
+ */
+export function sessionSecret(): Uint8Array {
   const secret = process.env.SESSION_SECRET;
   if (!secret || secret.length < 32) {
     if (config.isProduction) {
@@ -118,4 +123,19 @@ export async function signSessionToken(
     .setIssuedAt()
     .setExpirationTime(`${ttlSeconds}s`)
     .sign(sessionSecret());
+}
+
+/**
+ * When a session token expires, epoch ms, or null. Read WITHOUT verifying: it
+ * is only ever used to decide when the browser should renew (#27), after
+ * {@link verifySessionToken} has already accepted the same token, and a wrong
+ * value can only make a renewal early or late.
+ */
+export function tokenExpiry(token: string): number | null {
+  try {
+    const { exp } = decodeJwt(token);
+    return typeof exp === "number" ? exp * 1000 : null;
+  } catch {
+    return null;
+  }
 }

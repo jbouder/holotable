@@ -90,3 +90,26 @@ Decode an issued token and confirm it contains:
 If `groups` is missing or contains bare names rather than paths, revisit step 2.
 How those paths become roles is described in
 [Authorization model](/architecture/authorization/).
+
+## Session renewal
+
+Holotable renews a session without a new login while the Keycloak session
+behind it is alive. For that the client must be issued refresh tokens, which
+is Keycloak's default (**Advanced → Use refresh tokens**: on). Nothing else is
+configured on the Holotable side.
+
+The realm's session settings decide the lengths:
+
+- **SSO Session Idle** (default 30 minutes) is the refresh token's lifetime.
+  The Holotable session token lives half of it, and the browser renews before
+  it runs out, which also keeps the realm session from idling out while a tab
+  is open.
+- **SSO Session Max** (default 10 hours) is the hard end. Past it the realm
+  refuses the renewal, and the person sees a banner asking them to sign in
+  again.
+- Removing someone from a group takes effect at their next renewal, at most one
+  session-token lifetime later.
+
+The refresh token is stored encrypted in the config database and never sent to
+the browser. If the client does not issue refresh tokens, sessions last 8 hours
+and end there, as before.
