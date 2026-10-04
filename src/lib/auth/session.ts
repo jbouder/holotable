@@ -6,6 +6,7 @@ import {
   type Identity,
   type Profile,
 } from "@/lib/auth/claims";
+import { isRevoked, type TokenRef } from "@/lib/auth/revocation";
 
 /**
  * Session verification.
@@ -26,7 +27,8 @@ import {
 const GROUPS_CLAIM = process.env.OIDC_GROUPS_CLAIM || "groups";
 
 let jwks: ReturnType<typeof createRemoteJWKSet> | null = null;
-function getJwks() {
+/** The realm's signing keys, or null when `OIDC_JWKS_URL` is not set. */
+export function realmJwks() {
   const url = process.env.OIDC_JWKS_URL;
   if (!url) return null;
   if (!jwks) jwks = createRemoteJWKSet(new URL(url));
@@ -61,9 +63,20 @@ function extractGroups(payload: JWTPayload): string[] {
   return [];
 }
 
+function refFromPayload(payload: JWTPayload, sub: string): TokenRef {
+  return {
+    sub,
+    sid: typeof payload.sid === "string" ? payload.sid : null,
+    iat: typeof payload.iat === "number" ? payload.iat : 0,
+  };
+}
+
 function identityFromPayload(payload: JWTPayload): Identity | null {
   const sub = typeof payload.sub === "string" ? payload.sub : null;
   if (!sub) return null;
+  // A session the realm ended by back-channel logout (#28) is refused here,
+  // on every request, rather than at its expiry.
+  if (isRevoked(refFromPayload(payload, sub))) return null;
   return {
     ...parseGroups(sub, extractGroups(payload)),
     ...profileFromClaims(payload as Record<string, unknown>),
@@ -76,7 +89,7 @@ function identityFromPayload(payload: JWTPayload): Identity | null {
 export async function verifySessionToken(token: string): Promise<Identity | null> {
   if (!token) return null;
 
-  const remote = getJwks();
+  const remote = realmJwks();
   if (remote) {
     try {
       const { payload } = await jwtVerify(token, remote, {
@@ -111,8 +124,11 @@ export async function signSessionToken(
   groups: string[],
   profile: Profile = {},
   ttlSeconds = 60 * 60 * 8,
+  /** The realm session id, so a back-channel logout can name this token (#28). */
+  sid?: string,
 ): Promise<string> {
   const claims: JWTPayload = { [GROUPS_CLAIM]: groups };
+  if (sid) claims.sid = sid;
   if (profile.displayName) claims.name = profile.displayName;
   if (profile.email) claims.email = profile.email;
   return new SignJWT(claims)
@@ -135,6 +151,19 @@ export function tokenExpiry(token: string): number | null {
   try {
     const { exp } = decodeJwt(token);
     return typeof exp === "number" ? exp * 1000 : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * What a revocation is matched against, read from a token that has ALREADY
+ * been verified (the stream route reads it after `requireIdentity`).
+ */
+export function tokenRef(token: string): TokenRef | null {
+  try {
+    const payload = decodeJwt(token);
+    return typeof payload.sub === "string" ? refFromPayload(payload, payload.sub) : null;
   } catch {
     return null;
   }

@@ -23,16 +23,22 @@ export const pgSessionStore: SessionStore = {
     return withTransaction(async (client) => {
       const res = await client.query<{
         sub: string;
+        oidc_sid: string | null;
         refresh_token: Buffer;
         expires_at: Date;
       }>(
-        `SELECT sub, refresh_token, expires_at FROM sessions
+        `SELECT sub, oidc_sid, refresh_token, expires_at FROM sessions
          WHERE id_hash = $1 FOR UPDATE`,
         [idHash],
       );
       const r = res.rows[0];
       const row: StoredSession | null = r
-        ? { sub: r.sub, refreshToken: r.refresh_token, expiresAt: new Date(r.expires_at) }
+        ? {
+            sub: r.sub,
+            oidcSid: r.oidc_sid,
+            refreshToken: r.refresh_token,
+            expiresAt: new Date(r.expires_at),
+          }
         : null;
       return fn({
         row,
@@ -55,6 +61,30 @@ export const pgSessionStore: SessionStore = {
     await query(`DELETE FROM sessions WHERE id_hash = $1`, [idHash]);
   },
 };
+
+/**
+ * Back-channel logout (#28): forget the refresh tokens of the realm session it
+ * names, or of every session of the subject when it names no session. Returns
+ * how many rows went.
+ */
+export async function removeSessionsFor(target: {
+  sub?: string;
+  sid?: string;
+}): Promise<number> {
+  if (target.sid) {
+    const rows = await query(`DELETE FROM sessions WHERE oidc_sid = $1 RETURNING 1`, [
+      target.sid,
+    ]);
+    return rows.length;
+  }
+  if (target.sub) {
+    const rows = await query(`DELETE FROM sessions WHERE sub = $1 RETURNING 1`, [
+      target.sub,
+    ]);
+    return rows.length;
+  }
+  return 0;
+}
 
 /** The real database, realm and signer, for the three routes that use them. */
 export const renewalDeps: RenewalDeps = {

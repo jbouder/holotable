@@ -26,7 +26,12 @@ import {
   type StoredSession,
   UNRENEWABLE_TTL_SECONDS,
 } from "@/lib/auth/renewal";
-import { signSessionToken, tokenExpiry, verifySessionToken } from "@/lib/auth/session";
+import {
+  signSessionToken,
+  tokenExpiry,
+  tokenRef,
+  verifySessionToken,
+} from "@/lib/auth/session";
 import { readRenewResponse, renewalDelay } from "@/lib/session-renewal";
 
 /**
@@ -215,6 +220,9 @@ test("sign-in with a refresh token stores it sealed and issues a short, renewabl
   assert.equal(Buffer.from(row.refreshToken).includes(Buffer.from("rt-1")), false);
   assert.equal(openRefreshToken(row.refreshToken), "rt-1");
 
+  // It names the realm session, so a back-channel logout can reach it (#28).
+  assert.equal(tokenRef(issued.sessionToken)?.sid, "kc-session-1");
+
   // The token is an ordinary session token, verified the ordinary way.
   const identity = await verifySessionToken(issued.sessionToken);
   assert.equal(identity?.sub, "alice");
@@ -267,6 +275,9 @@ test("a renewal re-derives the groups from the realm's fresh id_token", async ()
   assert.equal(outcome.expiresAt, NOW + 900_000);
 
   // The rotated refresh token replaced the old one, still sealed.
+  // The fresh id_token carried no `sid`; the one from sign-in still names it.
+  assert.equal(tokenRef(outcome.sessionToken)?.sid, "kc-session-1");
+
   const row = [...store.rows.values()][0];
   assert.equal(openRefreshToken(row.refreshToken), "rt-2");
   assert.equal(row.expiresAt.getTime(), NOW + 1_800_000);

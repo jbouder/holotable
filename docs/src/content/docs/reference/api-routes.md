@@ -101,7 +101,8 @@ hand.
 | `/api/auth/login` | GET | Begins the OIDC authorization-code flow |
 | `/api/auth/callback` | GET | Verifies the token, mints the session cookie |
 | `/api/auth/refresh` | POST | Renews the session (#27). Authenticated by the `/api/auth`-scoped renewal cookie, not the session cookie, so it works after the token expired. Re-derives groups from the realm's fresh id_token. `200 { expiresAt }`; `401` when there is nothing to renew or the realm refused (both cookies cleared); `503` when the realm or database did not answer. A 404 in demo mode |
-| `/api/auth/logout` | POST | Clears both session cookies and deletes the stored refresh token |
+| `/api/auth/logout` | POST | Clears both session cookies, deletes the stored refresh token, and revokes the session's token so a copy of the cookie stops working |
+| `/api/auth/backchannel-logout` | POST | Called by Keycloak, not a browser (#28). Form body `logout_token`, verified against the realm JWKS for issuer, audience (`OIDC_CLIENT_ID`), age and the back-channel `events` claim. Revokes the named `sid` (or every session of a bare `sub`), closes its open streams, deletes its `sessions` rows. `200` empty, or `400 {"error":"invalid_request"}`. A 404 in demo mode or without OIDC |
 
 ## Operations
 

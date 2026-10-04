@@ -10,6 +10,7 @@ import { config } from "@/lib/config";
 import { accountOrigin } from "@/lib/account";
 import { GET as callback } from "@/app/api/auth/callback/route";
 import { POST as refresh } from "@/app/api/auth/refresh/route";
+import { POST as backchannelLogout } from "@/app/api/auth/backchannel-logout/route";
 import { proxy, config as proxyConfig } from "@/proxy";
 import { NextRequest } from "next/server";
 
@@ -111,11 +112,28 @@ test("session renewal is a 404 in demo mode: there is no realm to ask", async ()
   assert.equal(res.status, 404);
 });
 
-// The fourth is session renewal (#27), which mints only from a realm-issued
-// id_token. Anything else here is a new way in and needs the same scrutiny.
-test("there are still exactly four auth routes", () => {
+test("back-channel logout is a 404 in demo mode: there is no realm to hear from", async () => {
+  const res = await backchannelLogout(
+    new Request("http://localhost/api/auth/backchannel-logout", {
+      method: "POST",
+      body: "logout_token=x",
+    }),
+  );
+  assert.equal(res.status, 404);
+});
+
+// Session renewal (#27) mints only from a realm-issued id_token, and
+// back-channel logout (#28) only ever ends sessions. Anything else here is a
+// new way in and needs the same scrutiny.
+test("there are still exactly five auth routes", () => {
   const dir = new URL("../src/app/api/auth", import.meta.url);
-  assert.deepEqual(readdirSync(dir).sort(), ["callback", "login", "logout", "refresh"]);
+  assert.deepEqual(readdirSync(dir).sort(), [
+    "backchannel-logout",
+    "callback",
+    "login",
+    "logout",
+    "refresh",
+  ]);
 });
 
 test("a cookie-less page request is sent through demo login; an API request is not", () => {

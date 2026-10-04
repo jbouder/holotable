@@ -123,6 +123,17 @@ only a random id for it, in an `httpOnly` cookie scoped to `/api/auth`, whose
 SHA-256 is what the table stores. Sign-out deletes the row; a refused renewal
 deletes it too.
 
+**Back-channel logout.** When the realm ends a session it POSTs a signed
+logout token to `/api/auth/backchannel-logout`. The token's signature (realm
+JWKS only), issuer, audience (this client), age (five minutes) and `events`
+claim are all checked, and one carrying a `nonce` is refused, so an id_token
+from the same realm cannot pass for one. A valid one revokes the realm session
+it names at once: its session tokens stop verifying on the next request, its
+open dashboard streams are closed, and its stored refresh token is deleted.
+The revocation list is in memory (one instance by design), so a restart
+forgets it; a revoked token then works until it expires, at most one session
+token lifetime, and cannot be renewed.
+
 **Demo mode is outside this trust model.** `AUTH_MODE=demo` hands every
 visitor a session with no login, so anyone who can reach the server is a
 member of the `DEMO_GROUPS` workspaces. The server refuses to boot it beside
