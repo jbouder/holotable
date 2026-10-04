@@ -1,0 +1,61 @@
+{
+  // The public Holotable demo (#254). One Worker in front of one Cloudflare
+  // Container running the quick-start image. See
+  // docs/src/content/docs/operations/cloudflare-demo.md.
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "holotable-demo",
+  "main": "src/worker.ts",
+  "compatibility_date": "2026-10-04",
+  "compatibility_flags": ["nodejs_compat"],
+  "observability": { "enabled": true },
+
+  "containers": [
+    {
+      "class_name": "HolotableDemo",
+      "image": "./Dockerfile",
+      // ½ vCPU, 4 GiB. #253 measured a 5–7 s boot and a 14 s backfill at
+      // --cpus=0.5; move to standard-2 if real cold starts run past ~45 s.
+      "instance_type": "standard-1",
+      // One instance, ever: the demo is one shared database, and this is the
+      // ceiling on what a flood of traffic can cost.
+      "max_instances": 1
+    }
+  ],
+  "durable_objects": {
+    "bindings": [{ "name": "HOLOTABLE", "class_name": "HolotableDemo" }]
+  },
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["HolotableDemo"] }],
+
+  // Per-IP limits, checked in the Worker before anything reaches the
+  // container. Counted per Cloudflare location and eventually consistent: a
+  // brake on floods and scripts, not exact accounting. The period must be 10
+  // or 60 seconds.
+  "ratelimits": [
+    {
+      // Non-GET /api/*: queries, generation, edits, chat, sign-in.
+      "name": "WRITE_LIMITER",
+      "namespace_id": "25401",
+      "simple": { "limit": 60, "period": 60 }
+    },
+    {
+      // Everything else: pages, assets, reads, the live stream.
+      "name": "READ_LIMITER",
+      "namespace_id": "25402",
+      "simple": { "limit": 600, "period": 60 }
+    }
+  ],
+
+  // Not secrets. The model limits are passed to the container and are
+  // tighter than the app's defaults (20 requests/min, 2M tokens/day) because
+  // every visitor shares one workspace. Secrets (SESSION_SECRET,
+  // OPENAI_API_KEY, OPENAI_BASE_URL, AI_MODEL, OPENAI_API) are set with
+  // `wrangler secret put`; see the operations doc.
+  // The one secret the demo needs. The model secrets are optional: without
+  // them the demo runs with generation, Explore and chat off.
+  "secrets": { "required": ["SESSION_SECRET"] },
+
+  "vars": {
+    "LLM_RATE_PER_MINUTE": "5",
+    "LLM_DAILY_TOKEN_BUDGET": "300000"
+  }
+}

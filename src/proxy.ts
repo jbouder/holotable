@@ -84,9 +84,15 @@ function requestOrigin(request: NextRequest): string {
 }
 
 /**
- * A document navigation with no session cookie. A prefetch is left alone: it
- * cannot follow a redirect that sets a cookie on the visitor's behalf, and the
- * navigation it precedes will redirect anyway.
+ * A browser navigation with no session cookie.
+ *
+ * Only a navigation is redirected: a browser keeps the cookie the login route
+ * sets and comes straight back, while a cookie-less client (a health check,
+ * a script, curl) would bounce between the page and the login route until it
+ * gave up. Cloudflare's container start check fetches `/` exactly that way
+ * (#254). Those clients get the page itself, which shows "Enter the demo". A
+ * prefetch is left alone too: it cannot follow a redirect that sets a cookie
+ * on the visitor's behalf, and the navigation it precedes will redirect anyway.
  */
 function needsDemoSession(request: NextRequest): boolean {
   if (request.method !== "GET") return false;
@@ -97,7 +103,18 @@ function needsDemoSession(request: NextRequest): boolean {
   ) {
     return false;
   }
-  return true;
+  return isNavigation(request);
+}
+
+/**
+ * `Sec-Fetch-Dest: document` where the browser sends Fetch Metadata (every
+ * current one), else an `Accept` that asks for HTML, which every browser sends
+ * on a navigation and a bare `fetch()` does not.
+ */
+function isNavigation(request: NextRequest): boolean {
+  const dest = request.headers.get("sec-fetch-dest");
+  if (dest) return dest === "document";
+  return (request.headers.get("accept") ?? "").includes("text/html");
 }
 
 export const config = {

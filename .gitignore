@@ -40,3 +40,10 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# Cloudflare demo Worker (deploy/cloudflare/demo): generated runtime types,
+# local secrets and Wrangler's local state.
+deploy/cloudflare/demo/node_modules
+deploy/cloudflare/demo/worker-configuration.d.ts
+deploy/cloudflare/demo/.dev.vars
+deploy/cloudflare/demo/.wrangler

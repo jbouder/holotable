@@ -77,7 +77,9 @@ infrastructure errors stay generic.
 
 ## Quick start
 
-Three steps, from trying it to running it.
+Three steps, from trying it to running it. Or skip all three: the
+[public demo](https://holotable-demo.vibeproject.workers.dev) runs the same
+image as step 1, reset whenever it sleeps.
 
 **1. Evaluate: one command.** TimescaleDB, the app, six hours of demo history
 and the live seeder in one container, with no sign-in and no `.env`:
