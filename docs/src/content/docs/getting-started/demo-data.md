@@ -27,7 +27,29 @@ check](/concepts/generating-a-panel/) before the model is called, and a catalog
 seeded from this file has, in the only sense that matters, just been
 introspected.
 
-## 2. Loop
+## 2. Backfill (optional)
+
+With `SEED_BACKFILL` set to a duration such as `6h`, the seeder first writes
+the history it would have produced across that window, at the same
+`SEED_INTERVAL_MS` cadence and with the same row shapes as the loop. A fresh
+database then opens on full charts instead of filling in over the first
+minutes. It writes `metrics.http_requests` and `metrics.system_metrics` in
+multi-row inserts of at most 5 000 rows, logging once per insert. Then it
+refreshes the `metrics.http_requests_1m` continuous aggregate over the same
+range, so the aggregate has data at once rather than after its policy's first
+run. Six hours at the default cadence is about 540 000 request rows and takes
+seconds.
+
+Each table is filled from the window start or from just after its newest
+existing row, whichever is later. So a restart with a mounted volume fills only
+the time it was down and never doubles the history, and a restart right away
+writes nothing.
+
+`metrics.holotable_self` is never backfilled. The self-monitoring dashboard
+shows Holotable's real samples from the moment it starts, which is the point
+of that source.
+
+## 3. Loop
 
 Every `SEED_INTERVAL_MS` it inserts a fresh batch of synthetic rows into both
 tables so the live dashboards stream. It connects with the privileged metrics
@@ -53,6 +75,7 @@ database.
 | --- | --- | --- |
 | `SEED_INTERVAL_MS` | `2000` | Delay between insert batches (Docker dev override: `1000`). |
 | `SEED_DEMO` | — | Set to `false` to skip the one-time bootstrap and only stream metrics. |
+| `SEED_BACKFILL` | — | History to write before streaming: `30m`, `6h`, `1d`, at most `7d`. Unset writes none. An invalid value exits 1. |
 | `TS_METRICS_HOST` / `TS_METRICS_PORT` | `localhost` / `5432` | Host and port written into the seeded source configs. |
 | `POSTGRES_DB` | `holotable` | Database name written into the seeded source configs. |
 | `SELF_METRICS_INTERVAL_MS` | `15000` | Collector only: delay between scrapes of `/api/metrics`. |

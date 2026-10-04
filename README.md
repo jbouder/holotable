@@ -151,7 +151,12 @@ install something to show. It does two things:
    written inline here, which is what lets `npm test` validate it against the IR
    and run every panel through the SQL guard.
 
-2. **Loop:** every `SEED_INTERVAL_MS` it inserts a fresh batch of synthetic rows
+2. **Backfill (optional):** with `SEED_BACKFILL=6h` (or `30m`, `1d`, at most
+   `7d`) it first writes the history the loop would have produced across that
+   window, then refreshes `metrics.http_requests_1m`, so a fresh database opens
+   on full charts. A restart fills only the gap since the newest row.
+
+3. **Loop:** every `SEED_INTERVAL_MS` it inserts a fresh batch of synthetic rows
    into both tables so the live dashboards stream. It connects with the
    privileged metrics user and ensures the demo hypertables exist first, so it
    also works against a database whose volume predates a table.
@@ -174,6 +179,7 @@ default single-instance setup these are the same TimescaleDB database.
 | --- | --- | --- |
 | `SEED_INTERVAL_MS` | `2000` | Delay between insert batches (Docker dev override: `1000`). |
 | `SEED_DEMO` | — | Set to `false` to skip the one-time source/dashboard bootstrap and only stream metrics. |
+| `SEED_BACKFILL` | — | History to write before streaming: `30m`, `6h`, `1d`, at most `7d`. Unset writes none. |
 | `TS_METRICS_HOST` / `TS_METRICS_PORT` | `localhost` / `5432` | Host/port written into the seeded source configs. |
 | `POSTGRES_DB` | `holotable` | Database name written into the seeded source configs. |
 | `SELF_METRICS_INTERVAL_MS` | `15000` | `scripts/self-metrics.ts` only: delay between scrapes of `/api/metrics`. |
