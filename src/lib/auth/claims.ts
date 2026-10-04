@@ -39,10 +39,108 @@ export interface Identity {
    */
   displayName?: string;
   email?: string;
+  /**
+   * The realm claims named by `ROW_FILTER_CLAIMS`, as strings (#31). They
+   * decide which ROWS a row-filtered source returns to this person, never
+   * whether they may act: `can()` does not read them. Absent, or missing a
+   * name, when the token did not carry that claim as a single value, and a
+   * row-filtered source then refuses rather than serving every row.
+   */
+  attributes?: Readonly<Record<string, string>>;
 }
 
 /** The display-only part of an {@link Identity}. */
 export type Profile = Pick<Identity, "displayName" | "email">;
+
+/* -------------------------------------------------------------------------- */
+/* Row-filter attributes (#31)                                                */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * The claim a source's row filter may always use: the subject, which every
+ * identity has, for rows that belong to one person.
+ */
+export const SUBJECT_CLAIM = "sub";
+
+/**
+ * What a configurable claim name may look like: a plain name, or a namespaced
+ * one such as `https://example.com/tenant`. Matched against the token's
+ * top-level keys exactly, so a dotted name is one key, not a path.
+ */
+export const CLAIM_NAME = /^[A-Za-z_][A-Za-z0-9_.:/-]{0,127}$/;
+
+/**
+ * Claims the first-party session token already uses for itself. Carrying a
+ * realm claim under one of these names would overwrite it when the session is
+ * minted, so `validateConfig` refuses them in `ROW_FILTER_CLAIMS`.
+ */
+export const RESERVED_CLAIMS: ReadonlySet<string> = new Set([
+  "sub",
+  "iss",
+  "aud",
+  "exp",
+  "nbf",
+  "iat",
+  "jti",
+  "sid",
+  "azp",
+  "typ",
+  "nonce",
+  "auth_time",
+  "at_hash",
+  "c_hash",
+  "acr",
+  "amr",
+  "session_state",
+  "name",
+  "email",
+  "preferred_username",
+]);
+
+/** `ROW_FILTER_CLAIMS` as names: comma- or whitespace-separated. */
+export function splitClaimNames(raw: string): string[] {
+  return [...new Set(raw.split(/[\s,]+/).filter(Boolean))];
+}
+
+/** Longest attribute value kept. A tenant id is far shorter. */
+const ATTRIBUTE_MAX_LENGTH = 256;
+
+function attributeValue(value: unknown): string | undefined {
+  // One value or none. A list would make "which tenant?" ambiguous, and an
+  // ambiguous answer must not be resolved by picking one.
+  if (typeof value === "number" && Number.isFinite(value)) return String(value);
+  if (typeof value !== "string") return undefined;
+  // biome-ignore lint/suspicious/noControlCharactersInRegex: a control character is no part of an id
+  if (/[\u0000-\u001f\u007f]/.test(value)) return undefined;
+  if (value.length === 0 || value.length > ATTRIBUTE_MAX_LENGTH) return undefined;
+  return value;
+}
+
+/**
+ * Read the configured row-filter claims from a validated token. A claim that
+ * is missing, a list, an object, empty, too long or carries a control
+ * character is left out, never coerced: its absence is what makes a filtered
+ * source refuse.
+ */
+export function attributesFromClaims(
+  claims: Readonly<Record<string, unknown>>,
+  names: readonly string[],
+): Record<string, string> {
+  const out: Record<string, string> = {};
+  for (const name of names) {
+    const value = attributeValue(claims[name]);
+    if (value !== undefined) out[name] = value;
+  }
+  return out;
+}
+
+/** The value `claim` holds for this identity, if any. */
+export function claimValue(identity: Identity, claim: string): string | undefined {
+  if (claim === SUBJECT_CLAIM) return identity.sub;
+  return Object.hasOwn(identity.attributes ?? {}, claim)
+    ? identity.attributes?.[claim]
+    : undefined;
+}
 
 /** Longer than any real name or address, short enough to keep a cookie small. */
 const PROFILE_MAX_LENGTH = 254;

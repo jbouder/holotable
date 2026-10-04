@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { requireIdentity, assertAuthorized, can, HttpError } from "@/lib/auth/authorize";
 import { readJson, json, route } from "@/lib/http";
+import { assertRowFilterSavable } from "@/lib/row-scope";
 import { audit } from "@/lib/audit";
 import { listSources, createSource } from "@/lib/db/repo";
 import { catalogHealth } from "@/lib/catalog/health";
@@ -52,6 +53,7 @@ export const POST = route("sources.create", async (req: Request) => {
 
   assertAuthorized(identity, "source:manage", { workspaceId: body.workspaceId });
   requireGrantedSecretRef(body.secretRef, body.workspaceId);
+  assertRowFilterSavable(body.config);
 
   const source = await createSource({
     id: body.id,

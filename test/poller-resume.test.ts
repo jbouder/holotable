@@ -130,7 +130,7 @@ test("a second viewer joining a running dashboard gets the history, not just the
   mock.timers.enable({ apis: ["setTimeout"] });
   const { executor, add } = growingSource();
   add(1, 2, 3);
-  const poller = getPoller(dashboardId(), 1, "ws", spec(), executor);
+  const poller = getPoller(dashboardId(), 1, "ws", spec(), {}, executor);
 
   const a = viewer();
   const unsubA = poller.subscribe(a.listener);
@@ -171,7 +171,7 @@ test("a reconnect with its last event id misses nothing and repeats nothing", as
   const { executor, add } = growingSource();
   add(1, 2);
   const id = dashboardId();
-  const poller = getPoller(id, 1, "ws", spec(), executor);
+  const poller = getPoller(id, 1, "ws", spec(), {}, executor);
 
   // Someone else keeps the poller running throughout.
   const other = viewer();
@@ -215,12 +215,12 @@ test("resuming into a poller that had stopped picks up from the cursor", async (
   add(1, 2);
   const id = dashboardId();
   const a = viewer();
-  let unsub = getPoller(id, 1, "ws", spec(), executor).subscribe(a.listener);
+  let unsub = getPoller(id, 1, "ws", spec(), {}, executor).subscribe(a.listener);
   await settle();
   unsub(); // the only viewer: the poller stops
   add(3);
 
-  unsub = getPoller(id, 1, "ws", spec(), executor).subscribe(a.listener, a.lastId);
+  unsub = getPoller(id, 1, "ws", spec(), {}, executor).subscribe(a.listener, a.lastId);
   await settle();
   assert.deepEqual(seriesRows(a), [1, 2, 3]);
   assert.equal(panelEvents(a, "series").at(-1)?.mode, "append");
@@ -233,7 +233,7 @@ test("a reconnect after the spec changed version, or with a bad id, gets a full 
   add(1, 2);
   const id = dashboardId();
   const a = viewer();
-  const unsub = getPoller(id, 1, "ws", spec(), executor).subscribe(a.listener);
+  const unsub = getPoller(id, 1, "ws", spec(), {}, executor).subscribe(a.listener);
   await settle();
   unsub();
   const v1Token = a.lastId;
@@ -246,7 +246,7 @@ test("a reconnect after the spec changed version, or with a bad id, gets a full 
   ]) {
     const b = viewer();
     // Version 2 of the dashboard now.
-    const off = getPoller(id, 2, "ws", spec(), executor).subscribe(b.listener, token);
+    const off = getPoller(id, 2, "ws", spec(), {}, executor).subscribe(b.listener, token);
     await settle();
     assert.equal(
       panelEvents(b, "series")[0]?.mode,
@@ -264,7 +264,7 @@ test("the newest bucket updates in place while it fills, without duplicating", a
   add(1, 2);
   const id = dashboardId();
   const a = viewer();
-  let unsub = getPoller(id, 1, "ws", spec(), executor).subscribe(a.listener);
+  let unsub = getPoller(id, 1, "ws", spec(), {}, executor).subscribe(a.listener);
   await settle();
   assert.deepEqual(seriesRows(a), [1, 2]);
 
@@ -280,7 +280,7 @@ test("the newest bucket updates in place while it fills, without duplicating", a
   // A resume overlaps at the cursor's bucket; that is an update too.
   unsub();
   bump(30);
-  unsub = getPoller(id, 1, "ws", spec(), executor).subscribe(a.listener, a.lastId);
+  unsub = getPoller(id, 1, "ws", spec(), {}, executor).subscribe(a.listener, a.lastId);
   await settle();
   assert.deepEqual(seriesRows(a), [1, 25, 30]);
   unsub();

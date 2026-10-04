@@ -1,8 +1,11 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { buildChatQueryPlan } from "@/lib/ai/chat";
+import { parseGroups } from "@/lib/auth/claims";
 import { SourceConfig, type SourceRecord } from "@/lib/registry";
 import type { Dashboard } from "@/lib/ir";
+
+const reader = parseGroups("reader", ["/workspaces/ws/viewer"]);
 
 const config = SourceConfig.parse({
   host: "postgres",
@@ -49,6 +52,7 @@ test("rejects a source not available on the dashboard", async () => {
   const r = await buildChatQueryPlan({
     dashboard,
     sources: [source],
+    identity: reader,
     args: { sourceId: "src-other", sql: "SELECT count(*) FROM http_requests" },
   });
   assert.equal(r.ok, false);
@@ -59,6 +63,7 @@ test("rejects non-SELECT SQL", async () => {
   const r = await buildChatQueryPlan({
     dashboard,
     sources: [source],
+    identity: reader,
     args: { sourceId: "src-metrics", sql: "DELETE FROM http_requests" },
   });
   assert.equal(r.ok, false);
@@ -68,6 +73,7 @@ test("rejects a table not in the source allowlist", async () => {
   const r = await buildChatQueryPlan({
     dashboard,
     sources: [source],
+    identity: reader,
     args: { sourceId: "src-metrics", sql: "SELECT * FROM secrets" },
   });
   assert.equal(r.ok, false);
@@ -79,6 +85,7 @@ test("builds a guarded plan with server-injected time range for time-series", as
   const r = await buildChatQueryPlan({
     dashboard,
     sources: [source],
+    identity: reader,
     args: {
       sourceId: "src-metrics",
       sql: "SELECT time_bucket('1 minute', ts) AS minute, count(*) AS c FROM http_requests GROUP BY minute ORDER BY minute",
@@ -101,6 +108,7 @@ test("builds a plan with no time filter when timeField is omitted (scalar)", asy
   const r = await buildChatQueryPlan({
     dashboard,
     sources: [source],
+    identity: reader,
     args: {
       sourceId: "src-metrics",
       sql: "SELECT count(*) AS total FROM http_requests",

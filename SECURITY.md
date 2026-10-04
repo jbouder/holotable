@@ -142,6 +142,15 @@ viewer's workspaces. A browser reconnects with its renewed session, which is
 authorized afresh, so a group removed in the realm stops a stream within one
 session-token lifetime.
 
+**Row-level filters.** A source can carry a `rowFilter` naming a column and a
+session claim. Every table a statement on that source reads is then narrowed to
+the viewer's rows before the statement sees them. The predicate is not applied
+to the output, which a statement can relabel as any tenant. The value is a
+bound parameter from the verified identity. The rewrite re-parses its own output
+and refuses anything it cannot prove is fully narrowed, and a viewer without
+the claim is refused, platform admins included. See
+[Row-level filters](docs/src/content/docs/operations/row-level-filters.md).
+
 **The audit log.** Sign-ins, sign-outs, every change to a dashboard, source,
 template or workspace limit, every statement a person runs, and every request
 `assertAuthorized` refuses are written to `audit_log`. The actor is the

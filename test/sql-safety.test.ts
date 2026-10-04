@@ -119,6 +119,7 @@ test("buildExecutablePlan injects server-owned time range on timeField", () => {
     timeField: "ts",
     from,
     to,
+    rowFilter: null,
   });
   assert.match(plan.sql, /_holo\.ts >= \$1::timestamptz/);
   assert.match(plan.sql, /_holo\.ts < \$2::timestamptz/);
@@ -134,6 +135,7 @@ test("buildExecutablePlan without timeField still bounds rows and omits time par
     sql: "SELECT count(*) FROM http_requests",
     from: new Date(),
     to: new Date(),
+    rowFilter: null,
   });
   assert.match(plan.sql, /LIMIT \d+/);
   assert.deepEqual(plan.params, []);
@@ -146,6 +148,7 @@ test("buildExecutablePlan rejects an injection-shaped timeField", () => {
       timeField: "ts; DROP TABLE",
       from: new Date(),
       to: new Date(),
+      rowFilter: null,
     }),
   );
 });
@@ -167,6 +170,7 @@ test("every trailing terminator is stripped before the query is wrapped", async 
       timeField: "ts",
       from: new Date(0),
       to: new Date(1),
+      rowFilter: null,
     });
     assert.doesNotMatch(plan.sql, /;\)/, plan.sql);
     assert.match(plan.sql, /\(SELECT 1 FROM http_requests\) AS _holo/);

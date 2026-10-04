@@ -17,7 +17,8 @@ import { executePlan, QueryExecutionError } from "@/lib/timescaledb/client";
 import { Dashboard, Panel } from "@/lib/ir";
 import type { SourceRecord } from "@/lib/registry";
 import { can } from "@/lib/auth/authorize";
-import type { Identity } from "@/lib/auth/claims";
+import { claimValue, type Identity } from "@/lib/auth/claims";
+import { bindRowFilter, RowFilterDenied } from "@/lib/sql/row-filter";
 import { log } from "@/lib/log";
 
 /**
@@ -80,15 +81,18 @@ export async function resolveChatSources(input: {
 /**
  * Pure guard for a model-proposed query. Restricts the query to a source that
  * is actually referenced by (and authorized for) this dashboard, validates the
- * untrusted SQL, and injects the dashboard's server-owned time range. Does NOT
- * touch the database — the caller runs the returned plan. Exported for testing.
+ * untrusted SQL, and injects the dashboard's server-owned time range and, on
+ * a row-filtered source, the reader's own rows (#31). Does NOT touch the
+ * database — the caller runs the returned plan. Exported for testing.
  */
 export async function buildChatQueryPlan(input: {
   dashboard: Dashboard;
   sources: SourceRecord[];
   args: ChatQueryArgs;
+  /** Whose question this is: a row-filtered source returns only their rows. */
+  identity: Identity;
 }): Promise<ChatQueryPlan> {
-  const { dashboard, sources, args } = input;
+  const { dashboard, sources, args, identity } = input;
 
   const source = sources.find((s) => s.id === args.sourceId);
   if (!source) {
@@ -112,9 +116,14 @@ export async function buildChatQueryPlan(input: {
       timeField: args.timeField,
       from: range.from,
       to: range.to,
+      rowFilter: bindRowFilter(source.config, (claim) => claimValue(identity, claim)),
     });
     return { ok: true, source, plan };
   } catch (err) {
+    // Named for the model without the claim: it can do nothing about it.
+    if (err instanceof RowFilterDenied) {
+      return { ok: false, error: "the reader has no access to this source's rows" };
+    }
     return { ok: false, error: err instanceof Error ? err.message : "invalid query" };
   }
 }
@@ -216,6 +225,8 @@ export interface ChatQueryOutcome {
 export async function streamDashboardChat(input: {
   dashboard: Dashboard;
   sources: SourceRecord[];
+  /** The reader, whose rows a row-filtered source is narrowed to (#31). */
+  identity: Identity;
   messages: UIMessage[];
   /** Receives the usage summed over every step of the turn. */
   onUsage?: (usage: LanguageModelUsage) => void;
@@ -232,7 +243,7 @@ export async function streamDashboardChat(input: {
    */
   abortSignal?: AbortSignal;
 }) {
-  const { dashboard, sources, messages, onUsage, onQuery, abortSignal } = input;
+  const { dashboard, sources, identity, messages, onUsage, onQuery, abortSignal } = input;
   const modelMessages = await convertToModelMessages(messages);
 
   return streamText({
@@ -263,7 +274,7 @@ export async function streamDashboardChat(input: {
             ),
         }),
         execute: async (args) => {
-          const built = await buildChatQueryPlan({ dashboard, sources, args });
+          const built = await buildChatQueryPlan({ dashboard, sources, args, identity });
           const report = (outcome: ChatQueryOutcome["outcome"], stage?: string) =>
             onQuery?.({ sourceId: args.sourceId, sql: args.sql, outcome, stage });
           if (!built.ok) {

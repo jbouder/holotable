@@ -264,6 +264,31 @@ test("SSE_REAUTH_INTERVAL_MS is a positive number of milliseconds or unset", () 
   }
 });
 
+test("ROW_FILTER_CLAIMS names claims, and never one the session token uses itself", () => {
+  for (const value of ["tenant", "tenant org_id", "tenant,https:x/y", ""]) {
+    const ok = validateConfig(
+      { ...VALID_PRODUCTION, ROW_FILTER_CLAIMS: value },
+      { production: true },
+    );
+    assert.deepEqual(errors(ok), [], formatConfigProblems(ok));
+  }
+  // `sub` is always usable; the rest would be overwritten when the session
+  // is minted, or overwrite something it carries.
+  for (const value of ["sub", "groups", "exp", "sid", "email", "tenant 9lives", "a=b"]) {
+    const bad = validateConfig(
+      { ...VALID_PRODUCTION, ROW_FILTER_CLAIMS: value },
+      { production: true },
+    );
+    assert.deepEqual(variables(errors(bad)), ["ROW_FILTER_CLAIMS"], value);
+  }
+  // The groups claim is whatever OIDC_GROUPS_CLAIM says it is.
+  const renamed = validateConfig(
+    { ...VALID_PRODUCTION, OIDC_GROUPS_CLAIM: "roles", ROW_FILTER_CLAIMS: "roles" },
+    { production: true },
+  );
+  assert.deepEqual(variables(errors(renamed)), ["ROW_FILTER_CLAIMS"]);
+});
+
 test("chat history limits are bounded, and zero days means keep forever", () => {
   for (const value of ["1", "500", ""]) {
     const ok = validateConfig(

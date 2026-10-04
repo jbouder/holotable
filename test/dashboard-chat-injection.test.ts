@@ -85,9 +85,10 @@ const dashboard = parseDashboard({
 });
 
 const sources = [own];
+const reader = parseGroups("u1", ["/workspaces/ws-1/viewer"]);
 
 async function plan(args: { sourceId: string; sql: string; timeField?: string }) {
-  return buildChatQueryPlan({ dashboard, sources, args });
+  return buildChatQueryPlan({ dashboard, sources, args, identity: reader });
 }
 
 function assertRejected(r: Awaited<ReturnType<typeof plan>>, why: RegExp) {
@@ -153,6 +154,7 @@ test("injection: a sourceId from another workspace never reaches the tool", asyn
     dashboard: hostile,
     sources: resolved,
     args: { sourceId: "src-foreign", sql: "SELECT * FROM payroll" },
+    identity: reader,
   });
   assertRejected(r, /not available on this dashboard/);
   // The error names only what the caller may use; the foreign id is not echoed

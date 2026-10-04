@@ -1,6 +1,7 @@
 import { decodeJwt } from "jose";
 import type { Identity } from "@/lib/auth/claims";
 import { OidcGrantRefused, type TokenSet } from "@/lib/auth/oidc";
+import type { TokenProfile } from "@/lib/auth/session";
 import {
   hashSessionId,
   newSessionId,
@@ -103,7 +104,7 @@ export interface RenewalDeps {
   signSessionToken(
     sub: string,
     groups: string[],
-    profile: { displayName?: string; email?: string },
+    profile: TokenProfile,
     ttlSeconds: number,
     sid?: string,
   ): Promise<string>;
@@ -132,7 +133,11 @@ function mint(
   return deps.signSessionToken(
     identity.sub,
     groupsOf(identity),
-    { displayName: identity.displayName, email: identity.email },
+    {
+      displayName: identity.displayName,
+      email: identity.email,
+      attributes: identity.attributes,
+    },
     tokenTtl,
     oidcSid ?? undefined,
   );

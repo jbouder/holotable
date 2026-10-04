@@ -4,6 +4,7 @@ import fc from "fast-check";
 import { parse, scan } from "libpg-query";
 import { allowedTables, SourceConfig, sourceCatalog } from "@/lib/registry";
 import { sqlHints } from "@/lib/sql/hints";
+import { RowFilterError } from "@/lib/sql/row-filter";
 import { buildExecutablePlan, validateSql } from "@/lib/sql/safety";
 import { CORPUS } from "./fixtures/sql-fuzz-corpus";
 
@@ -1015,6 +1016,7 @@ test("corpus: every pinned input keeps its verdict", async () => {
         timeField: "ts",
         from: new Date(0),
         to: new Date(1),
+        rowFilter: null,
       });
       const problems = await oracle(plan.sql, { params: 2 });
       assert.deepEqual(
@@ -1170,7 +1172,7 @@ test("fuzz: the wrapped plan is one SELECT over the same relations with exactly 
       fc.pre(r.ok);
       const from = new Date("2024-01-01T00:00:00Z");
       const to = new Date("2024-01-01T01:00:00Z");
-      const plan = buildExecutablePlan({ sql, timeField, from, to });
+      const plan = buildExecutablePlan({ sql, timeField, from, to, rowFilter: null });
       assert.deepEqual(plan.params, [from, to]);
       assert.equal(plan.timeField, timeField);
       const problems = await oracle(plan.sql, { params: 2 });
@@ -1183,6 +1185,134 @@ test("fuzz: the wrapped plan is one SELECT over the same relations with exactly 
   );
 });
 
+// --- Row filters (#31) -------------------------------------------------------------
+//
+// A second oracle, independent of `src/lib/sql/row-filter.ts`: from the raw
+// parse tree of the plan, every relation that is not a CTE name must sit alone
+// in a SELECT whose WHERE is exactly `_holo_rf.<column> = $3`, and those must
+// be the only parameters beyond the time bounds.
+
+async function narrowingProblems(sql: string, column: string): Promise<string[]> {
+  const problems: string[] = [];
+  const tree = await parse(sql);
+  const ctes = new Set<string>();
+  const narrowed = new Set<unknown>();
+  let params = 0;
+  let narrowings = 0;
+
+  const isNarrowing = (stmt: Record<string, unknown>): unknown => {
+    const from = stmt.fromClause as Array<{
+      RangeVar?: { alias?: { aliasname?: string } };
+    }>;
+    const rv = from?.length === 1 ? from[0].RangeVar : undefined;
+    if (rv?.alias?.aliasname !== "_holo_rf") return null;
+    const expr = (stmt.whereClause as { A_Expr?: Record<string, unknown> } | undefined)
+      ?.A_Expr as
+      | {
+          name?: Array<{ String?: { sval?: string } }>;
+          lexpr?: { ColumnRef?: { fields?: Array<{ String?: { sval?: string } }> } };
+          rexpr?: { ParamRef?: { number?: number } };
+        }
+      | undefined;
+    const fields = expr?.lexpr?.ColumnRef?.fields?.map((f) => f.String?.sval);
+    const ok =
+      expr?.name?.[0]?.String?.sval === "=" &&
+      fields?.join(".") === `_holo_rf.${column}` &&
+      expr?.rexpr?.ParamRef?.number === 3;
+    return ok ? rv : null;
+  };
+
+  const collect = (value: unknown): void => {
+    if (Array.isArray(value)) {
+      for (const v of value) collect(v);
+      return;
+    }
+    if (typeof value !== "object" || value === null) return;
+    for (const [key, field] of Object.entries(value as Record<string, unknown>)) {
+      if (key === "CommonTableExpr") {
+        const name = (field as { ctename?: string }).ctename;
+        if (name) ctes.add(name);
+      }
+      if (key === "ParamRef") params += 1;
+      if (key === "SelectStmt") {
+        const rv = isNarrowing(field as Record<string, unknown>);
+        if (rv) {
+          narrowed.add(rv);
+          narrowings += 1;
+        }
+      }
+      collect(field);
+    }
+  };
+  collect(tree);
+
+  const check = (value: unknown): void => {
+    if (Array.isArray(value)) {
+      for (const v of value) check(v);
+      return;
+    }
+    if (typeof value !== "object" || value === null) return;
+    for (const [key, field] of Object.entries(value as Record<string, unknown>)) {
+      if (key === "RangeVar") {
+        const rv = field as { schemaname?: string; relname?: string };
+        const cte = !rv.schemaname && ctes.has(rv.relname ?? "");
+        if (!cte && !narrowed.has(field)) {
+          problems.push(
+            `reads ${rv.schemaname ? `${rv.schemaname}.` : ""}${rv.relname} unfiltered`,
+          );
+        }
+      }
+      check(field);
+    }
+  };
+  check(tree);
+
+  if (params !== 2 + narrowings) {
+    problems.push(`${params} parameters for ${narrowings} narrowed table(s)`);
+  }
+  return problems;
+}
+
+test("fuzz: with a row filter, every table the plan reads is narrowed to the viewer's rows", async () => {
+  await run(
+    fc.asyncProperty(benign, async ({ sql }) => {
+      const r = await validateSql(sql, source);
+      fc.pre(r.ok);
+      const from = new Date("2024-01-01T00:00:00Z");
+      const to = new Date("2024-01-01T01:00:00Z");
+      let plan: ReturnType<typeof buildExecutablePlan>;
+      try {
+        plan = buildExecutablePlan({
+          sql,
+          timeField: "ts",
+          from,
+          to,
+          rowFilter: { column: "tenant_id", value: "t'1" },
+        });
+      } catch (err) {
+        // The only refusals: constructs that apply to a table and not to the
+        // subquery standing in for it. Never a silent pass-through.
+        assert.ok(err instanceof RowFilterError, String(err));
+        assert.match(err.message, /^(ONLY|TABLESAMPLE) is not allowed/, sql);
+        return;
+      }
+      assert.deepEqual(plan.params, [from, to, "t'1"]);
+      assert.ok(!plan.sql.includes("t'1"), "the value is bound, never inlined");
+      const problems = [
+        ...(await oracle(plan.sql, { params: plan.sql.split("$3").length + 1 })).filter(
+          (p) => !/parameters, expected/.test(p),
+        ),
+        ...(await narrowingProblems(plan.sql, "tenant_id")),
+      ];
+      assert.deepEqual(
+        problems,
+        [],
+        `row-filtered plan for ${JSON.stringify(sql)}: ${problems.join("; ")}\n  plan: ${JSON.stringify(plan.sql)}`,
+      );
+    }),
+  );
+});
+
 test("fuzz: a timeField that is not a bare identifier is refused before it reaches SQL", async () => {
   // An empty timeField means "no time filter", the same as omitting it.
   const none = buildExecutablePlan({
@@ -1190,6 +1320,7 @@ test("fuzz: a timeField that is not a bare identifier is refused before it reach
     timeField: "",
     from: new Date(0),
     to: new Date(1),
+    rowFilter: null,
   });
   assert.deepEqual(none.params, []);
 
@@ -1218,6 +1349,7 @@ test("fuzz: a timeField that is not a bare identifier is refused before it reach
             timeField,
             from: new Date(0),
             to: new Date(1),
+            rowFilter: null,
           }),
         /invalid timeField/,
         `accepted timeField ${JSON.stringify(timeField)}`,

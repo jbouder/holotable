@@ -8,7 +8,7 @@ import {
   Panel,
 } from "@/lib/ir";
 import { config } from "@/lib/config";
-import { SourceDraft, type SourceRecord } from "@/lib/registry";
+import { ModelSourceDraft, type SourceRecord } from "@/lib/registry";
 
 /**
  * LLM generation.
@@ -199,7 +199,7 @@ export function streamSourceDraft(input: {
   return streamObject({
     model: getModel(),
     onFinish: finish(onFinish),
-    schema: SourceDraft,
+    schema: ModelSourceDraft,
     schemaName: "SourceDraft",
     schemaDescription:
       "A TimescaleDB/PostgreSQL data source registration: safe connection config plus a table catalog. Never contains credentials.",

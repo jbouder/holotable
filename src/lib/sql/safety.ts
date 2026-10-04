@@ -1,5 +1,6 @@
 import { config } from "@/lib/config";
 import { recordSqlRejection, type SqlRejectionReason } from "@/lib/metrics";
+import { applyRowFilter, type RowFilterBinding } from "@/lib/sql/row-filter";
 import {
   allowedTables,
   type CatalogTable,
@@ -307,17 +308,29 @@ export interface ExecutablePlan {
  * Build the final, guarded executable plan. Assumes `validateSql` already
  * passed. Wraps the validated query as a subquery and injects the server-owned
  * time range via bound parameters on the declared `timeField`.
+ *
+ * `rowFilter` is required, and `null` only for a source without one, so a
+ * call site cannot forget it (#31). When set, every table the statement reads
+ * is narrowed to the viewer's rows before the statement sees them
+ * (`applyRowFilter`), with the value bound as a parameter. Bind it with
+ * `bindRowFilter`, which refuses a viewer who lacks the claim.
  */
 export function buildExecutablePlan(input: {
   sql: string;
   timeField?: string;
   from: Date;
   to: Date;
+  rowFilter: RowFilterBinding | null;
 }): ExecutablePlan {
-  const inner = stripTerminators(input.sql);
   const limit = config.maxQueryRows;
 
   const params: unknown[] = [];
+  let inner = stripTerminators(input.sql);
+  if (input.rowFilter) {
+    // The time bounds, when there are any, are $1 and $2 below.
+    const param = input.timeField ? 3 : 1;
+    inner = applyRowFilter(inner, input.rowFilter.column, param);
+  }
 
   let sql: string;
   if (input.timeField) {
@@ -325,11 +338,13 @@ export function buildExecutablePlan(input: {
       throw new Error(`invalid timeField: ${input.timeField}`);
     }
     params.push(input.from, input.to);
+    if (input.rowFilter) params.push(input.rowFilter.value);
     sql = `SELECT * FROM (${inner}) AS _holo
 WHERE _holo.${input.timeField} >= $1::timestamptz
   AND _holo.${input.timeField} < $2::timestamptz
 LIMIT ${limit}`;
   } else {
+    if (input.rowFilter) params.push(input.rowFilter.value);
     sql = `SELECT * FROM (${inner}) AS _holo LIMIT ${limit}`;
   }
 

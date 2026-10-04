@@ -62,10 +62,16 @@ export function buildQueryPlanView(input: {
   /** `sessionStatements(schema)` from the execution client. */
   session: string[];
   limits: { maxRows: number; statementTimeoutMs: number; maxResultBytes: number };
+  /** The claim the source's row filter binds, when it has one (#31). */
+  rowFilterClaim?: string;
 }): QueryPlanView {
   // The wrapper binds `from` then `to`, in that order, and only when there is
-  // a time field. Anything else would be a change to `buildExecutablePlan`.
-  const boundFrom = [input.timeRange.from, input.timeRange.to];
+  // a time field; then the row filter's value, when the source has one.
+  // Anything else would be a change to `buildExecutablePlan`.
+  const boundFrom = [
+    ...(input.timeField ? [input.timeRange.from, input.timeRange.to] : []),
+    ...(input.rowFilterClaim ? [`your "${input.rowFilterClaim}" claim`] : []),
+  ];
   return {
     sql: input.sql,
     executedSql: input.plan.sql,

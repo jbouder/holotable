@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { requireIdentity, assertAuthorized, HttpError } from "@/lib/auth/authorize";
 import { readJson, json, route } from "@/lib/http";
+import { rowFilterFor, rowFilterHttpError } from "@/lib/row-scope";
 import { config } from "@/lib/config";
 import { getSourceById } from "@/lib/db/repo";
 import { TimeRange } from "@/lib/ir";
@@ -55,12 +56,19 @@ export const POST = route("sql.plan", async (req: Request) => {
   if (!check.ok) throw new HttpError(400, check.error ?? "invalid sql", {}, "statement");
 
   const range = resolveTimeRange(body.timeRange);
-  const plan = buildExecutablePlan({
-    sql: body.sql,
-    timeField: body.timeField,
-    from: range.from,
-    to: range.to,
-  });
+  let plan: ReturnType<typeof buildExecutablePlan>;
+  try {
+    plan = buildExecutablePlan({
+      sql: body.sql,
+      timeField: body.timeField,
+      from: range.from,
+      to: range.to,
+      // The plan shown is the one that would run for this caller (#31).
+      rowFilter: rowFilterFor(source, identity),
+    });
+  } catch (err) {
+    throw rowFilterHttpError(err);
+  }
 
   return json(
     buildQueryPlanView({
@@ -68,6 +76,7 @@ export const POST = route("sql.plan", async (req: Request) => {
       timeField: body.timeField,
       timeRange: body.timeRange,
       plan,
+      rowFilterClaim: source.config.rowFilter?.claim,
       session: sessionStatements(source.config.schema),
       limits: {
         maxRows: config.maxQueryRows,

@@ -6,6 +6,7 @@ import {
   selfMonitoringSpec,
 } from "@/lib/self-monitoring/dashboard";
 import { buildExecutablePlan, validateSql } from "@/lib/sql/safety";
+import { bindRowFilter } from "@/lib/sql/row-filter";
 import { resolveTimeRange } from "@/lib/time";
 import { executePlan } from "@/lib/timescaledb/client";
 
@@ -71,6 +72,8 @@ async function runPanel(
     timeField: panel.query.timeField,
     from: resolved.from,
     to: resolved.to,
+    // A script has no viewer, so a row-filtered source refuses here.
+    rowFilter: bindRowFilter(source.config, () => undefined),
   });
 
   try {

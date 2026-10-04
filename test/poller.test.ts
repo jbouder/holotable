@@ -75,17 +75,17 @@ test("computeDelta keeps the prior cursor when no rows are returned", () => {
 });
 
 test("getPoller returns one shared instance per dashboard", () => {
-  const a = getPoller("dash-shared", 1, "ws1", spec(), noopExecutor);
-  const b = getPoller("dash-shared", 1, "ws1", spec(), noopExecutor);
+  const a = getPoller("dash-shared", 1, "ws1", spec(), {}, noopExecutor);
+  const b = getPoller("dash-shared", 1, "ws1", spec(), {}, noopExecutor);
   assert.equal(a, b);
   invalidatePoller("dash-shared");
 });
 
 test("getPoller replaces the poller when a higher version is requested", () => {
-  const v1 = getPoller("dash-ver", 1, "ws1", spec(), noopExecutor);
-  const v1again = getPoller("dash-ver", 1, "ws1", spec(), noopExecutor);
+  const v1 = getPoller("dash-ver", 1, "ws1", spec(), {}, noopExecutor);
+  const v1again = getPoller("dash-ver", 1, "ws1", spec(), {}, noopExecutor);
   assert.equal(v1, v1again, "same/lower version keeps existing poller");
-  const v2 = getPoller("dash-ver", 2, "ws1", spec(), noopExecutor);
+  const v2 = getPoller("dash-ver", 2, "ws1", spec(), {}, noopExecutor);
   assert.notEqual(v1, v2, "higher version replaces the poller");
   assert.equal(v2.version, 2);
   invalidatePoller("dash-ver");
@@ -93,7 +93,7 @@ test("getPoller replaces the poller when a higher version is requested", () => {
 
 test("subscribe ref-counts and the last unsubscribe stops the poller", () => {
   const before = activePollerCount();
-  const poller = getPoller("dash-refcount", 1, "ws1", spec(), noopExecutor);
+  const poller = getPoller("dash-refcount", 1, "ws1", spec(), {}, noopExecutor);
   const unsub1 = poller.subscribe(() => {});
   const unsub2 = poller.subscribe(() => {});
   assert.equal(poller.subscriberCount, 2);
@@ -116,7 +116,7 @@ test("a shared poller runs one tick for multiple subscribers", async () => {
     ticks += 1;
     return [{ type: "panel", panelId: "p1", mode: "replace", columns: [], rows: [] }];
   };
-  const poller = getPoller("dash-onetick", 1, "ws1", spec(), executor);
+  const poller = getPoller("dash-onetick", 1, "ws1", spec(), {}, executor);
   const events: string[] = [];
   const unsubA = poller.subscribe((e) => events.push(`a:${e.type}`));
   const unsubB = poller.subscribe((e) => events.push(`b:${e.type}`));
@@ -180,6 +180,7 @@ test("makePanelExecutor emits tombstone for a cross-workspace source (never exec
     panel,
     { from: new Date("2024-01-01"), to: new Date("2024-01-02") },
     DASHBOARD_WORKSPACE,
+    {},
   );
 
   assert.equal(
@@ -243,6 +244,7 @@ test("makePanelExecutor allows execution when source workspace matches dashboard
       panel,
       { from: new Date("2024-01-01"), to: new Date("2024-01-02") },
       WORKSPACE,
+      {},
     );
   } catch {
     // Expected: no live TimescaleDB. The important thing is it didn't return
@@ -326,6 +328,7 @@ test("a rejected query is reported as the statement it is", async () => {
     spec().panels[0],
     { from: new Date(0), to: new Date(1) },
     "w1",
+    {},
   );
   assert.equal(events.length, 1);
   const [event] = events;
@@ -383,7 +386,7 @@ test("a throw outside the per-panel try is broadcast and the poller keeps tickin
   // the reachable case, since the viewer picks the range and the poller key
   // includes it. The throw lands outside the per-panel try.
   const inverted = spec({ timeRange: { from: "now", to: "now" } });
-  const poller = getPoller("dash-badrange", 1, "ws1", inverted, noopExecutor);
+  const poller = getPoller("dash-badrange", 1, "ws1", inverted, {}, noopExecutor);
   const events: PollerEvent[] = [];
 
   const { lines } = await captureLogAsync(async () => {
@@ -414,13 +417,13 @@ test("a throw outside the per-panel try is broadcast and the poller keeps tickin
 });
 
 test("getPoller replaces a stalled poller instead of sharing it", () => {
-  const poller = getPoller("dash-stalled", 1, "ws1", spec(), noopExecutor);
+  const poller = getPoller("dash-stalled", 1, "ws1", spec(), {}, noopExecutor);
   // Forced, because the guards above make it unreachable through the public
   // API — which is the point: this asserts the last line of defence.
   (poller as unknown as { running: boolean }).running = true;
   assert.equal(poller.isStalled, true);
 
-  const next = getPoller("dash-stalled", 1, "ws1", spec(), noopExecutor);
+  const next = getPoller("dash-stalled", 1, "ws1", spec(), {}, noopExecutor);
   assert.notEqual(next, poller, "a dead poller must not be handed to a subscriber");
   assert.equal(next.isStalled, false);
 
