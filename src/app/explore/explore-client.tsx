@@ -4,7 +4,7 @@ import * as React from "react";
 import Link from "next/link";
 import { experimental_useObject as useObject } from "@ai-sdk/react";
 import { Loader2, SendHorizontal, Compass, Save, ArrowUpRight } from "lucide-react";
-import { Panel, type TimeRange } from "@/lib/ir";
+import { Panel, type TimeRange, VizType, type VizType as VizTypeValue } from "@/lib/ir";
 import { Button } from "@/components/ui/button";
 import { Textarea, Label } from "@/components/ui/input";
 import { AiUnavailable } from "@/components/ai-unavailable";
@@ -51,7 +51,9 @@ interface Result {
   error?: ApiError;
 }
 
-const CHART_VIZ = new Set(["line", "bar", "heatmap", "pie", "donut"]);
+const CHART_VIZ: ReadonlySet<VizTypeValue> = new Set(
+  VizType.options.filter((viz) => viz !== "stat" && viz !== "table"),
+);
 const MAX_TABLE_ROWS = 500;
 const TIME_PRESETS: { value: string; label: string }[] = [
   { value: "now-15m", label: "Last 15 minutes" },

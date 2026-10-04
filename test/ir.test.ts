@@ -1,6 +1,14 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { Dashboard, Panel, TimeExpr, safeParseDashboard, parseDashboard } from "@/lib/ir";
+import { readFileSync } from "node:fs";
+import {
+  Dashboard,
+  Panel,
+  TimeExpr,
+  VizType,
+  safeParseDashboard,
+  parseDashboard,
+} from "@/lib/ir";
 
 const validPanel = {
   id: "p1",
@@ -71,6 +79,14 @@ test("accepts all supported chart visualizations", () => {
   for (const viz of ["line", "area", "bar", "scatter", "heatmap", "pie", "donut"]) {
     assert.equal(Panel.safeParse({ ...validPanel, viz }).success, true, viz);
   }
+});
+
+test("README stack viz list matches the IR enum", () => {
+  const readme = readFileSync("README.md", "utf8");
+  const match = readme.match(/ECharts \(([^)]+)\)/);
+
+  assert.ok(match, "README stack line should list ECharts visualization types");
+  assert.deepEqual(match[1].split("/"), VizType.options);
 });
 
 test("timeField is optional on a panel query", () => {
