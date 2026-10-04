@@ -1,19 +1,24 @@
 import {
   requireIdentity,
   assertAuthorized,
-  getSessionRef,
+  can,
+  getSessionToken,
   HttpError,
 } from "@/lib/auth/authorize";
-import { isRevoked, onRevoke } from "@/lib/auth/revocation";
+import { tokenExpiry, tokenRef, verifySessionToken } from "@/lib/auth/session";
+import { guardStream, type StreamEnd } from "@/lib/auth/stream-guard";
+import { config } from "@/lib/config";
 import { getDashboardById } from "@/lib/db/repo";
 import { getPoller, type PollerEvent } from "@/lib/poller/registry";
 import { TimeRange } from "@/lib/ir";
 import {
+  accessEndedFrame,
   drainFrame,
   eventFrame,
   HEARTBEAT_FRAME,
   HEARTBEAT_MS,
   sessionEndedFrame,
+  sessionExpiredFrame,
 } from "@/lib/sse";
 import { onDrain } from "@/lib/shutdown";
 import { route } from "@/lib/http";
@@ -21,19 +26,28 @@ import { route } from "@/lib/http";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
+const END_FRAMES: Record<StreamEnd, () => string> = {
+  expired: sessionExpiredFrame,
+  revoked: sessionEndedFrame,
+  forbidden: accessEndedFrame,
+};
+
 /**
  * Server-Sent Events stream for a dashboard.
  *
  * Auth is via the session cookie (sent automatically by EventSource for
  * same-origin requests). Each subscriber is independently authorized here, then
- * attaches to the ONE shared in-process poller for this dashboard.
+ * attaches to the ONE shared in-process poller for this dashboard, and stays
+ * authorized only as long as the session it connected with (#32,
+ * `lib/auth/stream-guard.ts`).
  */
 export const GET = route(
   "dashboards.stream",
   async (req: Request, ctx: RouteContext<"/api/dashboards/[id]/stream">) => {
     const identity = await requireIdentity();
-    // What a back-channel logout would name this subscriber by (#28).
-    const session = await getSessionRef();
+    // Kept to verify again while the stream is open (#32), and to match a
+    // back-channel logout against (#28). Verified by `requireIdentity` above.
+    const token = await getSessionToken();
     const { id } = await ctx.params;
     const dashboard = await getDashboardById(id);
     if (!dashboard) throw new HttpError(404, "dashboard not found");
@@ -90,13 +104,13 @@ export const GET = route(
         // hook is unregistered on close, or the set would grow by one entry
         // for every connection the instance ever served.
         let unregisterDrain = () => {};
-        let unregisterRevoke = () => {};
+        let stopGuard = () => {};
 
         const close = () => {
           clearInterval(heartbeat);
           unsubscribe();
           unregisterDrain();
-          unregisterRevoke();
+          stopGuard();
           try {
             controller.close();
           } catch {
@@ -113,19 +127,31 @@ export const GET = route(
           close();
         });
 
-        // Back-channel logout (#28): a stream is authorized once, when it
-        // opens, so a session the realm ends would otherwise keep receiving
-        // until the socket happened to drop. Every revocation is checked
-        // against this stream's session; only a match closes it, so the
-        // other subscribers on the same poller carry on.
-        unregisterRevoke = onRevoke(() => {
-          if (!session || !isRevoked(session)) return;
-          try {
-            controller.enqueue(encoder.encode(sessionEndedFrame()));
-          } catch {
-            /* controller closed */
-          }
-          close();
+        // The stream is authorized above, once; this keeps it authorized
+        // only while the session is (#32): it ends at the token's expiry, on
+        // a back-channel logout of this session (#28), and when a periodic
+        // re-check finds the dashboard gone or no longer viewable. Only this
+        // subscriber is closed; the others on the same poller carry on.
+        stopGuard = guardStream({
+          expiresAt: token ? tokenExpiry(token) : null,
+          ref: token ? tokenRef(token) : null,
+          intervalMs: config.sseReauthIntervalMs,
+          verify: async () => (token ? verifySessionToken(token) : null),
+          authorize: async (who) => {
+            const latest = await getDashboardById(id);
+            return (
+              latest !== null &&
+              can(who, "dashboard:view", { workspaceId: latest.workspaceId })
+            );
+          },
+          onEnd: (why) => {
+            try {
+              controller.enqueue(encoder.encode(END_FRAMES[why]()));
+            } catch {
+              /* controller closed */
+            }
+            close();
+          },
         });
 
         req.signal.addEventListener("abort", close);

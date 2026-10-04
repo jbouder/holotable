@@ -19,8 +19,13 @@ import {
   INITIAL_CONNECTION,
   reduceConnection,
 } from "@/lib/connection";
-import { DRAIN_EVENT, SESSION_ENDED_EVENT } from "@/lib/sse";
-import { renewSession } from "@/lib/session-renewal";
+import {
+  ACCESS_ENDED_EVENT,
+  DRAIN_EVENT,
+  SESSION_ENDED_EVENT,
+  SESSION_EXPIRED_EVENT,
+} from "@/lib/sse";
+import { ensureSession, renewSession } from "@/lib/session-renewal";
 import { mergePanelRows } from "@/lib/stream-merge";
 import { HIDDEN_STREAM_GRACE_MS } from "@/lib/stream-idle";
 import { isRolling, rangeSearch } from "@/lib/time-range";
@@ -278,9 +283,40 @@ export function LiveDashboard({
       });
     };
     es.addEventListener(SESSION_ENDED_EVENT, onSessionEnded);
+    // The token this stream was opened with ran out (#32). Routine: the
+    // keepalive has usually renewed the cookie already, so reconnect at once
+    // and resume from the last event id. The panels stay live through it;
+    // only a session that cannot be renewed marks them stale, and that
+    // refusal raises the keepalive's sign-in banner rather than a retry loop.
+    const onSessionExpired = () => {
+      es.close();
+      void ensureSession().then((result) => {
+        if (result.ok) {
+          setReconnectNonce((n) => n + 1);
+          return;
+        }
+        setStates(markStale);
+        signal({ type: "error", closed: true });
+      });
+    };
+    es.addEventListener(SESSION_EXPIRED_EVENT, onSessionExpired);
+    // This viewer may no longer see the dashboard, or it was deleted (#32).
+    // Renewing would not change that, so stop and say why.
+    const onAccessEnded = () => {
+      es.close();
+      setStates(markStale);
+      setDashboardError({
+        error: "This dashboard was deleted, or you no longer have access to it.",
+        kind: "authorization",
+      });
+      signal({ type: "error", closed: true });
+    };
+    es.addEventListener(ACCESS_ENDED_EVENT, onAccessEnded);
     return () => {
       es.removeEventListener(DRAIN_EVENT, onDraining);
       es.removeEventListener(SESSION_ENDED_EVENT, onSessionEnded);
+      es.removeEventListener(SESSION_EXPIRED_EVENT, onSessionExpired);
+      es.removeEventListener(ACCESS_ENDED_EVENT, onAccessEnded);
       es.close();
     };
   }, [applyEvent, live, suspended, signal, streamUrl, reconnectNonce]);

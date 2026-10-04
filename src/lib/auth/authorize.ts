@@ -137,8 +137,16 @@ export async function getIdentity(): Promise<Identity | null> {
  * {@link getIdentity} has verified it; null when there is none.
  */
 export async function getSessionRef(): Promise<TokenRef | null> {
-  const token = (await cookies()).get(config.sessionCookieName)?.value;
+  const token = await getSessionToken();
   return token ? tokenRef(token) : null;
+}
+
+/**
+ * The raw session token, for the stream route to verify again for as long as
+ * the stream stays open (#32). Never returned to a client or logged.
+ */
+export async function getSessionToken(): Promise<string | null> {
+  return (await cookies()).get(config.sessionCookieName)?.value ?? null;
 }
 
 /** Verify a token string directly (used by the SSE handler with NextRequest). */

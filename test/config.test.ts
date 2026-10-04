@@ -246,6 +246,24 @@ test("SHUTDOWN_GRACE_MS is a positive number of milliseconds or unset", () => {
   }
 });
 
+test("SSE_REAUTH_INTERVAL_MS is a positive number of milliseconds or unset", () => {
+  for (const value of ["5000", "60000", ""]) {
+    const ok = validateConfig(
+      { ...VALID_PRODUCTION, SSE_REAUTH_INTERVAL_MS: value },
+      { production: true },
+    );
+    assert.deepEqual(errors(ok), [], formatConfigProblems(ok));
+  }
+  // 0 would schedule the re-check in a tight loop.
+  for (const value of ["0", "-1", "1m"]) {
+    const bad = validateConfig(
+      { ...VALID_PRODUCTION, SSE_REAUTH_INTERVAL_MS: value },
+      { production: true },
+    );
+    assert.deepEqual(variables(errors(bad)), ["SSE_REAUTH_INTERVAL_MS"]);
+  }
+});
+
 test("chat history limits are bounded, and zero days means keep forever", () => {
   for (const value of ["1", "500", ""]) {
     const ok = validateConfig(
@@ -310,6 +328,7 @@ test("malformed values are errors regardless of environment", () => {
     QUERY_TIMEOUT_SECONDS: "-5",
     CATALOG_STALE_AFTER_DAYS: "-1",
     SHUTDOWN_GRACE_MS: "forever",
+    SSE_REAUTH_INTERVAL_MS: "0",
     DEFAULT_TIME_FROM: "yesterday-ish",
     SESSION_COOKIE_NAME: "has space",
   };

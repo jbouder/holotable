@@ -103,6 +103,15 @@ export const config = {
   shutdownGraceMs: num("SHUTDOWN_GRACE_MS", 10_000),
 
   /**
+   * How often an open dashboard stream verifies its session token again and
+   * re-authorizes the dashboard as it is now (#32), so a dashboard deleted or
+   * moved out of the viewer's workspaces stops streaming within this long. A
+   * stream also ends at its token's expiry and on revocation, whatever this
+   * is. Documented default: 60s.
+   */
+  sseReauthIntervalMs: num("SSE_REAUTH_INTERVAL_MS", 60_000),
+
+  /**
    * The AI model id used for generation, surfaced read-only to the UI so users
    * can see which model produced their specs. Empty when unconfigured. This is
    * a display label only — actual provider/model resolution lives in
@@ -394,6 +403,7 @@ const EnvSchema = z.object({
   CHAT_HISTORY_RETENTION_DAYS: blank(nonNegativeInt),
   GENERATION_LOG_RETENTION_DAYS: blank(nonNegativeInt),
   SHUTDOWN_GRACE_MS: blank(positiveInt),
+  SSE_REAUTH_INTERVAL_MS: blank(positiveInt),
 
   // Not `blank()`: the empty string is a real declaration here ("no source
   // may resolve credentials yet"), distinct from the variable being unset.

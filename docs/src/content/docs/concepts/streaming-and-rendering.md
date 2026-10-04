@@ -55,6 +55,30 @@ the viewer could already see.
 The stream also sends a comment every 15 seconds, so a proxy that closes quiet
 connections does not close one whose dashboard refreshes slowly.
 
+### How long a stream stays authorized
+
+The handler authorizes a subscriber when it connects, and the response then
+stays open. So that one check cannot outlive the session it was made with,
+each stream is guarded by the token it was opened with
+(`src/lib/auth/stream-guard.ts`, #32), and ended with a named event:
+
+| Event | When | The browser |
+| --- | --- | --- |
+| `session-expired` | the token reaches its `exp` | reconnects with its last event id, renewing first unless another tab already has |
+| `session-ended` | the realm ends the session (#28) | tries one renewal, which is refused, and the sign-in banner appears |
+| `access-ended` | a re-check finds the dashboard deleted, or no longer in the viewer's workspaces | stops and says so above the grid |
+
+The re-check runs every `SSE_REAUTH_INTERVAL_MS` (default 60s): it verifies
+the token again and re-authorizes `dashboard:view` against the dashboard as it
+is now. A database error during it keeps the stream and tries again next time.
+
+A stream cannot see the browser's newer cookie, so expiry ends it rather than
+extending it. The reconnect is cheap — it resumes, and the panels never go
+stale — and it is authorized from the renewed token, which is how a group the
+realm removed reaches an open stream: within one session-token lifetime, half
+the realm's refresh lifetime (#27). Only the one subscriber is closed; the
+others on the same poller carry on.
+
 A `tick` is sent only when the whole cycle completed. A cycle that failed
 before the panels — an unresolvable time range, say — sends a
 `dashboard-error` instead, the poller reschedules anyway, and the viewer shows

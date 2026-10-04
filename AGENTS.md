@@ -88,6 +88,11 @@ Important files:
   carries, `verifySessionToken` consults the set on every request, and open
   dashboard streams listen for it and close. Process-local, because the app is
   one instance by design
+- `src/lib/auth/stream-guard.ts` — how long an open dashboard stream stays
+  authorized (#32): it ends at its token's expiry, on revocation, and when the
+  re-check every `SSE_REAUTH_INTERVAL_MS` finds the dashboard no longer
+  viewable. A stream cannot see a renewed cookie, so expiry ends it and the
+  browser reconnects and resumes
 - `src/lib/settings.ts` — the `/settings` sections as data. A new section is
   an entry here and a page under `src/app/settings/<id>/`; a gated section
   also calls `notFound()` from its page, because hiding the link is never the

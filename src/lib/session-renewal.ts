@@ -76,6 +76,26 @@ export function renewSession(): Promise<RenewResult> {
   return inflight;
 }
 
+/**
+ * Margin under which a session counts as already over: a stream reconnecting
+ * on a token with less left than this would only be ended again at once.
+ */
+const FRESH_ENOUGH_MS = 10_000;
+
+/**
+ * A session good for a while yet, for a stream whose token just expired
+ * (#32). The keepalive renews about a minute before the cookie's token runs
+ * out, so usually this tab or another has already renewed and the stream only
+ * has to reconnect; renewing again would spend a refresh grant for nothing.
+ */
+export function ensureSession(now = Date.now()): Promise<RenewResult> {
+  const shared = readSharedExpiry();
+  if (shared !== null && shared - now > FRESH_ENOUGH_MS) {
+    return Promise.resolve({ ok: true, expiresAt: shared });
+  }
+  return renewSession();
+}
+
 /** Another tab's renewal, when it reached further than this tab knows. */
 export function readSharedExpiry(): number | null {
   try {

@@ -111,6 +111,12 @@ app on the realm, or the session is revoked — it calls
   dashboard carry on;
 - its `sessions` rows are deleted, so it cannot be renewed.
 
+An open dashboard stream is also ended when the token it was opened with
+expires, and when a re-check every `SSE_REAUTH_INTERVAL_MS` finds the
+dashboard gone or no longer viewable (#32). The browser reconnects after
+expiry with its renewed session, which is re-authorized from the groups the
+realm gives now; see [Streaming and rendering](/concepts/streaming-and-rendering/).
+
 A logout token naming only the person (`sub`, no `sid`) ends all of their
 sessions. Signing out in Holotable revokes that one session the same way, so a
 copy of the cookie stops working too, without signing the person out of their
