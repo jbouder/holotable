@@ -311,6 +311,8 @@ const EMITTERS: Record<string, string[]> = {
   templates: ["template.create"],
   "templates/[id]": ["template.delete"],
   "workspaces/[id]/limits": ["workspace.limits.update"],
+  "workspaces/[id]/annotations": ["annotation.create"],
+  "workspaces/[id]/annotations/[annotationId]": ["annotation.delete"],
 };
 
 test("each listed event is recorded by the route where it happens", () => {

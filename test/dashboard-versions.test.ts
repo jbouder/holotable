@@ -106,6 +106,16 @@ test("dashboard settings are compared as the reader sees them", () => {
       title: "Service health (prod)",
       timeRange: { from: "now-6h", to: "now" },
       refreshIntervalMs: 60_000,
+      variables: [
+        { name: "env", type: "enum", values: ["prod", "staging"] },
+        {
+          name: "host",
+          type: "query",
+          query: { sourceId: "src", sql: "SELECT DISTINCT host FROM m" },
+          multi: true,
+        },
+      ],
+      annotations: { tags: ["deploy"] },
     }),
   );
   assert.deepEqual(
@@ -114,6 +124,8 @@ test("dashboard settings are compared as the reader sees them", () => {
       ["title", "Service health", "Service health (prod)", true],
       ["timeRange", "now-1h → now", "now-6h → now", true],
       ["refresh", "15s", "60s", true],
+      ["variables", "none", ":env (2 values), :host (query, several)", true],
+      ["annotations", "all", "tagged deploy", true],
     ],
   );
   assert.equal(diff.panels.length, 0);

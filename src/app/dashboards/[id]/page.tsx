@@ -89,6 +89,7 @@ export default async function DashboardViewPage({
         // the stream route re-validates and re-resolves it regardless.
         initialTimeRange={rangeFromParams(query, dashboard.spec.timeRange)}
         variables={variables.choices}
+        annotationAccess={{ workspaceId: dashboard.workspaceId, canEdit }}
         initialSelection={asSelection(variables.selection)}
         // A saved dashboard with no panels is reachable — an import trimmed to
         // nothing, or every panel deleted in the editor — and used to render as

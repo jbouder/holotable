@@ -1,6 +1,7 @@
 import type { EChartsOption } from "echarts";
 import type { Panel } from "@/lib/ir";
 import { chartPalette } from "@/lib/color/oklch";
+import { ANNOTATION_COLORS, type Annotation } from "@/lib/annotations";
 import { formatValue } from "@/lib/format";
 import { tokenHex } from "@/lib/panels/colors";
 import {
@@ -201,6 +202,12 @@ export interface ChartContext {
    * the viewer's clock.
    */
   window?: { from: number; to: number };
+  /**
+   * Annotations to draw on a time axis (#68). Undefined draws none and adds
+   * nothing to the option; an array, even empty, always sets the marks, so
+   * one that leaves is cleared by the merge rather than by a new chart.
+   */
+  annotations?: readonly Annotation[];
 }
 
 /** One kind's chart: a panel spec and its current (bounded) rows as an ECharts option. */
@@ -224,7 +231,7 @@ export function normalized(build: ChartOptionBuilder): ChartOptionBuilder {
  * the panel's time field.
  */
 function buildSeries(type: "line" | "bar", area: boolean): ChartOptionBuilder {
-  return (panel, data, { display }) => {
+  return (panel, data, { display, annotations }) => {
     const x = xKey(panel, data);
     const keys = seriesKeys(panel, data);
     const xValues = data.rows.map((r) => r[x]);
@@ -262,13 +269,17 @@ function buildSeries(type: "line" | "bar", area: boolean): ChartOptionBuilder {
         axisLabel: { color: "#9aa0aa", ...(number ? { formatter: number } : {}) },
         splitLine: { lineStyle: { color: "#2a2f3a" } },
       },
-      series: keys.map((k) => ({
+      series: keys.map((k, i) => ({
         name: k,
         type,
         showSymbol: false,
         smooth: type === "line",
         areaStyle: area ? {} : undefined,
         ...(o.stacked ? { stack: "total" } : {}),
+        // The marks ride on the first series; one per chart is enough.
+        ...(i === 0 && annotations && panel.query?.timeField === x
+          ? annotationMarks(annotations, xValues, display)
+          : {}),
         data: data.rows.map((r) => toNumber(r[k])),
       })),
     };
@@ -354,6 +365,84 @@ function buildPie(panel: Panel, data: PanelData, donut: boolean): EChartsOption 
       },
     ],
   };
+}
+
+/**
+ * Annotations as the marks of one series (#68): a line at each point in time,
+ * a band over each range, in its kind's token color. The x axis is one
+ * category per row, so an instant is placed at the first row at or after it,
+ * and a range runs from the last row at or before its start to the first row
+ * at or after its end, so it covers its span even between two sparse rows.
+ * One wholly before the first row or after the last is off the chart and left
+ * out, and a range is clipped to the rows there are. Hovering a mark shows its
+ * title and time. Exported for testing.
+ */
+export function annotationMarks(
+  annotations: readonly Annotation[],
+  xValues: readonly unknown[],
+  display: TimeDisplay,
+): { markLine: Record<string, unknown>; markArea: Record<string, unknown> } {
+  const times = xValues.map((v) => asInstant(v)?.getTime() ?? Number.NaN);
+  const first = times.find(Number.isFinite);
+  const last = times.findLast(Number.isFinite);
+  const indexAt = (t: number): number => times.findIndex((x) => x >= t);
+  const lines: Record<string, unknown>[] = [];
+  const areas: Record<string, unknown>[][] = [];
+  if (first !== undefined && last !== undefined) {
+    for (const a of annotations) {
+      const color = tokenHex(ANNOTATION_COLORS[a.kind]);
+      // A function, not a template string: a title is untrusted text, and
+      // ECharts would read `{a}` in a template as a placeholder.
+      // Its own time, not the row it is drawn at, on the viewer's clock.
+      const when = formatDateTime(new Date(a.at), display);
+      const text = `${a.title}\n${when}`;
+      const label = {
+        show: false,
+        formatter: () => text,
+        color,
+        position: "insideEndTop",
+      };
+      const emphasis = { label: { show: true } };
+      if (a.endedAt === undefined || a.endedAt === a.at) {
+        if (a.at < first || a.at > last) continue;
+        lines.push({
+          name: a.title,
+          xAxis: indexAt(a.at),
+          lineStyle: { color, type: "dashed", width: 1 },
+          label,
+          emphasis,
+        });
+        continue;
+      }
+      if (a.endedAt < first || a.at > last) continue;
+      const start = Math.max(
+        0,
+        times.findLastIndex((x) => x <= a.at),
+      );
+      const endIndex = indexAt(a.endedAt);
+      const end = endIndex === -1 ? times.length - 1 : endIndex;
+      areas.push([
+        {
+          name: a.title,
+          xAxis: start,
+          itemStyle: { color: withAlpha(color, 0.12) },
+          label: { ...label, position: "insideTop" },
+          emphasis,
+        },
+        { xAxis: end },
+      ]);
+    }
+  }
+  return {
+    markLine: { symbol: "none", silent: false, animation: false, data: lines },
+    markArea: { silent: false, animation: false, data: areas },
+  };
+}
+
+/** `#rrggbb` at an opacity. */
+function withAlpha(hex: string, alpha: number): string {
+  const n = Number.parseInt(hex.slice(1), 16);
+  return `rgba(${(n >> 16) & 255}, ${(n >> 8) & 255}, ${n & 255}, ${alpha})`;
 }
 
 /**

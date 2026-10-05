@@ -62,6 +62,7 @@ export function PanelView({
   crosshairGroup,
   onSelectTimeRange,
   window,
+  annotations,
 }: {
   panel: Panel;
   state?: PanelState;
@@ -72,6 +73,8 @@ export function PanelView({
    * A chart that runs to "now" ends here (#201).
    */
   window?: ChartContext["window"];
+  /** Markers to draw on a time axis (#68); none when undefined. */
+  annotations?: ChartContext["annotations"];
   /**
    * The window this panel is being shown for. Only the details dialog uses it,
    * to ask the server what it would run (#110); a surface that does not know
@@ -158,6 +161,7 @@ export function PanelView({
             crosshairGroup={crosshairGroup}
             onSelectTimeRange={onSelectTimeRange}
             window={window}
+            annotations={annotations}
           />
         </CardContent>
       </Card>
@@ -279,6 +283,7 @@ function PanelBody({
   crosshairGroup,
   onSelectTimeRange,
   window,
+  annotations,
 }: {
   panel: Panel;
   data: PanelData;
@@ -289,6 +294,8 @@ function PanelBody({
   crosshairGroup?: string;
   onSelectTimeRange?: (range: TimeRange) => void;
   window?: ChartContext["window"];
+  /** Markers to draw on a time axis (#68); none when undefined. */
+  annotations?: ChartContext["annotations"];
 }) {
   if (state?.status === "tombstoned") {
     // A tombstone is the `conflict` kind: the source is gone, and the fix is to
@@ -345,6 +352,7 @@ function PanelBody({
         crosshairGroup={crosshairGroup}
         onSelectTimeRange={onSelectTimeRange}
         window={window}
+        annotations={annotations}
       />
     </div>
   );
@@ -357,6 +365,7 @@ function PanelContent({
   crosshairGroup,
   onSelectTimeRange,
   window,
+  annotations,
 }: {
   panel: Panel;
   data: PanelData;
@@ -364,6 +373,8 @@ function PanelContent({
   crosshairGroup?: string;
   onSelectTimeRange?: (range: TimeRange) => void;
   window?: ChartContext["window"];
+  /** Markers to draw on a time axis (#68); none when undefined. */
+  annotations?: ChartContext["annotations"];
 }) {
   const display = useTimeDisplay();
   // The registry decides how the kind is drawn (#61); nothing here names one.
@@ -377,7 +388,11 @@ function PanelContent({
       // a data update never changes this, so it still merges (invariant 11).
       key={`${panel.viz}:${renderer.shape?.(panel) ?? ""}`}
       ref={chartRef}
-      option={renderer.option(panel, data, { display, window: window ?? data.window })}
+      option={renderer.option(panel, data, {
+        display,
+        window: window ?? data.window,
+        annotations,
+      })}
       crosshairGroup={crosshairGroup}
       onBrush={
         onSelectTimeRange && supportsTimeBrush(panel)
