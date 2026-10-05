@@ -590,7 +590,9 @@ an unpinned `uses:`. Node 25 and later
 (the `node` base images and `@types/node`) are ignored in `dependabot.yml`, so
 only the LTS line up to 24 is proposed; a Node major is taken in one pull
 request that moves both Dockerfiles, CI's `node-version` and `@types/node`
-together.
+together. TypeScript 7 and later are ignored for the app until Next supports
+them: 7 drops the JavaScript compiler API that `next build` and `next typegen`
+load.
 
 `CONTRIBUTING.md` says the same things for human contributors, including the
 branch and Conventional Commit conventions and the pull request template's

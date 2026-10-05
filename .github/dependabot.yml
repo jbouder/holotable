@@ -24,6 +24,14 @@
 # than merging the per-file bumps. Raise the bound when the next LTS line is
 # the one to move to.
 #
+# TypeScript 7 and later are ignored for the app (not the docs site or the
+# demo Worker, which do not build through Next): 7 is the native compiler and
+# drops the JavaScript API, so `require("typescript")` no longer returns a
+# compiler. Next 16 loads TypeScript that way for `next typegen` and for the
+# type-check step of `next build`, and both fail with "you do not have the
+# required package(s) installed" (#309). Remove the entry when a Next release
+# supports TypeScript 7.
+#
 # Add any other `ignore` entry only for an update known to break, with a
 # comment saying why and what would let it be removed.
 version: 2
@@ -38,6 +46,9 @@ updates:
       # Node 25+ is not proposed; see the header.
       - dependency-name: "@types/node"
         versions: [">=25"]
+      # TypeScript 7+ breaks Next 16's build and typegen; see the header.
+      - dependency-name: typescript
+        versions: [">=7"]
     open-pull-requests-limit: 5
     commit-message:
       # `chore(deps): …` for dependencies, `chore(deps-dev): …` for
