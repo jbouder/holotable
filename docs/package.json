@@ -20,6 +20,6 @@
     "starlight-links-validator": "0.26.0"
   },
   "devDependencies": {
-    "wrangler": "4.135.0"
+    "wrangler": "4.147.0"
   }
 }
