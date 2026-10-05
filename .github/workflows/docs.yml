@@ -139,7 +139,7 @@ jobs:
       # uploaded as a new version without shifting production traffic.
       - name: Deploy
         if: github.event_name == 'push' || steps.worker.outputs.exists == 'true'
-        uses: cloudflare/wrangler-action@v3
+        uses: cloudflare/wrangler-action@v4
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
