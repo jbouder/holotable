@@ -33,10 +33,13 @@ export function RepointPanelsDialog({
   deadSourceId,
   panels,
   sources,
+  variables,
   onApply,
   onClose,
 }: {
   deadSourceId: string;
+  /** The variables the dashboard declares, which panel SQL may reference (#67). */
+  variables?: readonly string[];
   /** Only panels with a query have a source to re-point. */
   panels: QueryPanel[];
   sources: { id: string; name: string }[];
@@ -47,6 +50,7 @@ export function RepointPanelsDialog({
   // set cannot meaningfully change while it is up, and a caller re-rendering a
   // freshly built array must not restart the checks underneath the author.
   const [reviewed] = React.useState(panels);
+  const [declared] = React.useState(variables);
   const [target, setTarget] = React.useState<string | null>(sources[0]?.id ?? null);
   const [selected, setSelected] = React.useState<string[]>(() =>
     reviewed.map((p) => p.id),
@@ -65,7 +69,7 @@ export function RepointPanelsDialog({
     setVerdicts(null);
     setChecking(true);
     void (async () => {
-      const checks = await checkRepoint(reviewed, target);
+      const checks = await checkRepoint(reviewed, target, declared);
       if (!active) return;
       setVerdicts({ sourceId: target, checks });
       setChecking(false);
@@ -73,7 +77,7 @@ export function RepointPanelsDialog({
     return () => {
       active = false;
     };
-  }, [target, reviewed]);
+  }, [target, reviewed, declared]);
 
   const checks = verdicts?.sourceId === target ? verdicts.checks : null;
   const verdictFor = (panelId: string) => checks?.find((c) => c.panelId === panelId);

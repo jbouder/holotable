@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import type { VariableValues } from "@/lib/sql/variables";
 import { CheckCircle2, FileCode2, Loader2, Play, ShieldCheck } from "lucide-react";
 import type { QueryPanel, TimeRange } from "@/lib/ir";
 import {
@@ -49,7 +50,14 @@ export interface PanelPreviewController {
   explain: () => void;
 }
 
-export function usePanelPreview(panel: QueryPanel, timeRange: TimeRange) {
+const NO_VALUES: VariableValues = {};
+
+export function usePanelPreview(
+  panel: QueryPanel,
+  timeRange: TimeRange,
+  /** The dashboard's variables as the preview binds them (#67). */
+  variables: VariableValues = NO_VALUES,
+) {
   const [busy, setBusy] = React.useState<Busy>(null);
   const [check, setCheck] = React.useState<{ key: string; result: SqlCheck } | null>(
     null,
@@ -66,40 +74,44 @@ export function usePanelPreview(panel: QueryPanel, timeRange: TimeRange) {
   // Two presses in flight at once must not let the slower one win.
   const generation = React.useRef(0);
   const query = panel.query;
-  const checkKey = checkSubject(query);
-  const runKey = runSubject(query, timeRange);
+  const checkKey = checkSubject(query, variables);
+  const runKey = runSubject(query, timeRange, variables);
 
   const validate = React.useCallback(() => {
     const seq = ++generation.current;
     setBusy("validate");
-    void validatePanelSql({ sourceId: query.sourceId, sql: query.sql }).then((r) => {
+    void validatePanelSql({
+      sourceId: query.sourceId,
+      sql: query.sql,
+      variables: Object.keys(variables),
+    }).then((r) => {
       if (seq !== generation.current) return;
       setCheck({ key: checkKey, result: r });
       setBusy(null);
     });
-  }, [query, checkKey]);
+  }, [query, checkKey, variables]);
 
   const run = React.useCallback(() => {
     const seq = ++generation.current;
     setBusy("run");
-    void runPanelQuery(query, timeRange).then((outcome) => {
+    void runPanelQuery(query, timeRange, { variables }).then((outcome) => {
       if (seq !== generation.current) return;
       setResult({ key: runKey, outcome, at: Date.now() });
       setBusy(null);
     });
-  }, [query, runKey, timeRange]);
+  }, [query, runKey, timeRange, variables]);
 
   // A plan answers the same question a run does — this statement, this time
   // field, this window — so it goes stale on exactly the same key.
   const explain = React.useCallback(() => {
     const seq = ++generation.current;
     setBusy("plan");
-    void fetchQueryPlan(query, timeRange).then((outcome) => {
+    void fetchQueryPlan(query, timeRange, { variables }).then((outcome) => {
       if (seq !== generation.current) return;
       setPlan({ key: runKey, outcome });
       setBusy(null);
     });
-  }, [query, runKey, timeRange]);
+  }, [query, runKey, timeRange, variables]);
 
   const controller: PanelPreviewController = {
     busy,

@@ -1,5 +1,6 @@
 import { type ApiError, apiErrorFromThrown, readApiError } from "@/lib/errors";
 import type { PanelQuery, TimeRange } from "@/lib/ir";
+import type { VariableValues } from "@/lib/sql/variables";
 
 /**
  * What the database is actually asked, as opposed to what the panel says.
@@ -58,7 +59,7 @@ export function buildQueryPlanView(input: {
   /** What `resolveTimeRange` was given, for the "`now-1h` → instant" line. */
   timeRange: TimeRange;
   /** The plan `buildExecutablePlan` produced — its SQL and its parameters. */
-  plan: { sql: string; params: unknown[] };
+  plan: { sql: string; params: unknown[]; variables?: string[] };
   /** `sessionStatements(schema)` from the execution client. */
   session: string[];
   limits: { maxRows: number; statementTimeoutMs: number; maxResultBytes: number };
@@ -71,6 +72,8 @@ export function buildQueryPlanView(input: {
   const boundFrom = [
     ...(input.timeField ? [input.timeRange.from, input.timeRange.to] : []),
     ...(input.rowFilterClaim ? [`your "${input.rowFilterClaim}" claim`] : []),
+    // Variable values come last, in the plan's order (#67).
+    ...(input.plan.variables ?? []).map((name) => `the :${name} selection`),
   ];
   return {
     sql: input.sql,
@@ -91,6 +94,8 @@ export function buildQueryPlanView(input: {
 /** Parameters are instants; anything else is rendered rather than trusted. */
 function instant(value: unknown): string {
   if (value instanceof Date) return value.toISOString();
+  // A multi-value variable is bound as an array (#67).
+  if (Array.isArray(value)) return JSON.stringify(value);
   return String(value);
 }
 
@@ -107,7 +112,7 @@ export type PlanOutcome =
 export async function fetchQueryPlan(
   query: PanelQuery,
   timeRange: TimeRange,
-  init?: { signal?: AbortSignal },
+  init?: { signal?: AbortSignal; variables?: VariableValues },
 ): Promise<PlanOutcome> {
   try {
     const res = await fetch("/api/sql/plan", {
@@ -118,6 +123,7 @@ export async function fetchQueryPlan(
         sql: query.sql,
         timeField: query.timeField,
         timeRange,
+        ...(init?.variables ? { variables: init.variables } : {}),
       }),
       signal: init?.signal,
     });

@@ -3,12 +3,15 @@ import { requireIdentity, assertAuthorized, HttpError } from "@/lib/auth/authori
 import { readJson, json, route } from "@/lib/http";
 import { getSourceById } from "@/lib/db/repo";
 import { validateSql } from "@/lib/sql/safety";
+import { VariableName } from "@/lib/ir";
 
 export const runtime = "nodejs";
 
 const Body = z.object({
   sourceId: z.string().min(1),
   sql: z.string().min(1).max(8000),
+  /** The variables the dashboard declares, which `:name` may reference (#67). */
+  variables: z.array(VariableName).max(10).optional(),
 });
 
 /**
@@ -43,7 +46,7 @@ export const POST = route("sql.validate", async (req: Request) => {
     { type: "source", id: source.id },
   );
 
-  const check = await validateSql(body.sql, source.config);
+  const check = await validateSql(body.sql, source.config, new Set(body.variables));
   return json(
     check.ok ? { ok: true } : { ok: false, error: check.error ?? "invalid sql" },
   );

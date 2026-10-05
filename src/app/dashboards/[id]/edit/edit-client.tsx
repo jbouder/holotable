@@ -20,6 +20,7 @@ import {
 import {
   type Dashboard,
   hasQuery,
+  declaredVariables,
   Panel,
   panelTimeRange,
   type QueryPanel,
@@ -77,6 +78,8 @@ import {
   PanelPresentationFields,
   PanelTimingFields,
 } from "@/components/editor/panel-settings";
+import { usePreviewValues, VariablesEditor } from "@/components/editor/variables-editor";
+import type { VariableValues } from "@/lib/sql/variables";
 import { bindShortcuts, EDITOR_SHORTCUTS } from "@/lib/shortcuts";
 import {
   interceptedHref,
@@ -176,6 +179,8 @@ export function EditDashboardClient({
   // accidental delete or a mistaken Arrange recoverable (#81).
   const history = useHistory<Dashboard>(initialSpec);
   const spec = history.state;
+  // What the previews bind for the dashboard's variables (#67).
+  const previewValues = usePreviewValues(spec.variables);
 
   // What the server holds. The dirty flag is the difference between this and
   // the working spec, so an edit that lands back on the saved value — typing a
@@ -951,6 +956,24 @@ export function EditDashboardClient({
 
           <Card>
             <CardHeader>
+              <CardTitle>Variables</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <VariablesEditor
+                variables={spec.variables}
+                sources={sources}
+                onChange={(variables, action, key) =>
+                  updateSpec({ variables }, { action, key: key ? `spec:${key}` : null })
+                }
+              />
+              {previewValues.error && (
+                <ErrorDisplay error={previewValues.error} className="mt-3" />
+              )}
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
               <CardTitle>Layout</CardTitle>
               <div className="flex flex-wrap items-center gap-1.5 text-xs">
                 <LayoutGrid className="h-3.5 w-3.5 text-muted" />
@@ -1063,6 +1086,7 @@ export function EditDashboardClient({
                     sources={sources}
                     timeRange={spec.timeRange}
                     refreshIntervalMs={spec.refreshIntervalMs}
+                    variables={previewValues.values}
                     sourceMissing={
                       selected.query !== undefined &&
                       missingSources.includes(selected.query.sourceId)
@@ -1168,6 +1192,7 @@ export function EditDashboardClient({
           deadSourceId={repointing.sourceId}
           panels={repointPanelSet}
           sources={sources}
+          variables={[...declaredVariables(spec)]}
           onApply={applyRepoint}
           onClose={() => setRepointing(null)}
         />
@@ -1246,6 +1271,7 @@ function PanelEditor({
   sources,
   timeRange,
   refreshIntervalMs,
+  variables,
   sourceMissing,
   onRepoint,
   onChange,
@@ -1254,6 +1280,8 @@ function PanelEditor({
   sources: SourceOption[];
   timeRange: Dashboard["timeRange"];
   refreshIntervalMs: number;
+  /** The values the preview binds for the dashboard's variables (#67). */
+  variables: VariableValues;
   /** This panel's source is not among the workspace's live sources. */
   sourceMissing: boolean;
   onRepoint: () => void;
@@ -1375,6 +1403,7 @@ function PanelEditor({
           panel={panel}
           sources={sources}
           timeRange={timeRange}
+          variables={variables}
           onChange={onQueryChange}
         />
       ) : (
@@ -1456,14 +1485,16 @@ function QueryFields({
   panel,
   sources,
   timeRange,
+  variables,
   onChange,
 }: {
   panel: QueryPanel;
   sources: SourceOption[];
   timeRange: Dashboard["timeRange"];
+  variables: VariableValues;
   onChange: (fn: (p: QueryPanel) => Panel, intent: EditIntent) => void;
 }) {
-  const preview = usePanelPreview(panel, panelTimeRange(panel, timeRange));
+  const preview = usePanelPreview(panel, panelTimeRange(panel, timeRange), variables);
   const catalog = sources.find((s) => s.id === panel.query.sourceId)?.catalog ?? null;
 
   return (

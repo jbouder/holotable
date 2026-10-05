@@ -230,10 +230,20 @@ export async function sourcePanelStatements(
     panel_id: string | null;
     panel_title: string | null;
     sql: string | null;
+    variables: string[] | null;
   }>(
+    // The dashboard's declared variables come along (#67): a statement that
+    // references one is only valid with it declared.
     `SELECT d.id AS dashboard_id, d.title AS dashboard_title,
             panel->>'id' AS panel_id, panel->>'title' AS panel_title,
-            panel->'query'->>'sql' AS sql
+            panel->'query'->>'sql' AS sql,
+            ARRAY(
+              SELECT v->>'name'
+              FROM jsonb_array_elements(
+                CASE WHEN jsonb_typeof(dv.spec->'variables') = 'array'
+                     THEN dv.spec->'variables' ELSE '[]'::jsonb END
+              ) AS v
+            ) AS variables
      FROM dashboards d
      JOIN dashboard_versions dv ON dv.id = d.current_version_id
      CROSS JOIN LATERAL jsonb_array_elements(dv.spec->'panels')
@@ -250,6 +260,7 @@ export async function sourcePanelStatements(
     panelId: row.panel_id ?? "",
     panelTitle: row.panel_title ?? row.panel_id ?? "",
     sql: row.sql ?? "",
+    variables: (row.variables ?? []).filter((v): v is string => typeof v === "string"),
   }));
 }
 

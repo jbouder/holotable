@@ -2,6 +2,14 @@ import { config } from "@/lib/config";
 import { recordSqlRejection, type SqlRejectionReason } from "@/lib/metrics";
 import { applyRowFilter, type RowFilterBinding } from "@/lib/sql/row-filter";
 import {
+  referencedNames,
+  scanVariables,
+  scanVariablesSync,
+  substituteVariables,
+  VariableError,
+  type VariableValues,
+} from "@/lib/sql/variables";
+import {
   allowedTables,
   type CatalogTable,
   type SourceConfig,
@@ -44,6 +52,9 @@ import {
  *     CTE alias is recognised as the CTE it names.
  *   - No column the catalog marks unexposed may be read, in any position, by
  *     name or wholesale (see {@link checkColumns}).
+ *   - A `:name` variable reference (#67) must name a variable the dashboard
+ *     declares. It is checked as the `$n` it will run as, and its value is
+ *     only ever a bound parameter (`src/lib/sql/variables.ts`).
  *
  * At execution the server wraps the validated query and injects the dashboard
  * time range on the declared `timeField` using bound query parameters, plus
@@ -95,6 +106,54 @@ function stripTerminators(sql: string): string {
   return sql.replace(/[\s;]+$/, "").trim();
 }
 
+const NO_VARIABLES: ReadonlySet<string> = new Set();
+
+/**
+ * The statement with its variable references replaced by placeholders, or the
+ * reason it is refused: a `$n` of its own, a reference to a variable the
+ * dashboard does not declare, or text the scanner cannot tokenize.
+ */
+async function expandVariables(
+  sql: string,
+  declared: ReadonlySet<string>,
+): Promise<
+  | { ok: true; sql: string; placeholders: boolean }
+  | { ok: false; result: ValidationResult }
+> {
+  let scanned: Awaited<ReturnType<typeof scanVariables>>;
+  try {
+    scanned = await scanVariables(sql);
+  } catch {
+    return {
+      ok: false,
+      result: reject("structure", "only SELECT/WITH queries are allowed"),
+    };
+  }
+  if (scanned.hasParam) {
+    return {
+      ok: false,
+      result: reject("structure", "query parameters are reserved by the server"),
+    };
+  }
+  const names = referencedNames(scanned.refs);
+  const unknown = names.find((n) => !declared.has(n));
+  if (unknown !== undefined) {
+    return {
+      ok: false,
+      result: reject(
+        "variable",
+        `undeclared variable :${unknown.slice(0, 64)}; declare it on the dashboard or remove it`,
+      ),
+    };
+  }
+  if (names.length === 0) return { ok: true, sql, placeholders: false };
+  return {
+    ok: true,
+    sql: substituteVariables(sql, scanned.refs, (n) => names.indexOf(n) + 1),
+    placeholders: true,
+  };
+}
+
 function hasFunctionCall(haystack: string, fn: string): boolean {
   return new RegExp(`\\b${fn}\\s*\\(`, "i").test(haystack);
 }
@@ -111,8 +170,9 @@ function timeFunctionError(fn: string): ValidationResult {
 export async function validateSql(
   sql: string,
   source: SourceConfig,
+  variables: ReadonlySet<string> = NO_VARIABLES,
 ): Promise<ValidationResult> {
-  const result = await checkSql(sql, source);
+  const result = await checkSql(sql, source, variables);
   if (!result.ok && result.reason) recordSqlRejection(result.reason);
   return result;
 }
@@ -130,13 +190,22 @@ export async function validateSql(
 export async function checkSql(
   sql: string,
   source: SourceConfig,
+  variables: ReadonlySet<string> = NO_VARIABLES,
 ): Promise<ValidationResult> {
-  const trimmed = stripTerminators(sql);
-  if (trimmed.length === 0) return reject("empty", "empty SQL");
+  const stripped = stripTerminators(sql);
+  if (stripped.length === 0) return reject("empty", "empty SQL");
+
+  // Variable references (#67), found by PostgreSQL's own scanner. Every one
+  // must be declared, and the statement is checked from here on as it will
+  // run: with each reference a `$n`. A `$n` the statement spelled itself is
+  // refused first, so the only parameters the parse below accepts are ours.
+  const expanded = await expandVariables(stripped, variables);
+  if (!expanded.ok) return expanded.result;
+  const trimmed = expanded.sql;
 
   // The parse-tree pass: one SELECT, allowlisted constructs only, and a full
   // account of the relations, functions, keywords and literals it contains.
-  const analyzed = await analyzeSelect(trimmed);
+  const analyzed = await analyzeSelect(trimmed, { params: expanded.placeholders });
   if (!analyzed.ok) return reject("structure", analyzed.error);
   if (await containsComment(trimmed)) {
     return reject("comment", "comments are not allowed");
@@ -302,6 +371,11 @@ export interface ExecutablePlan {
   params: unknown[];
   /** The output column the server filters time on, if any. Used for diagnostics. */
   timeField?: string;
+  /**
+   * The variables bound (#67), in the order of their parameters, which come
+   * last. Present only when the statement references any.
+   */
+  variables?: string[];
 }
 
 /**
@@ -321,11 +395,39 @@ export function buildExecutablePlan(input: {
   from: Date;
   to: Date;
   rowFilter: RowFilterBinding | null;
+  /**
+   * The values of the variables the statement references (#67), already
+   * checked against what the dashboard allows. Each is bound after the time
+   * bounds and the row-filter value; none is ever written into the text.
+   */
+  variables?: VariableValues;
 }): ExecutablePlan {
   const limit = config.maxQueryRows;
 
   const params: unknown[] = [];
   let inner = stripTerminators(input.sql);
+
+  // A statement with neither a `:` nor a `$` has no reference and no
+  // parameter to find. Anything else is scanned, which needs the parser
+  // `validateSql` loaded; if it somehow is not, this throws and no plan is
+  // built.
+  const scanned = /[:$]/.test(inner)
+    ? scanVariablesSync(inner)
+    : { refs: [], hasParam: false };
+  if (scanned.hasParam)
+    throw new VariableError("query parameters are reserved by the server");
+  const names = referencedNames(scanned.refs);
+  const values = names.map((name) => {
+    const value = input.variables?.[name];
+    if (value === undefined) throw new VariableError(`no value for variable :${name}`);
+    // A copy: the caller's array is not the plan's to hold on to.
+    return typeof value === "string" ? value : [...value];
+  });
+  if (names.length > 0) {
+    const first = (input.timeField ? 2 : 0) + (input.rowFilter ? 1 : 0) + 1;
+    inner = substituteVariables(inner, scanned.refs, (n) => first + names.indexOf(n));
+  }
+
   if (input.rowFilter) {
     // The time bounds, when there are any, are $1 and $2 below.
     const param = input.timeField ? 3 : 1;
@@ -347,6 +449,12 @@ LIMIT ${limit}`;
     if (input.rowFilter) params.push(input.rowFilter.value);
     sql = `SELECT * FROM (${inner}) AS _holo LIMIT ${limit}`;
   }
+  params.push(...values);
 
-  return { sql, params, timeField: input.timeField };
+  return {
+    sql,
+    params,
+    timeField: input.timeField,
+    ...(names.length > 0 ? { variables: names } : {}),
+  };
 }

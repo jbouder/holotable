@@ -222,8 +222,10 @@ interface Context {
   ctes: Scope;
   from: TableRef[];
   /**
-   * Accept `$n`. Only ever set when re-reading SQL the server itself wrote
-   * (the row-filter rewrite, #31); untrusted SQL never carries a parameter.
+   * Accept `$n`. Only ever set for SQL the server itself rewrote: the
+   * row-filter rewrite (#31), and a statement whose variable references (#67)
+   * the server replaced with placeholders after refusing any `$n` the
+   * statement spelled itself. Untrusted SQL never carries a parameter.
    */
   params?: boolean;
 }
@@ -503,14 +505,17 @@ function sqlValueKeyword(node: SQLValueFunction): string {
  * statement, a statement that is not a SELECT, or any construct outside the
  * allowlist is rejected with a reason.
  */
-export async function analyzeSelect(sql: string): Promise<AnalyzeResult> {
+export async function analyzeSelect(
+  sql: string,
+  opts: { params?: boolean } = {},
+): Promise<AnalyzeResult> {
   let parsed: ParseResult;
   try {
     parsed = await parse(sql);
   } catch (err) {
     return unparseable(err);
   }
-  return analyzeParsed(parsed, false);
+  return analyzeParsed(parsed, opts.params ?? false);
 }
 
 /**

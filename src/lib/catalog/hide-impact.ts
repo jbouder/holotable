@@ -23,6 +23,8 @@ export interface PanelStatement {
   panelId: string;
   panelTitle: string;
   sql: string;
+  /** The variables its dashboard declares, which the statement may reference (#67). */
+  variables?: string[];
 }
 
 /**
@@ -41,8 +43,9 @@ export async function hiddenColumnImpact(
 
   const dashboards: ImpactDashboard[] = [];
   for (const panel of panels) {
-    if (!(await checkSql(panel.sql, config)).ok) continue;
-    if ((await checkSql(panel.sql, hidden)).ok) continue;
+    const declared = new Set(panel.variables);
+    if (!(await checkSql(panel.sql, config, declared)).ok) continue;
+    if ((await checkSql(panel.sql, hidden, declared)).ok) continue;
     let dashboard = dashboards.find((d) => d.id === panel.dashboardId);
     if (!dashboard) {
       dashboard = { id: panel.dashboardId, title: panel.dashboardTitle, panels: [] };

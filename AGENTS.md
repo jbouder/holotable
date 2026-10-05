@@ -99,6 +99,16 @@ Important files:
   `buildExecutablePlan` takes `rowFilter` as a required input; bind it with
   `rowFilterFor`/`rowFilterInScope` (`src/lib/row-scope.ts`), which refuse a
   viewer without the claim. Pollers are keyed by the claim values (`RowScope`)
+- `src/lib/sql/variables.ts` — dashboard variables in SQL (#67): `:name`
+  references are found by PostgreSQL's scanner, never a regex, and become `$n`
+  placeholders bound after the time and row-filter parameters; a value never
+  enters the text. `validateSql`/`checkSql` take the declared names, and a
+  caller that validates a dashboard's panel SQL passes
+  `declaredVariables(spec)`. Which values a viewer may bind is
+  `src/lib/variables.ts` (a `query` variable's guarded SELECT, in the
+  dashboard's workspace, under the viewer's row scope) and
+  `src/lib/variable-selection.ts` (`var-*` URL picks, defaults, the allowlist
+  check). Picks are part of the poller key
 - `src/lib/auth/authorize.ts` — the central `can()` check
 - `src/lib/auth/renewal.ts` — session renewal (#27): the realm's refresh token
   is sealed in `sessions` (`refresh-token.ts`) and never reaches the browser,
@@ -169,7 +179,7 @@ Important files:
 
 The paths with a `CODEOWNERS` entry (`src/lib/sql/`, `src/lib/auth/`,
 `src/lib/secrets/`, `ir.ts` and `ir/`, `time.ts`, `registry.ts`,
-`metrics-access.ts`, `row-scope.ts`) are
+`metrics-access.ts`, `row-scope.ts`, `variables.ts`, `variable-selection.ts`) are
 the ones where a quiet regression stops being a bug and becomes a
 vulnerability. Changes there need a test.
 

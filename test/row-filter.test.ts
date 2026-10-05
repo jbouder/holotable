@@ -339,6 +339,7 @@ test("a panel whose source needs a claim the poller's scope lacks is refused, no
     { from: new Date(0), to: new Date(1) },
     "ops",
     {},
+    {},
   );
   assert.deepEqual(events, [
     {

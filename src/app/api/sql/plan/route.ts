@@ -7,6 +7,8 @@ import { getSourceById } from "@/lib/db/repo";
 import { TimeRange } from "@/lib/ir";
 import { buildQueryPlanView } from "@/lib/query-plan";
 import { validateSql, buildExecutablePlan } from "@/lib/sql/safety";
+import { VariableError } from "@/lib/sql/variables";
+import { VariableValuesBody } from "@/lib/variable-selection";
 import { resolveTimeRange } from "@/lib/time";
 import { sessionStatements } from "@/lib/timescaledb/client";
 
@@ -17,6 +19,8 @@ const Body = z.object({
   sql: z.string().min(1).max(8000),
   timeField: z.string().min(1).max(128).optional(),
   timeRange: TimeRange,
+  /** The values the editor previews with (#67). */
+  variables: VariableValuesBody.optional(),
 });
 
 /**
@@ -52,7 +56,12 @@ export const POST = route("sql.plan", async (req: Request) => {
     { type: "source", id: source.id },
   );
 
-  const check = await validateSql(body.sql, source.config);
+  const variables = body.variables ?? {};
+  const check = await validateSql(
+    body.sql,
+    source.config,
+    new Set(Object.keys(variables)),
+  );
   if (!check.ok) throw new HttpError(400, check.error ?? "invalid sql", {}, "statement");
 
   const range = resolveTimeRange(body.timeRange);
@@ -65,8 +74,11 @@ export const POST = route("sql.plan", async (req: Request) => {
       to: range.to,
       // The plan shown is the one that would run for this caller (#31).
       rowFilter: rowFilterFor(source, identity),
+      variables,
     });
   } catch (err) {
+    if (err instanceof VariableError)
+      throw new HttpError(400, err.message, {}, "statement");
     throw rowFilterHttpError(err);
   }
 

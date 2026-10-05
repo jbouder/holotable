@@ -182,7 +182,9 @@ export function applyRowFilter(sql: string, column: string, param: number): stri
   if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(column)) {
     throw new RowFilterError(`invalid row filter column: ${column}`);
   }
-  const before = analyzeSelectSync(sql);
+  // `$n` here is the server's own: a variable reference (#67) already
+  // replaced by its placeholder. The statement's own were refused by the guard.
+  const before = analyzeSelectSync(sql, { params: true });
   if (!before.ok) throw new RowFilterError(before.error);
   const unfilterable = findUnfilterable(parseSync(sql));
   if (unfilterable) {

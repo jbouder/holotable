@@ -3,6 +3,12 @@
 import * as React from "react";
 import { Pause, Play } from "lucide-react";
 import { cycleMs, type Dashboard, panelTimeRange, type TimeRange } from "@/lib/ir";
+import {
+  type Selection,
+  selectionParams,
+  type VariableChoice,
+} from "@/lib/variable-selection";
+import { VariablePickers } from "@/components/dashboard/VariablePicker";
 import type { PollerEvent } from "@/lib/poller/registry";
 import { DashboardGrid } from "@/components/dashboard/DashboardGrid";
 import { PanelView, type PanelState } from "@/components/dashboard/PanelView";
@@ -75,6 +81,8 @@ export function LiveDashboard({
   actions,
   empty,
   idlePauseMs,
+  variables = [],
+  initialSelection = {},
 }: {
   dashboardId: string;
   spec: Dashboard;
@@ -95,7 +103,12 @@ export function LiveDashboard({
    * never pauses a visible tab.
    */
   idlePauseMs?: number;
+  /** The dashboard's variables as this viewer may pick them (#67). */
+  variables?: VariableChoice[];
+  /** The picks to open on, already resolved by the page. */
+  initialSelection?: Selection;
 }) {
+  const [selection, setSelection] = React.useState<Selection>(initialSelection);
   const [states, setStates] = React.useState<Record<string, PanelState>>({});
   const [live, setLive] = React.useState(true);
   // Set when the idle timer, not the user, paused the stream, so the page can
@@ -136,8 +149,10 @@ export function LiveDashboard({
   const cycle = cycleMs(spec);
   const streamUrl = React.useMemo(() => {
     const params = new URLSearchParams(timeRange);
+    // The picks travel with the stream (#67), and the server checks them.
+    for (const [key, value] of selectionParams(selection)) params.append(key, value);
     return `/api/dashboards/${dashboardId}/stream?${params.toString()}`;
-  }, [dashboardId, timeRange]);
+  }, [dashboardId, timeRange, selection]);
 
   /**
    * Keep the URL on the window being viewed, so a range is a link someone can
@@ -149,12 +164,15 @@ export function LiveDashboard({
    * every time the range changed.
    */
   React.useEffect(() => {
-    const search = rangeSearch(timeRange, spec.timeRange);
+    // The window, when it is not the dashboard's own, and the picks (#67).
+    const params = new URLSearchParams(rangeSearch(timeRange, spec.timeRange));
+    for (const [key, value] of selectionParams(selection)) params.append(key, value);
+    const search = params.size > 0 ? `?${params.toString()}` : "";
     const url = `${window.location.pathname}${search}`;
     if (url !== window.location.pathname + window.location.search) {
       window.history.replaceState(null, "", url);
     }
-  }, [timeRange, spec.timeRange]);
+  }, [timeRange, spec.timeRange, selection]);
 
   const signal = React.useCallback((s: ConnectionSignal) => {
     setConnection((prev) => reduceConnection(prev, s));
@@ -457,6 +475,12 @@ export function LiveDashboard({
         </div>
       </div>
       <NavPortal>{streamControls}</NavPortal>
+
+      <VariablePickers
+        choices={variables}
+        selection={selection}
+        onChange={setSelection}
+      />
 
       <Notice open={idlePaused && !live} role="status">
         <div className="mb-4 flex flex-wrap items-center gap-3 border border-border bg-surface px-3 py-2 text-sm">

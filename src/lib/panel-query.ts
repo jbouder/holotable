@@ -1,5 +1,7 @@
 import { type ApiError, apiErrorFromThrown, readApiError } from "@/lib/errors";
 import type { PanelQuery, TimeRange } from "@/lib/ir";
+import type { VariableValues } from "@/lib/sql/variables";
+import { valuesKey } from "@/lib/variable-selection";
 
 /**
  * The client half of running one guarded query.
@@ -31,14 +33,21 @@ export interface QueryRequest {
   sql: string;
   timeField?: string;
   timeRange: TimeRange;
+  /** The dashboard's variables, as the preview binds them (#67). */
+  variables?: VariableValues;
 }
 
-export function queryRequest(query: PanelQuery, timeRange: TimeRange): QueryRequest {
+export function queryRequest(
+  query: PanelQuery,
+  timeRange: TimeRange,
+  variables?: VariableValues,
+): QueryRequest {
   return {
     sourceId: query.sourceId,
     sql: query.sql,
     timeField: query.timeField,
     timeRange,
+    ...(variables && Object.keys(variables).length > 0 ? { variables } : {}),
   };
 }
 
@@ -54,7 +63,7 @@ export type PanelQueryOutcome =
 export async function runPanelQuery(
   query: PanelQuery,
   timeRange: TimeRange,
-  init?: { signal?: AbortSignal },
+  init?: { signal?: AbortSignal; variables?: VariableValues },
 ): Promise<PanelQueryOutcome> {
   const startedAt = performance.now();
   const elapsed = () => Math.round(performance.now() - startedAt);
@@ -62,7 +71,7 @@ export async function runPanelQuery(
     const res = await fetch("/api/query", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(queryRequest(query, timeRange)),
+      body: JSON.stringify(queryRequest(query, timeRange, init?.variables)),
       signal: init?.signal,
     });
     if (!res.ok) {
@@ -116,17 +125,22 @@ export function readWindow(value: unknown): QueryRows["window"] {
  * Serialized rather than joined on a separator, so no pair of values can be
  * arranged to collide with another.
  */
-export function checkSubject(query: PanelQuery): string {
-  return JSON.stringify([query.sourceId, query.sql]);
+export function checkSubject(query: PanelQuery, variables: VariableValues = {}): string {
+  return JSON.stringify([query.sourceId, query.sql, Object.keys(variables).sort()]);
 }
 
-export function runSubject(query: PanelQuery, timeRange: TimeRange): string {
+export function runSubject(
+  query: PanelQuery,
+  timeRange: TimeRange,
+  variables: VariableValues = {},
+): string {
   return JSON.stringify([
     query.sourceId,
     query.sql,
     query.timeField ?? null,
     timeRange.from,
     timeRange.to,
+    valuesKey(variables),
   ]);
 }
 
@@ -143,12 +157,18 @@ export type SqlCheck = { ok: true } | { ok: false; error: ApiError };
 export async function validatePanelSql(input: {
   sourceId: string;
   sql: string;
+  /** The variables the dashboard declares (#67). */
+  variables?: readonly string[];
 }): Promise<SqlCheck> {
   try {
     const res = await fetch("/api/sql/validate", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ sourceId: input.sourceId, sql: input.sql }),
+      body: JSON.stringify({
+        sourceId: input.sourceId,
+        sql: input.sql,
+        ...(input.variables?.length ? { variables: input.variables } : {}),
+      }),
     });
     if (!res.ok) return { ok: false, error: await readApiError(res) };
     const body: unknown = await res.json();

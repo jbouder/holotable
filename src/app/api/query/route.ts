@@ -8,6 +8,8 @@ import { resolveTimeRange } from "@/lib/time";
 import { rowFilterFor, rowFilterHttpError } from "@/lib/row-scope";
 import { executePlan, QueryExecutionError } from "@/lib/timescaledb/client";
 import { TimeRange } from "@/lib/ir";
+import { VariableError } from "@/lib/sql/variables";
+import { VariableValuesBody } from "@/lib/variable-selection";
 
 export const runtime = "nodejs";
 export const maxDuration = 30;
@@ -17,6 +19,8 @@ const Body = z.object({
   sql: z.string().min(1).max(8000),
   timeField: z.string().min(1).max(128).optional(),
   timeRange: TimeRange,
+  /** The dashboard's variables as the editor previews them (#67). */
+  variables: VariableValuesBody.optional(),
 });
 
 /**
@@ -52,7 +56,12 @@ export const POST = route("query", async (req: Request) => {
         detail: { via: "preview", sql: body.sql, stage },
       });
 
-    const check = await validateSql(body.sql, source.config);
+    const variables = body.variables ?? {};
+    const check = await validateSql(
+      body.sql,
+      source.config,
+      new Set(Object.keys(variables)),
+    );
     if (!check.ok) {
       record("failure", "validate");
       throw new HttpError(400, check.error ?? "invalid sql");
@@ -68,6 +77,7 @@ export const POST = route("query", async (req: Request) => {
         to: range.to,
         // The caller's own rows, when the source filters them (#31).
         rowFilter: rowFilterFor(source, identity),
+        variables,
       });
       result = await executePlan(source, plan);
     } catch (err) {
@@ -85,7 +95,7 @@ export const POST = route("query", async (req: Request) => {
     // A failed statement is the user's query to fix — surface it as a 400 with
     // the real message, tagged `statement` so the client offers an edit-and-
     // retry rather than the generic "correct the highlighted value".
-    if (err instanceof QueryExecutionError) {
+    if (err instanceof QueryExecutionError || err instanceof VariableError) {
       throw new HttpError(400, err.message, {}, "statement");
     }
     // A statement the row filter cannot narrow is the author's to fix too.

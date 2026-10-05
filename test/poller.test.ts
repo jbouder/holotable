@@ -182,6 +182,7 @@ test("makePanelExecutor emits tombstone for a cross-workspace source (never exec
     { from: new Date("2024-01-01"), to: new Date("2024-01-02") },
     DASHBOARD_WORKSPACE,
     {},
+    {},
   );
 
   assert.equal(
@@ -245,6 +246,7 @@ test("makePanelExecutor allows execution when source workspace matches dashboard
       panel,
       { from: new Date("2024-01-01"), to: new Date("2024-01-02") },
       WORKSPACE,
+      {},
       {},
     );
   } catch {
@@ -329,6 +331,7 @@ test("a rejected query is reported as the statement it is", async () => {
     asQueryPanel(spec().panels[0]),
     { from: new Date(0), to: new Date(1) },
     "w1",
+    {},
     {},
   );
   assert.equal(events.length, 1);

@@ -1185,6 +1185,77 @@ test("fuzz: the wrapped plan is one SELECT over the same relations with exactly 
   );
 });
 
+// --- Dashboard variables (#67) -----------------------------------------------------
+//
+// A benign statement with variable references added in places the scanner must
+// tell apart from look-alikes: a string literal, a dollar-quoted string, a
+// cast. The values are arbitrary text, including SQL. Whatever they are, the
+// plan binds them and never writes them, and the parse tree has exactly one
+// parameter per real reference beyond the time bounds.
+
+const VARIABLE_CONDITIONS: Array<{ sql: string; refs: number }> = [
+  { sql: ":host IS NOT NULL", refs: 1 },
+  { sql: "':host' <> :host", refs: 1 },
+  { sql: "lower(:host::text) = ':region'", refs: 1 },
+  { sql: ":host::text <> $$:region$$ OR :region IS NULL", refs: 2 },
+  { sql: "coalesce(:region, :host) = :host", refs: 3 },
+  { sql: "'x' = ANY(:hosts)", refs: 1 },
+];
+
+/** Text that cannot occur in a generated statement, so finding it means a value was written. */
+const valueText = fc.string({ maxLength: 24 }).map((s) => `\u0001${s}`);
+
+test("fuzz: a variable's value is always bound and never written into the plan", async () => {
+  await run(
+    fc.asyncProperty(
+      benign,
+      fc.constantFrom(...VARIABLE_CONDITIONS),
+      valueText,
+      valueText,
+      async ({ sql }, condition, host, region) => {
+        const inner = sql.replace(/[\s;]+$/, "");
+        const withRefs = `SELECT * FROM (${inner}) AS _v WHERE ${condition.sql}`;
+        const declared = new Set(["host", "hosts", "region"]);
+        const r = await validateSql(withRefs, source, declared);
+        fc.pre(r.ok);
+        assert.equal(
+          (await validateSql(withRefs, source)).ok,
+          false,
+          `accepted undeclared references: ${JSON.stringify(withRefs)}`,
+        );
+        const from = new Date("2024-01-01T00:00:00Z");
+        const to = new Date("2024-01-01T01:00:00Z");
+        const plan = buildExecutablePlan({
+          sql: withRefs,
+          timeField: "ts",
+          from,
+          to,
+          rowFilter: null,
+          variables: { host, region, hosts: [host, region] },
+        });
+        assert.equal(
+          plan.sql.includes("\u0001"),
+          false,
+          `a value reached the text: ${plan.sql}`,
+        );
+        assert.deepEqual(plan.params.slice(0, 2), [from, to]);
+        for (const value of plan.params.slice(2)) {
+          assert.ok(
+            [host, region].includes(value as string) ||
+              JSON.stringify(value) === JSON.stringify([host, region]),
+          );
+        }
+        const problems = await oracle(plan.sql, { params: 2 + condition.refs });
+        assert.deepEqual(
+          problems,
+          [],
+          `plan for ${JSON.stringify(withRefs)}: ${problems.join("; ")}\n  plan: ${JSON.stringify(plan.sql)}`,
+        );
+      },
+    ),
+  );
+});
+
 // --- Row filters (#31) -------------------------------------------------------------
 //
 // A second oracle, independent of `src/lib/sql/row-filter.ts`: from the raw

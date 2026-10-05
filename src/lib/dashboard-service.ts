@@ -1,7 +1,7 @@
 import { HttpError } from "@/lib/auth/authorize";
 import { getSourceById } from "@/lib/db/repo";
 import { validateSql } from "@/lib/sql/safety";
-import { type Dashboard, hasQuery } from "@/lib/ir";
+import { type Dashboard, declaredVariables, hasQuery } from "@/lib/ir";
 import type { SourceRecord } from "@/lib/registry";
 
 /**
@@ -16,6 +16,10 @@ import type { SourceRecord } from "@/lib/registry";
  * - A panel that runs no query (a text panel, #202) references no source and
  *   is skipped; a dashboard needs at least one panel that does, because its
  *   sources are what decide its workspace.
+ * - A panel's `:name` references must be variables the dashboard declares
+ *   (#67), and a `query` variable's SELECT is held to the same rules as a
+ *   panel's: its source exists, is in the dashboard's workspace, and the
+ *   statement passes the guard, with no variables of its own.
  */
 export async function resolveAndValidateDashboard(
   spec: Dashboard,
@@ -25,9 +29,9 @@ export async function resolveAndValidateDashboard(
 ): Promise<{ workspaceId: string; sources: Map<string, SourceRecord> }> {
   const sources = new Map<string, SourceRecord>();
   let workspaceId: string | null = null;
+  const declared = declaredVariables(spec);
 
-  for (const panel of spec.panels.filter(hasQuery)) {
-    const sourceId = panel.query.sourceId;
+  const sourceOf = async (sourceId: string): Promise<SourceRecord> => {
     let source = sources.get(sourceId);
     if (!source) {
       const found = await getSource(sourceId);
@@ -38,6 +42,11 @@ export async function resolveAndValidateDashboard(
       source = found;
       sources.set(sourceId, source);
     }
+    return source;
+  };
+
+  for (const panel of spec.panels.filter(hasQuery)) {
+    const source = await sourceOf(panel.query.sourceId);
 
     if (workspaceId === null) workspaceId = source.workspaceId;
     else if (workspaceId !== source.workspaceId) {
@@ -47,7 +56,7 @@ export async function resolveAndValidateDashboard(
       );
     }
 
-    const check = await validateSql(panel.query.sql, source.config);
+    const check = await validateSql(panel.query.sql, source.config, declared);
     if (!check.ok) {
       throw new HttpError(400, `panel "${panel.id}": ${check.error}`);
     }
@@ -58,6 +67,21 @@ export async function resolveAndValidateDashboard(
       400,
       "a dashboard needs at least one panel with a query; its source decides the dashboard's workspace",
     );
+  }
+
+  for (const variable of spec.variables ?? []) {
+    if (!variable.query) continue;
+    const source = await sourceOf(variable.query.sourceId);
+    if (source.workspaceId !== workspaceId) {
+      throw new HttpError(
+        400,
+        `variable "${variable.name}" reads a source outside the dashboard's workspace`,
+      );
+    }
+    const check = await validateSql(variable.query.sql, source.config);
+    if (!check.ok) {
+      throw new HttpError(400, `variable "${variable.name}": ${check.error}`);
+    }
   }
   return { workspaceId, sources };
 }
