@@ -21,12 +21,20 @@ Panel = {
   },
   options?: object,           // the kind's own; see Reference → Panel options
   format?: "number" | "bytes" | "percent" | "ms",
+  timeRange?: { from, to },   // the panel's own window, in place of the dashboard's
+  refreshIntervalMs?: number, // the panel's own cadence, same bounds as the dashboard's
   layout: { x, y, w, h },     // position on a 12-column grid
 }
 ```
 
 A `Dashboard` wraps a title, a `timeRange`, a `refreshIntervalMs`, and 1–50
-panels, with a refinement rejecting duplicate panel ids. The full list of
+panels, with a refinement rejecting duplicate panel ids. A panel may carry a
+`timeRange` and a `refreshIntervalMs` of its own
+([#114](https://github.com/jbouder/holotable/issues/114)): a "today so far"
+stat over 24 hours next to a five-minute error chart. Its window wins over both
+the dashboard's and the one a viewer picks, and the viewer shows a badge on it.
+The server resolves either window the same way and holds either cadence to
+`MIN_REFRESH_INTERVAL_MS`. A text panel takes neither. The full list of
 `viz` and `format` values is in
 [Visualization types](/reference/visualization-types/), generated from the enum
 itself.

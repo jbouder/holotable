@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { type Dashboard, hasQuery, type QueryPanel } from "@/lib/ir";
+import { type Dashboard, hasQuery, panelTimeRange, type QueryPanel } from "@/lib/ir";
 import { DashboardGrid } from "@/components/dashboard/DashboardGrid";
 import { PanelView, type PanelState } from "@/components/dashboard/PanelView";
 import { EMPTY_ROWS, runPanelQuery } from "@/lib/panel-query";
@@ -17,7 +17,8 @@ export function PreviewDashboard({ spec }: { spec: Dashboard }) {
   const runPanel = React.useCallback(
     async (panel: QueryPanel, timeRange: Dashboard["timeRange"]) => {
       setStates((s) => ({ ...s, [panel.id]: { data: EMPTY_ROWS, status: "loading" } }));
-      const outcome = await runPanelQuery(panel.query, timeRange);
+      // A panel with its own window (#114) is previewed over it.
+      const outcome = await runPanelQuery(panel.query, panelTimeRange(panel, timeRange));
       setStates((s) => ({
         ...s,
         [panel.id]: outcome.ok
@@ -50,7 +51,7 @@ export function PreviewDashboard({ spec }: { spec: Dashboard }) {
           onRetry={
             hasQuery(panel) ? () => void runPanel(panel, spec.timeRange) : undefined
           }
-          timeRange={spec.timeRange}
+          timeRange={panelTimeRange(panel, spec.timeRange)}
         />
       )}
     />

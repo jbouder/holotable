@@ -85,13 +85,13 @@ function parseConfig() {
 }
 
 /* -------------------------------------------------------------------------- */
-/* Enums, from src/lib/ir.ts                                                  */
+/* Enums, from the IR's source files                                          */
 /* -------------------------------------------------------------------------- */
 
-function parseEnum(source, name) {
+function parseEnum(file, name) {
   const re = new RegExp(`export const ${name} = z\\.enum\\(\\[([\\s\\S]*?)\\]\\)`);
-  const m = source.match(re);
-  if (!m) fail(`could not locate \`export const ${name} = z.enum([...])\` in src/lib/ir.ts`);
+  const m = read(file).match(re);
+  if (!m) fail(`could not locate \`export const ${name} = z.enum([...])\` in ${file}`);
   const values = [...m[1].matchAll(/"([^"]+)"/g)].map((v) => v[1]);
   if (values.length === 0) fail(`parsed zero values from ${name}`);
   return values;
@@ -145,9 +145,10 @@ function parsePanelKinds() {
 /* -------------------------------------------------------------------------- */
 
 const config = parseConfig();
-const ir = read("src/lib/ir.ts");
 const panelKinds = parsePanelKinds();
-const valueFormats = parseEnum(ir, "ValueFormat");
+// `ValueFormat` is defined beside the presentation options a table column
+// shares it with (#115); `src/lib/ir.ts` re-exports it as `panel.format`.
+const valueFormats = parseEnum("src/lib/panels/presentation.ts", "ValueFormat");
 
 const banner = (sourceFile) =>
   `---\n` +
@@ -214,7 +215,7 @@ const formatRows = valueFormats
   .join("\n");
 
 const vizPage =
-  banner("the panel registry in `src/lib/panels/` and `ValueFormat` in `src/lib/ir.ts`")
+  banner("the panel registry in `src/lib/panels/` and `ValueFormat` in `src/lib/panels/presentation.ts`")
     .replace("TITLE", "Visualization types")
     .replace("DESCRIPTION", "The panel visualization kinds and value formats defined by the shared IR.")
   + `

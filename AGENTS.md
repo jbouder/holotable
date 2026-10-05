@@ -85,7 +85,12 @@ Important files:
   time field. `panel.query` is optional because of that: anything that
   executes, validates, lists or re-points queries filters with `hasQuery`.
   Text-panel Markdown is rendered by `src/lib/markdown.ts` into React
-  elements, never as an HTML string
+  elements, never as an HTML string. Options several kinds share (numbers,
+  legend, axis, thresholds, #115) are fragments in
+  `src/lib/panels/presentation.ts`; a kind's `optionGroups` names the ones
+  the editor draws controls for. A panel's own `timeRange` and
+  `refreshIntervalMs` (#114) are read through `panelTimeRange` and
+  `panelRefreshMs`; the poller groups panels by cadence under one timer
 - `src/lib/sql/safety.ts` — the SQL guard every generated query passes through
 - `src/lib/sql/ast.ts` — the PostgreSQL parse-tree walk the guard is built on
 - `src/lib/sql/row-filter.ts` — row-level filters (#31): every real table a

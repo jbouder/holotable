@@ -1,4 +1,5 @@
 import type { PanelData } from "@/components/charts/options";
+import { readWindow } from "@/lib/panel-query";
 import type { PollerEvent } from "@/lib/poller/registry";
 
 /**
@@ -14,6 +15,9 @@ import type { PollerEvent } from "@/lib/poller/registry";
  *
  * Timestamps compare as strings, as the server's cursor does: the query
  * client sends them as ISO 8601, which sorts lexically.
+ *
+ * The frame's window, when it says one, is the panel's own (#114) and is kept
+ * with the rows; a chart that runs to "now" ends there.
  */
 export function mergePanelRows(
   prev: PanelData | undefined,
@@ -21,13 +25,16 @@ export function mergePanelRows(
   maxWindowPoints: number,
 ): PanelData {
   const columns = event.columns.length ? event.columns : (prev?.columns ?? []);
+  const window = readWindow(event.window) ?? prev?.window;
+  const withWindow = (data: PanelData): PanelData =>
+    window ? { ...data, window } : data;
   if (event.mode === "replace" || !prev) {
-    return { columns, rows: event.rows.slice(-maxWindowPoints) };
+    return withWindow({ columns, rows: event.rows.slice(-maxWindowPoints) });
   }
   const { since, timeField } = event;
   const kept =
     since !== undefined && timeField
       ? prev.rows.filter((r) => String(r[timeField]) < since)
       : prev.rows;
-  return { columns, rows: [...kept, ...event.rows].slice(-maxWindowPoints) };
+  return withWindow({ columns, rows: [...kept, ...event.rows].slice(-maxWindowPoints) });
 }

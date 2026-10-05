@@ -4,6 +4,7 @@ import {
   donutChart,
   heatmapChart,
   lineChart,
+  optionsShape,
   pieChart,
   scatterChart,
 } from "@/components/charts/options";
@@ -27,15 +28,15 @@ import type { VizType } from "@/lib/ir";
  * compile, so `PanelView` never meets one it cannot draw.
  */
 export const PANEL_RENDERERS = {
-  line: { type: "chart", option: lineChart },
-  area: { type: "chart", option: areaChart },
-  bar: { type: "chart", option: barChart },
+  line: { type: "chart", option: lineChart, shape: optionsShape },
+  area: { type: "chart", option: areaChart, shape: optionsShape },
+  bar: { type: "chart", option: barChart, shape: optionsShape },
   scatter: { type: "chart", option: scatterChart },
   stat: { type: "html", Body: StatView },
   table: { type: "html", Body: TableView },
   heatmap: { type: "chart", option: heatmapChart },
-  pie: { type: "chart", option: pieChart },
-  donut: { type: "chart", option: donutChart },
+  pie: { type: "chart", option: pieChart, shape: optionsShape },
+  donut: { type: "chart", option: donutChart, shape: optionsShape },
   gauge: { type: "chart", option: gaugeChart, shape: gaugeShape },
   "state-timeline": {
     type: "chart",

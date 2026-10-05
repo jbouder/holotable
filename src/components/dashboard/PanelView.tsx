@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { Info } from "lucide-react";
+import { Clock, Info } from "lucide-react";
 import { hasQuery, type Panel, type TimeRange } from "@/lib/ir";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ErrorDisplay } from "@/components/ui/error-display";
@@ -17,7 +17,7 @@ import { useTimeDisplay } from "@/components/time-display";
 import type { ApiError } from "@/lib/errors";
 import { PANEL_EXIT_SHORTCUT } from "@/lib/shortcuts";
 import { supportsImageExport } from "@/lib/panel-export";
-import { brushedRange, supportsTimeBrush } from "@/lib/time-range";
+import { brushedRange, panelOverride, supportsTimeBrush } from "@/lib/time-range";
 import { cn } from "@/lib/utils";
 import { type Box, DURATION_SLOW_MS, EASE_EMPHASIZED, flipFrom } from "@/lib/motion";
 import { useReducedMotion } from "@/components/motion-preference";
@@ -133,6 +133,7 @@ export function PanelView({
         <CardHeader>
           <CardTitle className="min-w-0 truncate">{panel.title}</CardTitle>
           <div className="flex shrink-0 items-center gap-1">
+            <OverrideBadge panel={panel} />
             {showBadge && <StatusBadge status={status} updatedAt={state?.updatedAt} />}
             <PanelDescription panel={panel} />
             <PanelSqlDialog panel={panel} timeRange={timeRange} />
@@ -420,6 +421,29 @@ function DegradedBody({ state, onRetry }: { state: PanelState; onRetry?: () => v
       retryLabel={state.retrying ? "Retrying…" : "Retry now"}
       disabled={state.retrying}
     />
+  );
+}
+
+/**
+ * A panel on its own window or cadence (#114), saying which. Unlike the status
+ * badge it stays visible on a phone: a number read against the wrong window is
+ * a wrong number.
+ */
+function OverrideBadge({ panel }: { panel: Panel }) {
+  const display = useTimeDisplay();
+  const override = panelOverride(panel, new Date(), display);
+  if (!override) return null;
+  return (
+    <span
+      title={override.description}
+      className="inline-flex max-w-40 items-center gap-1 truncate bg-surface-2 px-2 py-0.5 text-xs font-medium text-muted"
+    >
+      <Clock className="h-3 w-3 shrink-0" aria-hidden />
+      <span className="truncate" aria-hidden>
+        {override.label}
+      </span>
+      <span className="sr-only">{override.description}</span>
+    </span>
   );
 }
 

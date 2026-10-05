@@ -1,19 +1,111 @@
 ---
 title: Panel options
-description: The options each panel kind takes in `panel.options`, and how the three kinds added in M11 read their rows.
+description: The options each panel kind takes in `panel.options`, and how the kinds added in M11 read their rows.
 sidebar:
   order: 3
 ---
 
 A panel's `options` belong to its kind. The IR validates them against that
-kind's schema (`src/lib/panels/kinds/`), so a gauge's options on a pie panel are
-refused, and so is a field a kind does not know. Kinds not listed here take no
-options. In the editor, a kind with options gets an **Options (JSON)** box that
-is checked as you type.
+kind's schema (`src/lib/panels/kinds/` and `src/lib/panels/presentation.ts`),
+so a gauge's options on a pie panel are refused, and so is a field a kind does
+not know. `heatmap` and `scatter` take no options. Every option is optional,
+and a panel without `options` renders exactly as it did before they existed
+([#115](https://github.com/jbouder/holotable/issues/115)).
+
+In the editor, the shared groups below get their own controls, and every kind
+with options also has an **All options (JSON)** box that is checked as you type.
 
 Colors are always token names, never raw colors:
 `success`, `warning`, `danger`, `info`, `neutral`, `orange`, `purple`, `teal`.
 They resolve through the same OKLCH values as the theme (invariant 13).
+
+## Shared groups
+
+### Numbers
+
+Taken by `line`, `area`, `bar`, `stat`, `pie`, `donut` and `gauge`, and by each
+entry of a table's `columns`.
+
+| Option | Type | Default | Meaning |
+| --- | --- | --- | --- |
+| `decimals` | integer, 0 to 6 | the format's own rounding | Digits after the point, fixed. |
+| `unit` | string, up to 16 characters | none | Written after the number: `12 hosts`. A unit starting with `/` or `%` is joined to it: `4.1 KB/s`. |
+| `compact` | boolean | `false` | `1.2K` rather than `1,234`. `bytes` is compact already. |
+
+`panel.format` still picks bytes, percent or milliseconds. On a chart, values
+are written per the format and these options only once the panel has one of
+them; without, the axis and tooltip show values as they always have.
+
+### Thresholds
+
+Taken by `line`, `area`, `bar`, `stat` and `gauge`: `[{ value, color }]`,
+strictly ascending, at most 10. A value takes the color of the last step at or
+below it.
+
+- **`stat`**: the number is drawn in the step's color. Below the first step it
+  keeps the default text color.
+- **`line`, `area`, `bar`**: a hidden piecewise visual map colors each segment,
+  fill and bar by its value, so every series takes the step colors. Below the
+  first step, a value takes the first chart color.
+
+### Legend and axis
+
+| Option | Kinds | Type | Default | Meaning |
+| --- | --- | --- | --- | --- |
+| `legend` | series, `pie`, `donut` | `"top"` \| `"bottom"` \| `"right"` \| `"none"` | `"top"` | Where the legend sits. |
+| `yAxis.min`, `yAxis.max` | series | number | automatic | Fixed bounds; `min` must be below `max`. |
+| `yAxis.log` | series | boolean | `false` | A log10 scale. `min`, when given, must be above zero. |
+| `yAxis.label` | series | string, up to 64 | none | The axis title. |
+| `stacked` | series | boolean | `false` | Series drawn on top of each other. |
+
+"Series" is `line`, `area` and `bar`. A chart is drawn anew when its options
+change, because a merged `setOption` cannot take back a visual map, a stack or
+an axis bound; only authoring changes them, so a data update still merges
+(invariant 11).
+
+```json
+{
+  "viz": "line",
+  "format": "ms",
+  "options": {
+    "decimals": 0,
+    "legend": "bottom",
+    "yAxis": { "min": 0, "label": "p95 latency" },
+    "thresholds": [
+      { "value": 0, "color": "success" },
+      { "value": 250, "color": "warning" },
+      { "value": 1000, "color": "danger" }
+    ]
+  }
+}
+```
+
+## `stat`
+
+| Option | Type | Default | Meaning |
+| --- | --- | --- | --- |
+| `value` | column name | the last row's first numeric column that is not the time field | The column shown. A name the result lacks falls back to the default. |
+| `sparkline` | boolean | `false` | The value column across every row, drawn faintly behind the number in its color. |
+
+Plus the number options and thresholds above.
+
+## `table`
+
+| Option | Type | Default | Meaning |
+| --- | --- | --- | --- |
+| `columns` | `[{ name, label?, hidden?, format?, decimals?, unit?, compact?, align?, width? }]`, at most 50 | none | Listed columns come first, in this order, and the rest follow as the query returned them. A listed column the result lacks is skipped. |
+| `sort` | `{ column, order? }` | the query's order | `order` is `"asc"` (the default) or `"desc"`. Numbers sort as numbers, empty cells last. |
+
+- `label` is the header; `hidden: true` leaves the column out.
+- `format` (`number`, `bytes`, `percent`, `ms`) and the number options write a
+  numeric cell; without them a cell is shown as returned.
+- `align` is `left`, `center` or `right`; `width` is in pixels, 40 to 800.
+- Without `sort` the table shows the newest 100 rows, as before; with one, the
+  first 100 in its order.
+
+The editor's **Columns** section edits names, headers, format, alignment,
+visibility and order; `width`, `decimals` and `unit` per column are edited in
+the JSON box.
 
 ## `gauge`
 
@@ -26,12 +118,13 @@ One value against its limits ([#200](https://github.com/jbouder/holotable/issues
 | `min` | number or column name | `0` | The low limit. A column name reads it from the row. |
 | `max` | number or column name | `100` | The high limit. |
 | `thresholds` | `[{ value, color }]`, ascending, at most 10 | none | A value takes the color of the last step at or below it. Below the first step, or with none, it is `info`. |
+| `decimals`, `unit`, `compact` | see [Numbers](#numbers) | none | How the value and the limits are written. |
 
 - **`radial`** reads the last row, as `stat` does.
 - **`bar`** reads the latest row for each label, where the label is the first
   non-numeric column. Bars are sorted largest first, at most 50.
 - A value outside its limits is drawn clamped to them. Its text is always the
-  true value, formatted per `panel.format`.
+  true value, formatted per `panel.format` and the number options.
 
 ```json
 {

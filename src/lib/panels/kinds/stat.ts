@@ -1,3 +1,4 @@
+import { StatOptions } from "@/lib/panels/presentation";
 import { definePanelKind } from "@/lib/panels/types";
 
 export const stat = definePanelKind({
@@ -9,4 +10,6 @@ export const stat = definePanelKind({
   timeBrush: false,
   skeleton: "stat",
   query: "required",
+  options: StatOptions,
+  optionGroups: ["stat", "number", "thresholds"],
 });

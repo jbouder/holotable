@@ -25,6 +25,8 @@ export interface PanelDraft {
   format?: Panel["format"];
   query?: { sourceId?: string; sql?: string; timeField?: string };
   options?: Record<string, unknown>;
+  timeRange?: { from?: string; to?: string };
+  refreshIntervalMs?: number;
   layout?: { x?: number; y?: number; w?: number; h?: number };
 }
 
@@ -182,6 +184,17 @@ function formatOptions(options: Record<string, unknown> | undefined): string {
   return Object.keys(rest).length === 0 ? NONE : JSON.stringify(rest);
 }
 
+/** A panel's own window or cadence (#114); without one it follows the dashboard. */
+const DASHBOARD = "the dashboard's";
+
+function formatRange(range: PanelDraft["timeRange"]): string {
+  return range ? `${range.from ?? "…"} → ${range.to ?? "…"}` : DASHBOARD;
+}
+
+function formatRefresh(ms: number | undefined): string {
+  return ms === undefined ? DASHBOARD : `every ${ms / 1000}s`;
+}
+
 function formatLayout(layout: Panel["layout"]): string {
   return `x ${layout.x} · y ${layout.y} · w ${layout.w} · h ${layout.h}`;
 }
@@ -235,6 +248,24 @@ export function diffPanels(
         streaming && after.options === undefined
           ? undefined
           : formatOptions(after.options),
+    },
+    {
+      key: "timeRange",
+      label: "Time range",
+      before: formatRange(before.timeRange),
+      after:
+        streaming && after.timeRange === undefined
+          ? undefined
+          : formatRange(after.timeRange),
+    },
+    {
+      key: "refreshIntervalMs",
+      label: "Refresh",
+      before: formatRefresh(before.refreshIntervalMs),
+      after:
+        streaming && after.refreshIntervalMs === undefined
+          ? undefined
+          : formatRefresh(after.refreshIntervalMs),
     },
     {
       key: "sourceId",

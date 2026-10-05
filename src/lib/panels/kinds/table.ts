@@ -1,3 +1,4 @@
+import { TableOptions } from "@/lib/panels/presentation";
 import { definePanelKind } from "@/lib/panels/types";
 
 export const table = definePanelKind({
@@ -8,4 +9,6 @@ export const table = definePanelKind({
   timeBrush: false,
   skeleton: "table",
   query: "required",
+  options: TableOptions,
+  optionGroups: ["table"],
 });

@@ -104,8 +104,13 @@ test("a color is a token, never a raw color (invariant 13)", () => {
 
 test("options belong to their kind", () => {
   assert.match(
+    issues({ ...line(), viz: "heatmap", options: { legend: "top" } }).join(),
+    /a heatmap panel takes no options/,
+  );
+  assert.match(
     issues({ ...line(), options: { variant: "bar" } }).join(),
-    /a line panel takes no options/,
+    /variant/,
+    "a gauge's options on a line",
   );
   assert.match(
     issues({ ...gauge(), options: { content: "hi" } }).join(),

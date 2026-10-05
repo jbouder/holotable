@@ -1,4 +1,4 @@
-import { type Dashboard, hasQuery, type QueryPanel } from "@/lib/ir";
+import { type Dashboard, hasQuery, panelRefreshMs, type QueryPanel } from "@/lib/ir";
 import { getSourceById } from "@/lib/db/repo";
 import type { SourceRecord } from "@/lib/registry";
 import { validateSql, buildExecutablePlan, type ExecutablePlan } from "@/lib/sql/safety";
@@ -67,6 +67,11 @@ export type PollerEvent =
        */
       since?: string;
       timeField?: string;
+      /**
+       * The window these rows were selected over (epoch ms). The tick's
+       * window is the dashboard's; a panel with its own (#114) ends here.
+       */
+      window?: { from: number; to: number };
     }
   | { type: "panel-error"; panelId: string; error: string; kind: ErrorKind }
   /**
@@ -306,6 +311,14 @@ class DashboardPoller {
   private health = new Map<string, PanelHealth>();
   /** Panels executing right now, so a tick and a manual retry never overlap. */
   private executing = new Set<string>();
+  /**
+   * When each cadence is next due (epoch ms), keyed by its interval (#114).
+   * Panels that share an interval run together, so the loop is one timer for
+   * the dashboard however many panels have their own.
+   */
+  private nextDue = new Map<number, number>();
+  /** When the pending timer was set to fire for (epoch ms). */
+  private scheduledFor = 0;
 
   constructor(
     readonly dashboardId: string,
@@ -320,6 +333,46 @@ class DashboardPoller {
   /** The dashboard's refresh interval, never below the server's floor. */
   private get intervalMs(): number {
     return Math.max(config.minRefreshIntervalMs, this.spec.refreshIntervalMs);
+  }
+
+  /** A panel's own interval or the dashboard's, never below the server's floor. */
+  private intervalOf(panel: QueryPanel): number {
+    return Math.max(
+      config.minRefreshIntervalMs,
+      panelRefreshMs(panel, this.spec.refreshIntervalMs),
+    );
+  }
+
+  /**
+   * The intervals this dashboard runs on: one per distinct panel cadence, or
+   * the dashboard's own when nothing runs a query, which still ticks.
+   */
+  private cadences(): number[] {
+    const set = new Set(this.spec.panels.filter(hasQuery).map((p) => this.intervalOf(p)));
+    return set.size > 0 ? [...set] : [this.intervalMs];
+  }
+
+  /**
+   * The cadences to run now. One due within a quarter of its interval (and at
+   * most a second) is run with this cycle rather than on a timer of its own,
+   * so a 15s and a 30s cadence that drifted apart by a query's duration are
+   * still one cycle every 30 seconds rather than two.
+   */
+  private dueCadences(now: number): Set<number> {
+    return new Set(
+      this.cadences().filter((c) => {
+        const due = this.nextDue.get(c);
+        return due === undefined || due - now <= Math.min(1_000, c / 4);
+      }),
+    );
+  }
+
+  /**
+   * The window a panel is run over (#114): its own when it has one, resolved
+   * here like the dashboard's, or the dashboard's for this cycle.
+   */
+  private windowFor(panel: QueryPanel, shown: TimeWindow): TimeWindow {
+    return panel.timeRange ? resolveTimeRange(panel.timeRange) : shown;
   }
 
   /**
@@ -464,7 +517,14 @@ class DashboardPoller {
     // assume it runs once per tick: a second live timer would double the
     // dashboard's query rate for the life of the poller.
     if (this.timer) clearTimeout(this.timer);
-    this.timer = setTimeout(() => this.runTick(), this.intervalMs);
+    // The earliest cadence due. One that never completed (a crashed tick)
+    // waits its interval, as the whole dashboard used to.
+    const now = Date.now();
+    const delay = Math.min(
+      ...this.cadences().map((c) => Math.max(0, (this.nextDue.get(c) ?? now + c) - now)),
+    );
+    this.scheduledFor = now + delay;
+    this.timer = setTimeout(() => this.runTick(), delay);
   }
 
   /**
@@ -477,7 +537,20 @@ class DashboardPoller {
    * (an invalid statement, a missing row-filter claim), clears the count:
    * those never reached the source, so they put no load on it to back off from.
    */
-  private async runPanel(panel: QueryPanel, window: TimeWindow): Promise<void> {
+  private async runPanel(panel: QueryPanel, shown: TimeWindow): Promise<void> {
+    let window: TimeWindow;
+    try {
+      window = this.windowFor(panel, shown);
+    } catch (err) {
+      // A window of its own that will not resolve is the author's to fix, and
+      // is this panel's alone: the rest of the cycle runs.
+      this.publish(panel, {
+        type: "panel-error",
+        panelId: panel.id,
+        ...describeTickError(err, this.dashboardId),
+      });
+      return;
+    }
     this.executing.add(panel.id);
     const startedAt = Date.now();
     try {
@@ -488,14 +561,17 @@ class DashboardPoller {
         this.scope,
       );
       this.health.delete(panel.id);
-      for (const e of events) this.publish(panel, e);
+      const span = { from: window.from.getTime(), to: window.to.getTime() };
+      for (const e of events) {
+        this.publish(panel, e.type === "panel" ? { ...e, window: span } : e);
+      }
     } catch (err) {
       const described = describePanelError(err);
       const health = recordFailure(
         this.health.get(panel.id),
         startedAt,
         Date.now(),
-        this.intervalMs,
+        this.intervalOf(panel),
         this.backoff,
       );
       this.health.set(panel.id, health);
@@ -546,6 +622,7 @@ class DashboardPoller {
       // The tick reports a range that will not resolve; nothing to retry here.
       return false;
     }
+    // A panel with a window of its own resolves it in `runPanel`.
     this.runPanel(panel, window).catch((err) => {
       log.error("poller.retry_crashed", { dashboardId: this.dashboardId, panelId, err });
     });
@@ -568,18 +645,30 @@ class DashboardPoller {
     this.ticking = true;
     try {
       const startedAt = performance.now();
+      // A timer that fired has reached the time it was set for, whatever the
+      // clock reads, so the cadence it was set for is due.
+      const now = Math.max(Date.now(), this.scheduledFor);
+      const due = this.dueCadences(now);
+      // Due from now until the cycle completes, so a failed cycle is retried
+      // on the cadence's own interval rather than at once.
+      for (const c of due) this.nextDue.set(c, now + c);
       const window = resolveTimeRange(this.spec.timeRange);
-      const now = Date.now();
-      // A panel backing off (#44) sits out until its `retryAt`, and keeps the
-      // `panel-degraded` it last published, which is what a joiner is sent.
-      // One a viewer is retrying is already running.
+      // Only the panels whose cadence is due (#114). A panel backing off
+      // (#44) sits out until its `retryAt`, and keeps the `panel-degraded` it
+      // last published, which is what a joiner is sent. One a viewer is
+      // retrying is already running.
       // A text panel (#202) has no query and is never executed.
       await Promise.all(
         this.spec.panels
           .filter(hasQuery)
+          .filter((p) => due.has(this.intervalOf(p)))
           .filter((p) => isDue(this.health.get(p.id), now) && !this.executing.has(p.id))
           .map((p) => this.runPanel(p, window)),
       );
+      // Each interval runs from the end of its cycle, as the dashboard's
+      // always did, so a slow cycle is never followed by one at once.
+      const finishedAt = Date.now();
+      for (const c of due) this.nextDue.set(c, finishedAt + c);
       // Every panel is executed and broadcast by this point, so the tick's cost
       // is the whole cycle — not one query — which is what a refresh interval
       // has to accommodate.

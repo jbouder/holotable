@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { NumberFields } from "@/lib/panels/presentation";
 import { Thresholds } from "@/lib/panels/thresholds";
 import { definePanelKind } from "@/lib/panels/types";
 
@@ -18,6 +19,7 @@ export const GaugeOptions = z
     /** Defaults to 100. */
     max: Bound.optional(),
     thresholds: Thresholds.optional(),
+    ...NumberFields,
   })
   .strict()
   .superRefine((o, ctx) => {
@@ -39,4 +41,5 @@ export const gauge = definePanelKind({
   skeleton: "radial",
   query: "required",
   options: GaugeOptions,
+  optionGroups: ["number", "thresholds"],
 });

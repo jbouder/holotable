@@ -17,7 +17,15 @@ Server side (`.../stream/route.ts` and `src/lib/poller/registry.ts`):
   that dashboard. `getPoller` guarantees **one poller per dashboard**, shared
   across all subscribers; a newer saved version replaces the old poller.
 - Each tick (`max(minRefreshIntervalMs, spec.refreshIntervalMs)`), the poller
-  executes **every panel once** via `makePanelExecutor`. For each panel it:
+  executes **every panel once** via `makePanelExecutor`. A panel with a
+  `refreshIntervalMs` of its own (#114) runs on that cadence instead, under
+  the same floor. The poller keeps one timer and a due time per distinct
+  cadence; when it fires, every cadence due within a quarter of its interval
+  (at most a second) runs in the same cycle, so a 15-second and a 30-second
+  panel make one cycle every 30 seconds, not two. A panel with its own
+  `timeRange` is run over that window, resolved on the server like the
+  dashboard's, and its `panel` frames carry the window they were selected
+  over. For each panel it:
   1. **Re-resolves the source every tick.** If the source is missing,
      tombstoned, or belongs to a *different* workspace than the dashboard, it
      emits a `tombstone` event. All three cases look identical, so a crafted
@@ -139,7 +147,7 @@ Client side (`LiveDashboard.tsx` → `PanelView.tsx` → `EChart.tsx`):
 - `dashboard-error` belongs to no panel: it renders as a banner above the grid,
   marks every panel stale, and clears on the next completed `tick`.
 - A **staleness watchdog** marks panels `stale` if no `tick` arrives within
-  roughly two refresh intervals, and on an `EventSource` transport error — which
+  roughly two cycles (the fastest panel's cadence, `cycleMs`), and on an `EventSource` transport error — which
   auto-reconnects and resumes.
 - Panels are cleared only when a stream starts over (first load, or a new time
   window). A resumed stream keeps them.

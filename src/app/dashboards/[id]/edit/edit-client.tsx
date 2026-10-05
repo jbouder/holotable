@@ -21,6 +21,7 @@ import {
   type Dashboard,
   hasQuery,
   Panel,
+  panelTimeRange,
   type QueryPanel,
   VizType,
   ValueFormat,
@@ -40,7 +41,6 @@ import {
 } from "@/lib/panel-list";
 import { isStarterSql, panelStarter, starterPanel } from "@/lib/panel-starter";
 import { clampLayout } from "@/lib/grid-layout";
-import { cn } from "@/lib/utils";
 import { AiUnavailable } from "@/components/ai-unavailable";
 import { Button, ButtonLabel } from "@/components/ui/button";
 import { Input, Textarea, Label } from "@/components/ui/input";
@@ -73,6 +73,10 @@ import { useHistory } from "@/lib/editor/use-history";
 import { withViewTransition } from "@/lib/view-transition";
 import { useReducedMotion } from "@/components/motion-preference";
 import { formatShortcut, useIsMac, useShortcuts } from "@/lib/editor/use-shortcuts";
+import {
+  PanelPresentationFields,
+  PanelTimingFields,
+} from "@/components/editor/panel-settings";
 import { bindShortcuts, EDITOR_SHORTCUTS } from "@/lib/shortcuts";
 import {
   interceptedHref,
@@ -1058,6 +1062,7 @@ export function EditDashboardClient({
                     panel={selected}
                     sources={sources}
                     timeRange={spec.timeRange}
+                    refreshIntervalMs={spec.refreshIntervalMs}
                     sourceMissing={
                       selected.query !== undefined &&
                       missingSources.includes(selected.query.sourceId)
@@ -1240,6 +1245,7 @@ function PanelEditor({
   panel,
   sources,
   timeRange,
+  refreshIntervalMs,
   sourceMissing,
   onRepoint,
   onChange,
@@ -1247,6 +1253,7 @@ function PanelEditor({
   panel: Panel;
   sources: SourceOption[];
   timeRange: Dashboard["timeRange"];
+  refreshIntervalMs: number;
   /** This panel's source is not among the workspace's live sources. */
   sourceMissing: boolean;
   onRepoint: () => void;
@@ -1374,13 +1381,18 @@ function PanelEditor({
         <TextFields panel={panel} onChange={onChange} />
       )}
 
-      {kind.options && kind.query === "required" && (
-        <OptionsField
-          // A new kind starts a new draft: the old kind's text is not this one's.
-          key={`${panel.id}:${panel.viz}`}
+      {hasQuery(panel) && (
+        <PanelTimingFields
           panel={panel}
+          dashboardRange={timeRange}
+          dashboardRefreshMs={refreshIntervalMs}
           onChange={onChange}
         />
+      )}
+
+      {/* A text panel's one option, its content, is edited above. */}
+      {kind.query === "required" && (
+        <PanelPresentationFields panel={panel} onChange={onChange} />
       )}
 
       <div>
@@ -1451,7 +1463,7 @@ function QueryFields({
   timeRange: Dashboard["timeRange"];
   onChange: (fn: (p: QueryPanel) => Panel, intent: EditIntent) => void;
 }) {
-  const preview = usePanelPreview(panel, timeRange);
+  const preview = usePanelPreview(panel, panelTimeRange(panel, timeRange));
   const catalog = sources.find((s) => s.id === panel.query.sourceId)?.catalog ?? null;
 
   return (
@@ -1532,76 +1544,6 @@ function TextFields({
           <p className="text-sm text-muted">Nothing to show yet.</p>
         )}
       </div>
-    </div>
-  );
-}
-
-/**
- * A kind's options as JSON, checked against the kind's schema as it is typed.
- * Only a draft that parses and validates reaches the spec, so the panel never
- * holds options its kind would refuse; the draft itself is kept while it is
- * being written.
- */
-function OptionsField({
-  panel,
-  onChange,
-}: {
-  panel: Panel;
-  onChange: (fn: (p: Panel) => Panel, intent: EditIntent) => void;
-}) {
-  const schema = panelKind(panel.viz).options;
-  const [draft, setDraft] = React.useState(() =>
-    JSON.stringify(panel.options ?? {}, null, 2),
-  );
-  const [problem, setProblem] = React.useState<string | null>(null);
-
-  function edit(text: string) {
-    setDraft(text);
-    let value: unknown;
-    try {
-      value = text.trim() === "" ? {} : JSON.parse(text);
-    } catch {
-      setProblem("Not valid JSON yet.");
-      return;
-    }
-    const parsed = schema?.safeParse(value);
-    if (!parsed?.success) {
-      const issue = parsed?.error.issues[0];
-      setProblem(
-        issue
-          ? `${issue.path.length ? `${issue.path.join(".")}: ` : ""}${issue.message}`
-          : "Not valid for this kind.",
-      );
-      return;
-    }
-    setProblem(null);
-    const options = Object.keys(parsed.data).length > 0 ? parsed.data : undefined;
-    onChange((p) => ({ ...p, options }), {
-      action: "edit panel options",
-      key: `${panel.id}:options`,
-    });
-  }
-
-  return (
-    <div className="space-y-1">
-      <Label htmlFor="p-options">Options (JSON)</Label>
-      <Textarea
-        id="p-options"
-        rows={5}
-        className="font-mono text-xs"
-        spellCheck={false}
-        value={draft}
-        aria-invalid={problem !== null}
-        aria-describedby="p-options-help"
-        onChange={(e) => edit(e.target.value)}
-      />
-      <p
-        id="p-options-help"
-        className={cn("text-xs", problem ? "text-danger" : "text-muted")}
-      >
-        {problem ??
-          "This kind's own settings; Reference → Panel options lists the fields."}
-      </p>
     </div>
   );
 }
