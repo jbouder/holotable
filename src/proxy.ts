@@ -1,8 +1,11 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { publicOrigin } from "@/lib/auth/origin";
 import { config as appConfig } from "@/lib/config";
+import { shareFrameAncestors, verifyShareToken } from "@/lib/auth/share";
 import {
   contentSecurityPolicy,
+  EMBED_PATH_PREFIX,
+  EMBED_REQUEST_HEADER,
   contentSecurityPolicyHeaderName,
   generateNonce,
   NONCE_REQUEST_HEADER,
@@ -32,8 +35,13 @@ import {
  * `getIdentity()` on the page. `/api` is outside the matcher, so API routes
  * keep answering 401.
  */
-export function proxy(request: NextRequest): NextResponse {
-  if (appConfig.authMode === "demo" && needsDemoSession(request)) {
+export async function proxy(request: NextRequest): Promise<NextResponse> {
+  // A share link's embed page (#65) runs on its token, not a session, and may
+  // be framed by the origins that token names. The signature is checked here
+  // only to read those origins; the page itself checks the token against its
+  // row, so a revoked one framed by an allowed origin still shows nothing.
+  const embed = request.nextUrl.pathname.startsWith(EMBED_PATH_PREFIX);
+  if (!embed && appConfig.authMode === "demo" && needsDemoSession(request)) {
     const { pathname, search } = request.nextUrl;
     const login = new URL("/api/auth/login", requestOrigin(request));
     login.searchParams.set("next", `${pathname}${search}`);
@@ -47,6 +55,13 @@ export function proxy(request: NextRequest): NextResponse {
   const policy = contentSecurityPolicy({
     nonce,
     development: process.env.NODE_ENV === "development",
+    ...(embed
+      ? {
+          frameAncestors: shareFrameAncestors(
+            await verifyShareToken(request.nextUrl.searchParams.get("token")),
+          ),
+        }
+      : {}),
   });
   const header = contentSecurityPolicyHeaderName(appConfig.cspReportOnly);
 
@@ -55,6 +70,10 @@ export function proxy(request: NextRequest): NextResponse {
   requestHeaders.delete("Content-Security-Policy");
   requestHeaders.delete("Content-Security-Policy-Report-Only");
   requestHeaders.set(header, policy);
+  // The root layout leaves out the app's chrome for an embed; set here so a
+  // request cannot claim it, and cleared on every other path.
+  requestHeaders.delete(EMBED_REQUEST_HEADER);
+  if (embed) requestHeaders.set(EMBED_REQUEST_HEADER, "1");
 
   const response = NextResponse.next({ request: { headers: requestHeaders } });
   response.headers.set(header, policy);

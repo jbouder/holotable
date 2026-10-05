@@ -113,6 +113,12 @@ Important files:
   `src/lib/db/annotations.ts` — annotations (#68): workspace-scoped events
   drawn on time-series panels. Reads take the workspace from the dashboard
   record, writes from the path, and every statement filters on it
+- `src/lib/auth/share.ts` and `src/lib/auth/share-access.ts` — read-only
+  share links (#65): signed `hts_` tokens checked against a hashed, revocable
+  row on every use, resolving to an identity `can()` allows `dashboard:view`
+  on one dashboard and nothing else. Only the stream route and
+  `src/app/embed/` accept one, never `getIdentity()`; `test/share.test.ts`
+  holds that list. The page gets `sharedSpec()` (no SQL or source ids)
 - `src/lib/auth/authorize.ts` — the central `can()` check
 - `src/lib/auth/renewal.ts` — session renewal (#27): the realm's refresh token
   is sealed in `sessions` (`refresh-token.ts`) and never reaches the browser,

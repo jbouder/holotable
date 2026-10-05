@@ -127,6 +127,17 @@ only a random id for it, in an `httpOnly` cookie scoped to `/api/auth`, whose
 SHA-256 is what the table stores. Sign-out deletes the row; a refused renewal
 deletes it too.
 
+**Read-only share links.** A share link (#65) is the one credential that is
+not a session. Its `hts_` token is signed with a key derived from
+`SESSION_SECRET`, and only its SHA-256 is stored. Every use checks the token
+against its row: not revoked, not expired, the very token minted, for that
+dashboard. It resolves to an identity that `can()` allows `dashboard:view` on
+that one dashboard and nothing else, ahead of every other rule. Only the
+dashboard's stream and the `/embed/` page accept it. The page is sent no SQL or
+source ids, may be framed only by the origins the token names, and the link is
+revocable at once. See
+[Share links](docs/src/content/docs/operations/share-links.md).
+
 **Cookies and cross-origin requests.** The session cookie is `httpOnly` and
 `SameSite=Lax`. When it is `Secure`, its name is `__Host-` prefixed, so the
 browser accepts it only from this host with `Path=/` and no `Domain`; a sibling

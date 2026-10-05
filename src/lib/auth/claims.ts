@@ -34,7 +34,8 @@ export interface Identity {
    * Display-only profile fields (#208). They let the header and the settings
    * page show a person something they recognise as themselves, and nothing
    * else: no authorization decision reads them. `can()` decides from `sub`,
-   * `platformAdmin` and `workspaces` alone, and a test holds it to that.
+   * `platformAdmin`, `workspaces` and a share link's `share` alone, and a test
+   * holds it to that.
    * Absent when the token did not carry the claim.
    */
   displayName?: string;
@@ -47,6 +48,12 @@ export interface Identity {
    * row-filtered source then refuses rather than serving every row.
    */
   attributes?: Readonly<Record<string, string>>;
+  /**
+   * Set only for a read-only share link (#65), never for a person: the one
+   * dashboard it may view. `can()` reads it before anything else and allows
+   * `dashboard:view` on that dashboard and nothing at all besides.
+   */
+  share?: Readonly<{ shareId: string; dashboardId: string; workspaceId: string }>;
 }
 
 /** The display-only part of an {@link Identity}. */

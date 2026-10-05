@@ -6,6 +6,8 @@ import {
   HttpError,
 } from "@/lib/auth/authorize";
 import { tokenExpiry, tokenRef, verifySessionToken } from "@/lib/auth/session";
+import { shareSessionId } from "@/lib/auth/share";
+import { resolveShare } from "@/lib/auth/share-access";
 import { guardStream, type StreamEnd } from "@/lib/auth/stream-guard";
 import { config } from "@/lib/config";
 import { getDashboardById, getSourceById } from "@/lib/db/repo";
@@ -48,24 +50,31 @@ const END_FRAMES: Record<StreamEnd, () => string> = {
 export const GET = route(
   "dashboards.stream",
   async (req: Request, ctx: RouteContext<"/api/dashboards/[id]/stream">) => {
-    const identity = await requireIdentity();
+    const { id } = await ctx.params;
+    const url = new URL(req.url);
+    // A read-only share link (#65) streams with its token instead of a
+    // session: an identity that `can()` lets view this one dashboard and
+    // nothing else. This route and the embed page are the only places a
+    // share token is accepted. An unusable one reads as a missing dashboard.
+    const shareToken = url.searchParams.get("share");
+    const shared = shareToken === null ? null : await resolveShare(shareToken, id);
+    if (shareToken !== null && !shared) throw new HttpError(404, "dashboard not found");
+    const identity = shared ? shared.identity : await requireIdentity();
     // Kept to verify again while the stream is open (#32), and to match a
     // back-channel logout against (#28). Verified by `requireIdentity` above.
-    const token = await getSessionToken();
-    const { id } = await ctx.params;
+    const token = shared ? null : await getSessionToken();
     const dashboard = await getDashboardById(id);
     if (!dashboard) throw new HttpError(404, "dashboard not found");
 
     assertAuthorized(
       identity,
       "dashboard:view",
-      { workspaceId: dashboard.workspaceId },
+      { workspaceId: dashboard.workspaceId, dashboardId: id },
       { type: "dashboard", id },
     );
 
-    const url = new URL(req.url);
-    const from = url.searchParams.get("from");
-    const to = url.searchParams.get("to");
+    const from = shared ? null : url.searchParams.get("from");
+    const to = shared ? null : url.searchParams.get("to");
     if ((from === null) !== (to === null)) {
       throw new HttpError(400, "both from and to time-range parameters are required");
     }
@@ -73,9 +82,10 @@ export const GET = route(
     if (parsedRange && !parsedRange.success) {
       throw new HttpError(400, "invalid time-range parameters");
     }
-    const spec = parsedRange?.data
-      ? { ...dashboard.spec, timeRange: parsedRange.data }
-      : dashboard.spec;
+    // A share shows its own fixed window when it has one, and never one the
+    // holder of the link picks.
+    const range = shared ? (shared.share.timeRange ?? undefined) : parsedRange?.data;
+    const spec = range ? { ...dashboard.spec, timeRange: range } : dashboard.spec;
     // The viewer's row-filter claim values for this dashboard's filtered
     // sources (#31), which pick the poller: viewers who would see the same
     // rows share one, and no one is handed another tenant's poller. Sources
@@ -101,7 +111,8 @@ export const GET = route(
     // variable allows this viewer before anything runs with it.
     const variables = await checkedSelection(
       spec.variables,
-      selectionFromParams(url.searchParams),
+      // A share link runs every variable at its default.
+      shared ? {} : selectionFromParams(url.searchParams),
       dashboard.workspaceId,
       scope,
     );
@@ -199,21 +210,42 @@ export const GET = route(
         // a back-channel logout of this session (#28), and when a periodic
         // re-check finds the dashboard gone or no longer viewable. Only this
         // subscriber is closed; the others on the same poller carry on.
+        // A share's stream ends at the share's expiry, at once on its
+        // revocation (the revoke route names it by `shareSessionId`), and
+        // when the re-check finds it revoked or the dashboard gone; each as
+        // `access-ended`, since there is no session to renew.
         stopGuard = guardStream({
-          expiresAt: token ? tokenExpiry(token) : null,
-          ref: token ? tokenRef(token) : null,
+          expiresAt: shared
+            ? Date.parse(shared.share.expiresAt)
+            : token
+              ? tokenExpiry(token)
+              : null,
+          ref: shared
+            ? { sub: identity.sub, sid: shareSessionId(shared.share.id), iat: 0 }
+            : token
+              ? tokenRef(token)
+              : null,
           intervalMs: config.sseReauthIntervalMs,
-          verify: async () => (token ? verifySessionToken(token) : null),
+          verify: async () =>
+            shared
+              ? ((await resolveShare(shareToken, id))?.identity ?? null)
+              : token
+                ? verifySessionToken(token)
+                : null,
           authorize: async (who) => {
             const latest = await getDashboardById(id);
             return (
               latest !== null &&
-              can(who, "dashboard:view", { workspaceId: latest.workspaceId })
+              can(who, "dashboard:view", {
+                workspaceId: latest.workspaceId,
+                dashboardId: id,
+              })
             );
           },
           onEnd: (why) => {
             try {
-              controller.enqueue(encoder.encode(END_FRAMES[why]()));
+              const frame = shared ? accessEndedFrame : END_FRAMES[why];
+              controller.enqueue(encoder.encode(frame()));
             } catch {
               /* controller closed */
             }

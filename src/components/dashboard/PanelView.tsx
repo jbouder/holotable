@@ -63,6 +63,7 @@ export function PanelView({
   onSelectTimeRange,
   window,
   annotations,
+  embedded = false,
 }: {
   panel: Panel;
   state?: PanelState;
@@ -91,6 +92,8 @@ export function PanelView({
    * brushable.
    */
   onSelectTimeRange?: (range: TimeRange) => void;
+  /** Shown through a read-only share link (#65): nothing that needs a session or the SQL. */
+  embedded?: boolean;
 }) {
   const data = state?.data ?? EMPTY;
   // A panel that runs no query (text, #202) has nothing to load or go stale.
@@ -139,7 +142,8 @@ export function PanelView({
             <OverrideBadge panel={panel} />
             {showBadge && <StatusBadge status={status} updatedAt={state?.updatedAt} />}
             <PanelDescription panel={panel} />
-            <PanelSqlDialog panel={panel} timeRange={timeRange} />
+            {/* A share link (#65) carries no SQL to show. */}
+            {!embedded && <PanelSqlDialog panel={panel} timeRange={timeRange} />}
             <PanelActions
               panelTitle={panel.title}
               dashboardTitle={dashboardTitle}

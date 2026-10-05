@@ -19,9 +19,19 @@ const nextConfig: NextConfig = {
   async headers() {
     return [
       {
-        source: "/:path*",
+        // Everything but a share link's embed page (#65).
+        source: "/:path((?!embed(?:/|$)).*)",
         headers: staticSecurityHeaders({
           production: process.env.NODE_ENV === "production",
+        }),
+      },
+      {
+        // Framable by the origins its token names, which the proxy writes
+        // into `frame-ancestors`; so no `X-Frame-Options: DENY` here.
+        source: "/embed/:path*",
+        headers: staticSecurityHeaders({
+          production: process.env.NODE_ENV === "production",
+          framable: true,
         }),
       },
     ];

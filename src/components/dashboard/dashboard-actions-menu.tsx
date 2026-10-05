@@ -9,6 +9,7 @@ import {
   History,
   Loader2,
   MoreHorizontal,
+  Share2,
   Trash2,
 } from "lucide-react";
 import type { Dashboard } from "@/lib/ir";
@@ -16,6 +17,7 @@ import { type ApiError, readApiError } from "@/lib/errors";
 import { useSaveAsTemplate } from "@/components/templates/SaveAsTemplate";
 import { ErrorDisplay } from "@/components/ui/error-display";
 import { Menu, MenuItem, MenuSeparator } from "@/components/ui/menu";
+import { ShareDialog } from "@/components/dashboard/ShareDialog";
 
 /**
  * The dashboard view's occasional actions — version history, export, save as
@@ -31,6 +33,7 @@ export function DashboardActionsMenu({
   spec,
   canSaveTemplate,
   canDelete,
+  canShare = false,
 }: {
   dashboardId: string;
   title: string;
@@ -38,7 +41,10 @@ export function DashboardActionsMenu({
   spec: Dashboard;
   canSaveTemplate: boolean;
   canDelete: boolean;
+  /** Create and revoke read-only share links (#65): editors. */
+  canShare?: boolean;
 }) {
+  const [sharing, setSharing] = React.useState(false);
   const template = useSaveAsTemplate({
     workspaceId,
     subject: { kind: "dashboard", dashboard: spec },
@@ -69,6 +75,11 @@ export function DashboardActionsMenu({
         <MenuItem href={`/api/dashboards/${dashboardId}/export`} download>
           <Download className="h-4 w-4" /> Export
         </MenuItem>
+        {canShare && (
+          <MenuItem onClick={() => setSharing(true)}>
+            <Share2 className="h-4 w-4" /> Share read-only…
+          </MenuItem>
+        )}
         {canSaveTemplate && (
           <MenuItem onClick={template.openDialog}>
             {template.saved ? (
@@ -94,6 +105,14 @@ export function DashboardActionsMenu({
       </Menu>
       {/* Outside the menu: its popup unmounts on close, and the dialog would go with it. */}
       {template.dialog}
+      {canShare && (
+        <ShareDialog
+          dashboardId={dashboardId}
+          open={sharing}
+          onOpenChange={setSharing}
+          timeRange={spec.timeRange}
+        />
+      )}
       {remove.error && (
         <ErrorDisplay
           error={remove.error}

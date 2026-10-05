@@ -116,6 +116,8 @@ const STRING_SCRUBBERS: ReadonlyArray<[RegExp, string]> = [
   [/\beyJ[A-Za-z0-9_-]{6,}\.[A-Za-z0-9_-]{6,}\.[A-Za-z0-9_-]*/g, REDACTED],
   // Provider API keys that carry their own prefix.
   [/\b(sk|rk|pk)-[A-Za-z0-9_-]{16,}/g, REDACTED],
+  // A share link's token (#65), which travels in a URL.
+  [/\bhts_[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+/g, REDACTED],
 ];
 
 /** Caps that keep one pathological payload from producing an unreadable line. */
