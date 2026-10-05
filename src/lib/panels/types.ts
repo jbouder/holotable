@@ -13,6 +13,7 @@
  */
 
 import type { z } from "zod";
+import type { OptionGroup } from "@/lib/panels/presentation";
 
 /** The silhouette a kind's body shows while its first rows are on their way. */
 export type PanelSkeletonShape = "chart" | "radial" | "stat" | "table" | "lanes" | "text";
@@ -58,6 +59,11 @@ export interface PanelKind<K extends string = string> {
    * without it: a missing `options` is parsed as `{}`.
    */
   readonly options?: z.ZodType<Record<string, unknown>>;
+  /**
+   * The shared presentation groups among those options (#115), in the order
+   * the editor shows them. A field in none of them is edited as JSON.
+   */
+  readonly optionGroups?: readonly OptionGroup[];
   /**
    * The options a panel switched to this kind starts with, when `{}` would not
    * do (a text panel needs content). Given the panel's title.

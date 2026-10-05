@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { ValueFormat } from "@/lib/panels/presentation";
 import { findPanelKind, PANEL_KIND_NAMES, PANEL_KINDS } from "@/lib/panels/registry";
 
 /**
@@ -23,8 +24,7 @@ export const VizType = z.enum(PANEL_KIND_NAMES, {
 });
 export type VizType = z.infer<typeof VizType>;
 
-export const ValueFormat = z.enum(["number", "bytes", "percent", "ms"]);
-export type ValueFormat = z.infer<typeof ValueFormat>;
+export { ValueFormat };
 
 /**
  * Relative or absolute time expression. Relative forms: `now`, `now-15m`,
@@ -64,6 +64,9 @@ export const PanelQuery = z
   .strict();
 export type PanelQuery = z.infer<typeof PanelQuery>;
 
+/** How often a dashboard, or a panel with its own cadence, is re-run. */
+export const RefreshIntervalMs = z.number().int().min(1_000).max(3_600_000);
+
 export const PanelLayout = z
   .object({
     x: z.number().int().min(0).max(12),
@@ -80,7 +83,9 @@ export type PanelLayout = z.infer<typeof PanelLayout>;
  * union is what tells the model the shapes there are.
  *
  * A malformed object fails every branch, so the message is taken from the
- * branch it came closest to rather than a bare "Invalid input".
+ * branch it came closest to rather than a bare "Invalid input": the one whose
+ * fields it uses, with the fewest issues among those. Kinds share field names
+ * (`thresholds`, `legend`), so a count alone would often pick another kind.
  */
 const optionSchemas = PANEL_KINDS.flatMap((k) => (k.options ? [k.options] : []));
 export const PanelOptions = z.union(
@@ -88,7 +93,11 @@ export const PanelOptions = z.union(
   {
     error: (issue) => {
       if (issue.code !== "invalid_union" || !("errors" in issue)) return undefined;
-      const closest = [...issue.errors].sort((a, b) => a.length - b.length)[0]?.[0];
+      const unknownKeys = (errors: { code: string }[]) =>
+        errors.filter((e) => e.code === "unrecognized_keys").length;
+      const closest = [...issue.errors].sort(
+        (a, b) => unknownKeys(a) - unknownKeys(b) || a.length - b.length,
+      )[0]?.[0];
       if (!closest) return undefined;
       const at = closest.path.length > 0 ? `${closest.path.join(".")}: ` : "";
       return `invalid options: ${at}${closest.message}`;
@@ -123,6 +132,18 @@ function fitsItsKind(panel: z.infer<typeof PanelFields>, ctx: z.RefinementCtx): 
       message: `a ${kind.kind} panel needs "query.timeField"`,
       path: ["query", "timeField"],
     });
+  }
+  if (kind.query === "none") {
+    // Nothing runs, so there is no window to own and nothing to refresh.
+    for (const key of ["timeRange", "refreshIntervalMs"] as const) {
+      if (panel[key] !== undefined) {
+        ctx.addIssue({
+          code: "custom",
+          message: `a ${kind.kind} panel runs no query; remove "${key}"`,
+          path: [key],
+        });
+      }
+    }
   }
   if (!kind.options) {
     if (panel.options !== undefined) {
@@ -162,6 +183,13 @@ const PanelFields = z
     /** The kind's own options, validated against its schema. */
     options: PanelOptions.optional(),
     format: ValueFormat.optional(),
+    /**
+     * The panel's own window, in place of the dashboard's and of the one a
+     * viewer picked (#114). Resolved by the server like any other.
+     */
+    timeRange: TimeRange.optional(),
+    /** The panel's own cadence, under the same bounds and floor as the dashboard's. */
+    refreshIntervalMs: RefreshIntervalMs.optional(),
     layout: PanelLayout,
   })
   .strict();
@@ -190,6 +218,35 @@ export function hasQuery(panel: Panel): panel is QueryPanel {
 }
 
 /**
+ * The window a panel is run over: its own (#114), or else the one it is shown
+ * in, which is the dashboard's or the one a viewer picked. The server resolves
+ * whichever it is; this only says which.
+ */
+export function panelTimeRange(panel: Panel, shown: TimeRange): TimeRange {
+  return panel.timeRange ?? shown;
+}
+
+/**
+ * How often a panel is re-run: its own cadence (#114), or the dashboard's.
+ * The server still holds either to `MIN_REFRESH_INTERVAL_MS`.
+ */
+export function panelRefreshMs(panel: Panel, dashboardMs: number): number {
+  return panel.refreshIntervalMs ?? dashboardMs;
+}
+
+/**
+ * The longest a live dashboard goes between completed cycles: its fastest
+ * panel's cadence. Panels without their own run at the dashboard's, so this is
+ * the dashboard's own unless every panel that runs a query is slower.
+ */
+export function cycleMs(spec: Pick<Dashboard, "panels" | "refreshIntervalMs">): number {
+  const cadences = spec.panels
+    .filter(hasQuery)
+    .map((p) => panelRefreshMs(p, spec.refreshIntervalMs));
+  return cadences.length > 0 ? Math.min(...cadences) : spec.refreshIntervalMs;
+}
+
+/**
  * The IR version this build writes, and the only one {@link Dashboard}
  * accepts.
  *
@@ -207,7 +264,7 @@ export const SPEC_VERSION = 1;
 const DashboardFields = {
   title: z.string().min(1).max(200),
   timeRange: TimeRange,
-  refreshIntervalMs: z.number().int().min(1_000).max(3_600_000),
+  refreshIntervalMs: RefreshIntervalMs,
   panels: z.array(Panel).min(1).max(50),
 };
 

@@ -8,6 +8,7 @@ import {
   ExplorePanel,
   hasQuery,
   type Panel,
+  panelTimeRange,
   type QueryPanel,
   type TimeRange,
 } from "@/lib/ir";
@@ -31,6 +32,8 @@ import {
   useCatalogRefresh,
 } from "@/components/sources/catalog-health";
 import { formatValue } from "@/lib/format";
+import { tokenHex } from "@/lib/panels/colors";
+import { statReading } from "@/lib/panel-reading";
 import { NoSources } from "@/components/onboarding/no-sources";
 import { PromptHistoryMenu, usePromptHistory } from "@/components/prompt-history";
 import { SavePanelDialog, type SavedPanel } from "./save-panel-dialog";
@@ -108,7 +111,7 @@ export function ExploreClient({
 
   const runQuery = React.useCallback(async (p: QueryPanel, timeRange: TimeRange) => {
     setResult({ data: EMPTY_ROWS, status: "loading" });
-    const outcome = await runPanelQuery(p.query, timeRange);
+    const outcome = await runPanelQuery(p.query, panelTimeRange(p, timeRange));
     setResult(
       outcome.ok
         ? { data: outcome.rows, status: "done" }
@@ -445,18 +448,18 @@ function ResultBody({
 }
 
 function StatView({ panel, data }: { panel: QueryPanel; data: PanelData }) {
-  const last = data.rows[data.rows.length - 1];
-  const valueKey =
-    data.columns.find(
-      (c) => c !== panel.query.timeField && typeof last?.[c] === "number",
-    ) ?? data.columns[data.columns.length - 1];
-  const value = last?.[valueKey];
+  // The dashboard's own reading, so a value column or threshold the model
+  // chose is shown here as it will be there.
+  const reading = statReading(panel, data);
   return (
     <div className="border border-border bg-surface px-6 py-8">
-      <div className="text-4xl font-semibold tabular-nums">
-        {value === undefined ? "—" : formatValue(value, panel.format)}
+      <div
+        className="text-4xl font-semibold tabular-nums"
+        style={reading.color ? { color: tokenHex(reading.color) } : undefined}
+      >
+        {reading.text}
       </div>
-      <div className="mt-1 text-sm text-muted">{valueKey}</div>
+      <div className="mt-1 text-sm text-muted">{reading.column}</div>
     </div>
   );
 }

@@ -102,6 +102,19 @@ export const VIZ_GUIDE = PANEL_KINDS.map((k) => `- '${k.kind}': ${k.promptHint}`
   "\n",
 );
 
+/**
+ * Presentation options and per-panel overrides (#114, #115). All optional:
+ * the model is told when they earn their place, so a plain request still
+ * produces a plain spec.
+ */
+export const PRESENTATION_GUIDE = `Optional per-panel settings; omit each unless the request calls for it:
+- 'options' on line/area/bar: decimals (0-6), unit (e.g. "req/s"), compact (true for 1.2K), legend ("top"|"bottom"|"right"|"none"), yAxis {min, max, log, label}, stacked (true), thresholds [{value, color}] ascending.
+- 'options' on stat: value (the column to show), decimals, unit, compact, thresholds, sparkline (true to draw the column's history behind the number).
+- 'options' on pie/donut: decimals, unit, compact, legend.
+- 'options' on table: columns [{name, label, hidden, format, decimals, unit, align}] (listed first, in order), sort {column, order: "asc"|"desc"}.
+- Colors are tokens only: success, warning, danger, info, neutral, orange, purple, teal.
+- 'timeRange' and 'refreshIntervalMs' on a panel override the dashboard's, for a panel that needs a different window or cadence than the rest (e.g. a "today so far" stat over {from:"now-24h", to:"now"} refreshed every 300000ms). Never on a text panel.`;
+
 /** The kinds explore may plot when a question asks for a chart. Never text. */
 const CHART_KINDS = PANEL_KINDS.filter((k) => k.canvas)
   .map((k) => `"${k.kind}"`)
@@ -128,7 +141,9 @@ Use a wider or taller panel only when a request clearly calls for it.
 Choose each panel's 'viz' from these kinds, and no other:
 ${VIZ_GUIDE}
 
-Use 'format' (number|bytes|percent|ms) where meaningful.`;
+Use 'format' (number|bytes|percent|ms) where meaningful.
+
+${PRESENTATION_GUIDE}`;
 }
 
 export function streamDashboard(input: {

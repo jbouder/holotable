@@ -1,6 +1,9 @@
+import { SeriesOptions } from "@/lib/panels/presentation";
 import { definePanelKind } from "@/lib/panels/types";
 
 /** Numeric columns against the time field, one series per column. */
+
+const SERIES_GROUPS = ["number", "axis", "legend", "thresholds"] as const;
 
 export const line = definePanelKind({
   kind: "line",
@@ -11,6 +14,8 @@ export const line = definePanelKind({
   timeBrush: true,
   skeleton: "chart",
   query: "required",
+  options: SeriesOptions,
+  optionGroups: SERIES_GROUPS,
 });
 
 export const area = definePanelKind({
@@ -21,6 +26,8 @@ export const area = definePanelKind({
   timeBrush: true,
   skeleton: "chart",
   query: "required",
+  options: SeriesOptions,
+  optionGroups: SERIES_GROUPS,
 });
 
 export const bar = definePanelKind({
@@ -31,4 +38,6 @@ export const bar = definePanelKind({
   timeBrush: true,
   skeleton: "chart",
   query: "required",
+  options: SeriesOptions,
+  optionGroups: SERIES_GROUPS,
 });

@@ -172,6 +172,8 @@ test("formatSpan and describeRange say which of the three kinds a window is", ()
   assert.equal(formatSpan(HOUR), "1h");
   assert.equal(formatSpan(90 * 60_000), "1.5h");
   assert.equal(formatSpan(500), "1s");
+  assert.equal(formatSpan(30 * 24 * HOUR), "30d", "not 4.3w");
+  assert.equal(formatSpan(100 * 60_000), "100m", "not 1.7h");
 
   assert.equal(describeRange({ from: "now-15m", to: "now" }, NOW), "15m");
   assert.equal(describeRange({ from: "now-90m", to: "now" }, NOW), "Last 1.5h");

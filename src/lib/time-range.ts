@@ -211,8 +211,18 @@ export function matchingPreset(range: TimeRange): string | null {
   return RANGE_PRESETS.find((p) => p.from === range.from)?.label ?? null;
 }
 
-/** A span as the compact text the trigger and the badge both use. */
+/**
+ * A span as the compact text the trigger and the badge both use: the largest
+ * unit that says it exactly in at most one decimal (`1.5h`, `30d` rather than
+ * `4.3w`), or else the largest that fits, rounded.
+ */
 export function formatSpan(ms: number): string {
+  for (const unit of UNITS_DESCENDING) {
+    const amount = ms / UNIT_MS[unit];
+    if (amount >= 1 && Number.isInteger(Math.round(amount * 1e6) / 1e5)) {
+      return `${Number.isInteger(amount) ? amount : amount.toFixed(1)}${unit}`;
+    }
+  }
   for (const unit of UNITS_DESCENDING) {
     const size = UNIT_MS[unit];
     if (ms >= size) {
@@ -317,7 +327,13 @@ export function rangeSearch(range: TimeRange, dashboardDefault: TimeRange): stri
  * ordered.
  */
 export function supportsTimeBrush(panel: Panel): boolean {
-  return panelKind(panel.viz).timeBrush && panel.query?.timeField !== undefined;
+  return (
+    panelKind(panel.viz).timeBrush &&
+    panel.query?.timeField !== undefined &&
+    // A panel with its own window (#114) does not show the dashboard's, so a
+    // stretch of it is not a dashboard window to select.
+    panel.timeRange === undefined
+  );
 }
 
 /**
@@ -356,4 +372,31 @@ export function brushedRange(
   const to = rowInstant(rows[last]?.[timeField]);
   if (!from || !to) return null;
   return absoluteRange(from, to);
+}
+
+/**
+ * What a panel with its own window or cadence (#114) says about it in its
+ * header, or null for a panel that follows the dashboard. A reader must never
+ * take a panel's window for the dashboard's, so the badge is the window
+ * itself, and the tooltip says in words what differs.
+ */
+export function panelOverride(
+  panel: Panel,
+  now: Date = new Date(),
+  display: TimeDisplay = LOCAL_TIME_DISPLAY,
+): { label: string; description: string } | null {
+  if (panel.timeRange === undefined && panel.refreshIntervalMs === undefined) return null;
+  const parts: string[] = [];
+  const said: string[] = [];
+  if (panel.timeRange) {
+    const range = describeRange(panel.timeRange, now, display);
+    parts.push(range);
+    said.push(`shows its own window (${range}) rather than the dashboard's`);
+  }
+  if (panel.refreshIntervalMs !== undefined) {
+    const every = formatSpan(panel.refreshIntervalMs);
+    parts.push(`every ${every}`);
+    said.push(`refreshes every ${every}`);
+  }
+  return { label: parts.join(" · "), description: `This panel ${said.join(" and ")}.` };
 }

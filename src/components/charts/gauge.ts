@@ -84,7 +84,7 @@ export function gaugeReadings(panel: Panel, data: PanelData): GaugeReading[] {
       min,
       max,
       fraction,
-      text: formatValue(value, panel.format),
+      text: formatValue(value, panel.format, options),
       color: thresholdColor(options.thresholds, value) ?? DEFAULT_COLOR,
     };
   };
@@ -174,7 +174,7 @@ function radial(panel: Panel, reading: GaugeReading | undefined): EChartsOption 
         axisLabel: {
           color: "#9aa0aa",
           distance: 20,
-          formatter: (v: number) => formatValue(v, panel.format),
+          formatter: (v: number) => formatValue(v, panel.format, gaugeOptions(panel)),
         },
         title: { show: false },
         detail: {

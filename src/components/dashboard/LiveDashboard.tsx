@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { Pause, Play } from "lucide-react";
-import type { Dashboard, TimeRange } from "@/lib/ir";
+import { cycleMs, type Dashboard, panelTimeRange, type TimeRange } from "@/lib/ir";
 import type { PollerEvent } from "@/lib/poller/registry";
 import { DashboardGrid } from "@/components/dashboard/DashboardGrid";
 import { PanelView, type PanelState } from "@/components/dashboard/PanelView";
@@ -133,6 +133,7 @@ export function LiveDashboard({
   // renewal — resumes from it instead of starting over.
   const lastEventIdRef = React.useRef<{ url: string; id: string } | null>(null);
   const rolling = isRolling(timeRange);
+  const cycle = cycleMs(spec);
   const streamUrl = React.useMemo(() => {
     const params = new URLSearchParams(timeRange);
     return `/api/dashboards/${dashboardId}/stream?${params.toString()}`;
@@ -379,14 +380,16 @@ export function LiveDashboard({
   // not a stale one.
   React.useEffect(() => {
     if (!live || !rolling) return;
-    const budget = Math.max(spec.refreshIntervalMs * 2, 6_000);
+    // Cycles complete at the fastest panel's cadence (#114), which is the
+    // dashboard's own unless every panel has a slower one.
+    const budget = Math.max(cycle * 2, 6_000);
     const id = setInterval(() => {
       if (Date.now() - lastTickRef.current > budget) {
         setStates(markStale);
       }
     }, budget);
     return () => clearInterval(id);
-  }, [spec.refreshIntervalMs, live, rolling]);
+  }, [cycle, live, rolling]);
 
   // Read `live` directly rather than from a `setLive` updater: the updater can
   // run twice under StrictMode, and signalling the reducer from inside it would
@@ -484,11 +487,12 @@ export function LiveDashboard({
                 : undefined
             }
             paused={!live}
-            timeRange={timeRange}
+            timeRange={panelTimeRange(panel, timeRange)}
             dashboardTitle={spec.title}
             crosshairGroup={dashboardId}
             onSelectTimeRange={setTimeRange}
-            window={resolvedWindow}
+            // A panel with its own window (#114) is sent it with its rows.
+            window={panel.timeRange ? undefined : resolvedWindow}
           />
         )}
       />

@@ -1,6 +1,17 @@
 import type { EChartsOption } from "echarts";
 import type { Panel } from "@/lib/ir";
 import { chartPalette } from "@/lib/color/oklch";
+import { formatValue } from "@/lib/format";
+import { tokenHex } from "@/lib/panels/colors";
+import {
+  type LegendPosition,
+  type NumberDisplay,
+  numberDisplay,
+  PieOptions,
+  readOptions,
+  SeriesOptions,
+} from "@/lib/panels/presentation";
+import type { ThresholdStep } from "@/lib/panels/thresholds";
 import { formatDateTime, type TimeDisplay } from "@/lib/time-display";
 
 export interface PanelData {
@@ -110,13 +121,75 @@ export function timeAxisLabels(values: unknown[], display: TimeDisplay): string[
   });
 }
 
+const TOOLTIP_AXIS = { trigger: "axis", borderRadius: 0 } as const;
+
 const BASE: EChartsOption = {
   color: palette,
   grid: { left: 44, right: 16, top: 24, bottom: 28 },
-  tooltip: { trigger: "axis", borderRadius: 0 },
+  tooltip: TOOLTIP_AXIS,
   legend: { top: 0, textStyle: { color: "#9aa0aa" } },
   backgroundColor: "transparent",
 };
+
+const LEGEND_TEXT = { color: "#9aa0aa" };
+
+/** Where the legend goes (#115). `top` is where it always was. */
+function legendAt(position: LegendPosition | undefined): EChartsOption["legend"] {
+  switch (position) {
+    case "none":
+      return { show: false };
+    case "bottom":
+      return { bottom: 0, type: "scroll", textStyle: LEGEND_TEXT };
+    case "right":
+      return {
+        right: 0,
+        top: "middle",
+        orient: "vertical",
+        type: "scroll",
+        textStyle: LEGEND_TEXT,
+      };
+    default:
+      return BASE.legend;
+  }
+}
+
+/** The plot area, making room for the legend where it went and an axis title. */
+function gridFor(position: LegendPosition | undefined, axisTitle: boolean) {
+  return {
+    left: axisTitle ? 64 : 44,
+    right: position === "right" ? 128 : 16,
+    top: position === "none" || position === "bottom" ? 12 : 24,
+    bottom: position === "bottom" ? 52 : 28,
+  };
+}
+
+/**
+ * Threshold steps as a hidden piecewise visual map, so a line's segments, an
+ * area's fill and each bar take the color of the step their value is in. Below
+ * the first step a value keeps the first series color.
+ */
+function thresholdMap(steps: readonly ThresholdStep[]): EChartsOption["visualMap"] {
+  const pieces = steps.map((step, i) => ({
+    gte: step.value,
+    ...(steps[i + 1] ? { lt: steps[i + 1].value } : {}),
+    color: tokenHex(step.color),
+  }));
+  return {
+    show: false,
+    type: "piecewise",
+    pieces: [{ lt: steps[0].value, color: palette[0] }, ...pieces],
+  };
+}
+
+/**
+ * The options a series or pie chart was drawn with. When they change the chart
+ * is drawn anew, because a merged `setOption` cannot take back a visual map, a
+ * stack or an axis bound once set. Only authoring changes them; a data update
+ * never does, so it still merges (invariant 11).
+ */
+export function optionsShape(panel: Panel): string {
+  return JSON.stringify(panel.options ?? {});
+}
 
 /** What a chart is drawn in, besides its own rows. */
 export interface ChartContext {
@@ -159,8 +232,15 @@ function buildSeries(type: "line" | "bar", area: boolean): ChartOptionBuilder {
       panel.query?.timeField === x
         ? timeAxisLabels(xValues, display)
         : xValues.map(toText);
+    const o = readOptions(SeriesOptions, panel.options);
+    const number = valueFormatter(panel, numberDisplay(o));
+    const axis = o.yAxis;
     return {
       ...BASE,
+      grid: gridFor(o.legend, axis?.label !== undefined),
+      legend: legendAt(o.legend),
+      tooltip: { ...TOOLTIP_AXIS, ...(number ? { valueFormatter: number } : {}) },
+      ...(o.thresholds?.length ? { visualMap: thresholdMap(o.thresholds) } : {}),
       xAxis: {
         type: "category",
         data: categories,
@@ -168,8 +248,18 @@ function buildSeries(type: "line" | "bar", area: boolean): ChartOptionBuilder {
         axisLine: { lineStyle: { color: "#3a3f4b" } },
       },
       yAxis: {
-        type: "value",
-        axisLabel: { color: "#9aa0aa" },
+        type: axis?.log ? "log" : "value",
+        ...(axis?.min !== undefined ? { min: axis.min } : {}),
+        ...(axis?.max !== undefined ? { max: axis.max } : {}),
+        ...(axis?.label !== undefined
+          ? {
+              name: axis.label,
+              nameLocation: "middle",
+              nameGap: 48,
+              nameTextStyle: { color: "#9aa0aa" },
+            }
+          : {}),
+        axisLabel: { color: "#9aa0aa", ...(number ? { formatter: number } : {}) },
         splitLine: { lineStyle: { color: "#2a2f3a" } },
       },
       series: keys.map((k) => ({
@@ -178,6 +268,7 @@ function buildSeries(type: "line" | "bar", area: boolean): ChartOptionBuilder {
         showSymbol: false,
         smooth: type === "line",
         areaStyle: area ? {} : undefined,
+        ...(o.stacked ? { stack: "total" } : {}),
         data: data.rows.map((r) => toNumber(r[k])),
       })),
     };
@@ -231,16 +322,29 @@ function buildPie(panel: Panel, data: PanelData, donut: boolean): EChartsOption 
   const x = xKey(panel, data);
   const valueKey = seriesKeys(panel, data)[0] ?? data.columns.find((c) => c !== x) ?? x;
   const radius = donut ? ["48%", "72%"] : "72%";
+  const o = readOptions(PieOptions, panel.options);
+  const number = valueFormatter(panel, numberDisplay(o));
+  // The pie moves off the legend's side, as the series' grid does.
+  const center =
+    o.legend === "right"
+      ? ["40%", "50%"]
+      : o.legend === "bottom" || o.legend === "none"
+        ? ["50%", "46%"]
+        : ["50%", "56%"];
   return {
     color: palette,
     backgroundColor: "transparent",
-    tooltip: { trigger: "item", borderRadius: 0 },
-    legend: { top: 0, textStyle: { color: "#9aa0aa" } },
+    tooltip: {
+      trigger: "item",
+      borderRadius: 0,
+      ...(number ? { valueFormatter: number } : {}),
+    },
+    legend: legendAt(o.legend),
     series: [
       {
         type: "pie",
         radius,
-        center: ["50%", "56%"],
+        center,
         data: data.rows.map((r) => ({
           name: toText(r[x]),
           value: toNumber(r[valueKey]) || 0,
@@ -250,6 +354,18 @@ function buildPie(panel: Panel, data: PanelData, donut: boolean): EChartsOption 
       },
     ],
   };
+}
+
+/**
+ * How a chart writes a value, once the panel was given number options (#115).
+ * Without them a chart writes values as it always has, `panel.format` or not.
+ */
+function valueFormatter(
+  panel: Panel,
+  display: NumberDisplay | undefined,
+): ((value: unknown) => string) | undefined {
+  if (!display) return undefined;
+  return (value) => formatValue(value, panel.format, display);
 }
 
 function buildHeatmap(

@@ -1,3 +1,4 @@
+import { PieOptions } from "@/lib/panels/presentation";
 import { definePanelKind } from "@/lib/panels/types";
 
 /** One label column against one numeric value column. Not a time series. */
@@ -12,6 +13,8 @@ export const pie = definePanelKind({
   timeBrush: false,
   skeleton: "radial",
   query: "required",
+  options: PieOptions,
+  optionGroups: ["number", "legend"],
 });
 
 export const donut = definePanelKind({
@@ -22,4 +25,6 @@ export const donut = definePanelKind({
   timeBrush: false,
   skeleton: "radial",
   query: "required",
+  options: PieOptions,
+  optionGroups: ["number", "legend"],
 });
