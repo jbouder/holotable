@@ -17,6 +17,7 @@ export function Select({
   className,
   id,
   disabled,
+  "aria-label": ariaLabel,
 }: {
   value: string | null;
   onValueChange: (value: string) => void;
@@ -25,6 +26,11 @@ export function Select({
   className?: string;
   id?: string;
   disabled?: boolean;
+  /**
+   * The name, when no `<Label htmlFor={id}>` gives it one. A combobox with
+   * neither is announced as an unnamed button (#77).
+   */
+  "aria-label"?: string;
 }) {
   return (
     <BaseSelect.Root
@@ -35,6 +41,7 @@ export function Select({
     >
       <BaseSelect.Trigger
         id={id}
+        aria-label={ariaLabel}
         className={cn(
           "flex h-10 min-w-40 items-center justify-between gap-2 border border-border bg-surface px-3 text-sm text-foreground focus-visible:outline-2 focus-visible:outline-primary data-[disabled]:cursor-not-allowed data-[disabled]:opacity-50",
           className,

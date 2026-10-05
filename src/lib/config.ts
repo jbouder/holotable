@@ -425,9 +425,12 @@ const EnvSchema = z.object({
   ),
 
   AI_PROVIDER: blank(
-    z.enum(["gateway", "openai-compatible"], {
-      error: 'must be "gateway" or "openai-compatible"',
+    z.enum(["gateway", "openai-compatible", "stub"], {
+      error: 'must be "gateway", "openai-compatible" or "stub"',
     }),
+  ),
+  AI_STUB_IN_PRODUCTION: blank(
+    z.enum(["true", "false"], { error: 'must be "true" or "false"' }),
   ),
   AI_MODEL: blank(z.string()),
   OPENAI_API: blank(
@@ -645,13 +648,29 @@ export function validateConfig(
   // the SQL editor need no key, and the generate, chat and Explore pages say
   // what is missing instead of failing a request (src/lib/ai/configured.ts).
   const aiMissing = demo ? warning : missing;
-  if (!values.AI_MODEL) {
+  const provider = values.AI_PROVIDER ?? "openai-compatible";
+  // The recorded model (#88, src/lib/ai/stub.ts) answers every prompt with the
+  // same spec. It is for the end-to-end suite, which runs a production build;
+  // anywhere else in production it would be a deployment that forgot to
+  // configure a model and boots green anyway, so it has to be asked for twice.
+  if (provider === "stub") {
+    if (production && values.AI_STUB_IN_PRODUCTION !== "true") {
+      error(
+        "AI_PROVIDER",
+        'is "stub", which answers with recorded specs and never calls a model. It is for the end-to-end suite; set AI_STUB_IN_PRODUCTION=true if that is what this server is, or configure a real provider.',
+      );
+    } else {
+      warning(
+        "AI_PROVIDER",
+        'is "stub"; generation answers with recorded specs and never calls a model.',
+      );
+    }
+  } else if (!values.AI_MODEL) {
     aiMissing(
       "AI_MODEL",
       "is not set; every generate request would fail. Set the model id for your AI_PROVIDER (see .env.example).",
     );
   }
-  const provider = values.AI_PROVIDER ?? "openai-compatible";
   if (provider === "openai-compatible" && !values.OPENAI_API_KEY) {
     aiMissing(
       "OPENAI_API_KEY",

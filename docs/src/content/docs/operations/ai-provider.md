@@ -54,6 +54,17 @@ prefixed id such as `opencode-go/kimi-k2.7-code` is rejected with
 exact ids. Only models exposing an OpenAI-compatible `/chat/completions`
 interface work via this path.
 
+## `AI_PROVIDER=stub`
+
+A recorded model for the end-to-end suite (`src/lib/ai/stub.ts`). It never
+calls a network: every request is answered with a fixed spec, chosen by the
+output asked for (a dashboard, a panel, a source draft, a chat reply), and
+that spec goes through the same schema, SQL guard and server-side execution as
+a real model's. It needs no `AI_MODEL` or key. Because it would otherwise let
+a deployment that forgot to configure a model boot green, it is a startup
+error in production unless `AI_STUB_IN_PRODUCTION=true` is also set; the e2e
+suite sets both.
+
 ## Operational notes
 
 - There is currently **no rate limiting or budget** on the LLM routes

@@ -558,8 +558,9 @@ function TableRowItem({
           onCheckedChange={onToggle}
           label={
             <span>
-              <span className="font-medium">{table.name}</span>
-              <span className="ml-2 text-xs text-muted">
+              <span className="font-medium">{table.name}</span>{" "}
+              {/* The space keeps the accessible name "t 6 columns", not "t6 columns". */}
+              <span className="ml-1 text-xs text-muted">
                 {table.columns.length} column{table.columns.length === 1 ? "" : "s"}
               </span>
             </span>

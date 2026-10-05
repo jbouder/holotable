@@ -112,3 +112,38 @@ test("with no panels the arranger says so instead of rendering an empty grid", a
     h.unmount();
   }
 });
+
+test("Delete and Backspace on a tile remove that panel; the resize handle does not", async () => {
+  const h = await mount();
+  const deleted: string[] = [];
+  const changes: Panel[][] = [];
+  try {
+    h.render(
+      <PanelLayoutGrid
+        panels={PANELS}
+        onChange={(p) => changes.push(p)}
+        onDelete={(id) => deleted.push(id)}
+      />,
+    );
+    h.key(tile(h.container, "Errors,"), "Delete");
+    h.key(tile(h.container, "Requests,"), "Backspace");
+    // The handle is for size; a stray Delete there removes nothing.
+    h.key(tile(h.container, "Resize Requests"), "Delete");
+    assert.deepEqual(deleted, ["b", "a"]);
+    assert.deepEqual(changes, []);
+  } finally {
+    h.unmount();
+  }
+});
+
+test("without onDelete the keys do nothing, and the label does not promise them", async () => {
+  const h = await mount();
+  try {
+    h.render(<PanelLayoutGrid panels={PANELS} onChange={() => {}} />);
+    const el = tile(h.container, "Requests,");
+    assert.doesNotMatch(el.getAttribute("aria-label") ?? "", /Delete/);
+    h.key(el, "Delete");
+  } finally {
+    h.unmount();
+  }
+});

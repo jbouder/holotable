@@ -1,7 +1,6 @@
 "use client";
 
 import * as React from "react";
-import Link from "next/link";
 import { ArrowRight, Check, ExternalLink, Lock } from "lucide-react";
 import {
   FIRST_DASHBOARD_DOCS_URL,
@@ -10,7 +9,7 @@ import {
 } from "@/lib/onboarding";
 import { SETUP_DISMISSED_COOKIE } from "@/lib/dismissals";
 import { dismissHint } from "@/components/onboarding/actions";
-import { Button } from "@/components/ui/button";
+import { Button, ButtonLink } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
 
@@ -88,9 +87,9 @@ export function FirstRun({
           action={
             <div className="flex flex-wrap items-center justify-center gap-2">
               {generate?.action && (
-                <Link href={generate.action.href}>
-                  <Button>{generate.action.label}</Button>
-                </Link>
+                <ButtonLink href={generate.action.href}>
+                  {generate.action.label}
+                </ButtonLink>
               )}
               <Button variant="ghost" onClick={() => dismiss(false)}>
                 Show the setup guide
@@ -167,11 +166,14 @@ function StepCard({ step, index }: { step: OnboardingStep; index: number }) {
           <p className="mt-1 text-sm text-muted">{step.detail}</p>
           {step.status !== "done" &&
             (step.action ? (
-              <Link href={step.action.href} className="mt-3 inline-block">
-                <Button variant={current ? "primary" : "secondary"} size="sm">
-                  {step.action.label} <ArrowRight className="h-4 w-4" />
-                </Button>
-              </Link>
+              <ButtonLink
+                href={step.action.href}
+                className="mt-3"
+                variant={current ? "primary" : "secondary"}
+                size="sm"
+              >
+                {step.action.label} <ArrowRight className="h-4 w-4" />
+              </ButtonLink>
             ) : (
               <p className="mt-3 flex items-start gap-1.5 text-xs text-muted">
                 <Lock className="mt-0.5 h-3.5 w-3.5 shrink-0" />

@@ -1,0 +1,62 @@
+# The end-to-end suite's dependencies (#88): TimescaleDB with the demo metrics
+# schema, and Keycloak with the dev realm. A project of its own, on ports of
+# its own, so `npm run e2e` never writes into the database or the realm a
+# contributor develops against. The app is not in here: Playwright builds and
+# starts it on the host (e2e/playwright.config.ts), because the production
+# build is what the suite is meant to exercise.
+#
+#   docker compose -f e2e/compose.yml up -d --wait
+#   docker compose -f e2e/compose.yml down --volumes
+name: holotable-e2e
+
+services:
+  postgres:
+    image: timescale/timescaledb:2.17.2-pg16
+    environment:
+      POSTGRES_USER: holotable
+      POSTGRES_PASSWORD: holotable
+      POSTGRES_DB: holotable
+      TS_METRICS_USERNAME: metrics_ro
+      TS_METRICS_PASSWORD: readonly
+    ports:
+      - "${E2E_PG_PORT:-55433}:5432"
+    volumes:
+      - ../timescaledb/init:/docker-entrypoint-initdb.d:ro
+    # No volume for the data directory: every bring-up starts from an empty
+    # database, so a run never depends on what the last one left behind.
+    tmpfs:
+      - /var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -U holotable -d holotable"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+
+  keycloak:
+    image: quay.io/keycloak/keycloak:26.0
+    command:
+      - start-dev
+      - --import-realm
+      - --http-port=${E2E_KC_PORT:-18181}
+      - --health-enabled=true
+    environment:
+      KC_BOOTSTRAP_ADMIN_USERNAME: admin
+      KC_BOOTSTRAP_ADMIN_PASSWORD: admin
+    # The issuer is the URL the browser uses, so Keycloak listens on the same
+    # port inside the container as the one published outside it.
+    ports:
+      - "${E2E_KC_PORT:-18181}:${E2E_KC_PORT:-18181}"
+    volumes:
+      - ../keycloak:/opt/keycloak/data/import:ro
+    healthcheck:
+      # The image has no curl; bash's /dev/tcp is enough to ask the management
+      # port whether the realm import has finished.
+      test:
+        - CMD-SHELL
+        - >-
+          exec 3<>/dev/tcp/127.0.0.1/9000 &&
+          printf 'GET /health/ready HTTP/1.0\r\n\r\n' >&3 &&
+          grep -q UP <&3
+      interval: 3s
+      timeout: 3s
+      retries: 60

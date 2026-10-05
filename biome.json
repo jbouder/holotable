@@ -40,7 +40,7 @@
   "assist": { "actions": { "source": { "organizeImports": "off" } } },
   "overrides": [
     {
-      "includes": ["scripts/**", "test/**", "deploy/cloudflare/**"],
+      "includes": ["scripts/**", "test/**", "e2e/**", "deploy/cloudflare/**"],
       "linter": {
         "rules": {
           "suspicious": {

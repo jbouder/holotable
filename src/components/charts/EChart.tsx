@@ -41,6 +41,14 @@ export interface BrushSelection {
   endIndex: number;
 }
 
+/**
+ * Accessibility for every chart (#77), set once at init and kept by every
+ * merged update. ECharts writes `aria.label.description` onto the container
+ * as its accessible name; the decal patterns tell bar, pie and area series
+ * apart without relying on color alone (WCAG 1.4.1).
+ */
+export const CHART_ARIA = { enabled: true, decal: { show: true } } as const;
+
 const BRUSH_OPTION = {
   xAxisIndex: 0,
   brushType: "lineX",
@@ -64,12 +72,19 @@ const BRUSH_OPTION = {
  */
 export function EChart({
   option,
+  description,
   className,
   ref,
   crosshairGroup,
   onBrush,
 }: {
   option: EChartsOption;
+  /**
+   * The chart's accessible name: what it shows, in a sentence. A canvas has
+   * no text of its own, so this and the data table beside it are all a screen
+   * reader gets (#77).
+   */
+  description: string;
   className?: string;
   /** Exposes {@link EChartHandle}; omit it and the chart is unreachable. */
   ref?: React.Ref<EChartHandle>;
@@ -95,6 +110,8 @@ export function EChart({
   const reduceMotion = useReducedMotion();
   const reduceMotionRef = React.useRef(reduceMotion);
   reduceMotionRef.current = reduceMotion;
+  const descriptionRef = React.useRef(description);
+  descriptionRef.current = description;
 
   React.useEffect(() => {
     if (!containerRef.current) return;
@@ -102,7 +119,10 @@ export function EChart({
       renderer: "canvas",
     });
     chartRef.current = chart;
-    chart.setOption({ animation: !reduceMotionRef.current });
+    chart.setOption({
+      animation: !reduceMotionRef.current,
+      aria: { ...CHART_ARIA, label: { description: descriptionRef.current } },
+    });
 
     const observer = new ResizeObserver(() => chart.resize());
     observer.observe(containerRef.current);
@@ -122,6 +142,14 @@ export function EChart({
   React.useEffect(() => {
     chartRef.current?.setOption({ animation: !reduceMotion }, { notMerge: false });
   }, [reduceMotion]);
+
+  // A merged option, like the motion setting: a new title never rebuilds it.
+  React.useEffect(() => {
+    chartRef.current?.setOption(
+      { aria: { label: { description } } },
+      { notMerge: false, lazyUpdate: true },
+    );
+  }, [description]);
 
   React.useEffect(() => {
     const chart = chartRef.current;
@@ -155,8 +183,16 @@ export function EChart({
   );
 
   return (
+    // An image to assistive technology, named by `description` (ECharts
+    // writes the same text as `aria-label` once it initializes).
+    // `data-echarts-canvas` is what the axe scans exclude
+    // (e2e/support/a11y.ts): the canvas inside has nothing to read, and the
+    // table beside it is scanned instead.
     <div
       ref={containerRef}
+      role="img"
+      aria-label={description}
+      data-echarts-canvas=""
       className={className}
       style={{ width: "100%", height: "100%" }}
     />

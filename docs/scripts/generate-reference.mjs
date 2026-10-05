@@ -192,7 +192,7 @@ through the config module.
 | \`DATABASE_URL\` | \`src/lib/db/pg.ts\` | Config-store connection string. Required. |
 | \`PG_POOL_MAX\` | \`src/lib/db/pg.ts\` | Config-store pool size. Defaults to \`10\`. |
 | \`SESSION_SECRET\` | \`src/lib/auth/session.ts\` | HS256 signing key for first-party session tokens. Must be at least 32 characters in production. |
-| \`AI_PROVIDER\` | \`src/lib/ai/provider.ts\` | \`gateway\` or \`openai-compatible\`. |
+| \`AI_PROVIDER\` | \`src/lib/ai/provider.ts\` | \`gateway\`, \`openai-compatible\`, or \`stub\` (recorded specs for the end-to-end suite; refused in production unless \`AI_STUB_IN_PRODUCTION=true\`). |
 | \`OPENAI_BASE_URL\`, \`OPENAI_API_KEY\`, \`OPENAI_API\` | \`src/lib/ai/provider.ts\` | OpenAI-compatible endpoint selection. See [AI provider](/operations/ai-provider/). |
 | \`AI_GATEWAY_API_KEY\` | AI SDK | Used when \`AI_PROVIDER=gateway\`. |
 | \`OIDC_ISSUER\`, \`OIDC_CLIENT_ID\`, \`OIDC_CLIENT_SECRET\`, \`OIDC_REDIRECT_URI\`, \`OIDC_SCOPE\` | \`src/lib/auth/oidc.ts\` | OIDC login flow. See [Keycloak setup](/operations/keycloak/). |

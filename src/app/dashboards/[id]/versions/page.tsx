@@ -1,4 +1,3 @@
-import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
 import { can, getIdentity } from "@/lib/auth/authorize";
@@ -6,7 +5,7 @@ import { getDashboardById, listDashboardVersions } from "@/lib/db/repo";
 import { VERSION_PAGE_SIZE, VersionNumber } from "@/lib/dashboard-versions";
 import { SignIn } from "@/components/sign-in";
 import { PageHeader } from "@/components/ui/page-header";
-import { Button } from "@/components/ui/button";
+import { ButtonLink } from "@/components/ui/button";
 import { VersionHistory } from "./versions-client";
 
 export const dynamic = "force-dynamic";
@@ -60,11 +59,9 @@ export default async function DashboardVersionsPage({
           </>
         }
         actions={
-          <Link href={`/dashboards/${id}`}>
-            <Button variant="ghost" size="sm">
-              <ArrowLeft className="h-4 w-4" /> Back to dashboard
-            </Button>
-          </Link>
+          <ButtonLink href={`/dashboards/${id}`} variant="ghost" size="sm">
+            <ArrowLeft className="h-4 w-4" /> Back to dashboard
+          </ButtonLink>
         }
       />
       <VersionHistory

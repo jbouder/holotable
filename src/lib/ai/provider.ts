@@ -1,5 +1,6 @@
 import { createOpenAI } from "@ai-sdk/openai";
 import type { LanguageModel } from "ai";
+import { stubModel } from "@/lib/ai/stub";
 
 /**
  * Provider-agnostic model selection.
@@ -12,6 +13,8 @@ import type { LanguageModel } from "ai";
  *                                     (uses AI_GATEWAY_API_KEY from the env).
  *   AI_PROVIDER=openai-compatible  -> use an OpenAI-compatible endpoint via
  *                                     OPENAI_BASE_URL + OPENAI_API_KEY.
+ *   AI_PROVIDER=stub               -> recorded specs, no network (#88); for
+ *                                     the end-to-end suite, see ./stub.ts.
  *
  * OPEN DECISION: which concrete provider/model to run is deliberately left to
  * deployment (see docs/src/content/docs/operations/ai-provider.md). `AI_MODEL`
@@ -19,14 +22,16 @@ import type { LanguageModel } from "ai";
  */
 
 export function getModel(): LanguageModel {
+  const provider = process.env.AI_PROVIDER || "openai-compatible";
+  // Checked before AI_MODEL: the stub has no model to name.
+  if (provider === "stub") return stubModel();
+
   const modelId = process.env.AI_MODEL;
   if (!modelId) {
     throw new Error(
       "AI_MODEL is not set. Configure AI_PROVIDER and AI_MODEL (see .env.example).",
     );
   }
-
-  const provider = process.env.AI_PROVIDER || "openai-compatible";
 
   if (provider === "gateway") {
     // The AI SDK treats a bare model id string as a gateway model reference.

@@ -1009,13 +1009,14 @@ export function EditDashboardClient({
             <CardContent>
               <p className="mb-3 text-xs text-muted">
                 Drag a panel to move it, drag its corner to resize. Arrow keys move the
-                focused panel; hold Shift to resize.
+                focused panel; hold Shift to resize; Delete removes it.
               </p>
               <PanelLayoutGrid
                 panels={spec.panels}
                 selectedId={selectedId}
                 onSelect={selectPanel}
                 onChange={setPanels}
+                onDelete={removePanel}
               />
             </CardContent>
           </Card>
@@ -1348,8 +1349,9 @@ function PanelEditor({
         </div>
         {panel.query && (
           <div>
-            <Label>Source</Label>
+            <Label htmlFor="p-source">Source</Label>
             <Select
+              id="p-source"
               value={panel.query.sourceId}
               onValueChange={(v) =>
                 onQueryChange((p) => ({ ...p, query: { ...p.query, sourceId: v } }), {
@@ -1361,8 +1363,9 @@ function PanelEditor({
           </div>
         )}
         <div>
-          <Label>Visualization</Label>
+          <Label htmlFor="p-viz">Visualization</Label>
           <Select
+            id="p-viz"
             value={panel.viz}
             onValueChange={(v) =>
               onChange((p) => changePanelKind(p, v as VizType, starterQuery), {
@@ -1374,8 +1377,9 @@ function PanelEditor({
         </div>
         {panel.query && (
           <div>
-            <Label>Format</Label>
+            <Label htmlFor="p-format">Format</Label>
             <Select
+              id="p-format"
               value={panel.format ?? ""}
               onValueChange={(v) =>
                 onChange(
@@ -1440,8 +1444,9 @@ function PanelEditor({
       )}
 
       <div>
-        <Label>Width</Label>
+        <Label htmlFor="p-width">Width</Label>
         <Select
+          id="p-width"
           value={String(panel.layout.w)}
           onValueChange={(v) =>
             onChange(

@@ -1,0 +1,100 @@
+import { expect, test } from "@playwright/test";
+import { expectNoA11yViolations, type Theme, setAppearance } from "./support/a11y";
+import { DEMO_DASHBOARD, dashboardId, waitForPanels } from "./support/app";
+
+/*
+ * Every main surface, in both themes (#91): contrast differs between them, so
+ * a token that passes in one can fail in the other.
+ */
+
+const THEMES: Theme[] = ["dark", "light"];
+
+for (const theme of THEMES) {
+  test.describe(`${theme} theme`, () => {
+    test.beforeEach(async ({ page }) => {
+      await setAppearance(page, theme);
+    });
+
+    test("dashboard list", async ({ page }) => {
+      await page.goto("/dashboards");
+      await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
+      await expectNoA11yViolations(page);
+    });
+
+    test("new dashboard", async ({ page }) => {
+      await page.goto("/dashboards/new");
+      await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
+      await expectNoA11yViolations(page);
+    });
+
+    test("live dashboard", async ({ page, request }) => {
+      await page.goto(`/dashboards/${await dashboardId(request, DEMO_DASHBOARD)}`);
+      await waitForPanels(page);
+      await expectNoA11yViolations(page);
+    });
+
+    test("dashboard editor", async ({ page, request }) => {
+      await page.goto(`/dashboards/${await dashboardId(request, DEMO_DASHBOARD)}/edit`);
+      await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
+      await expectNoA11yViolations(page);
+    });
+
+    test("explore", async ({ page }) => {
+      await page.goto("/explore");
+      await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
+      await expectNoA11yViolations(page);
+    });
+
+    test("data sources", async ({ page }) => {
+      await page.goto("/data-sources");
+      await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
+      await expectNoA11yViolations(page);
+    });
+
+    test("settings", async ({ page }) => {
+      await page.goto("/settings/appearance");
+      await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
+      await expectNoA11yViolations(page);
+    });
+
+    test("an open dialog: the panel's SQL", async ({ page, request }) => {
+      await page.goto(`/dashboards/${await dashboardId(request, DEMO_DASHBOARD)}`);
+      await waitForPanels(page);
+      await page.getByRole("button", { name: /sql/i }).first().click();
+      await expect(page.getByRole("dialog")).toBeVisible();
+      await expectNoA11yViolations(page);
+    });
+
+    test("an open menu: the account menu", async ({ page }) => {
+      await page.goto("/dashboards");
+      await page.getByRole("button", { name: /account menu/i }).click();
+      await expect(page.getByRole("menu")).toBeVisible();
+      await expectNoA11yViolations(page);
+    });
+
+    test("the dashboard chat panel", async ({ page, request }) => {
+      await page.goto(`/dashboards/${await dashboardId(request, DEMO_DASHBOARD)}`);
+      await waitForPanels(page);
+      await page
+        .getByRole("button", { name: "Ask about this dashboard" })
+        .first()
+        .click();
+      await expect(page.getByRole("textbox").first()).toBeVisible();
+      await expectNoA11yViolations(page);
+    });
+  });
+}
+
+test("signed out: the sign-in card", async ({ browser }) => {
+  const context = await browser.newContext({
+    storageState: { cookies: [], origins: [] },
+  });
+  const page = await context.newPage();
+  for (const theme of THEMES) {
+    await setAppearance(page, theme);
+    await page.goto("/dashboards");
+    await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
+    await expectNoA11yViolations(page);
+  }
+  await context.close();
+});

@@ -17,6 +17,7 @@ import { canMove, type PanelMove } from "@/lib/panel-list";
 import { Menu, MenuItem, MenuSeparator } from "@/components/ui/menu";
 import { useReducedMotion } from "@/components/motion-preference";
 import { useFlip } from "@/components/use-flip";
+import { isPanelDeleteKey } from "@/lib/shortcuts";
 
 /**
  * The editor's panel list: select, reorder, duplicate and delete.
@@ -123,12 +124,18 @@ export function PanelList({
           <button
             type="button"
             onClick={() => onSelect(p.id)}
+            onKeyDown={(e) => {
+              // The list's keyboard delete (#77), the same as the menu's.
+              if (!isPanelDeleteKey(e.key)) return;
+              e.preventDefault();
+              remove(p.id);
+            }}
             aria-current={p.id === selectedId ? "true" : undefined}
             className="min-w-0 flex-1 px-1 py-1.5 text-left text-sm"
           >
             <span className="block truncate">{p.title}</span>
             <span className="sr-only">
-              Panel {i + 1} of {panels.length}
+              Panel {i + 1} of {panels.length}. Delete removes it.
             </span>
           </button>
           <Menu

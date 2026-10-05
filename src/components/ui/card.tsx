@@ -25,11 +25,17 @@ export function CardHeader({
   );
 }
 
+/**
+ * A card's heading. `h2` by default because a card sits directly under the
+ * page's `h1` (`PageHeader`) almost everywhere, and a skipped level breaks a
+ * screen reader's outline of the page (#77); `as` for a card nested deeper.
+ */
 export function CardTitle({
   className,
+  as: Heading = "h2",
   ...props
-}: React.HTMLAttributes<HTMLHeadingElement>) {
-  return <h3 className={cn("text-sm font-semibold", className)} {...props} />;
+}: React.HTMLAttributes<HTMLHeadingElement> & { as?: "h2" | "h3" | "h4" }) {
+  return <Heading className={cn("text-sm font-semibold", className)} {...props} />;
 }
 
 export function CardContent({

@@ -235,6 +235,8 @@ export function DashboardChat({
               }
             }}
             rows={1}
+            // A placeholder disappears once typing starts; a name does not (#77).
+            aria-label="Message"
             placeholder="Ask about this dashboard…"
             className="max-h-28 min-h-[2.5rem] resize-none"
           />
