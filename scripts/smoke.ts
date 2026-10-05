@@ -1,6 +1,6 @@
 import "./lib/env";
 import { getDashboardById, getSourceById, listDashboards } from "@/lib/db/repo";
-import type { Panel } from "@/lib/ir";
+import { hasQuery, type QueryPanel } from "@/lib/ir";
 import {
   SELF_DASHBOARD_TITLE,
   selfMonitoringSpec,
@@ -39,7 +39,7 @@ const TIMEOUT_MS = Number(process.env.SMOKE_TIMEOUT_MS || 180_000);
 const POLL_MS = 5_000;
 
 interface PanelOutcome {
-  panel: Panel;
+  panel: QueryPanel;
   rows: number;
   error?: string;
 }
@@ -55,7 +55,7 @@ async function findDashboard() {
 
 /** Run one panel exactly the way `POST /api/query` runs it. */
 async function runPanel(
-  panel: Panel,
+  panel: QueryPanel,
   range: { from: string; to: string },
 ): Promise<PanelOutcome> {
   const source = await getSourceById(panel.query.sourceId);
@@ -95,7 +95,9 @@ async function waitForData(deadline: number) {
 
     if (dashboard) {
       const outcomes = await Promise.all(
-        dashboard.spec.panels.map((panel) => runPanel(panel, dashboard.spec.timeRange)),
+        dashboard.spec.panels
+          .filter(hasQuery)
+          .map((panel) => runPanel(panel, dashboard.spec.timeRange)),
       );
       const refused = outcomes.filter((o) => o.error);
       // A refusal is a real failure, not something more waiting would fix.

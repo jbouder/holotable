@@ -3,6 +3,7 @@
 import * as React from "react";
 import { AlertTriangle, Check, LayoutTemplate, Loader2, Trash2 } from "lucide-react";
 import type { ApiError } from "@/lib/errors";
+import { hasQuery } from "@/lib/ir";
 import { type RepointCheck, checkRepoint, summarizeChecks } from "@/lib/panel-repoint";
 import {
   type Template,
@@ -106,7 +107,10 @@ export function TemplatePicker({
     setVerdicts(null);
     setChecking(true);
     void (async () => {
-      const panels = templatePanels(retargetTemplate(selected.body, target));
+      // A text panel (#202) has no SQL for the target to accept or refuse.
+      const panels = templatePanels(retargetTemplate(selected.body, target)).filter(
+        hasQuery,
+      );
       const checks = await checkRepoint(panels, target);
       if (!active) return;
       setVerdicts({ key: subject, checks });

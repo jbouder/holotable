@@ -1,4 +1,4 @@
-import type { Panel } from "@/lib/ir";
+import { hasQuery, type Panel, type QueryPanel } from "@/lib/ir";
 import { type SqlCheck, validatePanelSql } from "@/lib/panel-query";
 
 /**
@@ -38,16 +38,19 @@ export function missingSourceIds(
 ): string[] {
   const live = new Set(liveSourceIds);
   const missing: string[] = [];
-  for (const panel of panels) {
+  for (const panel of panels.filter(hasQuery)) {
     const id = panel.query.sourceId;
     if (!live.has(id) && !missing.includes(id)) missing.push(id);
   }
   return missing;
 }
 
-/** Every panel pointing at `sourceId`, in spec order — the bulk re-point set. */
-export function panelsUsingSource(panels: Panel[], sourceId: string): Panel[] {
-  return panels.filter((p) => p.query.sourceId === sourceId);
+/**
+ * Every panel pointing at `sourceId`, in spec order — the bulk re-point set. A
+ * text panel (#202) points at nothing and is never in it.
+ */
+export function panelsUsingSource(panels: Panel[], sourceId: string): QueryPanel[] {
+  return panels.filter(hasQuery).filter((p) => p.query.sourceId === sourceId);
 }
 
 /**
@@ -61,7 +64,7 @@ export function repointPanels(
 ): Panel[] {
   const ids = new Set(input.panelIds);
   return panels.map((panel) =>
-    ids.has(panel.id)
+    ids.has(panel.id) && hasQuery(panel)
       ? { ...panel, query: { ...panel.query, sourceId: input.sourceId } }
       : panel,
   );
@@ -83,7 +86,7 @@ export interface RepointCheck {
  * independent and a dashboard can carry up to 50 panels.
  */
 export async function checkRepoint(
-  panels: Panel[],
+  panels: QueryPanel[],
   sourceId: string,
 ): Promise<RepointCheck[]> {
   return Promise.all(

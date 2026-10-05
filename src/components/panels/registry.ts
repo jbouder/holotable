@@ -7,8 +7,14 @@ import {
   pieChart,
   scatterChart,
 } from "@/components/charts/options";
+import { gaugeChart, gaugeShape } from "@/components/charts/gauge";
+import {
+  stateTimelineChart,
+  stateTimelineShape,
+} from "@/components/charts/state-timeline";
 import { StatView } from "@/components/panels/stat";
 import { TableView } from "@/components/panels/table";
+import { TextView } from "@/components/panels/text";
 import type { PanelRenderer } from "@/components/panels/types";
 import type { VizType } from "@/lib/ir";
 
@@ -30,6 +36,13 @@ export const PANEL_RENDERERS = {
   heatmap: { type: "chart", option: heatmapChart },
   pie: { type: "chart", option: pieChart },
   donut: { type: "chart", option: donutChart },
+  gauge: { type: "chart", option: gaugeChart, shape: gaugeShape },
+  "state-timeline": {
+    type: "chart",
+    option: stateTimelineChart,
+    shape: stateTimelineShape,
+  },
+  text: { type: "html", Body: TextView },
 } as const satisfies Record<VizType, PanelRenderer>;
 
 /** How a kind is drawn. */

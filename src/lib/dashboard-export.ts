@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { type ApiError, apiErrorFromThrown, readApiError } from "@/lib/errors";
-import { Dashboard, type Panel } from "@/lib/ir";
+import { Dashboard, hasQuery, type Panel } from "@/lib/ir";
 import { StoredDashboard } from "@/lib/ir/upgrade";
 
 /**
@@ -112,10 +112,13 @@ export function buildDashboardExport(
   };
 }
 
-/** The source ids the panels reference, distinct, in the order they appear. */
+/**
+ * The source ids the panels reference, distinct, in the order they appear. A
+ * text panel (#202) references none.
+ */
 export function referencedSourceIds(spec: { panels: Panel[] }): string[] {
   const seen: string[] = [];
-  for (const panel of spec.panels) {
+  for (const panel of spec.panels.filter(hasQuery)) {
     if (!seen.includes(panel.query.sourceId)) seen.push(panel.query.sourceId);
   }
   return seen;
@@ -158,6 +161,7 @@ export function remapSourceIds(spec: Dashboard, mapping: SourceMapping): Dashboa
   return {
     ...spec,
     panels: spec.panels.map((panel) => {
+      if (!hasQuery(panel)) return panel;
       const target = mapping[panel.query.sourceId];
       return target ? { ...panel, query: { ...panel.query, sourceId: target } } : panel;
     }),

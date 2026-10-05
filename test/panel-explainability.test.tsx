@@ -5,6 +5,7 @@ import { PanelView } from "@/components/dashboard/PanelView";
 import { QueryPlanSection } from "@/components/sql/QueryPlanSection";
 import { DESCRIPTION_RULE } from "@/lib/ai/generate";
 import { mount } from "./support/dom";
+import { queryOf } from "./support/panels";
 
 /**
  * The two things a panel now says about itself: what it computes (#106) and
@@ -122,7 +123,7 @@ function button(root: ParentNode, label: string): Element {
 test("the plan is fetched only when asked for, and nothing is executed", async () => {
   const h = await mount();
   const urls = stubFetch(PLAN);
-  h.render(<QueryPlanSection query={panel().query} timeRange={RANGE} />);
+  h.render(<QueryPlanSection query={queryOf(panel())} timeRange={RANGE} />);
   assert.deepEqual(urls, [], "rendering the section fetches nothing");
 
   h.click(button(h.container, "Show"));
@@ -142,7 +143,7 @@ test("the plan is fetched only when asked for, and nothing is executed", async (
 test("the server's own values are labelled as the server's", async () => {
   const h = await mount();
   stubFetch(PLAN);
-  h.render(<QueryPlanSection query={panel().query} timeRange={RANGE} />);
+  h.render(<QueryPlanSection query={queryOf(panel())} timeRange={RANGE} />);
   h.click(button(h.container, "Show"));
   await settle();
 
@@ -155,7 +156,7 @@ test("the server's own values are labelled as the server's", async () => {
 test("a panel with no time field says so instead of showing an empty list", async () => {
   const h = await mount();
   stubFetch({ ...PLAN, params: [], timeField: undefined });
-  h.render(<QueryPlanSection query={panel().query} timeRange={RANGE} />);
+  h.render(<QueryPlanSection query={queryOf(panel())} timeRange={RANGE} />);
   h.click(button(h.container, "Show"));
   await settle();
 
@@ -170,7 +171,7 @@ test("a refusal is shown as the guard's own message, with a retry", async () => 
     { error: 'table "secrets" is not allowlisted', kind: "statement" },
     { status: 400 },
   );
-  h.render(<QueryPlanSection query={panel().query} timeRange={RANGE} />);
+  h.render(<QueryPlanSection query={queryOf(panel())} timeRange={RANGE} />);
   h.click(button(h.container, "Show"));
   await settle();
 

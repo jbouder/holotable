@@ -8,4 +8,5 @@ export const stat = definePanelKind({
   canvas: false,
   timeBrush: false,
   skeleton: "stat",
+  query: "required",
 });

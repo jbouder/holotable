@@ -148,7 +148,7 @@ test("the spec is copied verbatim, down to the SQL text", () => {
   const original = spec({ panels: [panel({ query: { sourceId: "src-a", sql } })] });
   const file = buildDashboardExport({ spec: original, version: 1 }, AT);
   assert.deepEqual(file.spec, original);
-  assert.equal(file.spec.panels[0].query.sql, sql);
+  assert.equal(file.spec.panels[0].query?.sql, sql);
 });
 
 /* -------------------------------------------------------------------------- */
@@ -298,7 +298,7 @@ test("remapping moves only the source reference, and only where named", () => {
   });
   assert.deepEqual(moved.panels[1], original.panels[1]);
   // Pure: the input is untouched.
-  assert.equal(original.panels[0].query.sourceId, "src-a");
+  assert.equal(original.panels[0].query?.sourceId, "src-a");
 });
 
 test("an empty mapping is the identity, so a same-registry import round-trips", () => {

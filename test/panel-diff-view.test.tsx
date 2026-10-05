@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import type { Panel } from "@/lib/ir";
+import type { Panel, QueryPanel } from "@/lib/ir";
 import { diffPanels } from "@/lib/panel-diff";
 import { PanelDiffView } from "@/components/dashboard/PanelDiffView";
 import { mount } from "./support/dom";
@@ -13,7 +13,7 @@ import { mount } from "./support/dom";
  * press of an action is exactly one call.
  */
 
-const BEFORE: Panel = {
+const BEFORE: QueryPanel = {
   id: "p1",
   title: "Requests",
   viz: "line",

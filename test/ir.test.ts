@@ -209,7 +209,7 @@ const v2ToV3: Upgrader = (spec) => ({
 });
 const SIMULATED = [v1ToV2, v2ToV3];
 
-const V3Panel = Panel.extend({ format: Panel.shape.format.unwrap() });
+const V3Panel = Panel.safeExtend({ format: Panel.shape.format.unwrap() });
 const V3Dashboard = z
   .object({
     specVersion: z.literal(3),
@@ -234,7 +234,7 @@ test("today's stored spec loads after a simulated two-step (v1 → v2 → v3) ch
     ],
   );
   // Nothing the upgraders did not touch moved.
-  assert.equal(v3.panels[0].query.sql, (UNVERSIONED.panels as Panel[])[0].query.sql);
+  assert.equal(v3.panels[0].query?.sql, (UNVERSIONED.panels as Panel[])[0].query?.sql);
 });
 
 test("the chain starts from the version a spec was saved at", () => {

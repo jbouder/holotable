@@ -12,8 +12,10 @@
  * `src/lib/ir.ts`: the IR is built from the registry, not the other way round.
  */
 
+import type { z } from "zod";
+
 /** The silhouette a kind's body shows while its first rows are on their way. */
-export type PanelSkeletonShape = "chart" | "radial" | "stat" | "table";
+export type PanelSkeletonShape = "chart" | "radial" | "stat" | "table" | "lanes" | "text";
 
 export interface PanelKind<K extends string = string> {
   /** The value of `panel.viz`. Stored in every saved spec, so never renamed. */
@@ -40,6 +42,27 @@ export interface PanelKind<K extends string = string> {
   readonly timeBrush: boolean;
   /** What the panel looks like while it loads (#72). */
   readonly skeleton: PanelSkeletonShape;
+  /**
+   * Whether the panel runs a query. `"none"` is a panel with nothing to
+   * execute (#202): it must not carry one, and every consumer of
+   * `panel.query` skips it.
+   */
+  readonly query: "required" | "none";
+  /** The kind cannot be drawn without `query.timeField` (#201). */
+  readonly requiresTimeField?: boolean;
+  /**
+   * The kind's own presentation options, `panel.options`, as a strict object
+   * schema. A kind without one takes no options. The IR validates a panel's
+   * options against its kind's schema, so a gauge's options on a pie are
+   * refused. Every field should be optional unless the kind cannot be drawn
+   * without it: a missing `options` is parsed as `{}`.
+   */
+  readonly options?: z.ZodType<Record<string, unknown>>;
+  /**
+   * The options a panel switched to this kind starts with, when `{}` would not
+   * do (a text panel needs content). Given the panel's title.
+   */
+  readonly starterOptions?: (title: string) => Record<string, unknown>;
 }
 
 /**

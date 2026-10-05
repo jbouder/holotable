@@ -24,6 +24,7 @@ export interface PanelDraft {
   viz?: Panel["viz"];
   format?: Panel["format"];
   query?: { sourceId?: string; sql?: string; timeField?: string };
+  options?: Record<string, unknown>;
   layout?: { x?: number; y?: number; w?: number; h?: number };
 }
 
@@ -59,7 +60,12 @@ export interface PanelDiff {
   /** Every comparable field, changed or not — the view collapses the rest. */
   fields: FieldDiff[];
   changedFields: number;
+  /**
+   * The panel's body, line by line: its SQL, or a text panel's Markdown
+   * (#202), which `bodyLabel` names.
+   */
   sql: SqlDiff;
+  bodyLabel: "SQL" | "Text";
   /** Nothing the author would see would change. */
   identical: boolean;
 }
@@ -161,6 +167,21 @@ export function diffSqlLines(before: string, after: string): SqlDiff {
   return { changed: added > 0 || removed > 0, added, removed, lines };
 }
 
+/** A text panel's Markdown, or undefined for every other kind (#202). */
+function textContent(options: Record<string, unknown> | undefined): string | undefined {
+  return typeof options?.content === "string" ? options.content : undefined;
+}
+
+/**
+ * The options other than a text panel's content, which is diffed as the body.
+ * Key order follows the spec, which is what the author wrote.
+ */
+function formatOptions(options: Record<string, unknown> | undefined): string {
+  if (!options) return NONE;
+  const { content: _, ...rest } = options;
+  return Object.keys(rest).length === 0 ? NONE : JSON.stringify(rest);
+}
+
 function formatLayout(layout: Panel["layout"]): string {
   return `x ${layout.x} · y ${layout.y} · w ${layout.w} · h ${layout.h}`;
 }
@@ -207,15 +228,28 @@ export function diffPanels(
       after: streaming && after.format === undefined ? undefined : (after.format ?? NONE),
     },
     {
+      key: "options",
+      label: "Options",
+      before: formatOptions(before.options),
+      after:
+        streaming && after.options === undefined
+          ? undefined
+          : formatOptions(after.options),
+    },
+    {
       key: "sourceId",
       label: "Source",
-      before: before.query.sourceId,
-      after: after.query?.sourceId,
+      // A text panel (#202) has no query, so no source either side of it.
+      before: before.query?.sourceId ?? NONE,
+      after:
+        streaming && after.query?.sourceId === undefined
+          ? undefined
+          : (after.query?.sourceId ?? NONE),
     },
     {
       key: "timeField",
       label: "Time field",
-      before: before.query.timeField ?? NONE,
+      before: before.query?.timeField ?? NONE,
       after:
         streaming && after.query?.timeField === undefined
           ? undefined
@@ -248,13 +282,16 @@ export function diffPanels(
     };
   });
 
-  const sql = diffSqlLines(before.query.sql, after.query?.sql ?? before.query.sql);
+  const beforeBody = before.query?.sql ?? textContent(before.options) ?? "";
+  const afterBody = after.query?.sql ?? textContent(after.options) ?? beforeBody;
+  const sql = diffSqlLines(beforeBody, afterBody);
   const changedFields = fields.filter((f) => f.changed).length;
 
   return {
     fields,
     changedFields,
     sql,
+    bodyLabel: before.query === undefined ? "Text" : "SQL",
     identical: changedFields === 0 && !sql.changed,
   };
 }

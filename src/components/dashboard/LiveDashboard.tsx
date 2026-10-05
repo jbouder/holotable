@@ -27,6 +27,7 @@ import {
 } from "@/lib/sse";
 import { ensureSession, renewSession } from "@/lib/session-renewal";
 import { mergePanelRows } from "@/lib/stream-merge";
+import { type QueryRows, readWindow } from "@/lib/panel-query";
 import { HIDDEN_STREAM_GRACE_MS } from "@/lib/stream-idle";
 import { isRolling, rangeSearch } from "@/lib/time-range";
 import { Notice } from "@/components/notice";
@@ -112,6 +113,11 @@ export function LiveDashboard({
   // time range, typically. It belongs above the grid because it is not any one
   // panel's, and it clears on the next completed tick.
   const [dashboardError, setDashboardError] = React.useState<ApiError | null>(null);
+  /**
+   * The window the server resolved for its last completed cycle (#201): where
+   * a chart that runs to "now" ends. Named so it never shadows `window`.
+   */
+  const [resolvedWindow, setResolvedWindow] = React.useState<QueryRows["window"]>();
   // Bumped by the manual Reconnect to tear the EventSource down and build a
   // new one; the browser's own retry schedule is not something a page can
   // shortcut, so the socket has to be replaced rather than nudged.
@@ -269,6 +275,8 @@ export function LiveDashboard({
         const event = JSON.parse(msg.data) as PollerEvent;
         if (event.type === "tick") {
           lastTickRef.current = event.at;
+          // Untrusted like the rest of the frame: kept only if it is a window.
+          setResolvedWindow(readWindow(event.window));
           // A tick only arrives on a completed cycle, so it is also the signal
           // that whatever broke the last one is over.
           setDashboardError(null);
@@ -480,6 +488,7 @@ export function LiveDashboard({
             dashboardTitle={spec.title}
             crosshairGroup={dashboardId}
             onSelectTimeRange={setTimeRange}
+            window={resolvedWindow}
           />
         )}
       />

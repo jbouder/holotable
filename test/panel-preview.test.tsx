@@ -1,6 +1,6 @@
 import { test, afterEach } from "node:test";
 import assert from "node:assert/strict";
-import type { Panel, TimeRange } from "@/lib/ir";
+import type { PanelQuery, QueryPanel, TimeRange } from "@/lib/ir";
 import { PanelPreview, usePanelPreview } from "@/components/dashboard/PanelPreview";
 import { mount } from "./support/dom";
 
@@ -16,7 +16,7 @@ import { mount } from "./support/dom";
 
 const RANGE: TimeRange = { from: "now-15m", to: "now" };
 
-function panel(overrides: Partial<Panel["query"]> = {}): Panel {
+function panel(overrides: Partial<PanelQuery> = {}): QueryPanel {
   return {
     id: "p1",
     title: "Requests",
@@ -31,7 +31,7 @@ function panel(overrides: Partial<Panel["query"]> = {}): Panel {
   };
 }
 
-function Host({ p }: { p: Panel }) {
+function Host({ p }: { p: QueryPanel }) {
   const preview = usePanelPreview(p, RANGE);
   return <PanelPreview panel={p} preview={preview} />;
 }

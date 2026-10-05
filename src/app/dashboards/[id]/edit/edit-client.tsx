@@ -19,11 +19,17 @@ import {
 } from "lucide-react";
 import {
   type Dashboard,
+  hasQuery,
   Panel,
+  type QueryPanel,
   VizType,
   ValueFormat,
   safeParseDashboard,
 } from "@/lib/ir";
+import { changePanelKind } from "@/lib/panel-kind-change";
+import { panelKind } from "@/lib/panels/registry";
+import { TEXT_CONTENT_MAX } from "@/lib/panels/kinds/text";
+import { MarkdownView } from "@/components/panels/text";
 import { autoLayoutPanels, COLUMN_PRESETS } from "@/lib/layout";
 import {
   canMove,
@@ -32,8 +38,9 @@ import {
   type PanelMove,
   reorderPanels,
 } from "@/lib/panel-list";
-import { isStarterSql, starterPanel } from "@/lib/panel-starter";
+import { isStarterSql, panelStarter, starterPanel } from "@/lib/panel-starter";
 import { clampLayout } from "@/lib/grid-layout";
+import { cn } from "@/lib/utils";
 import { AiUnavailable } from "@/components/ai-unavailable";
 import { Button, ButtonLabel } from "@/components/ui/button";
 import { Input, Textarea, Label } from "@/components/ui/input";
@@ -236,7 +243,7 @@ export function EditDashboardClient({
     sources.map((s) => s.id),
   );
   const repointPanelSet = repointing
-    ? spec.panels.filter((p) => repointing.panelIds.includes(p.id))
+    ? spec.panels.filter(hasQuery).filter((p) => repointing.panelIds.includes(p.id))
     : [];
   const proposalBase = proposal
     ? (spec.panels.find((p) => p.id === proposal.panelId) ?? null)
@@ -416,6 +423,14 @@ export function EditDashboardClient({
   function removePanel(id: string) {
     const panel = spec.panels.find((p) => p.id === id);
     if (!panel) return;
+    if (!hasQuery(panel)) {
+      // A text panel (#202) is worth asking about once it says something
+      // other than what it started with.
+      const starter = panelKind(panel.viz).starterOptions?.(panel.title);
+      if (starter?.content === panel.options?.content) deletePanel(id);
+      else setConfirmDelete(panel);
+      return;
+    }
     const catalog = sources.find((s) => s.id === panel.query.sourceId)?.catalog ?? null;
     if (isStarterSql(panel.query.sql, catalog)) deletePanel(id);
     else setConfirmDelete(panel);
@@ -470,10 +485,17 @@ export function EditDashboardClient({
     const instruction = feedback.trim()
       ? `${prompt}\n\nAdditional feedback: ${feedback.trim()}`.slice(0, 4000)
       : prompt;
+    // A text panel (#202) has no source of its own; the model is still shown
+    // the dashboard's, which is what its prose is about.
+    const sourceId =
+      base.query?.sourceId ??
+      spec.panels.find(hasQuery)?.query.sourceId ??
+      sources[0]?.id;
+    if (!sourceId) return;
     setProposal({ panelId: base.id, prompt, panel: null });
     submit({
       mode: "panel",
-      sourceId: base.query.sourceId,
+      sourceId,
       prompt: instruction,
       current: base,
     });
@@ -1036,13 +1058,17 @@ export function EditDashboardClient({
                     panel={selected}
                     sources={sources}
                     timeRange={spec.timeRange}
-                    sourceMissing={missingSources.includes(selected.query.sourceId)}
-                    onRepoint={() =>
+                    sourceMissing={
+                      selected.query !== undefined &&
+                      missingSources.includes(selected.query.sourceId)
+                    }
+                    onRepoint={() => {
+                      if (!selected.query) return;
                       setRepointing({
                         sourceId: selected.query.sourceId,
                         panelIds: [selected.id],
-                      })
-                    }
+                      });
+                    }}
                     onChange={(fn, intent) => updatePanel(selected.id, fn, intent)}
                   />
                 )}
@@ -1125,7 +1151,7 @@ export function EditDashboardClient({
         <TemplatePicker
           workspaceId={workspaceId}
           sources={sources.map((s) => ({ id: s.id, name: s.name }))}
-          defaultSourceId={selected?.query.sourceId}
+          defaultSourceId={selected?.query?.sourceId}
           applyLabel="Add panels"
           onApply={applyTemplate}
           onClose={() => setPicking(false)}
@@ -1152,8 +1178,9 @@ export function EditDashboardClient({
       >
         <div className="space-y-4">
           <p className="text-sm text-muted">
-            <span className="text-foreground">{confirmDelete?.title}</span> has a query of
-            its own. Deleting it is one undo away, and nothing is written until you save.
+            <span className="text-foreground">{confirmDelete?.title}</span> has{" "}
+            {confirmDelete?.query ? "a query" : "text"} of its own. Deleting it is one
+            undo away, and nothing is written until you save.
           </p>
           <div className="flex justify-end gap-2">
             <Button variant="secondary" onClick={() => setConfirmDelete(null)}>
@@ -1226,17 +1253,24 @@ function PanelEditor({
   /** Each control names its own undo step, so a burst of typing is one entry. */
   onChange: (fn: (p: Panel) => Panel, intent: EditIntent) => void;
 }) {
-  const preview = usePanelPreview(panel, timeRange);
-  const catalog = sources.find((s) => s.id === panel.query.sourceId)?.catalog ?? null;
+  const kind = panelKind(panel.viz);
   // A removed source is still what the panel names, so it stays in the list
   // rather than making the control read as some other source's panel.
   const sourceOptions = sources.map((s) => ({ value: s.id, label: s.name }));
-  if (sourceMissing) {
+  if (sourceMissing && panel.query) {
     sourceOptions.unshift({
       value: panel.query.sourceId,
       label: `${panel.query.sourceId} (removed)`,
     });
   }
+  /** A query for a panel switched back from a kind that had none (#202). */
+  const starterQuery = () => {
+    const source = sources[0];
+    const starter = panelStarter(source?.catalog ?? null);
+    return { sourceId: source?.id ?? "", sql: starter.sql, timeField: starter.timeField };
+  };
+  const onQueryChange = (fn: (p: QueryPanel) => Panel, intent: EditIntent) =>
+    onChange((p) => (hasQuery(p) ? fn(p) : p), intent);
 
   return (
     <div className="space-y-3">
@@ -1262,87 +1296,92 @@ function PanelEditor({
             }
           />
         </div>
-        <div>
-          <Label>Source</Label>
-          <Select
-            value={panel.query.sourceId}
-            onValueChange={(v) =>
-              onChange((p) => ({ ...p, query: { ...p.query, sourceId: v } }), {
-                action: "change panel source",
-              })
-            }
-            options={sourceOptions}
-          />
-        </div>
+        {panel.query && (
+          <div>
+            <Label>Source</Label>
+            <Select
+              value={panel.query.sourceId}
+              onValueChange={(v) =>
+                onQueryChange((p) => ({ ...p, query: { ...p.query, sourceId: v } }), {
+                  action: "change panel source",
+                })
+              }
+              options={sourceOptions}
+            />
+          </div>
+        )}
         <div>
           <Label>Visualization</Label>
           <Select
             value={panel.viz}
             onValueChange={(v) =>
-              onChange((p) => ({ ...p, viz: v as Panel["viz"] }), {
+              onChange((p) => changePanelKind(p, v as VizType, starterQuery), {
                 action: "change visualization",
               })
             }
             options={VIZ_OPTIONS}
           />
         </div>
+        {panel.query && (
+          <div>
+            <Label>Format</Label>
+            <Select
+              value={panel.format ?? ""}
+              onValueChange={(v) =>
+                onChange(
+                  (p) => ({ ...p, format: v ? (v as Panel["format"]) : undefined }),
+                  { action: "change value format" },
+                )
+              }
+              options={FORMAT_OPTIONS}
+            />
+          </div>
+        )}
+      </div>
+
+      {/* A text panel computes nothing; its content is what it says. */}
+      {panel.query && (
         <div>
-          <Label>Format</Label>
-          <Select
-            value={panel.format ?? ""}
-            onValueChange={(v) =>
-              onChange(
-                (p) => ({ ...p, format: v ? (v as Panel["format"]) : undefined }),
-                { action: "change value format" },
-              )
+          <Label htmlFor="p-description">Description (what this panel computes)</Label>
+          <Textarea
+            id="p-description"
+            rows={2}
+            maxLength={PANEL_DESCRIPTION_MAX}
+            placeholder="e.g. Requests per minute, grouped by route"
+            value={panel.description ?? ""}
+            onChange={(e) =>
+              onChange((p) => ({ ...p, description: e.target.value || undefined }), {
+                action: "edit panel description",
+                key: `${panel.id}:description`,
+              })
             }
-            options={FORMAT_OPTIONS}
           />
+          <p className="mt-1 text-xs text-muted">
+            Shown to readers behind the info icon on the panel. The model writes one for
+            every panel it generates; this is where you correct it.
+          </p>
         </div>
-      </div>
+      )}
 
-      <div>
-        <Label htmlFor="p-description">Description (what this panel computes)</Label>
-        <Textarea
-          id="p-description"
-          rows={2}
-          maxLength={PANEL_DESCRIPTION_MAX}
-          placeholder="e.g. Requests per minute, grouped by route"
-          value={panel.description ?? ""}
-          onChange={(e) =>
-            onChange((p) => ({ ...p, description: e.target.value || undefined }), {
-              action: "edit panel description",
-              key: `${panel.id}:description`,
-            })
-          }
+      {hasQuery(panel) ? (
+        <QueryFields
+          panel={panel}
+          sources={sources}
+          timeRange={timeRange}
+          onChange={onQueryChange}
         />
-        <p className="mt-1 text-xs text-muted">
-          Shown to readers behind the info icon on the panel. The model writes one for
-          every panel it generates; this is where you correct it.
-        </p>
-      </div>
+      ) : (
+        <TextFields panel={panel} onChange={onChange} />
+      )}
 
-      <div className="space-y-2">
-        <Label htmlFor="p-sql">
-          SQL (SELECT only; no time filter — the server injects it)
-        </Label>
-        <SqlEditor
-          id="p-sql"
-          value={panel.query.sql}
-          catalog={catalog}
-          onChange={(sql) =>
-            onChange((p) => ({ ...p, query: { ...p.query, sql } }), {
-              action: "edit SQL",
-              key: `${panel.id}:sql`,
-            })
-          }
-          onRun={() => {
-            if (preview.busy === null) preview.run();
-          }}
-          placeholder="SELECT …"
+      {kind.options && kind.query === "required" && (
+        <OptionsField
+          // A new kind starts a new draft: the old kind's text is not this one's.
+          key={`${panel.id}:${panel.viz}`}
+          panel={panel}
+          onChange={onChange}
         />
-        <PanelPreview panel={panel} preview={preview} />
-      </div>
+      )}
 
       <div>
         <Label>Width</Label>
@@ -1371,18 +1410,6 @@ function PanelEditor({
         </p>
       </div>
 
-      <TimeFieldPicker
-        id="p-tf"
-        value={panel.query.timeField}
-        sql={panel.query.sql}
-        catalog={catalog}
-        onChange={(timeField) =>
-          onChange((p) => ({ ...p, query: { ...p.query, timeField } }), {
-            action: "change time field",
-          })
-        }
-      />
-
       {/*
         Two up on a phone rather than four 60px-wide number inputs in a row
         (#78); still one row from `sm`, where it fits.
@@ -1408,6 +1435,173 @@ function PanelEditor({
           </div>
         ))}
       </div>
+    </div>
+  );
+}
+
+/** The SQL, its preview and its time field: a panel that runs a query. */
+function QueryFields({
+  panel,
+  sources,
+  timeRange,
+  onChange,
+}: {
+  panel: QueryPanel;
+  sources: SourceOption[];
+  timeRange: Dashboard["timeRange"];
+  onChange: (fn: (p: QueryPanel) => Panel, intent: EditIntent) => void;
+}) {
+  const preview = usePanelPreview(panel, timeRange);
+  const catalog = sources.find((s) => s.id === panel.query.sourceId)?.catalog ?? null;
+
+  return (
+    <>
+      <div className="space-y-2">
+        <Label htmlFor="p-sql">
+          SQL (SELECT only; no time filter — the server injects it)
+        </Label>
+        <SqlEditor
+          id="p-sql"
+          value={panel.query.sql}
+          catalog={catalog}
+          onChange={(sql) =>
+            onChange((p) => ({ ...p, query: { ...p.query, sql } }), {
+              action: "edit SQL",
+              key: `${panel.id}:sql`,
+            })
+          }
+          onRun={() => {
+            if (preview.busy === null) preview.run();
+          }}
+          placeholder="SELECT …"
+        />
+        <PanelPreview panel={panel} preview={preview} />
+      </div>
+
+      <TimeFieldPicker
+        id="p-tf"
+        value={panel.query.timeField}
+        sql={panel.query.sql}
+        catalog={catalog}
+        onChange={(timeField) =>
+          onChange((p) => ({ ...p, query: { ...p.query, timeField } }), {
+            action: "change time field",
+          })
+        }
+      />
+    </>
+  );
+}
+
+/**
+ * A text panel's Markdown (#202), with the panel's own rendering of it as the
+ * preview, so what is typed here is what readers get.
+ */
+function TextFields({
+  panel,
+  onChange,
+}: {
+  panel: Panel;
+  onChange: (fn: (p: Panel) => Panel, intent: EditIntent) => void;
+}) {
+  const content = typeof panel.options?.content === "string" ? panel.options.content : "";
+  return (
+    <div className="space-y-2">
+      <Label htmlFor="p-content">Text (Markdown)</Label>
+      <Textarea
+        id="p-content"
+        rows={8}
+        maxLength={TEXT_CONTENT_MAX}
+        className="font-mono text-xs"
+        value={content}
+        onChange={(e) =>
+          onChange((p) => ({ ...p, options: { content: e.target.value } }), {
+            action: "edit text",
+            key: `${panel.id}:content`,
+          })
+        }
+      />
+      <p className="text-xs text-muted">
+        Headings, emphasis, lists, code, tables and http(s) or mailto links. HTML is shown
+        as text, and images are not loaded.
+      </p>
+      <div className="max-h-64 overflow-auto border border-border bg-surface p-3">
+        {content.trim() ? (
+          <MarkdownView source={content} />
+        ) : (
+          <p className="text-sm text-muted">Nothing to show yet.</p>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/**
+ * A kind's options as JSON, checked against the kind's schema as it is typed.
+ * Only a draft that parses and validates reaches the spec, so the panel never
+ * holds options its kind would refuse; the draft itself is kept while it is
+ * being written.
+ */
+function OptionsField({
+  panel,
+  onChange,
+}: {
+  panel: Panel;
+  onChange: (fn: (p: Panel) => Panel, intent: EditIntent) => void;
+}) {
+  const schema = panelKind(panel.viz).options;
+  const [draft, setDraft] = React.useState(() =>
+    JSON.stringify(panel.options ?? {}, null, 2),
+  );
+  const [problem, setProblem] = React.useState<string | null>(null);
+
+  function edit(text: string) {
+    setDraft(text);
+    let value: unknown;
+    try {
+      value = text.trim() === "" ? {} : JSON.parse(text);
+    } catch {
+      setProblem("Not valid JSON yet.");
+      return;
+    }
+    const parsed = schema?.safeParse(value);
+    if (!parsed?.success) {
+      const issue = parsed?.error.issues[0];
+      setProblem(
+        issue
+          ? `${issue.path.length ? `${issue.path.join(".")}: ` : ""}${issue.message}`
+          : "Not valid for this kind.",
+      );
+      return;
+    }
+    setProblem(null);
+    const options = Object.keys(parsed.data).length > 0 ? parsed.data : undefined;
+    onChange((p) => ({ ...p, options }), {
+      action: "edit panel options",
+      key: `${panel.id}:options`,
+    });
+  }
+
+  return (
+    <div className="space-y-1">
+      <Label htmlFor="p-options">Options (JSON)</Label>
+      <Textarea
+        id="p-options"
+        rows={5}
+        className="font-mono text-xs"
+        spellCheck={false}
+        value={draft}
+        aria-invalid={problem !== null}
+        aria-describedby="p-options-help"
+        onChange={(e) => edit(e.target.value)}
+      />
+      <p
+        id="p-options-help"
+        className={cn("text-xs", problem ? "text-danger" : "text-muted")}
+      >
+        {problem ??
+          "This kind's own settings; Reference → Panel options lists the fields."}
+      </p>
     </div>
   );
 }

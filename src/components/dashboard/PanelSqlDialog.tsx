@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { Check, Code, Copy } from "lucide-react";
-import type { Panel, TimeRange } from "@/lib/ir";
+import { hasQuery, type Panel, type QueryPanel, type TimeRange } from "@/lib/ir";
 import { Button } from "@/components/ui/button";
 import { Dialog } from "@/components/ui/dialog";
 import { panelDetails } from "@/lib/panel-details";
@@ -24,6 +24,8 @@ export function PanelSqlDialog({
   timeRange?: TimeRange;
 }) {
   const [open, setOpen] = React.useState(false);
+  // A text panel (#202) computes nothing, so there is nothing to show.
+  if (!hasQuery(panel)) return null;
 
   return (
     <>
@@ -43,8 +45,15 @@ export function PanelSqlDialog({
   );
 }
 
-function PanelSqlBody({ panel, timeRange }: { panel: Panel; timeRange?: TimeRange }) {
-  const details = panelDetails(panel);
+function PanelSqlBody({
+  panel,
+  timeRange,
+}: {
+  panel: QueryPanel;
+  timeRange?: TimeRange;
+}) {
+  // Never null: the dialog is only offered for a panel with a query.
+  const details = panelDetails(panel) ?? { sql: "", sourceId: "" };
   const [copied, setCopied] = React.useState(false);
   const [copyFailed, setCopyFailed] = React.useState(false);
 

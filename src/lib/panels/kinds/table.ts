@@ -7,4 +7,5 @@ export const table = definePanelKind({
   canvas: false,
   timeBrush: false,
   skeleton: "table",
+  query: "required",
 });

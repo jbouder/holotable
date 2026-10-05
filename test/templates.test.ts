@@ -137,7 +137,7 @@ test("a dashboard template keeps its arrangement, range and refresh", () => {
     source.panels.map((p) => p.layout),
     "the layout is most of what made it worth saving",
   );
-  assert.deepEqual([...new Set(spec.panels.map((p) => p.query.sourceId))], ["src-9"]);
+  assert.deepEqual([...new Set(spec.panels.map((p) => p.query?.sourceId))], ["src-9"]);
 });
 
 test("a panel template becomes a one-panel dashboard at the origin", () => {
@@ -147,7 +147,7 @@ test("a panel template becomes a one-panel dashboard at the origin", () => {
   });
   assert.equal(spec.panels.length, 1);
   assert.deepEqual(spec.panels[0].layout, { x: 0, y: 0, w: 6, h: 4 });
-  assert.equal(spec.panels[0].query.sourceId, "src-9");
+  assert.equal(spec.panels[0].query?.sourceId, "src-9");
 });
 
 test("appending a template stacks its panels under unique ids", () => {
@@ -161,7 +161,7 @@ test("appending a template stacks its panels under unique ids", () => {
   // The second appended panel sees the bottom edge the first one produced.
   assert.ok(next.panels[2].layout.y >= next.panels[1].layout.y + next.panels[1].layout.h);
   assert.deepEqual(
-    [...new Set(next.panels.slice(1).map((p) => p.query.sourceId))],
+    [...new Set(next.panels.slice(1).map((p) => p.query?.sourceId))],
     ["src-2"],
   );
 });
@@ -191,8 +191,8 @@ test("the validation spec is a parseable dashboard for either kind", () => {
     const spec = templateValidationSpec(body);
     assert.ok(spec.panels.length > 0);
     assert.deepEqual(
-      spec.panels.map((p) => p.query.sql),
-      templatePanels(body).map((p) => p.query.sql),
+      spec.panels.map((p) => p.query?.sql),
+      templatePanels(body).map((p) => p.query?.sql),
       "every statement the server will guard is in the spec it guards",
     );
   }

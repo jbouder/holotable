@@ -1,5 +1,5 @@
 import type { UIMessage } from "ai";
-import type { Dashboard, Panel } from "@/lib/ir";
+import { type Dashboard, hasQuery, type Panel } from "@/lib/ir";
 
 /**
  * The parts of dashboard chat that are not a model call.
@@ -106,8 +106,14 @@ export function matchingPanels(
   sql: string,
 ): string[] {
   const needle = normalizeSql(sql);
+  // A text panel (#202) has no query, so nothing it said can be cited.
   return panels
-    .filter((p) => p.query.sourceId === sourceId && normalizeSql(p.query.sql) === needle)
+    .filter(
+      (p) =>
+        p.query !== undefined &&
+        p.query.sourceId === sourceId &&
+        normalizeSql(p.query.sql) === needle,
+    )
     .map((p) => p.title);
 }
 
@@ -163,10 +169,11 @@ export function chatSuggestions(dashboard: Dashboard): string[] {
   // A title only reaches a chip if it reads as one. A 200-character panel name
   // is legal in the IR and would make an unreadable question, so it is left
   // out rather than truncated into half a sentence.
-  const nameable = dashboard.panels.filter(
-    (p) => p.title.trim().length > 0 && p.title.trim().length <= 60,
-  );
-  const name = (p: Panel) => p.title.trim();
+  // A text panel (#202) has no data to ask about.
+  const nameable = dashboard.panels
+    .filter(hasQuery)
+    .filter((p) => p.title.trim().length > 0 && p.title.trim().length <= 60);
+  const name = (p: Pick<Panel, "title">) => p.title.trim();
 
   const suggestions = ["Summarize what this dashboard is showing right now."];
 
@@ -177,7 +184,7 @@ export function chatSuggestions(dashboard: Dashboard): string[] {
     suggestions.push(`Has "${name(timeSeries)}" changed over this window?`);
   }
 
-  if (dashboard.panels.length > 1) {
+  if (nameable.length > 1) {
     suggestions.push("Which panel looks the most unusual, and why?");
   }
 

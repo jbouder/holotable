@@ -1,4 +1,5 @@
 import { test } from "node:test";
+import { queryOf } from "./support/panels";
 import assert from "node:assert/strict";
 import type { Dashboard } from "../src/lib/ir";
 import {
@@ -36,7 +37,7 @@ test("an unchanged spec is not dirty, whatever order its keys were built in", ()
   const b: Dashboard = {
     panels: a.panels.map((p) => ({
       layout: p.layout,
-      query: { sql: p.query.sql, sourceId: p.query.sourceId },
+      query: { sql: queryOf(p).sql, sourceId: queryOf(p).sourceId },
       viz: p.viz,
       title: p.title,
       id: p.id,

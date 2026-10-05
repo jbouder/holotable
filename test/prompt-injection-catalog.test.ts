@@ -10,6 +10,7 @@ import { Panel, parseDashboard } from "@/lib/ir";
 import { SourceConfig, type SourceRecord } from "@/lib/registry";
 import { validateSql } from "@/lib/sql/safety";
 import { buildCatalogPrompt, renderCatalog } from "@/lib/timescaledb/catalog";
+import { queryOf } from "./support/panels";
 
 /**
  * Prompt-injection suite for catalog metadata and stored panel specs.
@@ -213,7 +214,7 @@ test("a source whose catalog carries a hostile column still backs a valid, guard
     },
     layout: { x: 0, y: 0, w: 12, h: 4 },
   });
-  assert.equal((await validateSql(panel.query.sql, source.config)).ok, true);
+  assert.equal((await validateSql(queryOf(panel).sql, source.config)).ok, true);
   // Even a query that reads the hostile column is ordinary quoted-identifier SQL.
   const quoted = `SELECT "${INJECTION}" AS label, count(*) AS c FROM http_requests GROUP BY label`;
   assert.equal((await validateSql(quoted, source.config)).ok, true);
@@ -297,7 +298,7 @@ test("renderPanels clamps every panel field to its IR maximum", () => {
   });
   dashboard.panels[0].title = "t".repeat(5_000);
   dashboard.panels[0].description = "d".repeat(5_000);
-  dashboard.panels[0].query.sql = `SELECT '${"s".repeat(9_000)}' AS one`;
+  queryOf(dashboard.panels[0]).sql = `SELECT '${"s".repeat(9_000)}' AS one`;
   const rendered = renderPanels(dashboard);
   assert.match(rendered, /^- panel "p1" — t{200} \(viz: table, source: src-metrics\)$/m);
   assert.match(rendered, /^ {4}intent: d{500}$/m);

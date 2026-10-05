@@ -27,12 +27,15 @@ export function PanelActions({
   dashboardTitle,
   data,
   chart,
+  exportable = true,
   expanded,
   onToggleExpanded,
 }: {
   panelTitle: string;
   dashboardTitle?: string;
   data: ExportableResult;
+  /** False for a panel with no rows to export at all (text, #202): fullscreen only. */
+  exportable?: boolean;
   /** The chart, when this panel has one. Stat and table panels offer CSV only. */
   chart?: React.RefObject<EChartHandle | null>;
   expanded: boolean;
@@ -78,12 +81,14 @@ export function PanelActions({
           </>
         )}
       </MenuItem>
-      <MenuSeparator />
-      <MenuItem onClick={exportCsv} disabled={!hasRows}>
-        <Download className="h-4 w-4" />
-        <span title={CSV_SCOPE_NOTE}>Export CSV</span>
-      </MenuItem>
-      {chart && (
+      {exportable && <MenuSeparator />}
+      {exportable && (
+        <MenuItem onClick={exportCsv} disabled={!hasRows}>
+          <Download className="h-4 w-4" />
+          <span title={CSV_SCOPE_NOTE}>Export CSV</span>
+        </MenuItem>
+      )}
+      {exportable && chart && (
         <MenuItem onClick={exportPng} disabled={!hasRows}>
           <ImageIcon className="h-4 w-4" /> Export PNG
         </MenuItem>

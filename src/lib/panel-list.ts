@@ -119,7 +119,8 @@ export function duplicatePanel(
     ...original,
     id: copyId,
     title: copyTitle(original.title),
-    query: { ...original.query },
+    query: original.query && { ...original.query },
+    options: original.options && structuredClone(original.options),
     layout: clampLayout({
       ...original.layout,
       y: original.layout.y + original.layout.h,

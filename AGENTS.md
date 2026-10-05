@@ -79,7 +79,13 @@ Important files:
   generation prompt's viz list and the docs reference are built from it; each
   kind is a module under `src/lib/panels/kinds/`, and its renderer is one line
   in `src/components/panels/registry.ts`, which does not compile without one.
-  Never add a `switch` on `panel.viz`: register the kind instead
+  Never add a `switch` on `panel.viz`: register the kind instead. A kind
+  declares its `options` schema (validated as `panel.options`), whether it
+  runs a query at all (`query: "none"` for text, #202) and whether it needs a
+  time field. `panel.query` is optional because of that: anything that
+  executes, validates, lists or re-points queries filters with `hasQuery`.
+  Text-panel Markdown is rendered by `src/lib/markdown.ts` into React
+  elements, never as an HTML string
 - `src/lib/sql/safety.ts` — the SQL guard every generated query passes through
 - `src/lib/sql/ast.ts` — the PostgreSQL parse-tree walk the guard is built on
 - `src/lib/sql/row-filter.ts` — row-level filters (#31): every real table a

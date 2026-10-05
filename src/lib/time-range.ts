@@ -317,7 +317,7 @@ export function rangeSearch(range: TimeRange, dashboardDefault: TimeRange): stri
  * ordered.
  */
 export function supportsTimeBrush(panel: Panel): boolean {
-  return panelKind(panel.viz).timeBrush && panel.query.timeField !== undefined;
+  return panelKind(panel.viz).timeBrush && panel.query?.timeField !== undefined;
 }
 
 /**

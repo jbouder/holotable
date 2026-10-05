@@ -51,7 +51,17 @@ const JUNK: PanelData[] = [
 test("every chart kind is covered", () => {
   assert.deepEqual(
     CHARTS.map((c) => c.viz),
-    ["line", "area", "bar", "scatter", "heatmap", "pie", "donut"],
+    [
+      "line",
+      "area",
+      "bar",
+      "scatter",
+      "heatmap",
+      "pie",
+      "donut",
+      "gauge",
+      "state-timeline",
+    ],
   );
 });
 
@@ -59,7 +69,7 @@ for (const { viz, option } of CHARTS) {
   test(`a chart's option builder does not throw on unexpected row shapes (${viz})`, () => {
     for (const data of JUNK) {
       assert.doesNotThrow(
-        () => option(panel({ viz }), data, LOCAL_TIME_DISPLAY),
+        () => option(panel({ viz }), data, { display: LOCAL_TIME_DISPLAY }),
         `viz=${viz} data=${JSON.stringify(data, (_k, v) => (typeof v === "bigint" || typeof v === "symbol" ? String(v) : v))}`,
       );
     }
@@ -77,7 +87,7 @@ test("non-object rows are dropped rather than rendered", () => {
         { ts: "t1", v: 2 },
       ] as unknown as PanelData["rows"],
     },
-    LOCAL_TIME_DISPLAY,
+    { display: LOCAL_TIME_DISPLAY },
   );
   assert.deepEqual((option.xAxis as { data: string[] }).data, ["t0", "t1"]);
 });
@@ -92,7 +102,7 @@ test("a well-formed line panel is unchanged by the normalization", () => {
         { ts: "t1", v: 2 },
       ],
     },
-    LOCAL_TIME_DISPLAY,
+    { display: LOCAL_TIME_DISPLAY },
   );
   assert.deepEqual((option.xAxis as { data: string[] }).data, ["t0", "t1"]);
   const series = option.series as { name: string; data: number[] }[];

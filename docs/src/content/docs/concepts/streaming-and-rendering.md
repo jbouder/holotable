@@ -168,10 +168,20 @@ module under `src/lib/panels/kinds/` that says, in plain data:
 | `canvas` | PNG export, and whether the explore page plots the panel. |
 | `timeBrush` | Whether a drag across the chart selects a time range. |
 | `skeleton` | The shape the panel shows while it loads. |
+| `query` | `"required"`, or `"none"` for a kind that runs nothing (text). The IR holds the panel to it, and code that executes or lists queries filters through `hasQuery`. |
+| `requiresTimeField` | The IR refuses the panel without `query.timeField` (state timeline). |
+| `options` | The kind's own options schema, which `panel.options` is validated against. See [Panel options](/reference/panel-options/). |
+| `starterOptions` | What a panel switched to this kind in the editor starts with, when `{}` would not do. |
 
 How a kind is drawn is the browser half, `PANEL_RENDERERS` in
-`src/components/panels/registry.ts`: either `{ type: "chart", option }`, an
-ECharts option builder, or `{ type: "html", Body }`, a component. It is kept
+`src/components/panels/registry.ts`: either `{ type: "chart", option, shape? }`,
+an ECharts option builder, or `{ type: "html", Body }`, a component. An option
+builder is given the rows and a context: the viewer's time display, and the
+window the server resolved for the rows (sent with every `tick`, and returned
+by `/api/query`), so a chart that runs to "now" ends where the server's window
+does. `shape` names a layout of the kind, such as a gauge's dial or bars.
+`PanelView` keys the chart by it, so switching layouts remounts the chart.
+Data updates never change it, so they still merge (invariant 11). It is kept
 apart because `src/lib/ir.ts` imports the registry, and the server and the
 prompt must not pull React in with it. The renderer map is typed as
 `Record<VizType, PanelRenderer>`, so a kind registered without a renderer does

@@ -15,8 +15,9 @@ import { OPAQUE_MESSAGE } from "@/lib/errors";
 import { TimeRangeError } from "@/lib/time";
 import { QueryExecutionError } from "@/lib/timescaledb/client";
 import { createLogger, setLogger } from "@/lib/log";
-import type { Dashboard, Panel } from "@/lib/ir";
+import type { Dashboard, QueryPanel } from "@/lib/ir";
 import type { SourceRecord } from "@/lib/registry";
+import { asQueryPanel } from "./support/panels";
 
 function spec(overrides: Partial<Dashboard> = {}): Dashboard {
   return {
@@ -168,7 +169,7 @@ test("makePanelExecutor emits tombstone for a cross-workspace source (never exec
 
   // Replace executePlan to detect if a query slips through.
   // (The workspace check must fire before executePlan is ever called.)
-  const panel: Panel = {
+  const panel: QueryPanel = {
     id: "p-cross",
     title: "Cross-workspace panel",
     viz: "line",
@@ -228,7 +229,7 @@ test("makePanelExecutor allows execution when source workspace matches dashboard
 
   const executor = makePanelExecutor(async () => matchingSource);
 
-  const panel: Panel = {
+  const panel: QueryPanel = {
     id: "p-same",
     title: "Same-workspace panel",
     viz: "line",
@@ -325,7 +326,7 @@ test("a rejected query is reported as the statement it is", async () => {
       }) as unknown as SourceRecord,
   );
   const events = await executor(
-    spec().panels[0],
+    asQueryPanel(spec().panels[0]),
     { from: new Date(0), to: new Date(1) },
     "w1",
     {},
