@@ -126,7 +126,9 @@ updates:
       prefix: chore
       include: scope
 
-  # The actions in .github/workflows/.
+  # The actions in .github/workflows/. Each is pinned to a commit SHA with
+  # its version in a trailing `# vX.Y.Z` comment (test/workflow-pins.test.ts
+  # holds that); Dependabot updates the SHA and the comment together.
   - package-ecosystem: github-actions
     directory: /
     schedule:
