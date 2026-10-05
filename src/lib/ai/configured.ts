@@ -10,8 +10,10 @@ import type { Environment } from "@/lib/config";
  * hand to a browser.
  */
 export function aiConfigProblem(env: Environment = process.env): string | null {
-  if (!env.AI_MODEL) return "AI_MODEL";
   const provider = env.AI_PROVIDER || "openai-compatible";
+  // The recorded model (#88) needs neither a model id nor a key.
+  if (provider === "stub") return null;
+  if (!env.AI_MODEL) return "AI_MODEL";
   if (provider === "gateway") return env.AI_GATEWAY_API_KEY ? null : "AI_GATEWAY_API_KEY";
   if (provider === "openai-compatible")
     return env.OPENAI_API_KEY ? null : "OPENAI_API_KEY";

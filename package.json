@@ -22,7 +22,9 @@
     "seed": "tsx scripts/seed.ts",
     "self-metrics": "tsx scripts/self-metrics.ts",
     "smoke": "tsx scripts/smoke.ts",
-    "fixture:capture": "tsx scripts/capture-spec-fixture.ts"
+    "fixture:capture": "tsx scripts/capture-spec-fixture.ts",
+    "e2e": "tsx e2e/prepare.ts && playwright test -c e2e",
+    "e2e:down": "docker compose -f e2e/compose.yml down --volumes"
   },
   "dependencies": {
     "@ai-sdk/openai": "4.0.11",
@@ -52,7 +54,9 @@
     "zod": "4.4.3"
   },
   "devDependencies": {
+    "@axe-core/playwright": "4.13.0",
     "@biomejs/biome": "2.5.14",
+    "@playwright/test": "1.63.0",
     "@tailwindcss/postcss": "4.3.2",
     "@testcontainers/postgresql": "12.2.0",
     "@types/jsdom": "30.0.0",

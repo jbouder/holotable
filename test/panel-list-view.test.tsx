@@ -138,3 +138,23 @@ test("the drag handle is not announced — it duplicates the menu", async () => 
   }
   harness.unmount();
 });
+
+test("Delete or Backspace on a row's select button deletes that panel (#77)", async () => {
+  const { harness, calls } = await render();
+  const select = (title: string) => {
+    const el = [...harness.container.querySelectorAll("li button")].find((b) =>
+      b.textContent?.startsWith(title),
+    );
+    assert.ok(el, title);
+    return el;
+  };
+  harness.key(select("Errors"), "Delete");
+  harness.key(select("Requests"), "Backspace");
+  // The row may leave first (animateOut) before the delete is dispatched.
+  await new Promise((r) => setTimeout(r, 400));
+  assert.deepEqual(
+    calls.filter((c) => c.startsWith("delete:")),
+    ["delete:b", "delete:a"],
+  );
+  harness.unmount();
+});

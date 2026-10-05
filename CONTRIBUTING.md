@@ -129,6 +129,19 @@ Docker; without it the run is skipped with a message (and fails under `CI`).
 `MIGRATE_TEST_DATABASE_URL` points it at an existing scratch database instead.
 In `npm test` those tests skip themselves.
 
+`npm run e2e` runs the Playwright suite in `e2e/`: the core journey (register
+a source, generate, save, watch rows arrive over SSE, pause, resume, edit,
+save a version), Explore, chat, a tombstoned source, a viewer kept out of the
+editor, and axe accessibility scans of every main surface in both themes. It
+brings up `e2e/compose.yml` (TimescaleDB and Keycloak on ports 55433 and 18181,
+away from your dev stack), builds the app and starts it on 3107, and signs in
+through the dev realm as `demo` and `viewer` — there is no test-only login. The
+model is `AI_PROVIDER=stub`, which answers with recorded specs. Needs Docker;
+`E2E_SKIP_BUILD=1` reuses the last build, `npm run e2e:down` removes the
+stack. A failure leaves a trace and a screenshot under `e2e/test-results/`.
+See [Accessibility](docs/src/content/docs/architecture/accessibility.md) for
+what the scans gate on.
+
 A change to the IR is checked against `test/fixtures/specs/`, stored specs
 that are never edited; see the README there before adding one or changing a
 snapshot under `test/snapshots/`.

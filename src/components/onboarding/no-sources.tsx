@@ -1,7 +1,6 @@
-import Link from "next/link";
 import { Database, ExternalLink } from "lucide-react";
 import { FIRST_DASHBOARD_DOCS_URL, noSourceGuidance } from "@/lib/onboarding";
-import { Button } from "@/components/ui/button";
+import { ButtonLink } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
 
 /**
@@ -35,9 +34,7 @@ export function NoSources({ canManageSources }: { canManageSources: boolean }) {
       }
       action={
         guidance.action ? (
-          <Link href={guidance.action.href}>
-            <Button>{guidance.action.label}</Button>
-          </Link>
+          <ButtonLink href={guidance.action.href}>{guidance.action.label}</ButtonLink>
         ) : undefined
       }
     />

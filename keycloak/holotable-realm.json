@@ -16,9 +16,11 @@
       "directAccessGrantsEnabled": true,
       "redirectUris": [
         "http://localhost:3000/api/auth/callback",
-        "http://localhost:3000/*"
+        "http://localhost:3000/*",
+        "http://localhost:3107/api/auth/callback",
+        "http://localhost:3107/*"
       ],
-      "webOrigins": ["http://localhost:3000"],
+      "webOrigins": ["http://localhost:3000", "http://localhost:3107"],
       "frontchannelLogout": false,
       "attributes": {
         "backchannel.logout.url": "http://host.docker.internal:3000/api/auth/backchannel-logout",
@@ -71,6 +73,18 @@
         { "type": "password", "value": "demo", "temporary": false }
       ],
       "groups": ["/workspaces/demo/source-admin", "/platform-admins"]
+    },
+    {
+      "username": "viewer",
+      "enabled": true,
+      "emailVerified": true,
+      "email": "viewer@example.com",
+      "firstName": "Read",
+      "lastName": "Only",
+      "credentials": [
+        { "type": "password", "value": "viewer", "temporary": false }
+      ],
+      "groups": ["/workspaces/demo/viewer"]
     }
   ]
 }

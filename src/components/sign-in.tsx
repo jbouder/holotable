@@ -1,5 +1,5 @@
 import { LayoutDashboard, LogIn } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { buttonClassName } from "@/components/ui/button-styles";
 import { Card, CardContent } from "@/components/ui/card";
 import { config } from "@/lib/config";
 import { ResumeSession } from "@/components/resume-session";
@@ -37,10 +37,16 @@ export function SignIn() {
           </div>
 
           <div className="space-y-4">
-            <a href="/api/auth/login" className="block">
-              <Button className="w-full">
-                <LogIn className="h-4 w-4" /> {demo ? "Enter the demo" : "Sign in"}
-              </Button>
+            {/*
+              A plain link, not `next/link`: this starts the OIDC redirect and
+              must be a full navigation, never a client-side one or a
+              prefetch. Styled as a button, not wrapping one (#77).
+            */}
+            <a
+              href="/api/auth/login"
+              className={buttonClassName({ className: "w-full" })}
+            >
+              <LogIn className="h-4 w-4" /> {demo ? "Enter the demo" : "Sign in"}
             </a>
             {!demo && <ResumeSession />}
             <p className="text-center text-xs text-muted">

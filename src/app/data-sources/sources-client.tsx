@@ -381,6 +381,7 @@ export function SourcesClient({
                       }}
                     >
                       <ListTree className="h-4 w-4" /> Catalog
+                      <span className="sr-only"> of {source.name}</span>
                     </Button>
                     {source.record && (
                       <>
@@ -391,6 +392,7 @@ export function SourcesClient({
                           onClick={() => test(source.id)}
                         >
                           <Plug className="h-4 w-4" /> Test
+                          <span className="sr-only"> {source.name}</span>
                         </Button>
                         <Button
                           variant="ghost"
@@ -402,6 +404,7 @@ export function SourcesClient({
                           }}
                         >
                           <RefreshCw className="h-4 w-4" /> Refresh
+                          <span className="sr-only"> {source.name}</span>
                         </Button>
                         <Button
                           variant="ghost"
@@ -413,11 +416,16 @@ export function SourcesClient({
                           }}
                         >
                           <Pencil className="h-4 w-4" /> Edit
+                          <span className="sr-only"> {source.name}</span>
                         </Button>
                         <Button
                           variant="ghost"
                           size="sm"
                           disabled={busy === source.id}
+                          // Icon-only, so the name is the only thing a screen
+                          // reader has; it says which source (#77).
+                          aria-label={`Delete ${source.name}`}
+                          title={`Delete ${source.name}`}
                           onClick={() => {
                             setNotice(null);
                             setConfirmingDelete(source.id);

@@ -217,6 +217,57 @@ jobs:
       - name: Integration tests
         run: npm run test:integration
 
+  e2e:
+    name: End-to-end and accessibility
+    # Builds the app itself (Playwright's webServer runs `next build`), so it
+    # waits for the cheaper jobs rather than spending a stack bring-up on a
+    # type error. Not a required check yet: a browser suite earns that after
+    # it has been quiet on main for a while.
+    needs: [test, build]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: package-lock.json
+
+      - name: Install
+        run: npm ci
+
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+
+      # e2e/prepare.ts brings up e2e/compose.yml (TimescaleDB and Keycloak
+      # with the dev realm) and migrates; Playwright then starts the seeder
+      # and the production build, signs in through the realm, and runs the
+      # journey (#88) and the axe scans in both themes (#91). The model is
+      # the recorded stub, so nothing here calls a provider.
+      - name: End-to-end
+        run: npm run e2e
+        env:
+          NEXT_TELEMETRY_DISABLED: 1
+
+      - name: Traces, screenshots and the report
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright
+          path: |
+            e2e/test-results/
+            e2e/playwright-report/
+          retention-days: 14
+
+      - name: Logs
+        if: failure()
+        run: docker compose -f e2e/compose.yml logs --no-color --tail 200
+
+      - name: Tear down
+        if: always()
+        run: npm run e2e:down
+
   helm:
     name: Helm chart
     runs-on: ubuntu-latest

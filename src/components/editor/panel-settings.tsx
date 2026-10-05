@@ -128,6 +128,7 @@ export function PanelTimingFields({
         />
         {refresh !== undefined && (
           <Select
+            aria-label="Refresh interval"
             value={String(refresh)}
             onValueChange={(v) =>
               onChange((p) => ({ ...p, refreshIntervalMs: Number(v) }), {
@@ -571,6 +572,7 @@ function ThresholdsField({ panel, onChange }: { panel: Panel; onChange: OnChange
             }
           />
           <Select
+            aria-label={`Step ${i + 1} color`}
             className="min-w-32"
             value={row.color}
             onValueChange={(color) =>
@@ -749,12 +751,14 @@ function TableFields({ panel, onChange }: { panel: Panel; onChange: OnChange }) 
           </div>
           <div className="flex flex-wrap items-center gap-2">
             <Select
+              aria-label={`Column ${i + 1} format`}
               className="min-w-32"
               value={row.format}
               onValueChange={(format) => edit(i, { format }, "change column format")}
               options={FORMAT_OPTIONS}
             />
             <Select
+              aria-label={`Column ${i + 1} alignment`}
               className="min-w-32"
               value={row.align}
               onValueChange={(align) => edit(i, { align }, "change column alignment")}

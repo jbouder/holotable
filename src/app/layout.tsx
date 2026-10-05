@@ -102,12 +102,29 @@ export default async function RootLayout({
           </TimeDisplayProvider>
         ) : (
           <TimeDisplayProvider value={timeDisplay}>
+            {/*
+              The first stop for a keyboard (#77): past the navigation, straight
+              to the page. Visible only while it has focus. `main` takes focus
+              from it (tabIndex -1) so the next Tab continues from there.
+            */}
+            <a
+              href="#main"
+              className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-3 focus:z-50 focus:bg-surface focus:px-3 focus:py-2 focus:text-sm focus:outline-2 focus:outline-primary"
+            >
+              Skip to content
+            </a>
             <NavBar account={account} />
             {config.authMode === "demo" && <DemoBanner />}
             {sessionExpiresAt !== null && (
               <SessionKeepalive expiresAt={sessionExpiresAt} />
             )}
-            <main className="flex-1 px-4 py-6 sm:px-6">{children}</main>
+            <main
+              id="main"
+              tabIndex={-1}
+              className="flex-1 px-4 py-6 outline-none sm:px-6"
+            >
+              {children}
+            </main>
             {signedIn && <CommandPalette />}
           </TimeDisplayProvider>
         )}

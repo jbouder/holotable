@@ -9,6 +9,8 @@ test("a configured model is no problem", () => {
     null,
   );
   assert.equal(aiUnavailable({ AI_MODEL: "m", OPENAI_API_KEY: "k" }), null);
+  // The recorded model (#88) has no model id or key to be missing.
+  assert.equal(aiConfigProblem({ AI_PROVIDER: "stub" }), null);
 });
 
 test("the missing variable is named, never a value", () => {

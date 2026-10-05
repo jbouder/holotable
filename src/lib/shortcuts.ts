@@ -136,6 +136,13 @@ export const FIELD_SHORTCUTS = [
     description: "Resize the focused panel",
   },
   {
+    id: "panel-delete",
+    key: "Delete",
+    keysLabel: "Delete / Backspace",
+    group: "Layout grid",
+    description: "Remove the focused panel (in the grid or the panel list)",
+  },
+  {
     id: "palette-move",
     key: "ArrowDown",
     keysLabel: "↑ ↓",
@@ -149,6 +156,14 @@ export const FIELD_SHORTCUTS = [
     description: "Run the highlighted command",
   },
 ] as const satisfies readonly Shortcut[];
+
+/**
+ * Delete or Backspace, on a focused panel tile or panel list row (#77). Both
+ * keys, because a Mac keyboard's "delete" is Backspace.
+ */
+export function isPanelDeleteKey(key: string): boolean {
+  return key === "Delete" || key === "Backspace";
+}
 
 export const SHORTCUT_SECTIONS: readonly ShortcutSection[] = [
   {

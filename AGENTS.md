@@ -310,6 +310,12 @@ This app uses a dark monitoring-dashboard aesthetic with tokens defined in
 
 - Use **Tailwind CSS v4** utilities and existing theme tokens.
 - Reuse the CSS variables/tokens already defined in `globals.css`.
+- Every text/background token pairing meets WCAG AA in both themes;
+  `test/contrast.test.ts` measures them (`src/lib/color/contrast.ts`) and the
+  table in `docs/src/content/docs/architecture/accessibility.md`. A new
+  pairing goes in `CONTRAST_PAIRS`. A chart goes through `AccessibleChart`,
+  a link styled as a button is `ButtonLink` (never `<Link><Button>`), and an
+  icon-only control has an `aria-label`. `npm run e2e` scans with axe.
 - Prefer existing composition helpers like `cn()` from `src/lib/utils.ts`.
 - Reuse existing UI primitives in `src/components/ui/` before adding new ones.
 - Keep styling consistent with current surfaces, borders, muted text, and
@@ -488,6 +494,7 @@ npm run typecheck  # next typegen && tsc --noEmit
 npm test           # node --test via tsx
 npm run test:fuzz  # property-based SQL guard suite alone (FUZZ_RUNS, FUZZ_SEED)
 npm run test:integration # real-server suites against TimescaleDB (Testcontainers, or MIGRATE_TEST_DATABASE_URL)
+npm run e2e        # Playwright journey + axe scans (e2e/; Docker; AI_PROVIDER=stub; realm sign-in)
 npm run fixture:capture  # add a stored dashboard spec to the IR fixture library
 npm run config:check # validate the environment as the server does at startup (exit 1 = would not boot)
 npm run migrate    # apply Postgres migrations (--check, --dry-run, --down)

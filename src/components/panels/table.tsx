@@ -17,7 +17,14 @@ const ALIGN = { left: "text-left", center: "text-center", right: "text-right" } 
 export function TableView({ panel, data }: PanelBodyProps) {
   const { columns, rows } = tableView(panel, data);
   return (
-    <div className="max-h-full overflow-auto">
+    // Focusable, so a keyboard can scroll a table that overflows its panel;
+    // named, so what took focus is announced (#77).
+    <section
+      aria-label={`${panel.title}, table`}
+      // biome-ignore lint/a11y/noNoninteractiveTabindex: a scroll container must be focusable to scroll by keyboard (WCAG 2.1.1)
+      tabIndex={0}
+      className="max-h-full overflow-auto focus-visible:outline-2 focus-visible:outline-primary"
+    >
       <table className="w-max min-w-full text-left text-sm">
         <thead className="sticky top-0 z-10 bg-surface-2 text-muted">
           <tr>
@@ -58,6 +65,6 @@ export function TableView({ panel, data }: PanelBodyProps) {
           ))}
         </tbody>
       </table>
-    </div>
+    </section>
   );
 }

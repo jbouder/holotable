@@ -58,6 +58,9 @@ test("a panel that is not expanded is a card in the grid, not an overlay", async
   assert.ok(card, "expected a card");
   assert.equal(h.container.children.length, 1);
   assert.ok(!card.className.includes("fixed"), card.className);
-  assert.equal(card.getAttribute("role"), null);
+  // A named region in the page (#77), not a dialog.
+  assert.equal(card.getAttribute("role"), "region");
+  assert.equal(card.getAttribute("aria-label"), panel().title);
+  assert.equal(card.getAttribute("aria-modal"), null);
   h.unmount();
 });

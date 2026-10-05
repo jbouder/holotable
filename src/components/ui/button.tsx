@@ -1,25 +1,9 @@
 "use client";
 
 import * as React from "react";
+import Link from "next/link";
 import { Button as BaseButton } from "@base-ui/react/button";
-import { cn } from "@/lib/utils";
-
-type Variant = "primary" | "secondary" | "ghost" | "danger";
-type Size = "sm" | "md" | "icon";
-
-const VARIANTS: Record<Variant, string> = {
-  primary: "bg-primary text-primary-foreground hover:opacity-90 disabled:opacity-50",
-  secondary:
-    "bg-surface-2 text-foreground hover:bg-surface border border-border disabled:opacity-50",
-  ghost: "bg-transparent text-foreground hover:bg-surface-2 disabled:opacity-50",
-  danger: "bg-danger text-primary-foreground hover:opacity-90 disabled:opacity-50",
-};
-
-const SIZES: Record<Size, string> = {
-  sm: "h-8 px-3 text-sm",
-  md: "h-10 px-4 text-sm",
-  icon: "h-9 w-9 p-0",
-};
+import { buttonClassName, type Size, type Variant } from "@/components/ui/button-styles";
 
 export interface ButtonProps extends React.ComponentPropsWithoutRef<typeof BaseButton> {
   variant?: Variant;
@@ -36,23 +20,43 @@ export const Button = React.forwardRef<HTMLElement, ButtonProps>(
   ({ className, variant = "primary", size = "md", collapse = false, ...props }, ref) => (
     <BaseButton
       ref={ref}
-      className={cn(
-        // `tap-target` is the coarse-pointer minimum (#78): on a touch screen
-        // every button grows to 44px in both directions, and on a mouse-driven
-        // screen the compact sizes below are left exactly as they were.
-        // `press` is the shared transition and the 4% dip on `:active` (#234);
-        // it keys off `<html data-motion>` like every other motion rule.
-        "tap-target press inline-flex items-center justify-center gap-2 font-medium cursor-pointer disabled:cursor-not-allowed focus-visible:outline-2 focus-visible:outline-primary",
-        VARIANTS[variant],
-        SIZES[size],
-        collapse && "max-sm:aspect-square max-sm:px-0",
-        className,
-      )}
+      className={
+        // Base UI also takes a function of the button's state.
+        typeof className === "function"
+          ? (state) =>
+              buttonClassName({ variant, size, collapse, className: className(state) })
+          : buttonClassName({ variant, size, collapse, className })
+      }
       {...props}
     />
   ),
 );
 Button.displayName = "Button";
+
+/**
+ * A link that looks like a button (#77). A `<Button>` inside a `<Link>` is two
+ * tab stops for one action and a button nested in a link, which assistive
+ * technology announces as both; this is one element, announced as the link it
+ * is.
+ */
+export function ButtonLink({
+  variant,
+  size,
+  collapse,
+  className,
+  ...props
+}: React.ComponentProps<typeof Link> & {
+  variant?: Variant;
+  size?: Size;
+  collapse?: boolean;
+}) {
+  return (
+    <Link
+      className={buttonClassName({ variant, size, collapse, className })}
+      {...props}
+    />
+  );
+}
 
 /**
  * A button's text, hidden visually below `sm` but kept for assistive

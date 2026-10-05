@@ -11,6 +11,7 @@ import {
   sameLayouts,
   snapDelta,
 } from "@/lib/grid-layout";
+import { isPanelDeleteKey } from "@/lib/shortcuts";
 import { cn } from "@/lib/utils";
 
 /**
@@ -52,11 +53,14 @@ export function PanelLayoutGrid({
   selectedId,
   onSelect,
   onChange,
+  onDelete,
 }: {
   panels: Panel[];
   selectedId?: string | null;
   onSelect?: (id: string) => void;
   onChange: (panels: Panel[]) => void;
+  /** Delete or Backspace on a focused tile (#77). Absent, the keys do nothing. */
+  onDelete?: (id: string) => void;
 }) {
   const container = React.useRef<HTMLDivElement>(null);
   const [drag, setDrag] = React.useState<Drag | null>(null);
@@ -106,12 +110,21 @@ export function PanelLayoutGrid({
     setPreview(null);
   }
 
-  /** Arrow keys move the panel; with Shift (or from the handle) they resize it. */
+  /**
+   * Arrow keys move the panel; with Shift (or from the handle) they resize it.
+   * Delete removes it, through the editor's own delete, which asks first when
+   * there is work to lose and is one step to undo.
+   */
   function nudge(
     e: React.KeyboardEvent<HTMLButtonElement>,
     panel: Panel,
     mode: DragMode,
   ) {
+    if (isPanelDeleteKey(e.key) && mode === "move" && onDelete) {
+      e.preventDefault();
+      onDelete(panel.id);
+      return;
+    }
     const step = NUDGE[e.key];
     if (!step) return;
     e.preventDefault();
@@ -154,7 +167,7 @@ export function PanelLayoutGrid({
               <div className="relative h-full">
                 <button
                   type="button"
-                  aria-label={`${panel.title}, column ${x + 1}, row ${y + 1}, ${w} of 12 wide, ${h} rows tall. Arrow keys move, shift and arrow keys resize.`}
+                  aria-label={`${panel.title}, column ${x + 1}, row ${y + 1}, ${w} of 12 wide, ${h} rows tall. Arrow keys move, shift and arrow keys resize${onDelete ? ", Delete removes" : ""}.`}
                   onPointerDown={(e) => begin(e, panel, "move")}
                   onPointerMove={track}
                   onPointerUp={(e) => end(e, true)}

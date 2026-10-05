@@ -1,4 +1,4 @@
-import { type PanelData, toNumber } from "@/components/charts/options";
+import { asInstant, type PanelData, toNumber, toText } from "@/components/charts/options";
 import { formatValue } from "@/lib/format";
 import type { Panel } from "@/lib/ir";
 import type { ColorToken } from "@/lib/panels/colors";
@@ -10,6 +10,7 @@ import {
   TableOptions,
 } from "@/lib/panels/presentation";
 import { thresholdColor } from "@/lib/panels/thresholds";
+import { formatDateTime, LOCAL_TIME_DISPLAY, type TimeDisplay } from "@/lib/time-display";
 
 /**
  * What the HTML-drawn kinds show for a set of rows, worked out apart from
@@ -123,4 +124,57 @@ function compareCells(a: unknown, b: unknown, sign: number): number {
   const y = toNumber(b);
   if (Number.isFinite(x) && Number.isFinite(y)) return (x - y) * sign;
   return String(a).localeCompare(String(b)) * sign;
+}
+
+/** The most rows a chart's screen-reader table carries: the newest ones. */
+export const CHART_TABLE_ROWS_MAX = 50;
+
+export interface ChartTable {
+  /** Says what the table is, how many rows it holds and of how many. */
+  caption: string;
+  columns: string[];
+  /** Every cell already written as text. */
+  rows: string[][];
+}
+
+/**
+ * The rows behind a canvas chart, as a table a screen reader can walk (#77).
+ *
+ * A canvas is opaque to assistive technology, so every chart panel renders
+ * this beside it, visually hidden. It is the result as it came, newest
+ * {@link CHART_TABLE_ROWS_MAX} rows, with timestamps on the reader's clock and
+ * values in the panel's format — what the chart shows, not a re-query.
+ */
+export function chartTable(
+  panel: Panel,
+  data: PanelData,
+  display: TimeDisplay = LOCAL_TIME_DISPLAY,
+): ChartTable {
+  const rows = data.rows.slice(-CHART_TABLE_ROWS_MAX);
+  const timeField = panel.query?.timeField;
+  const cell = (column: string, value: unknown): string => {
+    const instant = column === timeField ? asInstant(value) : null;
+    if (instant) return formatDateTime(instant, display, { seconds: true });
+    if (column !== timeField && typeof value === "number") {
+      return formatValue(value, panel.format);
+    }
+    return toText(value);
+  };
+  const shown =
+    rows.length === data.rows.length
+      ? `${rows.length} ${rows.length === 1 ? "row" : "rows"}`
+      : `the newest ${rows.length} of ${data.rows.length} rows`;
+  return {
+    caption: `Data for ${panel.title}: ${shown}.`,
+    columns: data.columns,
+    rows: rows.map((r) => data.columns.map((c) => cell(c, r[c]))),
+  };
+}
+
+/** A chart's accessible name: its title and its kind, never a value. */
+export function chartDescription(panel: Panel, rows: number): string {
+  const kind = panel.viz.replace(/-/g, " ");
+  return rows === 0
+    ? `${panel.title}, ${kind} chart, no data yet.`
+    : `${panel.title}, ${kind} chart. The data is in the table that follows.`;
 }

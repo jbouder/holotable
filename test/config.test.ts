@@ -195,8 +195,49 @@ test("an unknown AI_PROVIDER is an error in every environment", () => {
     );
     const e = errors(problems);
     assert.deepEqual(variables(e), ["AI_PROVIDER"]);
-    assert.match(e[0].message, /"gateway" or "openai-compatible"/);
+    assert.match(e[0].message, /"gateway", "openai-compatible" or "stub"/);
   }
+});
+
+// The recorded model (#88): needs no model id or key, and is refused in
+// production unless the operator says, separately, that this is the e2e suite.
+const STUB: Environment = {
+  ...VALID_PRODUCTION,
+  AI_PROVIDER: "stub",
+  AI_MODEL: undefined,
+  OPENAI_API_KEY: undefined,
+};
+
+test("AI_PROVIDER=stub is refused in production without AI_STUB_IN_PRODUCTION", () => {
+  const e = errors(validateConfig(STUB, { production: true }));
+  assert.deepEqual(variables(e), ["AI_PROVIDER"]);
+  assert.match(e[0].message, /AI_STUB_IN_PRODUCTION=true/);
+});
+
+test("AI_PROVIDER=stub boots in production once AI_STUB_IN_PRODUCTION is true, with a warning", () => {
+  const problems = validateConfig(
+    { ...STUB, AI_STUB_IN_PRODUCTION: "true" },
+    { production: true },
+  );
+  assert.deepEqual(errors(problems), []);
+  assert.deepEqual(variables(warnings(problems)), ["AI_PROVIDER"]);
+});
+
+test("AI_PROVIDER=stub in development needs no model id or key", () => {
+  const problems = validateConfig(STUB, { production: false });
+  assert.deepEqual(errors(problems), []);
+  assert.ok(!variables(problems).includes("AI_MODEL"));
+  assert.ok(!variables(problems).includes("OPENAI_API_KEY"));
+});
+
+test("AI_STUB_IN_PRODUCTION must be a boolean literal", () => {
+  const e = errors(
+    validateConfig(
+      { ...VALID_PRODUCTION, AI_STUB_IN_PRODUCTION: "yes" },
+      { production: true },
+    ),
+  );
+  assert.deepEqual(variables(e), ["AI_STUB_IN_PRODUCTION"]);
 });
 
 test("production: the OIDC client must be configured completely", () => {

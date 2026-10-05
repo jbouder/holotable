@@ -13,7 +13,7 @@ import { LiveDashboard } from "@/components/dashboard/LiveDashboard";
 import { DashboardChat } from "@/components/dashboard/DashboardChat";
 import { DashboardActionsMenu } from "@/components/dashboard/dashboard-actions-menu";
 import { RecordDashboardVisit } from "@/components/dashboard/RecordDashboardVisit";
-import { Button, ButtonLabel } from "@/components/ui/button";
+import { ButtonLabel, ButtonLink } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
 import { dashboardListHref, EMPTY_QUERY } from "@/lib/dashboard-list";
 import { chatSuggestions } from "@/lib/chat-history";
@@ -105,9 +105,9 @@ export default async function DashboardViewPage({
             }
             action={
               canEdit ? (
-                <Link key="edit" href={`/dashboards/${id}/edit`}>
-                  <Button>Add a panel</Button>
-                </Link>
+                <ButtonLink key="edit" href={`/dashboards/${id}/edit`}>
+                  Add a panel
+                </ButtonLink>
               ) : undefined
             }
           />
@@ -157,17 +157,17 @@ export default async function DashboardViewPage({
         actions={
           <>
             {canEdit && (
-              <Link key="edit" href={`/dashboards/${id}/edit`}>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  collapse
-                  title="Edit"
-                  className="text-muted hover:text-foreground"
-                >
-                  <Pencil className="h-4 w-4" /> <ButtonLabel>Edit</ButtonLabel>
-                </Button>
-              </Link>
+              <ButtonLink
+                key="edit"
+                href={`/dashboards/${id}/edit`}
+                variant="ghost"
+                size="sm"
+                collapse
+                title="Edit"
+                className="text-muted hover:text-foreground"
+              >
+                <Pencil className="h-4 w-4" /> <ButtonLabel>Edit</ButtonLabel>
+              </ButtonLink>
             )}
             <DashboardActionsMenu
               key="more"

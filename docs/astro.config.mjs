@@ -68,6 +68,7 @@ export default defineConfig({
             { label: "Scaling and the poller", slug: "architecture/scaling" },
             { label: "Data model", slug: "architecture/data-model" },
             { label: "Motion", slug: "architecture/motion" },
+            { label: "Accessibility", slug: "architecture/accessibility" },
           ],
         },
         {

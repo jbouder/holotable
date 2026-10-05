@@ -19,7 +19,7 @@ import { Select } from "@/components/ui/select";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { PageHeader } from "@/components/ui/page-header";
-import { EChart } from "@/components/charts/EChart";
+import { AccessibleChart } from "@/components/charts/AccessibleChart";
 import type { PanelData } from "@/components/charts/options";
 import { panelRenderer } from "@/components/panels/registry";
 import { useTimeDisplay } from "@/components/time-display";
@@ -437,7 +437,11 @@ function ResultBody({
   if (renderer.type === "chart") {
     return (
       <div className="h-96 border border-border bg-surface p-2">
-        <EChart option={renderer.option(panel, data, { display, window: data.window })} />
+        <AccessibleChart
+          panel={panel}
+          data={data}
+          option={renderer.option(panel, data, { display, window: data.window })}
+        />
       </div>
     );
   }
@@ -468,7 +472,12 @@ function ResultTable({ panel, data }: { panel: QueryPanel; data: PanelData }) {
   const rows = data.rows.slice(0, MAX_TABLE_ROWS);
   return (
     <div className="space-y-2">
-      <div className="max-h-[32rem] overflow-auto border border-border">
+      <section
+        aria-label={`${panel.title}, table`}
+        // biome-ignore lint/a11y/noNoninteractiveTabindex: a scroll container must be focusable to scroll by keyboard (WCAG 2.1.1)
+        tabIndex={0}
+        className="max-h-[32rem] overflow-auto border border-border focus-visible:outline-2 focus-visible:outline-primary"
+      >
         <table className="w-full text-left text-sm">
           <thead className="sticky top-0 bg-surface-2 text-muted">
             <tr>
@@ -497,7 +506,7 @@ function ResultTable({ panel, data }: { panel: QueryPanel; data: PanelData }) {
             ))}
           </tbody>
         </table>
-      </div>
+      </section>
       {data.rows.length > MAX_TABLE_ROWS && (
         <p className="text-xs text-muted">
           Showing first {MAX_TABLE_ROWS} of {data.rows.length} rows.

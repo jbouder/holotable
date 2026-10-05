@@ -29,7 +29,7 @@ import { FlipGroup } from "@/components/flip-group";
 import { DashboardListControls } from "@/components/dashboard/DashboardListControls";
 import { RecentDashboards } from "@/components/dashboard/RecentDashboards";
 import { ImportDashboard } from "./import-dashboard";
-import { Button, ButtonLabel } from "@/components/ui/button";
+import { ButtonLabel, ButtonLink } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
 import { PageHeader } from "@/components/ui/page-header";
 
@@ -153,12 +153,9 @@ export default async function DashboardsPage({
         canCreate && (
           <>
             <ImportDashboard targets={importTargets} />
-            <Link href="/dashboards/new">
-              <Button collapse title="Create New Dashboard">
-                <Plus className="h-4 w-4" />{" "}
-                <ButtonLabel>Create New Dashboard</ButtonLabel>
-              </Button>
-            </Link>
+            <ButtonLink href="/dashboards/new" collapse title="Create New Dashboard">
+              <Plus className="h-4 w-4" /> <ButtonLabel>Create New Dashboard</ButtonLabel>
+            </ButtonLink>
           </>
         )
       }
@@ -228,14 +225,15 @@ export default async function DashboardsPage({
                       : "No dashboard in your workspaces matches this search and these tags."
                   }
                   action={
-                    <Link
+                    <ButtonLink
                       href={dashboardListHref(
                         { ...query, search: "", tags: [], favorites: false, page: 1 },
                         listDefaults,
                       )}
+                      variant="secondary"
                     >
-                      <Button variant="secondary">Clear filters</Button>
-                    </Link>
+                      Clear filters
+                    </ButtonLink>
                   }
                 />
               ) : (

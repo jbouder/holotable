@@ -5,7 +5,8 @@ import { Clock, Info } from "lucide-react";
 import { hasQuery, type Panel, type TimeRange } from "@/lib/ir";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ErrorDisplay } from "@/components/ui/error-display";
-import { EChart, type EChartHandle } from "@/components/charts/EChart";
+import type { EChartHandle } from "@/components/charts/EChart";
+import { AccessibleChart } from "@/components/charts/AccessibleChart";
 import { PanelSqlDialog } from "@/components/dashboard/PanelSqlDialog";
 import { PanelActions } from "@/components/dashboard/PanelActions";
 import { LoadingLabel, PanelSkeleton } from "@/components/dashboard/PanelSkeleton";
@@ -126,9 +127,13 @@ export function PanelView({
       <Card
         ref={expansion.ref}
         tabIndex={expansion.expanded ? -1 : undefined}
-        role={expansion.expanded ? "dialog" : undefined}
+        // A named region per panel, so a screen reader's landmark list is
+        // the dashboard's table of contents (#77); a dialog while fullscreen.
+        role={expansion.expanded ? "dialog" : "region"}
         aria-modal={expansion.expanded ? true : undefined}
-        aria-label={expansion.expanded ? `${panel.title}, fullscreen` : undefined}
+        aria-label={expansion.expanded ? `${panel.title}, fullscreen` : panel.title}
+        data-panel-id={panel.id}
+        data-status={status}
         onKeyDown={expansion.onKeyDown}
         className={cn(
           "flex h-full flex-col transition-opacity duration-(--duration-base) ease-standard",
@@ -387,7 +392,9 @@ function PanelContent({
     return <renderer.Body panel={panel} data={data} />;
   }
   return (
-    <EChart
+    <AccessibleChart
+      panel={panel}
+      data={data}
       // A new layout of the same kind (a gauge's dial to bars) is a new chart;
       // a data update never changes this, so it still merges (invariant 11).
       key={`${panel.viz}:${renderer.shape?.(panel) ?? ""}`}
