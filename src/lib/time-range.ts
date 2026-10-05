@@ -154,11 +154,14 @@ export function shiftRange(
   const span = resolved.to.getTime() - resolved.from.getTime();
   const delta = span * multiple;
   const to = new Date(resolved.to.getTime() + delta);
-  // The tolerance is the second that `isoExpr` truncates: a window shifted back
-  // off `now` and then forward again lands up to 999ms short of it, and without
-  // this the forward arrow would leave a "fixed range" badge on what is plainly
-  // the live window.
-  if (to.getTime() + MIN_SPAN_MS > now.getTime()) {
+  // A window shifted back off `now` and then forward again lands short of it:
+  // by the up-to-999ms `isoExpr` truncates, and by however long the reader
+  // looked before pressing forward. Within half a window of `now` is that
+  // window coming back, and anything nearer than a second always is; without
+  // the slack the forward arrow left a "fixed range" badge on what is plainly
+  // the live window, depending on the clock's milliseconds. A window that
+  // stops a whole width short (back two, forward one) is still history.
+  if (to.getTime() + Math.max(MIN_SPAN_MS, span / 2) > now.getTime()) {
     return { from: relativeExpr(span), to: "now" };
   }
   return absoluteRange(new Date(resolved.from.getTime() + delta), to) ?? range;
