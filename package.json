@@ -55,9 +55,9 @@
   },
   "devDependencies": {
     "@axe-core/playwright": "4.13.0",
-    "@biomejs/biome": "2.5.14",
+    "@biomejs/biome": "2.5.15",
     "@playwright/test": "1.63.0",
-    "@tailwindcss/postcss": "4.3.2",
+    "@tailwindcss/postcss": "4.3.3",
     "@testcontainers/postgresql": "12.2.0",
     "@types/jsdom": "30.0.0",
     "@types/node": "^20",
@@ -66,8 +66,8 @@
     "@types/react-dom": "^19",
     "fast-check": "4.10.2",
     "jsdom": "30.1.1",
-    "tailwindcss": "4.3.2",
-    "tsx": "4.23.0",
+    "tailwindcss": "4.3.3",
+    "tsx": "4.23.15",
     "typescript": "^5"
   }
 }
