@@ -291,6 +291,24 @@ test("SSE_REAUTH_INTERVAL_MS is a positive number of milliseconds or unset", () 
   }
 });
 
+test("API_TOKEN_MAX_DAYS is a positive number of days or unset", () => {
+  for (const value of ["1", "90", "365", ""]) {
+    const ok = validateConfig(
+      { ...VALID_PRODUCTION, API_TOKEN_MAX_DAYS: value },
+      { production: true },
+    );
+    assert.deepEqual(errors(ok), [], formatConfigProblems(ok));
+  }
+  // 0 would mint tokens that are expired before they are used.
+  for (const value of ["0", "-1", "90d"]) {
+    const bad = validateConfig(
+      { ...VALID_PRODUCTION, API_TOKEN_MAX_DAYS: value },
+      { production: true },
+    );
+    assert.deepEqual(variables(errors(bad)), ["API_TOKEN_MAX_DAYS"]);
+  }
+});
+
 test("ROW_FILTER_CLAIMS names claims, and never one the session token uses itself", () => {
   for (const value of ["tenant", "tenant org_id", "tenant,https:x/y", ""]) {
     const ok = validateConfig(

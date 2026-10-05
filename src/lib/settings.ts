@@ -18,6 +18,7 @@ export const SETTINGS_SECTION_IDS = [
   "local-data",
   "shortcuts",
   "workspaces",
+  "tokens",
 ] as const;
 
 export type SettingsSectionId = (typeof SETTINGS_SECTION_IDS)[number];
@@ -74,6 +75,13 @@ export const SETTINGS_SECTIONS: readonly SettingsSection[] = [
     label: "Workspaces",
     description: "AI usage and limits for the workspaces you administer.",
     href: "/settings/workspaces",
+    visible: managesAWorkspace,
+  },
+  {
+    id: "tokens",
+    label: "API tokens",
+    description: "Service-account tokens for pipelines and scripts that call the API.",
+    href: "/settings/tokens",
     visible: managesAWorkspace,
   },
 ];

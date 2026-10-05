@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import {
   Building2,
   HardDrive,
+  KeyRound,
   Keyboard,
   type LucideIcon,
   Palette,
@@ -20,6 +21,7 @@ const ICONS: Record<SettingsSectionId, LucideIcon> = {
   "local-data": HardDrive,
   shortcuts: Keyboard,
   workspaces: Building2,
+  tokens: KeyRound,
 };
 
 /**

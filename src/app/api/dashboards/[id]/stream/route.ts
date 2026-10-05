@@ -60,6 +60,11 @@ export const GET = route(
     const shared = shareToken === null ? null : await resolveShare(shareToken, id);
     if (shareToken !== null && !shared) throw new HttpError(404, "dashboard not found");
     const identity = shared ? shared.identity : await requireIdentity();
+    // A service-account token (#288) calls the API; it does not watch. The
+    // stream's guard re-verifies a session, which a token is not.
+    if (identity.serviceAccount) {
+      throw new HttpError(403, "a service-account token cannot open a dashboard stream");
+    }
     // Kept to verify again while the stream is open (#32), and to match a
     // back-channel logout against (#28). Verified by `requireIdentity` above.
     const token = shared ? null : await getSessionToken();

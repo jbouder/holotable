@@ -33,9 +33,9 @@ them: a dashed line for a point in time, a band for a range.
   other (invariant 8). It is widened to cover any panel with a window of its own.
   The open dashboard reads again every minute and whenever the window changes.
 
-A pipeline posting deploy markers needs a token rather than a browser session;
-that is [#288](https://github.com/jbouder/holotable/issues/288), and the write
-route takes one through `can()` without changing here.
+A pipeline posts deploy markers with an editor
+[API token](/operations/api-tokens/) (#288); the write route authorizes it
+through `can()` like anyone else.
 
 ## On a dashboard
 

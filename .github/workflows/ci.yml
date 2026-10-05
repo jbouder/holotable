@@ -200,7 +200,7 @@ jobs:
       # revoked only through their own dashboard.
       # Skipped in the required Test job, which has no database.
       - name: Against a real server
-        run: LOG_LEVEL=silent node --test --import tsx test/migrations.test.ts test/audit.test.ts test/row-filter.test.ts test/source-pool.test.ts test/annotations.test.ts test/share.test.ts
+        run: LOG_LEVEL=silent node --test --import tsx test/migrations.test.ts test/audit.test.ts test/row-filter.test.ts test/source-pool.test.ts test/annotations.test.ts test/share.test.ts test/api-tokens.test.ts
         env:
           MIGRATE_TEST_DATABASE_URL: ${{ env.DATABASE_URL }}
 

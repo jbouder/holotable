@@ -54,6 +54,12 @@ export interface Identity {
    * `dashboard:view` on that dashboard and nothing at all besides.
    */
   share?: Readonly<{ shareId: string; dashboardId: string; workspaceId: string }>;
+  /**
+   * Set only for a service-account API token (#288): which token, for the
+   * audit log and the account summary. Display-only like the profile;
+   * `can()` decides from the token's one workspace role in `workspaces`.
+   */
+  serviceAccount?: Readonly<{ tokenId: string; name: string }>;
 }
 
 /** The display-only part of an {@link Identity}. */

@@ -67,6 +67,8 @@ export const AUDIT_ACTIONS = [
   "annotation.delete",
   "share.create",
   "share.revoke",
+  "token.create",
+  "token.revoke",
 ] as const;
 
 export type AuditAction = (typeof AUDIT_ACTIONS)[number];
