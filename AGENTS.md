@@ -583,10 +583,11 @@ link in the site or in the root markdown files.
 Dependency updates arrive from Dependabot (`.github/dependabot.yml`), grouped
 minor and patch updates weekly and each major on its own. They are reviewed and
 merged by a person like any other pull request; nothing auto-merges. A `next`
-or `react` major is a framework migration, not a version bump. Node majors
-(the `node` base images and `@types/node`) are ignored in `dependabot.yml`:
-moving Node is done by hand, in one pull request that changes both
-Dockerfiles, CI's `node-version` and `@types/node` together.
+or `react` major is a framework migration, not a version bump. Node 25 and later
+(the `node` base images and `@types/node`) are ignored in `dependabot.yml`, so
+only the LTS line up to 24 is proposed; a Node major is taken in one pull
+request that moves both Dockerfiles, CI's `node-version` and `@types/node`
+together.
 
 `CONTRIBUTING.md` says the same things for human contributors, including the
 branch and Conventional Commit conventions and the pull request template's
