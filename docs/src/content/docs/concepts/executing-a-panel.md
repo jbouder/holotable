@@ -81,8 +81,10 @@ of touching the database.
 :::caution[This is the whole security boundary]
 Statement shape and table access are decided from the parse tree. Which
 *functions* may be called is still decided by name against a list, and a list
-can only block what it has been told about. Generative testing of the guard is
-tracked in [#11](https://github.com/jbouder/holotable/issues/11).
+can only block what it has been told about. `test/sql-safety.fuzz.test.ts`
+([#11](https://github.com/jbouder/holotable/issues/11)) generates statements
+from adversarial shapes and holds every accepted one to an independent walk of
+the parse tree; `npm run test:fuzz` runs it on its own.
 :::
 
 ## Checking a query before saving
@@ -172,6 +174,12 @@ LIMIT <maxQueryRows>          -- default 5000
 - `from`/`to` come from `resolveTimeRange` (`src/lib/time.ts`), which turns the
   IR's relative expressions (`now-1h`) into concrete dates. The model never
   supplies a time value; it only named the column.
+- A source with a row filter adds one more bound parameter, the viewer's
+  claim value, spliced in where each table is read rather than on this wrapper
+  ([Row-level filters](/operations/row-level-filters/)). Dashboard variables
+  bind after it, one `$n` per declared name
+  ([Dashboard variables](/concepts/variables/)). Without a `timeField` the
+  wrapper has no `WHERE`, and the numbering starts at `$1`.
 - `timeField` is re-checked against a strict identifier regex before
   interpolation — it is an identifier, so it cannot be a bound parameter.
 - A hard `LIMIT` caps rows regardless of what the query does, and
@@ -209,7 +217,7 @@ it. `POST /api/sql/plan` shows the result, for one panel, without running it:
 
 - the wrapped statement as the server would send it, `LIMIT` and all;
 - the bound parameters, with the relative expression each was resolved from
-  (`$1 = 2026-09-22T11:00:00Z`, resolved from `now-1h`) and labelled as
+  (`$1 = 2026-09-22T11:00:00Z`, resolved from `now-1h`) and labeled as
   server-supplied;
 - the row, time and byte limits in force;
 - the session statements the query runs inside — the read-only transaction and
@@ -218,7 +226,7 @@ it. `POST /api/sql/plan` shows the result, for one panel, without running it:
 It is the same route as `/api/query` with the execution removed: the same
 `validateSql`, `resolveTimeRange`, `buildExecutablePlan` and
 `sessionStatements`. Re-deriving any of them for display would let the
-explanation drift from the behaviour it explains, which is the whole point of
+explanation drift from the behavior it explains, which is the whole point of
 showing it. Nothing connects to the source's database and nothing is written.
 
 A statement the guard refuses is a `400` with the guard's own message. Unlike

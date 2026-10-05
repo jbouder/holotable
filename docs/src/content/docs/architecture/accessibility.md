@@ -111,3 +111,7 @@ read as text on `surface-2` is too light to carry white at AA.
   stop, and the editor keys.
 
 A manual pass with a screen reader is still the maintainer's, per release.
+
+---
+
+*Last verified against the code at commit `4e4c5cf` (2026-10-05).*

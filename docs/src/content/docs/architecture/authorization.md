@@ -34,6 +34,11 @@ paths):
 | Dashboard delete | owner, source-admin, or platform-admin |
 | Source CRUD / test / refresh / column exposure | source-admin |
 | Source use (list for a picker, browse the exposed catalog) | viewer |
+| Annotations (read on a dashboard) | viewer |
+| Annotations (create / delete, `dashboard:update`) | editor |
+| Share links (create / revoke, `dashboard:update`) | editor |
+| Variable options in the editor (`dashboard:generate`) | editor |
+| Service-account API tokens (mint / revoke, `source:manage`) | source-admin |
 | Workspace AI limits (read) | source-admin |
 | Workspace AI limits (change, `workspace:limits`) | platform-admin only; no workspace role grants it |
 
@@ -42,7 +47,8 @@ paths):
 `can(identity, action, ctx)` in `src/lib/auth/authorize.ts` is the only place
 role decisions are made, and the only place the platform-admin bypass applies.
 Every route calls `requireIdentity()` then `assertAuthorized(...)`; nothing
-computes authorization inline.
+computes authorization inline. The actions it decides are `ACTIONS` in the same
+file.
 
 The source is re-resolved and re-authorized on **every** execution, including
 each poller tick — so revoking access to a source stops in-flight dashboards
@@ -58,6 +64,14 @@ verification strategies are selected by environment:
    `OIDC_ISSUER` are configured.
 2. **Locally-signed session tokens** (HS256 via `SESSION_SECRET`): used by the
    OIDC callback to mint a first-party session.
+
+Two credentials are not a person's session and never become one. A
+service-account API token (`Authorization: Bearer ht_…`, #288) resolves to one
+workspace at viewer or editor, and `can()` decides its requests from that role
+exactly as for a person; see [Service-account API tokens](/operations/api-tokens/).
+A share link (#65) may view one dashboard, through the stream and the embed
+page only, and `can()` checks it before anything else, the admin bypass
+included; see [Share links](/operations/share-links/).
 
 Either way, only the validated `sub` and `groups` claims are ever trusted for
 authorization. `name` and `email` are carried into the session as display-only
@@ -174,3 +188,7 @@ its row is gone.
 OIDC is the only way to authenticate; there is no local or development login
 path. Setup for the Keycloak side is in [Keycloak setup](/operations/keycloak/).
 :::
+
+---
+
+*Last verified against the code at commit `00ea858` (2026-10-05).*

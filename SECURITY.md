@@ -6,10 +6,11 @@ sharp edge, so the trust model is written down here rather than left implied.
 
 ## Supported versions
 
-Holotable is pre-1.0. There are no tagged releases or published images yet, so
-there is nothing to back-port to: **only `main` is supported**, and security
-fixes land as commits on `main`. This section will be replaced with a real
-version support table once releases exist.
+Holotable is pre-1.0. Images are published from `main` (`ghcr.io/jbouder/holotable:main`
+and `:quickstart`), but there are no tagged releases yet, so there is nothing
+to back-port to: **only `main` is supported**, and security fixes land as
+commits on `main` and in the next published image. This section will be
+replaced with a real version support table once releases exist.
 
 ## Reporting a vulnerability
 
@@ -24,19 +25,19 @@ What to expect:
 
 | Stage | Target |
 | --- | --- |
-| Acknowledgement that the report was received | 5 business days |
+| Acknowledgment that the report was received | 5 business days |
 | Initial assessment — severity, whether we can reproduce it | 10 business days |
 | Fix or documented mitigation for a confirmed high-severity issue | 90 days |
 
 Holotable is maintained by one person. These are honest targets, not a
-contractual SLA. If you have not heard back within the acknowledgement window,
+contractual SLA. If you have not heard back within the acknowledgment window,
 please assume the notification was missed and ping the thread again.
 
 A useful report includes the version or commit, how Holotable is deployed, what
 you did, what happened, and what you expected instead. A proof of concept is
 welcome but not required.
 
-### Safe harbour
+### Safe harbor
 
 We will not pursue or support legal action against anyone who makes a good
 faith effort to comply with this policy. Good faith means: report promptly,
@@ -97,8 +98,9 @@ id in a request body — it comes from the identity, and the source is re-resolv
 and re-authorized on **every** execution, including each poller tick. Every page
 carries a nonce-based `Content-Security-Policy` (`src/proxy.ts`): no inline
 script runs without the request's nonce, nothing loads from another origin,
-and the page cannot be framed, so a rendering bug in model-authored text stops
-at a console error. See
+and the page cannot be framed (a share link's `/embed/` page only by the
+origins its token names), so a rendering bug in model-authored text stops at a
+console error. See
 [Security headers](docs/src/content/docs/operations/security-headers.md).
 
 ### Trusted
@@ -255,8 +257,8 @@ deciding whether to run Holotable deserves to know them up front.
 - **The poller is single-instance.** Running more than one replica means more
   than one poller per dashboard, multiplying query load against the metrics
   store. Holotable does not yet coordinate pollers across instances.
-- **No published releases or signed artifacts.** There is nothing to verify the
-  provenance of yet.
+- **No signed artifacts.** The images published from `main` are not signed
+  and carry no provenance attestation or SBOM; there are no tagged releases.
 
 Reporting one of these as a new vulnerability is not necessary — they are known.
 Reporting a *bypass* of a control described above very much is.

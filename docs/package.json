@@ -10,6 +10,7 @@
     "build": "npm run generate && astro build",
     "preview": "astro preview",
     "check": "npm run generate && astro check",
+    "check:links": "npm run generate && node scripts/check-root-links.mjs",
     "deploy": "npm run build && wrangler deploy"
   },
   "dependencies": {

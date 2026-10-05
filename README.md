@@ -7,371 +7,50 @@ model authors a **validated visualization spec** (SQL + chart config) — never 
 data itself — and Holotable executes the guarded SQL against TimescaleDB and
 streams the results live.
 
-- **Stack:** Next.js 16 (App Router) · TypeScript · Tailwind v4 · Base UI ·
-  ECharts (line/area/bar/scatter/stat/table/heatmap/pie/donut/gauge/state-timeline/text) ·
-  TimescaleDB/PostgreSQL
-  (config + metrics) · Vercel AI SDK (`streamObject` for specs, `streamText` +
-  tool calls for chat) · Keycloak OIDC (group-based auth) · Server-Sent Events.
-- **Contract:** one shared Zod IR (`src/lib/ir.ts`) is used by the LLM output,
-  the API, persistence, and the client, so the spec cannot drift.
-
-## Documentation
-
-Full documentation lives in [`docs/`](docs/) as an Astro + Starlight site
-(`cd docs && npm install && npm run dev`). Start with:
-
-- [Your first dashboard](docs/src/content/docs/getting-started/your-first-dashboard.md) — from an
-  empty install to a live dashboard over your own database, in three steps.
-- [Invariants](docs/src/content/docs/architecture/invariants.md) — the guarantees the design rests on,
-  and [Scaling](docs/src/content/docs/architecture/scaling.md) for the single-instance poller caveat.
-- [How it works](docs/src/content/docs/concepts/how-it-works.md) — a panel from prompt to live chart.
-- [Keycloak setup](docs/src/content/docs/operations/keycloak.md) — the OIDC group-mapper setup.
-- [Configuration](docs/src/content/docs/reference/configuration.md) — generated from `src/lib/config.ts` at build time.
-
-## Screenshots
-
-Describe the dashboard you want in plain English; the model authors a validated
-spec (never the data):
+**Stack:** Next.js 16 (App Router) · TypeScript · Tailwind v4 · Base UI · ECharts ·
+TimescaleDB/PostgreSQL · Vercel AI SDK · Keycloak OIDC · Server-Sent Events. One
+shared Zod IR (`src/lib/ir.ts`) is the contract between the model, the API,
+persistence and the browser.
 
 ![New dashboard — natural-language authoring with starter prompts](docs/public/images/dashboard-new.png)
 
-Holotable executes the guarded SQL and streams results into a live dashboard:
-
 ![Live dashboard view — request rate, p95 latency, 5xx count, and requests by route](docs/public/images/dashboard-view.png)
-
-`docker compose up` also ships **Holotable self-monitoring**: the app scraped
-through its own `/api/metrics`, landed in TimescaleDB, and read back as an
-ordinary source. It is the honest demo — every panel below is guarded SQL over
-data the app produced about itself — and it doubles as the end-to-end smoke
-test (`docker compose --profile smoke run --rm smoke`).
-
-![Holotable self-monitoring — poller tick p95, query latency by source, resident memory, live viewers, active pollers, model tokens, and SQL guard rejections](docs/public/images/dashboard-self-monitoring.png)
-
-## How it works
-
-1. **Author** — `/api/generate` runs the LLM exactly once (only on create/edit).
-   It streams a Dashboard IR spec that is validated with Zod.
-2. **Save** — the whole immutable spec is stored as `jsonb`; every save appends a
-   new `dashboard_versions` row.
-3. **View** — a dashboard opens one `EventSource`. A single in-process poller per
-   dashboard executes each panel's guarded SQL per tick and broadcasts deltas to
-   all subscribers. The LLM never runs on view or on a tick.
-4. **Render** — ECharts merges deltas into a bounded rolling window without
-   recreating the chart.
-
-All model SQL is untrusted: SELECT-only, catalog-table allowlist, no comments,
-no time/non-deterministic functions, read-only settings, row/time limits, and a
-**server-injected** time range bound to the panel's `timeField`. Panels carry
-only a stable `sourceId`; the registry owns the safe connection config, the
-catalog, and a `secret_ref`. Credentials are resolved from the environment at
-execution time and never stored.
-
-The viewer can **pause** live updates (the Live/Pause toggle closes the
-`EventSource`; resuming reattaches to the shared poller) and includes a
-**read-only chat** assistant scoped to that dashboard. Chat reasons over the
-panel specs and may fetch fresh data through a guarded `runQuery` tool that runs
-the *same* validate → plan → execute pipeline as everything else — it cannot
-mutate the dashboard, supply a time filter, or reach any source the dashboard
-doesn't already reference. Statement-level query failures (bad column, syntax,
-timeout) surface as actionable messages with a one-click retry; connection and
-infrastructure errors stay generic.
 
 ## Quick start
 
-Three steps, from trying it to running it. Or skip all three: the
-[public demo](https://holotable-demo.vibeproject.workers.dev) runs the same
-image as step 1, reset whenever it sleeps.
-
-**1. Evaluate: one command.** TimescaleDB, the app, six hours of demo history
-and the live seeder in one container, with no sign-in and no `.env`:
+Try it in one container, with demo data and no sign-in (or open the
+[public demo](https://holotable-demo.vibeproject.workers.dev)):
 
 ```bash
 docker run -p 3000:3000 ghcr.io/jbouder/holotable:quickstart
 ```
 
-Open <http://localhost:3000>; the seeded dashboards are live within seconds.
-Generation, Explore and chat need a model, passed with `-e`:
+Then open <http://localhost:3000>. With Docker Compose instead (Keycloak, real
+sign-in as `demo` / `demo`, your own `.env`):
 
 ```bash
-docker run -p 3000:3000 \
-  -e AI_MODEL=openai/gpt-4o-mini \
-  -e OPENAI_BASE_URL=https://openrouter.ai/api/v1 -e OPENAI_API_KEY=sk-... \
-  ghcr.io/jbouder/holotable:quickstart
+cp .env.example .env    # then set SESSION_SECRET, AI_MODEL and its key, and
+                        # OIDC_CLIENT_SECRET=holotable-dev-secret (the local realm's)
+docker compose up
 ```
 
-Everyone who reaches it shares one demo workspace, and the data lives in the
-container unless you mount `-v holotable-data:/var/lib/postgresql/data`. It is
-for trying Holotable, never for real data: see
-[Demo mode](https://holotable-docs.beskar.workers.dev/operations/demo-mode/).
+The [quick start](https://holotable-docs.beskar.workers.dev/getting-started/quick-start/)
+covers both, Helm, and the development loop.
 
-**2. Integrate: Docker Compose.** Separate services, a Keycloak realm, real
-OIDC sign-in and your own `.env`:
+## Documentation
 
-```bash
-cp .env.example .env
-# set a strong SESSION_SECRET and your AI_PROVIDER/AI_MODEL (+ keys)
-docker compose up                  # timescaledb, keycloak, migrate, app, seed
-```
+Everything is explained once, on the docs site
+(<https://holotable-docs.beskar.workers.dev>, source in [`docs/`](docs/)):
 
-`docker compose up` pulls the published images,
-`ghcr.io/jbouder/holotable:main` and `:main-migrate`, so nothing is built
-locally. Set `HOLOTABLE_TAG` to pin a release instead of following `main`, or
-run `docker compose up --build` to build this checkout under the same names.
-Every image is multi-arch (`linux/amd64`, `linux/arm64`). The `seed` service
-continuously inserts demo metrics and, once, creates the `demo` workspace's
-sources and dashboards; see [Seeding demo data](#seeding-demo-data).
+- [Your first dashboard](https://holotable-docs.beskar.workers.dev/getting-started/your-first-dashboard/) — from an empty install to a live dashboard over your own database.
+- [How it works](https://holotable-docs.beskar.workers.dev/concepts/how-it-works/) — a panel from prompt to live chart.
+- [Invariants](https://holotable-docs.beskar.workers.dev/architecture/invariants/) — the guarantees the design rests on.
+- [Configuration](https://holotable-docs.beskar.workers.dev/reference/configuration/) — every environment variable, generated from `src/lib/config.ts`.
+- [Keycloak setup](https://holotable-docs.beskar.workers.dev/operations/keycloak/) — the OIDC client and group mapper.
+- [API routes](https://holotable-docs.beskar.workers.dev/reference/api-routes/) and [Deploying on Kubernetes](https://holotable-docs.beskar.workers.dev/operations/kubernetes/).
 
-**3. Run it: Helm.** See [Deploying (Kubernetes)](#deploying-kubernetes).
+## Contributing, security, license
 
-### Developing
-
-The shortest loop needs Node 22+ and Docker, and no Keycloak:
-
-```bash
-npm install
-cp .env.example .env               # the first lines are all this loop needs
-docker compose up -d postgres seed # TimescaleDB, migrations, demo data
-npm run dev:demo                   # http://localhost:3000, demo sign-in
-```
-
-`npm run dev:demo` is `npm run dev` in [demo mode](https://holotable-docs.beskar.workers.dev/operations/demo-mode/).
-Work on sign-in or authorization runs `npm run dev` against the Compose realm
-instead; see [CONTRIBUTING.md](CONTRIBUTING.md).
-
-## Deploying (Kubernetes)
-
-`deploy/helm/holotable/` is a Helm chart for the app, its migration Job, and the
-objects around them; `deploy/argocd/holotable-application.yaml` is a reference
-Argo CD `Application`.
-
-```bash
-helm install holotable deploy/helm/holotable \
-  -f deploy/helm/holotable/examples/values-kubernetes-secret.yaml
-```
-
-It deploys neither TimescaleDB nor Keycloak, and it holds no credentials: those
-come from a Secret you name, and the chart refuses to render if one is set as
-plain config. Migrations run as a pre-upgrade hook, so a failed migration aborts
-the release instead of rolling out code against a schema it cannot use. Keep
-`replicaCount` at 1: the poller is process-local, and one instance is the
-supported topology ([Scaling and the poller](https://holotable-docs.beskar.workers.dev/architecture/scaling/)).
-
-See [Deploying on Kubernetes](https://holotable-docs.beskar.workers.dev/operations/kubernetes/)
-and the [chart README](deploy/helm/holotable/README.md).
-
-## Seeding demo data
-
-`npm run seed` (`scripts/seed.ts`) is a long-running seeder that gives a fresh
-install something to show. It does two things:
-
-1. **Once (bootstrap):** registers three demo sources and their demo dashboards in
-   the `demo` workspace, if they don't already exist. All three point at the
-   `metrics` schema and share the read-only `TS_METRICS` secret reference — they
-   differ only in the tables they expose:
-
-   | Source id | Table | Demo dashboard |
-   | --- | --- | --- |
-   | `ts-metrics` | `metrics.http_requests` — per-request events | **Demo service health** (RPS, p95 latency, 5xx, requests by route) |
-   | `ts-system` | `metrics.system_metrics` — per-host infra metrics | **Demo infrastructure** (CPU/memory by host, disk %, CPU by region) and **Demo fleet status** (a text header, CPU and disk gauges, a host load state timeline) |
-   | `holotable-self` | `metrics.holotable_self` — the app's own Prometheus instruments | **Holotable self-monitoring** (tick p95, query latency by source, memory, viewers, pollers, model tokens, guard rejections) |
-
-   The first two carry synthetic rows. The third is real: `scripts/self-metrics.ts`
-   scrapes the app's own `/api/metrics` into `metrics.holotable_self`, so the
-   dashboard is Holotable reading guarded SQL over data it produced itself. Its
-   spec is committed in `src/lib/self-monitoring/dashboard.ts` rather than
-   written inline here, which is what lets `npm test` validate it against the IR
-   and run every panel through the SQL guard.
-
-2. **Backfill (optional):** with `SEED_BACKFILL=6h` (or `30m`, `1d`, at most
-   `7d`) it first writes the history the loop would have produced across that
-   window, then refreshes `metrics.http_requests_1m`, so a fresh database opens
-   on full charts. A restart fills only the gap since the newest row.
-
-3. **Loop:** every `SEED_INTERVAL_MS` it inserts a fresh batch of synthetic rows
-   into both tables so the live dashboards stream. It connects with the
-   privileged metrics user and ensures the demo hypertables exist first, so it
-   also works against a database whose volume predates a table.
-
-### Run it
-
-```bash
-# Docker: the `seed` service runs automatically with `docker compose up`.
-# Local:
-npm run seed                       # requires DATABASE_URL and TIMESCALEDB_URL
-```
-
-Bootstrap writes the source/dashboard rows to `DATABASE_URL` (config DB); the
-metric inserts go to `TIMESCALEDB_URL` (falls back to `DATABASE_URL`). In the
-default single-instance setup these are the same TimescaleDB database.
-
-### Environment knobs
-
-| Var | Default | Effect |
-| --- | --- | --- |
-| `SEED_INTERVAL_MS` | `2000` | Delay between insert batches (Docker dev override: `1000`). |
-| `SEED_DEMO` | — | Set to `false` to skip the one-time source/dashboard bootstrap and only stream metrics. |
-| `SEED_BACKFILL` | — | History to write before streaming: `30m`, `6h`, `1d`, at most `7d`. Unset writes none. |
-| `TS_METRICS_HOST` / `TS_METRICS_PORT` | `localhost` / `5432` | Host/port written into the seeded source configs. |
-| `POSTGRES_DB` | `holotable` | Database name written into the seeded source configs. |
-| `SELF_METRICS_INTERVAL_MS` | `15000` | `scripts/self-metrics.ts` only: delay between scrapes of `/api/metrics`. |
-| `METRICS_URL` | `http://app:3000/api/metrics` | `scripts/self-metrics.ts` only: what to scrape. |
-| `SMOKE_TIMEOUT_MS` | `180000` | `scripts/smoke.ts` only: how long to wait for the first panel with rows. |
-
-> The seeder is for demos and local development. It uses a privileged connection
-> to insert data and create tables; the **app** only ever reads through the
-> read-only `TS_METRICS` role. Don't run the seeder against production data.
-
-## Pages
-
-| Path | Purpose | Min role |
-| --- | --- | --- |
-| `/dashboards` | List dashboards in a workspace | viewer |
-| `/dashboards/new` | Prompt → preview → save, with one-click starter prompts | editor |
-| `/dashboards/[id]` | Live viewer (SSE) with a Live/Pause toggle and a read-only dashboard chat assistant | viewer |
-| `/dashboards/[id]/edit` | Panel CRUD/layout, single-panel NL edits, version save | editor |
-| `/explore` | Ad-hoc NL questions against editable sources (with sample-question chips); streams one panel spec, then runs it through guarded query preview | editor |
-| `/settings` | Account, appearance, preferences, local data, keyboard shortcuts, and (for admins) workspace AI limits. Reached from the account menu in the top bar | signed in |
-| `/data-sources` | Source CRUD / test / refresh; a structured connection form with live table discovery (JSON behind an Advanced toggle), plus a natural-language drafter that seeds it from a plain-English description | source-admin |
-
-## API
-
-| Route | Method | Notes |
-| --- | --- | --- |
-| `/api/generate` | POST | LLM streams a validated dashboard, panel, or explore-panel IR spec |
-| `/api/query` | POST | One-shot guarded query (preview and Explore results) |
-| `/api/dashboards` | GET/POST | List / create |
-| `/api/dashboards/[id]` | GET/PUT/DELETE | Get / new version / delete |
-| `/api/dashboards/[id]/stream` | GET | SSE deltas (cookie auth) |
-| `/api/dashboards/[id]/chat` | POST | Read-only chat scoped to one dashboard; streams a UI message stream, may call a guarded `runQuery` tool |
-| `/api/sources` | GET/POST | List / create |
-| `/api/sources/generate` | POST | LLM streams a validated source draft (safe connection config + catalog, never credentials) for review before create |
-| `/api/sources/[id]` | GET/PUT/DELETE | Get / update / delete (tombstone if referenced) |
-| `/api/sources/[id]/test` | POST | Connectivity test |
-| `/api/sources/[id]/refresh` | POST | Re-introspect catalog |
-| `/api/sources/discover` | POST | List the tables and columns a prospective source's read-only user can see, to pick an allowlist from (nothing is persisted) |
-| `/api/secret-refs` | GET | The `secret_ref`s granted to a workspace, each with whether the server holds credentials; names and booleans only (`source:manage`) |
-| `/api/auth/login` · `/callback` · `/logout` | | OIDC session |
-| `/api/health` · `/api/ready` | GET | Liveness and readiness probes (no auth) |
-| `/api/metrics` | GET | Prometheus scrape; `404` until `METRICS_TOKEN` or `METRICS_ALLOWED_CIDRS` is set |
-
-## Source secret references
-
-A source stores a `secret_ref` (an uppercase env-var family), never credentials.
-`SOURCE_SECRET_REFS` declares which workspace may use which ref
-(`TS_METRICS:ops; BILLING_RO:finance`); a ref not granted to a source's
-workspace never resolves, and unset grants nothing. For a granted ref,
-`resolveCredentials` reads `TS_METRICS_USERNAME` / `TS_METRICS_PASSWORD` at
-execution time, as files in `SOURCE_SECRETS_DIR` (a mounted Secret, refreshed
-without a restart) or from the environment. Point a `secret_ref` at your
-**read-only** TimescaleDB role; the app never connects with a privileged user.
-See `src/lib/secrets/credentials.ts`.
-
-This is also why the natural-language source drafter (`/api/sources/generate`)
-only ever emits the safe `SourceDraft` shape — connection config, table catalog,
-and the `secret_ref` *name* — and is prompted to ignore any password in the
-description. The source form picks the `secret_ref` from those granted to the
-workspace; a source whose ref has no credentials yet saves fine but fails on
-**Test** until they are set. The form and the source list show that readiness
-up front — a check when the server holds credentials, a warning naming the two
-variables to set when it does not, and "not granted" for a stored source whose
-grant was withdrawn — so the gap is visible before Test. The draft is
-a starting point: run **Test** and **Refresh** to pull the live column catalog
-before relying on it.
-
-## Configuration
-
-All defaults are environment-configurable (`src/lib/config.ts`). Notable
-documented defaults:
-
-- **Refresh cadence:** `DEFAULT_REFRESH_INTERVAL_MS=15000` (15s), floored by
-  `MIN_REFRESH_INTERVAL_MS=2000`.
-- **Time range:** `DEFAULT_TIME_FROM=now-1h` .. `DEFAULT_TIME_TO=now`.
-- **Limits:** `MAX_QUERY_ROWS=5000` rows and `MAX_RESULT_BYTES=4194304` (4 MiB
-  of serialized JSON) per query result, `QUERY_TIMEOUT_SECONDS`,
-  `MAX_WINDOW_POINTS`. A result over either cap is a `400` naming the limit.
-- **LLM limits:** `LLM_RATE_PER_MINUTE=20` per user per workspace and
-  `LLM_DAILY_TOKEN_BUDGET=2000000` per workspace per UTC day, on every
-  model-backed route; `0` disables, and `workspace_limits` overrides per
-  workspace. Over either is a `429` with `Retry-After`.
-- **Metrics:** `METRICS_TOKEN` and/or `METRICS_ALLOWED_CIDRS` gate
-  `GET /api/metrics`; with neither set the endpoint answers `404`. Set both and
-  both are required. See [Prometheus metrics](docs/src/content/docs/operations/metrics.md).
-- **AI:** `AI_PROVIDER` (`gateway` | `openai-compatible`) + `AI_MODEL` — no model
-  is baked in; this is a deliberate open decision (see architecture doc).
-  The `openai-compatible` path works with any OpenAI-compatible endpoint. It
-  defaults to the Responses API; set `OPENAI_API=chat` for providers that only
-  expose Chat Completions (`/chat/completions`):
-  - **OpenRouter:** set `OPENAI_BASE_URL=https://openrouter.ai/api/v1`,
-    `OPENAI_API_KEY` to your OpenRouter key, and `AI_MODEL` to any OpenRouter
-    model slug (e.g. `openai/gpt-4o-mini`). Leave `OPENAI_API` unset — forcing
-    `chat` breaks OpenRouter.
-  - **OpenCode Zen / Go:** set `OPENAI_BASE_URL` (e.g.
-    `https://opencode.ai/zen/go/v1`) and `OPENAI_API_KEY` to the values provided
-    by OpenCode, `OPENAI_API=chat`, and `AI_MODEL` to a **bare** model id (e.g.
-    `kimi-k2.7-code`) — OpenCode does not use `vendor/model` slugs like
-    OpenRouter. Query `GET <base-url>/models` for valid ids. Only models that
-    expose an OpenAI-compatible `/chat/completions` interface are supported via
-    this path.
-
-See [`.env.example`](.env.example) for the complete list.
-
-## Scripts
-
-```bash
-npm run dev      # dev server
-npm run dev:demo # dev server in demo mode, no Keycloak
-npm run build    # production build
-npm run start    # run the production build
-npm run lint     # biome check (lint + format, no writes)
-npm run lint:fix # biome check --write
-npm run format   # biome format --write
-npm test         # node --test (schema, auth, SQL safety, poller)
-npm run test:fuzz # property-based SQL guard suite alone; FUZZ_RUNS / FUZZ_SEED tune it
-npm run config:check # validate .env the way the server does at startup; exits 1 if it would refuse to boot
-npm run migrate  # apply Postgres migrations
-npm run seed     # looping metrics seeder
-npm run self-metrics # scrape the app's own /api/metrics into metrics.holotable_self
-npm run smoke    # end-to-end check of the self-monitoring dashboard
-```
-
-## Tests
-
-`node --test` (native) via `tsx`, covering the highest-risk logic:
-
-- `test/ir.test.ts` — shared IR schema (strict mode, duplicate panels, time expr).
-- `test/claims.test.ts` — group parsing (highest role wins, fail-closed).
-- `test/authorize.test.ts` — `can()` for every action incl. admin bypass and owner delete.
-- `test/sql-safety.test.ts` — SQL guard verdicts + server time injection + time resolution.
-- `test/sql-safety-ast.test.ts` — parse-tree properties: table references in every position, CTE scoping, literals and identifiers as the server reads them, fail-closed on unknown constructs.
-- `test/sql-safety-postgres.test.ts`, `test/sql-safety-cte.test.ts` — PostgreSQL time synonyms and privileged functions; writes smuggled through CTEs.
-- `test/sql-safety.fuzz.test.ts` — property-based (`fast-check`): generated statements built from adversarial shapes. Anything containing a forbidden construct is rejected; anything accepted satisfies an independent parse-tree oracle; anything benign is accepted; the wrapped executable plan still parses as one SELECT. `npm test` runs it with a fixed seed; CI's non-required "Fuzz" job runs it longer with a fresh seed. A failure prints the statement and a `FUZZ_SEED=… FUZZ_PATH=…` replay line; promote it into `test/fixtures/sql-fuzz-corpus.ts` and a named test.
-- `test/poller.test.ts` — delta cursors, poller identity/version replacement, subscriber ref-counting.
-- `test/layout.test.ts` — panel grid layout packing/normalization.
-- `test/dashboard-chat.test.ts` — chat `runQuery` guard: source scoping, SQL validation, server-owned time injection.
-
-## Security notes
-
-- OIDC is the only way to authenticate; there is no local or dev login path.
-- Keycloak tokens are verified with RS256 via JWKS (`OIDC_JWKS_URL`).
-- Authorization is centralized in `can()` and never derived from a request's
-  workspace field; the source is re-authorized on every execution.
-- A state-changing request (anything but GET, HEAD or OPTIONS) from another
-  origin is refused with a 403 before any handler runs, independently of the
-  session cookie's `SameSite=Lax`. `ALLOWED_ORIGINS` names any others.
-- A `Secure` session cookie is named `__Host-<SESSION_COOKIE_NAME>`, so the
-  browser refuses one set by a subdomain or for another path.
-
-The full trust model — what is trusted, what is not, and the known
-limitations — is in [SECURITY.md](SECURITY.md), along with how to report a
-vulnerability privately.
-
-## Contributing
-
-[`CONTRIBUTING.md`](CONTRIBUTING.md) covers local setup, the check sequence CI
-enforces, commit and pull-request conventions, and — most importantly — the
-architectural invariants a change must not break.
-
-## License
-
-Holotable is licensed under the [Apache License 2.0](LICENSE). See
-[`NOTICE`](NOTICE) for attribution requirements.
+- [`CONTRIBUTING.md`](CONTRIBUTING.md) — local setup, the checks CI runs, conventions, and the invariants a change must not break.
+- [`SECURITY.md`](SECURITY.md) — the trust model, and how to report a vulnerability privately.
+- Licensed under the [Apache License 2.0](LICENSE); see [`NOTICE`](NOTICE).

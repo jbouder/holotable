@@ -7,7 +7,7 @@ contact_links:
       private vulnerability reporting — see SECURITY.md for the trust model and
       response targets.
   - name: Documentation
-    url: https://github.com/jbouder/holotable/tree/main/docs
+    url: https://holotable-docs.beskar.workers.dev
     about: >
       Architecture, invariants, Keycloak setup, and the configuration
       reference — check here before filing a question as a bug.

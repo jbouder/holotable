@@ -155,3 +155,7 @@ Each step is a separate migration and a separate release. That is what makes
 every step individually reversible, and it is why the runner insists on a
 declared down path: a migration whose only honest answer is "this cannot be
 undone" is usually a contract step that was merged too early.
+
+---
+
+*Last verified against the code at commit `4e4c5cf` (2026-10-05).*

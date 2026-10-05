@@ -113,7 +113,7 @@ upgrading an existing deployment, list which workspace uses which ref:
 SELECT DISTINCT secret_ref, workspace_id FROM sources WHERE tombstoned_at IS NULL;
 ```
 
-and declare exactly those. Declaring them with `*` restores the old behaviour,
+and declare exactly those. Declaring them with `*` restores the old behavior,
 where any workspace could use any ref, and is what the grant exists to replace.
 
 ## Why the drafter never emits credentials
@@ -135,3 +135,7 @@ Adding a table to a source's catalog is what grants generated SQL permission to
 reference it. The allowlist is the boundary; refreshing only updates column
 metadata within it.
 :::
+
+---
+
+*Last verified against the code at commit `00ea858` (2026-10-05).*

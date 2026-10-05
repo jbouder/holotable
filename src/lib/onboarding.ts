@@ -28,8 +28,8 @@ import type { CatalogHealth } from "@/lib/catalog/health";
 /**
  * The walkthrough that says the same three steps in prose, for a reader who
  * skipped or dismissed the flow. The hosted docs site rather than a relative
- * path: the docs are a separate deployment, and the README already links to it
- * this way.
+ * path: the docs are a separate deployment, and the docs site is where every
+ * link to a page points, the README's included.
  */
 export const FIRST_DASHBOARD_DOCS_URL =
   "https://holotable-docs.beskar.workers.dev/getting-started/your-first-dashboard/";

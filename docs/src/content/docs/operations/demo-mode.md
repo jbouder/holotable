@@ -72,3 +72,7 @@ Demo mode is fine for working on dashboards, panels and charts. It is not a way
 to develop or test authentication. Anything that touches the session, the
 claims or authorization runs against a realm; see
 [Keycloak setup](/operations/keycloak/).
+
+---
+
+*Last verified against the code at commit `00ea858` (2026-10-05).*

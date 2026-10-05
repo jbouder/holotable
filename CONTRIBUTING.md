@@ -38,11 +38,14 @@ guard. It is not for auth work; see the note on authentication below.
 
 ```bash
 cp .env.example .env
-# set a strong SESSION_SECRET and your AI_PROVIDER/AI_MODEL (+ keys)
+# set a strong SESSION_SECRET, your AI_MODEL (+ key), and
+# OIDC_CLIENT_SECRET=holotable-dev-secret (the local realm's client secret)
 docker compose up --build          # timescaledb, keycloak, migrate, app, seed
 ```
 
-Open <http://localhost:3000>. The `seed` service continuously inserts demo
+Open <http://localhost:3000> and sign in as `demo` / `demo`. The app service
+runs in production mode, so a missing value stops it from booting; `docker
+compose logs app` names it. The `seed` service continuously inserts demo
 metrics and, once, creates the `demo` workspace's sources and dashboards, so a
 fresh checkout has live data to look at.
 
@@ -95,9 +98,13 @@ cd docs && npm install && npm run dev
 
 ## Checks
 
-Run these before you push. CI runs the same four on every pull request, plus a
-Docker image build and a Helm lint/template pass, and they are required to
-merge.
+Run these before you push. CI runs the same four on every pull request, and
+those four (`Lint`, `Typecheck`, `Test`, `Build`) are the checks required to
+merge. The same workflow also builds the Docker images, lints and renders the
+Helm chart, round-trips the migrations against a real TimescaleDB, runs the
+`Integration` suites, the `End-to-end and accessibility` suite and the
+self-monitoring smoke test, and fuzzes the SQL guard for longer; those report
+on every pull request without gating it, so look at them too.
 
 ```bash
 npm run lint         # biome check (lint + format, no writes)
@@ -109,8 +116,12 @@ npm run build        # production build
 `npm run config:check` validates your `.env` the way the server does at startup
 and exits 1 on anything that would refuse to boot; `NODE_ENV=production` applies
 the production rules. Missing values are warnings in development and errors in
-production, so `.env.example` always starts the dev server. The rules and how to
-add one are in `docs/src/content/docs/operations/startup-validation.md`.
+production, so `.env.example` always starts the dev server. A change that reads
+a new environment variable adds it to `EnvSchema`/`validateConfig` in
+`src/lib/config.ts`, with a message naming the variable and what to do, and a
+case in `test/config.test.ts`; CI checks that `.env.example` still passes. The
+rules and how to add one are in
+[Startup validation](docs/src/content/docs/operations/startup-validation.md).
 
 If you touch `deploy/`, render the chart before you push — the CI job does the
 same, plus every example values file:
@@ -119,6 +130,12 @@ same, plus every example values file:
 helm lint deploy/helm/holotable
 helm template holotable deploy/helm/holotable > /dev/null
 ```
+
+The CI job also asserts that two *bad* renders still fail: a credential under
+`.Values.config`, which would land in a ConfigMap in clear text, and a
+`terminationGracePeriodSeconds` below the drain budget, which would let the
+kubelet kill the server mid-drain. Both are `fail` calls in the templates; if
+you change one, change its assertion in `.github/workflows/ci.yml` with it.
 
 `npm run test:integration` runs the suites that need a real database:
 read-only execution, statement timeouts, the allowlist end to end, repository
@@ -262,7 +279,7 @@ issue and make the case first, rather than arriving with it already written.
 ## Pull requests
 
 - **Branch** from `main`, named `type/short-description`
-  (`docs/community-files`, `fix/poller-leak`, `feat/heatmap-panel`).
+  (`fix/poller-leak`, `feat/heatmap-panel`, `chore/dependabot`).
 - **Commit messages** follow [Conventional Commits](https://www.conventionalcommits.org/):
   `feat:`, `fix:`, `docs:`, `ci:`, `chore:`, `refactor:`, `test:`. Write the
   subject in the imperative and keep it under ~72 characters. The body is where
@@ -278,15 +295,74 @@ issue and make the case first, rather than arriving with it already written.
 - **Component tests** are the exception to "pure logic only", and live in
   `*.test.tsx` beside the rest. `test/support/dom.tsx` mounts a component in
   jsdom (a devDependency; it never reaches the build) and flushes with `act`.
-  Reach for it only when a behaviour genuinely cannot be tested without a
+  Reach for it only when a behavior genuinely cannot be tested without a
   render — an error boundary, for instance, since `react-dom/server` does not
   run boundaries at all. Everything else still belongs in `src/lib/` as a
   function with a plain test.
 - **Draft PRs** are fine and encouraged for work you want early eyes on.
 
-Files under `src/lib/sql/`, `src/lib/auth/`, `src/lib/ir.ts`, `src/lib/ir/`,
-and `src/lib/metrics-access.ts` have a code owner and will always be reviewed
-before merge.
+Files under `src/lib/sql/`, `src/lib/auth/`, `src/lib/secrets/`,
+`src/lib/ir.ts`, `src/lib/ir/`, `src/lib/time.ts`, `src/lib/registry.ts`,
+`src/lib/metrics-access.ts`, `src/lib/row-scope.ts`, `src/lib/variables.ts` and
+`src/lib/variable-selection.ts` have a code owner (`.github/CODEOWNERS`) and
+will always be reviewed before merge. These are the files where a quiet
+regression stops being a bug and becomes a vulnerability, so a change there
+needs a test.
+
+### Dependency updates
+
+Dependabot (`.github/dependabot.yml`) opens version updates weekly for the app,
+the docs site, the hosted demo's Worker, both Dockerfiles' base images and the
+workflow actions. Minor and patch updates arrive grouped; each major arrives on
+its own. Review one like any other pull request: read the changelog for
+anything in the guard, auth or rendering path, let the required checks pass,
+and merge it by hand. Nothing auto-merges. A `next` or `react` major is a
+framework migration, not a version bump: check the installed docs in
+`node_modules/next/dist/docs/` against the repository's patterns before
+accepting it.
+
+## Documentation
+
+The docs site (`docs/`) is the canonical explanation of every feature;
+`README.md` is a landing page that links into it. `SECURITY.md` is canonical
+for the trust model and disclosure, this file for contributor workflow, and
+`AGENTS.md` repeats these conventions in more detail for coding agents. Say a
+thing in one place and link to it from the others.
+
+A change to something a page describes updates that page in the same pull
+request:
+
+| When you change | Update |
+| --- | --- |
+| `src/lib/ir.ts`, `src/lib/ir/` (the IR, `SPEC_VERSION`, an upgrader) | `concepts/the-shared-ir.md`, invariant 3 in `architecture/invariants.md` |
+| `src/lib/panels/` (a panel kind or its options) | `reference/panel-options.md`, "Panel kinds" in `concepts/streaming-and-rendering.md`. The visualization list is generated |
+| `src/lib/sql/safety.ts`, `ast.ts`, `denylist.ts` (the guard) | `concepts/executing-a-panel.md`, invariants 7 and 8, the trust model in `SECURITY.md` |
+| `src/lib/sql/row-filter.ts`, `src/lib/row-scope.ts` | `operations/row-level-filters.md`, invariant 8a |
+| `src/lib/sql/variables.ts`, `src/lib/variables.ts`, `variable-selection.ts` | `concepts/variables.md` |
+| `src/lib/auth/authorize.ts` (an action or rule in `can()`) | `architecture/authorization.md` (the action matrix), `SECURITY.md` |
+| `src/lib/auth/` sessions, renewal, revocation, share links, API tokens | `architecture/authorization.md`, `operations/share-links.md`, `operations/api-tokens.md`, `SECURITY.md` |
+| `src/lib/config.ts` (a variable) | The configuration reference is generated; a startup rule goes in `operations/startup-validation.md`, and the variable in `.env.example` |
+| A route under `src/app/api/` | `reference/api-routes.md` (`test/docs-drift.test.ts` fails until it has a row) |
+| `AUDIT_ACTIONS` in `src/lib/audit.ts` | `operations/audit-log.md` (held by the same test) |
+| `src/lib/settings.ts` (a settings section) | `getting-started/settings.md` (held by the same test) |
+| `src/lib/metrics.ts` (an instrument) | `operations/metrics.md` |
+| `migrations/` (a table or column) | `architecture/data-model.md` |
+| `keycloak/holotable-realm.json` | `operations/keycloak.md` (the local realm, its users, client settings) |
+| A color token in `src/app/globals.css` | The contrast table in `architecture/accessibility.md` (`test/contrast.test.ts` fails until it matches) |
+| `src/lib/ai/` (a provider, including `stub`) | `operations/ai-provider.md` |
+| `docker-compose.yml`, `deploy/quickstart/` | `getting-started/quick-start.md`, the quick start in `README.md` |
+| `deploy/helm/holotable/` | `operations/kubernetes.md`, the chart's own `README.md` |
+| `scripts/seed.ts`, `scripts/self-metrics.ts` | `getting-started/demo-data.md` |
+| A `package.json` script | `getting-started/quick-start.md` (Scripts), `AGENTS.md` (Development workflow) |
+
+Paths in the table are under `docs/src/content/docs/` unless they say
+otherwise. The Docs workflow builds the site, which fails on a broken internal
+link, and then runs `docs/scripts/check-root-links.mjs` over the root markdown
+files, which fails on a broken relative link, a link to a docs page that does
+not exist, or a backticked repository path that is gone. Run it locally with
+`cd docs && npm run check:links`. The architecture and operations pages end
+with the commit they were last verified against; when you check one against
+the code, move its marker.
 
 ## Style
 
@@ -304,6 +380,11 @@ Match the surrounding code rather than importing conventions from elsewhere.
   and keys off `<html data-motion>`, never the OS media query directly.
   Durations and curves come from the tokens in `globals.css`; the full rules
   are the "Motion rules" section of `AGENTS.md`.
+- Accessibility is checked, not hoped for. Every text/background token pairing
+  meets WCAG AA in both themes (`test/contrast.test.ts`, with the table in
+  [Accessibility](docs/src/content/docs/architecture/accessibility.md)); a
+  chart goes through `AccessibleChart`, a link styled as a button is
+  `ButtonLink`, and an icon-only control has an `aria-label`.
 - This is Next.js 16 and React 19. Check the installed docs in
   `node_modules/next/dist/docs/` or the existing repository patterns before
   relying on behavior you remember from an older version, and do not introduce

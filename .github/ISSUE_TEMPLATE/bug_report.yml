@@ -42,8 +42,10 @@ body:
     attributes:
       label: Version
       description: >
-        The commit SHA you are running (`git rev-parse --short HEAD`). Holotable
-        is pre-1.0 and has no tagged releases yet, so the SHA is the version.
+        The commit SHA you are running: `git rev-parse --short HEAD` for a
+        checkout, or the `commit` from `GET /api/health` for an image.
+        Holotable is pre-1.0 and has no tagged releases yet, so the SHA is the
+        version.
       placeholder: 402c4a5
     validations:
       required: true
@@ -53,8 +55,11 @@ body:
     attributes:
       label: How are you running it?
       options:
+        - Quick-start image (docker run ghcr.io/jbouder/holotable:quickstart)
         - Docker Compose (docker compose up)
+        - Helm chart (Kubernetes)
         - Local (npm run dev)
+        - Local demo mode (npm run dev:demo)
         - Local production build (npm run build && npm run start)
         - Self-hosted / other
     validations:

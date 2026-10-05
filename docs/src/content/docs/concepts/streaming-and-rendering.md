@@ -42,7 +42,8 @@ Server side (`.../stream/route.ts` and `src/lib/poller/registry.ts`):
 
 Events go to every subscriber's stream. The event types are `panel`
 (`append`/`replace`), `panel-error`, `panel-degraded`, `dashboard-error`,
-`tombstone`, and `tick`.
+`tombstone`, and `tick`, plus the per-stream `session-expired`,
+`session-ended` and `access-ended` described below.
 
 ### When a panel keeps failing
 
@@ -159,6 +160,8 @@ finds:
 
 - `stat` → the last numeric value, run through `formatValue` per `panel.format`.
 - `table` → an HTML table of the windowed rows.
+- `text` → the panel's Markdown, rendered into React elements by
+  `src/lib/markdown.ts` (never as an HTML string). It runs no query.
 - every other kind → the kind's option builder (`src/components/charts/options.ts`)
   makes an ECharts option, drawn by `EChart`.
 
@@ -251,8 +254,9 @@ and zoom over whatever is currently chosen:
   stretch of time the drag covered and makes it the dashboard's window.
   `brushedRange` reads the timestamps of the first and last rows the selection
   covered; a selection it cannot read leaves the window alone rather than
-  guessing at one. `scatter`, `pie`, `donut`, `heatmap`, `stat` and `table`
-  panels are not brushable — their x-axis is not time laid out left to right.
+  guessing at one. Only kinds whose registry entry sets `timeBrush` (line,
+  area and bar) are brushable; on the rest the x-axis is not time laid out
+  left to right, or there is no axis at all.
 - Panels on one dashboard share a **crosshair**: moving the pointer over one
   chart moves the axis pointer on the others. This is done by forwarding the
   hovered category index between the instances, not with `echarts.connect`,
@@ -301,7 +305,7 @@ Each panel's header carries an overflow menu with three local actions (#76):
   because a spreadsheet would otherwise run it as a formula and the values come
   from a database Holotable does not own. Numbers are never touched.
 - **Export PNG** comes out of the ECharts instance with the theme's surface
-  colour painted behind it, since the canvas itself is transparent. Stat and
+  color painted behind it, since the canvas itself is transparent. Stat and
   table panels are offered the CSV alone.
 
 None of the three asks the server for anything. An export therefore cannot

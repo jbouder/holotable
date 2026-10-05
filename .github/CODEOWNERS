@@ -8,8 +8,9 @@
 # Default owner for anything not matched below.
 *                               @jbouder
 
-# The SQL guard. Everything the model emits passes through here: SELECT-only,
-# catalog allowlist, denylist, row and time limits, read-only execution.
+# The SQL guard. Everything the model emits passes through here: one SELECT
+# built from allowlisted parse-tree constructs, the catalog allowlist, the
+# function denylist, row and time limits, read-only execution.
 /src/lib/sql/                   @jbouder
 
 # Row-level filters at the edges: which tenant's value a viewer's queries and

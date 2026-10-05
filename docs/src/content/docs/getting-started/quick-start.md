@@ -6,7 +6,10 @@ sidebar:
 ---
 
 Three steps, from trying Holotable to running it: **`docker run`** to evaluate,
-**Docker Compose** to integrate, **Helm** for production.
+**Docker Compose** to integrate, **Helm** for production. Or skip all three:
+the [public demo](https://holotable-demo.vibeproject.workers.dev) runs the same
+image as step 1, reset whenever it sleeps
+([Hosted demo](/operations/cloudflare-demo/)).
 
 ## 1. Evaluate with `docker run`
 
@@ -40,12 +43,23 @@ It is for trying Holotable, never for real data or credentials.
 
 ```bash
 cp .env.example .env
-# set a strong SESSION_SECRET and your AI_PROVIDER/AI_MODEL (+ keys)
+# then set, in .env:
+#   SESSION_SECRET        32+ random characters (openssl rand -hex 32)
+#   AI_MODEL + its key    see AI provider; AI_PROVIDER defaults to openai-compatible
+#   OIDC_CLIENT_SECRET=holotable-dev-secret   the local realm's client secret
 docker compose up                  # timescaledb, keycloak, migrate, app, seed
 ```
 
+The app service runs with `NODE_ENV=production`, so
+[startup validation](/operations/startup-validation/) treats a missing value as
+an error: the placeholder `SESSION_SECRET`, an empty `AI_MODEL` or an empty
+`OIDC_CLIENT_SECRET` stops it from booting, and `docker compose logs app` says
+which.
+
 This brings up TimescaleDB, Keycloak, a one-shot migration job, the app, and the
-seeder as separate services, with real OIDC sign-in. The `seed` service
+seeder as separate services, with real OIDC sign-in. Sign in at
+`http://localhost:3000` as **`demo` / `demo`**, a source-admin in the `demo`
+workspace and a platform admin; see [the local realm](/operations/keycloak/#the-local-realm). The `seed` service
 continuously inserts demo metrics and, once, creates the demo `demo`
 workspace's sources and dashboards. See [Demo data](/getting-started/demo-data/)
 for what gets created and how to tune it.
@@ -116,15 +130,29 @@ Three things must be true, and each has its own failure mode:
 
 ## Scripts
 
+`package.json` is authoritative; these are the ones you will reach for.
+
 ```bash
-npm run dev      # dev server
-npm run dev:demo # dev server in demo mode (no Keycloak)
-npm run build    # production build
-npm run start    # run the production build
-npm run lint     # lint
-npm test         # node --test (schema, auth, SQL safety, poller)
-npm run migrate  # apply Postgres migrations
-npm run seed     # looping metrics seeder
+npm run dev            # dev server
+npm run dev:demo       # dev server in demo mode (no Keycloak)
+npm run build          # production build
+npm run start          # run the production build
+npm run lint           # Biome lint + format check, no writes
+npm run lint:fix       # apply Biome's safe fixes
+npm run format         # Biome format --write
+npm run typecheck      # next typegen && tsc --noEmit
+npm test               # node --test via tsx
+npm run test:fuzz      # the property-based SQL guard suite alone (FUZZ_RUNS, FUZZ_SEED)
+npm run test:integration # real-database suites against TimescaleDB (Docker)
+npm run e2e            # Playwright journeys and axe scans against their own stack (Docker)
+npm run e2e:down       # remove the e2e stack
+npm run fixture:capture # save a stored dashboard spec as an IR test fixture
+npm run config:check   # validate the environment as the server does at startup
+npm run migrate        # apply Postgres migrations (--check, --dry-run, --down)
+npm run migrate:verify # round-trip every migration against a scratch database
+npm run seed           # looping metrics seeder (+ demo sources and dashboards)
+npm run self-metrics   # scrape the app's own /api/metrics into metrics.holotable_self
+npm run smoke          # check the self-monitoring dashboard answers with scraped rows
 ```
 
 ## Pages
@@ -135,7 +163,10 @@ npm run seed     # looping metrics seeder
 | `/dashboards/new` | Prompt → preview → save, with starter prompts built from the selected source's catalog | editor |
 | `/dashboards/[id]` | Live viewer (SSE) with Live/Pause and a read-only chat assistant | viewer |
 | `/dashboards/[id]/edit` | Panel CRUD/layout, single-panel NL edits, version save | editor |
+| `/dashboards/[id]/versions` | Version history, diff, preview and restore | viewer (restore: editor) |
+| `/embed/dashboards/[id]` | A [share link](/operations/share-links/)'s read-only view, framable by the origins the link names | the link's token |
 | `/explore` | Ad-hoc NL questions against editable sources | editor |
+| `/settings` | Account, appearance, preferences, local data, shortcuts; workspace AI limits and API tokens for admins. Reached from the account menu | signed in |
 | `/data-sources` | Source CRUD / test / reviewed refresh, a catalog browser with per-column exposure, a structured form with table discovery, plus a natural-language drafter. Viewers get the list and the catalog browser read-only, without connection details or hidden columns | source-admin (read-only: viewer) |
 
 Roles come from Keycloak group membership — see

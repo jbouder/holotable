@@ -1,21 +1,38 @@
 name: Docs
 
 # The docs site is generated partly FROM the app source (the configuration
-# reference from src/lib/config.ts, the viz list from src/lib/ir.ts), so a
-# change to either must rebuild and redeploy the site.
+# reference from src/lib/config.ts, the viz list from the panel registry in
+# src/lib/panels/), so a change to either must rebuild and redeploy the site.
+# The same job checks the links in the root markdown files, which sit outside
+# the site and its link validator.
 on:
   push:
     branches: [main]
     paths:
       - "docs/**"
-      - "src/lib/config.ts"
-      - "src/lib/ir.ts"
+      # The configuration and visualization references are generated from
+      # src/lib/config.ts and the panel registry, and the root-link check
+      # below holds the root markdown files' backticked paths to src/,
+      # scripts/, test/ and the rest. A rename anywhere can break either.
+      - "src/**"
+      - "scripts/**"
+      - "test/**"
+      - "migrations/**"
+      - "deploy/**"
+      - "*.md"
+      - ".github/pull_request_template.md"
       - ".github/workflows/docs.yml"
   pull_request:
     paths:
       - "docs/**"
-      - "src/lib/config.ts"
-      - "src/lib/ir.ts"
+      # The same list as `push` above.
+      - "src/**"
+      - "scripts/**"
+      - "test/**"
+      - "migrations/**"
+      - "deploy/**"
+      - "*.md"
+      - ".github/pull_request_template.md"
       - ".github/workflows/docs.yml"
 
 concurrency:
@@ -48,6 +65,15 @@ jobs:
       - name: Build
         working-directory: docs
         run: npm run build
+
+      # README, CONTRIBUTING, SECURITY, AGENTS, the pull request template and
+      # the chart README: relative links, links into the docs site and
+      # backticked repository paths must all resolve. Offline, so a third
+      # party's outage cannot fail it. Runs after the build because links to
+      # the generated reference pages need them generated.
+      - name: Check root markdown links
+        working-directory: docs
+        run: node scripts/check-root-links.mjs
 
       - uses: actions/upload-artifact@v4
         with:

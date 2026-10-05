@@ -166,3 +166,7 @@ and the request carries on. Each lost row also increments
 ```text
 increase(holotable_audit_write_failures_total[15m]) > 0
 ```
+
+---
+
+*Last verified against the code at commit `00ea858` (2026-10-05).*

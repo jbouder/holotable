@@ -26,7 +26,7 @@ production boots with a warning that names what you have given up — a silent
 server keeps no record of its own unhandled errors, and `pretty` lines are
 written for a terminal, not for an aggregator.
 
-`pretty` is the development format: a clock, a coloured level, the message, and
+`pretty` is the development format: a clock, a colored level, the message, and
 the fields, with a multi-line report (the startup configuration report is the
 one that matters) indented beneath rather than escaped into one line.
 
@@ -77,10 +77,9 @@ id would appear on the response and in no log line, which is worse than none.
 
 A W3C `traceparent` header on an inbound request is parsed into `traceId` and
 `spanId` and added to every line of that request. That covers the hop from an
-already-instrumented caller today; when tracing lands
-([#50](https://github.com/jbouder/holotable/issues/50)) the exporter becomes
-the source of these and header parsing stays the fallback for the
-un-instrumented hop.
+already-instrumented caller. Holotable exports no traces of its own; end-to-end
+tracing ([#50](https://github.com/jbouder/holotable/issues/50)) was closed
+without being built.
 
 ## Redaction
 
@@ -144,3 +143,7 @@ No call site threads a logger or a request id; the context is picked up from
 the enclosing request automatically. `console.*` is a lint error in `src/`
 (`suspicious/noConsole` in `biome.json`) — `scripts/` and `test/` are exempt,
 since a CLI's output *is* its interface.
+
+---
+
+*Last verified against the code at commit `00ea858` (2026-10-05).*

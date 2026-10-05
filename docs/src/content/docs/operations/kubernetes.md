@@ -220,3 +220,7 @@ with no rules would cut the app off from its own database. Worth turning on: the
 app's egress is small and known — config store, metrics store, Keycloak, model
 provider — so a policy makes "generated SQL cannot call somewhere else" true at
 the network layer too.
+
+---
+
+*Last verified against the code at commit `00ea858` (2026-10-05).*

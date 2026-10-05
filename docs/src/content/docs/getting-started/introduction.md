@@ -53,3 +53,19 @@ These are enforced, not aspirational — see [Invariants](/architecture/invarian
   steps from an empty install to a live dashboard over your own database.
 - [How it works](/concepts/how-it-works/) — the path from prompt to live chart.
 - [Invariants](/architecture/invariants/) — the numbered guarantees the design rests on.
+
+## Where each topic lives
+
+This site is the canonical explanation of every feature. A few documents live
+in the repository instead, and each is the one place its topic is kept:
+
+- [`SECURITY.md`](https://github.com/jbouder/holotable/blob/main/SECURITY.md) —
+  the trust model, the known limitations, and how to report a vulnerability.
+  [Invariants](/architecture/invariants/) is where each boundary is enforced.
+- [`CONTRIBUTING.md`](https://github.com/jbouder/holotable/blob/main/CONTRIBUTING.md) —
+  local setup, the checks, conventions, and which pages a change must update.
+- [`AGENTS.md`](https://github.com/jbouder/holotable/blob/main/AGENTS.md) — the
+  same conventions in more detail, written for coding agents.
+- The [Helm chart README](https://github.com/jbouder/holotable/tree/main/deploy/helm/holotable) —
+  every chart value. [Deploying on Kubernetes](/operations/kubernetes/) is the
+  reasoning behind them.

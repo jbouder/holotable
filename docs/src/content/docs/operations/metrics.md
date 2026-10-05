@@ -75,7 +75,8 @@ process and Node.js collectors (`holotable_process_cpu_seconds_total`,
 | `holotable_audit_write_failures_total` | counter | — | Audit log rows lost because they could not be written. Anything above zero is a gap in `audit_log`; see [the audit log](/operations/audit-log/) |
 
 `reason` comes from a fixed enum, not the error message: `empty`, `structure`,
-`comment`, `keyword`, `function`, `time`, `catalog`, `column`. The message
+`comment`, `keyword`, `function`, `time`, `catalog`, `column`, `variable`
+(`SqlRejectionReason` in `src/lib/metrics.ts`). The message
 names the offending table, column or function and is therefore
 attacker-influenced text; only the reason is safe as a label. A dry run is not
 counted: the check behind the "hide this column?" warning asks the guard about
@@ -135,3 +136,7 @@ table, and the end-to-end smoke test built on it.
 A Kubernetes deployment scrapes the same endpoint; put the token in a Secret
 and reference it from the `ServiceMonitor`'s `bearerTokenSecret`, or restrict
 the port and use `METRICS_ALLOWED_CIDRS` instead.
+
+---
+
+*Last verified against the code at commit `00ea858` (2026-10-05).*

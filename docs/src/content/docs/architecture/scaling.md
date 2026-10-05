@@ -25,9 +25,9 @@ Running multiple app replicas would create one poller **per replica**:
 - no cross-instance delta sharing, so each replica keeps its own cursor
 - subscribers on different replicas can see different data
 
-`getPoller` keys pollers by `[dashboardId, timeRange.from, timeRange.to]` in a
-process-local `Map`, so "one poller per dashboard" holds only *within* a
-process.
+`getPoller` keys pollers by the dashboard id, its time range, the viewer's
+row-filter claim values and the picked variable values, in a process-local
+`Map`, so "one poller per dashboard" holds only *within* a process.
 
 ## What extraction would take
 
@@ -58,3 +58,7 @@ rather than a rewrite.
   (`src/lib/stream-idle.ts`), and a poller with no subscribers stops.
 - **The public demo** sits behind a Worker with per-IP limits
   (`deploy/cloudflare/demo/`).
+
+---
+
+*Last verified against the code at commit `00ea858` (2026-10-05).*
