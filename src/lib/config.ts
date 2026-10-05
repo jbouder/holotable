@@ -157,6 +157,13 @@ export const config = {
   sseReauthIntervalMs: num("SSE_REAUTH_INTERVAL_MS", 60_000),
 
   /**
+   * The longest a service-account API token may live, in days (#288). Every
+   * token has an expiry, and this caps it, so a forgotten one runs out.
+   * Documented default: 90.
+   */
+  apiTokenMaxDays: num("API_TOKEN_MAX_DAYS", 90),
+
+  /**
    * The AI model id used for generation, surfaced read-only to the UI so users
    * can see which model produced their specs. Empty when unconfigured. This is
    * a display label only — actual provider/model resolution lives in
@@ -483,6 +490,7 @@ const EnvSchema = z.object({
   GENERATION_LOG_RETENTION_DAYS: blank(nonNegativeInt),
   SHUTDOWN_GRACE_MS: blank(positiveInt),
   SSE_REAUTH_INTERVAL_MS: blank(positiveInt),
+  API_TOKEN_MAX_DAYS: blank(positiveInt),
 
   // Not `blank()`: the empty string is a real declaration here ("no source
   // may resolve credentials yet"), distinct from the variable being unset.

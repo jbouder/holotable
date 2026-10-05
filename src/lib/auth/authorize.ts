@@ -1,4 +1,5 @@
-import { cookies } from "next/headers";
+import { cookies, headers } from "next/headers";
+import { bearerApiToken, resolveApiToken } from "@/lib/auth/api-token";
 import { audit, type AuditResource } from "@/lib/audit";
 import { config } from "@/lib/config";
 import { accessibleWorkspaces, hasWorkspaceRole, type Identity } from "@/lib/auth/claims";
@@ -139,8 +140,18 @@ export function authorizedWorkspaces(
   );
 }
 
-/** Read + verify the session cookie, returning the identity or null. */
+/**
+ * The request's identity, or null: a service-account API token in an
+ * `Authorization: Bearer ht_…` header (#288), or else the session cookie.
+ * A bearer header that is not a valid token is a refusal, not a reason to
+ * fall back to the cookie, so a request means one identity or none.
+ */
 export async function getIdentity(): Promise<Identity | null> {
+  const authorization = (await headers()).get("authorization");
+  if (authorization && /^bearer\s/i.test(authorization)) {
+    const token = bearerApiToken(authorization);
+    return token ? resolveApiToken(token) : null;
+  }
   const store = await cookies();
   const token = store.get(config.sessionCookieName)?.value;
   if (!token) return null;

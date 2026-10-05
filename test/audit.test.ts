@@ -315,6 +315,8 @@ const EMITTERS: Record<string, string[]> = {
   "workspaces/[id]/annotations/[annotationId]": ["annotation.delete"],
   "dashboards/[id]/shares": ["share.create"],
   "dashboards/[id]/shares/[shareId]": ["share.revoke"],
+  "workspaces/[id]/tokens": ["token.create"],
+  "workspaces/[id]/tokens/[tokenId]": ["token.revoke"],
 };
 
 test("each listed event is recorded by the route where it happens", () => {

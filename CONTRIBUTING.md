@@ -74,6 +74,9 @@ path — so you need the Keycloak from `docker compose` (or your own realm) when
 running the app with `npm run dev`. See
 [Keycloak setup](docs/src/content/docs/operations/keycloak.md) for the
 group-mapper configuration that produces the roles the app authorizes against.
+Scripts and pipelines that are not a person use a service-account API token
+from **Settings → API tokens** instead (#288); it holds one workspace at viewer
+or editor and is checked by the same `can()`.
 
 The one exception is `AUTH_MODE=demo`, which gives every visitor a session with
 no login, for evaluating Holotable and for the public demo. It refuses to boot

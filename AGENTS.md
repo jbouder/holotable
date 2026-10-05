@@ -440,8 +440,20 @@ variable, and refuses `DEMO_GROUPS` that reach `source-admin` or
 touches `src/lib/auth/`, the session or the claims still runs against the
 realm.
 
+Two credentials are not people, and neither is a way in for one:
+
+- **Service-account API tokens** (#288, `src/lib/auth/api-token.ts`):
+  `Authorization: Bearer ht_…`, minted by a source-admin under
+  `/settings/tokens`, hashed in `api_tokens`. A token resolves to one
+  workspace at viewer or editor, never source-admin or platform admin, and
+  `can()` decides its requests from that role exactly as for a person. It
+  cannot open a dashboard stream or manage tokens.
+- **Share links** (#65): view one dashboard, and only through the stream and
+  `src/app/embed/`.
+
 Authorization is derived exclusively from the validated identity token's
-`groups` claim and is centralized in `can()` (`src/lib/auth/authorize.ts`).
+`groups` claim (or, for a service-account token, its row's single role) and
+is centralized in `can()` (`src/lib/auth/authorize.ts`).
 Group paths map to per-workspace roles, highest role wins, and parsing fails
 closed (`src/lib/auth/claims.ts`).
 

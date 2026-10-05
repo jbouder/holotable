@@ -101,6 +101,8 @@ hand.
 | `/api/workspaces/[id]/limits` | PATCH | platform admin | Set or clear the workspace's `ratePerMinute` and `dailyTokenBudget` overrides in `workspace_limits`. A present key is written, `null` inherits the environment's value again, `0` disables the limit, and an absent key is left alone. Gated on `workspace:limits`, which no workspace role grants. Each change writes a `workspace_limits.changed` log line with the before and after values. Answers with the workspace's effective limits and today's usage; the next model call uses them, with no restart |
 | `/api/workspaces/[id]/annotations` | POST | editor | Write an [annotation](/concepts/annotations/) into the workspace in the path: `{ at, endedAt?, kind, title, description?, tags?, source? }`. Audited as `annotation.create` |
 | `/api/workspaces/[id]/annotations/[annotationId]` | DELETE | editor | Delete one of that workspace's annotations; another workspace's id is a `404`. Audited as `annotation.delete` |
+| `/api/workspaces/[id]/tokens` | GET, POST | source-admin | List the workspace's [API tokens](/operations/api-tokens/), or create one (`{ name, role, expiresInDays }`); the token is in the create response only. Audited as `token.create` |
+| `/api/workspaces/[id]/tokens/[tokenId]` | DELETE | source-admin | Revoke a token; refused from its next request. Audited as `token.revoke` |
 
 ## Auth
 

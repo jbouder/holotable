@@ -138,6 +138,20 @@ source ids, may be framed only by the origins the token names, and the link is
 revocable at once. See
 [Share links](docs/src/content/docs/operations/share-links.md).
 
+**Service-account API tokens.** A pipeline or script calls the API with
+`Authorization: Bearer ht_…` (#288). A source-admin mints the token in one
+workspace at viewer or editor, never source-admin or platform admin; a CHECK in
+`api_tokens` holds the role, and the resolver refuses any other. Only the
+token's SHA-256 is stored, and the plaintext is shown once. Every request looks
+the row up again, so revocation and expiry (at most `API_TOKEN_MAX_DAYS`) take
+effect on the next one. `can()` decides from the token's single role, with no
+rule of its own. A bearer header that is not a valid token is a refusal, never
+a fall back to the cookie. Tokens cannot open a dashboard stream or manage
+tokens. A browser page on another origin cannot use one for a mutation,
+because the origin check refuses it before authentication. Requests made with
+a token are audited as `token:<id>`. See
+[API tokens](docs/src/content/docs/operations/api-tokens.md).
+
 **Cookies and cross-origin requests.** The session cookie is `httpOnly` and
 `SameSite=Lax`. When it is `Secure`, its name is `__Host-` prefixed, so the
 browser accepts it only from this host with `Path=/` and no `Domain`; a sibling
