@@ -14,7 +14,7 @@ import type { PollerEvent } from "@/lib/poller/registry";
 import { DashboardGrid } from "@/components/dashboard/DashboardGrid";
 import { PanelView, type PanelState } from "@/components/dashboard/PanelView";
 import { ErrorDisplay } from "@/components/ui/error-display";
-import type { ApiError } from "@/lib/errors";
+import { type ApiError, presentError } from "@/lib/errors";
 import { ConnectionIndicator } from "@/components/dashboard/ConnectionIndicator";
 import { NavPortal } from "@/components/nav-slot";
 import { Button } from "@/components/ui/button";
@@ -85,6 +85,7 @@ export function LiveDashboard({
   variables = [],
   initialSelection = {},
   annotationAccess,
+  shareToken,
 }: {
   dashboardId: string;
   spec: Dashboard;
@@ -114,7 +115,14 @@ export function LiveDashboard({
    * workspace is the dashboard record's; the server authorizes every write.
    */
   annotationAccess?: { workspaceId: string; canEdit: boolean };
+  /**
+   * A read-only share link's token (#65): the stream runs on it instead of a
+   * session, with the share's window and each variable's default, and the
+   * page offers no controls that would need a session.
+   */
+  shareToken?: string;
 }) {
+  const shared = shareToken !== undefined;
   const [selection, setSelection] = React.useState<Selection>(initialSelection);
   const [states, setStates] = React.useState<Record<string, PanelState>>({});
   const [live, setLive] = React.useState(true);
@@ -165,11 +173,14 @@ export function LiveDashboard({
   );
   const cycle = cycleMs(spec);
   const streamUrl = React.useMemo(() => {
+    if (shareToken !== undefined) {
+      return `/api/dashboards/${dashboardId}/stream?${new URLSearchParams({ share: shareToken })}`;
+    }
     const params = new URLSearchParams(timeRange);
     // The picks travel with the stream (#67), and the server checks them.
     for (const [key, value] of selectionParams(selection)) params.append(key, value);
     return `/api/dashboards/${dashboardId}/stream?${params.toString()}`;
-  }, [dashboardId, timeRange, selection]);
+  }, [dashboardId, timeRange, selection, shareToken]);
 
   /**
    * Keep the URL on the window being viewed, so a range is a link someone can
@@ -181,6 +192,8 @@ export function LiveDashboard({
    * every time the range changed.
    */
   React.useEffect(() => {
+    // A share link's URL is its token, and it picks nothing.
+    if (shared) return;
     // The window, when it is not the dashboard's own, and the picks (#67).
     const params = new URLSearchParams(rangeSearch(timeRange, spec.timeRange));
     for (const [key, value] of selectionParams(selection)) params.append(key, value);
@@ -189,7 +202,7 @@ export function LiveDashboard({
     if (url !== window.location.pathname + window.location.search) {
       window.history.replaceState(null, "", url);
     }
-  }, [timeRange, spec.timeRange, selection]);
+  }, [timeRange, spec.timeRange, selection, shared]);
 
   const signal = React.useCallback((s: ConnectionSignal) => {
     setConnection((prev) => reduceConnection(prev, s));
@@ -342,7 +355,9 @@ export function LiveDashboard({
       // EventSource cannot see the status code, so a closed stream is treated
       // as a possible expiry: renew once and, if that worked, reconnect. If
       // the session is over, the keepalive banner asks for a sign-in.
-      if (closed && !renewTriedRef.current) {
+      // A share link has no session to renew; its stream ends with
+      // `access-ended`, which says why.
+      if (closed && !renewTriedRef.current && !shared) {
         renewTriedRef.current = true;
         void renewSession().then((result) => {
           if (result.ok) setReconnectNonce((n) => n + 1);
@@ -394,7 +409,9 @@ export function LiveDashboard({
       es.close();
       setStates(markStale);
       setDashboardError({
-        error: "This dashboard was deleted, or you no longer have access to it.",
+        error: shared
+          ? "This link has expired or been revoked."
+          : "This dashboard was deleted, or you no longer have access to it.",
         kind: "authorization",
       });
       signal({ type: "error", closed: true });
@@ -481,7 +498,7 @@ export function LiveDashboard({
           onChanged={reloadAnnotations}
         />
       )}
-      <TimeRangeFilter value={timeRange} onChange={setTimeRange} />
+      {!shared && <TimeRangeFilter value={timeRange} onChange={setTimeRange} />}
     </>
   );
 
@@ -497,11 +514,12 @@ export function LiveDashboard({
           sit here under the title instead; from `lg` they are portalled into
           the bar (see `NavSlot`).
         */}
-        <div className="flex flex-wrap items-center gap-2 lg:hidden">
+        {/* A share link's page has no top bar to portal into. */}
+        <div className={cn("flex flex-wrap items-center gap-2", !shared && "lg:hidden")}>
           {streamControls}
         </div>
       </div>
-      <NavPortal>{streamControls}</NavPortal>
+      {!shared && <NavPortal>{streamControls}</NavPortal>}
 
       <VariablePickers
         choices={variables}
@@ -523,7 +541,20 @@ export function LiveDashboard({
         </div>
       </Notice>
 
-      {dashboardError && <ErrorDisplay error={dashboardError} className="mb-4" />}
+      {dashboardError && (
+        <ErrorDisplay
+          error={
+            // Someone holding a link has no workspace admin to ask.
+            shared && dashboardError.kind === "authorization"
+              ? {
+                  ...presentError(dashboardError),
+                  hint: "Ask whoever shared it for a new link.",
+                }
+              : dashboardError
+          }
+          className="mb-4"
+        />
+      )}
 
       <DashboardGrid
         panels={spec.panels}
@@ -533,7 +564,7 @@ export function LiveDashboard({
             panel={panel}
             state={states[panel.id]}
             onRetry={
-              states[panel.id]?.status === "degraded" && live
+              states[panel.id]?.status === "degraded" && live && !shared
                 ? () => void retryPanel(panel.id)
                 : undefined
             }
@@ -541,7 +572,8 @@ export function LiveDashboard({
             timeRange={panelTimeRange(panel, timeRange)}
             dashboardTitle={spec.title}
             crosshairGroup={dashboardId}
-            onSelectTimeRange={setTimeRange}
+            onSelectTimeRange={shared ? undefined : setTimeRange}
+            embedded={shared}
             // A panel with its own window (#114) is sent it with its rows.
             window={panel.timeRange ? undefined : resolvedWindow}
             // Hidden is an empty list rather than none, so the merge clears

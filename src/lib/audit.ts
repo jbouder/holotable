@@ -65,6 +65,8 @@ export const AUDIT_ACTIONS = [
   "workspace.limits.update",
   "annotation.create",
   "annotation.delete",
+  "share.create",
+  "share.revoke",
 ] as const;
 
 export type AuditAction = (typeof AUDIT_ACTIONS)[number];

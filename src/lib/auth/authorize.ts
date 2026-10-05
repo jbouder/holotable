@@ -39,6 +39,12 @@ export interface AuthzContext {
   workspaceId: string;
   /** Owner subject of the target resource, required for owner-gated actions. */
   ownerSub?: string;
+  /**
+   * The dashboard acted on, where there is one. Only a share link (#65)
+   * needs it: a share may view one dashboard, so a check that does not name
+   * that dashboard refuses it.
+   */
+  dashboardId?: string;
 }
 
 export class HttpError extends Error {
@@ -65,6 +71,15 @@ export class HttpError extends Error {
  * globally authorized (the single sanctioned bypass).
  */
 export function can(identity: Identity, action: Action, ctx: AuthzContext): boolean {
+  // A share link (#65) views its one dashboard and does nothing else. First,
+  // so no other rule (the admin bypass included) can widen it.
+  if (identity.share) {
+    return (
+      action === "dashboard:view" &&
+      ctx.dashboardId === identity.share.dashboardId &&
+      ctx.workspaceId === identity.share.workspaceId
+    );
+  }
   if (identity.platformAdmin) return true;
   const { workspaceId, ownerSub } = ctx;
 

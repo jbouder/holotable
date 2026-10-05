@@ -136,9 +136,9 @@ test("there are still exactly five auth routes", () => {
   ]);
 });
 
-test("a cookie-less page request is sent through demo login; an API request is not", () => {
+test("a cookie-less page request is sent through demo login; an API request is not", async () => {
   const navigation = { "sec-fetch-dest": "document" };
-  const page = proxy(
+  const page = await proxy(
     new NextRequest("http://localhost/dashboards?tag=x", { headers: navigation }),
   );
   assert.equal(page.status, 307);
@@ -150,7 +150,7 @@ test("a cookie-less page request is sent through demo login; an API request is n
   assert.equal(page.headers.get("cache-control"), "no-store");
 
   // Behind a reverse proxy or a Worker the redirect follows the visitor's host.
-  const proxied = proxy(
+  const proxied = await proxy(
     new NextRequest("http://0.0.0.0:3000/explore", {
       headers: {
         ...navigation,
@@ -164,7 +164,7 @@ test("a cookie-less page request is sent through demo login; an API request is n
     new URL(proxied.headers.get("location") ?? "").origin,
     "https://demo.example.com",
   );
-  const hosted = proxy(
+  const hosted = await proxy(
     new NextRequest("http://0.0.0.0:3000/explore", {
       headers: { ...navigation, host: "localhost:3000" },
     }),
@@ -174,14 +174,14 @@ test("a cookie-less page request is sent through demo login; an API request is n
     "http://localhost:3000",
   );
 
-  const withCookie = proxy(
+  const withCookie = await proxy(
     new NextRequest("http://localhost/dashboards", {
       headers: { ...navigation, cookie: `${config.sessionCookieName}=anything` },
     }),
   );
   assert.notEqual(withCookie.status, 307);
 
-  const prefetch = proxy(
+  const prefetch = await proxy(
     new NextRequest("http://localhost/dashboards", {
       headers: { ...navigation, "next-router-prefetch": "1" },
     }),
@@ -189,7 +189,7 @@ test("a cookie-less page request is sent through demo login; an API request is n
   assert.notEqual(prefetch.status, 307);
 
   // A browser without Fetch Metadata still navigates with Accept: text/html.
-  const oldBrowser = proxy(
+  const oldBrowser = await proxy(
     new NextRequest("http://localhost/dashboards", {
       headers: { accept: "text/html,application/xhtml+xml,*/*;q=0.8" },
     }),
@@ -205,7 +205,7 @@ test("a cookie-less page request is sent through demo login; an API request is n
   ];
   for (const headers of probes) {
     assert.notEqual(
-      proxy(new NextRequest("http://localhost/", { headers })).status,
+      (await proxy(new NextRequest("http://localhost/", { headers }))).status,
       307,
       JSON.stringify(headers),
     );

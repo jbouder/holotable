@@ -177,6 +177,7 @@ export default async function DashboardViewPage({
               spec={dashboard.spec}
               canSaveTemplate={canSaveTemplate}
               canDelete={canDelete}
+              canShare={canEdit}
             />
           </>
         }

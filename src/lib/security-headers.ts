@@ -14,9 +14,17 @@
  * The app renders model-influenced text (titles, descriptions, SQL), so the
  * policy is the last line against a rendering bug turning into script
  * execution: no inline script runs without this request's nonce, nothing loads
- * from another origin, and the page cannot be framed (the embed mode in #65
- * relaxes `frame-ancestors` per response when it lands).
+ * from another origin, and the page cannot be framed. The one exception is a
+ * share link's embed page (#65, under {@link EMBED_PATH_PREFIX}): it may be
+ * framed by exactly the origins its signed token names, and by nobody when it
+ * names none.
  */
+
+/** Where a share link's chrome-less page lives (#65). */
+export const EMBED_PATH_PREFIX = "/embed/";
+
+/** The request header the proxy marks an embed render with, for the root layout. */
+export const EMBED_REQUEST_HEADER = "x-holotable-embed";
 
 export interface SecurityHeader {
   key: string;
@@ -31,13 +39,21 @@ const HSTS_MAX_AGE_SECONDS = 31_536_000;
  * `next dev` serves plain http, and a browser that has seen the header for
  * `localhost` refuses http://localhost for every other project for a year.
  */
-export function staticSecurityHeaders(opts: { production: boolean }): SecurityHeader[] {
+export function staticSecurityHeaders(opts: {
+  production: boolean;
+  /**
+   * The embed pages (#65), whose framing is decided per response by the
+   * proxy's `frame-ancestors`. `X-Frame-Options` has no allowlist form, so it
+   * is left off there rather than set to something it cannot say.
+   */
+  framable?: boolean;
+}): SecurityHeader[] {
   const headers: SecurityHeader[] = [
     { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
     { key: "X-Content-Type-Options", value: "nosniff" },
     // Redundant with `frame-ancestors` for browsers that support CSP, kept for
     // the ones that do not.
-    { key: "X-Frame-Options", value: "DENY" },
+    ...(opts.framable ? [] : [{ key: "X-Frame-Options", value: "DENY" }]),
     {
       key: "Permissions-Policy",
       value: "camera=(), microphone=(), geolocation=(), payment=()",
@@ -70,6 +86,11 @@ export interface ContentSecurityPolicyOptions {
    * server error stacks with `eval`, and hot reload runs over a WebSocket.
    */
   development: boolean;
+  /**
+   * `frame-ancestors` sources, for a share link's embed page only (#65).
+   * `'none'` everywhere else.
+   */
+  frameAncestors?: string;
 }
 
 /**
@@ -86,6 +107,7 @@ export interface ContentSecurityPolicyOptions {
  */
 export function contentSecurityPolicy(opts: ContentSecurityPolicyOptions): string {
   const { nonce, development } = opts;
+  const frameAncestors = opts.frameAncestors ?? "'none'";
   const directives: string[] = [
     "default-src 'self'",
     `script-src 'self' 'nonce-${nonce}' 'strict-dynamic'${development ? " 'unsafe-eval'" : ""}`,
@@ -97,7 +119,7 @@ export function contentSecurityPolicy(opts: ContentSecurityPolicyOptions): strin
     "object-src 'none'",
     "base-uri 'self'",
     "form-action 'self'",
-    "frame-ancestors 'none'",
+    `frame-ancestors ${frameAncestors}`,
   ];
   return directives.join("; ");
 }
