@@ -78,4 +78,4 @@ suite sets both.
 
 ---
 
-*Last verified against the code at commit `00ea858` (2026-10-05).*
+*Last verified against the code at commit `4e4c5cf` (2026-10-05).*

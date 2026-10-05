@@ -14,10 +14,13 @@ you must add a group-membership mapper.
 `docker compose up` starts Keycloak 26 on `http://localhost:8080` and imports
 `keycloak/holotable-realm.json`: the `holotable` realm, the `holotable` client
 with the settings below, the `demo` workspace's three role groups,
-`/platform-admins`, and one user, **`demo` / `demo`**, in
-`/workspaces/demo/source-admin` and `/platform-admins`. The Keycloak admin
-console signs in as `admin` / `admin`. Both are development credentials and
-must never reach a real deployment. The rest of this page is what to set up in
+`/platform-admins`, and two users: **`demo` / `demo`**, in
+`/workspaces/demo/source-admin` and `/platform-admins`, and **`viewer` /
+`viewer`**, in `/workspaces/demo/viewer`, which the end-to-end suite uses to
+check what a read-only member cannot reach. The client also accepts redirects
+to `http://localhost:3107`, the port `npm run e2e` serves the app on. The
+Keycloak admin console signs in as `admin` / `admin`. All three are
+development credentials and must never reach a real deployment. The rest of this page is what to set up in
 a realm of your own.
 
 ## 1. Realm, client, groups
@@ -153,4 +156,4 @@ verifying, any open dashboard streams for it close, and it cannot be renewed.
 
 ---
 
-*Last verified against the code at commit `00ea858` (2026-10-05).*
+*Last verified against the code at commit `4e4c5cf` (2026-10-05).*

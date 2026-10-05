@@ -102,9 +102,9 @@ Run these before you push. CI runs the same four on every pull request, and
 those four (`Lint`, `Typecheck`, `Test`, `Build`) are the checks required to
 merge. The same workflow also builds the Docker images, lints and renders the
 Helm chart, round-trips the migrations against a real TimescaleDB, runs the
-`Integration` suites and the self-monitoring smoke test, and fuzzes the SQL
-guard for longer; those report on every pull request without gating it, so look
-at them too.
+`Integration` suites, the `End-to-end and accessibility` suite and the
+self-monitoring smoke test, and fuzzes the SQL guard for longer; those report
+on every pull request without gating it, so look at them too.
 
 ```bash
 npm run lint         # biome check (lint + format, no writes)
@@ -347,7 +347,9 @@ request:
 | `src/lib/settings.ts` (a settings section) | `getting-started/settings.md` (held by the same test) |
 | `src/lib/metrics.ts` (an instrument) | `operations/metrics.md` |
 | `migrations/` (a table or column) | `architecture/data-model.md` |
-| `keycloak/holotable-realm.json` | `operations/keycloak.md` (the local realm, client settings) |
+| `keycloak/holotable-realm.json` | `operations/keycloak.md` (the local realm, its users, client settings) |
+| A color token in `src/app/globals.css` | The contrast table in `architecture/accessibility.md` (`test/contrast.test.ts` fails until it matches) |
+| `src/lib/ai/` (a provider, including `stub`) | `operations/ai-provider.md` |
 | `docker-compose.yml`, `deploy/quickstart/` | `getting-started/quick-start.md`, the quick start in `README.md` |
 | `deploy/helm/holotable/` | `operations/kubernetes.md`, the chart's own `README.md` |
 | `scripts/seed.ts`, `scripts/self-metrics.ts` | `getting-started/demo-data.md` |
@@ -378,6 +380,11 @@ Match the surrounding code rather than importing conventions from elsewhere.
   and keys off `<html data-motion>`, never the OS media query directly.
   Durations and curves come from the tokens in `globals.css`; the full rules
   are the "Motion rules" section of `AGENTS.md`.
+- Accessibility is checked, not hoped for. Every text/background token pairing
+  meets WCAG AA in both themes (`test/contrast.test.ts`, with the table in
+  [Accessibility](docs/src/content/docs/architecture/accessibility.md)); a
+  chart goes through `AccessibleChart`, a link styled as a button is
+  `ButtonLink`, and an icon-only control has an `aria-label`.
 - This is Next.js 16 and React 19. Check the installed docs in
   `node_modules/next/dist/docs/` or the existing repository patterns before
   relying on behavior you remember from an older version, and do not introduce

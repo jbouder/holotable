@@ -143,12 +143,16 @@ npm run format         # Biome format --write
 npm run typecheck      # next typegen && tsc --noEmit
 npm test               # node --test via tsx
 npm run test:fuzz      # the property-based SQL guard suite alone (FUZZ_RUNS, FUZZ_SEED)
+npm run test:integration # real-database suites against TimescaleDB (Docker)
+npm run e2e            # Playwright journeys and axe scans against their own stack (Docker)
+npm run e2e:down       # remove the e2e stack
+npm run fixture:capture # save a stored dashboard spec as an IR test fixture
 npm run config:check   # validate the environment as the server does at startup
 npm run migrate        # apply Postgres migrations (--check, --dry-run, --down)
 npm run migrate:verify # round-trip every migration against a scratch database
 npm run seed           # looping metrics seeder (+ demo sources and dashboards)
 npm run self-metrics   # scrape the app's own /api/metrics into metrics.holotable_self
-npm run smoke          # end-to-end check of the self-monitoring dashboard
+npm run smoke          # check the self-monitoring dashboard answers with scraped rows
 ```
 
 ## Pages

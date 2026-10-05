@@ -55,11 +55,14 @@ Key locations:
 - `src/app/` — App Router routes, layouts, pages, API routes
 - `src/components/` — UI and feature components
 - `src/lib/` — shared domain logic, schemas, formatting, utilities
-- `scripts/` — migration and seeding scripts
+- `scripts/` — migration, seeding, integration-runner and fixture-capture
+  scripts
 - `test/` — Node test runner tests (`*.test.ts`; `*.test.tsx` for the few that
   need a real render, via the jsdom harness in `test/support/dom.tsx`)
 - `docs/` — the Astro + Starlight documentation site (its own `package.json`;
   content under `docs/src/content/docs/`)
+- `e2e/` — the Playwright suite (`npm run e2e`): journeys and axe scans
+  against its own stack in `e2e/compose.yml`, signed in through the realm
 - `timescaledb/` — database bootstrap/schema assets
 - `deploy/` — the Helm chart (`deploy/helm/holotable/`, with runnable example
   values under `examples/`), a reference Argo CD `Application`, and the
@@ -516,10 +519,10 @@ CI (`.github/workflows/ci.yml`) runs all four on every pull request, and
 those four (`Lint`, `Typecheck`, `Test`, `Build`) are the required checks on
 `main`. The same workflow also builds the Docker images, lints and renders the
 Helm chart, round-trips the migrations against TimescaleDB, and runs the
-real-database `Integration` suites, the self-monitoring smoke test and a long
-fuzz of the SQL guard; those report on every pull request but do not gate the
-merge, so read them. Five constraints
-CI enforces that are easy to break accidentally:
+real-database `Integration` suites, the Playwright and axe `End-to-end and
+accessibility` suite, the self-monitoring smoke test and a long fuzz of the SQL
+guard; those report on every pull request but do not gate the merge, so read
+them. Five constraints CI enforces that are easy to break accidentally:
 
 - `lint` is **Biome**, linter and formatter in one tool, configured entirely in
   `biome.json`. CI runs `biome ci`, which never writes, so an unformatted file
