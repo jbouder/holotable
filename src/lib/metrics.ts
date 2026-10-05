@@ -58,7 +58,8 @@ export type SqlRejectionReason =
   | "function"
   | "time"
   | "catalog"
-  | "column";
+  | "column"
+  | "variable";
 
 /** What happened to a model request at the admission gate. */
 export type LlmRequestOutcome = "admitted" | "rate_limited" | "over_budget";

@@ -102,6 +102,12 @@ tricks, comments, casing, whitespace — and checks that everything poisoned is
 rejected, everything benign is accepted, and everything accepted satisfies an
 independent walk of the parse tree.
 
+A dashboard variable ([Dashboard variables](/concepts/variables/), #67) never
+widens this. `:name` is found by PostgreSQL's scanner, must be declared, and is
+checked as the `$n` it runs as; a statement's own `$n` is still refused. The
+picked value is a bound parameter, never part of the text, and is checked
+against what the variable allows the viewer before anything runs.
+
 ## 8. The server owns the time range
 
 Blocking `now()` and `current_timestamp` is not sufficient on PostgreSQL:

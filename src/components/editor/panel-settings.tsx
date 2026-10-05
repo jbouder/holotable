@@ -3,6 +3,7 @@
 import * as React from "react";
 import { ArrowDown, ArrowUp, Plus, X } from "lucide-react";
 import { TimeRangeFilter } from "@/components/dashboard/TimeRangeFilter";
+import { useSyncedDraft } from "@/components/editor/use-synced-draft";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input, Label, Textarea } from "@/components/ui/input";
@@ -41,23 +42,6 @@ export interface SettingsIntent {
 }
 
 type OnChange = (fn: (p: Panel) => Panel, intent: SettingsIntent) => void;
-
-/**
- * A draft that follows the spec. While the person edits, the draft is theirs
- * (a half-typed number, a step out of order); when the spec changes from
- * anywhere else (undo, the JSON box, another control) the draft is taken from
- * it again. `committed` tells the hook what the spec will now say, so its own
- * commit is not mistaken for an outside change.
- */
-function useSyncedDraft<D>(external: string, fromSpec: () => D) {
-  const [draft, setDraft] = React.useState(fromSpec);
-  const [seen, setSeen] = React.useState(external);
-  if (external !== seen) {
-    setSeen(external);
-    setDraft(fromSpec());
-  }
-  return { draft, setDraft, committed: setSeen };
-}
 
 function Problem({
   id,

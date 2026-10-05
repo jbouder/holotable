@@ -3,6 +3,8 @@ import { getSourceById } from "@/lib/db/repo";
 import type { SourceRecord } from "@/lib/registry";
 import { validateSql, buildExecutablePlan, type ExecutablePlan } from "@/lib/sql/safety";
 import { RowFilterDenied, RowFilterError } from "@/lib/sql/row-filter";
+import { VariableError, type VariableValues } from "@/lib/sql/variables";
+import { valuesKey } from "@/lib/variable-selection";
 import { rowFilterInScope, type RowScope } from "@/lib/row-scope";
 import { resolveTimeRange, TimeRangeError } from "@/lib/time";
 import { executePlan, QueryExecutionError } from "@/lib/timescaledb/client";
@@ -156,12 +158,18 @@ export function computeDelta(
  * `scope` is the claim values this poller's subscribers share (#31); a
  * row-filtered source is narrowed to the rows they match, and a panel whose
  * source needs a claim the scope lacks is refused, never run unfiltered.
+ *
+ * `variables` is the values this poller's subscribers selected (#67), already
+ * checked against what each variable allows: one for every variable the
+ * dashboard declares, so its names are the declared ones. They are bound as
+ * parameters, never written into the statement.
  */
 export type PanelExecutor = (
   panel: QueryPanel,
   window: TimeWindow,
   dashboardWorkspaceId: string,
   scope: RowScope,
+  variables: VariableValues,
 ) => Promise<PollerEvent[]>;
 
 /**
@@ -172,7 +180,7 @@ export type PanelExecutor = (
 export function makePanelExecutor(
   getSource: (id: string) => Promise<SourceRecord | null> = getSourceById,
 ): PanelExecutor {
-  return async (panel, window, dashboardWorkspaceId, scope) => {
+  return async (panel, window, dashboardWorkspaceId, scope, variables) => {
     // Re-resolve the source on every execution.
     const source = await getSource(panel.query.sourceId);
 
@@ -184,7 +192,11 @@ export function makePanelExecutor(
       return [{ type: "tombstone", panelId: panel.id, sourceId: panel.query.sourceId }];
     }
 
-    const check = await validateSql(panel.query.sql, source.config);
+    const check = await validateSql(
+      panel.query.sql,
+      source.config,
+      new Set(Object.keys(variables)),
+    );
     if (!check.ok) {
       return [
         {
@@ -206,6 +218,7 @@ export function makePanelExecutor(
         // Re-bound every tick from the source as it is now, so a filter
         // added since the poller started applies at once.
         rowFilter: rowFilterInScope(source, scope),
+        variables,
       });
     } catch (err) {
       if (err instanceof RowFilterDenied) {
@@ -218,7 +231,7 @@ export function makePanelExecutor(
           },
         ];
       }
-      if (err instanceof RowFilterError) {
+      if (err instanceof RowFilterError || err instanceof VariableError) {
         return [
           {
             type: "panel-error",
@@ -328,6 +341,7 @@ class DashboardPoller {
     private readonly scope: RowScope = {},
     private executor: PanelExecutor = defaultPanelExecutor,
     private readonly backoff: BackoffPolicy = configuredBackoff(),
+    private readonly variables: VariableValues = {},
   ) {}
 
   /** The dashboard's refresh interval, never below the server's floor. */
@@ -559,6 +573,7 @@ class DashboardPoller {
         window,
         this.dashboardWorkspaceId,
         this.scope,
+        this.variables,
       );
       this.health.delete(panel.id);
       const span = { from: window.from.getTime(), to: window.to.getTime() };
@@ -712,6 +727,10 @@ const registry = new Map<string, DashboardPoller>();
  * and is part of the key: subscribers share a poller only when they would see
  * the same rows. A dashboard with no row-filtered source has an empty scope,
  * and every viewer shares one poller as before.
+ *
+ * `variables` is the subscriber's checked variable values (#67), and is part
+ * of the key too: two viewers with different selections are different
+ * statements, and share nothing.
  */
 export function getPoller(
   dashboardId: string,
@@ -720,6 +739,7 @@ export function getPoller(
   spec: Dashboard,
   scope: RowScope,
   executor: PanelExecutor = defaultPanelExecutor,
+  variables: VariableValues = {},
 ): DashboardPoller {
   const scopeKey = Object.entries(scope).sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0));
   const key = JSON.stringify([
@@ -727,6 +747,7 @@ export function getPoller(
     spec.timeRange.from,
     spec.timeRange.to,
     scopeKey,
+    valuesKey(variables),
   ]);
   const existing = registry.get(key);
   if (existing?.isStalled) {
@@ -744,6 +765,8 @@ export function getPoller(
     spec,
     scope,
     executor,
+    configuredBackoff(),
+    variables,
   );
   registry.set(key, poller);
   return poller;

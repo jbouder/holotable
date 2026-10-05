@@ -247,6 +247,101 @@ export function cycleMs(spec: Pick<Dashboard, "panels" | "refreshIntervalMs">): 
 }
 
 /**
+ * Dashboard variables (#67): a name panel SQL references as `:name`, and the
+ * values a viewer may pick for it. A value is only ever a bound parameter
+ * (`src/lib/sql/variables.ts`), and the server checks every value it is sent
+ * against this declaration: the listed `values` of an `enum`, or what the
+ * variable's own guarded `query` returns.
+ */
+export const VariableName = z
+  .string()
+  .regex(
+    /^[a-z][a-z0-9_]{0,31}$/,
+    "a variable name is lowercase letters, digits and _, starting with a letter, at most 32",
+  );
+
+/** One value, as a viewer selects it and the statement is bound with it. */
+export const VariableText = z.string().min(1).max(256);
+
+/** The most values a variable lists, or its query offers. */
+export const VARIABLE_VALUES_MAX = 200;
+
+/**
+ * Where a `query` variable's values come from: the first column of a guarded
+ * SELECT against a source in the dashboard's workspace. No time filter, and
+ * no variables of its own.
+ */
+export const VariableQuery = z
+  .object({
+    sourceId: z.string().min(1).max(128),
+    sql: z.string().min(1).max(8_000),
+  })
+  .strict();
+
+export const Variable = z
+  .object({
+    name: VariableName,
+    /** What the picker is labeled; the name by default. */
+    label: z.string().min(1).max(64).optional(),
+    type: z.enum(["enum", "query"]),
+    /** An `enum`'s values, in the picker's order. */
+    values: z.array(VariableText).min(1).max(VARIABLE_VALUES_MAX).optional(),
+    /** A `query` variable's source of values. */
+    query: VariableQuery.optional(),
+    /** Several values at once, bound as an array: write `col = ANY(:name)`. */
+    multi: z.boolean().optional(),
+    /** The selection before a viewer picks one. By default the first value. */
+    default: z
+      .union([VariableText, z.array(VariableText).min(1).max(VARIABLE_VALUES_MAX)])
+      .optional(),
+  })
+  .strict()
+  .superRefine((v, ctx) => {
+    if (v.type === "enum" && (v.values === undefined || v.query !== undefined)) {
+      ctx.addIssue({
+        code: "custom",
+        message: 'an "enum" variable lists "values" and has no "query"',
+        path: ["values"],
+      });
+    }
+    if (v.type === "query" && (v.query === undefined || v.values !== undefined)) {
+      ctx.addIssue({
+        code: "custom",
+        message: 'a "query" variable has a "query" and no "values"',
+        path: ["query"],
+      });
+    }
+    if (v.values && new Set(v.values).size !== v.values.length) {
+      ctx.addIssue({
+        code: "custom",
+        message: "values must be unique",
+        path: ["values"],
+      });
+    }
+    if (Array.isArray(v.default) && !v.multi) {
+      ctx.addIssue({
+        code: "custom",
+        message: 'only a "multi" variable defaults to several values',
+        path: ["default"],
+      });
+    }
+    const defaults = v.default === undefined ? [] : [v.default].flat();
+    if (v.values && defaults.some((d) => !v.values?.includes(d))) {
+      ctx.addIssue({
+        code: "custom",
+        message: "the default must be one of the values",
+        path: ["default"],
+      });
+    }
+  });
+export type Variable = z.infer<typeof Variable>;
+
+/** The names a dashboard declares: what its panels' SQL may reference. */
+export function declaredVariables(spec: { variables?: Variable[] }): Set<string> {
+  return new Set((spec.variables ?? []).map((v) => v.name));
+}
+
+/**
  * The IR version this build writes, and the only one {@link Dashboard}
  * accepts.
  *
@@ -266,9 +361,25 @@ const DashboardFields = {
   timeRange: TimeRange,
   refreshIntervalMs: RefreshIntervalMs,
   panels: z.array(Panel).min(1).max(50),
+  /** Variables panel SQL may reference as `:name` (#67). */
+  variables: z.array(Variable).max(10).optional(),
 };
 
-function uniquePanelIds(dash: { panels: Panel[] }, ctx: z.RefinementCtx): void {
+function uniqueIds(
+  dash: { panels: Panel[]; variables?: Variable[] },
+  ctx: z.RefinementCtx,
+): void {
+  const names = new Set<string>();
+  dash.variables?.forEach((v, i) => {
+    if (names.has(v.name)) {
+      ctx.addIssue({
+        code: "custom",
+        message: `duplicate variable "${v.name}"`,
+        path: ["variables", i, "name"],
+      });
+    }
+    names.add(v.name);
+  });
   const ids = new Set<string>();
   dash.panels.forEach((p, i) => {
     if (ids.has(p.id)) {
@@ -290,7 +401,7 @@ export const Dashboard = z
     ...DashboardFields,
   })
   .strict()
-  .superRefine(uniquePanelIds);
+  .superRefine(uniqueIds);
 export type Dashboard = z.infer<typeof Dashboard>;
 
 /**
@@ -304,7 +415,7 @@ export type Dashboard = z.infer<typeof Dashboard>;
 export const DashboardGenerationSchema = z
   .object(DashboardFields)
   .strict()
-  .superRefine(uniquePanelIds);
+  .superRefine(uniqueIds);
 export type GeneratedDashboard = z.infer<typeof DashboardGenerationSchema>;
 
 /**

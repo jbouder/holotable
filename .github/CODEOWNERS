@@ -16,6 +16,12 @@
 # pollers are narrowed to. A wrong binding serves one tenant another's rows.
 /src/lib/row-scope.ts           @jbouder
 
+# Dashboard variables: which values a viewer may bind, and the query that
+# decides it. A value allowed here that should not be is another tenant's row
+# or a value the dashboard never offered.
+/src/lib/variables.ts           @jbouder
+/src/lib/variable-selection.ts  @jbouder
+
 # Authentication and authorization. OIDC session handling, claim parsing
 # (highest role wins, fail-closed), and the central can() check.
 /src/lib/auth/                  @jbouder

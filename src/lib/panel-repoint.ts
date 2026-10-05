@@ -88,12 +88,14 @@ export interface RepointCheck {
 export async function checkRepoint(
   panels: QueryPanel[],
   sourceId: string,
+  /** The variables the dashboard declares (#67). */
+  variables: readonly string[] = [],
 ): Promise<RepointCheck[]> {
   return Promise.all(
     panels.map(async (panel) => ({
       panelId: panel.id,
       title: panel.title,
-      check: await validatePanelSql({ sourceId, sql: panel.query.sql }),
+      check: await validatePanelSql({ sourceId, sql: panel.query.sql, variables }),
     })),
   );
 }

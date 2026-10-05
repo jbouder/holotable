@@ -118,6 +118,18 @@ test("shifting forward past now returns to the rolling window of the same width"
   assert.deepEqual(forward, { from: "now-1h", to: "now" });
   assert.equal(isRolling(forward), true);
 
+  // However long the reader looked before pressing forward, and whatever the
+  // clock's milliseconds were when they pressed back (which `isoExpr` trims).
+  const startedAt = new Date("2026-09-22T12:00:00.990Z");
+  const looked = shiftRange({ from: "now-1h", to: "now" }, -1, startedAt);
+  for (const later of [1_000, 15_000, 10 * 60_000]) {
+    assert.deepEqual(
+      shiftRange(looked, 1, new Date(startedAt.getTime() + later)),
+      { from: "now-1h", to: "now" },
+      `forward ${later}ms later`,
+    );
+  }
+
   // Two steps back is still history, so it stays absolute.
   const twoBack = shiftRange(back, -1, NOW);
   assert.equal(isRolling(twoBack), false);
@@ -125,6 +137,7 @@ test("shifting forward past now returns to the rolling window of the same width"
     from: "2026-09-22T09:00:00Z",
     to: "2026-09-22T10:00:00Z",
   });
+  assert.equal(isRolling(shiftRange(twoBack, 1, NOW)), false, "back two, forward one");
 });
 
 test("zooming a live window keeps it live; zooming a fixed one keeps it fixed", () => {

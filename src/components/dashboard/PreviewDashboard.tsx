@@ -5,6 +5,7 @@ import { type Dashboard, hasQuery, panelTimeRange, type QueryPanel } from "@/lib
 import { DashboardGrid } from "@/components/dashboard/DashboardGrid";
 import { PanelView, type PanelState } from "@/components/dashboard/PanelView";
 import { EMPTY_ROWS, runPanelQuery } from "@/lib/panel-query";
+import { usePreviewValues } from "@/components/editor/variables-editor";
 
 /**
  * One-shot preview: runs each panel's guarded query once via /api/query and
@@ -13,12 +14,16 @@ import { EMPTY_ROWS, runPanelQuery } from "@/lib/panel-query";
  */
 export function PreviewDashboard({ spec }: { spec: Dashboard }) {
   const [states, setStates] = React.useState<Record<string, PanelState>>({});
+  // Each variable at its default or first value (#67).
+  const { values: variables, ready } = usePreviewValues(spec.variables);
 
   const runPanel = React.useCallback(
     async (panel: QueryPanel, timeRange: Dashboard["timeRange"]) => {
       setStates((s) => ({ ...s, [panel.id]: { data: EMPTY_ROWS, status: "loading" } }));
       // A panel with its own window (#114) is previewed over it.
-      const outcome = await runPanelQuery(panel.query, panelTimeRange(panel, timeRange));
+      const outcome = await runPanelQuery(panel.query, panelTimeRange(panel, timeRange), {
+        variables,
+      });
       setStates((s) => ({
         ...s,
         [panel.id]: outcome.ok
@@ -26,7 +31,7 @@ export function PreviewDashboard({ spec }: { spec: Dashboard }) {
           : { data: EMPTY_ROWS, status: "error", error: outcome.error },
       }));
     },
-    [],
+    [variables],
   );
 
   // `spec` is a fresh object on every render, so depending on it directly would
@@ -36,10 +41,13 @@ export function PreviewDashboard({ spec }: { spec: Dashboard }) {
   const specKey = JSON.stringify(spec);
   // biome-ignore lint/correctness/useExhaustiveDependencies: keyed on the serialized spec on purpose
   React.useEffect(() => {
+    // Not before the variables' values are known: a panel that references one
+    // would only be refused for lacking it.
+    if (!ready) return;
     // A text panel (#202) has nothing to run; it renders as it is.
     for (const panel of spec.panels.filter(hasQuery))
       void runPanel(panel, spec.timeRange);
-  }, [specKey]);
+  }, [specKey, runPanel, ready]);
 
   return (
     <DashboardGrid

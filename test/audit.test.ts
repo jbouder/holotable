@@ -300,6 +300,7 @@ const EMITTERS: Record<string, string[]> = {
   "dashboards/[id]/chat": ["dashboard.chat", "query.execute"],
   generate: ["dashboard.generate"],
   query: ["query.execute"],
+  "variables/options": ["query.execute"],
   sources: ["source.create"],
   "sources/[id]": ["source.update", "source.delete"],
   "sources/[id]/catalog": ["source.update"],

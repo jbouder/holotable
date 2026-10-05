@@ -14,7 +14,9 @@ import { SQL_RULES } from "@/lib/ai/generate";
 import { validateSql, buildExecutablePlan, type ExecutablePlan } from "@/lib/sql/safety";
 import { resolveTimeRange } from "@/lib/time";
 import { executePlan, QueryExecutionError } from "@/lib/timescaledb/client";
-import { Dashboard, hasQuery, Panel, PanelQuery } from "@/lib/ir";
+import { Dashboard, declaredVariables, hasQuery, Panel, PanelQuery } from "@/lib/ir";
+import type { VariableValues } from "@/lib/sql/variables";
+import { defaultValue } from "@/lib/variable-selection";
 import type { SourceRecord } from "@/lib/registry";
 import { can } from "@/lib/auth/authorize";
 import { claimValue, type Identity } from "@/lib/auth/claims";
@@ -106,7 +108,12 @@ export async function buildChatQueryPlan(input: {
     };
   }
 
-  const check = await validateSql(args.sql, source.config);
+  // A panel's statement may reference the dashboard's variables (#67). The
+  // model's query runs with each one's default, or a list's first value; a
+  // query variable without a default has no value here, and a statement that
+  // needs it is refused by name.
+  const variables = chatVariableValues(dashboard);
+  const check = await validateSql(args.sql, source.config, declaredVariables(dashboard));
   if (!check.ok) return { ok: false, error: check.error ?? "invalid sql" };
 
   // The server is the sole authority on the window: use the dashboard's own
@@ -119,6 +126,7 @@ export async function buildChatQueryPlan(input: {
       from: range.from,
       to: range.to,
       rowFilter: bindRowFilter(source.config, (claim) => claimValue(identity, claim)),
+      variables,
     });
     return { ok: true, source, plan };
   } catch (err) {
@@ -128,6 +136,27 @@ export async function buildChatQueryPlan(input: {
     }
     return { ok: false, error: err instanceof Error ? err.message : "invalid query" };
   }
+}
+
+/**
+ * The variables a query may reference (#67). Names only: the IR holds them to
+ * `[a-z][a-z0-9_]*`, so they carry nothing to fence, and their values are
+ * bound by the server rather than shown to the model.
+ */
+function variablesLine(dashboard: Dashboard): string {
+  const names = [...declaredVariables(dashboard)];
+  if (names.length === 0) return "";
+  return `\nVariables a query may reference as :name, bound to their defaults: ${names.join(", ")}`;
+}
+
+/** The values a chat query binds: defaults, or a list's first value. */
+function chatVariableValues(dashboard: Dashboard): VariableValues {
+  const values: Record<string, VariableValues[string]> = {};
+  for (const v of dashboard.variables ?? []) {
+    const value = defaultValue(v, v.values ?? []);
+    if (value !== undefined) values[v.name] = value;
+  }
+  return values;
 }
 
 // Prompt clamps for stored panel fields: the IR schema's own maxima, read from
@@ -193,7 +222,7 @@ panels, or change its settings.
 
 Dashboard: "${sanitizePromptField(dashboard.title, PANEL_MAX.dashboardTitle)}"
 Time range (fixed by the server): ${dashboard.timeRange.from} -> ${dashboard.timeRange.to}
-Refresh interval: ${dashboard.refreshIntervalMs}ms
+Refresh interval: ${dashboard.refreshIntervalMs}ms${variablesLine(dashboard)}
 
 Panels on this dashboard:
 ${panels}

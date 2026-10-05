@@ -26,7 +26,7 @@ All routes run on the Node runtime. Every one resolves identity with
 | `/api/dashboards/[id]/versions/[version]` | GET | viewer | One version with its spec, upgraded in memory to the current `specVersion` |
 | `/api/dashboards/[id]/versions/[version]/restore` | POST | editor | Appends a **new version** copying that version's spec, noted `restored from vN`. Never repoints or edits an old row. The copy goes through the same source and SQL checks as a save, so a version reading a since-removed source, table or hidden column is refused (400) |
 | `/api/dashboards/import` | POST | editor | Creates a dashboard at version 1 from an exported file. The target workspace is a request field re-checked by `can()`; source ids are re-pointed by an **explicit** mapping and any still unresolved refuse the whole import |
-| `/api/dashboards/[id]/stream` | GET | viewer | SSE deltas, cookie-authenticated |
+| `/api/dashboards/[id]/stream` | GET | viewer | SSE deltas, cookie-authenticated. `from`/`to` pick the window; `var-<name>` (repeated for a multi-value variable) picks variable values, each checked against what the variable allows this viewer, or a `400` |
 | `/api/dashboards/[id]/panels/[panelId]/retry` | POST | viewer | Runs a panel the poller is backing off from now instead of at its `retryAt`, on every poller showing the dashboard. Refused (`started: 0`) for a panel that is not backing off or within `MIN_REFRESH_INTERVAL_MS` of its last attempt. The result arrives on the stream |
 | `/api/dashboards/[id]/chat` | POST | viewer | Read-only chat with a guarded `runQuery` tool. Rate limited and budgeted. The turn is persisted for the **caller's own** subject and the request's abort signal cancels the model call |
 | `/api/dashboards/[id]/chat` | GET | viewer | The caller's own stored conversation on this dashboard, bounded by `CHAT_HISTORY_MAX_MESSAGES` / `CHAT_HISTORY_RETENTION_DAYS`. The subject comes from the session, never from the request |
@@ -56,8 +56,9 @@ hand.
 | Route | Method | Min role | Notes |
 | --- | --- | --- | --- |
 | `/api/generate` | POST | editor | Streams a validated dashboard, panel, or explore-panel spec. Authorized against the workspace owning the selected **source**. Refuses with a 400 when that source's catalog was never refreshed or names nothing that still exists. Rate limited and budgeted |
-| `/api/query` | POST | editor | One-shot guarded query for preview and Explore |
-| `/api/sql/validate` | POST | editor | Runs the SQL guard against a source's catalog without executing. Always `200`; the verdict is `{ ok, error? }` |
+| `/api/query` | POST | editor | One-shot guarded query for preview and Explore. `variables` carries the values a preview binds for `:name` references, only ever as parameters |
+| `/api/sql/validate` | POST | editor | Runs the SQL guard against a source's catalog without executing. Always `200`; the verdict is `{ ok, error? }`. `variables` names the dashboard's declared variables, which `:name` may reference |
+| `/api/variables/options` | POST | editor | The values a [dashboard variable](/concepts/variables/) allows, from its declaration: an `enum`'s list, or a `query` variable's guarded SELECT run as the caller. Audited as `query.execute` |
 | `/api/generation-log` | GET | source-admin | The redacted prompt/spec pairs every generation leaves behind. Workspaces come from the caller's claims, so `?workspaceId=` narrows and can never widen; a viewer or editor reads an empty list rather than a 403. `?limit=` is clamped |
 | `/api/audit` | GET | source-admin | The append-only [audit log](/operations/audit-log/), newest first. Filters: `workspaceId`, `from`/`to` (ISO or `now-24h`), `action`, `outcome`; paged with `limit` and `before` (the previous page's `next`). Workspaces come from the caller's claims as above; a platform admin reads any workspace, and every row with no filter. An unusable filter is a 400 |
 

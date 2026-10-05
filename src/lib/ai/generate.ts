@@ -115,6 +115,15 @@ export const PRESENTATION_GUIDE = `Optional per-panel settings; omit each unless
 - Colors are tokens only: success, warning, danger, info, neutral, orange, purple, teal.
 - 'timeRange' and 'refreshIntervalMs' on a panel override the dashboard's, for a panel that needs a different window or cadence than the rest (e.g. a "today so far" stat over {from:"now-24h", to:"now"} refreshed every 300000ms). Never on a text panel.`;
 
+/**
+ * Dashboard variables (#67). The model may declare them and reference them;
+ * the values are bound by the server, never written into the SQL.
+ */
+export const VARIABLES_GUIDE = `Dashboard 'variables' are optional; declare one only when the request asks to switch the dashboard between values of a dimension (per host, per region):
+- {"name":"host","type":"query","query":{"sourceId":"<this source>","sql":"SELECT DISTINCT host FROM <table> ORDER BY 1"}} lists values from the catalog; {"name":"env","type":"enum","values":["prod","staging"]} lists them literally. Add "multi": true to allow several.
+- Reference a variable in panel SQL as :host (e.g. WHERE host = :host), or for a multi variable as host = ANY(:host). Never quote it and never write a value into the SQL; the server binds it.
+- A variable's own query has no time filter and references no variable.`;
+
 /** The kinds explore may plot when a question asks for a chart. Never text. */
 const CHART_KINDS = PANEL_KINDS.filter((k) => k.canvas)
   .map((k) => `"${k.kind}"`)
@@ -143,7 +152,9 @@ ${VIZ_GUIDE}
 
 Use 'format' (number|bytes|percent|ms) where meaningful.
 
-${PRESENTATION_GUIDE}`;
+${PRESENTATION_GUIDE}
+
+${VARIABLES_GUIDE}`;
 }
 
 export function streamDashboard(input: {

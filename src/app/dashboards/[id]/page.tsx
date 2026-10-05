@@ -3,7 +3,10 @@ import { notFound } from "next/navigation";
 import { LayoutTemplate, Pencil, Tag } from "lucide-react";
 import { getIdentity } from "@/lib/auth/authorize";
 import { can } from "@/lib/auth/authorize";
-import { getDashboardById } from "@/lib/db/repo";
+import { getDashboardById, getSourceById } from "@/lib/db/repo";
+import { rowScopeFor } from "@/lib/row-scope";
+import { asSelection, selectionFromParams } from "@/lib/variable-selection";
+import { variableChoices, variableSourceIds } from "@/lib/variables";
 import { config } from "@/lib/config";
 import { SignIn } from "@/components/sign-in";
 import { LiveDashboard } from "@/components/dashboard/LiveDashboard";
@@ -39,6 +42,22 @@ export default async function DashboardViewPage({
     notFound();
   }
 
+  // The variable pickers (#67): each variable's values for this viewer, and
+  // the picks in the URL when they are allowed. The stream checks the picks
+  // again, on its own, before anything runs with them.
+  const variableSources = (
+    await Promise.all(variableSourceIds(dashboard.spec.variables).map(getSourceById))
+  ).filter(
+    (s): s is NonNullable<typeof s> =>
+      s !== null && !s.tombstonedAt && s.workspaceId === dashboard.workspaceId,
+  );
+  const variables = await variableChoices(
+    dashboard.spec.variables,
+    selectionFromParams(query),
+    dashboard.workspaceId,
+    rowScopeFor(identity, variableSources),
+  );
+
   const canEdit = can(identity, "dashboard:update", {
     workspaceId: dashboard.workspaceId,
   });
@@ -69,6 +88,8 @@ export default async function DashboardViewPage({
         // a mangled `?from=` opens the dashboard rather than an error — and
         // the stream route re-validates and re-resolves it regardless.
         initialTimeRange={rangeFromParams(query, dashboard.spec.timeRange)}
+        variables={variables.choices}
+        initialSelection={asSelection(variables.selection)}
         // A saved dashboard with no panels is reachable — an import trimmed to
         // nothing, or every panel deleted in the editor — and used to render as
         // a header over blank space with a live badge above it.

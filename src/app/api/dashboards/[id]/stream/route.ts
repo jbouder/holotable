@@ -10,7 +10,9 @@ import { guardStream, type StreamEnd } from "@/lib/auth/stream-guard";
 import { config } from "@/lib/config";
 import { getDashboardById, getSourceById } from "@/lib/db/repo";
 import { rowScopeFor } from "@/lib/row-scope";
-import { getPoller, type PollerEvent } from "@/lib/poller/registry";
+import { defaultPanelExecutor, getPoller, type PollerEvent } from "@/lib/poller/registry";
+import { selectionFromParams } from "@/lib/variable-selection";
+import { checkedSelection, variableSourceIds } from "@/lib/variables";
 import { hasQuery, TimeRange } from "@/lib/ir";
 import {
   accessEndedFrame,
@@ -81,20 +83,36 @@ export const GET = route(
     // executor, as they always were.
     const sources = (
       await Promise.all(
-        [...new Set(spec.panels.filter(hasQuery).map((p) => p.query.sourceId))].map((s) =>
-          getSourceById(s),
-        ),
+        [
+          ...new Set([
+            ...spec.panels.filter(hasQuery).map((p) => p.query.sourceId),
+            // A query variable's source narrows its values to the viewer's
+            // rows as well (#67).
+            ...variableSourceIds(spec.variables),
+          ]),
+        ].map((s) => getSourceById(s)),
       )
     ).filter(
       (s): s is NonNullable<typeof s> =>
         s !== null && !s.tombstonedAt && s.workspaceId === dashboard.workspaceId,
+    );
+    const scope = rowScopeFor(identity, sources);
+    // The viewer's variable picks (#67), each checked against what its
+    // variable allows this viewer before anything runs with it.
+    const variables = await checkedSelection(
+      spec.variables,
+      selectionFromParams(url.searchParams),
+      dashboard.workspaceId,
+      scope,
     );
     const poller = getPoller(
       id,
       dashboard.version,
       dashboard.workspaceId,
       spec,
-      rowScopeFor(identity, sources),
+      scope,
+      defaultPanelExecutor,
+      variables,
     );
     // Where the browser got to before it lost the stream (#43). `EventSource`
     // sends the header itself when it reconnects; a page that builds a new
@@ -116,6 +134,7 @@ export const GET = route(
       detail: {
         version: dashboard.version,
         timeRange: spec.timeRange,
+        variables,
         resumed: resumeToken !== null,
         queries: spec.panels.filter(hasQuery).map((p) => ({
           panelId: p.id,
