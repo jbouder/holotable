@@ -1,0 +1,329 @@
+{
+  "v1-builtin-golden-signals.json#rate": {
+    "sql": "SELECT * FROM (SELECT date_trunc('minute', ts) AS bucket, count(*) AS events\nFROM holotable_self\nGROUP BY bucket\nORDER BY bucket) AS _holo\nWHERE _holo.bucket >= $1::timestamptz\n  AND _holo.bucket < $2::timestamptz\nLIMIT 5000",
+    "params": ["2026-01-01T00:00:00.000Z", "2026-01-01T01:00:00.000Z"],
+    "timeField": "bucket"
+  },
+  "v1-builtin-golden-signals.json#errors": {
+    "sql": "SELECT * FROM (SELECT date_trunc('minute', ts) AS bucket, outcome, count(*) AS events\nFROM holotable_self\nGROUP BY bucket, outcome\nORDER BY bucket DESC, events DESC) AS _holo\nWHERE _holo.bucket >= $1::timestamptz\n  AND _holo.bucket < $2::timestamptz\nLIMIT 5000",
+    "params": ["2026-01-01T00:00:00.000Z", "2026-01-01T01:00:00.000Z"],
+    "timeField": "bucket"
+  },
+  "v1-edge-limits.json#panel-1": {
+    "sql": "SELECT * FROM (SELECT    time_bucket('1 minute', ts) AS minute, count(*) AS requests FROM http_requests WHERE route NOT IN ('/r0000', '/r0001', '/r0002', '/r0003', '/r0004', '/r0005', '/r0006', '/r0007', '/r0008', '/r0009', '/r0010', '/r0011', '/r0012', '/r0013', '/r0014', '/r0015', '/r0016', '/r0017', '/r0018', '/r0019', '/r0020', '/r0021', '/r0022', '/r0023', '/r0024', '/r0025', '/r0026', '/r0027', '/r0028', '/r0029', '/r0030', '/r0031', '/r0032', '/r0033', '/r0034', '/r0035', '/r0036', '/r0037', '/r0038', '/r0039', '/r0040', '/r0041', '/r0042', '/r0043', '/r0044', '/r0045', '/r0046', '/r0047', '/r0048', '/r0049', '/r0050', '/r0051', '/r0052', '/r0053', '/r0054', '/r0055', '/r0056', '/r0057', '/r0058', '/r0059', '/r0060', '/r0061', '/r0062', '/r0063', '/r0064', '/r0065', '/r0066', '/r0067', '/r0068', '/r0069', '/r0070', '/r0071', '/r0072', '/r0073', '/r0074', '/r0075', '/r0076', '/r0077', '/r0078', '/r0079', '/r0080', '/r0081', '/r0082', '/r0083', '/r0084', '/r0085', '/r0086', '/r0087', '/r0088', '/r0089', '/r0090', '/r0091', '/r0092', '/r0093', '/r0094', '/r0095', '/r0096', '/r0097', '/r0098', '/r0099', '/r0100', '/r0101', '/r0102', '/r0103', '/r0104', '/r0105', '/r0106', '/r0107', '/r0108', '/r0109', '/r0110', '/r0111', '/r0112', '/r0113', '/r0114', '/r0115', '/r0116', '/r0117', '/r0118', '/r0119', '/r0120', '/r0121', '/r0122', '/r0123', '/r0124', '/r0125', '/r0126', '/r0127', '/r0128', '/r0129', '/r0130', '/r0131', '/r0132', '/r0133', '/r0134', '/r0135', '/r0136', '/r0137', '/r0138', '/r0139', '/r0140', '/r0141', '/r0142', '/r0143', '/r0144', '/r0145', '/r0146', '/r0147', '/r0148', '/r0149', '/r0150', '/r0151', '/r0152', '/r0153', '/r0154', '/r0155', '/r0156', '/r0157', '/r0158', '/r0159', '/r0160', '/r0161', '/r0162', '/r0163', '/r0164', '/r0165', '/r0166', '/r0167', '/r0168', '/r0169', '/r0170', '/r0171', '/r0172', '/r0173', '/r0174', '/r0175', '/r0176', '/r0177', '/r0178', '/r0179', '/r0180', '/r0181', '/r0182', '/r0183', '/r0184', '/r0185', '/r0186', '/r0187', '/r0188', '/r0189', '/r0190', '/r0191', '/r0192', '/r0193', '/r0194', '/r0195', '/r0196', '/r0197', '/r0198', '/r0199', '/r0200', '/r0201', '/r0202', '/r0203', '/r0204', '/r0205', '/r0206', '/r0207', '/r0208', '/r0209', '/r0210', '/r0211', '/r0212', '/r0213', '/r0214', '/r0215', '/r0216', '/r0217', '/r0218', '/r0219', '/r0220', '/r0221', '/r0222', '/r0223', '/r0224', '/r0225', '/r0226', '/r0227', '/r0228', '/r0229', '/r0230', '/r0231', '/r0232', '/r0233', '/r0234', '/r0235', '/r0236', '/r0237', '/r0238', '/r0239', '/r0240', '/r0241', '/r0242', '/r0243', '/r0244', '/r0245', '/r0246', '/r0247', '/r0248', '/r0249', '/r0250', '/r0251', '/r0252', '/r0253', '/r0254', '/r0255', '/r0256', '/r0257', '/r0258', '/r0259', '/r0260', '/r0261', '/r0262', '/r0263', '/r0264', '/r0265', '/r0266', '/r0267', '/r0268', '/r0269', '/r0270', '/r0271', '/r0272', '/r0273', '/r0274', '/r0275', '/r0276', '/r0277', '/r0278', '/r0279', '/r0280', '/r0281', '/r0282', '/r0283', '/r0284', '/r0285', '/r0286', '/r0287', '/r0288', '/r0289', '/r0290', '/r0291', '/r0292', '/r0293', '/r0294', '/r0295', '/r0296', '/r0297', '/r0298', '/r0299', '/r0300', '/r0301', '/r0302', '/r0303', '/r0304', '/r0305', '/r0306', '/r0307', '/r0308', '/r0309', '/r0310', '/r0311', '/r0312', '/r0313', '/r0314', '/r0315', '/r0316', '/r0317', '/r0318', '/r0319', '/r0320', '/r0321', '/r0322', '/r0323', '/r0324', '/r0325', '/r0326', '/r0327', '/r0328', '/r0329', '/r0330', '/r0331', '/r0332', '/r0333', '/r0334', '/r0335', '/r0336', '/r0337', '/r0338', '/r0339', '/r0340', '/r0341', '/r0342', '/r0343', '/r0344', '/r0345', '/r0346', '/r0347', '/r0348', '/r0349', '/r0350', '/r0351', '/r0352', '/r0353', '/r0354', '/r0355', '/r0356', '/r0357', '/r0358', '/r0359', '/r0360', '/r0361', '/r0362', '/r0363', '/r0364', '/r0365', '/r0366', '/r0367', '/r0368', '/r0369', '/r0370', '/r0371', '/r0372', '/r0373', '/r0374', '/r0375', '/r0376', '/r0377', '/r0378', '/r0379', '/r0380', '/r0381', '/r0382', '/r0383', '/r0384', '/r0385', '/r0386', '/r0387', '/r0388', '/r0389', '/r0390', '/r0391', '/r0392', '/r0393', '/r0394', '/r0395', '/r0396', '/r0397', '/r0398', '/r0399', '/r0400', '/r0401', '/r0402', '/r0403', '/r0404', '/r0405', '/r0406', '/r0407', '/r0408', '/r0409', '/r0410', '/r0411', '/r0412', '/r0413', '/r0414', '/r0415', '/r0416', '/r0417', '/r0418', '/r0419', '/r0420', '/r0421', '/r0422', '/r0423', '/r0424', '/r0425', '/r0426', '/r0427', '/r0428', '/r0429', '/r0430', '/r0431', '/r0432', '/r0433', '/r0434', '/r0435', '/r0436', '/r0437', '/r0438', '/r0439', '/r0440', '/r0441', '/r0442', '/r0443', '/r0444', '/r0445', '/r0446', '/r0447', '/r0448', '/r0449', '/r0450', '/r0451', '/r0452', '/r0453', '/r0454', '/r0455', '/r0456', '/r0457', '/r0458', '/r0459', '/r0460', '/r0461', '/r0462', '/r0463', '/r0464', '/r0465', '/r0466', '/r0467', '/r0468', '/r0469', '/r0470', '/r0471', '/r0472', '/r0473', '/r0474', '/r0475', '/r0476', '/r0477', '/r0478', '/r0479', '/r0480', '/r0481', '/r0482', '/r0483', '/r0484', '/r0485', '/r0486', '/r0487', '/r0488', '/r0489', '/r0490', '/r0491', '/r0492', '/r0493', '/r0494', '/r0495', '/r0496', '/r0497', '/r0498', '/r0499', '/r0500', '/r0501', '/r0502', '/r0503', '/r0504', '/r0505', '/r0506', '/r0507', '/r0508', '/r0509', '/r0510', '/r0511', '/r0512', '/r0513', '/r0514', '/r0515', '/r0516', '/r0517', '/r0518', '/r0519', '/r0520', '/r0521', '/r0522', '/r0523', '/r0524', '/r0525', '/r0526', '/r0527', '/r0528', '/r0529', '/r0530', '/r0531', '/r0532', '/r0533', '/r0534', '/r0535', '/r0536', '/r0537', '/r0538', '/r0539', '/r0540', '/r0541', '/r0542', '/r0543', '/r0544', '/r0545', '/r0546', '/r0547', '/r0548', '/r0549', '/r0550', '/r0551', '/r0552', '/r0553', '/r0554', '/r0555', '/r0556', '/r0557', '/r0558', '/r0559', '/r0560', '/r0561', '/r0562', '/r0563', '/r0564', '/r0565', '/r0566', '/r0567', '/r0568', '/r0569', '/r0570', '/r0571', '/r0572', '/r0573', '/r0574', '/r0575', '/r0576', '/r0577', '/r0578', '/r0579', '/r0580', '/r0581', '/r0582', '/r0583', '/r0584', '/r0585', '/r0586', '/r0587', '/r0588', '/r0589', '/r0590', '/r0591', '/r0592', '/r0593', '/r0594', '/r0595', '/r0596', '/r0597', '/r0598', '/r0599', '/r0600', '/r0601', '/r0602', '/r0603', '/r0604', '/r0605', '/r0606', '/r0607', '/r0608', '/r0609', '/r0610', '/r0611', '/r0612', '/r0613', '/r0614', '/r0615', '/r0616', '/r0617', '/r0618', '/r0619', '/r0620', '/r0621', '/r0622', '/r0623', '/r0624', '/r0625', '/r0626', '/r0627', '/r0628', '/r0629', '/r0630', '/r0631', '/r0632', '/r0633', '/r0634', '/r0635', '/r0636', '/r0637', '/r0638', '/r0639', '/r0640', '/r0641', '/r0642', '/r0643', '/r0644', '/r0645', '/r0646', '/r0647', '/r0648', '/r0649', '/r0650', '/r0651', '/r0652', '/r0653', '/r0654', '/r0655', '/r0656', '/r0657', '/r0658', '/r0659', '/r0660', '/r0661', '/r0662', '/r0663', '/r0664', '/r0665', '/r0666', '/r0667', '/r0668', '/r0669', '/r0670', '/r0671', '/r0672', '/r0673', '/r0674', '/r0675', '/r0676', '/r0677', '/r0678', '/r0679', '/r0680', '/r0681', '/r0682', '/r0683', '/r0684', '/r0685', '/r0686', '/r0687', '/r0688', '/r0689', '/r0690', '/r0691', '/r0692', '/r0693', '/r0694', '/r0695', '/r0696', '/r0697', '/r0698', '/r0699', '/r0700', '/r0701', '/r0702', '/r0703', '/r0704', '/r0705', '/r0706', '/r0707', '/r0708', '/r0709', '/r0710', '/r0711', '/r0712', '/r0713', '/r0714', '/r0715', '/r0716', '/r0717', '/r0718', '/r0719', '/r0720', '/r0721', '/r0722', '/r0723', '/r0724', '/r0725', '/r0726', '/r0727', '/r0728', '/r0729', '/r0730', '/r0731', '/r0732', '/r0733', '/r0734', '/r0735', '/r0736', '/r0737', '/r0738', '/r0739', '/r0740', '/r0741', '/r0742', '/r0743', '/r0744', '/r0745', '/r0746', '/r0747', '/r0748', '/r0749', '/r0750', '/r0751', '/r0752', '/r0753', '/r0754', '/r0755', '/r0756', '/r0757', '/r0758', '/r0759', '/r0760', '/r0761', '/r0762', '/r0763', '/r0764', '/r0765', '/r0766', '/r0767', '/r0768', '/r0769', '/r0770', '/r0771', '/r0772', '/r0773', '/r0774', '/r0775', '/r0776', '/r0777', '/r0778', '/r0779', '/r0780', '/r0781', '/r0782', '/r0783', '/r0784', '/r0785') GROUP BY minute ORDER BY minute) AS _holo\nWHERE _holo.minute >= $1::timestamptz\n  AND _holo.minute < $2::timestamptz\nLIMIT 5000",
+    "params": ["2026-01-01T00:00:00.000Z", "2026-01-01T01:00:00.000Z"],
+    "timeField": "minute"
+  },
+  "v1-edge-limits.json#panel-2": {
+    "sql": "SELECT * FROM (SELECT count(*) AS requests FROM http_requests) AS _holo LIMIT 5000",
+    "params": []
+  },
+  "v1-edge-limits.json#panel-3": {
+    "sql": "SELECT * FROM (SELECT host, max(cpu_pct) AS cpu FROM system_metrics GROUP BY host ORDER BY host) AS _holo LIMIT 5000",
+    "params": []
+  },
+  "v1-edge-limits.json#panel-4": {
+    "sql": "SELECT * FROM (SELECT count(*) AS requests FROM http_requests) AS _holo LIMIT 5000",
+    "params": []
+  },
+  "v1-edge-limits.json#panel-5": {
+    "sql": "SELECT * FROM (SELECT host, max(cpu_pct) AS cpu FROM system_metrics GROUP BY host ORDER BY host) AS _holo LIMIT 5000",
+    "params": []
+  },
+  "v1-edge-limits.json#panel-6": {
+    "sql": "SELECT * FROM (SELECT count(*) AS requests FROM http_requests) AS _holo LIMIT 5000",
+    "params": []
+  },
+  "v1-edge-limits.json#panel-8": {
+    "sql": "SELECT * FROM (SELECT count(*) AS requests FROM http_requests) AS _holo LIMIT 5000",
+    "params": []
+  },
+  "v1-edge-limits.json#panel-9": {
+    "sql": "SELECT * FROM (SELECT host, max(cpu_pct) AS cpu FROM system_metrics GROUP BY host ORDER BY host) AS _holo LIMIT 5000",
+    "params": []
+  },
+  "v1-edge-limits.json#panel-10": {
+    "sql": "SELECT * FROM (SELECT count(*) AS requests FROM http_requests) AS _holo LIMIT 5000",
+    "params": []
+  },
+  "v1-edge-limits.json#panel-11": {
+    "sql": "SELECT * FROM (SELECT host, max(cpu_pct) AS cpu FROM system_metrics GROUP BY host ORDER BY host) AS _holo LIMIT 5000",
+    "params": []
+  },
+  "v1-edge-limits.json#panel-12": {
+    "sql": "SELECT * FROM (SELECT count(*) AS requests FROM http_requests) AS _holo LIMIT 5000",
+    "params": []
+  },
+  "v1-edge-limits.json#panel-13": {
+    "sql": "SELECT * FROM (SELECT host, max(cpu_pct) AS cpu FROM system_metrics GROUP BY host ORDER BY host) AS _holo LIMIT 5000",
+    "params": []
+  },
+  "v1-edge-limits.json#panel-15": {
+    "sql": "SELECT * FROM (SELECT host, max(cpu_pct) AS cpu FROM system_metrics GROUP BY host ORDER BY host) AS _holo LIMIT 5000",
+    "params": []
+  },
+  "v1-edge-limits.json#panel-16": {
+    "sql": "SELECT * FROM (SELECT count(*) AS requests FROM http_requests) AS _holo LIMIT 5000",
+    "params": []
+  },
+  "v1-edge-limits.json#panel-17": {
+    "sql": "SELECT * FROM (SELECT host, max(cpu_pct) AS cpu FROM system_metrics GROUP BY host ORDER BY host) AS _holo LIMIT 5000",
+    "params": []
+  },
+  "v1-edge-limits.json#panel-18": {
+    "sql": "SELECT * FROM (SELECT count(*) AS requests FROM http_requests) AS _holo LIMIT 5000",
+    "params": []
+  },
+  "v1-edge-limits.json#panel-19": {
+    "sql": "SELECT * FROM (SELECT host, max(cpu_pct) AS cpu FROM system_metrics GROUP BY host ORDER BY host) AS _holo LIMIT 5000",
+    "params": []
+  },
+  "v1-edge-limits.json#panel-20": {
+    "sql": "SELECT * FROM (SELECT count(*) AS requests FROM http_requests) AS _holo LIMIT 5000",
+    "params": []
+  },
+  "v1-edge-limits.json#panel-22": {
+    "sql": "SELECT * FROM (SELECT count(*) AS requests FROM http_requests) AS _holo LIMIT 5000",
+    "params": []
+  },
+  "v1-edge-limits.json#panel-23": {
+    "sql": "SELECT * FROM (SELECT host, max(cpu_pct) AS cpu FROM system_metrics GROUP BY host ORDER BY host) AS _holo LIMIT 5000",
+    "params": []
+  },
+  "v1-edge-limits.json#panel-24": {
+    "sql": "SELECT * FROM (SELECT count(*) AS requests FROM http_requests) AS _holo LIMIT 5000",
+    "params": []
+  },
+  "v1-edge-limits.json#panel-25": {
+    "sql": "SELECT * FROM (SELECT host, max(cpu_pct) AS cpu FROM system_metrics GROUP BY host ORDER BY host) AS _holo LIMIT 5000",
+    "params": []
+  },
+  "v1-edge-limits.json#panel-26": {
+    "sql": "SELECT * FROM (SELECT count(*) AS requests FROM http_requests) AS _holo LIMIT 5000",
+    "params": []
+  },
+  "v1-edge-limits.json#panel-27": {
+    "sql": "SELECT * FROM (SELECT host, max(cpu_pct) AS cpu FROM system_metrics GROUP BY host ORDER BY host) AS _holo LIMIT 5000",
+    "params": []
+  },
+  "v1-edge-limits.json#panel-29": {
+    "sql": "SELECT * FROM (SELECT host, max(cpu_pct) AS cpu FROM system_metrics GROUP BY host ORDER BY host) AS _holo LIMIT 5000",
+    "params": []
+  },
+  "v1-edge-limits.json#panel-30": {
+    "sql": "SELECT * FROM (SELECT count(*) AS requests FROM http_requests) AS _holo LIMIT 5000",
+    "params": []
+  },
+  "v1-edge-limits.json#panel-31": {
+    "sql": "SELECT * FROM (SELECT host, max(cpu_pct) AS cpu FROM system_metrics GROUP BY host ORDER BY host) AS _holo LIMIT 5000",
+    "params": []
+  },
+  "v1-edge-limits.json#panel-32": {
+    "sql": "SELECT * FROM (SELECT count(*) AS requests FROM http_requests) AS _holo LIMIT 5000",
+    "params": []
+  },
+  "v1-edge-limits.json#panel-33": {
+    "sql": "SELECT * FROM (SELECT host, max(cpu_pct) AS cpu FROM system_metrics GROUP BY host ORDER BY host) AS _holo LIMIT 5000",
+    "params": []
+  },
+  "v1-edge-limits.json#panel-34": {
+    "sql": "SELECT * FROM (SELECT count(*) AS requests FROM http_requests) AS _holo LIMIT 5000",
+    "params": []
+  },
+  "v1-edge-limits.json#panel-36": {
+    "sql": "SELECT * FROM (SELECT count(*) AS requests FROM http_requests) AS _holo LIMIT 5000",
+    "params": []
+  },
+  "v1-edge-limits.json#panel-37": {
+    "sql": "SELECT * FROM (SELECT host, max(cpu_pct) AS cpu FROM system_metrics GROUP BY host ORDER BY host) AS _holo LIMIT 5000",
+    "params": []
+  },
+  "v1-edge-limits.json#panel-38": {
+    "sql": "SELECT * FROM (SELECT count(*) AS requests FROM http_requests) AS _holo LIMIT 5000",
+    "params": []
+  },
+  "v1-edge-limits.json#panel-39": {
+    "sql": "SELECT * FROM (SELECT host, max(cpu_pct) AS cpu FROM system_metrics GROUP BY host ORDER BY host) AS _holo LIMIT 5000",
+    "params": []
+  },
+  "v1-edge-limits.json#panel-40": {
+    "sql": "SELECT * FROM (SELECT count(*) AS requests FROM http_requests) AS _holo LIMIT 5000",
+    "params": []
+  },
+  "v1-edge-limits.json#panel-41": {
+    "sql": "SELECT * FROM (SELECT host, max(cpu_pct) AS cpu FROM system_metrics GROUP BY host ORDER BY host) AS _holo LIMIT 5000",
+    "params": []
+  },
+  "v1-edge-limits.json#panel-43": {
+    "sql": "SELECT * FROM (SELECT host, max(cpu_pct) AS cpu FROM system_metrics GROUP BY host ORDER BY host) AS _holo LIMIT 5000",
+    "params": []
+  },
+  "v1-edge-limits.json#panel-44": {
+    "sql": "SELECT * FROM (SELECT count(*) AS requests FROM http_requests) AS _holo LIMIT 5000",
+    "params": []
+  },
+  "v1-edge-limits.json#panel-45": {
+    "sql": "SELECT * FROM (SELECT host, max(cpu_pct) AS cpu FROM system_metrics GROUP BY host ORDER BY host) AS _holo LIMIT 5000",
+    "params": []
+  },
+  "v1-edge-limits.json#panel-46": {
+    "sql": "SELECT * FROM (SELECT count(*) AS requests FROM http_requests) AS _holo LIMIT 5000",
+    "params": []
+  },
+  "v1-edge-limits.json#panel-47": {
+    "sql": "SELECT * FROM (SELECT host, max(cpu_pct) AS cpu FROM system_metrics GROUP BY host ORDER BY host) AS _holo LIMIT 5000",
+    "params": []
+  },
+  "v1-edge-limits.json#panel-48": {
+    "sql": "SELECT * FROM (SELECT count(*) AS requests FROM http_requests) AS _holo LIMIT 5000",
+    "params": []
+  },
+  "v1-every-kind.json#line": {
+    "sql": "SELECT * FROM (SELECT time_bucket('1 minute', ts) AS minute, count(*) AS requests FROM http_requests WHERE service = $3 GROUP BY minute ORDER BY minute) AS _holo\nWHERE _holo.minute >= $1::timestamptz\n  AND _holo.minute < $2::timestamptz\nLIMIT 5000",
+    "params": ["2026-01-01T00:00:00.000Z", "2026-01-01T01:00:00.000Z", "api"],
+    "timeField": "minute",
+    "variables": ["service"]
+  },
+  "v1-every-kind.json#area": {
+    "sql": "SELECT * FROM (SELECT time_bucket('1 minute', ts) AS minute, service, sum(bytes) AS bytes FROM http_requests GROUP BY minute, service ORDER BY minute) AS _holo\nWHERE _holo.minute >= $1::timestamptz\n  AND _holo.minute < $2::timestamptz\nLIMIT 5000",
+    "params": ["2026-01-01T00:00:00.000Z", "2026-01-01T01:00:00.000Z"],
+    "timeField": "minute"
+  },
+  "v1-every-kind.json#bar": {
+    "sql": "SELECT * FROM (SELECT route, count(*) FILTER (WHERE status >= 500) AS errors FROM http_requests WHERE route = ANY($1) GROUP BY route ORDER BY errors DESC) AS _holo LIMIT 5000",
+    "params": [["/login", "/search"]],
+    "variables": ["routes"]
+  },
+  "v1-every-kind.json#scatter": {
+    "sql": "SELECT * FROM (SELECT bytes, duration_ms FROM http_requests ORDER BY ts DESC LIMIT 500) AS _holo LIMIT 5000",
+    "params": []
+  },
+  "v1-every-kind.json#stat": {
+    "sql": "SELECT * FROM (SELECT time_bucket('1 minute', ts) AS minute, percentile_cont(0.95) WITHIN GROUP (ORDER BY duration_ms) AS p95 FROM http_requests GROUP BY minute ORDER BY minute) AS _holo\nWHERE _holo.minute >= $1::timestamptz\n  AND _holo.minute < $2::timestamptz\nLIMIT 5000",
+    "params": ["2026-01-01T00:00:00.000Z", "2026-01-01T01:00:00.000Z"],
+    "timeField": "minute"
+  },
+  "v1-every-kind.json#table": {
+    "sql": "SELECT * FROM (SELECT service, route, avg(duration_ms) AS avg_ms, count(*) AS requests FROM http_requests GROUP BY service, route ORDER BY avg_ms DESC LIMIT 20) AS _holo LIMIT 5000",
+    "params": []
+  },
+  "v1-every-kind.json#heatmap": {
+    "sql": "SELECT * FROM (SELECT time_bucket('5 minutes', ts) AS bucket, host, avg(cpu_pct) AS cpu FROM system_metrics GROUP BY bucket, host ORDER BY bucket) AS _holo LIMIT 5000",
+    "params": []
+  },
+  "v1-every-kind.json#pie": {
+    "sql": "SELECT * FROM (SELECT service, count(*) AS requests FROM http_requests GROUP BY service) AS _holo LIMIT 5000",
+    "params": []
+  },
+  "v1-every-kind.json#donut": {
+    "sql": "SELECT * FROM (SELECT region, count(DISTINCT host) AS hosts FROM system_metrics GROUP BY region) AS _holo LIMIT 5000",
+    "params": []
+  },
+  "v1-every-kind.json#gauge": {
+    "sql": "SELECT * FROM (SELECT time_bucket('1 minute', ts) AS minute, avg(mem_pct) AS mem FROM system_metrics WHERE host = $3 GROUP BY minute ORDER BY minute) AS _holo\nWHERE _holo.minute >= $1::timestamptz\n  AND _holo.minute < $2::timestamptz\nLIMIT 5000",
+    "params": ["2026-01-01T00:00:00.000Z", "2026-01-01T01:00:00.000Z", "host-value"],
+    "timeField": "minute",
+    "variables": ["host"]
+  },
+  "v1-every-kind.json#states": {
+    "sql": "SELECT * FROM (SELECT ts, host, CASE WHEN cpu_pct >= 85 THEN 'hot' ELSE 'ok' END AS state FROM system_metrics ORDER BY ts) AS _holo\nWHERE _holo.ts >= $1::timestamptz\n  AND _holo.ts < $2::timestamptz\nLIMIT 5000",
+    "params": ["2026-01-01T00:00:00.000Z", "2026-01-01T01:00:00.000Z"],
+    "timeField": "ts"
+  },
+  "v1-seeded-fleet-status.json#cpu-now": {
+    "sql": "SELECT * FROM (SELECT time_bucket('1 minute', ts) AS minute, host, avg(cpu_pct) AS cpu FROM system_metrics GROUP BY minute, host ORDER BY minute) AS _holo\nWHERE _holo.minute >= $1::timestamptz\n  AND _holo.minute < $2::timestamptz\nLIMIT 5000",
+    "params": ["2026-01-01T00:00:00.000Z", "2026-01-01T01:00:00.000Z"],
+    "timeField": "minute"
+  },
+  "v1-seeded-fleet-status.json#disk-max": {
+    "sql": "SELECT * FROM (SELECT time_bucket('1 minute', ts) AS minute, max(disk_pct) AS disk FROM system_metrics GROUP BY minute ORDER BY minute) AS _holo\nWHERE _holo.minute >= $1::timestamptz\n  AND _holo.minute < $2::timestamptz\nLIMIT 5000",
+    "params": ["2026-01-01T00:00:00.000Z", "2026-01-01T01:00:00.000Z"],
+    "timeField": "minute"
+  },
+  "v1-seeded-fleet-status.json#load-state": {
+    "sql": "SELECT * FROM (SELECT time_bucket('1 minute', ts) AS minute, host, CASE WHEN avg(cpu_pct) >= 85 THEN 'hot' WHEN avg(cpu_pct) >= 70 THEN 'busy' ELSE 'ok' END AS state FROM system_metrics GROUP BY minute, host ORDER BY minute) AS _holo\nWHERE _holo.minute >= $1::timestamptz\n  AND _holo.minute < $2::timestamptz\nLIMIT 5000",
+    "params": ["2026-01-01T00:00:00.000Z", "2026-01-01T01:00:00.000Z"],
+    "timeField": "minute"
+  },
+  "v1-seeded-infrastructure.json#cpu": {
+    "sql": "SELECT * FROM (SELECT time_bucket('1 minute', ts) AS minute, host, avg(cpu_pct) AS cpu FROM system_metrics GROUP BY minute, host ORDER BY minute) AS _holo\nWHERE _holo.minute >= $1::timestamptz\n  AND _holo.minute < $2::timestamptz\nLIMIT 5000",
+    "params": ["2026-01-01T00:00:00.000Z", "2026-01-01T01:00:00.000Z"],
+    "timeField": "minute"
+  },
+  "v1-seeded-infrastructure.json#mem": {
+    "sql": "SELECT * FROM (SELECT time_bucket('1 minute', ts) AS minute, host, avg(mem_pct) AS mem FROM system_metrics GROUP BY minute, host ORDER BY minute) AS _holo\nWHERE _holo.minute >= $1::timestamptz\n  AND _holo.minute < $2::timestamptz\nLIMIT 5000",
+    "params": ["2026-01-01T00:00:00.000Z", "2026-01-01T01:00:00.000Z"],
+    "timeField": "minute"
+  },
+  "v1-seeded-infrastructure.json#disk": {
+    "sql": "SELECT * FROM (SELECT time_bucket('1 minute', ts) AS minute, max(disk_pct) AS disk FROM system_metrics GROUP BY minute ORDER BY minute) AS _holo\nWHERE _holo.minute >= $1::timestamptz\n  AND _holo.minute < $2::timestamptz\nLIMIT 5000",
+    "params": ["2026-01-01T00:00:00.000Z", "2026-01-01T01:00:00.000Z"],
+    "timeField": "minute"
+  },
+  "v1-seeded-infrastructure.json#by-region": {
+    "sql": "SELECT * FROM (SELECT region, round(avg(cpu_pct)::numeric, 1) AS avg_cpu FROM system_metrics GROUP BY region ORDER BY avg_cpu DESC) AS _holo LIMIT 5000",
+    "params": []
+  },
+  "v1-seeded-self-monitoring.json#tick-p95": {
+    "sql": "SELECT * FROM (WITH scraped AS (\n  SELECT ts, le, sum(value) AS cumulative\n  FROM holotable_self\n  WHERE metric = 'holotable_poller_tick_duration_seconds_bucket' AND le IS NOT NULL\n  GROUP BY ts, le\n), buckets AS (\n  SELECT time_bucket('1 minute', ts) AS minute, le, max(cumulative) - min(cumulative) AS hits\n  FROM scraped\n  GROUP BY minute, le\n), counted AS (\n  SELECT ts, sum(value) AS cumulative\n  FROM holotable_self\n  WHERE metric = 'holotable_poller_tick_duration_seconds_count'\n  GROUP BY ts\n), totals AS (\n  SELECT time_bucket('1 minute', ts) AS minute, max(cumulative) - min(cumulative) AS ticks\n  FROM counted\n  GROUP BY minute\n)\nSELECT buckets.minute, min(buckets.le) AS p95_seconds\nFROM buckets JOIN totals ON totals.minute = buckets.minute\nWHERE totals.ticks > 0 AND buckets.hits >= 0.95 * totals.ticks\nGROUP BY buckets.minute\nORDER BY buckets.minute) AS _holo\nWHERE _holo.minute >= $1::timestamptz\n  AND _holo.minute < $2::timestamptz\nLIMIT 5000",
+    "params": ["2026-01-01T00:00:00.000Z", "2026-01-01T01:00:00.000Z"],
+    "timeField": "minute"
+  },
+  "v1-seeded-self-monitoring.json#query-latency": {
+    "sql": "SELECT * FROM (WITH scraped AS (\n  SELECT ts, source,\n         sum(value) FILTER (WHERE metric = 'holotable_query_duration_seconds_sum') AS seconds,\n         sum(value) FILTER (WHERE metric = 'holotable_query_duration_seconds_count') AS queries\n  FROM holotable_self\n  WHERE metric IN ('holotable_query_duration_seconds_sum', 'holotable_query_duration_seconds_count')\n  GROUP BY ts, source\n)\nSELECT time_bucket('1 minute', ts) AS minute, source,\n       1000.0 * (max(seconds) - min(seconds))\n         / NULLIF(max(queries) - min(queries), 0) AS avg_ms\nFROM scraped\nGROUP BY minute, source\nORDER BY minute) AS _holo\nWHERE _holo.minute >= $1::timestamptz\n  AND _holo.minute < $2::timestamptz\nLIMIT 5000",
+    "params": ["2026-01-01T00:00:00.000Z", "2026-01-01T01:00:00.000Z"],
+    "timeField": "minute"
+  },
+  "v1-seeded-self-monitoring.json#resident-memory": {
+    "sql": "SELECT * FROM (SELECT time_bucket('1 minute', ts) AS minute, max(value) AS resident_bytes\nFROM holotable_self\nWHERE metric = 'holotable_process_resident_memory_bytes'\nGROUP BY minute\nORDER BY minute) AS _holo\nWHERE _holo.minute >= $1::timestamptz\n  AND _holo.minute < $2::timestamptz\nLIMIT 5000",
+    "params": ["2026-01-01T00:00:00.000Z", "2026-01-01T01:00:00.000Z"],
+    "timeField": "minute"
+  },
+  "v1-seeded-self-monitoring.json#sse-subscribers": {
+    "sql": "SELECT * FROM (WITH scraped AS (\n  SELECT ts, sum(value) AS subscribers\n  FROM holotable_self\n  WHERE metric = 'holotable_sse_subscribers'\n  GROUP BY ts\n)\nSELECT time_bucket('1 minute', ts) AS minute, max(subscribers) AS subscribers\nFROM scraped\nGROUP BY minute\nORDER BY minute) AS _holo\nWHERE _holo.minute >= $1::timestamptz\n  AND _holo.minute < $2::timestamptz\nLIMIT 5000",
+    "params": ["2026-01-01T00:00:00.000Z", "2026-01-01T01:00:00.000Z"],
+    "timeField": "minute"
+  },
+  "v1-seeded-self-monitoring.json#pollers-active": {
+    "sql": "SELECT * FROM (SELECT time_bucket('1 minute', ts) AS minute, max(value) AS pollers\nFROM holotable_self\nWHERE metric = 'holotable_pollers_active'\nGROUP BY minute\nORDER BY minute) AS _holo\nWHERE _holo.minute >= $1::timestamptz\n  AND _holo.minute < $2::timestamptz\nLIMIT 5000",
+    "params": ["2026-01-01T00:00:00.000Z", "2026-01-01T01:00:00.000Z"],
+    "timeField": "minute"
+  },
+  "v1-seeded-self-monitoring.json#llm-tokens": {
+    "sql": "SELECT * FROM (WITH scraped AS (\n  SELECT ts, direction, sum(value) AS cumulative\n  FROM holotable_self\n  WHERE metric = 'holotable_llm_tokens_total'\n  GROUP BY ts, direction\n)\nSELECT time_bucket('5 minutes', ts) AS minute, direction,\n       max(cumulative) - min(cumulative) AS tokens\nFROM scraped\nGROUP BY minute, direction\nORDER BY minute) AS _holo\nWHERE _holo.minute >= $1::timestamptz\n  AND _holo.minute < $2::timestamptz\nLIMIT 5000",
+    "params": ["2026-01-01T00:00:00.000Z", "2026-01-01T01:00:00.000Z"],
+    "timeField": "minute"
+  },
+  "v1-seeded-self-monitoring.json#sql-rejections": {
+    "sql": "SELECT * FROM (WITH scraped AS (\n  SELECT ts, reason, sum(value) AS cumulative\n  FROM holotable_self\n  WHERE metric = 'holotable_sql_validation_rejections_total'\n  GROUP BY ts, reason\n)\nSELECT reason, max(cumulative) - min(cumulative) AS rejections\nFROM scraped\nGROUP BY reason\nORDER BY rejections DESC) AS _holo LIMIT 5000",
+    "params": []
+  },
+  "v1-seeded-service-health.json#rps": {
+    "sql": "SELECT * FROM (SELECT time_bucket('1 minute', ts) AS minute, count(*) AS requests FROM http_requests GROUP BY minute ORDER BY minute) AS _holo\nWHERE _holo.minute >= $1::timestamptz\n  AND _holo.minute < $2::timestamptz\nLIMIT 5000",
+    "params": ["2026-01-01T00:00:00.000Z", "2026-01-01T01:00:00.000Z"],
+    "timeField": "minute"
+  },
+  "v1-seeded-service-health.json#latency": {
+    "sql": "SELECT * FROM (SELECT time_bucket('1 minute', ts) AS minute, percentile_cont(0.95) WITHIN GROUP (ORDER BY duration_ms) AS p95 FROM http_requests GROUP BY minute ORDER BY minute) AS _holo\nWHERE _holo.minute >= $1::timestamptz\n  AND _holo.minute < $2::timestamptz\nLIMIT 5000",
+    "params": ["2026-01-01T00:00:00.000Z", "2026-01-01T01:00:00.000Z"],
+    "timeField": "minute"
+  },
+  "v1-seeded-service-health.json#errors": {
+    "sql": "SELECT * FROM (SELECT time_bucket('1 minute', ts) AS minute, count(*) FILTER (WHERE status >= 500) AS errors FROM http_requests GROUP BY minute ORDER BY minute) AS _holo\nWHERE _holo.minute >= $1::timestamptz\n  AND _holo.minute < $2::timestamptz\nLIMIT 5000",
+    "params": ["2026-01-01T00:00:00.000Z", "2026-01-01T01:00:00.000Z"],
+    "timeField": "minute"
+  },
+  "v1-seeded-service-health.json#by-route": {
+    "sql": "SELECT * FROM (SELECT route, count(*) AS requests FROM http_requests GROUP BY route ORDER BY requests DESC) AS _holo LIMIT 5000",
+    "params": []
+  },
+  "v1-unversioned.json#rps": {
+    "sql": "SELECT * FROM (SELECT time_bucket('1 minute', ts) AS minute, count(*) AS requests FROM http_requests GROUP BY minute ORDER BY minute) AS _holo\nWHERE _holo.minute >= $1::timestamptz\n  AND _holo.minute < $2::timestamptz\nLIMIT 5000",
+    "params": ["2026-01-01T00:00:00.000Z", "2026-01-01T01:00:00.000Z"],
+    "timeField": "minute"
+  },
+  "v1-unversioned.json#by-route": {
+    "sql": "SELECT * FROM (SELECT route, count(*) AS requests FROM http_requests GROUP BY route ORDER BY requests DESC) AS _holo LIMIT 5000",
+    "params": []
+  }
+}

@@ -163,7 +163,7 @@ test("a token cannot open a dashboard stream", () => {
 const dbUrl = process.env.MIGRATE_TEST_DATABASE_URL;
 
 test("a token row is found by hash and revoked only in its own workspace", {
-  skip: dbUrl ? false : "set MIGRATE_TEST_DATABASE_URL to run",
+  skip: dbUrl ? false : "run with npm run test:integration (needs Docker)",
 }, async () => {
   const client = new Client({ connectionString: dbUrl });
   await client.connect();

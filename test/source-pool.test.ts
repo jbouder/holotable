@@ -279,7 +279,7 @@ test("deleting a source and shutting down close its pools", async () => {
 const dbUrl = process.env.MIGRATE_TEST_DATABASE_URL;
 
 test("pooled connections are reused, capped, and left clean", {
-  skip: dbUrl ? false : "set MIGRATE_TEST_DATABASE_URL to run",
+  skip: dbUrl ? false : "run with npm run test:integration (needs Docker)",
 }, async () => {
   const url = new URL(dbUrl as string);
   process.env.SOURCE_SECRET_REFS = `${REF}:${WORKSPACE}`;

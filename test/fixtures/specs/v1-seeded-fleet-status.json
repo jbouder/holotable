@@ -1,0 +1,131 @@
+{
+  "title": "Demo fleet status",
+  "panels": [
+    {
+      "id": "about",
+      "viz": "text",
+      "title": "About this dashboard",
+      "layout": {
+        "h": 2,
+        "w": 12,
+        "x": 0,
+        "y": 0
+      },
+      "options": {
+        "content": "## Fleet status\n\nWhere each demo host stands **now**, and how its load has moved over the window.\n\n- **ok** below 70% CPU, **busy** from 70%, **hot** from 85%\n- The data is the demo seeder's `system_metrics` table, written every few seconds"
+      }
+    },
+    {
+      "id": "cpu-now",
+      "viz": "gauge",
+      "query": {
+        "sql": "SELECT time_bucket('1 minute', ts) AS minute, host, avg(cpu_pct) AS cpu FROM system_metrics GROUP BY minute, host ORDER BY minute",
+        "sourceId": "ts-system",
+        "timeField": "minute"
+      },
+      "title": "CPU now by host",
+      "format": "percent",
+      "layout": {
+        "h": 3,
+        "w": 8,
+        "x": 0,
+        "y": 2
+      },
+      "options": {
+        "max": 100,
+        "min": 0,
+        "value": "cpu",
+        "variant": "bar",
+        "thresholds": [
+          {
+            "color": "success",
+            "value": 0
+          },
+          {
+            "color": "warning",
+            "value": 70
+          },
+          {
+            "color": "danger",
+            "value": 85
+          }
+        ]
+      }
+    },
+    {
+      "id": "disk-max",
+      "viz": "gauge",
+      "query": {
+        "sql": "SELECT time_bucket('1 minute', ts) AS minute, max(disk_pct) AS disk FROM system_metrics GROUP BY minute ORDER BY minute",
+        "sourceId": "ts-system",
+        "timeField": "minute"
+      },
+      "title": "Fullest disk",
+      "format": "percent",
+      "layout": {
+        "h": 3,
+        "w": 4,
+        "x": 8,
+        "y": 2
+      },
+      "options": {
+        "max": 100,
+        "min": 0,
+        "thresholds": [
+          {
+            "color": "success",
+            "value": 0
+          },
+          {
+            "color": "warning",
+            "value": 80
+          },
+          {
+            "color": "danger",
+            "value": 90
+          }
+        ]
+      }
+    },
+    {
+      "id": "load-state",
+      "viz": "state-timeline",
+      "query": {
+        "sql": "SELECT time_bucket('1 minute', ts) AS minute, host, CASE WHEN avg(cpu_pct) >= 85 THEN 'hot' WHEN avg(cpu_pct) >= 70 THEN 'busy' ELSE 'ok' END AS state FROM system_metrics GROUP BY minute, host ORDER BY minute",
+        "sourceId": "ts-system",
+        "timeField": "minute"
+      },
+      "title": "Host load state",
+      "layout": {
+        "h": 4,
+        "w": 12,
+        "x": 0,
+        "y": 5
+      },
+      "options": {
+        "state": "state",
+        "entity": "host",
+        "states": [
+          {
+            "color": "success",
+            "state": "ok"
+          },
+          {
+            "color": "warning",
+            "state": "busy"
+          },
+          {
+            "color": "danger",
+            "state": "hot"
+          }
+        ]
+      }
+    }
+  ],
+  "timeRange": {
+    "to": "now",
+    "from": "now-1h"
+  },
+  "specVersion": 1,
+  "refreshIntervalMs": 15000
+}

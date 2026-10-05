@@ -354,7 +354,7 @@ test("the migration refuses every change to a stored row", () => {
 const dbUrl = process.env.MIGRATE_TEST_DATABASE_URL;
 
 test("the table's own owner can insert and read, and cannot change or remove", {
-  skip: dbUrl ? false : "set MIGRATE_TEST_DATABASE_URL to run",
+  skip: dbUrl ? false : "run with npm run test:integration (needs Docker)",
 }, async () => {
   const client = new Client({ connectionString: dbUrl });
   await client.connect();

@@ -193,16 +193,29 @@ jobs:
           psql "$DATABASE_URL" -q -c 'DROP SCHEMA public CASCADE; CREATE SCHEMA public;'
           npm run migrate:verify
 
-      # The advisory lock that serializes two migrate Jobs from one rollout,
-      # the audit log's append-only triggers, row filters against two
-      # tenants' rows (both in scratch schemas), pooled source connections
-      # coming back clean, annotations kept to their workspace, and share rows
-      # revoked only through their own dashboard.
-      # Skipped in the required Test job, which has no database.
-      - name: Against a real server
-        run: LOG_LEVEL=silent node --test --import tsx test/migrations.test.ts test/audit.test.ts test/row-filter.test.ts test/source-pool.test.ts test/annotations.test.ts test/share.test.ts test/api-tokens.test.ts
-        env:
-          MIGRATE_TEST_DATABASE_URL: ${{ env.DATABASE_URL }}
+  integration:
+    name: Integration
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: package-lock.json
+
+      - name: Install
+        run: npm ci
+
+      # Starts TimescaleDB with Testcontainers (#87), initialized by the same
+      # timescaledb/init scripts compose mounts, applies the migrations, and
+      # runs every real-server suite: read-only execution, statement timeouts,
+      # SQLSTATE mapping, the allowlist end to end, repository round trips and
+      # a poller ticking over real rows. Under CI a missing Docker fails the
+      # job rather than skipping it.
+      - name: Integration tests
+        run: npm run test:integration
 
   helm:
     name: Helm chart

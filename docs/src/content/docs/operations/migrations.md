@@ -119,6 +119,11 @@ A parse-only dry run cannot catch a rollback that fails only against a live
 server with the TimescaleDB extension loaded. Running the statements can, which
 is why the down path is exercised for real rather than inspected.
 
+The `Integration` job (`npm run test:integration`) adds the first-deploy view:
+it creates an empty database, runs the real `npm run migrate` CLI into it, and
+asserts that every migration was recorded, that a second run applies nothing
+and leaves the schema fingerprint unchanged, and that `--check` then passes.
+
 ## Breaking changes: expand and contract
 
 A migration that changes an existing column or table in place assumes the old

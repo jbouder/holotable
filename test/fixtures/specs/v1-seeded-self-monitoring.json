@@ -1,0 +1,133 @@
+{
+  "title": "Holotable self-monitoring",
+  "panels": [
+    {
+      "id": "tick-p95",
+      "viz": "line",
+      "query": {
+        "sql": "WITH scraped AS (\n  SELECT ts, le, sum(value) AS cumulative\n  FROM holotable_self\n  WHERE metric = 'holotable_poller_tick_duration_seconds_bucket' AND le IS NOT NULL\n  GROUP BY ts, le\n), buckets AS (\n  SELECT time_bucket('1 minute', ts) AS minute, le, max(cumulative) - min(cumulative) AS hits\n  FROM scraped\n  GROUP BY minute, le\n), counted AS (\n  SELECT ts, sum(value) AS cumulative\n  FROM holotable_self\n  WHERE metric = 'holotable_poller_tick_duration_seconds_count'\n  GROUP BY ts\n), totals AS (\n  SELECT time_bucket('1 minute', ts) AS minute, max(cumulative) - min(cumulative) AS ticks\n  FROM counted\n  GROUP BY minute\n)\nSELECT buckets.minute, min(buckets.le) AS p95_seconds\nFROM buckets JOIN totals ON totals.minute = buckets.minute\nWHERE totals.ticks > 0 AND buckets.hits >= 0.95 * totals.ticks\nGROUP BY buckets.minute\nORDER BY buckets.minute",
+        "sourceId": "holotable-self",
+        "timeField": "minute"
+      },
+      "title": "Poller tick p95 (s)",
+      "format": "number",
+      "layout": {
+        "h": 3,
+        "w": 6,
+        "x": 0,
+        "y": 0
+      },
+      "description": "95th percentile wall time of a dashboard poller tick, read off the histogram buckets: the smallest bucket bound whose share of this minute's ticks has reached 95%."
+    },
+    {
+      "id": "query-latency",
+      "viz": "line",
+      "query": {
+        "sql": "WITH scraped AS (\n  SELECT ts, source,\n         sum(value) FILTER (WHERE metric = 'holotable_query_duration_seconds_sum') AS seconds,\n         sum(value) FILTER (WHERE metric = 'holotable_query_duration_seconds_count') AS queries\n  FROM holotable_self\n  WHERE metric IN ('holotable_query_duration_seconds_sum', 'holotable_query_duration_seconds_count')\n  GROUP BY ts, source\n)\nSELECT time_bucket('1 minute', ts) AS minute, source,\n       1000.0 * (max(seconds) - min(seconds))\n         / NULLIF(max(queries) - min(queries), 0) AS avg_ms\nFROM scraped\nGROUP BY minute, source\nORDER BY minute",
+        "sourceId": "holotable-self",
+        "timeField": "minute"
+      },
+      "title": "Query latency by source (ms)",
+      "format": "ms",
+      "layout": {
+        "h": 3,
+        "w": 6,
+        "x": 6,
+        "y": 0
+      },
+      "description": "Mean wall time of one guarded query per minute, per source: the increase in the histogram's summed seconds divided by the increase in its count."
+    },
+    {
+      "id": "resident-memory",
+      "viz": "area",
+      "query": {
+        "sql": "SELECT time_bucket('1 minute', ts) AS minute, max(value) AS resident_bytes\nFROM holotable_self\nWHERE metric = 'holotable_process_resident_memory_bytes'\nGROUP BY minute\nORDER BY minute",
+        "sourceId": "holotable-self",
+        "timeField": "minute"
+      },
+      "title": "Resident memory",
+      "format": "bytes",
+      "layout": {
+        "h": 3,
+        "w": 6,
+        "x": 0,
+        "y": 3
+      },
+      "description": "The app process's resident set size, the one series that is live from boot."
+    },
+    {
+      "id": "sse-subscribers",
+      "viz": "line",
+      "query": {
+        "sql": "WITH scraped AS (\n  SELECT ts, sum(value) AS subscribers\n  FROM holotable_self\n  WHERE metric = 'holotable_sse_subscribers'\n  GROUP BY ts\n)\nSELECT time_bucket('1 minute', ts) AS minute, max(subscribers) AS subscribers\nFROM scraped\nGROUP BY minute\nORDER BY minute",
+        "sourceId": "holotable-self",
+        "timeField": "minute"
+      },
+      "title": "Live viewers",
+      "format": "number",
+      "layout": {
+        "h": 3,
+        "w": 3,
+        "x": 6,
+        "y": 3
+      },
+      "description": "Browsers attached to a dashboard's event stream, summed across dashboards."
+    },
+    {
+      "id": "pollers-active",
+      "viz": "stat",
+      "query": {
+        "sql": "SELECT time_bucket('1 minute', ts) AS minute, max(value) AS pollers\nFROM holotable_self\nWHERE metric = 'holotable_pollers_active'\nGROUP BY minute\nORDER BY minute",
+        "sourceId": "holotable-self",
+        "timeField": "minute"
+      },
+      "title": "Active pollers",
+      "format": "number",
+      "layout": {
+        "h": 3,
+        "w": 3,
+        "x": 9,
+        "y": 3
+      }
+    },
+    {
+      "id": "llm-tokens",
+      "viz": "bar",
+      "query": {
+        "sql": "WITH scraped AS (\n  SELECT ts, direction, sum(value) AS cumulative\n  FROM holotable_self\n  WHERE metric = 'holotable_llm_tokens_total'\n  GROUP BY ts, direction\n)\nSELECT time_bucket('5 minutes', ts) AS minute, direction,\n       max(cumulative) - min(cumulative) AS tokens\nFROM scraped\nGROUP BY minute, direction\nORDER BY minute",
+        "sourceId": "holotable-self",
+        "timeField": "minute"
+      },
+      "title": "Model tokens per 5 minutes",
+      "format": "number",
+      "layout": {
+        "h": 3,
+        "w": 6,
+        "x": 0,
+        "y": 6
+      },
+      "description": "Tokens billed by direction. Empty until a generate or chat request runs."
+    },
+    {
+      "id": "sql-rejections",
+      "viz": "table",
+      "query": {
+        "sql": "WITH scraped AS (\n  SELECT ts, reason, sum(value) AS cumulative\n  FROM holotable_self\n  WHERE metric = 'holotable_sql_validation_rejections_total'\n  GROUP BY ts, reason\n)\nSELECT reason, max(cumulative) - min(cumulative) AS rejections\nFROM scraped\nGROUP BY reason\nORDER BY rejections DESC",
+        "sourceId": "holotable-self"
+      },
+      "title": "SQL guard rejections by reason",
+      "layout": {
+        "h": 3,
+        "w": 6,
+        "x": 6,
+        "y": 6
+      },
+      "description": "Statements the guard refused, over everything the collector still retains. No time field, so the dashboard's range does not narrow it."
+    }
+  ],
+  "timeRange": {
+    "to": "now",
+    "from": "now-1h"
+  },
+  "refreshIntervalMs": 15000
+}

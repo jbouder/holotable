@@ -1,0 +1,76 @@
+{
+  "title": "Demo service health",
+  "panels": [
+    {
+      "id": "rps",
+      "viz": "line",
+      "query": {
+        "sql": "SELECT time_bucket('1 minute', ts) AS minute, count(*) AS requests FROM http_requests GROUP BY minute ORDER BY minute",
+        "sourceId": "ts-metrics",
+        "timeField": "minute"
+      },
+      "title": "Requests / min",
+      "format": "number",
+      "layout": {
+        "h": 3,
+        "w": 6,
+        "x": 0,
+        "y": 0
+      }
+    },
+    {
+      "id": "latency",
+      "viz": "line",
+      "query": {
+        "sql": "SELECT time_bucket('1 minute', ts) AS minute, percentile_cont(0.95) WITHIN GROUP (ORDER BY duration_ms) AS p95 FROM http_requests GROUP BY minute ORDER BY minute",
+        "sourceId": "ts-metrics",
+        "timeField": "minute"
+      },
+      "title": "p95 latency (ms)",
+      "format": "ms",
+      "layout": {
+        "h": 3,
+        "w": 6,
+        "x": 6,
+        "y": 0
+      }
+    },
+    {
+      "id": "errors",
+      "viz": "stat",
+      "query": {
+        "sql": "SELECT time_bucket('1 minute', ts) AS minute, count(*) FILTER (WHERE status >= 500) AS errors FROM http_requests GROUP BY minute ORDER BY minute",
+        "sourceId": "ts-metrics",
+        "timeField": "minute"
+      },
+      "title": "Errors (5xx) total",
+      "format": "number",
+      "layout": {
+        "h": 2,
+        "w": 3,
+        "x": 0,
+        "y": 3
+      }
+    },
+    {
+      "id": "by-route",
+      "viz": "table",
+      "query": {
+        "sql": "SELECT route, count(*) AS requests FROM http_requests GROUP BY route ORDER BY requests DESC",
+        "sourceId": "ts-metrics"
+      },
+      "title": "Requests by route",
+      "layout": {
+        "h": 2,
+        "w": 9,
+        "x": 3,
+        "y": 3
+      }
+    }
+  ],
+  "timeRange": {
+    "to": "now",
+    "from": "now-1h"
+  },
+  "refreshIntervalMs": 15000
+}

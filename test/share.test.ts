@@ -356,7 +356,7 @@ test("only the stream route and the embed page accept a share token", () => {
 const dbUrl = process.env.MIGRATE_TEST_DATABASE_URL;
 
 test("a share row is revoked only through its own dashboard and workspace", {
-  skip: dbUrl ? false : "set MIGRATE_TEST_DATABASE_URL to run",
+  skip: dbUrl ? false : "run with npm run test:integration (needs Docker)",
 }, async () => {
   const client = new Client({ connectionString: dbUrl });
   await client.connect();

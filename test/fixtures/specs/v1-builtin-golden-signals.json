@@ -1,0 +1,45 @@
+{
+  "title": "Golden signals — holotable_self",
+  "panels": [
+    {
+      "id": "rate",
+      "viz": "line",
+      "query": {
+        "sql": "SELECT date_trunc('minute', ts) AS bucket, count(*) AS events\nFROM holotable_self\nGROUP BY bucket\nORDER BY bucket",
+        "sourceId": "postgresql-events",
+        "timeField": "bucket"
+      },
+      "title": "holotable_self rate",
+      "format": "number",
+      "layout": {
+        "h": 4,
+        "w": 6,
+        "x": 0,
+        "y": 0
+      },
+      "description": "Rows written to holotable_self per minute — the traffic this table sees."
+    },
+    {
+      "id": "errors",
+      "viz": "table",
+      "query": {
+        "sql": "SELECT date_trunc('minute', ts) AS bucket, outcome, count(*) AS events\nFROM holotable_self\nGROUP BY bucket, outcome\nORDER BY bucket DESC, events DESC",
+        "sourceId": "postgresql-events",
+        "timeField": "bucket"
+      },
+      "title": "holotable_self by outcome",
+      "layout": {
+        "h": 4,
+        "w": 6,
+        "x": 6,
+        "y": 0
+      },
+      "description": "Rows per minute broken down by outcome. The catalog does not say which value means failure, so the breakdown is shown whole rather than guessed at — narrow it in the SQL once you know."
+    }
+  ],
+  "timeRange": {
+    "to": "now",
+    "from": "now-1h"
+  },
+  "refreshIntervalMs": 30000
+}
