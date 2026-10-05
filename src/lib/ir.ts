@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { DashboardAnnotations } from "@/lib/annotations";
 import { ValueFormat } from "@/lib/panels/presentation";
 import { findPanelKind, PANEL_KIND_NAMES, PANEL_KINDS } from "@/lib/panels/registry";
 
@@ -363,6 +364,8 @@ const DashboardFields = {
   panels: z.array(Panel).min(1).max(50),
   /** Variables panel SQL may reference as `:name` (#67). */
   variables: z.array(Variable).max(10).optional(),
+  /** Whether, and which, annotations are drawn on its time-series panels (#68). */
+  annotations: DashboardAnnotations.optional(),
 };
 
 function uniqueIds(

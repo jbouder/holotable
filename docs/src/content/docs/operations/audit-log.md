@@ -32,6 +32,8 @@ configure.
 | `source.test`, `source.refresh`, `source.discover`, `source.draft` | Connection test, applied catalog refresh, table discovery, drafted source | source, or — before one exists |
 | `template.create`, `template.delete` | Workspace templates | template |
 | `workspace.limits.update` | A platform admin changes a workspace's LLM limits (`before`, `after`) | workspace |
+| `annotation.create` | An editor or pipeline writes an annotation (`kind`, `at`, `source`) | annotation |
+| `annotation.delete` | An editor deletes an annotation | annotation |
 
 `outcome` is `success`, `failure` (a statement the guard refused or the source
 rejected, a failed connection test, a generation that produced nothing) or

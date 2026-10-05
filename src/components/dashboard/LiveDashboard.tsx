@@ -9,6 +9,7 @@ import {
   type VariableChoice,
 } from "@/lib/variable-selection";
 import { VariablePickers } from "@/components/dashboard/VariablePicker";
+import { AnnotationsControl, useAnnotations } from "@/components/dashboard/Annotations";
 import type { PollerEvent } from "@/lib/poller/registry";
 import { DashboardGrid } from "@/components/dashboard/DashboardGrid";
 import { PanelView, type PanelState } from "@/components/dashboard/PanelView";
@@ -83,6 +84,7 @@ export function LiveDashboard({
   idlePauseMs,
   variables = [],
   initialSelection = {},
+  annotationAccess,
 }: {
   dashboardId: string;
   spec: Dashboard;
@@ -107,6 +109,11 @@ export function LiveDashboard({
   variables?: VariableChoice[];
   /** The picks to open on, already resolved by the page. */
   initialSelection?: Selection;
+  /**
+   * Where annotations are written, and whether this viewer may (#68). The
+   * workspace is the dashboard record's; the server authorizes every write.
+   */
+  annotationAccess?: { workspaceId: string; canEdit: boolean };
 }) {
   const [selection, setSelection] = React.useState<Selection>(initialSelection);
   const [states, setStates] = React.useState<Record<string, PanelState>>({});
@@ -146,6 +153,16 @@ export function LiveDashboard({
   // renewal — resumes from it instead of starting over.
   const lastEventIdRef = React.useRef<{ url: string; id: string } | null>(null);
   const rolling = isRolling(timeRange);
+  // Annotations (#68): off for a dashboard that turns them off; a viewer can
+  // hide them from this view without changing the dashboard.
+  const annotationsOn =
+    annotationAccess !== undefined && spec.annotations?.show !== false;
+  const [annotationsShown, setAnnotationsShown] = React.useState(true);
+  const { annotations, reload: reloadAnnotations } = useAnnotations(
+    dashboardId,
+    timeRange,
+    annotationsOn,
+  );
   const cycle = cycleMs(spec);
   const streamUrl = React.useMemo(() => {
     const params = new URLSearchParams(timeRange);
@@ -454,6 +471,16 @@ export function LiveDashboard({
           <Play className="pop-in h-4 w-4 fill-current" />
         )}
       </Button>
+      {annotationsOn && annotationAccess && (
+        <AnnotationsControl
+          annotations={annotations}
+          shown={annotationsShown}
+          onShownChange={setAnnotationsShown}
+          workspaceId={annotationAccess.workspaceId}
+          canEdit={annotationAccess.canEdit}
+          onChanged={reloadAnnotations}
+        />
+      )}
       <TimeRangeFilter value={timeRange} onChange={setTimeRange} />
     </>
   );
@@ -517,6 +544,9 @@ export function LiveDashboard({
             onSelectTimeRange={setTimeRange}
             // A panel with its own window (#114) is sent it with its rows.
             window={panel.timeRange ? undefined : resolvedWindow}
+            // Hidden is an empty list rather than none, so the merge clears
+            // the marks instead of leaving them on the chart (invariant 11).
+            annotations={annotations && (annotationsShown ? annotations : [])}
           />
         )}
       />

@@ -63,6 +63,8 @@ export const AUDIT_ACTIONS = [
   "template.create",
   "template.delete",
   "workspace.limits.update",
+  "annotation.create",
+  "annotation.delete",
 ] as const;
 
 export type AuditAction = (typeof AUDIT_ACTIONS)[number];
@@ -71,7 +73,12 @@ export type AuditAction = (typeof AUDIT_ACTIONS)[number];
 export const AUDIT_OUTCOMES = ["success", "failure", "denied"] as const;
 export type AuditOutcome = (typeof AUDIT_OUTCOMES)[number];
 
-export type AuditResourceType = "dashboard" | "source" | "template" | "workspace";
+export type AuditResourceType =
+  | "dashboard"
+  | "source"
+  | "template"
+  | "workspace"
+  | "annotation";
 
 /** What an event acted on. */
 export interface AuditResource {

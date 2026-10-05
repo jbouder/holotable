@@ -109,6 +109,10 @@ Important files:
   dashboard's workspace, under the viewer's row scope) and
   `src/lib/variable-selection.ts` (`var-*` URL picks, defaults, the allowlist
   check). Picks are part of the poller key
+- `src/lib/annotations.ts`, `src/lib/annotation-service.ts` and
+  `src/lib/db/annotations.ts` — annotations (#68): workspace-scoped events
+  drawn on time-series panels. Reads take the workspace from the dashboard
+  record, writes from the path, and every statement filters on it
 - `src/lib/auth/authorize.ts` — the central `can()` check
 - `src/lib/auth/renewal.ts` — session renewal (#27): the realm's refresh token
   is sealed in `sessions` (`refresh-token.ts`) and never reaches the browser,

@@ -79,6 +79,7 @@ import {
   PanelTimingFields,
 } from "@/components/editor/panel-settings";
 import { usePreviewValues, VariablesEditor } from "@/components/editor/variables-editor";
+import { AnnotationSettings } from "@/components/editor/annotation-settings";
 import type { VariableValues } from "@/lib/sql/variables";
 import { bindShortcuts, EDITOR_SHORTCUTS } from "@/lib/shortcuts";
 import {
@@ -969,6 +970,20 @@ export function EditDashboardClient({
               {previewValues.error && (
                 <ErrorDisplay error={previewValues.error} className="mt-3" />
               )}
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Annotations</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <AnnotationSettings
+                value={spec.annotations}
+                onChange={(annotations, action, key) =>
+                  updateSpec({ annotations }, { action, key: key ? `spec:${key}` : null })
+                }
+              />
             </CardContent>
           </Card>
 

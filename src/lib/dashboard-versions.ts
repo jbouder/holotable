@@ -80,7 +80,7 @@ export function authorLabel(createdBy: string, viewerSub: string): string {
 /* -------------------------------------------------------------------------- */
 
 export interface DashboardFieldDiff {
-  key: "title" | "timeRange" | "refresh";
+  key: "title" | "timeRange" | "refresh" | "variables" | "annotations";
   label: string;
   before: string;
   after: string;
@@ -119,6 +119,23 @@ function formatRange(range: Dashboard["timeRange"]): string {
  * matched pair goes through the same `diffPanels` the NL panel edit review
  * uses, so the history and that review describe a change the same way.
  */
+/** Each variable as `:name (kind)`; `none` without any (#67). */
+function formatVariables(variables: Dashboard["variables"]): string {
+  if (!variables?.length) return "none";
+  return variables
+    .map(
+      (v) =>
+        `:${v.name} (${v.type === "enum" ? `${v.values?.length ?? 0} values` : "query"}${v.multi ? ", several" : ""})`,
+    )
+    .join(", ");
+}
+
+/** Whether a dashboard draws annotations, and which (#68). */
+function formatAnnotations(settings: Dashboard["annotations"]): string {
+  if (settings?.show === false) return "hidden";
+  return settings?.tags?.length ? `tagged ${settings.tags.join(", ")}` : "all";
+}
+
 export function diffDashboards(before: Dashboard, after: Dashboard): DashboardDiff {
   const field = (
     key: DashboardFieldDiff["key"],
@@ -145,6 +162,18 @@ export function diffDashboards(before: Dashboard, after: Dashboard): DashboardDi
       "Refresh",
       formatRefresh(before.refreshIntervalMs),
       formatRefresh(after.refreshIntervalMs),
+    ),
+    field(
+      "variables",
+      "Variables",
+      formatVariables(before.variables),
+      formatVariables(after.variables),
+    ),
+    field(
+      "annotations",
+      "Annotations",
+      formatAnnotations(before.annotations),
+      formatAnnotations(after.annotations),
     ),
   ];
 
