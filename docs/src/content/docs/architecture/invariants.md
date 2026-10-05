@@ -194,7 +194,9 @@ re-authorized (#32, `src/lib/auth/stream-guard.ts`).
 ## 13. OKLCH tokens are resolved before reaching ECharts
 
 `src/lib/color/oklch.ts` converts design tokens to RGB/hex, because ECharts
-cannot parse `oklch()`.
+cannot parse `oklch()`. A spec never stores a raw color either: a gauge's
+threshold steps and a state timeline's state colors name tokens
+(`src/lib/panels/colors.ts`), which resolve through the same OKLCH values.
 
 ## 14. Every request is authorized from the validated identity
 

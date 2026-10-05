@@ -30,13 +30,13 @@ test("exposes the sql, source id, time field and description", () => {
 
 test("copies the sql verbatim", () => {
   const sql = "SELECT\n  ts,\n  avg(value) AS v\nFROM metrics\nGROUP BY 1";
-  assert.equal(panelDetails(panel({ query: { sourceId: "s", sql } })).sql, sql);
+  assert.equal(panelDetails(panel({ query: { sourceId: "s", sql } }))?.sql, sql);
 });
 
 test("omits an absent time field and description rather than inventing one", () => {
   const details = panelDetails(panel({ query: { sourceId: "s", sql: "SELECT 1" } }));
-  assert.equal(details.timeField, undefined);
-  assert.equal(details.description, undefined);
+  assert.equal(details?.timeField, undefined);
+  assert.equal(details?.description, undefined);
 });
 
 test("never carries connection details smuggled onto the panel", () => {
@@ -52,11 +52,16 @@ test("never carries connection details smuggled onto the panel", () => {
   const smuggled = { ...panel(), query } as unknown as Panel;
 
   const details = panelDetails(smuggled);
-  assert.deepEqual(Object.keys(details).sort(), [
+  assert.deepEqual(Object.keys(details ?? {}).sort(), [
     "description",
     "sourceId",
     "sql",
     "timeField",
   ]);
   assert.doesNotMatch(JSON.stringify(details), /hunter2|vault:\/\/|postgresql:\/\//);
+});
+
+test("a panel that runs no query has no details to show (#202)", () => {
+  const text = { ...panel(), viz: "text", query: undefined } as Panel;
+  assert.equal(panelDetails(text), null);
 });

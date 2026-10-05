@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { Info } from "lucide-react";
-import type { Panel, TimeRange } from "@/lib/ir";
+import { hasQuery, type Panel, type TimeRange } from "@/lib/ir";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ErrorDisplay } from "@/components/ui/error-display";
 import { EChart, type EChartHandle } from "@/components/charts/EChart";
@@ -10,7 +10,7 @@ import { PanelSqlDialog } from "@/components/dashboard/PanelSqlDialog";
 import { PanelActions } from "@/components/dashboard/PanelActions";
 import { LoadingLabel, PanelSkeleton } from "@/components/dashboard/PanelSkeleton";
 import { Popover } from "@/components/ui/popover";
-import type { PanelData } from "@/components/charts/options";
+import type { ChartContext, PanelData } from "@/components/charts/options";
 import { panelRenderer } from "@/components/panels/registry";
 import { formatClockTime } from "@/lib/connection";
 import { useTimeDisplay } from "@/components/time-display";
@@ -61,11 +61,17 @@ export function PanelView({
   dashboardTitle,
   crosshairGroup,
   onSelectTimeRange,
+  window,
 }: {
   panel: Panel;
   state?: PanelState;
   onRetry?: () => void;
   paused?: boolean;
+  /**
+   * The window the server resolved for the rows, once it has said (epoch ms).
+   * A chart that runs to "now" ends here (#201).
+   */
+  window?: ChartContext["window"];
   /**
    * The window this panel is being shown for. Only the details dialog uses it,
    * to ask the server what it would run (#110); a surface that does not know
@@ -84,13 +90,16 @@ export function PanelView({
   onSelectTimeRange?: (range: TimeRange) => void;
 }) {
   const data = state?.data ?? EMPTY;
-  const status = state?.status ?? "loading";
+  // A panel that runs no query (text, #202) has nothing to load or go stale.
+  const queried = hasQuery(panel);
+  const status = queried ? (state?.status ?? "loading") : "live";
   const chart = React.useRef<EChartHandle | null>(null);
   const expansion = useExpanded();
 
   // While paused, suppress the transient "live"/"loading" badges — they no
-  // longer reflect reality. Error/tombstoned states remain meaningful.
-  const showBadge = !(paused && (status === "live" || status === "loading"));
+  // longer reflect reality. Error/tombstoned states remain meaningful. A text
+  // panel has no status at all.
+  const showBadge = queried && !(paused && (status === "live" || status === "loading"));
 
   return (
     <>
@@ -131,6 +140,7 @@ export function PanelView({
               panelTitle={panel.title}
               dashboardTitle={dashboardTitle}
               data={data}
+              exportable={queried}
               chart={supportsImageExport(panel.viz) ? chart : undefined}
               expanded={expansion.expanded}
               onToggleExpanded={expansion.toggle}
@@ -141,11 +151,12 @@ export function PanelView({
           <PanelBody
             panel={panel}
             data={data}
-            state={state}
+            state={queried ? state : { data, status: "live" }}
             onRetry={onRetry}
             chartRef={chart}
             crosshairGroup={crosshairGroup}
             onSelectTimeRange={onSelectTimeRange}
+            window={window}
           />
         </CardContent>
       </Card>
@@ -266,6 +277,7 @@ function PanelBody({
   chartRef,
   crosshairGroup,
   onSelectTimeRange,
+  window,
 }: {
   panel: Panel;
   data: PanelData;
@@ -275,6 +287,7 @@ function PanelBody({
   chartRef?: React.RefObject<EChartHandle | null>;
   crosshairGroup?: string;
   onSelectTimeRange?: (range: TimeRange) => void;
+  window?: ChartContext["window"];
 }) {
   if (state?.status === "tombstoned") {
     // A tombstone is the `conflict` kind: the source is gone, and the fix is to
@@ -302,7 +315,11 @@ function PanelBody({
   if (state?.status === "degraded") {
     return <DegradedBody state={state} onRetry={onRetry} />;
   }
-  if (data.rows.length === 0 && (!state || state.status === "loading")) {
+  if (
+    hasQuery(panel) &&
+    data.rows.length === 0 &&
+    (!state || state.status === "loading")
+  ) {
     // A skeleton in the panel's own shape rather than a centred spinner: the
     // panel already occupies its final grid cell, and filling it with the
     // silhouette of what is coming is what stops the page moving when the
@@ -326,6 +343,7 @@ function PanelBody({
         chartRef={chartRef}
         crosshairGroup={crosshairGroup}
         onSelectTimeRange={onSelectTimeRange}
+        window={window}
       />
     </div>
   );
@@ -337,12 +355,14 @@ function PanelContent({
   chartRef,
   crosshairGroup,
   onSelectTimeRange,
+  window,
 }: {
   panel: Panel;
   data: PanelData;
   chartRef?: React.RefObject<EChartHandle | null>;
   crosshairGroup?: string;
   onSelectTimeRange?: (range: TimeRange) => void;
+  window?: ChartContext["window"];
 }) {
   const display = useTimeDisplay();
   // The registry decides how the kind is drawn (#61); nothing here names one.
@@ -352,8 +372,11 @@ function PanelContent({
   }
   return (
     <EChart
+      // A new layout of the same kind (a gauge's dial to bars) is a new chart;
+      // a data update never changes this, so it still merges (invariant 11).
+      key={`${panel.viz}:${renderer.shape?.(panel) ?? ""}`}
       ref={chartRef}
-      option={renderer.option(panel, data, display)}
+      option={renderer.option(panel, data, { display, window: window ?? data.window })}
       crosshairGroup={crosshairGroup}
       onBrush={
         onSelectTimeRange && supportsTimeBrush(panel)
@@ -365,7 +388,7 @@ function PanelContent({
               // window alone rather than guessing at one.
               const range = brushedRange(
                 data.rows,
-                panel.query.timeField,
+                panel.query?.timeField,
                 startIndex,
                 endIndex,
               );

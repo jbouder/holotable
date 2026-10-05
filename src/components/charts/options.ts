@@ -6,6 +6,11 @@ import { formatDateTime, type TimeDisplay } from "@/lib/time-display";
 export interface PanelData {
   columns: string[];
   rows: Record<string, unknown>[];
+  /**
+   * The window a one-shot query (`/api/query`) resolved for these rows, in
+   * epoch ms. A live dashboard learns it from each `tick` instead.
+   */
+  window?: { from: number; to: number };
 }
 
 const palette = chartPalette();
@@ -19,7 +24,7 @@ const EMPTY: PanelData = { columns: [], rows: [] };
  * on a shape it did not expect: `PanelErrorBoundary` is the backstop, but a
  * panel that degrades to an empty chart beats one that degrades to a card.
  */
-function normalize(data: PanelData | undefined): PanelData {
+export function normalize(data: PanelData | undefined): PanelData {
   if (!data) return EMPTY;
   return {
     columns: Array.isArray(data.columns)
@@ -34,7 +39,7 @@ function normalize(data: PanelData | undefined): PanelData {
 }
 
 /** `String(v)` throws on a symbol and stringifies objects unhelpfully. */
-function toText(value: unknown): string {
+export function toText(value: unknown): string {
   if (value === null || value === undefined) return "";
   switch (typeof value) {
     case "string":
@@ -56,13 +61,13 @@ function toText(value: unknown): string {
 }
 
 /** `Number(v)` throws on a symbol; everything else here becomes NaN or a number. */
-function toNumber(value: unknown): number {
+export function toNumber(value: unknown): number {
   if (typeof value === "symbol" || typeof value === "function") return Number.NaN;
   const n = Number(value);
   return Number.isFinite(n) ? n : Number.NaN;
 }
 
-function isNumeric(rows: Record<string, unknown>[], key: string): boolean {
+export function isNumeric(rows: Record<string, unknown>[], key: string): boolean {
   return rows.some(
     (r) =>
       typeof r[key] === "number" ||
@@ -71,7 +76,7 @@ function isNumeric(rows: Record<string, unknown>[], key: string): boolean {
 }
 
 function xKey(panel: Panel, data: PanelData): string {
-  return panel.query.timeField ?? data.columns[0] ?? "x";
+  return panel.query?.timeField ?? data.columns[0] ?? "x";
 }
 
 function seriesKeys(panel: Panel, data: PanelData): string[] {
@@ -82,7 +87,7 @@ function seriesKeys(panel: Panel, data: PanelData): string[] {
 /** An ISO-8601-shaped timestamp, the form every driver serializes one to. */
 const TIMESTAMP_RE = /^\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}/;
 
-function asInstant(value: unknown): Date | null {
+export function asInstant(value: unknown): Date | null {
   if (value instanceof Date) return Number.isNaN(value.getTime()) ? null : value;
   if (typeof value !== "string" || !TIMESTAMP_RE.test(value)) return null;
   const date = new Date(value);
@@ -113,19 +118,31 @@ const BASE: EChartsOption = {
   backgroundColor: "transparent",
 };
 
+/** What a chart is drawn in, besides its own rows. */
+export interface ChartContext {
+  /** How the viewer wants times shown (#214). */
+  display: TimeDisplay;
+  /**
+   * The window the rows were selected over, as the server resolved it (epoch
+   * ms), once it has said. A chart that runs to "now" ends at `to`, never at
+   * the viewer's clock.
+   */
+  window?: { from: number; to: number };
+}
+
 /** One kind's chart: a panel spec and its current (bounded) rows as an ECharts option. */
 export type ChartOptionBuilder = (
   panel: Panel,
   data: PanelData,
-  display: TimeDisplay,
+  ctx: ChartContext,
 ) => EChartsOption;
 
 /**
  * A builder that is handed only well-formed rows, whatever arrived. Every
  * builder below goes through this, so none of them has to defend itself.
  */
-function normalized(build: ChartOptionBuilder): ChartOptionBuilder {
-  return (panel, data, display) => build(panel, normalize(data), display);
+export function normalized(build: ChartOptionBuilder): ChartOptionBuilder {
+  return (panel, data, ctx) => build(panel, normalize(data), ctx);
 }
 
 /**
@@ -134,12 +151,12 @@ function normalized(build: ChartOptionBuilder): ChartOptionBuilder {
  * the panel's time field.
  */
 function buildSeries(type: "line" | "bar", area: boolean): ChartOptionBuilder {
-  return (panel, data, display) => {
+  return (panel, data, { display }) => {
     const x = xKey(panel, data);
     const keys = seriesKeys(panel, data);
     const xValues = data.rows.map((r) => r[x]);
     const categories =
-      panel.query.timeField === x
+      panel.query?.timeField === x
         ? timeAxisLabels(xValues, display)
         : xValues.map(toText);
     return {
@@ -171,7 +188,9 @@ export const lineChart = normalized(buildSeries("line", false));
 export const areaChart = normalized(buildSeries("line", true));
 export const barChart = normalized(buildSeries("bar", false));
 export const scatterChart = normalized((_panel, data) => buildScatter(data));
-export const heatmapChart = normalized(buildHeatmap);
+export const heatmapChart = normalized((panel, data, { display }) =>
+  buildHeatmap(panel, data, display),
+);
 export const pieChart = normalized((panel, data) => buildPie(panel, data, false));
 export const donutChart = normalized((panel, data) => buildPie(panel, data, true));
 
@@ -240,7 +259,7 @@ function buildHeatmap(
 ): EChartsOption {
   const [xk, yk, vk] = data.columns;
   const xs = [...new Set(data.rows.map((r) => toText(r[xk])))];
-  const xLabels = panel.query.timeField === xk ? timeAxisLabels(xs, display) : xs;
+  const xLabels = panel.query?.timeField === xk ? timeAxisLabels(xs, display) : xs;
   const ys = [...new Set(data.rows.map((r) => toText(r[yk])))];
   const values = data.rows.map((r) => [
     xs.indexOf(toText(r[xk])),

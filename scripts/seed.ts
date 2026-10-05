@@ -136,6 +136,7 @@ async function ensureDemo() {
 
     await ensureDashboard(pg, demoSpec());
     await ensureDashboard(pg, systemSpec());
+    await ensureDashboard(pg, fleetSpec());
     await ensureDashboard(pg, selfMonitoringSpec());
   } finally {
     await pg.end();
@@ -280,6 +281,102 @@ function systemSpec() {
           sql: "SELECT region, round(avg(cpu_pct)::numeric, 1) AS avg_cpu FROM system_metrics GROUP BY region ORDER BY avg_cpu DESC",
         },
         layout: { x: 3, y: 3, w: 9, h: 2 },
+      },
+    ],
+  };
+}
+
+/**
+ * The newer panel kinds on the same host metrics: a text header, gauges
+ * (#200), and a state timeline (#201) whose states are derived in SQL. A
+ * dashboard of its own rather than panels added to "Demo infrastructure",
+ * because `ensureDashboard` only inserts a title that is missing: an install
+ * seeded before these kinds existed gets this one on its next seed.
+ */
+function fleetSpec() {
+  const perHostMinute =
+    "SELECT time_bucket('1 minute', ts) AS minute, host, avg(cpu_pct) AS cpu FROM system_metrics GROUP BY minute, host ORDER BY minute";
+  return {
+    specVersion: SPEC_VERSION,
+    title: "Demo fleet status",
+    timeRange: { from: "now-1h", to: "now" },
+    refreshIntervalMs: 15000,
+    panels: [
+      {
+        id: "about",
+        title: "About this dashboard",
+        viz: "text",
+        options: {
+          content: [
+            "## Fleet status",
+            "",
+            "Where each demo host stands **now**, and how its load has moved over the window.",
+            "",
+            "- **ok** below 70% CPU, **busy** from 70%, **hot** from 85%",
+            "- The data is the demo seeder's `system_metrics` table, written every few seconds",
+          ].join("\n"),
+        },
+        layout: { x: 0, y: 0, w: 12, h: 3 },
+      },
+      {
+        id: "cpu-now",
+        title: "CPU now by host",
+        viz: "gauge",
+        query: { sourceId: "ts-system", timeField: "minute", sql: perHostMinute },
+        options: {
+          variant: "bar",
+          value: "cpu",
+          min: 0,
+          max: 100,
+          thresholds: [
+            { value: 0, color: "success" },
+            { value: 70, color: "warning" },
+            { value: 85, color: "danger" },
+          ],
+        },
+        format: "percent",
+        layout: { x: 0, y: 3, w: 8, h: 3 },
+      },
+      {
+        id: "disk-max",
+        title: "Fullest disk",
+        viz: "gauge",
+        query: {
+          sourceId: "ts-system",
+          timeField: "minute",
+          sql: "SELECT time_bucket('1 minute', ts) AS minute, max(disk_pct) AS disk FROM system_metrics GROUP BY minute ORDER BY minute",
+        },
+        options: {
+          min: 0,
+          max: 100,
+          thresholds: [
+            { value: 0, color: "success" },
+            { value: 80, color: "warning" },
+            { value: 90, color: "danger" },
+          ],
+        },
+        format: "percent",
+        layout: { x: 8, y: 3, w: 4, h: 3 },
+      },
+      {
+        id: "load-state",
+        title: "Host load state",
+        viz: "state-timeline",
+        query: {
+          sourceId: "ts-system",
+          timeField: "minute",
+          sql: "SELECT time_bucket('1 minute', ts) AS minute, host, CASE WHEN avg(cpu_pct) >= 85 THEN 'hot' WHEN avg(cpu_pct) >= 70 THEN 'busy' ELSE 'ok' END AS state FROM system_metrics GROUP BY minute, host ORDER BY minute",
+        },
+        options: {
+          entity: "host",
+          state: "state",
+          states: [
+            { state: "ok", color: "success" },
+            { state: "busy", color: "warning" },
+            { state: "hot", color: "danger" },
+          ],
+        },
+        layout: { x: 0, y: 6, w: 12, h: 4 },
       },
     ],
   };

@@ -4,6 +4,7 @@ import { buildCatalogPrompt } from "@/lib/timescaledb/catalog";
 import {
   type Dashboard,
   DashboardGenerationSchema,
+  ExplorePanel,
   forGeneration,
   Panel,
 } from "@/lib/ir";
@@ -101,7 +102,7 @@ export const VIZ_GUIDE = PANEL_KINDS.map((k) => `- '${k.kind}': ${k.promptHint}`
   "\n",
 );
 
-/** The kinds explore may plot when a question asks for a chart. */
+/** The kinds explore may plot when a question asks for a chart. Never text. */
 const CHART_KINDS = PANEL_KINDS.filter((k) => k.canvas)
   .map((k) => `"${k.kind}"`)
   .join(", ");
@@ -163,7 +164,7 @@ export function streamExplorePanel(input: {
   return streamObject({
     model: getModel(),
     onFinish: finish(onFinish),
-    schema: Panel,
+    schema: ExplorePanel,
     schemaName: "Panel",
     schemaDescription: "A single panel specification (viz spec, not data).",
     system: baseSystem(source),
@@ -174,7 +175,8 @@ Return one Panel. Give it a concise title, use id "explore", and set layout to
 {"x":0,"y":0,"w":12,"h":4}.
 
 Viz selection (IMPORTANT — default to text/tabular output):
-- Default to viz "table" and return the relevant rows/columns.
+- Default to viz "table" and return the relevant rows/columns. Never use "text":
+  explore answers from data.
 - Use "stat" only when the question asks for a single scalar value.
 - Use a chart viz (${CHART_KINDS}) ONLY when the
   request explicitly asks to chart/plot/graph/visualize the data or to see a

@@ -14,7 +14,7 @@ import { SQL_RULES } from "@/lib/ai/generate";
 import { validateSql, buildExecutablePlan, type ExecutablePlan } from "@/lib/sql/safety";
 import { resolveTimeRange } from "@/lib/time";
 import { executePlan, QueryExecutionError } from "@/lib/timescaledb/client";
-import { Dashboard, Panel } from "@/lib/ir";
+import { Dashboard, hasQuery, Panel, PanelQuery } from "@/lib/ir";
 import type { SourceRecord } from "@/lib/registry";
 import { can } from "@/lib/auth/authorize";
 import { claimValue, type Identity } from "@/lib/auth/claims";
@@ -67,7 +67,9 @@ export async function resolveChatSources(input: {
   getSource: (id: string) => Promise<SourceRecord | null>;
 }): Promise<SourceRecord[]> {
   const { identity, dashboard, getSource } = input;
-  const sourceIds = [...new Set(dashboard.panels.map((p) => p.query.sourceId))];
+  const sourceIds = [
+    ...new Set(dashboard.panels.filter(hasQuery).map((p) => p.query.sourceId)),
+  ];
   const sources: SourceRecord[] = [];
   for (const sourceId of sourceIds) {
     const source = await getSource(sourceId);
@@ -134,9 +136,11 @@ const PANEL_MAX = {
   id: Panel.shape.id.maxLength ?? 64,
   title: Panel.shape.title.maxLength ?? 200,
   description: Panel.shape.description.unwrap().maxLength ?? 500,
-  sourceId: Panel.shape.query.shape.sourceId.maxLength ?? 128,
-  sql: Panel.shape.query.shape.sql.maxLength ?? 8_000,
-  timeField: Panel.shape.query.shape.timeField.unwrap().maxLength ?? 128,
+  sourceId: PanelQuery.shape.sourceId.maxLength ?? 128,
+  sql: PanelQuery.shape.sql.maxLength ?? 8_000,
+  timeField: PanelQuery.shape.timeField.unwrap().maxLength ?? 128,
+  /** A text panel's Markdown is context, not the point: a short excerpt. */
+  content: 500,
   dashboardTitle: Dashboard.shape.title.maxLength ?? 200,
 } as const;
 
@@ -150,8 +154,18 @@ export function renderPanels(dashboard: Dashboard): string {
   const f = sanitizePromptField;
   return dashboard.panels
     .map((p) => {
+      const head = `- panel "${f(p.id, PANEL_MAX.id)}" — ${f(p.title, PANEL_MAX.title)}`;
+      if (!hasQuery(p)) {
+        // A text panel (#202): no query to cite, and its prose is as
+        // untrusted as any other stored field.
+        const content = typeof p.options?.content === "string" ? p.options.content : "";
+        return [
+          `${head} (viz: ${p.viz}, runs no query)`,
+          `    text: ${f(content, PANEL_MAX.content)}`,
+        ].join("\n");
+      }
       const lines = [
-        `- panel "${f(p.id, PANEL_MAX.id)}" — ${f(p.title, PANEL_MAX.title)} (viz: ${p.viz}, source: ${f(p.query.sourceId, PANEL_MAX.sourceId)})`,
+        `${head} (viz: ${p.viz}, source: ${f(p.query.sourceId, PANEL_MAX.sourceId)})`,
       ];
       if (p.description)
         lines.push(`    intent: ${f(p.description, PANEL_MAX.description)}`);

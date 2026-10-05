@@ -15,7 +15,9 @@ export interface PanelDetails {
   description?: string;
 }
 
-export function panelDetails(panel: Panel): PanelDetails {
+/** How a panel is computed, or null for one that computes nothing (#202). */
+export function panelDetails(panel: Panel): PanelDetails | null {
+  if (!panel.query) return null;
   return {
     sql: panel.query.sql,
     sourceId: panel.query.sourceId,

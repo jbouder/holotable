@@ -12,6 +12,7 @@ import {
   parseStoredMessages,
   type StoredChatMessage,
 } from "@/lib/chat-history";
+import { queryOf } from "./support/panels";
 
 function panel(overrides: Partial<Panel> = {}): Panel {
   return {
@@ -141,7 +142,7 @@ test("a query is cited to the panels that run exactly it", () => {
     [],
   );
   // Same statement, different source.
-  assert.deepEqual(matchingPanels(panels, "src-2", panels[0].query.sql), []);
+  assert.deepEqual(matchingPanels(panels, "src-2", queryOf(panels[0]).sql), []);
 });
 
 test("citations are read off the message's own tool parts", () => {
@@ -184,7 +185,7 @@ test("a message that ran several queries cites each of them", () => {
       {
         type: "tool-runQuery",
         state: "output-available",
-        input: { sourceId: "src-1", sql: panel().query.sql },
+        input: { sourceId: "src-1", sql: queryOf(panel()).sql },
       },
       {
         type: "tool-runQuery",

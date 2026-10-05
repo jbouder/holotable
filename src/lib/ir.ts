@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { PANEL_KIND_NAMES } from "@/lib/panels/registry";
+import { findPanelKind, PANEL_KIND_NAMES, PANEL_KINDS } from "@/lib/panels/registry";
 
 /**
  * Shared Intermediate Representation (IR).
@@ -74,7 +74,77 @@ export const PanelLayout = z
   .strict();
 export type PanelLayout = z.infer<typeof PanelLayout>;
 
-export const Panel = z
+/**
+ * A panel's presentation options (#61): one of the registered kinds' option
+ * schemas. Which one is the kind's, and `Panel` holds it to that below; the
+ * union is what tells the model the shapes there are.
+ *
+ * A malformed object fails every branch, so the message is taken from the
+ * branch it came closest to rather than a bare "Invalid input".
+ */
+const optionSchemas = PANEL_KINDS.flatMap((k) => (k.options ? [k.options] : []));
+export const PanelOptions = z.union(
+  optionSchemas as [(typeof optionSchemas)[number], ...(typeof optionSchemas)[number][]],
+  {
+    error: (issue) => {
+      if (issue.code !== "invalid_union" || !("errors" in issue)) return undefined;
+      const closest = [...issue.errors].sort((a, b) => a.length - b.length)[0]?.[0];
+      if (!closest) return undefined;
+      const at = closest.path.length > 0 ? `${closest.path.join(".")}: ` : "";
+      return `invalid options: ${at}${closest.message}`;
+    },
+  },
+);
+
+/**
+ * What a panel's kind asks of the rest of it: a query or none (a text panel,
+ * #202), a time field (a state timeline, #201), and options that are its own.
+ */
+function fitsItsKind(panel: z.infer<typeof PanelFields>, ctx: z.RefinementCtx): void {
+  const kind = findPanelKind(panel.viz);
+  if (!kind) return;
+  if (kind.query === "none" && panel.query !== undefined) {
+    ctx.addIssue({
+      code: "custom",
+      message: `a ${kind.kind} panel runs no query; remove "query"`,
+      path: ["query"],
+    });
+  }
+  if (kind.query === "required" && panel.query === undefined) {
+    ctx.addIssue({
+      code: "custom",
+      message: `a ${kind.kind} panel needs a "query"`,
+      path: ["query"],
+    });
+  }
+  if (kind.requiresTimeField && panel.query && panel.query.timeField === undefined) {
+    ctx.addIssue({
+      code: "custom",
+      message: `a ${kind.kind} panel needs "query.timeField"`,
+      path: ["query", "timeField"],
+    });
+  }
+  if (!kind.options) {
+    if (panel.options !== undefined) {
+      ctx.addIssue({
+        code: "custom",
+        message: `a ${kind.kind} panel takes no options`,
+        path: ["options"],
+      });
+    }
+    return;
+  }
+  const own = kind.options.safeParse(panel.options ?? {});
+  for (const issue of own.success ? [] : own.error.issues) {
+    ctx.addIssue({
+      code: "custom",
+      message: issue.message,
+      path: ["options", ...issue.path],
+    });
+  }
+}
+
+const PanelFields = z
   .object({
     id: z.string().min(1).max(64),
     title: z.string().min(1).max(200),
@@ -84,12 +154,40 @@ export const Panel = z
      */
     description: z.string().max(500).optional(),
     viz: VizType,
-    query: PanelQuery,
+    /**
+     * Absent exactly when the kind runs no query (a text panel, #202). Code
+     * that executes, validates or lists queries goes through `hasQuery`.
+     */
+    query: PanelQuery.optional(),
+    /** The kind's own options, validated against its schema. */
+    options: PanelOptions.optional(),
     format: ValueFormat.optional(),
     layout: PanelLayout,
   })
   .strict();
+
+export const Panel = PanelFields.superRefine(fitsItsKind);
 export type Panel = z.infer<typeof Panel>;
+
+/**
+ * A panel that answers a question from data: what explore asks the model for.
+ * A text panel (#202) is a valid panel but no answer, so it is refused here.
+ */
+export const ExplorePanel = Panel.refine((p) => p.query !== undefined, {
+  message: "explore answers from data: choose a kind that runs a query",
+  path: ["query"],
+});
+
+/** A panel that runs a query: every kind but the query-less ones. */
+export type QueryPanel = Panel & { query: PanelQuery };
+
+/**
+ * Whether a panel runs a query. Everything that executes, validates, lists or
+ * re-points queries filters through this, and skips the rest (#202).
+ */
+export function hasQuery(panel: Panel): panel is QueryPanel {
+  return panel.query !== undefined;
+}
 
 /**
  * The IR version this build writes, and the only one {@link Dashboard}

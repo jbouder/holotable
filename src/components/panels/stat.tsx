@@ -9,7 +9,7 @@ export function StatView({ panel, data }: PanelBodyProps) {
   const last = data.rows[data.rows.length - 1];
   const valueKey =
     data.columns.find(
-      (c) => c !== panel.query.timeField && typeof last?.[c] === "number",
+      (c) => c !== panel.query?.timeField && typeof last?.[c] === "number",
     ) ?? data.columns[data.columns.length - 1];
   const value = last?.[valueKey];
   return (

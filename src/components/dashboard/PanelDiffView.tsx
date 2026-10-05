@@ -123,7 +123,7 @@ export function PanelDiffView({
                 ? "no changes"
                 : `${diff.changedFields} field${diff.changedFields === 1 ? "" : "s"}${
                     diff.sql.changed
-                      ? ` · SQL +${diff.sql.added}/−${diff.sql.removed}`
+                      ? ` · ${diff.bodyLabel} +${diff.sql.added}/−${diff.sql.removed}`
                       : ""
                   }`}
             </Badge>
@@ -189,7 +189,7 @@ export function PanelDiffView({
 
       <div className="space-y-1">
         <div className="flex items-center gap-2 text-xs text-muted">
-          SQL
+          {diff.bodyLabel}
           {diff.sql.changed ? (
             <span>
               <span className="text-success">+{diff.sql.added}</span>{" "}

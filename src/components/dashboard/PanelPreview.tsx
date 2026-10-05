@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { CheckCircle2, FileCode2, Loader2, Play, ShieldCheck } from "lucide-react";
-import type { Panel, TimeRange } from "@/lib/ir";
+import type { QueryPanel, TimeRange } from "@/lib/ir";
 import {
   type PanelQueryOutcome,
   type SqlCheck,
@@ -49,7 +49,7 @@ export interface PanelPreviewController {
   explain: () => void;
 }
 
-export function usePanelPreview(panel: Panel, timeRange: TimeRange) {
+export function usePanelPreview(panel: QueryPanel, timeRange: TimeRange) {
   const [busy, setBusy] = React.useState<Busy>(null);
   const [check, setCheck] = React.useState<{ key: string; result: SqlCheck } | null>(
     null,
@@ -121,7 +121,7 @@ export function PanelPreview({
   panel,
   preview,
 }: {
-  panel: Panel;
+  panel: QueryPanel;
   preview: PanelPreviewController;
 }) {
   const { busy, check, plan, result } = preview;

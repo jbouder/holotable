@@ -4,7 +4,13 @@ import * as React from "react";
 import Link from "next/link";
 import { experimental_useObject as useObject } from "@ai-sdk/react";
 import { Loader2, SendHorizontal, Compass, Save, ArrowUpRight } from "lucide-react";
-import { Panel, type TimeRange } from "@/lib/ir";
+import {
+  ExplorePanel,
+  hasQuery,
+  type Panel,
+  type QueryPanel,
+  type TimeRange,
+} from "@/lib/ir";
 import { Button } from "@/components/ui/button";
 import { Textarea, Label } from "@/components/ui/input";
 import { AiUnavailable } from "@/components/ai-unavailable";
@@ -88,7 +94,7 @@ export function ExploreClient({
   const [sourceId, setSourceId] = React.useState<string | null>(sources[0]?.id ?? null);
   const [from, setFrom] = React.useState("now-24h");
   const [prompt, setPrompt] = React.useState("");
-  const [panel, setPanel] = React.useState<Panel | null>(null);
+  const [panel, setPanel] = React.useState<QueryPanel | null>(null);
   const [result, setResult] = React.useState<Result | null>(null);
   const [saveOpen, setSaveOpen] = React.useState(false);
   const [saved, setSaved] = React.useState<SavedPanel | null>(null);
@@ -100,7 +106,7 @@ export function ExploreClient({
   // Recent Explore questions for this workspace, offered back on the box (#83).
   const prompts = usePromptHistory(source?.workspaceId, "explore");
 
-  const runQuery = React.useCallback(async (p: Panel, timeRange: TimeRange) => {
+  const runQuery = React.useCallback(async (p: QueryPanel, timeRange: TimeRange) => {
     setResult({ data: EMPTY_ROWS, status: "loading" });
     const outcome = await runPanelQuery(p.query, timeRange);
     setResult(
@@ -112,11 +118,12 @@ export function ExploreClient({
 
   const { object, submit, isLoading, error, stop } = useObject({
     api: "/api/generate",
-    schema: Panel,
+    schema: ExplorePanel,
     onFinish({ object }) {
-      if (!object || !sourceId) return;
+      // `ExplorePanel` refuses a query-less panel; the guard says so to the type.
+      if (!object || !sourceId || !hasQuery(object)) return;
       // The panel query carries the source id; pin it to the selected source.
-      const finalized: Panel = {
+      const finalized: QueryPanel = {
         ...object,
         query: { ...object.query, sourceId },
       };
@@ -335,7 +342,7 @@ function ResultView({
   onSave,
   onRetry,
 }: {
-  panel: Panel;
+  panel: QueryPanel;
   result: Result | null;
   sourceName: string;
   rangeLabel: string;
@@ -396,7 +403,7 @@ function ResultBody({
   data,
   onRetry,
 }: {
-  panel: Panel;
+  panel: QueryPanel;
   result: Result | null;
   data: PanelData;
   onRetry: () => void;
@@ -427,7 +434,7 @@ function ResultBody({
   if (renderer.type === "chart") {
     return (
       <div className="h-96 border border-border bg-surface p-2">
-        <EChart option={renderer.option(panel, data, display)} />
+        <EChart option={renderer.option(panel, data, { display, window: data.window })} />
       </div>
     );
   }
@@ -437,7 +444,7 @@ function ResultBody({
   return <ResultTable panel={panel} data={data} />;
 }
 
-function StatView({ panel, data }: { panel: Panel; data: PanelData }) {
+function StatView({ panel, data }: { panel: QueryPanel; data: PanelData }) {
   const last = data.rows[data.rows.length - 1];
   const valueKey =
     data.columns.find(
@@ -454,7 +461,7 @@ function StatView({ panel, data }: { panel: Panel; data: PanelData }) {
   );
 }
 
-function ResultTable({ panel, data }: { panel: Panel; data: PanelData }) {
+function ResultTable({ panel, data }: { panel: QueryPanel; data: PanelData }) {
   const rows = data.rows.slice(0, MAX_TABLE_ROWS);
   return (
     <div className="space-y-2">

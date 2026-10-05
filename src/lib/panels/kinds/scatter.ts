@@ -8,4 +8,5 @@ export const scatter = definePanelKind({
   canvas: true,
   timeBrush: false,
   skeleton: "chart",
+  query: "required",
 });

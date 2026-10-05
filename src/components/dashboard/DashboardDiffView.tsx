@@ -25,8 +25,10 @@ function summary(diff: DashboardDiff): string {
   return parts.join(" · ");
 }
 
+/** The panel's body as diff lines: its SQL, or a text panel's Markdown (#202). */
 function wholeSql(panel: Panel, kind: "add" | "remove") {
-  return panel.query.sql
+  const content = typeof panel.options?.content === "string" ? panel.options.content : "";
+  return (panel.query?.sql ?? content)
     .replace(/\n+$/, "")
     .split(/\r?\n/)
     .map((text) => ({ kind, text }));

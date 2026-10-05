@@ -23,6 +23,7 @@ import {
 import { SourceConfig } from "@/lib/registry";
 import { buildExecutablePlan, validateSql } from "@/lib/sql/safety";
 import { resolveTimeRange } from "@/lib/time";
+import { queryOf } from "./support/panels";
 
 /**
  * A real scrape of the compose stack's `/api/metrics`, idle. Everything the
@@ -200,7 +201,7 @@ test("the committed spec parses against the current IR", () => {
 
 test("every panel reads the self source and nothing else", () => {
   for (const panel of selfMonitoringSpec().panels) {
-    assert.equal(panel.query.sourceId, SELF_SOURCE_ID, panel.id);
+    assert.equal(panel.query?.sourceId, SELF_SOURCE_ID, panel.id);
   }
 });
 
@@ -217,7 +218,7 @@ test("the catalog names every column the panels select on", () => {
 test("every panel's SQL passes the guard against the committed catalog", async () => {
   const source = SourceConfig.parse(selfMonitoringConfig(connection));
   for (const panel of selfMonitoringSpec().panels) {
-    const result = await validateSql(panel.query.sql, source);
+    const result = await validateSql(queryOf(panel).sql, source);
     assert.equal(result.ok, true, `${panel.id}: ${result.ok ? "" : result.error}`);
   }
 });
@@ -227,8 +228,8 @@ test("every panel builds an executable plan with the server's time range", () =>
   const range = resolveTimeRange(spec.timeRange);
   for (const panel of spec.panels) {
     const plan = buildExecutablePlan({
-      sql: panel.query.sql,
-      timeField: panel.query.timeField,
+      sql: queryOf(panel).sql,
+      timeField: panel.query?.timeField,
       from: range.from,
       to: range.to,
       rowFilter: null,
@@ -236,7 +237,7 @@ test("every panel builds an executable plan with the server's time range", () =>
     assert.match(plan.sql, /LIMIT \d+$/);
     // A panel that declares a time field is filtered by the server, never by
     // the SQL: two bound parameters, and no time expression in the spec.
-    assert.equal(plan.params.length, panel.query.timeField ? 2 : 0, panel.id);
+    assert.equal(plan.params.length, panel.query?.timeField ? 2 : 0, panel.id);
   }
 });
 
@@ -248,7 +249,7 @@ test("every panel builds an executable plan with the server's time range", () =>
 test("the panels and the collector agree on which metrics exist", () => {
   const referenced = new Set<string>();
   for (const panel of selfMonitoringSpec().panels) {
-    for (const match of panel.query.sql.matchAll(/'(holotable_[a-z0-9_]+)'/g)) {
+    for (const match of queryOf(panel).sql.matchAll(/'(holotable_[a-z0-9_]+)'/g)) {
       referenced.add(metricFamily(match[1]));
     }
   }

@@ -10,6 +10,7 @@ export const line = definePanelKind({
   canvas: true,
   timeBrush: true,
   skeleton: "chart",
+  query: "required",
 });
 
 export const area = definePanelKind({
@@ -19,6 +20,7 @@ export const area = definePanelKind({
   canvas: true,
   timeBrush: true,
   skeleton: "chart",
+  query: "required",
 });
 
 export const bar = definePanelKind({
@@ -28,4 +30,5 @@ export const bar = definePanelKind({
   canvas: true,
   timeBrush: true,
   skeleton: "chart",
+  query: "required",
 });

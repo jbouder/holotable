@@ -1,9 +1,12 @@
+import { gauge } from "@/lib/panels/kinds/gauge";
 import { heatmap } from "@/lib/panels/kinds/heatmap";
 import { donut, pie } from "@/lib/panels/kinds/pie";
 import { scatter } from "@/lib/panels/kinds/scatter";
 import { area, bar, line } from "@/lib/panels/kinds/series";
 import { stat } from "@/lib/panels/kinds/stat";
+import { stateTimeline } from "@/lib/panels/kinds/state-timeline";
 import { table } from "@/lib/panels/kinds/table";
+import { text } from "@/lib/panels/kinds/text";
 import type { PanelKind } from "@/lib/panels/types";
 
 /**
@@ -31,6 +34,9 @@ export const PANEL_KINDS = [
   heatmap,
   pie,
   donut,
+  gauge,
+  stateTimeline,
+  text,
 ] as const satisfies readonly PanelKind[];
 
 /** The name of a registered kind: the type of `panel.viz`. */

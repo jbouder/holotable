@@ -24,6 +24,7 @@ import {
   RowFilterError,
 } from "@/lib/sql/row-filter";
 import { buildExecutablePlan, validateSql } from "@/lib/sql/safety";
+import { asQueryPanel } from "./support/panels";
 
 /**
  * Row-level filters (#31). The predicate narrows every table a statement
@@ -334,7 +335,7 @@ test("viewers share a poller only when they would see the same rows", () => {
 test("a panel whose source needs a claim the poller's scope lacks is refused, not run", async () => {
   const executor = makePanelExecutor(async () => source());
   const events = await executor(
-    dashboard.panels[0],
+    asQueryPanel(dashboard.panels[0]),
     { from: new Date(0), to: new Date(1) },
     "ops",
     {},

@@ -12,7 +12,17 @@ import type { Panel } from "@/lib/ir";
  * each other.
  */
 export type PanelRenderer =
-  | { type: "chart"; option: ChartOptionBuilder }
+  | {
+      type: "chart";
+      option: ChartOptionBuilder;
+      /**
+       * Which of the kind's chart layouts this panel is (a gauge's dial or
+       * bars). A change of shape remounts the chart, because a merged
+       * `setOption` cannot take back the axes of the old one; data updates
+       * never change it, so they still merge (invariant 11).
+       */
+      shape?: (panel: Panel) => string;
+    }
   | { type: "html"; Body: React.ComponentType<PanelBodyProps> };
 
 export interface PanelBodyProps {

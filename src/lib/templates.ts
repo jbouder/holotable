@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { appendPanel } from "@/lib/explore-save";
 import { type ApiError, apiErrorFromThrown, readApiError } from "@/lib/errors";
-import { Dashboard, Panel, SPEC_VERSION, type TimeRange } from "@/lib/ir";
+import { Dashboard, hasQuery, Panel, SPEC_VERSION, type TimeRange } from "@/lib/ir";
 import { migratePanel, migrateSpec } from "@/lib/ir/upgrade";
 
 /**
@@ -139,10 +139,13 @@ export function templatePanels(body: TemplateBody): Panel[] {
   return body.kind === "panel" ? [body.panel] : body.dashboard.panels;
 }
 
-/** The source ids a template's panels reference, distinct, in spec order. */
+/**
+ * The source ids a template's panels reference, distinct, in spec order. A
+ * text panel (#202) references none, so a template of only text has none.
+ */
 export function templateSourceIds(body: TemplateBody): string[] {
   const seen: string[] = [];
-  for (const panel of templatePanels(body)) {
+  for (const panel of templatePanels(body).filter(hasQuery)) {
     if (!seen.includes(panel.query.sourceId)) seen.push(panel.query.sourceId);
   }
   return seen;
@@ -156,10 +159,8 @@ export function templateSourceIds(body: TemplateBody): string[] {
  * picker asks it before anything is applied.
  */
 export function retargetTemplate(body: TemplateBody, sourceId: string): TemplateBody {
-  const retarget = (panel: Panel): Panel => ({
-    ...panel,
-    query: { ...panel.query, sourceId },
-  });
+  const retarget = (panel: Panel): Panel =>
+    hasQuery(panel) ? { ...panel, query: { ...panel.query, sourceId } } : panel;
   return body.kind === "panel"
     ? { ...body, panel: retarget(body.panel) }
     : {

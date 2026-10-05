@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import type { Dashboard, Panel } from "@/lib/ir";
+import { type Dashboard, hasQuery, type QueryPanel } from "@/lib/ir";
 import { DashboardGrid } from "@/components/dashboard/DashboardGrid";
 import { PanelView, type PanelState } from "@/components/dashboard/PanelView";
 import { EMPTY_ROWS, runPanelQuery } from "@/lib/panel-query";
@@ -15,7 +15,7 @@ export function PreviewDashboard({ spec }: { spec: Dashboard }) {
   const [states, setStates] = React.useState<Record<string, PanelState>>({});
 
   const runPanel = React.useCallback(
-    async (panel: Panel, timeRange: Dashboard["timeRange"]) => {
+    async (panel: QueryPanel, timeRange: Dashboard["timeRange"]) => {
       setStates((s) => ({ ...s, [panel.id]: { data: EMPTY_ROWS, status: "loading" } }));
       const outcome = await runPanelQuery(panel.query, timeRange);
       setStates((s) => ({
@@ -35,7 +35,9 @@ export function PreviewDashboard({ spec }: { spec: Dashboard }) {
   const specKey = JSON.stringify(spec);
   // biome-ignore lint/correctness/useExhaustiveDependencies: keyed on the serialized spec on purpose
   React.useEffect(() => {
-    for (const panel of spec.panels) void runPanel(panel, spec.timeRange);
+    // A text panel (#202) has nothing to run; it renders as it is.
+    for (const panel of spec.panels.filter(hasQuery))
+      void runPanel(panel, spec.timeRange);
   }, [specKey]);
 
   return (
@@ -45,7 +47,9 @@ export function PreviewDashboard({ spec }: { spec: Dashboard }) {
         <PanelView
           panel={panel}
           state={states[panel.id]}
-          onRetry={() => void runPanel(panel, spec.timeRange)}
+          onRetry={
+            hasQuery(panel) ? () => void runPanel(panel, spec.timeRange) : undefined
+          }
           timeRange={spec.timeRange}
         />
       )}

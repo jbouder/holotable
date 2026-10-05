@@ -1,4 +1,4 @@
-import type { Dashboard, Panel } from "@/lib/ir";
+import { type Dashboard, hasQuery, type QueryPanel } from "@/lib/ir";
 import { getSourceById } from "@/lib/db/repo";
 import type { SourceRecord } from "@/lib/registry";
 import { validateSql, buildExecutablePlan, type ExecutablePlan } from "@/lib/sql/safety";
@@ -84,7 +84,13 @@ export type PollerEvent =
     }
   | { type: "dashboard-error"; error: string; kind: ErrorKind }
   | { type: "tombstone"; panelId: string; sourceId: string }
-  | { type: "tick"; at: number };
+  /**
+   * A completed cycle. `window` is the range that cycle ran over, as the
+   * server resolved it (epoch ms): a panel that draws up to "now" — a state
+   * timeline's open span (#201) — ends at the server's `to`, never at the
+   * viewer's clock.
+   */
+  | { type: "tick"; at: number; window?: { from: number; to: number } };
 
 /**
  * `id`, when present, is the SSE event id to send with the frame: the
@@ -147,7 +153,7 @@ export function computeDelta(
  * source needs a claim the scope lacks is refused, never run unfiltered.
  */
 export type PanelExecutor = (
-  panel: Panel,
+  panel: QueryPanel,
   window: TimeWindow,
   dashboardWorkspaceId: string,
   scope: RowScope,
@@ -291,7 +297,8 @@ class DashboardPoller {
   private latest = new Map<string, PollerEvent>();
   /** The failure of the last cycle, until a cycle completes. */
   private dashboardError: PollerEvent | null = null;
-  private lastTickAt: number | null = null;
+  /** The last completed cycle's `tick`, which a joiner is sent. */
+  private lastTick: Extract<PollerEvent, { type: "tick" }> | null = null;
   private timer: NodeJS.Timeout | null = null;
   private running = false;
   private ticking = false;
@@ -346,13 +353,12 @@ class DashboardPoller {
 
   /** Send a new subscriber everything the last cycle produced. */
   private catchUp(sub: Subscriber) {
-    for (const panel of this.spec.panels) {
+    for (const panel of this.spec.panels.filter(hasQuery)) {
       const event = this.latest.get(panel.id);
       if (event) this.deliver(sub, panel, event);
     }
     if (this.dashboardError) this.send(sub, this.dashboardError);
-    else if (this.lastTickAt !== null)
-      this.send(sub, { type: "tick", at: this.lastTickAt });
+    else if (this.lastTick !== null) this.send(sub, this.lastTick);
   }
 
   /**
@@ -360,7 +366,7 @@ class DashboardPoller {
    * the rows newer than this subscriber's cursor, and the frame carries the
    * advanced cursors as its event id.
    */
-  private deliver(sub: Subscriber, panel: Panel, event: PollerEvent) {
+  private deliver(sub: Subscriber, panel: QueryPanel, event: PollerEvent) {
     const timeField = panel.query.timeField;
     if (event.type !== "panel" || !timeField) {
       this.send(sub, event);
@@ -447,7 +453,7 @@ class DashboardPoller {
   }
 
   /** A panel's outcome for this cycle: remembered, then sent to everyone. */
-  private publish(panel: Panel, event: PollerEvent) {
+  private publish(panel: QueryPanel, event: PollerEvent) {
     this.latest.set(panel.id, event);
     for (const sub of this.subscribers) this.deliver(sub, panel, event);
   }
@@ -471,7 +477,7 @@ class DashboardPoller {
    * (an invalid statement, a missing row-filter claim), clears the count:
    * those never reached the source, so they put no load on it to back off from.
    */
-  private async runPanel(panel: Panel, window: TimeWindow): Promise<void> {
+  private async runPanel(panel: QueryPanel, window: TimeWindow): Promise<void> {
     this.executing.add(panel.id);
     const startedAt = Date.now();
     try {
@@ -527,7 +533,8 @@ class DashboardPoller {
    */
   retryPanel(panelId: string): boolean {
     if (!this.running) return false;
-    const panel = this.spec.panels.find((p) => p.id === panelId);
+    // A query-less panel (#202) has nothing to retry.
+    const panel = this.spec.panels.filter(hasQuery).find((p) => p.id === panelId);
     if (!panel || this.executing.has(panelId)) return false;
     if (!canRetryNow(this.health.get(panelId), Date.now(), config.minRefreshIntervalMs)) {
       return false;
@@ -566,8 +573,10 @@ class DashboardPoller {
       // A panel backing off (#44) sits out until its `retryAt`, and keeps the
       // `panel-degraded` it last published, which is what a joiner is sent.
       // One a viewer is retrying is already running.
+      // A text panel (#202) has no query and is never executed.
       await Promise.all(
         this.spec.panels
+          .filter(hasQuery)
           .filter((p) => isDue(this.health.get(p.id), now) && !this.executing.has(p.id))
           .map((p) => this.runPanel(p, window)),
       );
@@ -579,8 +588,12 @@ class DashboardPoller {
       // readout and staleness watchdog run on, so a failed cycle must not
       // refresh it.
       this.dashboardError = null;
-      this.lastTickAt = Date.now();
-      this.broadcast({ type: "tick", at: this.lastTickAt });
+      this.lastTick = {
+        type: "tick",
+        at: Date.now(),
+        window: { from: window.from.getTime(), to: window.to.getTime() },
+      };
+      this.broadcast(this.lastTick);
     } catch (err) {
       this.dashboardError = {
         type: "dashboard-error",

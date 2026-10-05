@@ -9,6 +9,7 @@ import {
 } from "@/lib/panel-starter";
 import type { CatalogTable, SourceConfig } from "@/lib/registry";
 import { validateSql } from "@/lib/sql/safety";
+import { queryOf } from "./support/panels";
 
 /**
  * The seeded demo catalogs, copied from `scripts/seed.ts` for the same reason
@@ -154,7 +155,7 @@ test("the built panel satisfies the IR", () => {
   const panel = starterPanel("panel-1", "src-1", { tables: [HTTP_REQUESTS] }, LAYOUT);
   const parsed = Panel.safeParse(panel);
   assert.ok(parsed.success, JSON.stringify(parsed.error?.issues));
-  assert.equal(panel.query.sourceId, "src-1");
+  assert.equal(panel.query?.sourceId, "src-1");
 });
 
 /* -------------------------------------------------------------------------- */
@@ -164,7 +165,7 @@ test("the built panel satisfies the IR", () => {
 test("a freshly added panel is recognised as still being its starter", () => {
   const catalog = { tables: [HTTP_REQUESTS] };
   const panel = starterPanel("panel-1", "src-1", catalog, LAYOUT);
-  assert.equal(isStarterSql(panel.query.sql, catalog), true);
+  assert.equal(isStarterSql(queryOf(panel).sql, catalog), true);
 });
 
 test("the old placeholder still counts as untouched", () => {

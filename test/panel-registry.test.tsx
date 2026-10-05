@@ -30,9 +30,22 @@ function panel(viz: unknown): unknown {
   };
 }
 
+/** The smallest valid panel of a registered kind: what that kind asks for. */
+function validPanel(viz: (typeof PANEL_KIND_NAMES)[number]): unknown {
+  const kind = panelKind(viz);
+  const base = panel(viz) as Record<string, unknown>;
+  if (kind.query === "none") delete base.query;
+  if (kind.requiresTimeField) {
+    base.query = { sourceId: "src-1", sql: "SELECT now() AS ts", timeField: "ts" };
+  }
+  if (kind.starterOptions) base.options = kind.starterOptions("Requests");
+  return base;
+}
+
 test("every kind there was before the registry is still registered, in the same order", () => {
-  // The order is the editor's picker and the model's schema: unchanged.
-  assert.deepEqual(VizType.options, [
+  // The order is the editor's picker and the model's schema: the original
+  // nine unchanged, new kinds after them.
+  assert.deepEqual(VizType.options.slice(0, 9), [
     "line",
     "area",
     "bar",
@@ -43,6 +56,7 @@ test("every kind there was before the registry is still registered, in the same 
     "pie",
     "donut",
   ]);
+  assert.deepEqual(VizType.options.slice(9), ["gauge", "state-timeline", "text"]);
   assert.deepEqual(VizType.options, PANEL_KIND_NAMES);
 });
 
@@ -99,7 +113,7 @@ test("a stored spec of every registered kind still loads", () => {
       title: "t",
       timeRange: { from: "now-1h", to: "now" },
       refreshIntervalMs: 30_000,
-      panels: [panel(viz)],
+      panels: [validPanel(viz)],
     });
     assert.equal(spec.panels[0].viz, viz);
   }
@@ -142,5 +156,13 @@ test("nothing outside the registry dispatches on the kind", () => {
       /switch\s*\(\s*[\w.]*viz\s*\)/,
       `${relative(process.cwd(), file)} switches on viz; register the kind instead`,
     );
+  }
+});
+
+test("every kind's loading silhouette draws something", () => {
+  for (const kind of PANEL_KINDS) {
+    const markup = renderToStaticMarkup(<PanelCardSkeleton viz={kind.kind} />);
+    // The header's own blocks are two; the body adds its shape.
+    assert.ok((markup.match(/skeleton/g) ?? []).length > 2, kind.kind);
   }
 });

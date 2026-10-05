@@ -8,7 +8,8 @@ data itself — and Holotable executes the guarded SQL against TimescaleDB and
 streams the results live.
 
 - **Stack:** Next.js 16 (App Router) · TypeScript · Tailwind v4 · Base UI ·
-  ECharts (line/area/bar/scatter/stat/table/heatmap/pie/donut) · TimescaleDB/PostgreSQL
+  ECharts (line/area/bar/scatter/stat/table/heatmap/pie/donut/gauge/state-timeline/text) ·
+  TimescaleDB/PostgreSQL
   (config + metrics) · Vercel AI SDK (`streamObject` for specs, `streamText` +
   tool calls for chat) · Keycloak OIDC (group-based auth) · Server-Sent Events.
 - **Contract:** one shared Zod IR (`src/lib/ir.ts`) is used by the LLM output,
@@ -163,7 +164,7 @@ and the [chart README](deploy/helm/holotable/README.md).
 `npm run seed` (`scripts/seed.ts`) is a long-running seeder that gives a fresh
 install something to show. It does two things:
 
-1. **Once (bootstrap):** registers three demo sources and a dashboard for each in
+1. **Once (bootstrap):** registers three demo sources and their demo dashboards in
    the `demo` workspace, if they don't already exist. All three point at the
    `metrics` schema and share the read-only `TS_METRICS` secret reference — they
    differ only in the tables they expose:
@@ -171,7 +172,7 @@ install something to show. It does two things:
    | Source id | Table | Demo dashboard |
    | --- | --- | --- |
    | `ts-metrics` | `metrics.http_requests` — per-request events | **Demo service health** (RPS, p95 latency, 5xx, requests by route) |
-   | `ts-system` | `metrics.system_metrics` — per-host infra metrics | **Demo infrastructure** (CPU/memory by host, disk %, CPU by region) |
+   | `ts-system` | `metrics.system_metrics` — per-host infra metrics | **Demo infrastructure** (CPU/memory by host, disk %, CPU by region) and **Demo fleet status** (a text header, CPU and disk gauges, a host load state timeline) |
    | `holotable-self` | `metrics.holotable_self` — the app's own Prometheus instruments | **Holotable self-monitoring** (tick p95, query latency by source, memory, viewers, pollers, model tokens, guard rejections) |
 
    The first two carry synthetic rows. The third is real: `scripts/self-metrics.ts`

@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { AlertTriangle, Check, Loader2 } from "lucide-react";
-import type { Panel } from "@/lib/ir";
+import type { QueryPanel } from "@/lib/ir";
 import { type RepointCheck, checkRepoint, summarizeChecks } from "@/lib/panel-repoint";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -37,7 +37,8 @@ export function RepointPanelsDialog({
   onClose,
 }: {
   deadSourceId: string;
-  panels: Panel[];
+  /** Only panels with a query have a source to re-point. */
+  panels: QueryPanel[];
   sources: { id: string; name: string }[];
   onApply: (input: { sourceId: string; panelIds: string[] }) => void;
   onClose: () => void;

@@ -14,6 +14,7 @@ import { catalogCompletions } from "@/lib/sql/completion";
 import { validateSql } from "@/lib/sql/safety";
 import { templatePanels } from "@/lib/templates";
 import { buildCatalogPrompt, refreshedColumns } from "@/lib/timescaledb/catalog";
+import { queryOf } from "./support/panels";
 
 /**
  * The catalog half of per-column exposure (#12): a column marked
@@ -124,8 +125,8 @@ test("suggestions are built from exposed columns only, and the guard accepts eve
   assertNoHidden(JSON.stringify(templates), "built-in templates");
   for (const template of templates) {
     for (const panel of templatePanels(template.body)) {
-      const result = await validateSql(panel.query.sql, config);
-      assert.equal(result.ok, true, `${panel.query.sql} -> ${result.error}`);
+      const result = await validateSql(queryOf(panel).sql, config);
+      assert.equal(result.ok, true, `${panel.query?.sql} -> ${result.error}`);
     }
   }
 });

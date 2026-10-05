@@ -15,6 +15,8 @@ import type { PanelQuery, TimeRange } from "@/lib/ir";
 export interface QueryRows {
   columns: string[];
   rows: Record<string, unknown>[];
+  /** The window the server resolved for these rows, in epoch ms. */
+  window?: { from: number; to: number };
 }
 
 export const EMPTY_ROWS: QueryRows = { columns: [], rows: [] };
@@ -75,11 +77,25 @@ export async function runPanelQuery(
 /** A result body is trusted no further than its shape. */
 function readRows(body: unknown): QueryRows {
   const record = typeof body === "object" && body !== null ? body : {};
-  const { columns, rows } = record as Partial<QueryRows>;
+  const { columns, rows, window } = record as Partial<QueryRows>;
+  const resolved = readWindow(window);
   return {
     columns: Array.isArray(columns) ? columns : [],
     rows: Array.isArray(rows) ? rows : [],
+    ...(resolved && { window: resolved }),
   };
+}
+
+/** A window from a response, or undefined when it is not two finite instants. */
+export function readWindow(value: unknown): QueryRows["window"] {
+  if (typeof value !== "object" || value === null) return undefined;
+  const { from, to } = value as { from?: unknown; to?: unknown };
+  return typeof from === "number" &&
+    typeof to === "number" &&
+    Number.isFinite(from) &&
+    Number.isFinite(to)
+    ? { from, to }
+    : undefined;
 }
 
 /**

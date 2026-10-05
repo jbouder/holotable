@@ -11,7 +11,7 @@ import { config } from "@/lib/config";
 import { getDashboardById, getSourceById } from "@/lib/db/repo";
 import { rowScopeFor } from "@/lib/row-scope";
 import { getPoller, type PollerEvent } from "@/lib/poller/registry";
-import { TimeRange } from "@/lib/ir";
+import { hasQuery, TimeRange } from "@/lib/ir";
 import {
   accessEndedFrame,
   drainFrame,
@@ -81,7 +81,7 @@ export const GET = route(
     // executor, as they always were.
     const sources = (
       await Promise.all(
-        [...new Set(spec.panels.map((p) => p.query.sourceId))].map((s) =>
+        [...new Set(spec.panels.filter(hasQuery).map((p) => p.query.sourceId))].map((s) =>
           getSourceById(s),
         ),
       )
@@ -117,7 +117,7 @@ export const GET = route(
         version: dashboard.version,
         timeRange: spec.timeRange,
         resumed: resumeToken !== null,
-        queries: spec.panels.map((p) => ({
+        queries: spec.panels.filter(hasQuery).map((p) => ({
           panelId: p.id,
           sourceId: p.query.sourceId,
           sql: p.query.sql,

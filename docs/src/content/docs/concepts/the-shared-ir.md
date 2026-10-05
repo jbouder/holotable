@@ -14,11 +14,12 @@ Panel = {
   title: string,
   description?: string,       // intent only, populated for ad-hoc exploration
   viz: VizType,               // see Reference → Visualization types
-  query: {
+  query?: {                   // absent exactly for a kind that runs none (text)
     sourceId: string,         // opaque reference into the source registry
     sql: string,              // UNTRUSTED SELECT — validated before it ever runs
     timeField?: string,       // the column the SERVER filters time on
   },
+  options?: object,           // the kind's own; see Reference → Panel options
   format?: "number" | "bytes" | "percent" | "ms",
   layout: { x, y, w, h },     // position on a 12-column grid
 }

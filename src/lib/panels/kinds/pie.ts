@@ -11,6 +11,7 @@ export const pie = definePanelKind({
   canvas: true,
   timeBrush: false,
   skeleton: "radial",
+  query: "required",
 });
 
 export const donut = definePanelKind({
@@ -20,4 +21,5 @@ export const donut = definePanelKind({
   canvas: true,
   timeBrush: false,
   skeleton: "radial",
+  query: "required",
 });

@@ -75,7 +75,12 @@ export const POST = route("query", async (req: Request) => {
       throw err;
     }
     record("success");
-    return json(result);
+    // The window the rows were selected over, as resolved here: a chart that
+    // runs to "now" ends at it rather than at the browser's clock (#201).
+    return json({
+      ...result,
+      window: { from: range.from.getTime(), to: range.to.getTime() },
+    });
   } catch (err) {
     // A failed statement is the user's query to fix — surface it as a 400 with
     // the real message, tagged `statement` so the client offers an edit-and-

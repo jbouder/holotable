@@ -5,6 +5,7 @@ import { buildBuiltinTemplates } from "@/lib/builtin-templates";
 import type { CatalogTable, SourceConfig } from "@/lib/registry";
 import { validateSql } from "@/lib/sql/safety";
 import { templatePanels } from "@/lib/templates";
+import { queryOf } from "./support/panels";
 
 /**
  * The seeded demo catalogs, copied from `scripts/seed.ts`.
@@ -82,10 +83,10 @@ test("every built-in statement passes the real guard against its own source", as
 
     for (const template of templates) {
       for (const panel of templatePanels(template.body)) {
-        const check = await validateSql(panel.query.sql, cfg);
+        const check = await validateSql(queryOf(panel).sql, cfg);
         assert.ok(
           check.ok,
-          `${template.name} / ${panel.title}: ${check.error}\n${panel.query.sql}`,
+          `${template.name} / ${panel.title}: ${check.error}\n${panel.query?.sql}`,
         );
       }
     }
@@ -95,8 +96,8 @@ test("every built-in statement passes the real guard against its own source", as
 test("every built-in panel declares the time field the server injects on", () => {
   for (const template of buildBuiltinTemplates(source([HTTP_REQUESTS]))) {
     for (const panel of templatePanels(template.body)) {
-      assert.equal(panel.query.timeField, "bucket");
-      assert.match(panel.query.sql, /AS bucket\b/);
+      assert.equal(panel.query?.timeField, "bucket");
+      assert.match(panel.query?.sql, /AS bucket\b/);
     }
   }
 });
@@ -104,7 +105,7 @@ test("every built-in panel declares the time field the server injects on", () =>
 test("no built-in filters time itself — the server owns the range", () => {
   for (const template of buildBuiltinTemplates(source([HTTP_REQUESTS, SYSTEM_METRICS]))) {
     for (const panel of templatePanels(template.body)) {
-      assert.doesNotMatch(panel.query.sql, /\bWHERE\b/i);
+      assert.doesNotMatch(queryOf(panel).sql, /\bWHERE\b/i);
     }
   }
 });
@@ -112,7 +113,7 @@ test("no built-in filters time itself — the server owns the range", () => {
 test("every built-in panel references only its own source", () => {
   for (const template of buildBuiltinTemplates(source([HTTP_REQUESTS], "ts-metrics"))) {
     for (const panel of templatePanels(template.body)) {
-      assert.equal(panel.query.sourceId, "ts-metrics");
+      assert.equal(panel.query?.sourceId, "ts-metrics");
     }
   }
 });
@@ -158,7 +159,7 @@ test("an HTTP status is a breakdown, never something to average", () => {
   const [duration] = buildBuiltinTemplates(source([HTTP_REQUESTS])).filter((t) =>
     t.id.endsWith(":duration"),
   );
-  const sql = templatePanels(duration.body)[0].query.sql;
+  const sql = queryOf(templatePanels(duration.body)[0]).sql;
   assert.match(sql, /avg\(duration_ms\)/);
   assert.doesNotMatch(sql, /avg\(status\)/);
 });

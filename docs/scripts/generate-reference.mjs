@@ -108,7 +108,9 @@ function parseEnum(source, name) {
  * which of them are registered and in what order.
  */
 function parsePanelKinds() {
-  const string = String.raw`"((?:[^"\\]|\\.)*)"`;
+  // Either quote style: the formatter switches to single quotes for a
+  // string that contains double ones.
+  const string = String.raw`(?:"((?:[^"\\]|\\.)*)"|'((?:[^'\\]|\\.)*)')`;
   const declared = new Map();
   const kindsDir = "src/lib/panels/kinds";
   for (const file of readdirSync(join(repoRoot, kindsDir))) {
@@ -119,7 +121,9 @@ function parsePanelKinds() {
       "g",
     );
     for (const m of source.matchAll(re)) {
-      declared.set(m[1], { kind: m[2], summary: m[3].replace(/\\"/g, '"') });
+      const kind = m[2] ?? m[3];
+      const summary = (m[4] ?? m[5]).replace(/\\(["'])/g, "$1");
+      declared.set(m[1], { kind, summary });
     }
   }
   const registry = read("src/lib/panels/registry.ts");
@@ -227,7 +231,9 @@ and the client's renderers.
 | --- | --- |
 ${vizRows}
 
-\`stat\` and \`table\` are drawn as HTML; every other kind is an ECharts chart.
+\`stat\`, \`table\` and \`text\` are drawn as HTML; every other kind is an
+ECharts chart. The options a kind takes are in
+[Panel options](/reference/panel-options/), and
 [Adding a panel kind](/concepts/streaming-and-rendering/#panel-kinds) says
 where each one is declared.
 

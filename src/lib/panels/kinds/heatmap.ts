@@ -8,4 +8,5 @@ export const heatmap = definePanelKind({
   canvas: true,
   timeBrush: false,
   skeleton: "chart",
+  query: "required",
 });

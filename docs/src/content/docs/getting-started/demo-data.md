@@ -10,7 +10,7 @@ install something to show. It does two things.
 
 ## 1. Bootstrap, once
 
-It registers three demo sources and a dashboard for each in the `demo`
+It registers three demo sources and their demo dashboards in the `demo`
 workspace, if they do not already exist. All three point at the `metrics` schema
 and share the read-only `TS_METRICS` secret reference — they differ only in the
 tables they expose.
@@ -18,7 +18,7 @@ tables they expose.
 | Source id | Table | Demo dashboard |
 | --- | --- | --- |
 | `ts-metrics` | `metrics.http_requests` — per-request events | **Demo service health** (RPS, p95 latency, 5xx, requests by route) |
-| `ts-system` | `metrics.system_metrics` — per-host infra metrics | **Demo infrastructure** (CPU/memory by host, disk %, CPU by region) |
+| `ts-system` | `metrics.system_metrics` — per-host infra metrics | **Demo infrastructure** (CPU/memory by host, disk %, CPU by region) and **Demo fleet status** (a text header, CPU and disk gauges, a host load state timeline) |
 | `holotable-self` | `metrics.holotable_self` — the app's own instruments | **Holotable self-monitoring**, below |
 
 Each source is stamped with a `catalog_refreshed_at` as it is written. A source

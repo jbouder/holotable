@@ -1,6 +1,6 @@
 import { test, afterEach } from "node:test";
 import assert from "node:assert/strict";
-import type { Panel } from "@/lib/ir";
+import type { QueryPanel } from "@/lib/ir";
 import {
   checkRepoint,
   missingSourceIds,
@@ -9,7 +9,7 @@ import {
   summarizeChecks,
 } from "@/lib/panel-repoint";
 
-function panel(id: string, sourceId: string, sql = "SELECT 1 AS value"): Panel {
+function panel(id: string, sourceId: string, sql = "SELECT 1 AS value"): QueryPanel {
   return {
     id,
     title: `Panel ${id}`,
@@ -41,7 +41,7 @@ test("the bulk set is every panel on that source", () => {
 
 test("re-pointing moves the source reference and nothing else", () => {
   const moved = repointPanels(PANELS, { panelIds: ["a"], sourceId: "live" });
-  assert.equal(moved[0].query.sourceId, "live");
+  assert.equal(moved[0].query?.sourceId, "live");
   // The panel keeps its identity: an id change would orphan the layout, the
   // selection and anything else that refers to the panel by id.
   assert.equal(moved[0].id, "a");
@@ -61,7 +61,7 @@ test("re-pointing does not mutate the panels it was given", () => {
 
 test("an unselected panel is left on the dead source", () => {
   const moved = repointPanels(PANELS, { panelIds: ["a"], sourceId: "live" });
-  assert.equal(moved[2].query.sourceId, "dead");
+  assert.equal(moved[2].query?.sourceId, "dead");
 });
 
 test("each panel is checked against the new source, and the verdicts keep their panel", async () => {
