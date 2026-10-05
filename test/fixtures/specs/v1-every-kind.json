@@ -1,0 +1,316 @@
+{
+  "specVersion": 1,
+  "title": "Every panel kind",
+  "timeRange": {
+    "from": "now-6h",
+    "to": "now"
+  },
+  "refreshIntervalMs": 30000,
+  "variables": [
+    {
+      "name": "service",
+      "label": "Service",
+      "type": "enum",
+      "values": ["api", "web", "worker"],
+      "default": "api"
+    },
+    {
+      "name": "routes",
+      "type": "enum",
+      "values": ["/login", "/checkout", "/search"],
+      "multi": true,
+      "default": ["/login", "/search"]
+    },
+    {
+      "name": "host",
+      "type": "query",
+      "query": {
+        "sourceId": "ts-system",
+        "sql": "SELECT DISTINCT host FROM system_metrics ORDER BY host"
+      }
+    }
+  ],
+  "annotations": {
+    "show": true,
+    "tags": ["deploy", "incident"]
+  },
+  "panels": [
+    {
+      "id": "intro",
+      "title": "About",
+      "viz": "text",
+      "options": {
+        "content": "## Every kind\n\nOne panel of each registered kind, across two sources."
+      },
+      "layout": {
+        "x": 0,
+        "y": 0,
+        "w": 12,
+        "h": 2
+      }
+    },
+    {
+      "id": "line",
+      "title": "Requests",
+      "viz": "line",
+      "format": "number",
+      "query": {
+        "sourceId": "ts-metrics",
+        "timeField": "minute",
+        "sql": "SELECT time_bucket('1 minute', ts) AS minute, count(*) AS requests FROM http_requests WHERE service = :service GROUP BY minute ORDER BY minute"
+      },
+      "options": {
+        "decimals": 0,
+        "legend": "bottom",
+        "yAxis": {
+          "min": 0,
+          "label": "req/min"
+        },
+        "thresholds": [
+          {
+            "value": 0,
+            "color": "success"
+          },
+          {
+            "value": 1000,
+            "color": "danger"
+          }
+        ]
+      },
+      "layout": {
+        "x": 0,
+        "y": 3,
+        "w": 4,
+        "h": 3
+      }
+    },
+    {
+      "id": "area",
+      "title": "Bytes by service",
+      "viz": "area",
+      "format": "bytes",
+      "query": {
+        "sourceId": "ts-metrics",
+        "timeField": "minute",
+        "sql": "SELECT time_bucket('1 minute', ts) AS minute, service, sum(bytes) AS bytes FROM http_requests GROUP BY minute, service ORDER BY minute"
+      },
+      "options": {
+        "stacked": true,
+        "compact": true
+      },
+      "layout": {
+        "x": 4,
+        "y": 3,
+        "w": 4,
+        "h": 3
+      }
+    },
+    {
+      "id": "bar",
+      "title": "Errors by route",
+      "viz": "bar",
+      "query": {
+        "sourceId": "ts-metrics",
+        "sql": "SELECT route, count(*) FILTER (WHERE status >= 500) AS errors FROM http_requests WHERE route = ANY(:routes) GROUP BY route ORDER BY errors DESC"
+      },
+      "layout": {
+        "x": 8,
+        "y": 3,
+        "w": 4,
+        "h": 3
+      }
+    },
+    {
+      "id": "scatter",
+      "title": "Latency against size",
+      "viz": "scatter",
+      "query": {
+        "sourceId": "ts-metrics",
+        "sql": "SELECT bytes, duration_ms FROM http_requests ORDER BY ts DESC LIMIT 500"
+      },
+      "layout": {
+        "x": 0,
+        "y": 6,
+        "w": 4,
+        "h": 3
+      }
+    },
+    {
+      "id": "stat",
+      "title": "p95 latency",
+      "viz": "stat",
+      "format": "ms",
+      "query": {
+        "sourceId": "ts-metrics",
+        "timeField": "minute",
+        "sql": "SELECT time_bucket('1 minute', ts) AS minute, percentile_cont(0.95) WITHIN GROUP (ORDER BY duration_ms) AS p95 FROM http_requests GROUP BY minute ORDER BY minute"
+      },
+      "options": {
+        "value": "p95",
+        "sparkline": true,
+        "decimals": 1,
+        "unit": "ms"
+      },
+      "timeRange": {
+        "from": "now-15m",
+        "to": "now"
+      },
+      "refreshIntervalMs": 5000,
+      "layout": {
+        "x": 4,
+        "y": 6,
+        "w": 4,
+        "h": 3
+      }
+    },
+    {
+      "id": "table",
+      "title": "Slowest routes",
+      "viz": "table",
+      "query": {
+        "sourceId": "ts-metrics",
+        "sql": "SELECT service, route, avg(duration_ms) AS avg_ms, count(*) AS requests FROM http_requests GROUP BY service, route ORDER BY avg_ms DESC LIMIT 20"
+      },
+      "options": {
+        "columns": [
+          {
+            "name": "avg_ms",
+            "label": "Average",
+            "format": "ms",
+            "decimals": 1,
+            "align": "right",
+            "width": 120
+          },
+          {
+            "name": "requests",
+            "hidden": false
+          }
+        ],
+        "sort": {
+          "column": "avg_ms",
+          "order": "desc"
+        }
+      },
+      "layout": {
+        "x": 8,
+        "y": 6,
+        "w": 4,
+        "h": 3
+      }
+    },
+    {
+      "id": "heatmap",
+      "title": "CPU by host",
+      "viz": "heatmap",
+      "query": {
+        "sourceId": "ts-system",
+        "sql": "SELECT time_bucket('5 minutes', ts) AS bucket, host, avg(cpu_pct) AS cpu FROM system_metrics GROUP BY bucket, host ORDER BY bucket"
+      },
+      "layout": {
+        "x": 0,
+        "y": 9,
+        "w": 4,
+        "h": 3
+      }
+    },
+    {
+      "id": "pie",
+      "title": "Requests by service",
+      "viz": "pie",
+      "query": {
+        "sourceId": "ts-metrics",
+        "sql": "SELECT service, count(*) AS requests FROM http_requests GROUP BY service"
+      },
+      "options": {
+        "legend": "right",
+        "compact": true
+      },
+      "layout": {
+        "x": 4,
+        "y": 9,
+        "w": 4,
+        "h": 3
+      }
+    },
+    {
+      "id": "donut",
+      "title": "Hosts by region",
+      "viz": "donut",
+      "query": {
+        "sourceId": "ts-system",
+        "sql": "SELECT region, count(DISTINCT host) AS hosts FROM system_metrics GROUP BY region"
+      },
+      "options": {
+        "legend": "none"
+      },
+      "layout": {
+        "x": 8,
+        "y": 9,
+        "w": 4,
+        "h": 3
+      }
+    },
+    {
+      "id": "gauge",
+      "title": "Memory on host",
+      "viz": "gauge",
+      "format": "percent",
+      "query": {
+        "sourceId": "ts-system",
+        "timeField": "minute",
+        "sql": "SELECT time_bucket('1 minute', ts) AS minute, avg(mem_pct) AS mem FROM system_metrics WHERE host = :host GROUP BY minute ORDER BY minute"
+      },
+      "options": {
+        "min": 0,
+        "max": 100,
+        "value": "mem",
+        "thresholds": [
+          {
+            "value": 0,
+            "color": "success"
+          },
+          {
+            "value": 90,
+            "color": "danger"
+          }
+        ]
+      },
+      "layout": {
+        "x": 0,
+        "y": 12,
+        "w": 4,
+        "h": 3
+      }
+    },
+    {
+      "id": "states",
+      "title": "Load state",
+      "viz": "state-timeline",
+      "query": {
+        "sourceId": "ts-system",
+        "timeField": "ts",
+        "sql": "SELECT ts, host, CASE WHEN cpu_pct >= 85 THEN 'hot' ELSE 'ok' END AS state FROM system_metrics ORDER BY ts"
+      },
+      "options": {
+        "entity": "host",
+        "state": "state",
+        "states": [
+          {
+            "state": "ok",
+            "color": "success"
+          },
+          {
+            "state": "hot",
+            "color": "danger"
+          }
+        ]
+      },
+      "layout": {
+        "x": 4,
+        "y": 12,
+        "w": 4,
+        "h": 3
+      }
+    }
+  ]
+}

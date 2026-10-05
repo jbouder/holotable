@@ -1,0 +1,42 @@
+{
+  "v1-unversioned.json": {
+    "authoredAt": 1,
+    "digest": "6df5a2eaf47eb925ff735f27bd934b6c5d558bb84fef01c383fa2f7bd2dc88f5",
+    "origin": "hand-written (#58): a spec saved before specVersion existed"
+  },
+  "v1-seeded-service-health.json": {
+    "authoredAt": 1,
+    "digest": "73653808ddca22331c13cf28a13faee28673eca7875ded721853aab6c0f747b1",
+    "origin": "captured: dashboard \"Demo service health\" version 1"
+  },
+  "v1-seeded-infrastructure.json": {
+    "authoredAt": 1,
+    "digest": "3381a96fa4a2a3100f655c6ccb16535635764073efc604ecc7bca51bb8605d20",
+    "origin": "captured: dashboard \"Demo infrastructure\" version 1"
+  },
+  "v1-seeded-fleet-status.json": {
+    "authoredAt": 1,
+    "digest": "b87ffd60c1d4722540865ddba94e7a08f623075ca2baa3c41f73abba563628ff",
+    "origin": "captured: dashboard \"Demo fleet status\" version 1"
+  },
+  "v1-seeded-self-monitoring.json": {
+    "authoredAt": 1,
+    "digest": "ddb3db91e023ace92f5c04f948863c9821b1e1ab21c9f12ecb1c9529138e2416",
+    "origin": "captured: dashboard \"Holotable self-monitoring\" version 1"
+  },
+  "v1-builtin-golden-signals.json": {
+    "authoredAt": 1,
+    "digest": "2f980944f4b73ea5764113160945213c3a655a326d898216a9389b9d764dbdb7",
+    "origin": "captured: dashboard \"Golden signals — holotable_self\" version 1"
+  },
+  "v1-every-kind.json": {
+    "authoredAt": 1,
+    "digest": "399e4118ae4c212f18c94845cf29a4b16f98a8a1b11b6b3135f8a25e1e730da2",
+    "origin": "hand-written (#90): every registered panel kind across two sources, with variables, annotations and a panel's own time range and refresh"
+  },
+  "v1-edge-limits.json": {
+    "authoredAt": 1,
+    "digest": "0c62254466dc58c200feaeb8d54e3d4f9644602d6141b9e6353c3a1185986606",
+    "origin": "hand-written (#90): the most panels and variables, the longest SQL, the longest title, ids and descriptions, unicode titles, an absolute time range"
+  }
+}

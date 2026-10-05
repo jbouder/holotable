@@ -120,6 +120,19 @@ helm lint deploy/helm/holotable
 helm template holotable deploy/helm/holotable > /dev/null
 ```
 
+`npm run test:integration` runs the suites that need a real database:
+read-only execution, statement timeouts, the allowlist end to end, repository
+round trips, a poller ticking over real rows, and the real-server halves of
+the audit, row-filter, pool, annotation, share and token suites. It starts
+TimescaleDB with Testcontainers, initialized by `timescaledb/init`, so it needs
+Docker; without it the run is skipped with a message (and fails under `CI`).
+`MIGRATE_TEST_DATABASE_URL` points it at an existing scratch database instead.
+In `npm test` those tests skip themselves.
+
+A change to the IR is checked against `test/fixtures/specs/`, stored specs
+that are never edited; see the README there before adding one or changing a
+snapshot under `test/snapshots/`.
+
 `npm run test:fuzz` runs the property-based SQL guard suite on its own.
 `npm test` includes it with a fixed seed and a small iteration count, so it is
 deterministic; CI also runs it longer with a fresh seed in a job that is not
@@ -209,7 +222,8 @@ The short version, five rules:
    be inferred from it. Do not introduce a parallel TypeScript-only interface
    that can drift. A change that would stop a saved spec parsing bumps
    `SPEC_VERSION` and adds an upgrader to `src/lib/ir/upgrade.ts` (see
-   AGENTS.md). Panel kinds are registered in `src/lib/panels/registry.ts`,
+   AGENTS.md); the fixture library in `test/fixtures/specs/` fails until it
+   does. Panel kinds are registered in `src/lib/panels/registry.ts`,
    not listed in `ir.ts`; the docs page "Streaming and rendering" says how to
    add one.
 2. **The model generates specs, never data.** The LLM may produce a

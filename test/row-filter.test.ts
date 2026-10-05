@@ -417,7 +417,7 @@ test("the plan view says where the filter's value came from", () => {
 const dbUrl = process.env.MIGRATE_TEST_DATABASE_URL;
 
 test("no statement reads another tenant's rows", {
-  skip: dbUrl ? false : "set MIGRATE_TEST_DATABASE_URL to run",
+  skip: dbUrl ? false : "run with npm run test:integration (needs Docker)",
 }, async () => {
   const schema = `rf_test_${process.pid}`;
   const scoped = SourceConfig.parse({ ...config, schema });

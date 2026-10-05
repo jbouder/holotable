@@ -196,7 +196,7 @@ test("the digest is stable for the same rows and changes with them", () => {
 const dbUrl = process.env.MIGRATE_TEST_DATABASE_URL;
 
 test("two runners cannot hold the migration lock at once", {
-  skip: dbUrl ? false : "set MIGRATE_TEST_DATABASE_URL to run",
+  skip: dbUrl ? false : "run with npm run test:integration (needs Docker)",
 }, async () => {
   const holder = new Client({ connectionString: dbUrl });
   const contender = new Client({ connectionString: dbUrl });

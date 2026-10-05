@@ -1,0 +1,324 @@
+{
+  "ts-metrics": {
+    "schema": "metrics",
+    "tables": [
+      {
+        "name": "http_requests",
+        "description": "per-request events",
+        "timeField": "ts",
+        "columns": [
+          {
+            "name": "ts",
+            "type": "timestamp with time zone"
+          },
+          {
+            "name": "service",
+            "type": "text"
+          },
+          {
+            "name": "route",
+            "type": "text"
+          },
+          {
+            "name": "status",
+            "type": "smallint"
+          },
+          {
+            "name": "duration_ms",
+            "type": "double precision"
+          },
+          {
+            "name": "bytes",
+            "type": "bigint"
+          }
+        ]
+      }
+    ]
+  },
+  "ts-system": {
+    "schema": "metrics",
+    "tables": [
+      {
+        "name": "system_metrics",
+        "description": "per-host infrastructure metrics",
+        "timeField": "ts",
+        "columns": [
+          {
+            "name": "ts",
+            "type": "timestamp with time zone"
+          },
+          {
+            "name": "host",
+            "type": "text"
+          },
+          {
+            "name": "region",
+            "type": "text"
+          },
+          {
+            "name": "cpu_pct",
+            "type": "double precision"
+          },
+          {
+            "name": "mem_pct",
+            "type": "double precision"
+          },
+          {
+            "name": "disk_pct",
+            "type": "double precision"
+          },
+          {
+            "name": "net_in_bytes",
+            "type": "bigint"
+          },
+          {
+            "name": "net_out_bytes",
+            "type": "bigint"
+          }
+        ]
+      }
+    ]
+  },
+  "holotable-self": {
+    "schema": "metrics",
+    "tables": [
+      {
+        "name": "holotable_self",
+        "description": "Holotable's own Prometheus instruments, one row per series per scrape. Counters and histogram buckets are cumulative since the process started, so a rate is the difference across a time bucket.",
+        "timeField": "ts",
+        "columns": [
+          {
+            "name": "ts",
+            "type": "timestamp with time zone",
+            "description": "When the scrape happened"
+          },
+          {
+            "name": "metric",
+            "type": "text",
+            "description": "Metric name as exposed, including any _bucket/_sum/_count suffix, e.g. holotable_query_duration_seconds_sum"
+          },
+          {
+            "name": "labels",
+            "type": "text",
+            "description": "The full label set, canonically serialized, so series stay distinguishable"
+          },
+          {
+            "name": "dashboard",
+            "type": "text",
+            "description": "Dashboard id label, when the metric has one"
+          },
+          {
+            "name": "source",
+            "type": "text",
+            "description": "Source id label, when the metric has one"
+          },
+          {
+            "name": "workspace",
+            "type": "text",
+            "description": "Workspace label, when the metric has one"
+          },
+          {
+            "name": "model",
+            "type": "text",
+            "description": "Model id label on the LLM counters"
+          },
+          {
+            "name": "direction",
+            "type": "text",
+            "description": "input or output, on the LLM token counter"
+          },
+          {
+            "name": "route",
+            "type": "text",
+            "description": "API route label on the LLM request counter"
+          },
+          {
+            "name": "reason",
+            "type": "text",
+            "description": "Why the SQL guard refused a statement"
+          },
+          {
+            "name": "outcome",
+            "type": "text",
+            "description": "How the measured operation ended"
+          },
+          {
+            "name": "le",
+            "type": "double precision",
+            "description": "Histogram bucket upper bound. NULL for the +Inf bucket and for non-buckets"
+          },
+          {
+            "name": "value",
+            "type": "double precision",
+            "description": "The sample value"
+          }
+        ]
+      }
+    ]
+  },
+  "postgresql-events": {
+    "schema": "metrics",
+    "tables": [
+      {
+        "name": "holotable_self",
+        "timeField": "ts",
+        "columns": [
+          {
+            "name": "ts",
+            "type": "timestamp with time zone"
+          },
+          {
+            "name": "metric",
+            "type": "text"
+          },
+          {
+            "name": "labels",
+            "type": "text"
+          },
+          {
+            "name": "dashboard",
+            "type": "text"
+          },
+          {
+            "name": "source",
+            "type": "text"
+          },
+          {
+            "name": "workspace",
+            "type": "text"
+          },
+          {
+            "name": "model",
+            "type": "text"
+          },
+          {
+            "name": "direction",
+            "type": "text"
+          },
+          {
+            "name": "route",
+            "type": "text"
+          },
+          {
+            "name": "reason",
+            "type": "text"
+          },
+          {
+            "name": "outcome",
+            "type": "text"
+          },
+          {
+            "name": "le",
+            "type": "double precision"
+          },
+          {
+            "name": "value",
+            "type": "double precision"
+          }
+        ]
+      },
+      {
+        "name": "http_requests",
+        "timeField": "ts",
+        "columns": [
+          {
+            "name": "ts",
+            "type": "timestamp with time zone"
+          },
+          {
+            "name": "service",
+            "type": "text"
+          },
+          {
+            "name": "route",
+            "type": "text"
+          },
+          {
+            "name": "status",
+            "type": "smallint"
+          },
+          {
+            "name": "duration_ms",
+            "type": "double precision"
+          },
+          {
+            "name": "bytes",
+            "type": "bigint"
+          }
+        ]
+      },
+      {
+        "name": "http_requests_1m",
+        "timeField": "minute",
+        "columns": [
+          {
+            "name": "minute",
+            "type": "timestamp with time zone"
+          },
+          {
+            "name": "service",
+            "type": "text"
+          },
+          {
+            "name": "route",
+            "type": "text"
+          },
+          {
+            "name": "requests",
+            "type": "bigint"
+          },
+          {
+            "name": "avg_duration_ms",
+            "type": "double precision"
+          },
+          {
+            "name": "errors",
+            "type": "bigint"
+          },
+          {
+            "name": "bytes_sum",
+            "type": "numeric"
+          }
+        ]
+      },
+      {
+        "name": "system_metrics",
+        "timeField": "ts",
+        "columns": [
+          {
+            "name": "ts",
+            "type": "timestamp with time zone"
+          },
+          {
+            "name": "host",
+            "type": "text"
+          },
+          {
+            "name": "region",
+            "type": "text"
+          },
+          {
+            "name": "cpu_pct",
+            "type": "double precision"
+          },
+          {
+            "name": "mem_pct",
+            "type": "double precision"
+          },
+          {
+            "name": "disk_pct",
+            "type": "double precision"
+          },
+          {
+            "name": "net_in_bytes",
+            "type": "bigint"
+          },
+          {
+            "name": "net_out_bytes",
+            "type": "bigint"
+          }
+        ]
+      }
+    ]
+  }
+}

@@ -264,7 +264,7 @@ test("writing needs an editor and reading a viewer, each in the workspace it tou
 const dbUrl = process.env.MIGRATE_TEST_DATABASE_URL;
 
 test("annotations are kept to their workspace", {
-  skip: dbUrl ? false : "set MIGRATE_TEST_DATABASE_URL to run",
+  skip: dbUrl ? false : "run with npm run test:integration (needs Docker)",
 }, async () => {
   const client = new Client({ connectionString: dbUrl });
   await client.connect();

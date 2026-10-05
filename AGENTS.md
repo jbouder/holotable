@@ -239,8 +239,13 @@ type) is a **breaking** change:
 - append the upgrader from the previous version to `UPGRADERS` in
   `src/lib/ir/upgrade.ts`: a pure function on plain JSON that imports nothing
   from `ir.ts`
-- test it against a fixture of the previous version; `test/ir.test.ts` keeps
-  the pre-versioning fixture in `test/fixtures/specs/` loading
+- test it against a fixture of the previous version. `test/ir-contract.test.ts`
+  (#90) holds every spec in `test/fixtures/specs/` to loading, passing the
+  guard and planning as its snapshot says; a fixture is never edited (its
+  digest is in `index.json`), so add fixtures of the new version beside the
+  old ones (`npm run fixture:capture` reads one from a live dashboard). The IR's
+  JSON Schema is snapshotted in `test/snapshots/`; rewrite both snapshots with
+  `UPDATE_SNAPSHOTS=1 npm test` and review the diff
 - read any spec you did not just build (a database row, a template, a file, a
   draft, a request body) through `StoredDashboard`, never `Dashboard` directly
 - check the SQL that reads raw `spec` jsonb without upgrading it: the version
@@ -482,6 +487,8 @@ npm run format     # biome format --write
 npm run typecheck  # next typegen && tsc --noEmit
 npm test           # node --test via tsx
 npm run test:fuzz  # property-based SQL guard suite alone (FUZZ_RUNS, FUZZ_SEED)
+npm run test:integration # real-server suites against TimescaleDB (Testcontainers, or MIGRATE_TEST_DATABASE_URL)
+npm run fixture:capture  # add a stored dashboard spec to the IR fixture library
 npm run config:check # validate the environment as the server does at startup (exit 1 = would not boot)
 npm run migrate    # apply Postgres migrations (--check, --dry-run, --down)
 npm run migrate:verify # round-trip every migration (scratch database)

@@ -1,0 +1,76 @@
+{
+  "title": "Demo infrastructure",
+  "panels": [
+    {
+      "id": "cpu",
+      "viz": "line",
+      "query": {
+        "sql": "SELECT time_bucket('1 minute', ts) AS minute, host, avg(cpu_pct) AS cpu FROM system_metrics GROUP BY minute, host ORDER BY minute",
+        "sourceId": "ts-system",
+        "timeField": "minute"
+      },
+      "title": "Avg CPU % by host",
+      "format": "percent",
+      "layout": {
+        "h": 3,
+        "w": 6,
+        "x": 0,
+        "y": 0
+      }
+    },
+    {
+      "id": "mem",
+      "viz": "line",
+      "query": {
+        "sql": "SELECT time_bucket('1 minute', ts) AS minute, host, avg(mem_pct) AS mem FROM system_metrics GROUP BY minute, host ORDER BY minute",
+        "sourceId": "ts-system",
+        "timeField": "minute"
+      },
+      "title": "Avg memory % by host",
+      "format": "percent",
+      "layout": {
+        "h": 3,
+        "w": 6,
+        "x": 6,
+        "y": 0
+      }
+    },
+    {
+      "id": "disk",
+      "viz": "stat",
+      "query": {
+        "sql": "SELECT time_bucket('1 minute', ts) AS minute, max(disk_pct) AS disk FROM system_metrics GROUP BY minute ORDER BY minute",
+        "sourceId": "ts-system",
+        "timeField": "minute"
+      },
+      "title": "Max disk % used",
+      "format": "percent",
+      "layout": {
+        "h": 2,
+        "w": 3,
+        "x": 0,
+        "y": 3
+      }
+    },
+    {
+      "id": "by-region",
+      "viz": "table",
+      "query": {
+        "sql": "SELECT region, round(avg(cpu_pct)::numeric, 1) AS avg_cpu FROM system_metrics GROUP BY region ORDER BY avg_cpu DESC",
+        "sourceId": "ts-system"
+      },
+      "title": "Avg CPU by region",
+      "layout": {
+        "h": 2,
+        "w": 9,
+        "x": 3,
+        "y": 3
+      }
+    }
+  ],
+  "timeRange": {
+    "to": "now",
+    "from": "now-1h"
+  },
+  "refreshIntervalMs": 15000
+}
