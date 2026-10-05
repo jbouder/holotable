@@ -324,7 +324,9 @@ a trailing comment (`uses: actions/checkout@<sha> # v4.4.0`); a tag is refused
 by `test/workflow-pins.test.ts`. Dependabot proposes Node up to 24, the LTS
 line, and never 25 or later (the `node` base images and `@types/node` are
 ignored from 25): take a Node major in one pull request that moves both
-Dockerfiles, CI's `node-version` and `@types/node` together.
+Dockerfiles, CI's `node-version` and `@types/node` together. The app's
+TypeScript is held below 7 until Next supports it, because 7 drops the
+JavaScript compiler API that `next build` and `next typegen` load.
 
 ## Documentation
 
