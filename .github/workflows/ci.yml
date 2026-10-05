@@ -381,7 +381,7 @@ jobs:
       # Build only — never pushed. A pull request runs with a read-only token
       # and may come from a fork; publishing is `publish` below, on `main`.
       - name: Build image
-        uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6.19.2
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
         with:
           context: .
           push: false
@@ -395,7 +395,7 @@ jobs:
       # it is here so a change to `scripts/` or `migrations/` that breaks the
       # target fails CI instead of the next `docker compose up`.
       - name: Build migrate image
-        uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6.19.2
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
         with:
           context: .
           target: migrate
@@ -408,7 +408,7 @@ jobs:
       # the demo jobs, built on Alpine from its own Dockerfile. Built, never
       # run here; the boot is verified by hand and recorded in its PR.
       - name: Build quick-start image
-        uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6.19.2
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
         with:
           context: .
           file: deploy/quickstart/Dockerfile
@@ -487,7 +487,7 @@ jobs:
 
       - name: Build and push by digest
         id: build
-        uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6.19.2
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
         with:
           context: .
           file: ${{ matrix.target == 'quickstart' && 'deploy/quickstart/Dockerfile' || 'Dockerfile' }}
