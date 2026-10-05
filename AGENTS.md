@@ -68,7 +68,8 @@ Key locations:
   demo (`deploy/cloudflare/demo/`: a Worker with per-IP limits fronting one
   Cloudflare Container on that image; its own `package.json`, excluded from the
   root `tsconfig`, checked by `.github/workflows/demo.yml`)
-- `.github/` — CI workflows, issue forms, the pull request template, `CODEOWNERS`
+- `.github/` — CI workflows, issue forms, the pull request template, `CODEOWNERS`,
+  `dependabot.yml`
 
 Important files:
 
@@ -511,9 +512,14 @@ Before finalizing code changes, run the checks relevant to your change:
 - `npm test`
 - `npm run build` for framework/build-sensitive changes
 
-CI (`.github/workflows/ci.yml`) runs all four on every pull request, plus a
-Docker image build and a Helm lint/template pass, and they are required to
-merge. Four constraints they enforce that are easy to break accidentally:
+CI (`.github/workflows/ci.yml`) runs all four on every pull request, and
+those four (`Lint`, `Typecheck`, `Test`, `Build`) are the required checks on
+`main`. The same workflow also builds the Docker images, lints and renders the
+Helm chart, round-trips the migrations against TimescaleDB, and runs the
+real-database `Integration` suites, the self-monitoring smoke test and a long
+fuzz of the SQL guard; those report on every pull request but do not gate the
+merge, so read them. Five constraints
+CI enforces that are easy to break accidentally:
 
 - `lint` is **Biome**, linter and formatter in one tool, configured entirely in
   `biome.json`. CI runs `biome ci`, which never writes, so an unformatted file
@@ -564,6 +570,17 @@ container and asserts the schema fingerprint matches the previous step, so an
 incomplete down path fails CI. Prefer expand/contract over an in-place change
 to an existing column: during a rolling update both versions of the code run at
 once. `docs/src/content/docs/operations/migrations.md` has both.
+
+A change that alters something the docs describe updates the page in the same
+pull request. `CONTRIBUTING.md` has the checklist of which source file maps to
+which page. `test/docs-drift.test.ts` holds the API routes, audit actions and
+settings sections tables to the code, and the Docs workflow fails on a broken
+link in the site or in the root markdown files.
+
+Dependency updates arrive from Dependabot (`.github/dependabot.yml`), grouped
+minor and patch updates weekly and each major on its own. They are reviewed and
+merged by a person like any other pull request; nothing auto-merges. A `next`
+or `react` major is a framework migration, not a version bump.
 
 `CONTRIBUTING.md` says the same things for human contributors, including the
 branch and Conventional Commit conventions and the pull request template's
@@ -638,7 +655,8 @@ If a requested change appears to conflict with the architecture, prefer:
 
 Consult:
 
-- `README.md`
+- the docs site under `docs/src/content/docs/`, which is the canonical
+  explanation of every feature (`README.md` is only a landing page)
 - `CONTRIBUTING.md`
 - `SECURITY.md` — the same boundaries stated as a trust model
 - `docs/src/content/docs/architecture/invariants.md`

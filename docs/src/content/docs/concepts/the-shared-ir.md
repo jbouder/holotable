@@ -27,8 +27,11 @@ Panel = {
 }
 ```
 
-A `Dashboard` wraps a title, a `timeRange`, a `refreshIntervalMs`, and 1–50
-panels, with a refinement rejecting duplicate panel ids. A panel may carry a
+A `Dashboard` wraps its `specVersion`, a title, a `timeRange`, a
+`refreshIntervalMs`, 1–50 panels, up to 10 optional `variables`
+([Dashboard variables](/concepts/variables/)) and an optional `annotations`
+setting ([Annotations](/concepts/annotations/)), with a refinement rejecting
+duplicate panel ids and variable names. A panel may carry a
 `timeRange` and a `refreshIntervalMs` of its own
 ([#114](https://github.com/jbouder/holotable/issues/114)): a "today so far"
 stat over 24 hours next to a five-minute error chart. Its window wins over both
@@ -59,10 +62,15 @@ The same `Panel` schema is the model's output type, the API's validation type,
 the persisted type, and the client's render type:
 
 ```ts
-export const DashboardGenerationSchema = Dashboard;
+export const DashboardGenerationSchema = z
+  .object(DashboardFields) // the Dashboard's own fields, minus specVersion
+  .strict()
+  .superRefine(uniqueIds);
 ```
 
-Because generation is bound to the same object the client renders, a spec that
+The one difference is `specVersion`: which shape a spec is in is a fact about
+the build, so `fromGenerated` stamps it rather than letting the model assert
+it. Because generation is bound to the same fields the client renders, a spec that
 would not render is a spec the model could not have emitted. This is why
 changing dashboard structure means changing the Zod schema *first* and updating
 every producer and consumer together — parallel ad-hoc types would reintroduce
@@ -86,9 +94,12 @@ is the key to the client's renderers. See
 
 Every object in the IR is `.strict()`, so an unknown key is a validation error
 rather than a silently ignored field. That is what makes a stored spec safe to
-parse years later — and it is also why the IR needs an explicit version field
-and an upgrader chain before the first breaking change
-([#58](https://github.com/jbouder/holotable/issues/58)).
+parse years later, and it is also why the IR carries an explicit
+`specVersion` and an upgrader chain (`src/lib/ir/upgrade.ts`,
+[#58](https://github.com/jbouder/holotable/issues/58)): a breaking change bumps
+`SPEC_VERSION` and appends an upgrader, and anything that reads a stored spec
+reads it through `StoredDashboard`. See
+[invariant 3](/architecture/invariants/#3-specs-are-immutable-and-versioned).
 
 ## Leaving and entering the app
 
@@ -107,8 +118,9 @@ envelope around it rather than a serializer
 ```
 
 `formatVersion` versions the *envelope*, not the IR — it is the reader's signal
-to refuse a file it would otherwise misread, and the place the upgrader chain
-from [#58](https://github.com/jbouder/holotable/issues/58) would attach.
+to refuse a file it would otherwise misread. The spec inside carries its own
+`specVersion` and is read through `StoredDashboard`, so a file exported by an
+older build is upgraded on import like any stored spec.
 
 The manifest is informational: an import makes every decision from `spec`, so a
 doctored manifest changes nothing. What an import cannot decide for itself is

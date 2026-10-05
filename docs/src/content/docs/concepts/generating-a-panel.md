@@ -32,7 +32,7 @@ Only then does it hand off to `src/lib/ai/generate.ts`, which uses the AI SDK's
 ```ts
 streamObject({
   model: getModel(),               // env-selected provider/model
-  schema: Dashboard,               // or Panel — the model's output IS the IR
+  schema: DashboardGenerationSchema, // or ExplorePanel — the model's output IS the IR
   system: baseSystem(source),      // catalog metadata + strict SQL rules
   prompt: ...,
 })
@@ -54,7 +54,7 @@ data.
 A catalog nobody has checked is a schema the model designs against and the
 database does not have, and the author meets it as a broken panel rather than
 as an error. `catalogHealth()` in `src/lib/catalog/health.ts` is the single
-judgement about that, and `/api/generate` refuses before the model is called —
+judgment about that, and `/api/generate` refuses before the model is called —
 before the rate limit is even spent — when it is one of the two states that
 cannot produce working SQL:
 

@@ -104,7 +104,7 @@ rather than an exit. The sequence lives in `src/lib/shutdown.ts`:
    broken, and restarting it is the wrong cure.
 2. **Every poller stops** (`stopAllPollers`), so no new metric query is issued.
 3. **Open SSE streams get a terminal frame** — an SSE `retry:` hint plus a
-   named `draining` event — and are closed. `EventSource` honours `retry:`
+   named `draining` event — and are closed. `EventSource` honors `retry:`
    natively, so subscribers come back to a healthy instance; the delay is
    randomized per stream (2–10s) so a terminating instance does not send all
    of its viewers back at the same moment, to the replacement that is least
@@ -145,3 +145,7 @@ draining and would win the race. `NEXT_MANUAL_SIG_HANDLE=true` hands the
 signals to the app instead; it is set in the `start` script and in the runtime
 image, and a deployment that starts the server some other way must set it too.
 It has no effect under `next dev`, where Next does not hand signals over.
+
+---
+
+*Last verified against the code at commit `00ea858` (2026-10-05).*

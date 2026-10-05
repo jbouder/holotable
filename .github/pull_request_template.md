@@ -17,6 +17,8 @@ takes a non-obvious route, say why the obvious one did not work.
 - [ ] `npm run typecheck`
 - [ ] `npm test`
 - [ ] `npm run build`
+- [ ] Docs updated for anything a page describes (the checklist is in
+      `CONTRIBUTING.md`)
 - [ ] Verified in the running app (say how — Docker Compose, `npm run dev`)
 
 ## Invariants
@@ -33,9 +35,11 @@ lines, say so under **Notes** and link the issue where that was agreed.
       producer and consumer was updated together.
 - [ ] **The model still generates specs, never data** — nothing renders metric
       values that did not come from server-side query execution.
-- [ ] **SQL guard not weakened** — SELECT-only, allowlist, denylist, row/time
-      limits, and read-only execution are intact; any widening is deliberate
-      and covered by a test.
+- [ ] **SQL guard not weakened** — one SELECT built only from allowlisted
+      parse-tree constructs, the catalog table and column allowlist, the
+      function denylist, row/time/byte limits, and read-only execution are
+      intact; any widening is deliberate and covered by a test (and
+      `npm run test:fuzz` still passes).
 - [ ] **The server still owns time** — concrete ranges are resolved and
       injected server-side, bound to the panel's `timeField`; neither client
       nor model supplies an authoritative window.

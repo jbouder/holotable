@@ -6,7 +6,7 @@ sidebar:
 ---
 
 `npm run seed` (`scripts/seed.ts`) is a long-running seeder that gives a fresh
-install something to show. It does two things.
+install something to show. It does three things.
 
 ## 1. Bootstrap, once
 
@@ -94,7 +94,8 @@ production data.
 `metrics.http_requests` is a hypertable of raw request events (see
 `timescaledb/init/001_schema.sql`). A continuous aggregate pre-aggregates
 per-minute request, error, duration, and byte statistics, and a seven-day
-retention policy removes old raw chunks. A **read-only** role is created by
+retention policy removes old raw chunks. `metrics.system_metrics` and
+`metrics.holotable_self` are hypertables in the same file. A **read-only** role is created by
 `timescaledb/init/002_readonly_user.sh`; the app only ever connects as this user
 via the source's `secret_ref`.
 
@@ -169,5 +170,5 @@ the collector really scraped the running app.
 It asserts "at least one" because an idle stack has nobody viewing a dashboard,
 so there are no pollers, no live viewers, and no model calls; resident memory is
 the series that is live from boot. What it deliberately does not cover is the
-HTTP and session layer above those functions — reaching `/api/stream` in a
-browser needs a Keycloak login, which is not something CI should hold.
+HTTP and session layer above those functions: reaching
+`/api/dashboards/[id]/stream` needs a signed-in browser session.

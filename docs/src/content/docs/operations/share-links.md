@@ -66,3 +66,7 @@ Holotable's own logs redact `hts_` tokens. A reverse proxy's access log, a
 browser's history, or `next dev`'s request log records URLs as they are, so
 prefer short expiries and revoke links that are no longer needed. The
 management list shows when each link was last used.
+
+---
+
+*Last verified against the code at commit `00ea858` (2026-10-05).*

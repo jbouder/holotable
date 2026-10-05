@@ -61,7 +61,7 @@ production deployment cannot boot without:
 | `AI_MODEL` | Set. |
 | `OPENAI_API_KEY` | Set when `AI_PROVIDER` is `openai-compatible` (the default). `OPENAI_BASE_URL` is optional and defaults to OpenAI, but must be an http(s) URL when set. |
 | `AI_GATEWAY_API_KEY` | Set when `AI_PROVIDER` is `gateway`. |
-| `OIDC_ISSUER`, `OIDC_CLIENT_ID`, `OIDC_CLIENT_SECRET`, `OIDC_JWKS_URL` | All set: Keycloak is the only way to sign in, and the [client is confidential](/operations/keycloak/). `OIDC_REDIRECT_URI` is derived from the request origin when unset. |
+| `OIDC_ISSUER`, `OIDC_CLIENT_ID`, `OIDC_CLIENT_SECRET`, `OIDC_JWKS_URL` | All set: Keycloak is the only way to sign in, and the [client is confidential](/operations/keycloak/). `OIDC_REDIRECT_URI` is derived from the request origin when unset. Under `AUTH_MODE=demo` the rule inverts: any of them is an error, and `AI_MODEL` and the provider key become warnings; see [Demo mode](/operations/demo-mode/). |
 
 Every numeric knob (`MAX_QUERY_ROWS`, `MAX_RESULT_BYTES`, `QUERY_TIMEOUT_SECONDS`, …) must be a
 positive integer when set, `LLM_RATE_PER_MINUTE` and `LLM_DAILY_TOKEN_BUDGET`
@@ -103,3 +103,7 @@ integer) belong in the Zod `EnvSchema`; presence and cross-variable rules
 belong in the function body, using `missing()` for values whose severity
 depends on the environment and `error()` for values that are wrong everywhere.
 Every message names the variable and says what to do.
+
+---
+
+*Last verified against the code at commit `00ea858` (2026-10-05).*

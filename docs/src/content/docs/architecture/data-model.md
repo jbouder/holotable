@@ -55,10 +55,10 @@ row. The decision is recorded as `TITLE_AUTHORITY` in
 
 ### `dashboard_favorites`
 
-`user_sub`, `dashboard_id`, `created_at`. Favouriting is **per person**, so it
+`user_sub`, `dashboard_id`, `created_at`. Favoriting is **per person**, so it
 keys on the identity's subject and sits outside the dashboard row everyone
 shares; the API takes the subject from the validated session and never from a
-request field. `ON DELETE CASCADE`, because a favourite of a deleted dashboard
+request field. `ON DELETE CASCADE`, because a favorite of a deleted dashboard
 is a bookmark to nothing rather than a dangling reference.
 
 ### `dashboard_versions`
@@ -113,9 +113,8 @@ re-sent turn therefore updates the row it belongs to instead of appending a
 duplicate.
 
 Per person, not per dashboard: a chat is a reader working something out, not a
-shared annotation (annotations are
-[#68](https://github.com/jbouder/holotable/issues/68)). `ON DELETE CASCADE` for
-the same reason as a favourite.
+shared annotation (see `annotations` below). `ON DELETE CASCADE` for the same
+reason as a favorite.
 
 `content` is deliberately opaque rather than a column per part kind — the
 message shape is the AI SDK's, it evolves, and a second opinion about it would
@@ -211,12 +210,43 @@ token), and deleted at sign-out, on a refused renewal, or once expired.
 Nothing on the request path reads it. Rotating `SESSION_SECRET` makes every
 stored token unreadable, which ends every session.
 
+### `annotations`
+
+One workspace event drawn on time-series panels (#68): `workspace_id`, `at`,
+an optional `ended_at` (a range, such as an incident), `kind` (`deploy`,
+`incident` or `note`), `title`, `description`, `tags`, `created_by`,
+`created_at`, and `source` (`manual`, or the name of the pipeline that posted
+it). Every statement filters on `workspace_id`: a read takes it from the
+dashboard record, a write from the path. See
+[Annotations](/concepts/annotations/).
+
+### `dashboard_shares`
+
+One read-only share link (#65): `dashboard_id`, `workspace_id`, `token_hash`
+(SHA-256 of the `hts_` token, never the token), `label`, `allowed_origins`,
+an optional pinned `time_range`, `created_by`, `created_at`, `expires_at`,
+`revoked_at` and `last_used_at`. Checked on every use of the token, so
+revoking takes effect on the next request. See
+[Share links and embedding](/operations/share-links/).
+
+### `api_tokens`
+
+One service-account API token (#288): `workspace_id`, `name`, `token_hash`
+(SHA-256 of the `ht_` token), `role` (`viewer` or `editor` only, by a `CHECK`),
+`created_by`, `created_at`, `expires_at`, `revoked_at` and `last_used_at`. See
+[Service-account API tokens](/operations/api-tokens/).
+
 ## Metrics store (TimescaleDB)
 
-- `metrics.http_requests` is a hypertable containing raw request events (see
-  `timescaledb/init/001_schema.sql`).
-- A continuous aggregate pre-aggregates per-minute request, error, duration, and
-  byte statistics; a seven-day retention policy removes old raw chunks.
+`timescaledb/init/001_schema.sql` creates the demo schema:
+
+- `metrics.http_requests` is a hypertable of raw request events. A continuous
+  aggregate, `metrics.http_requests_1m`, pre-aggregates per-minute request,
+  error, duration and byte statistics; a seven-day retention policy removes old
+  raw chunks.
+- `metrics.system_metrics` holds per-host infrastructure samples, and
+  `metrics.holotable_self` the app's own Prometheus instruments, scraped by
+  `scripts/self-metrics.ts`. See [Demo data](/getting-started/demo-data/).
 - A **read-only** role is created by `timescaledb/init/002_readonly_user.sh`.
   The app only ever connects as this user, via the source's `secret_ref`.
 
@@ -228,3 +258,7 @@ migration declares a rollback or an explicit reason it has none, concurrent
 runs serialize on an advisory lock, and `--check` is the pipeline gate against
 deploying code ahead of its schema. See
 [Database migrations](/operations/migrations/).
+
+---
+
+*Last verified against the code at commit `00ea858` (2026-10-05).*

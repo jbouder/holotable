@@ -5,9 +5,16 @@ sidebar:
   order: 3
 ---
 
-All routes run on the Node runtime. Every one resolves identity with
-`requireIdentity()` and authorizes through `can()` — see
-[Authorization model](/architecture/authorization/).
+All routes run on the Node runtime. Every route below **Auth** and
+**Operations** resolves identity with `requireIdentity()` and authorizes
+through `can()`; see [Authorization model](/architecture/authorization/).
+A [service-account API token](/operations/api-tokens/) is accepted wherever a
+session is, except the dashboard stream. A [share link](/operations/share-links/)
+is accepted only by the stream.
+
+`test/docs-drift.test.ts` holds this page to the route files: every route
+under `src/app/api/` and every method it exports has a row here, and every row
+names one that exists.
 
 ## Dashboards
 
@@ -61,6 +68,7 @@ hand.
 | `/api/generate` | POST | editor | Streams a validated dashboard, panel, or explore-panel spec. Authorized against the workspace owning the selected **source**. Refuses with a 400 when that source's catalog was never refreshed or names nothing that still exists. Rate limited and budgeted |
 | `/api/query` | POST | editor | One-shot guarded query for preview and Explore. `variables` carries the values a preview binds for `:name` references, only ever as parameters |
 | `/api/sql/validate` | POST | editor | Runs the SQL guard against a source's catalog without executing. Always `200`; the verdict is `{ ok, error? }`. `variables` names the dashboard's declared variables, which `:name` may reference |
+| `/api/sql/plan` | POST | editor | The statement exactly as the server would run it, without running it: the wrapped SQL, the bound parameters with what each was resolved from, the limits and the session statements. A refused statement is a `400` with the guard's message. See [Seeing what actually runs](/concepts/executing-a-panel/#seeing-what-actually-runs) |
 | `/api/variables/options` | POST | editor | The values a [dashboard variable](/concepts/variables/) allows, from its declaration: an `enum`'s list, or a `query` variable's guarded SELECT run as the caller. Audited as `query.execute` |
 | `/api/generation-log` | GET | source-admin | The redacted prompt/spec pairs every generation leaves behind. Workspaces come from the caller's claims, so `?workspaceId=` narrows and can never widen; a viewer or editor reads an empty list rather than a 403. `?limit=` is clamped |
 | `/api/audit` | GET | source-admin | The append-only [audit log](/operations/audit-log/), newest first. Filters: `workspaceId`, `from`/`to` (ISO or `now-24h`), `action`, `outcome`; paged with `limit` and `before` (the previous page's `next`). Workspaces come from the caller's claims as above; a platform admin reads any workspace, and every row with no filter. An unusable filter is a 400 |
@@ -79,6 +87,8 @@ hand.
 | `/api/sources/[id]/catalog` | PATCH | source-admin | Hide or expose one column, `{ table, column, exposed }`. Takes effect on the next generation and execution |
 | `/api/sources/[id]/impact` | GET | source-admin | Dashboards and panels currently referencing the source, scoped to its workspace |
 | `/api/sources/[id]/test` | POST | source-admin | Connectivity, latency, server and role identity, a **read-only proof**, and per-table reachability. All of it inside one rolled-back read-only transaction |
+| `/api/sources/discover` | POST | source-admin | The tables and columns a prospective source's read-only user can see, to pick an allowlist from. Nothing is persisted, and the `secret_ref` grant is checked like any connection |
+| `/api/secret-refs` | GET | source-admin | `?workspaceId=`: the `secret_ref`s granted to that workspace, each with whether the server holds credentials. Names and booleans only, rate limited per caller. See [Source secret references](/operations/secret-references/) |
 | `/api/sources/[id]/refresh` | POST | source-admin | Re-introspect the catalog. With `{}` it is a preview: it writes nothing and answers with the diff and a `digest`. With `{ digest }` it introspects again and writes only if the result matches, recording freshness and any allowlisted table the database no longer has; otherwise 409 with the new diff and digest |
 
 ## Search
@@ -98,7 +108,7 @@ hand.
 
 | Route | Method | Min role | Notes |
 | --- | --- | --- | --- |
-| `/api/workspaces/[id]/limits` | PATCH | platform admin | Set or clear the workspace's `ratePerMinute` and `dailyTokenBudget` overrides in `workspace_limits`. A present key is written, `null` inherits the environment's value again, `0` disables the limit, and an absent key is left alone. Gated on `workspace:limits`, which no workspace role grants. Each change writes a `workspace_limits.changed` log line with the before and after values. Answers with the workspace's effective limits and today's usage; the next model call uses them, with no restart |
+| `/api/workspaces/[id]/limits` | PATCH | platform admin | Set or clear the workspace's `ratePerMinute` and `dailyTokenBudget` overrides in `workspace_limits`. A present key is written, `null` inherits the environment's value again, `0` disables the limit, and an absent key is left alone. Gated on `workspace:limits`, which no workspace role grants. Each change writes a `workspace_limits.changed` log line and a `workspace.limits.update` audit row, both with the before and after values. Answers with the workspace's effective limits and today's usage; the next model call uses them, with no restart |
 | `/api/workspaces/[id]/annotations` | POST | editor | Write an [annotation](/concepts/annotations/) into the workspace in the path: `{ at, endedAt?, kind, title, description?, tags?, source? }`. Audited as `annotation.create` |
 | `/api/workspaces/[id]/annotations/[annotationId]` | DELETE | editor | Delete one of that workspace's annotations; another workspace's id is a `404`. Audited as `annotation.delete` |
 | `/api/workspaces/[id]/tokens` | GET, POST | source-admin | List the workspace's [API tokens](/operations/api-tokens/), or create one (`{ name, role, expiresInDays }`); the token is in the create response only. Audited as `token.create` |

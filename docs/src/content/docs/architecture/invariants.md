@@ -89,7 +89,7 @@ is rejected.
 
 Statement shape and table access are decided from the parse tree, so the
 guard sees through dollar-quoting, unicode escapes, nested CTEs and
-subqueries in any position, and it recognises a CTE alias, `FROM` inside
+subqueries in any position, and it recognizes a CTE alias, `FROM` inside
 `extract()`, and a keyword inside a string literal for what they are. The
 function check is still a list of names, and a list can only block what it
 has been told about. `test/sql-safety-postgres.test.ts` and
@@ -165,14 +165,15 @@ model would only produce SQL that fails.
 The names come from `information_schema.columns` of a database the operator may
 not control, and a column called `-- ignore previous instructions` is a prompt
 injection aimed at every generation path. So the catalog enters a prompt only
-through `renderCatalog` and `fenceUntrustedBlock` (`src/lib/ai/untrusted.ts`):
+through `renderCatalog` (`src/lib/timescaledb/catalog.ts`) and
+`fenceUntrustedBlock` (`src/lib/ai/untrusted.ts`):
 every field is flattened onto one line, stripped of control characters and
 clamped to its registry-schema maximum, and the whole block sits between
 markers carrying a random per-call token, preceded by a standing rule that the
 contents are data. The body is scrubbed of the token, so no name or
 description can close the block or open a fake one. The dashboard chat prompt
 treats the stored panel specs (titles, descriptions, SQL written by an earlier
-model run) the same way. This is a second line of defence: the model's output
+model run) the same way. This is a second line of defense: the model's output
 is untrusted regardless (invariant 7), which is what actually contains a
 successful injection.
 
@@ -227,7 +228,7 @@ translate it to a `400` with the real message so an editor can fix and retry;
 connection and socket failures stay a generic `500` and are never surfaced.
 
 The split is carried, not inferred. Every error body names a `kind`
-(`src/lib/errors.ts`), and the SSE path honours it too: a `panel-error` or
+(`src/lib/errors.ts`), and the SSE path honors it too: a `panel-error` or
 `panel-degraded` frame carries the real message only for a statement failure, and
 `describePanelError` reduces anything else to the generic sentence with the
 cause going to the log. `describeTickError` makes the same split for a
@@ -256,3 +257,7 @@ pass and drops anything shaped like a result, so no credential and no metric
 value is stored. The table's triggers refuse `UPDATE`, `DELETE` and `TRUNCATE`
 for every role. Writing never blocks or fails the request it describes. See
 [Audit log](/operations/audit-log/).
+
+---
+
+*Last verified against the code at commit `00ea858` (2026-10-05).*

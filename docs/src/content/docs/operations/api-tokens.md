@@ -62,3 +62,7 @@ curl -fsS -X POST "$HOLOTABLE_URL/api/workspaces/ops/annotations" \
 Treat a token as a password: keep it in the pipeline's secret store, give it the
 lowest role that works and a short expiry, and revoke it when it is no longer
 needed.
+
+---
+
+*Last verified against the code at commit `00ea858` (2026-10-05).*

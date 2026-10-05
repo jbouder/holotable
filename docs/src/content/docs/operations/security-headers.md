@@ -70,8 +70,9 @@ emits, including the framework bootstrap and each page's chunks. Setting the
 request header also discards any policy a client sent, so a request cannot
 choose its own nonce.
 
-One inline script is hand-written: the theme bootstrap in `src/app/layout.tsx`
-that sets `data-theme` before first paint. The layout reads the nonce from the
+One inline script is hand-written: the bootstrap in `src/app/layout.tsx`
+(built by `src/lib/bootstrap.ts`) that sets `data-theme` and `data-motion`
+before first paint. The layout reads the nonce from the
 `x-nonce` request header and stamps it itself.
 
 Reading a request header makes every page dynamic, which they already were:
@@ -121,3 +122,7 @@ Embedding a page in another site's `<iframe>` is blocked by
 `frame-ancestors` to exactly the origins the link's signed token names, or
 `'none'` when it names none. `next.config.ts` leaves `X-Frame-Options` off that
 path, since that header cannot express an allowlist.
+
+---
+
+*Last verified against the code at commit `00ea858` (2026-10-05).*

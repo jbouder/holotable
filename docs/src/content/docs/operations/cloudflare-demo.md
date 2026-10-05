@@ -118,3 +118,7 @@ DEMO_URL=http://localhost:8787 npm run smoke
 
 `wrangler dev` runs the real container locally, built for `linux/amd64`, so
 it is slower on Apple Silicon.
+
+---
+
+*Last verified against the code at commit `00ea858` (2026-10-05).*

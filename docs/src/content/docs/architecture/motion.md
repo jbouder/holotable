@@ -67,3 +67,7 @@ for the rules (no `motion-safe:`, no literal durations, no animation
 library, every view-transition name scoped). Whether anything moves is a
 browser question, and the manual checklist in `CONTRIBUTING.md` is the
 answer until an end-to-end harness exists for other reasons.
+
+---
+
+*Last verified against the code at commit `00ea858` (2026-10-05).*

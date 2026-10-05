@@ -58,6 +58,8 @@ export default defineConfig({
             { label: "Executing a panel", slug: "concepts/executing-a-panel" },
             { label: "Streaming and rendering", slug: "concepts/streaming-and-rendering" },
             { label: "Editing a dashboard", slug: "concepts/editing-a-dashboard" },
+            { label: "Dashboard variables", slug: "concepts/variables" },
+            { label: "Annotations", slug: "concepts/annotations" },
           ],
         },
         {
@@ -79,6 +81,8 @@ export default defineConfig({
             { label: "Hosted demo on Cloudflare", slug: "operations/cloudflare-demo" },
             { label: "Source secret references", slug: "operations/secret-references" },
             { label: "Row-level filters", slug: "operations/row-level-filters" },
+            { label: "Share links and embedding", slug: "operations/share-links" },
+            { label: "Service-account API tokens", slug: "operations/api-tokens" },
             { label: "AI provider", slug: "operations/ai-provider" },
             { label: "Startup validation", slug: "operations/startup-validation" },
             { label: "Security headers", slug: "operations/security-headers" },
@@ -96,6 +100,7 @@ export default defineConfig({
           items: [
             { label: "Configuration", slug: "reference/configuration" },
             { label: "Visualization types", slug: "reference/visualization-types" },
+            { label: "Panel options", slug: "reference/panel-options" },
             { label: "API routes", slug: "reference/api-routes" },
           ],
         },

@@ -67,10 +67,15 @@ suite sets both.
 
 ## Operational notes
 
-- There is currently **no rate limiting or budget** on the LLM routes
-  ([#18](https://github.com/jbouder/holotable/issues/18)).
+- Every model-backed route is rate limited per user and budgeted per
+  workspace per day ([#18](https://github.com/jbouder/holotable/issues/18));
+  see [LLM rate limits and budgets](/operations/llm-limits/).
 - There is **no timeout, retry, or fallback model**
   ([#22](https://github.com/jbouder/holotable/issues/22)); a provider 429 ends
   the author action.
 - `AI_MODEL` is also surfaced read-only in the UI so users can see which model
   produced their specs.
+
+---
+
+*Last verified against the code at commit `00ea858` (2026-10-05).*

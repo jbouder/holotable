@@ -102,3 +102,7 @@ reserves.
 - **Belt and braces.** This is enforced in Holotable. If the metrics database
   already enforces tenancy with its own row-level security policies, keep them:
   the two do not conflict.
+
+---
+
+*Last verified against the code at commit `00ea858` (2026-10-05).*

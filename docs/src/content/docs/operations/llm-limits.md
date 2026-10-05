@@ -62,8 +62,8 @@ workspace.
 
 A platform admin sets and clears overrides in **Settings → Workspaces**, which
 also shows today's usage against the effective limits. Source-admins see their
-own workspaces there read-only. Each change is written to the log as an audit
-line. The table can still be edited directly, for example from automation:
+own workspaces there read-only. Each change is recorded in the
+[audit log](/operations/audit-log/) as `workspace.limits.update`. The table can still be edited directly, for example from automation:
 
 ```sql
 INSERT INTO workspace_limits (workspace_id, rate_per_minute, daily_token_budget)
@@ -81,9 +81,9 @@ The row is read on every model request, so a change applies to the next one.
 `llm_usage` holds one row per `(workspace_id, day, route, model)` with
 `input_tokens`, `output_tokens`, and `requests`, each finished call adding to
 it. `route` is one of `generate`, `source-draft`, `chat`. The table holds
-counters only, never prompts, specs, or output, and it is the data the
-Prometheus counters in [#51](https://github.com/jbouder/holotable/issues/51)
-will read.
+counters only, never prompts, specs, or output. The Prometheus counter
+`holotable_llm_tokens_total` ([#51](https://github.com/jbouder/holotable/issues/51))
+counts the same calls in process; see [Prometheus metrics](/operations/metrics/).
 
 ```sql
 SELECT day, route, model, input_tokens + output_tokens AS tokens, requests
@@ -98,5 +98,9 @@ The rate limiter's buckets are in process memory: every instance counts on its
 own, so with N replicas the effective rate is N times the configured one. The
 budget is in Postgres and is shared. The store behind the limiter is an
 interface (`RateLimitStore`) so a shared implementation can replace the
-in-memory one when the app goes horizontal
-([M4](https://github.com/jbouder/holotable/milestones)).
+in-memory one if the app ever goes horizontal; one instance is the supported
+topology (see [Scaling and the poller](/architecture/scaling/)).
+
+---
+
+*Last verified against the code at commit `00ea858` (2026-10-05).*

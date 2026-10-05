@@ -9,6 +9,17 @@ Holotable derives all authorization from the `groups` claim of the session
 token. Keycloak does **not** include group memberships in tokens by default —
 you must add a group-membership mapper.
 
+## The local realm
+
+`docker compose up` starts Keycloak 26 on `http://localhost:8080` and imports
+`keycloak/holotable-realm.json`: the `holotable` realm, the `holotable` client
+with the settings below, the `demo` workspace's three role groups,
+`/platform-admins`, and one user, **`demo` / `demo`**, in
+`/workspaces/demo/source-admin` and `/platform-admins`. The Keycloak admin
+console signs in as `admin` / `admin`. Both are development credentials and
+must never reach a real deployment. The rest of this page is what to set up in
+a realm of your own.
+
 ## 1. Realm, client, groups
 
 1. Create (or reuse) a realm, e.g. `holotable`.
@@ -139,3 +150,7 @@ before this change keeps its old client settings; recreate the container
 A logout is checked against the realm's keys, issuer and this client id before
 anything happens, and it takes effect at once: the session token stops
 verifying, any open dashboard streams for it close, and it cannot be renewed.
+
+---
+
+*Last verified against the code at commit `00ea858` (2026-10-05).*

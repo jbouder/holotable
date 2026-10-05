@@ -31,6 +31,7 @@ bookmark one or send it to someone.
 | Local data | `/settings/local-data` | What this browser remembers, with a way to clear each part |
 | Keyboard shortcuts | `/settings/shortcuts` | Every key binding, grouped by where it works |
 | Workspaces | `/settings/workspaces` | AI usage and limits. Listed only if you are a source-admin somewhere or a platform admin |
+| API tokens | `/settings/tokens` | Service-account tokens for scripts and pipelines. Listed only if you are a source-admin somewhere or a platform admin |
 
 ### Account
 
@@ -65,7 +66,7 @@ If that dashboard is deleted or you lose access to it, you land on the list
 with a one-time notice instead.
 
 **Dashboard list** defaults set the sort order and whether only your
-favourites are shown. A link that names a sort or filter still wins.
+favorites are shown. A link that names a sort or filter still wins.
 
 ### Local data
 
@@ -84,6 +85,12 @@ is overridden for that workspace, or is off. Source-admins see their own
 workspaces. Only platform admins can change an override, and the change
 applies to the next model request. See
 [LLM rate limits and budgets](/operations/llm-limits/).
+
+### API tokens
+
+Mint and revoke service-account API tokens for the workspaces you administer:
+a name, a role (viewer or editor, never more) and an expiry. A token is shown
+once. See [Service-account API tokens](/operations/api-tokens/).
 
 ## What follows you, and what stays on this device
 
