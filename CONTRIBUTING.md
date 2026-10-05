@@ -319,7 +319,10 @@ anything in the guard, auth or rendering path, let the required checks pass,
 and merge it by hand. Nothing auto-merges. A `next` or `react` major is a
 framework migration, not a version bump: check the installed docs in
 `node_modules/next/dist/docs/` against the repository's patterns before
-accepting it.
+accepting it. Dependabot never proposes a Node major (the `node` base images
+and `@types/node` are ignored for majors): a Node upgrade is done by hand, in
+one pull request that moves both Dockerfiles, CI's `node-version` and
+`@types/node` together.
 
 ## Documentation
 

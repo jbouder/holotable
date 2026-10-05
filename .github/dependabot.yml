@@ -16,7 +16,13 @@
 # as soon as an advisory lands, and `open-pull-requests-limit` does not hold
 # them back.
 #
-# No `ignore` entries. Add one only for an update known to break, with a
+# Node majors are ignored everywhere (the `node` base images and
+# `@types/node`): moving Node is a deliberate migration done by hand, in one
+# pull request that changes both Dockerfiles, the CI `node-version`, and
+# `@types/node` together, never a bump Dependabot proposes per file. Minor and
+# patch updates within the current major still arrive.
+#
+# Add any other `ignore` entry only for an update known to break, with a
 # comment saying why and what would let it be removed.
 version: 2
 
@@ -26,6 +32,10 @@ updates:
     directory: /
     schedule:
       interval: weekly
+    ignore:
+      # Node majors move by hand; see the header.
+      - dependency-name: "@types/node"
+        update-types: ["version-update:semver-major"]
     open-pull-requests-limit: 5
     commit-message:
       # `chore(deps): …` for dependencies, `chore(deps-dev): …` for
@@ -66,6 +76,10 @@ updates:
     directory: /deploy/cloudflare/demo
     schedule:
       interval: weekly
+    ignore:
+      # Node majors move by hand; see the header.
+      - dependency-name: "@types/node"
+        update-types: ["version-update:semver-major"]
     open-pull-requests-limit: 5
     commit-message:
       prefix: chore
@@ -84,6 +98,10 @@ updates:
     directory: /
     schedule:
       interval: weekly
+    ignore:
+      # Node majors move by hand; see the header.
+      - dependency-name: node
+        update-types: ["version-update:semver-major"]
     open-pull-requests-limit: 5
     commit-message:
       prefix: chore
@@ -97,6 +115,10 @@ updates:
     directory: /deploy/quickstart
     schedule:
       interval: weekly
+    ignore:
+      # Node majors move by hand; see the header.
+      - dependency-name: node
+        update-types: ["version-update:semver-major"]
     open-pull-requests-limit: 5
     commit-message:
       prefix: chore
