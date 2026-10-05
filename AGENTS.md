@@ -583,7 +583,10 @@ link in the site or in the root markdown files.
 Dependency updates arrive from Dependabot (`.github/dependabot.yml`), grouped
 minor and patch updates weekly and each major on its own. They are reviewed and
 merged by a person like any other pull request; nothing auto-merges. A `next`
-or `react` major is a framework migration, not a version bump. Node 25 and later
+or `react` major is a framework migration, not a version bump. Every action
+in `.github/workflows/` is pinned to a full commit SHA with its version as a
+trailing `# vX.Y.Z` comment, never a tag; `test/workflow-pins.test.ts` fails on
+an unpinned `uses:`. Node 25 and later
 (the `node` base images and `@types/node`) are ignored in `dependabot.yml`, so
 only the LTS line up to 24 is proposed; a Node major is taken in one pull
 request that moves both Dockerfiles, CI's `node-version` and `@types/node`

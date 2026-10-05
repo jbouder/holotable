@@ -319,10 +319,12 @@ anything in the guard, auth or rendering path, let the required checks pass,
 and merge it by hand. Nothing auto-merges. A `next` or `react` major is a
 framework migration, not a version bump: check the installed docs in
 `node_modules/next/dist/docs/` against the repository's patterns before
-accepting it. Dependabot proposes Node up to 24, the LTS line, and never 25 or
-later (the `node` base images and `@types/node` are ignored from 25): take a
-Node major in one pull request that moves both Dockerfiles, CI's
-`node-version` and `@types/node` together.
+accepting it. Workflow actions are pinned to a commit SHA, with the version in
+a trailing comment (`uses: actions/checkout@<sha> # v4.4.0`); a tag is refused
+by `test/workflow-pins.test.ts`. Dependabot proposes Node up to 24, the LTS
+line, and never 25 or later (the `node` base images and `@types/node` are
+ignored from 25): take a Node major in one pull request that moves both
+Dockerfiles, CI's `node-version` and `@types/node` together.
 
 ## Documentation
 
