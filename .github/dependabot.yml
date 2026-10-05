@@ -1,0 +1,116 @@
+# Dependabot version updates (#164).
+#
+# Every runtime dependency is pinned exactly and every base image by digest,
+# which is right for reproducibility and also means nothing moves unless
+# something proposes it. This file is that something. Each entry is reviewed
+# and merged by a person like any other pull request: nothing here
+# auto-merges, and CI's required checks (lint, typecheck, test, build) gate
+# every update the same way they gate a hand-written change.
+#
+# Minor and patch updates arrive grouped, one pull request per ecosystem and
+# dependency type per week. A major is never in a group, so it arrives as its
+# own pull request: a `next` or `react` major is a framework migration (see the
+# framework warning in AGENTS.md), not a version bump.
+#
+# Security updates are separate from these version updates. GitHub opens them
+# as soon as an advisory lands, and `open-pull-requests-limit` does not hold
+# them back.
+#
+# No `ignore` entries. Add one only for an update known to break, with a
+# comment saying why and what would let it be removed.
+version: 2
+
+updates:
+  # The app.
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    commit-message:
+      # `chore(deps): …` for dependencies, `chore(deps-dev): …` for
+      # devDependencies, matching the Conventional Commits in CONTRIBUTING.md.
+      prefix: chore
+      include: scope
+    groups:
+      production:
+        dependency-type: production
+        update-types: [minor, patch]
+      development:
+        dependency-type: development
+        update-types: [minor, patch]
+
+  # The docs site: its own package.json and lockfile, so without this entry it
+  # is never updated.
+  - package-ecosystem: npm
+    directory: /docs
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: chore
+      include: scope
+    groups:
+      production:
+        dependency-type: production
+        update-types: [minor, patch]
+      development:
+        dependency-type: development
+        update-types: [minor, patch]
+
+  # The hosted demo's Worker (deploy/cloudflare/demo): its own package.json
+  # and lockfile, checked by .github/workflows/demo.yml. Its Dockerfile is a
+  # one-line FROM of this repository's own quick-start image, so it has no
+  # base image to update.
+  - package-ecosystem: npm
+    directory: /deploy/cloudflare/demo
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: chore
+      include: scope
+    groups:
+      production:
+        dependency-type: production
+        update-types: [minor, patch]
+      development:
+        dependency-type: development
+        update-types: [minor, patch]
+
+  # The repository Dockerfile's digest-pinned base. Digest pinning (#36) is
+  # what makes this necessary: a pinned digest never moves on its own.
+  - package-ecosystem: docker
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: chore
+      include: scope
+
+  # The all-in-one quick-start image: a digest-pinned Node base for its build
+  # stages and a digest-pinned TimescaleDB base it runs on. A TimescaleDB
+  # update here should move docker-compose.yml and the CI service containers
+  # to the same version in the same pull request.
+  - package-ecosystem: docker
+    directory: /deploy/quickstart
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: chore
+      include: scope
+
+  # The actions in .github/workflows/.
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: chore
+      include: scope
+    groups:
+      actions:
+        update-types: [minor, patch]
