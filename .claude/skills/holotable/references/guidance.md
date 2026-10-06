@@ -1,0 +1,80 @@
+# Choosing and laying out panels
+
+Advice, not rules: a spec that ignores it still validates. It is what makes a
+dashboard readable during an incident.
+
+## Which kind answers which question
+
+| The question | Kind | Query shape |
+|---|---|---|
+| How much right now? (requests, error rate, p95) | `stat` | One scalar; add `sparkline` with a per-bucket query for its recent history. |
+| How is it changing? (rate, latency, saturation over time) | `line` | Bucketed time column + one or more numeric columns. |
+| How much in total over time? (bytes, volume) | `area` | As `line`; `stacked: true` for parts of a whole. |
+| Which are the biggest? (top routes, hosts, tenants) | `bar` (or `table`) | Label + value, `ORDER BY value DESC LIMIT 10`. |
+| What share of the whole? (status classes, regions) | `pie` / `donut` | Label + value, a handful of categories. More than ~8 slices: use `bar`. |
+| How close to a limit? (CPU %, disk, quota) | `gauge` | One value, `min`/`max` set; `variant: "bar"` for one bar per host. |
+| What state was it in, and when? (up/down, deploys) | `state-timeline` | Raw time, entity, state, ordered by time. |
+| Where is the load concentrated over time? | `heatmap` | Time bucket, a dimension, a count. |
+| Do two measures move together? (size vs latency) | `scatter` | Two numeric columns, optionally a label. |
+| I need the exact numbers | `table` | Rows; set `columns` labels and formats. |
+| What is this dashboard for? Who to page? | `text` | No query; Markdown in `options.content`. |
+
+## Monitoring measures that read well
+
+- **Rates and counts**: `count(*)` per bucket, or `count(*) FILTER (WHERE
+  status >= 500)` beside it on the same line chart.
+- **Error rate**: `100.0 * count(*) FILTER (WHERE status >= 500) /
+  NULLIF(count(*), 0)` with `"format": "percent"`. `NULLIF` avoids a divide
+  by zero on an empty window.
+- **Latency**: percentiles, not averages. `percentile_cont(0.95) WITHIN GROUP
+  (ORDER BY duration_ms)` with `"format": "ms"`. Show p50 and p95 together.
+- **Saturation**: utilization against a bound, `gauge` 0–100 or a `line` with
+  `yAxis: { min: 0, max: 100 }`.
+- **Bucket size**: about 100–300 points across the default window. 1 minute
+  for 1–6 h, 5 minutes for 24 h, 1 hour for 7 d. Prefer a rollup table (a
+  continuous aggregate such as `…_1m`) when the catalog has one.
+
+## Formats, units and thresholds
+
+- Pick the `format` the raw value is in: `ms` for milliseconds, `bytes` for
+  bytes, `percent` for an already-0–100 value. Convert in SQL, not in `unit`.
+- `unit` is a label (`"req/s"`, `"hosts"`), not a conversion.
+- `compact: true` for large counts on a stat.
+- Thresholds read green → amber → red: `[{value: 0, color: "success"},
+  {value: 1, color: "warning"}, {value: 5, color: "danger"}]` for an error
+  rate. Ask the author for their SLO rather than inventing numbers, and say
+  when a threshold is a placeholder.
+
+## Layout
+
+- The grid is 12 columns. Defaults: two panels side by side, `w: 6`, `h: 4`.
+- Top row: what an on-call reader needs first, as `stat` tiles (`w: 3`, `h: 3`,
+  four across): traffic, errors, latency, saturation.
+- Then the trends that explain them (`line`, `w: 6`), then the breakdowns
+  (`bar`, `table`, `pie`), then detail (`heatmap`, `state-timeline`, often
+  `w: 12`).
+- A `text` panel at the top (`w: 12`, `h: 2`) says what the dashboard is for
+  and links the runbook.
+- No overlaps, nothing past column 12, no gaps that leave a ragged right edge.
+
+## Titles and descriptions
+
+- Title: what is measured, in a few words ("p95 latency", "Errors per minute").
+  No units in the title when `format` or `unit` already carries them.
+- Description: one sentence on what the query computes, its grouping and unit.
+  Never a value or a trend; the spec is written before anyone has seen the
+  data.
+
+## Variables
+
+Add one only when the dashboard should switch between values of a dimension
+(per host, per region, per service). A `query` variable lists values from the
+catalog (`SELECT DISTINCT host FROM … ORDER BY 1`); an `enum` lists them
+literally. Use `multi: true` with `= ANY(:name)` when comparing several makes
+sense.
+
+## Per-panel window and cadence
+
+Give a panel its own `timeRange` or `refreshIntervalMs` only when it must
+differ from the rest, such as a "last 24 hours" table refreshed every 5
+minutes on a 1-hour dashboard.

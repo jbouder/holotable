@@ -1,0 +1,121 @@
+{
+  "catalog": "catalog.json",
+  "accepted": [
+    {
+      "rule": "A time series buckets the time column and aliases it; timeField names the alias",
+      "sql": "SELECT time_bucket('1 minute', ts) AS minute, count(*) AS requests FROM http_requests GROUP BY minute ORDER BY minute"
+    },
+    {
+      "rule": "A scalar has no time column at all",
+      "sql": "SELECT count(*) AS requests FROM http_requests"
+    },
+    {
+      "rule": "Schema-qualified catalog tables are allowed",
+      "sql": "SELECT route, count(*) AS requests FROM metrics.http_requests GROUP BY route"
+    },
+    {
+      "rule": "CTEs, joins, FILTER, window functions and percentile aggregates are fine",
+      "sql": "WITH per_route AS (SELECT route, count(*) AS n, count(*) FILTER (WHERE status >= 500) AS errors FROM http_requests GROUP BY route) SELECT route, n, errors, rank() OVER (ORDER BY n DESC) AS rnk FROM per_route"
+    },
+    {
+      "rule": "Only exposed columns may be named",
+      "sql": "SELECT service, avg(duration_ms) AS avg_ms FROM http_requests GROUP BY service"
+    },
+    {
+      "rule": "A declared variable is referenced as :name, unquoted",
+      "variables": ["host"],
+      "sql": "SELECT time_bucket('1 minute', ts) AS minute, avg(cpu_pct) AS cpu FROM host_metrics WHERE host = :host GROUP BY minute ORDER BY minute"
+    },
+    {
+      "rule": "A multi-value variable is bound as an array",
+      "variables": ["host"],
+      "sql": "SELECT host, max(cpu_pct) AS peak FROM host_metrics WHERE host = ANY(:host) GROUP BY host"
+    },
+    {
+      "rule": "Fixed intervals in the query are fine; only clock readings are refused",
+      "sql": "SELECT time_bucket(INTERVAL '5 minutes', ts) AS bucket, avg(cpu_pct) AS cpu FROM host_metrics GROUP BY bucket ORDER BY bucket"
+    }
+  ],
+  "rejected": [
+    {
+      "rule": "SELECT only: no writes",
+      "sql": "DELETE FROM http_requests",
+      "error": "only SELECT"
+    },
+    {
+      "rule": "One statement only",
+      "sql": "SELECT 1; SELECT 2",
+      "error": "multiple statements are not allowed"
+    },
+    {
+      "rule": "No comments",
+      "sql": "SELECT count(*) AS n FROM http_requests -- all of them",
+      "error": "comments are not allowed"
+    },
+    {
+      "rule": "No time filter: the server owns the window",
+      "sql": "SELECT count(*) AS n FROM http_requests WHERE ts > now() - INTERVAL '1 hour'",
+      "error": "now()"
+    },
+    {
+      "rule": "No parenless clock keywords either",
+      "sql": "SELECT count(*) AS n FROM http_requests WHERE ts > current_timestamp - INTERVAL '1 hour'",
+      "error": "disallowed keyword"
+    },
+    {
+      "rule": "No time literals",
+      "sql": "SELECT count(*) AS n FROM http_requests WHERE ts > 'now'::timestamptz",
+      "error": "disallowed time literal"
+    },
+    {
+      "rule": "No non-deterministic functions",
+      "sql": "SELECT route FROM http_requests ORDER BY random() LIMIT 5",
+      "error": "random()"
+    },
+    {
+      "rule": "No server-side sleeps, file access or session state",
+      "sql": "SELECT pg_sleep(5)",
+      "error": "pg_sleep"
+    },
+    {
+      "rule": "Only tables in the source's catalog",
+      "sql": "SELECT * FROM pg_catalog.pg_user",
+      "error": "not in catalog allowlist"
+    },
+    {
+      "rule": "Not even a catalog table under another schema",
+      "sql": "SELECT count(*) FROM public.http_requests",
+      "error": "not in catalog allowlist"
+    },
+    {
+      "rule": "No unexposed column, by name",
+      "sql": "SELECT client_ip, count(*) AS n FROM http_requests GROUP BY client_ip",
+      "error": "column not exposed: http_requests.client_ip"
+    },
+    {
+      "rule": "No SELECT * over a table with an unexposed column",
+      "sql": "SELECT * FROM http_requests",
+      "error": "SELECT * is not allowed on http_requests: it has unexposed columns"
+    },
+    {
+      "rule": "A variable must be declared on the dashboard",
+      "sql": "SELECT avg(cpu_pct) AS cpu FROM host_metrics WHERE host = :host",
+      "error": "undeclared variable :host"
+    },
+    {
+      "rule": "Query parameters ($1) are reserved for the server",
+      "sql": "SELECT avg(cpu_pct) AS cpu FROM host_metrics WHERE host = $1",
+      "error": "reserved by the server"
+    },
+    {
+      "rule": "No SELECT INTO",
+      "sql": "SELECT route INTO copy_of_routes FROM http_requests",
+      "error": "disallowed keyword: into"
+    },
+    {
+      "rule": "No row locking",
+      "sql": "SELECT route FROM http_requests FOR UPDATE",
+      "error": "row locking (FOR UPDATE / FOR SHARE) is not allowed"
+    }
+  ]
+}

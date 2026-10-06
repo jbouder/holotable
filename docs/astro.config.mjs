@@ -47,6 +47,10 @@ export default defineConfig({
             },
             { label: "Demo data", slug: "getting-started/demo-data" },
             { label: "Settings and your account", slug: "getting-started/settings" },
+            {
+              label: "Writing specs with Claude Code",
+              slug: "getting-started/writing-specs-with-claude-code",
+            },
           ],
         },
         {
