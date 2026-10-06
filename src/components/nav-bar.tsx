@@ -51,7 +51,12 @@ export function NavBar({ account }: { account: ProfileMenuAccount | null }) {
       render={<header />}
       className="border-b border-border bg-surface"
     >
-      <div className="flex items-center justify-between gap-2 px-4 py-3 sm:px-6">
+      {/*
+        A fixed height, not padding around the content: a page's controls
+        portaled into the NavSlot (the dashboard's time range is 38px) would
+        otherwise grow the bar, and it would shift between pages.
+      */}
+      <div className="flex h-14 items-center justify-between gap-2 px-4 sm:px-6">
         <nav className="flex min-w-0 items-center gap-6" aria-label="Main">
           <Link
             href="/dashboards"

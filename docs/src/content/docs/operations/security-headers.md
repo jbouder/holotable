@@ -109,7 +109,7 @@ the browser, not collected.
 ## What is exempt
 
 The proxy runs on every path except `/api`, `/_next/static`, `/_next/image`
-and `/favicon.ico`. API responses are JSON, or the SSE stream at
+and `/icon.svg`. API responses are JSON, or the SSE stream at
 `/api/dashboards/[id]/stream`, which a document policy does not apply to.
 Leaving `/api` out keeps the proxy off the stream path entirely; the static
 headers are the only thing added to it, and adding headers does not buffer or
