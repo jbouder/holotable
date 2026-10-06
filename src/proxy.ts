@@ -134,5 +134,5 @@ export const config = {
    * deliberately *not* excluded: a nonce costs nothing, and a prefetched
    * document served without a policy would be a page without one.
    */
-  matcher: ["/((?!api|_next/static|_next/image|favicon.ico).*)"],
+  matcher: ["/((?!api|_next/static|_next/image|icon.svg).*)"],
 };
