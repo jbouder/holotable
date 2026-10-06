@@ -1,6 +1,8 @@
 import { createOpenAI } from "@ai-sdk/openai";
-import type { LanguageModel } from "ai";
+import { gateway } from "ai";
+import { resilientModel } from "@/lib/ai/invoke";
 import { stubModel } from "@/lib/ai/stub";
+import { config } from "@/lib/config";
 
 /**
  * Provider-agnostic model selection.
@@ -19,9 +21,28 @@ import { stubModel } from "@/lib/ai/stub";
  * OPEN DECISION: which concrete provider/model to run is deliberately left to
  * deployment (see docs/src/content/docs/operations/ai-provider.md). `AI_MODEL`
  * selects it; there is no baked-in default model.
+ *
+ * Every model is wrapped with the deadline and retry from ./invoke.ts (#22).
  */
 
-export function getModel(): LanguageModel {
+/**
+ * What every `streamObject`/`streamText` call spreads in: the model, and the
+ * SDK's own retry turned off, because the model's middleware already retries
+ * (with jitter, inside a deadline) and two loops would multiply.
+ * `test/ai-invoke.test.ts` fails on a call site that does not use it.
+ */
+export function modelSettings() {
+  return { model: getModel(), maxRetries: 0 } as const;
+}
+
+export function getModel() {
+  return resilientModel(baseModel(), {
+    timeoutMs: config.aiRequestTimeoutMs,
+    maxRetries: config.aiMaxRetries,
+  });
+}
+
+function baseModel() {
   const provider = process.env.AI_PROVIDER || "openai-compatible";
   // Checked before AI_MODEL: the stub has no model to name.
   if (provider === "stub") return stubModel();
@@ -34,8 +55,8 @@ export function getModel(): LanguageModel {
   }
 
   if (provider === "gateway") {
-    // The AI SDK treats a bare model id string as a gateway model reference.
-    return modelId;
+    // What a bare model id string resolves to; spelled out so it can be wrapped.
+    return gateway(modelId);
   }
 
   if (provider === "openai-compatible") {

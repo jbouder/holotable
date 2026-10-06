@@ -2,6 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import {
+  AI_ROUTE_MAX_DURATION_MS,
   cookieSecure,
   formatConfigProblems,
   validateConfig,
@@ -952,4 +953,43 @@ test("insecure session cookies warn in production, except in demo mode", () => {
     { production: true },
   );
   assert.deepEqual(demo, []);
+});
+
+test("AI_REQUEST_TIMEOUT_MS must be positive and AI_MAX_RETRIES 0 to 10", () => {
+  const bad = validateConfig(
+    { ...VALID_PRODUCTION, AI_REQUEST_TIMEOUT_MS: "0", AI_MAX_RETRIES: "11" },
+    { production: true },
+  );
+  assert.deepEqual(variables(errors(bad)).sort(), [
+    "AI_MAX_RETRIES",
+    "AI_REQUEST_TIMEOUT_MS",
+  ]);
+  assert.deepEqual(
+    validateConfig(
+      { ...VALID_PRODUCTION, AI_REQUEST_TIMEOUT_MS: "30000", AI_MAX_RETRIES: "0" },
+      { production: true },
+    ),
+    [],
+  );
+});
+
+test("a model deadline at or past the routes' maxDuration is a warning", () => {
+  const long = validateConfig(
+    { ...VALID_PRODUCTION, AI_REQUEST_TIMEOUT_MS: String(AI_ROUTE_MAX_DURATION_MS) },
+    { production: true },
+  );
+  assert.deepEqual(errors(long), []);
+  assert.deepEqual(variables(warnings(long)), ["AI_REQUEST_TIMEOUT_MS"]);
+});
+
+test("AI_ROUTE_MAX_DURATION_MS matches every model-backed route", () => {
+  for (const route of [
+    "src/app/api/generate/route.ts",
+    "src/app/api/sources/generate/route.ts",
+    "src/app/api/dashboards/[id]/chat/route.ts",
+  ]) {
+    const text = readFileSync(route, "utf8");
+    const seconds = Number(/export const maxDuration = (\d+);/.exec(text)?.[1]);
+    assert.equal(seconds * 1000, AI_ROUTE_MAX_DURATION_MS, route);
+  }
 });

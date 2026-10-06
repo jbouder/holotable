@@ -1,5 +1,5 @@
 import { type LanguageModelUsage, streamObject } from "ai";
-import { getModel } from "@/lib/ai/provider";
+import { modelSettings } from "@/lib/ai/provider";
 import { buildCatalogPrompt } from "@/lib/timescaledb/catalog";
 import {
   type Dashboard,
@@ -164,7 +164,7 @@ export function streamDashboard(input: {
 }) {
   const { source, prompt, onFinish } = input;
   return streamObject({
-    model: getModel(),
+    ...modelSettings(),
     onFinish: finish(onFinish),
     schema: DashboardGenerationSchema,
     schemaName: "Dashboard",
@@ -188,7 +188,7 @@ export function streamExplorePanel(input: {
 }) {
   const { source, prompt, onFinish } = input;
   return streamObject({
-    model: getModel(),
+    ...modelSettings(),
     onFinish: finish(onFinish),
     schema: ExplorePanel,
     schemaName: "Panel",
@@ -238,7 +238,7 @@ export function streamSourceDraft(input: {
       : `No 'secretRef' is granted to this workspace yet. Use "TS_METRICS"; the
   user will choose a granted one before creating the source.`;
   return streamObject({
-    model: getModel(),
+    ...modelSettings(),
     onFinish: finish(onFinish),
     schema: ModelSourceDraft,
     schemaName: "SourceDraft",
@@ -282,7 +282,7 @@ export function streamPanel(input: {
 }) {
   const { source, prompt, current, onFinish } = input;
   return streamObject({
-    model: getModel(),
+    ...modelSettings(),
     onFinish: finish(onFinish),
     schema: Panel,
     schemaName: "Panel",
@@ -311,7 +311,7 @@ export function streamDashboardRefinement(input: {
 }) {
   const { source, prompt, current, onFinish } = input;
   return streamObject({
-    model: getModel(),
+    ...modelSettings(),
     onFinish: finish(onFinish),
     schema: DashboardGenerationSchema,
     schemaName: "Dashboard",
