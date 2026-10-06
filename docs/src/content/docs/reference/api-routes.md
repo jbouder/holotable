@@ -65,7 +65,7 @@ hand.
 
 | Route | Method | Min role | Notes |
 | --- | --- | --- | --- |
-| `/api/generate` | POST | editor | Streams a validated dashboard, panel, or explore-panel spec. Authorized against the workspace owning the selected **source**. Refuses with a 400 when that source's catalog was never refreshed or names nothing that still exists. Rate limited and budgeted |
+| `/api/generate` | POST | editor | Streams a validated dashboard, panel, or explore-panel spec. Authorized against the workspace owning the selected **source**. Refuses with a 400 when that source's catalog was never refreshed or names nothing that still exists. Rate limited and budgeted. A first attempt carries `X-Generation-Id`; `{ "repairOf": id }` asks for its one [repair](/operations/ai-provider/#structured-output-repair), and is a 404 once taken or expired |
 | `/api/query` | POST | editor | One-shot guarded query for preview and Explore. `variables` carries the values a preview binds for `:name` references, only ever as parameters |
 | `/api/sql/validate` | POST | editor | Runs the SQL guard against a source's catalog without executing. Always `200`; the verdict is `{ ok, error? }`. `variables` names the dashboard's declared variables, which `:name` may reference |
 | `/api/sql/plan` | POST | editor | The statement exactly as the server would run it, without running it: the wrapped SQL, the bound parameters with what each was resolved from, the limits and the session statements. A refused statement is a `400` with the guard's message. See [Seeing what actually runs](/concepts/executing-a-panel/#seeing-what-actually-runs) |
@@ -79,7 +79,7 @@ hand.
 | --- | --- | --- | --- |
 | `/api/sources` | GET | viewer | List sources in a workspace, each with its catalog health. A source admin gets full records; anyone else gets a listing (id, name, schema, table count, status) with no connection details, `secret_ref` or catalog. `canManage` says which |
 | `/api/sources` | POST | source-admin | Create |
-| `/api/sources/generate` | POST | editor | Streams a validated `SourceDraft` — never credentials. Rate limited and budgeted |
+| `/api/sources/generate` | POST | editor | Streams a validated `SourceDraft` — never credentials. Rate limited and budgeted. Takes `{ "repairOf": id }` for the one [repair](/operations/ai-provider/#structured-output-repair), as `/api/generate` does |
 | `/api/sources/[id]` | GET | viewer | The full record for a source admin, the listing for anyone else |
 | `/api/sources/[id]` | PUT/DELETE | source-admin | Delete tombstones when referenced |
 | `/api/sources/[id]/catalog` | GET | viewer | The catalog browser's view: every column with its `exposed` flag for a source admin, exposed columns only for anyone else, plus catalog health |

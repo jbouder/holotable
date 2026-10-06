@@ -76,6 +76,7 @@ interface Instruments {
   pollersActive: Gauge<string>;
   llmTokens: Counter<"workspace" | "model" | "direction">;
   llmRequests: Counter<"route" | "outcome">;
+  llmRepairs: Counter<"route" | "outcome">;
   sqlRejections: Counter<"reason">;
   auditWriteFailures: Counter<string>;
   /** One set of seen values per bounded label, keyed `metric/label`. */
@@ -131,6 +132,12 @@ function build(): Instruments {
     llmRequests: new Counter({
       name: "holotable_llm_requests_total",
       help: "Model requests seen by the admission gate, by route and what the gate decided.",
+      labelNames: ["route", "outcome"],
+      registers: [registry],
+    }),
+    llmRepairs: new Counter({
+      name: "holotable_llm_repairs_total",
+      help: "Structured-output repairs (#21): one re-ask after a generation failed its schema, by route and whether the repaired output validated.",
       labelNames: ["route", "outcome"],
       registers: [registry],
     }),
@@ -250,6 +257,14 @@ export function recordLlmTokens(input: {
 /** Record what the LLM admission gate decided about one request. */
 export function recordLlmRequest(route: string, outcome: LlmRequestOutcome): void {
   instruments().llmRequests.inc({ route, outcome });
+}
+
+/** What became of one structured-output repair. */
+export type LlmRepairOutcome = "repaired" | "failed";
+
+/** Record one structured-output repair attempt and how it ended (#21). */
+export function recordLlmRepair(route: string, outcome: LlmRepairOutcome): void {
+  instruments().llmRepairs.inc({ route, outcome });
 }
 
 /** Record one statement refused by the SQL guard. */

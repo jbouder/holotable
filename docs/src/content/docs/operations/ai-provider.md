@@ -107,6 +107,41 @@ edit, source draft, dashboard chat), goes through the same model middleware
   request with its own deadline.
 - Every retry and every timeout is logged at `warn`.
 
+## Structured-output repair
+
+Every generation is bound to a schema (a dashboard, a panel, a source draft).
+When the finished output fails it, usually over a single field such as a `viz`
+that does not exist or a `timeField` that is not a column alias, the author
+gets **one** automatic repair instead of losing the turn
+([#21](https://github.com/jbouder/holotable/issues/21)):
+
+1. The first attempt streams to the browser as usual, and its response carries
+   an `X-Generation-Id` header.
+2. When the output fails the schema, the server works out why, against the
+   real schema, and holds the original request, the output and the issues for
+   five minutes, keyed by that id and by who asked.
+3. The browser sees the failure and asks the same route for
+   `{ "repairOf": "<id>" }`, showing "Fixing it automatically…".
+4. The server takes the held entry. Taking removes it, so there is one repair
+   per generation. It authorizes, rate limits and budgets the request again,
+   then re-asks the model with the original prompt plus the rejected output
+   and the issues, both [fenced as data](/architecture/invariants/). The repair
+   streams in place of the first answer.
+5. If the repair fails too, that failure is final, and the author sees it with
+   Try again.
+
+Nothing the repair acts on comes from the browser except the id: not the
+request, not the output, not the issues. A failure that was not about the
+output's shape (a provider error, a [timeout](#timeouts-and-retries)) is not
+repaired. The held entries live in the server process, which is single-instance
+by design, so a restart drops them and the author sees the failure and Try
+again, as before.
+
+Each repair is a second row in the generation log with `attempts = 2`, an
+audit row with `attempt: 2`, and a count in `holotable_llm_repairs_total`
+(`outcome` is `repaired` or `failed`; see [Prometheus
+metrics](/operations/metrics/)).
+
 ---
 
 *Last verified against the code at commit `4e4c5cf` (2026-10-05).*

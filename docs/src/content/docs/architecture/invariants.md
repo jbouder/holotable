@@ -13,6 +13,13 @@ conventions — a change that breaks one of them is a bug, not a trade-off.
 Only on author, create, or edit — never on view, and never on a poller tick.
 Viewing and ticking replay the stored spec.
 
+The one bounded exception is the [structured-output
+repair](/operations/ai-provider/#structured-output-repair): when an author
+action's output fails the schema, it gets **one** more model call that shows the
+model what was wrong, and that call's own failure is final. The repair is part
+of the same author action, never of a view, and it is rate limited, budgeted
+and logged (`attempts = 2`) like any other call.
+
 ## 2. The LLM emits a validated spec, never data
 
 `streamObject` is bound to the shared IR (`DashboardGenerationSchema`, which is
