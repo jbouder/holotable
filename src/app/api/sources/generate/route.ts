@@ -1,9 +1,18 @@
+import { randomUUID } from "node:crypto";
 import { z } from "zod";
-import { requireIdentity, assertAuthorized } from "@/lib/auth/authorize";
+import { requireIdentity, assertAuthorized, HttpError } from "@/lib/auth/authorize";
 import { readJson, route } from "@/lib/http";
 import { audit } from "@/lib/audit";
 import { type OnGenerationFinish, streamSourceDraft } from "@/lib/ai/generate";
 import { recordGeneration } from "@/lib/ai/log";
+import {
+  type Failure,
+  GENERATION_ID_HEADER,
+  NOTHING_TO_REPAIR,
+  rememberFailure,
+  takeFailure,
+} from "@/lib/ai/repair";
+import { recordLlmRepair } from "@/lib/metrics";
 import { enforceLlmLimits } from "@/lib/limits/llm";
 import { grantedRefs } from "@/lib/secret-refs";
 import { secretRefGrants } from "@/lib/secrets/credentials";
@@ -11,13 +20,20 @@ import { secretRefGrants } from "@/lib/secrets/credentials";
 export const runtime = "nodejs";
 export const maxDuration = 60;
 
-const Body = z.object({
+const DraftBody = z.object({
   workspaceId: z.string().min(1).max(128),
   prompt: z.string().min(1).max(4000),
 });
+type DraftBody = z.infer<typeof DraftBody>;
+
+/** The one automatic repair of a draft that failed its schema (#21). */
+const RepairBody = z.object({ repairOf: z.uuid() }).strict();
+
+const Body = z.union([RepairBody, DraftBody]);
 
 /**
- * Draft a data source from natural language. Runs the model exactly once and
+ * Draft a data source from natural language. Runs the model exactly once (plus
+ * the one repair, #21, for `{ repairOf }`) and
  * streams back a SourceDraft (safe connection config + table catalog, never
  * credentials or data) for the user to review before creating it.
  *
@@ -28,7 +44,20 @@ const Body = z.object({
  */
 export const POST = route("sources.draft", async (req: Request) => {
   const identity = await requireIdentity();
-  const body = await readJson(req, Body);
+  const input = await readJson(req, Body);
+
+  // A repair replays the original request from the store, and is authorized
+  // and limited again like any other.
+  let body: DraftBody;
+  let repair: Failure | undefined;
+  if ("repairOf" in input) {
+    const pending = takeFailure<DraftBody>(input.repairOf, identity.sub, "source-draft");
+    if (!pending) throw new HttpError(404, NOTHING_TO_REPAIR);
+    body = pending.request;
+    repair = pending.failure;
+  } else {
+    body = input;
+  }
 
   assertAuthorized(identity, "source:manage", {
     workspaceId: body.workspaceId,
@@ -43,8 +72,19 @@ export const POST = route("sources.draft", async (req: Request) => {
   // A source description is the prompt most likely to contain a pasted
   // connection string, which is exactly what the log's redaction pass is for.
   // There is no source yet, so no catalog was in context.
+  const generationId = repair ? null : randomUUID();
   const onFinish: OnGenerationFinish = (event) => {
     usage.record(event.usage);
+    const ok = !event.error && event.object !== undefined;
+    if (repair) recordLlmRepair("source-draft", ok ? "repaired" : "failed");
+    if (generationId && event.failure) {
+      rememberFailure(generationId, {
+        sub: identity.sub,
+        route: "source-draft",
+        request: body,
+        failure: event.failure,
+      });
+    }
     recordGeneration({
       workspaceId: body.workspaceId,
       createdBy: identity.sub,
@@ -55,6 +95,7 @@ export const POST = route("sources.draft", async (req: Request) => {
       spec: event.object,
       model: event.modelId,
       usage: event.usage,
+      attempts: repair ? 2 : 1,
       error: event.error,
     });
     audit({
@@ -62,7 +103,11 @@ export const POST = route("sources.draft", async (req: Request) => {
       action: "source.draft",
       workspaceId: body.workspaceId,
       outcome: event.error || !event.object ? "failure" : "success",
-      detail: { prompt: body.prompt, model: event.modelId },
+      detail: {
+        prompt: body.prompt,
+        model: event.modelId,
+        ...(repair ? { attempt: 2 } : {}),
+      },
     });
   };
 
@@ -70,6 +115,9 @@ export const POST = route("sources.draft", async (req: Request) => {
     prompt: body.prompt,
     grantedSecretRefs: grantedRefs(secretRefGrants(), body.workspaceId),
     onFinish,
+    repair,
   });
-  return result.toTextStreamResponse();
+  return result.toTextStreamResponse(
+    generationId ? { headers: { [GENERATION_ID_HEADER]: generationId } } : undefined,
+  );
 });

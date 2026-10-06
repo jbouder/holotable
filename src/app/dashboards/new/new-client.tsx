@@ -2,7 +2,6 @@
 
 import * as React from "react";
 import { useRouter } from "next/navigation";
-import { experimental_useObject as useObject } from "@ai-sdk/react";
 import {
   LayoutTemplate,
   Loader2,
@@ -34,6 +33,8 @@ import { PageHeader } from "@/components/ui/page-header";
 import { PreviewDashboard } from "@/components/dashboard/PreviewDashboard";
 import { GeneratingPanels } from "@/components/dashboard/GeneratingPanels";
 import { ErrorDisplay } from "@/components/ui/error-display";
+import { RepairingNote } from "@/components/repairing-note";
+import { useRepairingObject } from "@/components/use-repairing-object";
 import { type ApiError, apiErrorFromThrown, readApiError } from "@/lib/errors";
 import type { CatalogHealth } from "@/lib/catalog/health";
 import {
@@ -122,7 +123,7 @@ export function NewDashboardClient({
   const finalSpec = activeSpec(history);
   const refining = history.turns.length > 0;
 
-  const { object, submit, isLoading, error, stop } = useObject({
+  const { object, submit, isLoading, error, stop, repairing } = useRepairingObject({
     api: "/api/generate",
     schema: DashboardGenerationSchema,
     onFinish({ object }) {
@@ -448,6 +449,7 @@ export function NewDashboardClient({
                   )}
                 </div>
               )}
+              <RepairingNote show={repairing} />
               {error && (
                 <ErrorDisplay
                   error={apiErrorFromThrown(error)}

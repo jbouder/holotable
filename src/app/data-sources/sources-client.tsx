@@ -1,7 +1,6 @@
 "use client";
 
 import * as React from "react";
-import { experimental_useObject as useObject } from "@ai-sdk/react";
 import {
   Plus,
   Trash2,
@@ -38,6 +37,8 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { ErrorDisplay } from "@/components/ui/error-display";
+import { RepairingNote } from "@/components/repairing-note";
+import { useRepairingObject } from "@/components/use-repairing-object";
 import { FIRST_DASHBOARD_DOCS_URL } from "@/lib/onboarding";
 import { apiErrorFromThrown, readApiError } from "@/lib/errors";
 import { buildSourceDescriptionStarters } from "@/lib/prompts/starters";
@@ -629,7 +630,7 @@ function NaturalLanguageDrafter({
     () => buildSourceDescriptionStarters(existing),
     [existing],
   );
-  const { object, submit, isLoading, error, stop } = useObject({
+  const { object, submit, isLoading, error, stop, repairing } = useRepairingObject({
     api: "/api/sources/generate",
     schema: SourceDraft,
     onFinish({ object }) {
@@ -704,6 +705,7 @@ function NaturalLanguageDrafter({
           Stop
         </Button>
       )}
+      <RepairingNote show={repairing} />
       {error && (
         <ErrorDisplay
           error={apiErrorFromThrown(error)}

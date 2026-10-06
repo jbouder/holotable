@@ -115,7 +115,10 @@ an ordinary spec edit.
 
 `streamObject` streams the partial object to the client so the UI can render the
 spec as it forms. **The model runs exactly once per author action** — never on
-view, never on a refresh tick.
+view, never on a refresh tick. The one exception: output that fails the schema
+gets a single automatic repair, shown as "Fixing it automatically…" while it
+streams (see [Structured-output
+repair](/operations/ai-provider/#structured-output-repair)).
 
 ## Refining before the first save
 

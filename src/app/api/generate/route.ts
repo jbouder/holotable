@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import { z } from "zod";
 import { requireIdentity, assertAuthorized, HttpError } from "@/lib/auth/authorize";
 import { readJson, route } from "@/lib/http";
@@ -12,6 +13,14 @@ import {
 } from "@/lib/ai/generate";
 import { catalogHealth, catalogRefusal } from "@/lib/catalog/health";
 import { recordGeneration } from "@/lib/ai/log";
+import {
+  type Failure,
+  GENERATION_ID_HEADER,
+  NOTHING_TO_REPAIR,
+  rememberFailure,
+  takeFailure,
+} from "@/lib/ai/repair";
+import { recordLlmRepair } from "@/lib/metrics";
 import { buildCatalogPrompt } from "@/lib/timescaledb/catalog";
 import { enforceLlmLimits } from "@/lib/limits/llm";
 import { Panel } from "@/lib/ir";
@@ -20,7 +29,7 @@ import { StoredDashboard } from "@/lib/ir/upgrade";
 export const runtime = "nodejs";
 export const maxDuration = 60;
 
-const Body = z.discriminatedUnion("mode", [
+const GenerateBody = z.discriminatedUnion("mode", [
   z.object({
     mode: z.literal("dashboard"),
     sourceId: z.string().min(1),
@@ -45,9 +54,21 @@ const Body = z.discriminatedUnion("mode", [
     prompt: z.string().min(1).max(4000),
   }),
 ]);
+type GenerateBody = z.infer<typeof GenerateBody>;
 
 /**
- * Generate a dashboard/panel spec via the LLM. Runs the model exactly once.
+ * The one automatic repair of a generation whose output failed its schema
+ * (#21). It names the failed generation and nothing else: the request it
+ * repeats, and what was wrong, come from the server's own record.
+ */
+const RepairBody = z.object({ repairOf: z.uuid() }).strict();
+
+const Body = z.union([RepairBody, GenerateBody]);
+
+/**
+ * Generate a dashboard/panel spec via the LLM. Runs the model exactly once, or
+ * for `{ repairOf }` once more to repair a first attempt that failed its schema
+ * (#21), from the server's own record of that attempt.
  * Authorization: editor on the workspace that OWNS the selected source (the
  * workspace is derived from the trusted source record, never from the request).
  * Then the catalog is checked, and the workspace's rate limit and token budget
@@ -61,7 +82,20 @@ const Body = z.discriminatedUnion("mode", [
  */
 export const POST = route("generate", async (req: Request) => {
   const identity = await requireIdentity();
-  const body = await readJson(req, Body);
+  const input = await readJson(req, Body);
+
+  // A repair replays the original request from the store; everything below,
+  // authorization and the limits included, runs again for it as for any other.
+  let body: GenerateBody;
+  let repair: Failure | undefined;
+  if ("repairOf" in input) {
+    const pending = takeFailure<GenerateBody>(input.repairOf, identity.sub, "generate");
+    if (!pending) throw new HttpError(404, NOTHING_TO_REPAIR);
+    body = pending.request;
+    repair = pending.failure;
+  } else {
+    body = input;
+  }
 
   const source = await getSourceById(body.sourceId);
   if (!source || source.tombstonedAt) {
@@ -88,8 +122,22 @@ export const POST = route("generate", async (req: Request) => {
   // in context without keeping the text. Built here rather than handed back by
   // the stream: it is a pure function of the same trusted source record.
   const catalog = buildCatalogPrompt(source);
+  // Only a first attempt can be repaired, so only it gets an id.
+  const generationId = repair ? null : randomUUID();
   const onFinish: OnGenerationFinish = (event) => {
     usage.record(event.usage);
+    const ok = !event.error && event.object !== undefined;
+    if (repair) recordLlmRepair("generate", ok ? "repaired" : "failed");
+    // Held before the stream closes: onFinish runs ahead of the browser
+    // seeing the end, so the repair request it triggers finds the entry.
+    if (generationId && event.failure) {
+      rememberFailure(generationId, {
+        sub: identity.sub,
+        route: "generate",
+        request: body,
+        failure: event.failure,
+      });
+    }
     recordGeneration({
       workspaceId: source.workspaceId,
       createdBy: identity.sub,
@@ -100,6 +148,7 @@ export const POST = route("generate", async (req: Request) => {
       spec: event.object,
       model: event.modelId,
       usage: event.usage,
+      attempts: repair ? 2 : 1,
       error: event.error,
     });
     // The generation log keeps the redacted prompt and the spec; the audit
@@ -110,7 +159,12 @@ export const POST = route("generate", async (req: Request) => {
       workspaceId: source.workspaceId,
       resource: { type: "source", id: source.id },
       outcome: event.error || !event.object ? "failure" : "success",
-      detail: { mode: body.mode, prompt: body.prompt, model: event.modelId },
+      detail: {
+        mode: body.mode,
+        prompt: body.prompt,
+        model: event.modelId,
+        ...(repair ? { attempt: 2 } : {}),
+      },
     });
   };
 
@@ -118,17 +172,26 @@ export const POST = route("generate", async (req: Request) => {
   // an implicit `any`, which loses the streamObject result type here.
   const result =
     body.mode === "dashboard"
-      ? streamDashboard({ source, prompt: body.prompt, onFinish })
+      ? streamDashboard({ source, prompt: body.prompt, onFinish, repair })
       : body.mode === "dashboard-refine"
         ? streamDashboardRefinement({
             source,
             prompt: body.prompt,
             current: body.current,
             onFinish,
+            repair,
           })
         : body.mode === "explore"
-          ? streamExplorePanel({ source, prompt: body.prompt, onFinish })
-          : streamPanel({ source, prompt: body.prompt, current: body.current, onFinish });
+          ? streamExplorePanel({ source, prompt: body.prompt, onFinish, repair })
+          : streamPanel({
+              source,
+              prompt: body.prompt,
+              current: body.current,
+              onFinish,
+              repair,
+            });
 
-  return result.toTextStreamResponse();
+  return result.toTextStreamResponse(
+    generationId ? { headers: { [GENERATION_ID_HEADER]: generationId } } : undefined,
+  );
 });

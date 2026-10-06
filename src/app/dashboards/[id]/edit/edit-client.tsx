@@ -2,7 +2,6 @@
 
 import * as React from "react";
 import { useRouter } from "next/navigation";
-import { experimental_useObject as useObject } from "@ai-sdk/react";
 import {
   Plus,
   Save,
@@ -60,6 +59,8 @@ import { acceptedPanel, diffPanels, type PanelDraft } from "@/lib/panel-diff";
 import { missingSourceIds, panelsUsingSource, repointPanels } from "@/lib/panel-repoint";
 import { RepointPanelsDialog } from "@/components/dashboard/RepointPanelsDialog";
 import { ErrorDisplay } from "@/components/ui/error-display";
+import { RepairingNote } from "@/components/repairing-note";
+import { useRepairingObject } from "@/components/use-repairing-object";
 import { type ApiError, apiErrorFromThrown, readApiError } from "@/lib/errors";
 import { appendTemplate, type Template } from "@/lib/templates";
 import { SaveAsTemplate } from "@/components/templates/SaveAsTemplate";
@@ -265,7 +266,8 @@ export function EditDashboardClient({
     stop,
     isLoading,
     error: genError,
-  } = useObject({
+    repairing,
+  } = useRepairingObject({
     api: "/api/generate",
     schema: Panel,
     onFinish({ object }) {
@@ -1155,6 +1157,7 @@ export function EditDashboardClient({
                         )}
                       </Button>
                     </div>
+                    <RepairingNote show={repairing} />
                     {genError && (
                       <ErrorDisplay
                         error={apiErrorFromThrown(genError)}

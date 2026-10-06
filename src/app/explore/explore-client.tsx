@@ -2,7 +2,6 @@
 
 import * as React from "react";
 import Link from "next/link";
-import { experimental_useObject as useObject } from "@ai-sdk/react";
 import { Loader2, SendHorizontal, Compass, Save, ArrowUpRight } from "lucide-react";
 import {
   ExplorePanel,
@@ -24,6 +23,8 @@ import type { PanelData } from "@/components/charts/options";
 import { panelRenderer } from "@/components/panels/registry";
 import { useTimeDisplay } from "@/components/time-display";
 import { ErrorDisplay } from "@/components/ui/error-display";
+import { RepairingNote } from "@/components/repairing-note";
+import { useRepairingObject } from "@/components/use-repairing-object";
 import { type ApiError, apiErrorFromThrown } from "@/lib/errors";
 import { EMPTY_ROWS, runPanelQuery } from "@/lib/panel-query";
 import type { CatalogHealth } from "@/lib/catalog/health";
@@ -119,7 +120,7 @@ export function ExploreClient({
     );
   }, []);
 
-  const { object, submit, isLoading, error, stop } = useObject({
+  const { object, submit, isLoading, error, stop, repairing } = useRepairingObject({
     api: "/api/generate",
     schema: ExplorePanel,
     onFinish({ object }) {
@@ -289,6 +290,7 @@ export function ExploreClient({
               </Button>
             </div>
           )}
+          <RepairingNote show={repairing} />
           {error && (
             <ErrorDisplay
               error={apiErrorFromThrown(error)}

@@ -185,6 +185,12 @@ Important files:
   `streamObject`/`streamText` call spreads `...modelSettings()` from
   `provider.ts`, which also turns the SDK's own retry off;
   `test/ai-invoke.test.ts` fails on a call site that does not
+- `src/lib/ai/repair.ts` and `src/components/use-repairing-object.ts` — the
+  one automatic repair of output that failed its schema (#21). The browser
+  sends only `{ repairOf: id }`; the request, the rejected output and the
+  issues come from the server's process-local store, and taking an entry
+  removes it. A new generation surface uses `useRepairingObject`, not
+  `useObject`, and its route remembers failures the way `/api/generate` does
 - `src/lib/self-monitoring/` — the committed self-monitoring demo: the
   dashboard spec (also an IR snapshot), the source catalog, and the Prometheus
   text-format parser the collector uses. `test/self-monitoring.test.ts` holds

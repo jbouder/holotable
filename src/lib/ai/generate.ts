@@ -1,4 +1,6 @@
 import { type LanguageModelUsage, streamObject } from "ai";
+import type { z } from "zod";
+import { describeFailure, type Failure, repairPrompt } from "@/lib/ai/repair";
 import { modelSettings } from "@/lib/ai/provider";
 import { buildCatalogPrompt } from "@/lib/timescaledb/catalog";
 import {
@@ -16,8 +18,12 @@ import { ModelSourceDraft, type SourceRecord } from "@/lib/registry";
  * LLM generation.
  *
  * The model runs EXACTLY ONCE per author action (create / refine a turn / full
- * edit / single panel NL edit) and only ever emits a validated spec conforming
- * to the shared Zod IR — never data. The prompt contains catalog METADATA for the single
+ * edit / single panel NL edit), plus at most one repair when that run's output
+ * fails its schema (#21, ./repair.ts). Each function takes the failure to
+ * repair as `repair`; the rest of the prompt is unchanged.
+ *
+ * The model only ever emits a validated spec conforming to the shared Zod IR —
+ * never data. The prompt contains catalog METADATA for the single
  * selected, already-authorized source. The model must not write time filters;
  * the server injects the dashboard time range at execution.
  */
@@ -38,6 +44,17 @@ export interface GenerationFinish {
   error: unknown;
   /** The model the provider says answered, which can be more specific than AI_MODEL. */
   modelId: string;
+  /**
+   * Why the output failed the schema, worked out here against the schema the
+   * call used; null on success or when the failure was not the output's shape.
+   * What a repair (#21) is built from.
+   */
+  failure: Failure | null;
+}
+
+/** The prompt, or the repair prompt built on it when this run is a repair (#21). */
+function withRepair(repair: Failure | undefined, prompt: string): string {
+  return repair ? repairPrompt(prompt, repair) : prompt;
 }
 
 /**
@@ -47,7 +64,7 @@ export interface GenerationFinish {
 export type OnGenerationFinish = (event: GenerationFinish) => void;
 
 /** Adapt `streamObject`'s finish event to {@link GenerationFinish}. */
-function finish(onFinish: OnGenerationFinish | undefined) {
+function finish(onFinish: OnGenerationFinish | undefined, schema: z.ZodType) {
   return (event: {
     object: unknown;
     usage: LanguageModelUsage;
@@ -59,6 +76,7 @@ function finish(onFinish: OnGenerationFinish | undefined) {
       usage: event.usage,
       error: event.error,
       modelId: event.response.modelId ?? "",
+      failure: event.object === undefined ? describeFailure(event.error, schema) : null,
     });
 }
 
@@ -161,17 +179,22 @@ export function streamDashboard(input: {
   source: SourceRecord;
   prompt: string;
   onFinish?: OnGenerationFinish;
+  /** Set when this run repairs a failed one (#21). */
+  repair?: Failure;
 }) {
-  const { source, prompt, onFinish } = input;
+  const { source, prompt, onFinish, repair } = input;
   return streamObject({
     ...modelSettings(),
-    onFinish: finish(onFinish),
+    onFinish: finish(onFinish, DashboardGenerationSchema),
     schema: DashboardGenerationSchema,
     schemaName: "Dashboard",
     schemaDescription: "A monitoring dashboard specification (viz spec, not data).",
     system: baseSystem(source),
-    prompt: `Create a dashboard for this request:\n"""${prompt}"""\n
+    prompt: withRepair(
+      repair,
+      `Create a dashboard for this request:\n"""${prompt}"""\n
 Use refreshIntervalMs=${config.defaultRefreshIntervalMs} and timeRange {from:"${config.defaultTimeFrom}", to:"${config.defaultTimeTo}"} unless the request clearly implies otherwise.`,
+    ),
   });
 }
 
@@ -185,16 +208,20 @@ export function streamExplorePanel(input: {
   source: SourceRecord;
   prompt: string;
   onFinish?: OnGenerationFinish;
+  /** Set when this run repairs a failed one (#21). */
+  repair?: Failure;
 }) {
-  const { source, prompt, onFinish } = input;
+  const { source, prompt, onFinish, repair } = input;
   return streamObject({
     ...modelSettings(),
-    onFinish: finish(onFinish),
+    onFinish: finish(onFinish, ExplorePanel),
     schema: ExplorePanel,
     schemaName: "Panel",
     schemaDescription: "A single panel specification (viz spec, not data).",
     system: baseSystem(source),
-    prompt: `Answer this question with a SINGLE panel:
+    prompt: withRepair(
+      repair,
+      `Answer this question with a SINGLE panel:
 """${prompt}"""
 
 Return one Panel. Give it a concise title, use id "explore", and set layout to
@@ -208,6 +235,7 @@ Viz selection (IMPORTANT — default to text/tabular output):
   request explicitly asks to chart/plot/graph/visualize the data or to see a
   trend over time. Use "pie"/"donut" for share/proportion/breakdown questions
   across a small set of categories.`,
+    ),
   });
 }
 
@@ -229,8 +257,10 @@ export function streamSourceDraft(input: {
   prompt: string;
   grantedSecretRefs: readonly string[];
   onFinish?: OnGenerationFinish;
+  /** Set when this run repairs a failed one (#21). */
+  repair?: Failure;
 }) {
-  const { prompt, grantedSecretRefs, onFinish } = input;
+  const { prompt, grantedSecretRefs, onFinish, repair } = input;
   const refRule =
     grantedSecretRefs.length > 0
       ? `'secretRef' MUST be one of: ${grantedSecretRefs.map((r) => JSON.stringify(r)).join(", ")}.
@@ -239,7 +269,7 @@ export function streamSourceDraft(input: {
   user will choose a granted one before creating the source.`;
   return streamObject({
     ...modelSettings(),
-    onFinish: finish(onFinish),
+    onFinish: finish(onFinish, ModelSourceDraft),
     schema: ModelSourceDraft,
     schemaName: "SourceDraft",
     schemaDescription:
@@ -270,7 +300,10 @@ Field rules:
   column when there is one (used for server-injected time filtering). If the
   user names no tables/columns, emit a single reasonable placeholder table so
   the draft validates — the user will Refresh it against the live database.`,
-    prompt: `Draft a data source for this description:\n"""${prompt}"""`,
+    prompt: withRepair(
+      repair,
+      `Draft a data source for this description:\n"""${prompt}"""`,
+    ),
   });
 }
 
@@ -279,20 +312,25 @@ export function streamPanel(input: {
   prompt: string;
   current: Panel;
   onFinish?: OnGenerationFinish;
+  /** Set when this run repairs a failed one (#21). */
+  repair?: Failure;
 }) {
-  const { source, prompt, current, onFinish } = input;
+  const { source, prompt, current, onFinish, repair } = input;
   return streamObject({
     ...modelSettings(),
-    onFinish: finish(onFinish),
+    onFinish: finish(onFinish, Panel),
     schema: Panel,
     schemaName: "Panel",
     schemaDescription: "A single dashboard panel specification (viz spec, not data).",
     system: baseSystem(source),
-    prompt: `Here is the current panel spec:
+    prompt: withRepair(
+      repair,
+      `Here is the current panel spec:
 ${JSON.stringify(current, null, 2)}
 
 Apply this change and return the full updated panel (keep the same "id"):
 """${prompt}"""`,
+    ),
   });
 }
 
@@ -308,16 +346,20 @@ export function streamDashboardRefinement(input: {
   prompt: string;
   current: Dashboard;
   onFinish?: OnGenerationFinish;
+  /** Set when this run repairs a failed one (#21). */
+  repair?: Failure;
 }) {
-  const { source, prompt, current, onFinish } = input;
+  const { source, prompt, current, onFinish, repair } = input;
   return streamObject({
     ...modelSettings(),
-    onFinish: finish(onFinish),
+    onFinish: finish(onFinish, DashboardGenerationSchema),
     schema: DashboardGenerationSchema,
     schemaName: "Dashboard",
     schemaDescription: "A monitoring dashboard specification (viz spec, not data).",
     system: baseSystem(source),
-    prompt: `Here is the current dashboard spec:
+    prompt: withRepair(
+      repair,
+      `Here is the current dashboard spec:
 ${JSON.stringify(forGeneration(current), null, 2)}
 
 Apply this change and return the FULL updated dashboard:
@@ -326,5 +368,6 @@ Apply this change and return the FULL updated dashboard:
 Carry over every panel the request does not mention, unchanged and with the same
 "id". Keep "title", "timeRange" and "refreshIntervalMs" unless the request asks
 to change them.`,
+    ),
   });
 }
