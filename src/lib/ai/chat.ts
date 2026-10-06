@@ -7,7 +7,7 @@ import {
   type UIMessage,
 } from "ai";
 import { z } from "zod";
-import { getModel } from "@/lib/ai/provider";
+import { modelSettings } from "@/lib/ai/provider";
 import { renderCatalog } from "@/lib/timescaledb/catalog";
 import { fenceUntrustedBlock, sanitizePromptField } from "@/lib/ai/untrusted";
 import { SQL_RULES } from "@/lib/ai/generate";
@@ -290,7 +290,7 @@ export async function streamDashboardChat(input: {
   const modelMessages = await convertToModelMessages(messages);
 
   return streamText({
-    model: getModel(),
+    ...modelSettings(),
     system: buildSystemPrompt(dashboard, sources),
     messages: modelMessages,
     stopWhen: stepCountIs(MAX_STEPS),

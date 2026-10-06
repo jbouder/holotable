@@ -172,6 +172,21 @@ export const config = {
   aiModel: str("AI_MODEL", ""),
 
   /**
+   * The deadline for one model request, retries and backoff waits included
+   * (#22). Keep it below the generate and chat routes' 60s `maxDuration`, or
+   * the platform cuts the response first, with no error. Documented default:
+   * 45s.
+   */
+  aiRequestTimeoutMs: num("AI_REQUEST_TIMEOUT_MS", 45_000),
+  /**
+   * How many times a model request is retried after a transient provider
+   * failure (429, 5xx, a dropped connection), with jittered exponential
+   * backoff. A 401 or 404 is never retried. `0` disables retrying. Documented
+   * default: 2.
+   */
+  aiMaxRetries: num("AI_MAX_RETRIES", 2),
+
+  /**
    * Model requests per minute allowed per user in a workspace, on every
    * LLM-backed route (generate, source draft, dashboard chat). A token bucket:
    * this is both the sustained rate and the burst size. `0` disables the
@@ -340,6 +355,13 @@ const httpUrl = (what: string) =>
     error: `must be an absolute http(s) URL (${what})`,
   });
 
+/**
+ * The `maxDuration` of the model-backed routes (`/api/generate`,
+ * `/api/sources/generate`, the dashboard chat), in milliseconds.
+ * `test/config.test.ts` holds it to the routes.
+ */
+export const AI_ROUTE_MAX_DURATION_MS = 60_000;
+
 const positiveInt = z.coerce
   .number({ error: "must be a positive integer" })
   .int("must be a positive integer")
@@ -443,6 +465,14 @@ const EnvSchema = z.object({
   ),
   OPENAI_API_KEY: blank(z.string()),
   AI_GATEWAY_API_KEY: blank(z.string()),
+  AI_REQUEST_TIMEOUT_MS: blank(positiveInt),
+  AI_MAX_RETRIES: blank(
+    z.coerce
+      .number({ error: "must be an integer from 0 to 10 (0 disables retrying)" })
+      .int("must be an integer from 0 to 10 (0 disables retrying)")
+      .min(0, "must be an integer from 0 to 10 (0 disables retrying)")
+      .max(10, "must be an integer from 0 to 10 (0 disables retrying)"),
+  ),
   LLM_RATE_PER_MINUTE: blank(nonNegativeInt),
   LLM_DAILY_TOKEN_BUDGET: blank(nonNegativeInt),
 
@@ -685,6 +715,19 @@ export function validateConfig(
   }
   if (provider === "gateway" && values.OPENAI_API) {
     warning("OPENAI_API", "is ignored when AI_PROVIDER is gateway.");
+  }
+
+  // The generate and chat routes export `maxDuration = 60`; past it the
+  // platform ends the response with no error, so a deadline that long never
+  // gets to report a timeout.
+  if (
+    values.AI_REQUEST_TIMEOUT_MS !== undefined &&
+    values.AI_REQUEST_TIMEOUT_MS >= AI_ROUTE_MAX_DURATION_MS
+  ) {
+    warning(
+      "AI_REQUEST_TIMEOUT_MS",
+      `is ${values.AI_REQUEST_TIMEOUT_MS}; the generate and chat routes end at ${AI_ROUTE_MAX_DURATION_MS}ms, so a hung model would be cut off without an error. Set it below that, e.g. 45000.`,
+    );
   }
 
   // --- LLM limits ---------------------------------------------------------

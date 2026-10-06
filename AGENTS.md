@@ -180,6 +180,11 @@ Important files:
   base64/hex runs), the catalog is kept as a hash rather than as text, and a
   write that fails is dropped rather than failing the generation. The only
   reader is `GET /api/generation-log`, behind `source:manage`
+- `src/lib/ai/invoke.ts` — the deadline and jittered retry on every model
+  request (#22), as a model middleware `getModel()` applies. A new
+  `streamObject`/`streamText` call spreads `...modelSettings()` from
+  `provider.ts`, which also turns the SDK's own retry off;
+  `test/ai-invoke.test.ts` fails on a call site that does not
 - `src/lib/self-monitoring/` — the committed self-monitoring demo: the
   dashboard spec (also an IR snapshot), the source catalog, and the Prometheus
   text-format parser the collector uses. `test/self-monitoring.test.ts` holds

@@ -70,11 +70,42 @@ suite sets both.
 - Every model-backed route is rate limited per user and budgeted per
   workspace per day ([#18](https://github.com/jbouder/holotable/issues/18));
   see [LLM rate limits and budgets](/operations/llm-limits/).
-- There is **no timeout, retry, or fallback model**
-  ([#22](https://github.com/jbouder/holotable/issues/22)); a provider 429 ends
-  the author action.
+- Every model request has a deadline and a bounded retry
+  ([#22](https://github.com/jbouder/holotable/issues/22)); see
+  [Timeouts and retries](#timeouts-and-retries) below. There is no fallback
+  model.
 - `AI_MODEL` is also surfaced read-only in the UI so users can see which model
   produced their specs.
+
+## Timeouts and retries
+
+Every request to the provider, from every surface (generate, Explore, panel
+edit, source draft, dashboard chat), goes through the same model middleware
+(`src/lib/ai/invoke.ts`):
+
+| Variable | Default | What it does |
+|---|---|---|
+| `AI_REQUEST_TIMEOUT_MS` | `45000` | The deadline for one model request, **retries and waits included**. A provider that hangs, before its first byte or partway through a stream, is cut off here with "The model did not finish within …ms" instead of at the route's 60s `maxDuration`, where the platform would end the response with no error. A value of 60000 or more is a startup warning. |
+| `AI_MAX_RETRIES` | `2` | Retries after a transient failure, `0` to `10`. `0` turns retrying off. |
+
+- **What is retried**: whatever the provider marks transient, which is a 408,
+  409, 429 or 5xx response, or a dropped connection. A 400, 401, 403 or 404,
+  or a schema the model does not support, fails at once.
+- **Backoff**: full jitter, a random wait under a ceiling that starts at 500ms
+  and doubles per retry, up to 8s. A `retry-after` or `retry-after-ms` header
+  from the provider is honored instead.
+- **Giving up early**: if the next wait would end past the deadline, the
+  request fails immediately with the provider's own error rather than
+  sleeping into a timeout.
+- **What surfaces**: after the last retry, the provider's own error, not a
+  wrapper, so the generation log and audit row record what the provider
+  said.
+- **Only before output starts**: a stream that breaks after the first chunk
+  is not retried. Its partial output has already reached the browser, and a
+  second attempt would be a different answer.
+- In the dashboard chat, each model step (one per tool call) is its own
+  request with its own deadline.
+- Every retry and every timeout is logged at `warn`.
 
 ---
 
