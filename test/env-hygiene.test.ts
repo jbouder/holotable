@@ -2,12 +2,15 @@ import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import { test } from "node:test";
-import { PROVIDER_VARIABLE_PREFIXES, unsetEmptyProviderVariables } from "@/lib/env-hygiene";
+import {
+  PROVIDER_VARIABLE_PREFIXES,
+  unsetEmptyProviderVariables,
+} from "@/lib/env-hygiene";
 
 /** An empty provider variable means unset, for the SDKs as well (#350). */
 
 test("empty provider variables are dropped, declared ones and other families kept", () => {
-  const env: NodeJS.ProcessEnv = {
+  const env: Record<string, string | undefined> = {
     OPENAI_BASE_URL: "",
     OPENAI_API_KEY: "",
     OPENAI_API: "chat",

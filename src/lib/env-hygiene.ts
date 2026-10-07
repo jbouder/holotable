@@ -24,7 +24,9 @@ export const PROVIDER_VARIABLE_PREFIXES = ["OPENAI_", "AI_"] as const;
  * Delete every provider variable whose value is the empty string, and return
  * the names that were dropped, for a log line.
  */
-export function unsetEmptyProviderVariables(env: NodeJS.ProcessEnv = process.env): string[] {
+export function unsetEmptyProviderVariables(
+  env: Record<string, string | undefined> = process.env,
+): string[] {
   const dropped: string[] = [];
   for (const name of Object.keys(env)) {
     if (!PROVIDER_VARIABLE_PREFIXES.some((prefix) => name.startsWith(prefix))) continue;
