@@ -19,9 +19,11 @@ import { cn } from "@/lib/utils";
  *
  * Rendered through {@link DashboardGrid} on purpose: the arranger and the
  * viewer share one renderer, so what an author drags into place is what the
- * dashboard shows. The tiles are placeholders, not live panels — this surface
- * is about position, and running every query again on every drag frame is not
- * what it is for.
+ * dashboard shows. By default the tiles are placeholders; the editor's canvas
+ * (#357) passes `renderBody` to draw each panel itself under the handle. The
+ * body is keyed by panel id like any other grid cell, so a drag moves the
+ * chart's card and never recreates the chart, and it is `inert`: the handle
+ * on top is the one control a pointer or a Tab reaches.
  *
  * A drag previews locally and commits once on release, so the spec sees one
  * change per gesture rather than one per pointer move (#81).
@@ -54,6 +56,9 @@ export function PanelLayoutGrid({
   onSelect,
   onChange,
   onDelete,
+  renderBody,
+  rowHeight = ARRANGE_ROW_HEIGHT,
+  empty,
 }: {
   panels: Panel[];
   selectedId?: string | null;
@@ -61,6 +66,12 @@ export function PanelLayoutGrid({
   onChange: (panels: Panel[]) => void;
   /** Delete or Backspace on a focused tile (#77). Absent, the keys do nothing. */
   onDelete?: (id: string) => void;
+  /** What to draw under each tile's handle; absent, the tile names the panel. */
+  renderBody?: (panel: Panel) => React.ReactNode;
+  /** Grid row height in pixels; the drag math measures cells with the same value. */
+  rowHeight?: number;
+  /** Replaces the default "No panels yet" line. */
+  empty?: React.ReactNode;
 }) {
   const container = React.useRef<HTMLDivElement>(null);
   const [drag, setDrag] = React.useState<Drag | null>(null);
@@ -85,7 +96,7 @@ export function PanelLayoutGrid({
       fromX: e.clientX,
       fromY: e.clientY,
       layout: panel.layout,
-      step: cellStep(width),
+      step: cellStep(width, rowHeight),
     });
   }
 
@@ -138,6 +149,7 @@ export function PanelLayoutGrid({
   }
 
   if (panels.length === 0) {
+    if (empty) return empty;
     return (
       <p className="py-6 text-center text-sm text-muted">
         No panels yet. Add one to arrange it here.
@@ -156,15 +168,21 @@ export function PanelLayoutGrid({
         <DashboardGrid
           panels={shown}
           responsive={false}
-          rowHeight={ARRANGE_ROW_HEIGHT}
+          rowHeight={rowHeight}
           // The displaced tiles slide as the dragged one pushes them; the
           // dragged tile itself snaps with the pointer (#237).
           pinnedId={drag?.id ?? null}
           renderPanel={(panel) => {
             const { x, y, w, h } = panel.layout;
             const active = drag?.id === panel.id;
+            const selected = panel.id === selectedId;
             return (
               <div className="relative h-full">
+                {renderBody && (
+                  <div inert className="pointer-events-none h-full">
+                    {renderBody(panel)}
+                  </div>
+                )}
                 <button
                   type="button"
                   aria-label={`${panel.title}, column ${x + 1}, row ${y + 1}, ${w} of 12 wide, ${h} rows tall. Arrow keys move, shift and arrow keys resize${onDelete ? ", Delete removes" : ""}.`}
@@ -174,20 +192,33 @@ export function PanelLayoutGrid({
                   onPointerCancel={(e) => end(e, false)}
                   onKeyDown={(e) => nudge(e, panel, "move")}
                   onClick={() => onSelect?.(panel.id)}
+                  aria-pressed={renderBody ? selected : undefined}
                   className={cn(
-                    "absolute inset-0 flex touch-none select-none flex-col items-start gap-0.5 overflow-hidden border p-2 text-left transition-colors",
+                    "absolute inset-0 flex touch-none select-none flex-col items-start gap-0.5 overflow-hidden text-left transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary",
                     active ? "cursor-grabbing" : "cursor-grab",
-                    panel.id === selectedId
-                      ? "border-primary bg-surface-2"
-                      : "border-border bg-surface hover:bg-surface-2",
+                    renderBody
+                      ? // Over a live panel the handle is only an outline.
+                        selected
+                        ? "ring-2 ring-primary ring-inset"
+                        : "hover:ring-1 hover:ring-primary/60 hover:ring-inset"
+                      : cn(
+                          "border p-2",
+                          selected
+                            ? "border-primary bg-surface-2"
+                            : "border-border bg-surface hover:bg-surface-2",
+                        ),
                   )}
                 >
-                  <span className="w-full truncate text-xs font-medium">
-                    {panel.title}
-                  </span>
-                  <span className="text-[10px] text-muted">
-                    {panel.viz} · {w}×{h}
-                  </span>
+                  {!renderBody && (
+                    <>
+                      <span className="w-full truncate text-xs font-medium">
+                        {panel.title}
+                      </span>
+                      <span className="text-[10px] text-muted">
+                        {panel.viz} · {w}×{h}
+                      </span>
+                    </>
+                  )}
                 </button>
                 <button
                   type="button"
@@ -197,7 +228,7 @@ export function PanelLayoutGrid({
                   onPointerUp={(e) => end(e, true)}
                   onPointerCancel={(e) => end(e, false)}
                   onKeyDown={(e) => nudge(e, panel, "resize")}
-                  className="absolute bottom-0 right-0 h-4 w-4 cursor-se-resize touch-none border-b-2 border-r-2 border-muted hover:border-primary"
+                  className="absolute bottom-0 right-0 z-10 h-4 w-4 cursor-se-resize touch-none border-b-2 border-r-2 border-muted hover:border-primary"
                 />
               </div>
             );
