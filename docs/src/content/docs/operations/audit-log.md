@@ -21,13 +21,13 @@ configure.
 | `auth.logout` | Sign-out with a session that still verifies | — |
 | `auth.backchannel_logout` | The realm ends sessions (actor kind `realm`) | — |
 | `authz.denied` | Any `assertAuthorized` refusal. `detail` names the `permission` and `route` | what was being acted on, when the route knows |
-| `dashboard.create` | Create, import (`via: "import"`), duplicate (`via: "duplicate"`) | dashboard |
+| `dashboard.create` | Create, import (`via: "import"`), duplicate (`via: "duplicate"`), or an MCP client's `save_dashboard` (`via: "mcp"`) | dashboard |
 | `dashboard.update` | Save, rename or metadata edit (`fields`), restore (`restoredFrom`) | dashboard |
 | `dashboard.delete` | Delete | dashboard |
 | `dashboard.stream` | A viewer opens or resumes a dashboard's live stream | dashboard |
 | `dashboard.generate` | A generation finishes, or fails | source |
 | `dashboard.chat` | A chat turn starts | dashboard |
-| `query.execute` | A statement run from preview or Explore (`via: "preview"`) or by a chat (`via: "chat"`) | source |
+| `query.execute` | A statement run from preview or Explore (`via: "preview"`), by a chat (`via: "chat"`) or by an MCP client's `run_query` (`via: "mcp"`) | source |
 | `source.create`, `source.update`, `source.delete` | Source changes, including hiding a column (`fields: ["catalog"]`) | source |
 | `source.test`, `source.refresh`, `source.discover`, `source.draft` | Connection test, applied catalog refresh, table discovery, drafted source | source, or — before one exists |
 | `template.create`, `template.delete` | Workspace templates | template |

@@ -182,10 +182,10 @@ A realm token is a credential for `/api/mcp` and nothing else. No other route
 reads one: `getIdentity()` knows only the session cookie and `ht_` tokens,
 and a token minted for the MCP client put in the session cookie is refused
 by `azp` even though the realm's keys verify it. The MCP route in turn reads
-no cookie, so a browser page cannot reach it with a session. Until the tools
-arrive ([#148](https://github.com/jbouder/holotable/issues/148)), an
-authenticated `GET /api/mcp` answers with the caller's own identity, the way
-`/api/me` does, so a configuration can be checked end to end:
+no cookie, so a browser page cannot reach it with a session. What the tools do
+is on the [MCP server](/operations/mcp/) page. An authenticated `GET /api/mcp`
+answers with the caller's own identity, the way `/api/me` does, so a
+configuration can be checked end to end:
 
 ```bash
 curl -sS http://localhost:3000/api/mcp -H "Authorization: Bearer $TOKEN"

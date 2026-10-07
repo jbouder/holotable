@@ -54,6 +54,6 @@ checks the reference's lists of panel kinds, value formats and color tokens
 against the code. A change to the IR or the guard that the skill no longer
 describes fails the build.
 
-Connecting an agent to a running Holotable (listing sources, running a query,
-saving a dashboard) is a separate piece of work: the MCP server,
-[#148](https://github.com/jbouder/holotable/issues/148).
+Connecting an agent to a running Holotable — listing sources, validating and
+running a query, saving a dashboard — is the [MCP server](/operations/mcp/),
+which the same client reaches at `/api/mcp` after signing in to the realm.
