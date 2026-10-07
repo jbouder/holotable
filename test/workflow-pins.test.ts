@@ -26,15 +26,14 @@ function files(): string[] {
 }
 
 function usesLines(): { file: string; line: number; ref: string }[] {
-  return files()
-    .flatMap((file) => {
-      return readFileSync(file, "utf8")
-        .split("\n")
-        .flatMap((text, i) => {
-          const match = /^\s*(?:-\s+)?uses:\s*(.+?)\s*$/.exec(text);
-          return match ? [{ file, line: i + 1, ref: match[1] }] : [];
-        });
-    });
+  return files().flatMap((file) => {
+    return readFileSync(file, "utf8")
+      .split("\n")
+      .flatMap((text, i) => {
+        const match = /^\s*(?:-\s+)?uses:\s*(.+?)\s*$/.exec(text);
+        return match ? [{ file, line: i + 1, ref: match[1] }] : [];
+      });
+  });
 }
 
 test("the workflows use at least one action, and so does the setup action", () => {
