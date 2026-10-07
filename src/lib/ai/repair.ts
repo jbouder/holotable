@@ -30,7 +30,7 @@ export { GENERATION_ID_HEADER } from "@/lib/ai/generation-id";
 
 /** The 404 a repair request gets when there is nothing (left) to repair. */
 export const NOTHING_TO_REPAIR =
-  "That generation can no longer be repaired. Generate again.";
+  "There is no failed answer to repair: it expired, or the model never finished one. Generate again.";
 
 /** How long a failed generation can still be repaired. */
 export const FAILURE_TTL_MS = 5 * 60_000;

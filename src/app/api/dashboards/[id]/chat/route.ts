@@ -1,5 +1,7 @@
 import { z } from "zod";
-import type { UIMessage } from "ai";
+import { ModelTimeoutError } from "@/lib/ai/invoke";
+import { providerHttpError } from "@/lib/ai/provider-error";
+import { APICallError, type UIMessage } from "ai";
 import { requireIdentity, assertAuthorized, HttpError } from "@/lib/auth/authorize";
 import { json, readJson, route } from "@/lib/http";
 import { audit } from "@/lib/audit";
@@ -150,6 +152,13 @@ export const POST = route("dashboards.chat", async (req: Request, ctx: RoutePara
 
   return result.toUIMessageStreamResponse({
     originalMessages: incoming,
+    // The SDK's default says only "An error occurred." A provider failure
+    // names the setting to fix instead (#337); anything else keeps the
+    // default's reticence, since its message could be anything.
+    onError: (error) =>
+      APICallError.isInstance(error) || error instanceof ModelTimeoutError
+        ? providerHttpError(error).message
+        : "Something went wrong while answering. Try again.",
     onEnd: async ({ messages }) => {
       try {
         await appendChatMessages({
