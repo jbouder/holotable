@@ -311,7 +311,34 @@ function sources(dir: string): string[] {
   });
 }
 
-test("every model call spreads modelSettings(), so the SDK's retry stays off", () => {
+/** The text of the object literal that opens at `start` (a `{`), braces balanced. */
+function objectAt(text: string, start: number): string {
+  let depth = 0;
+  for (let i = start; i < text.length; i++) {
+    if (text[i] === "{") depth++;
+    else if (text[i] === "}" && --depth === 0) return text.slice(start, i + 1);
+  }
+  return text.slice(start);
+}
+
+/** Whether `object` sets `key` itself, rather than in an object nested in it. */
+function setsOwnKey(object: string, key: string): boolean {
+  let depth = 0;
+  for (let i = 0; i < object.length; i++) {
+    if (object[i] === "{") depth++;
+    else if (object[i] === "}") depth--;
+    else if (
+      depth === 1 &&
+      object.startsWith(`${key}:`, i) &&
+      !/\w/.test(object[i - 1])
+    ) {
+      return true;
+    }
+  }
+  return false;
+}
+
+test("every model call spreads modelSettings(), so the SDK's retry stays off and its errors are logged", () => {
   const offenders: string[] = [];
   let calls = 0;
   for (const file of sources(join(process.cwd(), "src"))) {
@@ -320,14 +347,25 @@ test("every model call spreads modelSettings(), so the SDK's retry stays off", (
       /\b(streamObject|streamText|generateObject|generateText)\(\{/g,
     )) {
       calls++;
+      const where = `${file.slice(process.cwd().length + 1)}: ${match[1]}`;
       // The options object opens at the match; modelSettings() must be in it
       // before its first nested object closes the call's first lines.
       const head = text.slice(match.index, match.index + 200);
-      if (!head.includes("...modelSettings()")) {
-        offenders.push(`${file.slice(process.cwd().length + 1)}: ${match[1]}`);
-      }
+      if (!head.includes("...modelSettings()")) offenders.push(where);
+      // Its own onError would replace the one that logs through the redacting
+      // log, and the SDK's raw dump never comes back, but neither does the
+      // log line (#343).
+      const options = objectAt(text, match.index + match[0].length - 1);
+      if (setsOwnKey(options, "onError")) offenders.push(`${where} replaces onError`);
     }
   }
   assert.ok(calls >= 6, `found only ${calls} model calls; has the scan broken?`);
   assert.deepEqual(offenders, []);
+});
+
+test("the scan sees an onError the call sets, and not one nested in it", () => {
+  const own = "streamText({ ...modelSettings(), onError: () => {} })";
+  const nested = "streamText({ ...modelSettings(), tools: { x: { onError: 1 } } })";
+  assert.equal(setsOwnKey(objectAt(own, own.indexOf("{")), "onError"), true);
+  assert.equal(setsOwnKey(objectAt(nested, nested.indexOf("{")), "onError"), false);
 });

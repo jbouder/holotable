@@ -189,8 +189,10 @@ Important files:
 - `src/lib/ai/invoke.ts` — the deadline and jittered retry on every model
   request (#22), as a model middleware `getModel()` applies. A new
   `streamObject`/`streamText` call spreads `...modelSettings()` from
-  `provider.ts`, which also turns the SDK's own retry off;
-  `test/ai-invoke.test.ts` fails on a call site that does not
+  `provider.ts`, which also turns the SDK's own retry off and carries the
+  `onError` that logs a failed call through `log` instead of the SDK's raw
+  console dump (#343); `test/ai-invoke.test.ts` fails on a call site that does
+  not, or that sets its own `onError`
 - `src/lib/ai/repair.ts` and `src/components/use-repairing-object.ts` — the
   one automatic repair of output that failed its schema (#21). The browser
   sends only `{ repairOf: id }`; the request, the rejected output and the
