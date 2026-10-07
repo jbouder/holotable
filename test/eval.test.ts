@@ -15,6 +15,7 @@ import {
   requestDigest,
   runCase,
 } from "../scripts/lib/eval";
+import { PROVIDER_OPTIONS } from "@/lib/ai/provider";
 import { recordedDashboard, recordedExplorePanel } from "@/lib/ai/stub";
 import type { Panel } from "@/lib/ir";
 
@@ -159,4 +160,22 @@ test("the request digest is stable across calls despite the random fence tokens"
     requestDigest(caseRequest(c, source)),
     requestDigest(caseRequest(c, source)),
   );
+});
+
+test("a case is asked with the provider options every app call carries", async () => {
+  const [c] = loadCases();
+  let seen: unknown;
+  const capturing = {
+    specificationVersion: "v4",
+    provider: "x",
+    modelId: "x",
+    supportedUrls: {},
+    doGenerate: () => Promise.reject(new Error("unused")),
+    doStream: (options: { providerOptions?: unknown }) => {
+      seen = options.providerOptions;
+      return Promise.reject(new Error("stop"));
+    },
+  } satisfies Parameters<typeof runCase>[2];
+  await runCase(c, source, capturing);
+  assert.deepEqual(seen, PROVIDER_OPTIONS);
 });
