@@ -93,7 +93,14 @@ quick way to try a model before switching the server to it.
 
 Any other provider failure reaches the author as the status and a pointer to
 the server log, never as the provider's reply, which can quote the request or
-part of a key. Generation waits for the model's first output before it answers,
+part of a key.
+
+Every failed model call, on every surface, is one `model.request_failed` line
+in the server log, through the log's redaction and with the request's id:
+before output starts and after, when the answer breaks partway. The error's
+name, message and the provider's status are on it; the request the SDK sent
+(prompt, catalog, schema) is not, and nothing is printed to the console raw
+([#343](https://github.com/jbouder/holotable/issues/343)). Generation waits for the model's first output before it answers,
 so a refusal is an error response (502, or 504 for a
 [timeout](#timeouts-and-retries)) rather than an empty answer.
 

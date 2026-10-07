@@ -1,7 +1,7 @@
 import { APICallError, createTextStreamResponse } from "ai";
 import { HttpError } from "@/lib/auth/authorize";
 import { ModelTimeoutError } from "@/lib/ai/invoke";
-import { log } from "@/lib/log";
+import { currentRequest, log, runWithRequest } from "@/lib/log";
 
 /**
  * What an author is told when the model provider fails (#337).
@@ -39,15 +39,44 @@ export function providerErrorMessage(error: unknown): string {
   return "The model provider could not be reached or did not answer. The server log has the details.";
 }
 
-/** A provider failure as the response a route answers with, logged once here. */
+/**
+ * A provider failure as the response a route answers with. It does not log:
+ * {@link logModelErrors} already has, from the model call itself.
+ */
 export function providerHttpError(error: unknown): HttpError {
-  log.error("model.request_failed", {
-    err: error,
-    status: APICallError.isInstance(error) ? error.statusCode : undefined,
-    protocolMismatch: isProtocolMismatch(error),
-  });
   const status = error instanceof ModelTimeoutError ? 504 : 502;
   return new HttpError(status, providerErrorMessage(error), {}, "infrastructure");
+}
+
+/**
+ * The `onError` every `streamObject`/`streamText` call carries, through
+ * `modelSettings()` (#343). It is the one place a failed model call is
+ * logged: before output starts, when the route turns it into an error
+ * response, and after, when nothing else sees it.
+ *
+ * Without it the SDK's default prints the raw error to the console: the
+ * request body (prompt, catalog and schema included), the provider's reply
+ * and its headers, as multi-line text that never went through the log's
+ * redaction.
+ *
+ * The request's context is captured when the call is made, because the
+ * stream is read, and so fails, wherever the response body is being piped
+ * from, which is outside the route's own async context.
+ */
+export function logModelErrors(): (event: { error: unknown }) => void {
+  const ctx = currentRequest();
+  return ({ error }) => {
+    // A browser that stops the generation aborts the call; nothing failed.
+    if (error instanceof Error && error.name === "AbortError") return;
+    const write = () =>
+      log.error("model.request_failed", {
+        err: error,
+        status: APICallError.isInstance(error) ? error.statusCode : undefined,
+        protocolMismatch: isProtocolMismatch(error),
+      });
+    if (ctx) runWithRequest(ctx, write);
+    else write();
+  };
 }
 
 /** The parts of a structured generation's `fullStream` this reads. */

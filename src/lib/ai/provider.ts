@@ -1,6 +1,7 @@
 import { createOpenAI } from "@ai-sdk/openai";
 import { gateway } from "ai";
 import { resilientModel } from "@/lib/ai/invoke";
+import { logModelErrors } from "@/lib/ai/provider-error";
 import { stubModel } from "@/lib/ai/stub";
 import { config } from "@/lib/config";
 
@@ -44,12 +45,19 @@ export const PROVIDER_OPTIONS = {
 /**
  * What every `streamObject`/`streamText` call spreads in: the model, the
  * SDK's own retry turned off, because the model's middleware already retries
- * (with jitter, inside a deadline) and two loops would multiply, and
- * {@link PROVIDER_OPTIONS}. `test/ai-invoke.test.ts` fails on a call site that
- * does not use it.
+ * (with jitter, inside a deadline) and two loops would multiply,
+ * {@link PROVIDER_OPTIONS}, and the `onError` that logs a failed call through
+ * the redacting log instead of the SDK's raw console dump (#343).
+ * `test/ai-invoke.test.ts` fails on a call site that does not use it, or that
+ * replaces its `onError`.
  */
 export function modelSettings() {
-  return { model: getModel(), maxRetries: 0, providerOptions: PROVIDER_OPTIONS } as const;
+  return {
+    model: getModel(),
+    maxRetries: 0,
+    providerOptions: PROVIDER_OPTIONS,
+    onError: logModelErrors(),
+  } as const;
 }
 
 export function getModel() {
