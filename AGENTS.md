@@ -517,6 +517,7 @@ npm run test:fuzz  # property-based SQL guard suite alone (FUZZ_RUNS, FUZZ_SEED)
 npm run test:integration # real-server suites against TimescaleDB (Testcontainers, or MIGRATE_TEST_DATABASE_URL)
 npm run e2e        # Playwright journey + axe scans (e2e/; Docker; AI_PROVIDER=stub; realm sign-in)
 npm run fixture:capture  # add a stored dashboard spec to the IR fixture library
+npm run eval       # grade recorded generations (evals/); --live --record re-records
 npm run config:check # validate the environment as the server does at startup (exit 1 = would not boot)
 npm run migrate    # apply Postgres migrations (--check, --dry-run, --down)
 npm run migrate:verify # round-trip every migration (scratch database)

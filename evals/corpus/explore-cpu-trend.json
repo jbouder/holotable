@@ -1,0 +1,11 @@
+{
+  "name": "explore-cpu-trend",
+  "mode": "explore",
+  "catalog": "demo",
+  "prompt": "Chart average CPU per host over time.",
+  "expect": {
+    "tables": ["system_metrics"],
+    "plausibleViz": ["line", "area"],
+    "timeField": "required"
+  }
+}

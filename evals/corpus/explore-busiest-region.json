@@ -1,0 +1,11 @@
+{
+  "name": "explore-busiest-region",
+  "mode": "explore",
+  "catalog": "demo",
+  "prompt": "What is the average memory usage by region, highest first?",
+  "expect": {
+    "tables": ["system_metrics"],
+    "plausibleViz": ["table", "bar"],
+    "timeField": "absent"
+  }
+}

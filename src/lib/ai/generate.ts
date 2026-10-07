@@ -175,17 +175,19 @@ ${PRESENTATION_GUIDE}
 ${VARIABLES_GUIDE}`;
 }
 
-export function streamDashboard(input: {
+/**
+ * What a dashboard generation sends the model: the schema it is bound to and
+ * the prompts. Separate from {@link streamDashboard} so the eval harness (#24)
+ * grades the exact request the route makes.
+ */
+export function dashboardRequest(input: {
   source: SourceRecord;
   prompt: string;
-  onFinish?: OnGenerationFinish;
   /** Set when this run repairs a failed one (#21). */
   repair?: Failure;
 }) {
-  const { source, prompt, onFinish, repair } = input;
-  return streamObject({
-    ...modelSettings(),
-    onFinish: finish(onFinish, DashboardGenerationSchema),
+  const { source, prompt, repair } = input;
+  return {
     schema: DashboardGenerationSchema,
     schemaName: "Dashboard",
     schemaDescription: "A monitoring dashboard specification (viz spec, not data).",
@@ -195,6 +197,21 @@ export function streamDashboard(input: {
       `Create a dashboard for this request:\n"""${prompt}"""\n
 Use refreshIntervalMs=${config.defaultRefreshIntervalMs} and timeRange {from:"${config.defaultTimeFrom}", to:"${config.defaultTimeTo}"} unless the request clearly implies otherwise.`,
     ),
+  };
+}
+
+export function streamDashboard(input: {
+  source: SourceRecord;
+  prompt: string;
+  onFinish?: OnGenerationFinish;
+  /** Set when this run repairs a failed one (#21). */
+  repair?: Failure;
+}) {
+  const request = dashboardRequest(input);
+  return streamObject({
+    ...modelSettings(),
+    onFinish: finish(input.onFinish, request.schema),
+    ...request,
   });
 }
 
@@ -204,17 +221,15 @@ Use refreshIntervalMs=${config.defaultRefreshIntervalMs} and timeRange {from:"${
  * other generation path — the model emits only a validated Panel (SQL + viz),
  * never data, and never a time filter (the server injects the range).
  */
-export function streamExplorePanel(input: {
+/** What an explore generation sends the model; see {@link dashboardRequest}. */
+export function explorePanelRequest(input: {
   source: SourceRecord;
   prompt: string;
-  onFinish?: OnGenerationFinish;
   /** Set when this run repairs a failed one (#21). */
   repair?: Failure;
 }) {
-  const { source, prompt, onFinish, repair } = input;
-  return streamObject({
-    ...modelSettings(),
-    onFinish: finish(onFinish, ExplorePanel),
+  const { source, prompt, repair } = input;
+  return {
     schema: ExplorePanel,
     schemaName: "Panel",
     schemaDescription: "A single panel specification (viz spec, not data).",
@@ -236,6 +251,21 @@ Viz selection (IMPORTANT — default to text/tabular output):
   trend over time. Use "pie"/"donut" for share/proportion/breakdown questions
   across a small set of categories.`,
     ),
+  };
+}
+
+export function streamExplorePanel(input: {
+  source: SourceRecord;
+  prompt: string;
+  onFinish?: OnGenerationFinish;
+  /** Set when this run repairs a failed one (#21). */
+  repair?: Failure;
+}) {
+  const request = explorePanelRequest(input);
+  return streamObject({
+    ...modelSettings(),
+    onFinish: finish(input.onFinish, request.schema),
+    ...request,
   });
 }
 

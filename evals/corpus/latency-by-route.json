@@ -1,0 +1,12 @@
+{
+  "name": "latency-by-route",
+  "mode": "dashboard",
+  "catalog": "demo",
+  "prompt": "Latency dashboard: p50, p95 and p99 latency over time, and the slowest routes by p95.",
+  "expect": {
+    "tables": ["http_requests"],
+    "requiredViz": ["line"],
+    "plausibleViz": ["line", "area", "bar", "table", "heatmap", "stat"],
+    "minPanels": 2
+  }
+}

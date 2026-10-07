@@ -1,0 +1,11 @@
+{
+  "name": "explore-bytes-by-service",
+  "mode": "explore",
+  "catalog": "demo",
+  "prompt": "Plot the proportion of response bytes served by each service.",
+  "expect": {
+    "tables": ["http_requests"],
+    "plausibleViz": ["pie", "donut", "bar"],
+    "timeField": "absent"
+  }
+}

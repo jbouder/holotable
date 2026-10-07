@@ -1,0 +1,6 @@
+{
+  "model": "glm-5.3",
+  "recordedAt": "2026-10-06T23:14:55.643Z",
+  "requestDigest": "44c449818e01322ff3e31a2f34abbfe566453d0762925763d8afc85928fa1dd9",
+  "text": "{\n\"id\": \"explore\",\n\"title\": \"Average CPU per Host\",\n\"description\": \"Computes the average CPU utilization in percent (cpu_pct) for each host, grouped into one-minute buckets over time.\",\n\"viz\": \"line\",\n\"layout\": {\"x\": 0, \"y\": 0, \"w\": 12, \"h\": 4},\n\"query\": {\n\"sourceId\": \"eval-demo\",\n\"sql\": \"SELECT time_bucket('1 minute', ts) AS bucket, host, avg(cpu_pct) AS avg_cpu FROM system_metrics GROUP BY bucket, host ORDER BY bucket\",\n\"timeField\": \"bucket\"\n},\n\"format\": \"percent\",\n\"options\": {\"decimals\": 1, \"legend\": \"bottom\", \"yAxis\": {\"min\": 0, \"max\": 100, \"label\": \"CPU %\"}}\n}"
+}

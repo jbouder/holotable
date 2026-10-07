@@ -1,0 +1,6 @@
+{
+  "model": "glm-5.3",
+  "recordedAt": "2026-10-06T23:15:08.009Z",
+  "requestDigest": "0212e5242e0c3dd1a63bce4361a35a0caa66be86e7fd392c78be1f5278a89842",
+  "text": "{\n\"id\": \"explore\",\n\"title\": \"5xx Response Count\",\n\"viz\": \"stat\",\n\"description\": \"Counts the total number of HTTP requests that returned a 5xx server-error status code over the dashboard time range.\",\n\"query\": {\n\"sourceId\": \"eval-demo\",\n\"sql\": \"SELECT count(*) AS responses_5xx FROM http_requests WHERE status >= 500 AND status < 600\"\n},\n\"layout\": {\n\"x\": 0,\n\"y\": 0,\n\"w\": 12,\n\"h\": 4\n},\n\"options\": {\n\"value\": \"responses_5xx\",\n\"decimals\": 0,\n\"unit\": \"responses\"\n}\n}"
+}
