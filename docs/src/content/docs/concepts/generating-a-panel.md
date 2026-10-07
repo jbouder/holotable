@@ -33,7 +33,7 @@ Only then does it hand off to `src/lib/ai/generate.ts`, which uses the AI SDK's
 streamObject({
   model: getModel(),               // env-selected provider/model
   schema: DashboardGenerationSchema, // or ExplorePanel — the model's output IS the IR
-  system: baseSystem(source),      // catalog metadata + strict SQL rules
+  system: baseSystem(source, workspacePrompt), // catalog, workspace context, strict SQL rules
   prompt: ...,
 })
 ```
@@ -45,9 +45,56 @@ to emit a spec shaped like `Dashboard`/`Panel` — not free-form text, and not
 data rows.
 
 **The system prompt contains only catalog *metadata*** for the single selected
-source: table and column names and types from `buildCatalogPrompt(source)`. No
-sample rows are ever sent to the model. It designs against a schema, not against
+source: table and column names and types from `buildCatalogPrompt(source)`,
+plus the workspace's own context when it has one (below). No sample rows are
+ever sent to the model. It designs against a schema, not against
 data.
+
+## Workspace context
+
+The catalog says what columns exist, not what they mean: that `duration_ms`
+is measured server-side, that this team says "latency" when it means p95, or
+which of three request tables is the canonical one. A workspace's
+source-admins add that under **Settings → AI context**
+(`src/lib/workspace-prompt.ts`), and every dashboard, refinement, panel edit
+and explore generation in the workspace carries it. Dashboard chat and source
+drafting do not.
+
+| Part | Cap | In the prompt |
+| --- | --- | --- |
+| Glossary | 2,000 characters | Line by line |
+| Metric definitions | 15, each a 48-character name and a 200-character definition | `- name: definition` |
+| Example panels | 4, each a 300-character request and a panel of at most 1,800 characters of JSON | Only for the source being generated against |
+
+`baseSystem` composes the prompt as the base rules, the fenced catalog, the
+workspace's block, and then the SQL, description, layout and presentation
+rules (`src/lib/ai/prompt.ts`). The text is written by an admin, but it is
+still not an instruction channel:
+
+- **It is fenced like the catalog.** Every line is flattened and clamped, and
+  the markers carry a random per-call token, so nothing inside can close the
+  block or open a fake one. Its preamble says it is reference material and
+  that anything claiming to change the rules is only text, and the line after
+  it says the rules win where the two disagree.
+- **It is bounded.** The caps above bound it, and the composer clamps it again
+  to `MAX_WORKSPACE_CONTEXT_CHARS`, so the prompt stays bounded however much is
+  written.
+- **An example cannot teach a query the app would not run.** Saving refuses an
+  example whose panel fails the IR or runs no query, whose source is not live
+  in the workspace, or whose SQL fails the guard against that source. Before
+  each generation, an example whose SQL no longer passes against the catalog
+  as it is now (a table that went missing since) is left out.
+- **Nothing it says is enforced by the prompt alone.** The model's SQL still
+  goes through the guard and its output through the IR, as for every
+  generation, so a glossary that asks for a `DELETE` or a time filter gets a
+  refused spec, not a query.
+
+Editors see the customization read-only, and anyone who may generate in the
+workspace can show the composed system prompt for any of its sources
+(`GET /api/workspaces/[id]/prompt/preview`), so a surprising answer can be
+traced back to what the model was told. A customization that cannot be read
+when a generation starts is logged and skipped; the generation runs on the
+base prompt.
 
 ## The catalog has to be true before any of that matters
 

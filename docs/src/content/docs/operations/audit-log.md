@@ -32,6 +32,7 @@ configure.
 | `source.test`, `source.refresh`, `source.discover`, `source.draft` | Connection test, applied catalog refresh, table discovery, drafted source | source, or — before one exists |
 | `template.create`, `template.delete` | Workspace templates | template |
 | `workspace.limits.update` | A platform admin changes a workspace's LLM limits (`before`, `after`) | workspace |
+| `workspace.prompt.update` | A source-admin saves a workspace's prompt customization (`glossaryChars`, `metricDefinitions`, `examples`: sizes, not the text) | workspace |
 | `annotation.create` | An editor or pipeline writes an annotation (`kind`, `at`, `source`) | annotation |
 | `annotation.delete` | An editor deletes an annotation | annotation |
 | `share.create` | An editor creates a read-only share link (`shareId`, `expiresAt`, `allowedOrigins`, `timeRange`) | dashboard |

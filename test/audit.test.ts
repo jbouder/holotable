@@ -311,6 +311,7 @@ const EMITTERS: Record<string, string[]> = {
   templates: ["template.create"],
   "templates/[id]": ["template.delete"],
   "workspaces/[id]/limits": ["workspace.limits.update"],
+  "workspaces/[id]/prompt": ["workspace.prompt.update"],
   "workspaces/[id]/annotations": ["annotation.create"],
   "workspaces/[id]/annotations/[annotationId]": ["annotation.delete"],
   "dashboards/[id]/shares": ["share.create"],

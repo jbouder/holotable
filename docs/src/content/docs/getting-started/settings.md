@@ -31,6 +31,7 @@ bookmark one or send it to someone.
 | Local data | `/settings/local-data` | What this browser remembers, with a way to clear each part |
 | Keyboard shortcuts | `/settings/shortcuts` | Every key binding, grouped by where it works |
 | Workspaces | `/settings/workspaces` | AI usage and limits. Listed only if you are a source-admin somewhere or a platform admin |
+| AI context | `/settings/ai-context` | What the model is told about each workspace: a glossary, metric definitions and example panels, and the composed prompt. Listed if you are an editor somewhere; only a source-admin can change it |
 | API tokens | `/settings/tokens` | Service-account tokens for scripts and pipelines. Listed only if you are a source-admin somewhere or a platform admin |
 
 ### Account
@@ -85,6 +86,18 @@ is overridden for that workspace, or is off. Source-admins see their own
 workspaces. Only platform admins can change an override, and the change
 applies to the next model request. See
 [LLM rate limits and budgets](/operations/llm-limits/).
+
+### AI context
+
+The model knows a source's tables and columns and nothing else. Here a
+source-admin tells it the rest, per workspace: a **glossary** (what the team
+means by "latency"), **metric definitions** (how "error rate" is computed) and
+up to four **example panels**, each a request and the panel JSON that answers
+it. An example is checked against the IR and its SQL against the guard for its
+source before it can be saved, and the model is shown it only when generating
+against that source. Editors see the same page read-only, and anyone on it can
+show the composed system prompt for any of the workspace's sources. See
+[Workspace context](/concepts/generating-a-panel/#workspace-context).
 
 ### API tokens
 
