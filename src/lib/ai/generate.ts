@@ -15,6 +15,7 @@ import {
 import { config } from "@/lib/config";
 import { PANEL_KINDS } from "@/lib/panels/registry";
 import { ModelSourceDraft, type SourceRecord } from "@/lib/registry";
+import { MAX_ADDITIONAL_SOURCES } from "@/lib/source-selection";
 import type { WorkspacePrompt } from "@/lib/workspace-prompt";
 
 /**
@@ -26,8 +27,9 @@ import type { WorkspacePrompt } from "@/lib/workspace-prompt";
  * repair as `repair`; the rest of the prompt is unchanged.
  *
  * The model only ever emits a validated spec conforming to the shared Zod IR —
- * never data. The prompt contains catalog METADATA for the single
- * selected, already-authorized source. The model must not write time filters;
+ * never data. The prompt contains catalog METADATA for the selected,
+ * already-authorized source, or for a dashboard up to three of one workspace
+ * (#104, ADR 1). The model must not write time filters;
  * the server injects the dashboard time range at execution.
  */
 
@@ -83,6 +85,17 @@ function finish(onFinish: OnGenerationFinish | undefined, schema: z.ZodType) {
     });
 }
 
+/** The most sources one generation may be given (#104): the primary and its others. */
+export const MAX_GENERATION_SOURCES = 1 + MAX_ADDITIONAL_SOURCES;
+
+const SINGLE_SOURCE_RULE =
+  "- Every panel's query.sourceId MUST equal the provided sourceId.";
+
+const MULTI_SOURCE_RULE = `- Every panel's query.sourceId MUST be one of the provided sourceIds, and its SQL
+  may reference ONLY tables from the catalog block of THAT source. Never use a
+  table from one source's catalog under another sourceId, and never join or
+  combine tables from different sources in one query.`;
+
 export const SQL_RULES = `SQL rules (STRICT):
 - Emit TimescaleDB/PostgreSQL SELECT statements only. No INSERT/UPDATE/DDL, no semicolons, no comments.
 - Reference ONLY tables listed in the catalog for the given source.
@@ -96,8 +109,18 @@ export const SQL_RULES = `SQL rules (STRICT):
   FROM http_requests GROUP BY minute ORDER BY minute  ->  timeField "minute".
 - OMIT 'query.timeField' when the result has no time column (a 'stat' scalar or a
   group-by-dimension breakdown). Never name a column that is not in the output.
-- Every panel's query.sourceId MUST equal the provided sourceId.
+${SINGLE_SOURCE_RULE}
 - Keep result sets small; the server also enforces row limits.`;
+
+/**
+ * The SQL rules for a generation over `sourceCount` sources. One source gets
+ * {@link SQL_RULES} exactly, so a single-source prompt is unchanged by #104.
+ */
+export function sqlRules(sourceCount: number): string {
+  return sourceCount > 1
+    ? SQL_RULES.replace(SINGLE_SOURCE_RULE, MULTI_SOURCE_RULE)
+    : SQL_RULES;
+}
 
 /**
  * Every panel carries its own one-sentence explanation.
@@ -151,26 +174,62 @@ const CHART_KINDS = PANEL_KINDS.filter((k) => k.canvas)
   .join(", ");
 
 /**
+ * Which sources a generation may use, and what each one holds. One source is
+ * the prompt as it has always been. Several (#104, at most
+ * {@link MAX_GENERATION_SOURCES}, all already authorized by the caller) each
+ * get their own fenced catalog block under a heading naming the source, so a
+ * table is always attributable to the one source whose catalog it is in.
+ */
+function sourcesSection(sources: readonly SourceRecord[]): string {
+  if (sources.length === 1) {
+    const [source] = sources;
+    return `The only authorized data source for this request:
+sourceId: ${source.id}
+
+Catalog (metadata only):
+${buildCatalogPrompt(source)}`;
+  }
+  const ids = sources.map((s) => `sourceId: ${s.id}`).join("\n");
+  const catalogs = sources
+    .map(
+      (s) => `Catalog for sourceId "${s.id}" (metadata only):\n${buildCatalogPrompt(s)}`,
+    )
+    .join("\n\n");
+  return `The authorized data sources for this request (each panel uses exactly ONE):
+${ids}
+
+${catalogs}`;
+}
+
+/**
  * The system prompt every spec generation shares: the base rules, the fenced
- * catalog, the workspace's own context when it has one (#66), and then the
- * rules, so the last word before the model reads the request is ours.
- * Exported so the settings page shows editors the prompt the model is given.
+ * catalog of each source, the workspace's own context when it has one (#66),
+ * and then the rules, so the last word before the model reads the request is
+ * ours. Exported so the settings page shows editors the prompt the model is
+ * given.
+ *
+ * `additionalSources` (#104) are the dashboard modes' other sources, in the
+ * same workspace as `source`; the caller has authorized each one.
  */
 export function baseSystem(
   source: SourceRecord,
   workspacePrompt?: WorkspacePrompt | null,
+  additionalSources: readonly SourceRecord[] = [],
 ): string {
-  const workspace = workspaceContextBlock(workspacePrompt, source.id);
+  const sources = [source, ...additionalSources];
+  if (sources.length > MAX_GENERATION_SOURCES) {
+    throw new Error(`a generation takes at most ${MAX_GENERATION_SOURCES} sources`);
+  }
+  const workspace = workspaceContextBlock(
+    workspacePrompt,
+    sources.map((s) => s.id),
+  );
   return `You design monitoring dashboards as a strict JSON spec.
 You NEVER return data rows — only a viz specification (SQL + layout).
 
-The only authorized data source for this request:
-sourceId: ${source.id}
-
-Catalog (metadata only):
-${buildCatalogPrompt(source)}
+${sourcesSection(sources)}
 ${workspace ? `\n${workspace}\n` : ""}
-${SQL_RULES}
+${sqlRules(sources.length)}
 
 ${DESCRIPTION_RULE}
 
@@ -194,6 +253,8 @@ ${VARIABLES_GUIDE}`;
  * grades the exact request the route makes.
  */
 export function dashboardRequest(input: {
+  /** The dashboard's other sources (#104), same workspace, already authorized. */
+  additionalSources?: readonly SourceRecord[];
   source: SourceRecord;
   prompt: string;
   /** The workspace's prompt customization (#66), when it has one. */
@@ -201,12 +262,12 @@ export function dashboardRequest(input: {
   /** Set when this run repairs a failed one (#21). */
   repair?: Failure;
 }) {
-  const { source, prompt, repair, workspacePrompt } = input;
+  const { source, prompt, repair, workspacePrompt, additionalSources } = input;
   return {
     schema: DashboardGenerationSchema,
     schemaName: "Dashboard",
     schemaDescription: "A monitoring dashboard specification (viz spec, not data).",
-    system: baseSystem(source, workspacePrompt),
+    system: baseSystem(source, workspacePrompt, additionalSources),
     prompt: withRepair(
       repair,
       `Create a dashboard for this request:\n"""${prompt}"""\n
@@ -216,6 +277,7 @@ Use refreshIntervalMs=${config.defaultRefreshIntervalMs} and timeRange {from:"${
 }
 
 export function streamDashboard(input: {
+  additionalSources?: readonly SourceRecord[];
   source: SourceRecord;
   prompt: string;
   /** The workspace's prompt customization (#66), when it has one. */
@@ -395,6 +457,8 @@ Apply this change and return the full updated panel (keep the same "id"):
  * only a validated spec, never data.
  */
 export function streamDashboardRefinement(input: {
+  /** The dashboard's other sources (#104), same workspace, already authorized. */
+  additionalSources?: readonly SourceRecord[];
   source: SourceRecord;
   prompt: string;
   /** The workspace's prompt customization (#66), when it has one. */
@@ -404,14 +468,22 @@ export function streamDashboardRefinement(input: {
   /** Set when this run repairs a failed one (#21). */
   repair?: Failure;
 }) {
-  const { source, prompt, current, onFinish, repair, workspacePrompt } = input;
+  const {
+    source,
+    prompt,
+    current,
+    onFinish,
+    repair,
+    workspacePrompt,
+    additionalSources,
+  } = input;
   return streamObject({
     ...modelSettings(),
     onFinish: finish(onFinish, DashboardGenerationSchema),
     schema: DashboardGenerationSchema,
     schemaName: "Dashboard",
     schemaDescription: "A monitoring dashboard specification (viz spec, not data).",
-    system: baseSystem(source, workspacePrompt),
+    system: baseSystem(source, workspacePrompt, additionalSources),
     prompt: withRepair(
       repair,
       `Here is the current dashboard spec:

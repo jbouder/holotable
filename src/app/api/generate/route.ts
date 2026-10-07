@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { z } from "zod";
-import { requireIdentity, assertAuthorized, HttpError } from "@/lib/auth/authorize";
+import { requireIdentity, HttpError } from "@/lib/auth/authorize";
 import { readJson, route } from "@/lib/http";
 import { audit } from "@/lib/audit";
 import { getSourceById } from "@/lib/db/repo";
@@ -11,7 +11,7 @@ import {
   streamExplorePanel,
   type OnGenerationFinish,
 } from "@/lib/ai/generate";
-import { catalogHealth, catalogRefusal } from "@/lib/catalog/health";
+import { AdditionalSourceIds, resolveGenerationSources } from "@/lib/generation-sources";
 import { recordGeneration } from "@/lib/ai/log";
 import { textResponseOnceStarted } from "@/lib/ai/provider-error";
 import {
@@ -36,11 +36,14 @@ const GenerateBody = z.discriminatedUnion("mode", [
   z.object({
     mode: z.literal("dashboard"),
     sourceId: z.string().min(1),
+    // The dashboard's other sources (#104), in the same workspace.
+    additionalSourceIds: AdditionalSourceIds.optional(),
     prompt: z.string().min(1).max(4000),
   }),
   z.object({
     mode: z.literal("dashboard-refine"),
     sourceId: z.string().min(1),
+    additionalSourceIds: AdditionalSourceIds.optional(),
     prompt: z.string().min(1).max(4000),
     // A tab opened before a deploy sends the spec it has; upgrade it (#58).
     current: StoredDashboard,
@@ -72,8 +75,9 @@ const Body = z.union([RepairBody, GenerateBody]);
  * Generate a dashboard/panel spec via the LLM. Runs the model exactly once, or
  * for `{ repairOf }` once more to repair a first attempt that failed its schema
  * (#21), from the server's own record of that attempt.
- * Authorization: editor on the workspace that OWNS the selected source (the
- * workspace is derived from the trusted source record, never from the request).
+ * Authorization: editor on the workspace that OWNS each selected source (the
+ * workspace is derived from the trusted source records, never from the
+ * request); a dashboard's sources (#104) must all be in that one workspace.
  * Then the catalog is checked, and the workspace's rate limit and token budget
  * are enforced; over either, the request is refused with 429 before the model
  * is called.
@@ -100,20 +104,19 @@ export const POST = route("generate", async (req: Request) => {
     body = input;
   }
 
-  const source = await getSourceById(body.sourceId);
-  if (!source || source.tombstonedAt) {
-    throw new HttpError(400, "unknown or removed source");
-  }
-
-  assertAuthorized(
+  // Every source is checked on its own record: live, generatable by this
+  // caller, a usable catalog, and (for a dashboard's others, #104) in the
+  // primary's workspace.
+  const { source, additional } = await resolveGenerationSources({
     identity,
-    "dashboard:generate",
-    { workspaceId: source.workspaceId },
-    { type: "source", id: source.id },
-  );
-
-  const refusal = catalogRefusal(source, catalogHealth(source));
-  if (refusal) throw new HttpError(400, refusal);
+    sourceId: body.sourceId,
+    additionalSourceIds:
+      body.mode === "dashboard" || body.mode === "dashboard-refine"
+        ? body.additionalSourceIds
+        : undefined,
+    getSource: getSourceById,
+  });
+  const sources = [source, ...additional];
 
   const usage = await enforceLlmLimits({
     identity,
@@ -124,7 +127,7 @@ export const POST = route("generate", async (req: Request) => {
   // The workspace's own context (#66), from the workspace that owns the
   // trusted source record. Advisory: if it cannot be read, the generation
   // runs on the base prompt rather than failing.
-  const workspacePrompt = await workspacePromptFor(source).catch((error: unknown) => {
+  const workspacePrompt = await workspacePromptFor(sources).catch((error: unknown) => {
     log.warn("workspace_prompt.load_failed", { workspaceId: source.workspaceId, error });
     return null;
   });
@@ -132,7 +135,7 @@ export const POST = route("generate", async (req: Request) => {
   // What the model is about to be shown, so the log can say which catalog was
   // in context without keeping the text. Built here rather than handed back by
   // the stream: it is a pure function of the same trusted source record.
-  const catalog = buildCatalogPrompt(source);
+  const catalog = sources.map((s) => buildCatalogPrompt(s)).join("\n\n");
   // Only a first attempt can be repaired, so only it gets an id.
   const generationId = repair ? null : randomUUID();
   const onFinish: OnGenerationFinish = (event) => {
@@ -174,6 +177,7 @@ export const POST = route("generate", async (req: Request) => {
         mode: body.mode,
         prompt: body.prompt,
         model: event.modelId,
+        ...(additional.length > 0 ? { sourceIds: sources.map((s) => s.id) } : {}),
         ...(repair ? { attempt: 2 } : {}),
       },
     });
@@ -185,6 +189,7 @@ export const POST = route("generate", async (req: Request) => {
     body.mode === "dashboard"
       ? streamDashboard({
           source,
+          additionalSources: additional,
           prompt: body.prompt,
           workspacePrompt,
           onFinish,
@@ -193,6 +198,7 @@ export const POST = route("generate", async (req: Request) => {
       : body.mode === "dashboard-refine"
         ? streamDashboardRefinement({
             source,
+            additionalSources: additional,
             prompt: body.prompt,
             current: body.current,
             workspacePrompt,
