@@ -25,7 +25,7 @@ import { fileURLToPath } from "node:url";
 
 const repoRoot = join(dirname(fileURLToPath(import.meta.url)), "..", "..");
 const docsRoot = join(repoRoot, "docs", "src", "content", "docs");
-const DOCS_SITE = "https://holotable-docs.beskar.workers.dev";
+const DOCS_SITE = "https://holotable-docs.vibeproject.workers.dev";
 const REPO_URL = /^https:\/\/github\.com\/jbouder\/holotable\/(?:blob|tree)\/main\/([^#?]*)(#.*)?$/;
 
 const FILES = [

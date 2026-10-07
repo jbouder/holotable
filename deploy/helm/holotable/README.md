@@ -33,7 +33,7 @@ helm install holotable deploy/helm/holotable \
    cluster. The migration Job creates the schema on first install.
 
 3. **A Keycloak realm.** OIDC is the only way to sign in; there is no local
-   login. See [Keycloak setup](https://holotable-docs.beskar.workers.dev/operations/keycloak/).
+   login. See [Keycloak setup](https://holotable-docs.vibeproject.workers.dev/operations/keycloak/).
 
 4. **A Secret** holding the credential environment. The chart never generates
    one for you — see below.
@@ -72,7 +72,7 @@ can:
 
 A source whose ref is granted but has no credentials saves fine and fails on
 **Test**. See
-[Source secret references](https://holotable-docs.beskar.workers.dev/operations/secret-references/).
+[Source secret references](https://holotable-docs.vibeproject.workers.dev/operations/secret-references/).
 
 Three wirings, each a runnable values file in [`examples/`](examples):
 
@@ -116,7 +116,7 @@ The three settings below are one mechanism, not three independent knobs.
 Together: no request is routed to a pod that is going away, open SSE streams
 get a reconnect hint with a randomized delay, in-flight queries finish, and the
 process exits 0. [Health, readiness, and
-shutdown](https://holotable-docs.beskar.workers.dev/operations/health-checks/) has the
+shutdown](https://holotable-docs.vibeproject.workers.dev/operations/health-checks/) has the
 full sequence.
 
 ## Migrations
@@ -163,7 +163,7 @@ own cursor.
 
 The HPA and PDB templates are here because a chart without them is incomplete,
 not because scaling out is supported. One instance is the supported topology;
-[Scaling and the poller](https://holotable-docs.beskar.workers.dev/architecture/scaling/)
+[Scaling and the poller](https://holotable-docs.vibeproject.workers.dev/architecture/scaling/)
 says why and what an extraction would take. `NOTES.txt` says so again after any
 install that raises the replica count.
 
@@ -211,7 +211,7 @@ alongside the release, with `bearerTokenSecret` pointing at the same Secret key.
 | `app.shutdownGraceMs` | `10000` | `SHUTDOWN_GRACE_MS`. Sizes the grace period. |
 | `app.preStopSleepSeconds` | `5` | preStop sleep before SIGTERM. |
 | `app.command` / `app.args` | `[]` | Entrypoint override. Needed only to source an injected environment file (see the Vault example). |
-| `config` | `{}` | Non-secret environment, rendered into a ConfigMap. Any variable from the [configuration reference](https://holotable-docs.beskar.workers.dev/reference/configuration/). |
+| `config` | `{}` | Non-secret environment, rendered into a ConfigMap. Any variable from the [configuration reference](https://holotable-docs.vibeproject.workers.dev/reference/configuration/). |
 | `extraEnv` | `[]` | Raw `env` entries, for a single key from a Secret via `valueFrom`. |
 | `extraEnvFrom` | `[]` | Extra `envFrom` sources, by name. |
 | `extraVolumes` / `extraVolumeMounts` | `[]` | Applied to the app **and** the migration Job. |

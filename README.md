@@ -12,7 +12,7 @@ TimescaleDB/PostgreSQL · Vercel AI SDK · Keycloak OIDC · Server-Sent Events. 
 shared Zod IR (`src/lib/ir.ts`) is the contract between the model, the API,
 persistence and the browser.
 
-![New dashboard — natural-language authoring with starter prompts](docs/public/images/dashboard-new.png)
+![New dashboard — a generated dashboard previewed with live data, beside its versions and the refine box](docs/public/images/dashboard-new.png)
 
 ![Live dashboard view — request rate, p95 latency, 5xx count, and requests by route](docs/public/images/dashboard-view.png)
 
@@ -34,21 +34,21 @@ cp .env.example .env    # then set SESSION_SECRET, AI_MODEL and its key, and
 docker compose up
 ```
 
-The [quick start](https://holotable-docs.beskar.workers.dev/getting-started/quick-start/)
+The [quick start](https://holotable-docs.vibeproject.workers.dev/getting-started/quick-start/)
 covers both, Helm, and the development loop.
 
 ## Documentation
 
 Everything is explained once, on the docs site
-(<https://holotable-docs.beskar.workers.dev>, source in [`docs/`](docs/)):
+(<https://holotable-docs.vibeproject.workers.dev>, source in [`docs/`](docs/)):
 
-- [Your first dashboard](https://holotable-docs.beskar.workers.dev/getting-started/your-first-dashboard/) — from an empty install to a live dashboard over your own database.
-- [How it works](https://holotable-docs.beskar.workers.dev/concepts/how-it-works/) — a panel from prompt to live chart.
-- [Invariants](https://holotable-docs.beskar.workers.dev/architecture/invariants/) — the guarantees the design rests on.
-- [Configuration](https://holotable-docs.beskar.workers.dev/reference/configuration/) — every environment variable, generated from `src/lib/config.ts`.
-- [Keycloak setup](https://holotable-docs.beskar.workers.dev/operations/keycloak/) — the OIDC client and group mapper.
-- [API routes](https://holotable-docs.beskar.workers.dev/reference/api-routes/) and [Deploying on Kubernetes](https://holotable-docs.beskar.workers.dev/operations/kubernetes/).
-- [Writing specs with Claude Code](https://holotable-docs.beskar.workers.dev/getting-started/writing-specs-with-claude-code/) — the `/holotable` skill in `.claude/skills/holotable/` writes, reviews and fixes dashboard specs from your terminal.
+- [Your first dashboard](https://holotable-docs.vibeproject.workers.dev/getting-started/your-first-dashboard/) — from an empty install to a live dashboard over your own database.
+- [How it works](https://holotable-docs.vibeproject.workers.dev/concepts/how-it-works/) — a panel from prompt to live chart.
+- [Invariants](https://holotable-docs.vibeproject.workers.dev/architecture/invariants/) — the guarantees the design rests on.
+- [Configuration](https://holotable-docs.vibeproject.workers.dev/reference/configuration/) — every environment variable, generated from `src/lib/config.ts`.
+- [Keycloak setup](https://holotable-docs.vibeproject.workers.dev/operations/keycloak/) — the OIDC client and group mapper.
+- [API routes](https://holotable-docs.vibeproject.workers.dev/reference/api-routes/) and [Deploying on Kubernetes](https://holotable-docs.vibeproject.workers.dev/operations/kubernetes/).
+- [Writing specs with Claude Code](https://holotable-docs.vibeproject.workers.dev/getting-started/writing-specs-with-claude-code/) — the `/holotable` skill in `.claude/skills/holotable/` writes, reviews and fixes dashboard specs from your terminal.
 
 ## Contributing, security, license
 
