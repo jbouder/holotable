@@ -27,6 +27,15 @@ Two OpenAI-compatible surfaces exist and they are **not** interchangeable:
 | Responses API | `/responses` | the default |
 | Chat Completions | `/chat/completions` | `OPENAI_API=chat` |
 
+Structured output is requested **non-strict** on both
+([#336](https://github.com/jbouder/holotable/issues/336)). OpenAI's strict
+mode, the provider default, accepts a schema only when every property is
+required, and the dashboard IR has optional fields throughout. Strict, an
+OpenAI model refused every generation before it started. The schema is still
+sent and the model still follows it; what comes back is validated against the
+IR either way, and repaired once if it fails. Endpoints that are not OpenAI
+ignore the setting.
+
 ### OpenRouter
 
 ```bash

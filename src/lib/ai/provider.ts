@@ -26,13 +26,30 @@ import { config } from "@/lib/config";
  */
 
 /**
- * What every `streamObject`/`streamText` call spreads in: the model, and the
+ * Provider options every call carries.
+ *
+ * OpenAI's strict structured outputs (the provider's default) accept a schema
+ * only when every property is required, and refuse the IR, whose optional
+ * fields (`timeField`, `description`, `options` …) are the point. The refusal
+ * comes before any generation, on every request, so a deployment pointed at an
+ * OpenAI model could generate nothing (#336). Non-strict, the schema is still
+ * sent and followed; what the model returns is validated against the IR either
+ * way, and repaired once when it fails (#21). Providers that are not OpenAI
+ * ignore the option.
+ */
+export const PROVIDER_OPTIONS = {
+  openai: { strictJsonSchema: false },
+} as const;
+
+/**
+ * What every `streamObject`/`streamText` call spreads in: the model, the
  * SDK's own retry turned off, because the model's middleware already retries
- * (with jitter, inside a deadline) and two loops would multiply.
- * `test/ai-invoke.test.ts` fails on a call site that does not use it.
+ * (with jitter, inside a deadline) and two loops would multiply, and
+ * {@link PROVIDER_OPTIONS}. `test/ai-invoke.test.ts` fails on a call site that
+ * does not use it.
  */
 export function modelSettings() {
-  return { model: getModel(), maxRetries: 0 } as const;
+  return { model: getModel(), maxRetries: 0, providerOptions: PROVIDER_OPTIONS } as const;
 }
 
 export function getModel() {

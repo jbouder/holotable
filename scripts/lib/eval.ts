@@ -4,6 +4,7 @@ import { join } from "node:path";
 import { type LanguageModel, streamObject } from "ai";
 import { z } from "zod";
 import { dashboardRequest, explorePanelRequest } from "@/lib/ai/generate";
+import { PROVIDER_OPTIONS } from "@/lib/ai/provider";
 import { describeFailure } from "@/lib/ai/repair";
 import { resolveAndValidateDashboard } from "@/lib/dashboard-service";
 import {
@@ -243,6 +244,9 @@ export async function runCase(
   const settings = {
     model,
     maxRetries: 0,
+    // What every app call carries (#336); without it an OpenAI model is
+    // measured refusing a schema the app never sends it strict.
+    providerOptions: PROVIDER_OPTIONS,
     onFinish: (event: { response: { modelId?: string } }) => {
       modelId = event.response.modelId ?? "";
     },
