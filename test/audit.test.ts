@@ -320,6 +320,32 @@ const EMITTERS: Record<string, string[]> = {
   "workspaces/[id]/tokens/[tokenId]": ["token.revoke"],
 };
 
+/**
+ * The MCP tools (#148) record the same events as the routes they mirror, from
+ * `src/lib/mcp/tools/`; held here the same way.
+ */
+const MCP_EMITTERS: Record<string, string[]> = {
+  sql: ["query.execute"],
+  dashboards: ["dashboard.create", "dashboard.update"],
+  generate: ["dashboard.generate", "source.draft"],
+};
+
+test("each MCP tool records the event its route records", () => {
+  for (const [file, actions] of Object.entries(MCP_EMITTERS)) {
+    const source = readFileSync(
+      new URL(`../src/lib/mcp/tools/${file}.ts`, import.meta.url),
+      "utf8",
+    );
+    for (const action of actions) {
+      assert.ok(
+        source.includes(`action: "${action}"`),
+        `mcp/tools/${file} does not record ${action}`,
+      );
+    }
+    assert.match(source, /via: "mcp"/, `mcp/tools/${file} names mcp as the way in`);
+  }
+});
+
 test("each listed event is recorded by the route where it happens", () => {
   for (const [path, actions] of Object.entries(EMITTERS)) {
     const source = api(path);

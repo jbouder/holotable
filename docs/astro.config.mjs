@@ -91,6 +91,7 @@ export default defineConfig({
             { label: "Row-level filters", slug: "operations/row-level-filters" },
             { label: "Share links and embedding", slug: "operations/share-links" },
             { label: "Service-account API tokens", slug: "operations/api-tokens" },
+            { label: "MCP server", slug: "operations/mcp" },
             { label: "AI provider", slug: "operations/ai-provider" },
             { label: "Startup validation", slug: "operations/startup-validation" },
             { label: "Security headers", slug: "operations/security-headers" },

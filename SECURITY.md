@@ -178,8 +178,15 @@ decides every call as for a session. No other route reads a realm token:
 `getIdentity()` knows only the session cookie and `ht_` tokens, a token
 minted for the MCP client is refused as a session by `azp`, and the MCP route
 reads no cookie. A service-account token is accepted there as well, by its
-prefix, with the same resolution as elsewhere. See
-[Keycloak setup](docs/src/content/docs/operations/keycloak.md).
+prefix, with the same resolution as elsewhere. The tools behind the route
+(#148) are façades over the functions the HTTP routes call: each applies the
+same `can()` check as its route, re-authorizes the source on every execution,
+runs SQL through the same guard, plan and read-only executor with the same
+limits, and records the same audit event; none returns a connection detail,
+a credential or an unguarded row, and the model's answers are specs the IR
+validated, never data. See
+[Keycloak setup](docs/src/content/docs/operations/keycloak.md) and the
+[MCP server](docs/src/content/docs/operations/mcp.md).
 
 **Cookies and cross-origin requests.** The session cookie is `httpOnly` and
 `SameSite=Lax`. When it is `Secure`, its name is `__Host-` prefixed, so the

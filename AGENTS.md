@@ -137,6 +137,17 @@ Important files:
   client to the realm itself; Holotable mints nothing. `getIdentity()` never
   reaches it, `verifySessionToken` refuses a token minted for that client,
   and `test/mcp-auth.test.ts` holds the list of routes that import it
+- `src/lib/mcp/` — the MCP server behind `/api/mcp` (#148): `protocol.ts` is
+  the stateless streamable-HTTP JSON-RPC layer (no sessions, no SSE, no
+  dependency; the official SDK's client drives it in `test/mcp-client.test.ts`),
+  `tool.ts` is what a tool is (one zod schema validates the arguments and,
+  as JSON Schema, documents them; a failure is `isError`, never a protocol
+  error), and `tools/` are thin façades over the same functions the HTTP
+  routes call, each with the route's `assertAuthorized` and audit event
+  (`test/audit.test.ts` holds that) and reached through `McpDeps` so tests
+  hand in fakes. A tool returns specs and guarded rows, never a connection
+  detail or a credential; generation repairs a schema failure once, inline,
+  as a second admitted model call
 - `src/lib/auth/authorize.ts` — the central `can()` check
 - `src/lib/auth/renewal.ts` — session renewal (#27): the realm's refresh token
   is sealed in `sessions` (`refresh-token.ts`) and never reaches the browser,
