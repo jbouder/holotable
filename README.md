@@ -12,8 +12,6 @@ TimescaleDB/PostgreSQL · Vercel AI SDK · Keycloak OIDC · Server-Sent Events. 
 shared Zod IR (`src/lib/ir.ts`) is the contract between the model, the API,
 persistence and the browser.
 
-![New dashboard — a generated dashboard previewed with live data, beside its versions and the refine box](docs/public/images/dashboard-new.png)
-
 ![Live dashboard view — request rate, p95 latency, 5xx count, and requests by route](docs/public/images/dashboard-view.png)
 
 ## Quick start
