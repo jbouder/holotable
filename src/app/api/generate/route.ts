@@ -26,6 +26,8 @@ import { buildCatalogPrompt } from "@/lib/timescaledb/catalog";
 import { enforceLlmLimits } from "@/lib/limits/llm";
 import { Panel } from "@/lib/ir";
 import { StoredDashboard } from "@/lib/ir/upgrade";
+import { log } from "@/lib/log";
+import { workspacePromptFor } from "@/lib/workspace-prompt-service";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -119,6 +121,14 @@ export const POST = route("generate", async (req: Request) => {
     route: "generate",
   });
 
+  // The workspace's own context (#66), from the workspace that owns the
+  // trusted source record. Advisory: if it cannot be read, the generation
+  // runs on the base prompt rather than failing.
+  const workspacePrompt = await workspacePromptFor(source).catch((error: unknown) => {
+    log.warn("workspace_prompt.load_failed", { workspaceId: source.workspaceId, error });
+    return null;
+  });
+
   // What the model is about to be shown, so the log can say which catalog was
   // in context without keeping the text. Built here rather than handed back by
   // the stream: it is a pure function of the same trusted source record.
@@ -173,21 +183,35 @@ export const POST = route("generate", async (req: Request) => {
   // an implicit `any`, which loses the streamObject result type here.
   const result =
     body.mode === "dashboard"
-      ? streamDashboard({ source, prompt: body.prompt, onFinish, repair })
+      ? streamDashboard({
+          source,
+          prompt: body.prompt,
+          workspacePrompt,
+          onFinish,
+          repair,
+        })
       : body.mode === "dashboard-refine"
         ? streamDashboardRefinement({
             source,
             prompt: body.prompt,
             current: body.current,
+            workspacePrompt,
             onFinish,
             repair,
           })
         : body.mode === "explore"
-          ? streamExplorePanel({ source, prompt: body.prompt, onFinish, repair })
+          ? streamExplorePanel({
+              source,
+              prompt: body.prompt,
+              workspacePrompt,
+              onFinish,
+              repair,
+            })
           : streamPanel({
               source,
               prompt: body.prompt,
               current: body.current,
+              workspacePrompt,
               onFinish,
               repair,
             });

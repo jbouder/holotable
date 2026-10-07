@@ -43,6 +43,14 @@ test("the workspaces section is only listed for someone who manages a workspace"
   assert.ok(ids(["/platform-admins"]).includes("workspaces"));
 });
 
+test("the AI context section is listed for anyone who generates in a workspace", () => {
+  assert.ok(!ids([]).includes("ai-context"));
+  assert.ok(!ids(["/workspaces/w/viewer"]).includes("ai-context"));
+  assert.ok(ids(["/workspaces/w/editor"]).includes("ai-context"));
+  assert.ok(ids(["/workspaces/w/source-admin"]).includes("ai-context"));
+  assert.ok(ids(["/platform-admins"]).includes("ai-context"));
+});
+
 test("the command palette offers Settings", () => {
   const command = STATIC_COMMANDS.find((c) => c.id === "page:settings");
   assert.deepEqual(command?.action, { type: "navigate", href: "/settings" });

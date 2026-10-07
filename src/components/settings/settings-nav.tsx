@@ -10,6 +10,7 @@ import {
   type LucideIcon,
   Palette,
   SlidersHorizontal,
+  Sparkles,
   UserRound,
 } from "lucide-react";
 import type { SettingsSectionId } from "@/lib/settings";
@@ -21,6 +22,7 @@ const ICONS: Record<SettingsSectionId, LucideIcon> = {
   "local-data": HardDrive,
   shortcuts: Keyboard,
   workspaces: Building2,
+  "ai-context": Sparkles,
   tokens: KeyRound,
 };
 

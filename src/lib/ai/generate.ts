@@ -2,6 +2,7 @@ import { type LanguageModelUsage, streamObject } from "ai";
 import type { z } from "zod";
 import { describeFailure, type Failure, repairPrompt } from "@/lib/ai/repair";
 import { modelSettings } from "@/lib/ai/provider";
+import { workspaceContextBlock } from "@/lib/ai/prompt";
 import { buildCatalogPrompt } from "@/lib/timescaledb/catalog";
 import {
   type Dashboard,
@@ -14,6 +15,7 @@ import {
 import { config } from "@/lib/config";
 import { PANEL_KINDS } from "@/lib/panels/registry";
 import { ModelSourceDraft, type SourceRecord } from "@/lib/registry";
+import type { WorkspacePrompt } from "@/lib/workspace-prompt";
 
 /**
  * LLM generation.
@@ -148,7 +150,17 @@ const CHART_KINDS = PANEL_KINDS.filter((k) => k.canvas)
   .map((k) => `"${k.kind}"`)
   .join(", ");
 
-function baseSystem(source: SourceRecord): string {
+/**
+ * The system prompt every spec generation shares: the base rules, the fenced
+ * catalog, the workspace's own context when it has one (#66), and then the
+ * rules, so the last word before the model reads the request is ours.
+ * Exported so the settings page shows editors the prompt the model is given.
+ */
+export function baseSystem(
+  source: SourceRecord,
+  workspacePrompt?: WorkspacePrompt | null,
+): string {
+  const workspace = workspaceContextBlock(workspacePrompt, source.id);
   return `You design monitoring dashboards as a strict JSON spec.
 You NEVER return data rows — only a viz specification (SQL + layout).
 
@@ -157,7 +169,7 @@ sourceId: ${source.id}
 
 Catalog (metadata only):
 ${buildCatalogPrompt(source)}
-
+${workspace ? `\n${workspace}\n` : ""}
 ${SQL_RULES}
 
 ${DESCRIPTION_RULE}
@@ -184,15 +196,17 @@ ${VARIABLES_GUIDE}`;
 export function dashboardRequest(input: {
   source: SourceRecord;
   prompt: string;
+  /** The workspace's prompt customization (#66), when it has one. */
+  workspacePrompt?: WorkspacePrompt | null;
   /** Set when this run repairs a failed one (#21). */
   repair?: Failure;
 }) {
-  const { source, prompt, repair } = input;
+  const { source, prompt, repair, workspacePrompt } = input;
   return {
     schema: DashboardGenerationSchema,
     schemaName: "Dashboard",
     schemaDescription: "A monitoring dashboard specification (viz spec, not data).",
-    system: baseSystem(source),
+    system: baseSystem(source, workspacePrompt),
     prompt: withRepair(
       repair,
       `Create a dashboard for this request:\n"""${prompt}"""\n
@@ -204,6 +218,8 @@ Use refreshIntervalMs=${config.defaultRefreshIntervalMs} and timeRange {from:"${
 export function streamDashboard(input: {
   source: SourceRecord;
   prompt: string;
+  /** The workspace's prompt customization (#66), when it has one. */
+  workspacePrompt?: WorkspacePrompt | null;
   onFinish?: OnGenerationFinish;
   /** Set when this run repairs a failed one (#21). */
   repair?: Failure;
@@ -226,15 +242,17 @@ export function streamDashboard(input: {
 export function explorePanelRequest(input: {
   source: SourceRecord;
   prompt: string;
+  /** The workspace's prompt customization (#66), when it has one. */
+  workspacePrompt?: WorkspacePrompt | null;
   /** Set when this run repairs a failed one (#21). */
   repair?: Failure;
 }) {
-  const { source, prompt, repair } = input;
+  const { source, prompt, repair, workspacePrompt } = input;
   return {
     schema: ExplorePanel,
     schemaName: "Panel",
     schemaDescription: "A single panel specification (viz spec, not data).",
-    system: baseSystem(source),
+    system: baseSystem(source, workspacePrompt),
     prompt: withRepair(
       repair,
       `Answer this question with a SINGLE panel:
@@ -258,6 +276,8 @@ Viz selection (IMPORTANT — default to text/tabular output):
 export function streamExplorePanel(input: {
   source: SourceRecord;
   prompt: string;
+  /** The workspace's prompt customization (#66), when it has one. */
+  workspacePrompt?: WorkspacePrompt | null;
   onFinish?: OnGenerationFinish;
   /** Set when this run repairs a failed one (#21). */
   repair?: Failure;
@@ -341,19 +361,21 @@ Field rules:
 export function streamPanel(input: {
   source: SourceRecord;
   prompt: string;
+  /** The workspace's prompt customization (#66), when it has one. */
+  workspacePrompt?: WorkspacePrompt | null;
   current: Panel;
   onFinish?: OnGenerationFinish;
   /** Set when this run repairs a failed one (#21). */
   repair?: Failure;
 }) {
-  const { source, prompt, current, onFinish, repair } = input;
+  const { source, prompt, current, onFinish, repair, workspacePrompt } = input;
   return streamObject({
     ...modelSettings(),
     onFinish: finish(onFinish, GeneratedPanel),
     schema: GeneratedPanel,
     schemaName: "Panel",
     schemaDescription: "A single dashboard panel specification (viz spec, not data).",
-    system: baseSystem(source),
+    system: baseSystem(source, workspacePrompt),
     prompt: withRepair(
       repair,
       `Here is the current panel spec:
@@ -375,19 +397,21 @@ Apply this change and return the full updated panel (keep the same "id"):
 export function streamDashboardRefinement(input: {
   source: SourceRecord;
   prompt: string;
+  /** The workspace's prompt customization (#66), when it has one. */
+  workspacePrompt?: WorkspacePrompt | null;
   current: Dashboard;
   onFinish?: OnGenerationFinish;
   /** Set when this run repairs a failed one (#21). */
   repair?: Failure;
 }) {
-  const { source, prompt, current, onFinish, repair } = input;
+  const { source, prompt, current, onFinish, repair, workspacePrompt } = input;
   return streamObject({
     ...modelSettings(),
     onFinish: finish(onFinish, DashboardGenerationSchema),
     schema: DashboardGenerationSchema,
     schemaName: "Dashboard",
     schemaDescription: "A monitoring dashboard specification (viz spec, not data).",
-    system: baseSystem(source),
+    system: baseSystem(source, workspacePrompt),
     prompt: withRepair(
       repair,
       `Here is the current dashboard spec:

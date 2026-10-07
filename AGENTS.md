@@ -199,6 +199,13 @@ Important files:
   issues come from the server's process-local store, and taking an entry
   removes it. A new generation surface uses `useRepairingObject`, not
   `useObject`, and its route remembers failures the way `/api/generate` does
+- `src/lib/workspace-prompt.ts`, `src/lib/ai/prompt.ts` and
+  `src/lib/workspace-prompt-service.ts` — per-workspace prompt customization
+  (#66): a glossary, metric definitions and example panels that `baseSystem`
+  puts in a fenced `WORKSPACE_CONTEXT` block between the catalog and the rules.
+  Every field is capped, so the prompt stays bounded; an example's SQL passes
+  the guard against a live source in the same workspace before it is saved,
+  and again against the current catalog before it is shown to the model
 - `src/lib/self-monitoring/` — the committed self-monitoring demo: the
   dashboard spec (also an IR snapshot), the source catalog, and the Prometheus
   text-format parser the collector uses. `test/self-monitoring.test.ts` holds

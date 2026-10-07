@@ -18,6 +18,7 @@ export const SETTINGS_SECTION_IDS = [
   "local-data",
   "shortcuts",
   "workspaces",
+  "ai-context",
   "tokens",
 ] as const;
 
@@ -30,6 +31,14 @@ export interface SettingsSection {
   description: string;
   href: string;
   visible?: (identity: Identity) => boolean;
+}
+
+/** May generate somewhere, which an editor and a platform admin always may. */
+function generatesInAWorkspace(identity: Identity): boolean {
+  return (
+    identity.platformAdmin ||
+    authorizedWorkspaces(identity, "dashboard:generate").length > 0
+  );
 }
 
 /** Holds `source:manage` somewhere, which a platform admin always does. */
@@ -76,6 +85,14 @@ export const SETTINGS_SECTIONS: readonly SettingsSection[] = [
     description: "AI usage and limits for the workspaces you administer.",
     href: "/settings/workspaces",
     visible: managesAWorkspace,
+  },
+  {
+    id: "ai-context",
+    label: "AI context",
+    description:
+      "What the model is told about each workspace: its vocabulary, metrics and example panels.",
+    href: "/settings/ai-context",
+    visible: generatesInAWorkspace,
   },
   {
     id: "tokens",

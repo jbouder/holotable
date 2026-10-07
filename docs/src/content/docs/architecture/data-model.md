@@ -186,6 +186,17 @@ Optional per-workspace overrides of `LLM_RATE_PER_MINUTE` and
 column inherits the environment; `0` disables that limit. Platform admins edit
 it from **Settings → Workspaces** through `PATCH /api/workspaces/[id]/limits`.
 
+### `workspace_prompts`
+
+One row per workspace that has a prompt customization (#66): `glossary`
+(text), `metric_definitions` and `examples` (JSONB arrays), `updated_by`,
+`updated_at`. Each example is `{ prompt, specVersion, panel }`, a lone panel
+recording its IR version as a panel template does, so it is upgraded on read.
+A row is read through the `WorkspacePrompt` schema; one that no longer parses
+is logged and treated as no customization. Written only by
+`PUT /api/workspaces/[id]/prompt`. See
+[Workspace context](/concepts/generating-a-panel/#workspace-context).
+
 ### `user_preferences`
 
 One row per subject: `sub` (primary key), `prefs` (JSONB), `updated_at`. It

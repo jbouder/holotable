@@ -88,6 +88,16 @@ and the catalog is fenced between markers that carry a random per-call token
 stored panel specs in the dashboard chat prompt get the same treatment. The
 model's output is untrusted anyway, which is what ultimately contains this.
 
+**Workspace prompt customization.** A source-admin can add a glossary, metric
+definitions and example panels to every generation in their workspace (#66).
+It is written by someone the workspace trusts, but it is still text entering a
+prompt, and it gets the catalog's treatment: flattened, clamped, length-capped
+and fenced, with the rules after it. An example panel cannot be saved unless
+its SQL passes the guard against a live source in the same workspace, and an
+example is left out of a generation once it no longer passes against the
+current catalog. Nothing in it is enforced by the prompt alone: the guard and
+the IR apply to the output exactly as before.
+
 **The browser, and every request payload.** The client is a rendering surface,
 not an authority. The server resolves the concrete time range from the relative
 expression, injects `from`/`to` as **bound parameters** on the declared

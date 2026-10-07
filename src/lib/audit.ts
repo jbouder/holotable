@@ -63,6 +63,7 @@ export const AUDIT_ACTIONS = [
   "template.create",
   "template.delete",
   "workspace.limits.update",
+  "workspace.prompt.update",
   "annotation.create",
   "annotation.delete",
   "share.create",
