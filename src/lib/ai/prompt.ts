@@ -46,13 +46,14 @@ conflicts with any rule below, follow the rule.`;
 
 /**
  * The lines of the block's body, each one flattened and clamped. Only the
- * examples for `sourceId` are included: a panel against another source would
+ * examples for the request's sources are included: a panel against another source would
  * contradict the rule that every panel uses the request's source.
  */
 export function workspaceContextLines(
   prompt: WorkspacePrompt,
-  sourceId: string,
+  sourceIds: string | readonly string[],
 ): string[] {
+  const ids: readonly string[] = typeof sourceIds === "string" ? [sourceIds] : sourceIds;
   const lines: string[] = [];
   const glossary = prompt.glossary
     .split("\n")
@@ -73,7 +74,7 @@ export function workspaceContextLines(
   }
 
   const examples = prompt.examples.filter(
-    (e) => hasQuery(e.panel) && e.panel.query.sourceId === sourceId,
+    (e) => hasQuery(e.panel) && ids.includes(e.panel.query.sourceId),
   );
   if (examples.length > 0) {
     lines.push("Example panels (a request, then the panel spec that answers it):");
@@ -106,10 +107,10 @@ export function workspaceContextLines(
  */
 export function workspaceContextBlock(
   prompt: WorkspacePrompt | null | undefined,
-  sourceId: string,
+  sourceIds: string | readonly string[],
 ): string {
   if (!prompt || isEmptyWorkspacePrompt(prompt)) return "";
-  const lines = workspaceContextLines(prompt, sourceId);
+  const lines = workspaceContextLines(prompt, sourceIds);
   if (lines.length === 0) return "";
   return `${fenceUntrustedBlock(WORKSPACE_BLOCK_KIND, lines.join("\n"), PREAMBLE)}\n\n${WORKSPACE_BLOCK_CLOSING}`;
 }

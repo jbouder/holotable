@@ -164,8 +164,12 @@ share one. See [Row-level filters](/operations/row-level-filters/).
 
 ## 9. The catalog prompt is metadata only, and that metadata is untrusted
 
-Table and column names and types for a **single selected, authorized source per
-call**. No sample rows are sent, and no column the catalog marks
+Table and column names and types for the **selected, authorized sources of the
+call: one, or for a dashboard up to three in one workspace, each in its own
+fenced block** ([ADR 1](/architecture/decisions/0001-multi-source-generation/)).
+Every source is resolved and authorized on its own record, and a panel's SQL
+is validated against the catalog of the source it names, so a table from one
+source under another's id is refused. No sample rows are sent, and no column the catalog marks
 `"exposed": false`: the guard refuses any read of one, so naming it to the
 model would only produce SQL that fails.
 

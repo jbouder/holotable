@@ -47,31 +47,41 @@ export async function validateWorkspacePrompt(
 }
 
 /**
- * The customization as the model sees it for one source: the examples that
- * are not for `source` are dropped (the prompt carries them only for their
- * own source), and so is any whose SQL no longer passes the guard against the
- * catalog as it is now, since a column can be hidden or a table go missing
- * after the example was saved.
+ * The customization as the model sees it for a generation over `sources`:
+ * an example is kept only when it is for one of them (the prompt carries an
+ * example only for its own source), and only while its SQL still passes the
+ * guard against that source's catalog as it is now, since a table can go
+ * missing after the example was saved.
  */
 export async function usableWorkspacePrompt(
   prompt: WorkspacePrompt | null,
-  source: SourceRecord,
+  sources: SourceRecord | readonly SourceRecord[],
 ): Promise<WorkspacePrompt | null> {
   if (!prompt) return null;
+  const list: readonly SourceRecord[] = Array.isArray(sources) ? sources : [sources];
   const examples: WorkspacePrompt["examples"] = [];
   for (const example of prompt.examples) {
-    if (!hasQuery(example.panel) || example.panel.query.sourceId !== source.id) continue;
+    if (!hasQuery(example.panel)) continue;
+    const source = list.find((s) => s.id === example.panel.query?.sourceId);
+    if (!source) continue;
     const check = await validateSql(example.panel.query.sql, source.config);
     if (check.ok) examples.push(example);
   }
   return { ...prompt, examples };
 }
 
-/** What a generation against `source` adds to its prompt, or null for nothing. */
+/**
+ * What a generation against `sources` adds to its prompt, or null for
+ * nothing. Every source of one generation is in one workspace, so the first
+ * one's workspace is the workspace's.
+ */
 export async function workspacePromptFor(
-  source: SourceRecord,
+  sources: SourceRecord | readonly SourceRecord[],
   store: WorkspacePromptStore = pgWorkspacePromptStore,
 ): Promise<WorkspacePrompt | null> {
-  const view = await store.get(source.workspaceId);
-  return usableWorkspacePrompt(view?.prompt ?? null, source);
+  const list: readonly SourceRecord[] = Array.isArray(sources) ? sources : [sources];
+  const [first] = list;
+  if (!first) return null;
+  const view = await store.get(first.workspaceId);
+  return usableWorkspacePrompt(view?.prompt ?? null, list);
 }

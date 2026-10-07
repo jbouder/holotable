@@ -27,6 +27,13 @@ import { Button } from "@/components/ui/button";
 import { Input, Textarea, Label } from "@/components/ui/input";
 import { AiUnavailable } from "@/components/ai-unavailable";
 import { Select } from "@/components/ui/select";
+import { Checkbox } from "@/components/ui/checkbox";
+import {
+  additionalSourceChoices,
+  MAX_ADDITIONAL_SOURCES,
+  pruneAdditionalSources,
+  toggleAdditionalSource,
+} from "@/lib/source-selection";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { PageHeader } from "@/components/ui/page-header";
@@ -84,7 +91,15 @@ export function NewDashboardClient({
   const router = useRouter();
   const [activeTab, setActiveTab] = React.useState<"chat" | "preview">("chat");
   const reducedMotion = useReducedMotion();
-  const [sourceId, setSourceId] = React.useState<string | null>(sources[0]?.id ?? null);
+  const [sourceId, setSourceIdState] = React.useState<string | null>(
+    sources[0]?.id ?? null,
+  );
+  // The dashboard's other sources (#104): same workspace, at most two more.
+  const [additionalIds, setAdditionalIds] = React.useState<string[]>([]);
+  const setSourceId = (id: string | null) => {
+    setSourceIdState(id);
+    setAdditionalIds((ids) => pruneAdditionalSources(ids, sources, id));
+  };
   const [prompt, setPrompt] = React.useState("");
   const [history, setHistory] = React.useState<TurnHistory>(EMPTY_HISTORY);
   const [saveError, setSaveError] = React.useState<ApiError | null>(null);
@@ -95,6 +110,8 @@ export function NewDashboardClient({
     Object.fromEntries(sources.map((s) => [s.id, s.catalog])),
   );
   const source = sources.find((s) => s.id === sourceId);
+  const additionalChoices = additionalSourceChoices(sources, sourceId);
+  const additionalSources = additionalChoices.filter((s) => additionalIds.includes(s.id));
   // Chips for the selected source. Server-built from its catalog, so they
   // change with the picker and never describe a table this source cannot read.
   const starters = source?.starters ?? [];
@@ -162,10 +179,16 @@ export function NewDashboardClient({
         ? {
             mode: "dashboard-refine",
             sourceId,
+            ...(additionalIds.length > 0 ? { additionalSourceIds: additionalIds } : {}),
             prompt: input.instruction,
             current: input.base,
           }
-        : { mode: "dashboard", sourceId, prompt: input.instruction },
+        : {
+            mode: "dashboard",
+            sourceId,
+            ...(additionalIds.length > 0 ? { additionalSourceIds: additionalIds } : {}),
+            prompt: input.instruction,
+          },
     );
   }
 
@@ -215,6 +238,8 @@ export function NewDashboardClient({
       appendTurn(h, { prompt: `From template "${input.template.name}"`, spec }),
     );
     setSourceId(input.sourceId);
+    // A template is built over one source.
+    setAdditionalIds([]);
     setSaveError(null);
     setPicking(false);
   }
@@ -348,13 +373,50 @@ export function NewDashboardClient({
                   </p>
                 )}
               </div>
-              {source && (
-                <CatalogHealthNotice
-                  source={source}
-                  health={catalog.health[source.id]}
-                  canRefresh={source.canRefresh}
-                  onRefreshed={(health) => catalog.update(source.id, health)}
-                />
+              {additionalChoices.length > 0 && (
+                <fieldset className="space-y-2">
+                  <legend className="mb-1 text-sm font-medium text-muted">
+                    Also use (up to {MAX_ADDITIONAL_SOURCES} more from{" "}
+                    {source?.workspaceId})
+                  </legend>
+                  <div className="flex flex-wrap gap-x-6 gap-y-2">
+                    {additionalChoices.map((s) => {
+                      const checked = additionalIds.includes(s.id);
+                      return (
+                        <Checkbox
+                          key={s.id}
+                          checked={checked}
+                          disabled={
+                            refining ||
+                            isLoading ||
+                            (!checked && additionalIds.length >= MAX_ADDITIONAL_SOURCES)
+                          }
+                          onCheckedChange={(next) =>
+                            setAdditionalIds((ids) =>
+                              toggleAdditionalSource(ids, s.id, next),
+                            )
+                          }
+                          label={s.name}
+                        />
+                      );
+                    })}
+                  </div>
+                  <p className="text-xs text-muted">
+                    Each panel reads one source; a query never combines two.
+                  </p>
+                </fieldset>
+              )}
+              {[source, ...additionalSources].map(
+                (s) =>
+                  s && (
+                    <CatalogHealthNotice
+                      key={s.id}
+                      source={s}
+                      health={catalog.health[s.id]}
+                      canRefresh={s.canRefresh}
+                      onRefreshed={(health) => catalog.update(s.id, health)}
+                    />
+                  ),
               )}
               <div>
                 <div className="flex items-center justify-between gap-2">

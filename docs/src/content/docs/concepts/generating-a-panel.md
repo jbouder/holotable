@@ -44,11 +44,30 @@ streamObject({
 to emit a spec shaped like `Dashboard`/`Panel` — not free-form text, and not
 data rows.
 
-**The system prompt contains only catalog *metadata*** for the single selected
-source: table and column names and types from `buildCatalogPrompt(source)`,
+**The system prompt contains only catalog *metadata*** for the selected
+sources (one, or for a dashboard [up to three](#more-than-one-source)): table and column names and types from `buildCatalogPrompt(source)`,
 plus the workspace's own context when it has one (below). No sample rows are
 ever sent to the model. It designs against a schema, not against
 data.
+
+## More than one source
+
+A dashboard can be generated over up to three sources of one workspace: on
+`/dashboards/new`, pick the data source and tick up to two more under **Also
+use** (`additionalSourceIds` on the `dashboard` and `dashboard-refine`
+modes). It is still one model call. Each source is resolved and authorized on
+its own record, and one that is missing, removed, unchecked, outside the
+workspace or not the caller's to use refuses the request rather than being
+dropped.
+
+The prompt lists every `sourceId` and gives each catalog its own fenced block
+under a heading naming its source, and the SQL rules say a panel reads only
+its own source's tables and never combines sources. On save, each panel's
+SQL is validated against the source it names, which is what actually refuses
+a table from one source under another's id. A panel edit or an explore
+question still uses one source. See
+[ADR 1](/architecture/decisions/0001-multi-source-generation/) for the
+options and why this one.
 
 ## Workspace context
 

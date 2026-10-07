@@ -75,6 +75,10 @@ export default defineConfig({
             { label: "Data model", slug: "architecture/data-model" },
             { label: "Motion", slug: "architecture/motion" },
             { label: "Accessibility", slug: "architecture/accessibility" },
+            {
+              label: "ADR 1: Multi-source generation",
+              slug: "architecture/decisions/0001-multi-source-generation",
+            },
           ],
         },
         {
