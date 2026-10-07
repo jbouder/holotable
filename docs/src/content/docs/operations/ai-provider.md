@@ -63,6 +63,40 @@ prefixed id such as `opencode-go/kimi-k2.7-code` is rejected with
 exact ids. Only models exposing an OpenAI-compatible `/chat/completions`
 interface work via this path.
 
+### When a listed model does not speak the protocol
+
+An aggregator (OpenCode Zen, OpenRouter and the like) puts many vendors' models
+behind one base URL and one key, and lists them all at `/models`. Being listed
+does **not** mean a model speaks either OpenAI protocol. On Zen, for one, the
+Claude and Gemini models answer every request with "Model does not support this
+protocol", under `OPENAI_API=chat` and `responses` alike
+([#337](https://github.com/jbouder/holotable/issues/337)).
+
+An author then sees, in place of an answer:
+
+> The model provider says the model in AI_MODEL does not support the API this
+> server calls it with. Set OPENAI_API to "chat" (Chat Completions) or
+> "responses" (Responses API) to match what the provider offers for that
+> model, or choose another AI_MODEL.
+
+The server log has the provider's own reply, as `model.request_failed` with
+`protocolMismatch: true`. To fix it:
+
+1. Try the other `OPENAI_API` value, and restart.
+2. If neither works, the model needs its vendor's own protocol. Use a model
+   the aggregator serves over the OpenAI API, point `AI_PROVIDER=gateway` at
+   it, or use the vendor's native provider once that is supported
+   ([#331](https://github.com/jbouder/holotable/issues/331)).
+
+`npm run eval -- --live --case <name>` with `AI_MODEL` set for that one run is a
+quick way to try a model before switching the server to it.
+
+Any other provider failure reaches the author as the status and a pointer to
+the server log, never as the provider's reply, which can quote the request or
+part of a key. Generation waits for the model's first output before it answers,
+so a refusal is an error response (502, or 504 for a
+[timeout](#timeouts-and-retries)) rather than an empty answer.
+
 ## `AI_PROVIDER=stub`
 
 A recorded model for the end-to-end suite (`src/lib/ai/stub.ts`). It never

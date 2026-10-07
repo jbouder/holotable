@@ -5,6 +5,7 @@ import { readJson, route } from "@/lib/http";
 import { audit } from "@/lib/audit";
 import { type OnGenerationFinish, streamSourceDraft } from "@/lib/ai/generate";
 import { recordGeneration } from "@/lib/ai/log";
+import { textResponseOnceStarted } from "@/lib/ai/provider-error";
 import {
   type Failure,
   GENERATION_ID_HEADER,
@@ -117,7 +118,10 @@ export const POST = route("sources.draft", async (req: Request) => {
     onFinish,
     repair,
   });
-  return result.toTextStreamResponse(
-    generationId ? { headers: { [GENERATION_ID_HEADER]: generationId } } : undefined,
+  // A provider that refused the request answers here, as an error that names
+  // the setting to fix, rather than as an empty 200 (#337).
+  return textResponseOnceStarted(
+    result,
+    generationId ? { [GENERATION_ID_HEADER]: generationId } : undefined,
   );
 });
