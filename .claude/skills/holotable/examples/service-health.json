@@ -1,0 +1,216 @@
+{
+  "format": "holotable.dashboard",
+  "formatVersion": 1,
+  "spec": {
+    "specVersion": 1,
+    "title": "Checkout service health",
+    "timeRange": { "from": "now-6h", "to": "now" },
+    "refreshIntervalMs": 15000,
+    "panels": [
+      {
+        "id": "about",
+        "title": "About this dashboard",
+        "viz": "text",
+        "options": {
+          "content": "## Checkout service health\n\nTraffic, errors and latency for the HTTP tier. Paging runbook: [checkout on-call](https://runbooks.example.com/checkout)."
+        },
+        "layout": { "x": 0, "y": 0, "w": 12, "h": 2 }
+      },
+      {
+        "id": "requests",
+        "title": "Requests",
+        "description": "Number of HTTP requests served in the window.",
+        "viz": "stat",
+        "query": {
+          "sourceId": "ts-metrics",
+          "sql": "SELECT count(*) AS requests FROM http_requests"
+        },
+        "options": { "compact": true, "unit": "requests" },
+        "layout": { "x": 0, "y": 2, "w": 3, "h": 3 }
+      },
+      {
+        "id": "error-rate",
+        "title": "Error rate",
+        "description": "Share of requests that returned a 5xx status, as a percentage.",
+        "viz": "stat",
+        "query": {
+          "sourceId": "ts-metrics",
+          "sql": "SELECT 100.0 * count(*) FILTER (WHERE status >= 500) / NULLIF(count(*), 0) AS error_pct FROM http_requests"
+        },
+        "format": "percent",
+        "options": {
+          "decimals": 2,
+          "thresholds": [
+            { "value": 0, "color": "success" },
+            { "value": 1, "color": "warning" },
+            { "value": 5, "color": "danger" }
+          ]
+        },
+        "layout": { "x": 3, "y": 2, "w": 3, "h": 3 }
+      },
+      {
+        "id": "p95-now",
+        "title": "p95 latency",
+        "description": "95th percentile request duration in milliseconds, with its per-minute history.",
+        "viz": "stat",
+        "query": {
+          "sourceId": "ts-metrics",
+          "sql": "SELECT time_bucket('1 minute', ts) AS minute, percentile_cont(0.95) WITHIN GROUP (ORDER BY duration_ms) AS p95_ms FROM http_requests GROUP BY minute ORDER BY minute",
+          "timeField": "minute"
+        },
+        "format": "ms",
+        "options": { "value": "p95_ms", "sparkline": true },
+        "layout": { "x": 6, "y": 2, "w": 3, "h": 3 }
+      },
+      {
+        "id": "cpu-by-host",
+        "title": "CPU by host",
+        "description": "Average CPU utilization per host over the window, as a percentage.",
+        "viz": "gauge",
+        "query": {
+          "sourceId": "ts-metrics",
+          "sql": "SELECT host, avg(cpu_pct) AS cpu FROM host_metrics GROUP BY host ORDER BY host"
+        },
+        "format": "percent",
+        "options": {
+          "variant": "bar",
+          "value": "cpu",
+          "min": 0,
+          "max": 100,
+          "thresholds": [
+            { "value": 0, "color": "success" },
+            { "value": 70, "color": "warning" },
+            { "value": 90, "color": "danger" }
+          ]
+        },
+        "layout": { "x": 9, "y": 2, "w": 3, "h": 3 }
+      },
+      {
+        "id": "traffic",
+        "title": "Requests and errors per minute",
+        "description": "Requests and 5xx responses counted per one-minute bucket.",
+        "viz": "line",
+        "query": {
+          "sourceId": "ts-metrics",
+          "sql": "SELECT time_bucket('1 minute', ts) AS minute, count(*) AS requests, count(*) FILTER (WHERE status >= 500) AS errors FROM http_requests GROUP BY minute ORDER BY minute",
+          "timeField": "minute"
+        },
+        "options": { "unit": "req/min", "legend": "bottom" },
+        "layout": { "x": 0, "y": 5, "w": 6, "h": 4 }
+      },
+      {
+        "id": "latency",
+        "title": "Latency percentiles",
+        "description": "Median and 95th percentile request duration in milliseconds, per minute.",
+        "viz": "line",
+        "query": {
+          "sourceId": "ts-metrics",
+          "sql": "SELECT time_bucket('1 minute', ts) AS minute, percentile_cont(0.5) WITHIN GROUP (ORDER BY duration_ms) AS p50_ms, percentile_cont(0.95) WITHIN GROUP (ORDER BY duration_ms) AS p95_ms FROM http_requests GROUP BY minute ORDER BY minute",
+          "timeField": "minute"
+        },
+        "format": "ms",
+        "options": { "yAxis": { "min": 0, "label": "ms" } },
+        "layout": { "x": 6, "y": 5, "w": 6, "h": 4 }
+      },
+      {
+        "id": "bandwidth",
+        "title": "Bytes served",
+        "description": "Response bytes summed per five-minute bucket, from the per-minute rollup.",
+        "viz": "area",
+        "query": {
+          "sourceId": "ts-metrics",
+          "sql": "SELECT time_bucket('5 minutes', minute) AS bucket, sum(bytes_sum) AS bytes FROM http_requests_1m GROUP BY bucket ORDER BY bucket",
+          "timeField": "bucket"
+        },
+        "format": "bytes",
+        "layout": { "x": 0, "y": 9, "w": 6, "h": 4 }
+      },
+      {
+        "id": "top-routes",
+        "title": "Busiest routes",
+        "description": "Request count per route, the ten busiest.",
+        "viz": "bar",
+        "query": {
+          "sourceId": "ts-metrics",
+          "sql": "SELECT route, count(*) AS requests FROM http_requests GROUP BY route ORDER BY requests DESC LIMIT 10"
+        },
+        "layout": { "x": 6, "y": 9, "w": 6, "h": 4 }
+      },
+      {
+        "id": "status-mix",
+        "title": "Responses by status class",
+        "description": "Share of responses per status class (2xx, 3xx, 4xx, 5xx).",
+        "viz": "donut",
+        "query": {
+          "sourceId": "ts-metrics",
+          "sql": "SELECT (status / 100)::text || 'xx' AS status_class, count(*) AS responses FROM http_requests GROUP BY status_class ORDER BY status_class"
+        },
+        "options": { "legend": "right" },
+        "layout": { "x": 0, "y": 13, "w": 4, "h": 4 }
+      },
+      {
+        "id": "slow-routes",
+        "title": "Slowest routes",
+        "description": "Request count and 95th percentile duration per route, slowest first.",
+        "viz": "table",
+        "query": {
+          "sourceId": "ts-metrics",
+          "sql": "SELECT route, count(*) AS requests, percentile_cont(0.95) WITHIN GROUP (ORDER BY duration_ms) AS p95_ms FROM http_requests GROUP BY route ORDER BY p95_ms DESC LIMIT 20"
+        },
+        "options": {
+          "columns": [
+            { "name": "route", "label": "Route" },
+            { "name": "p95_ms", "label": "p95", "format": "ms", "align": "right" },
+            { "name": "requests", "label": "Requests", "compact": true, "align": "right" }
+          ],
+          "sort": { "column": "p95_ms", "order": "desc" }
+        },
+        "layout": { "x": 4, "y": 13, "w": 8, "h": 4 }
+      },
+      {
+        "id": "route-heat",
+        "title": "Traffic by route over time",
+        "description": "Request count per route per five-minute bucket.",
+        "viz": "heatmap",
+        "query": {
+          "sourceId": "ts-metrics",
+          "sql": "SELECT time_bucket('5 minutes', ts) AS bucket, route, count(*) AS requests FROM http_requests GROUP BY bucket, route ORDER BY bucket",
+          "timeField": "bucket"
+        },
+        "layout": { "x": 0, "y": 17, "w": 8, "h": 4 }
+      },
+      {
+        "id": "size-vs-latency",
+        "title": "Response size against latency",
+        "description": "Average response bytes against average duration in milliseconds, one point per route.",
+        "viz": "scatter",
+        "query": {
+          "sourceId": "ts-metrics",
+          "sql": "SELECT avg(bytes) AS avg_bytes, avg(duration_ms) AS avg_ms, route FROM http_requests GROUP BY route"
+        },
+        "layout": { "x": 8, "y": 17, "w": 4, "h": 4 }
+      },
+      {
+        "id": "service-states",
+        "title": "Service status",
+        "description": "Each service's state over time, one lane per service.",
+        "viz": "state-timeline",
+        "query": {
+          "sourceId": "ts-metrics",
+          "sql": "SELECT ts, service, state FROM service_status ORDER BY ts",
+          "timeField": "ts"
+        },
+        "options": {
+          "entity": "service",
+          "state": "state",
+          "states": [
+            { "state": "up", "color": "success" },
+            { "state": "degraded", "color": "warning" },
+            { "state": "down", "color": "danger" }
+          ]
+        },
+        "layout": { "x": 0, "y": 21, "w": 12, "h": 3 }
+      }
+    ]
+  }
+}

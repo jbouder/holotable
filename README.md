@@ -48,6 +48,7 @@ Everything is explained once, on the docs site
 - [Configuration](https://holotable-docs.beskar.workers.dev/reference/configuration/) — every environment variable, generated from `src/lib/config.ts`.
 - [Keycloak setup](https://holotable-docs.beskar.workers.dev/operations/keycloak/) — the OIDC client and group mapper.
 - [API routes](https://holotable-docs.beskar.workers.dev/reference/api-routes/) and [Deploying on Kubernetes](https://holotable-docs.beskar.workers.dev/operations/kubernetes/).
+- [Writing specs with Claude Code](https://holotable-docs.beskar.workers.dev/getting-started/writing-specs-with-claude-code/) — the `/holotable` skill in `.claude/skills/holotable/` writes, reviews and fixes dashboard specs from your terminal.
 
 ## Contributing, security, license
 

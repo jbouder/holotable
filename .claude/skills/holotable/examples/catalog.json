@@ -1,0 +1,56 @@
+{
+  "sourceId": "ts-metrics",
+  "schema": "metrics",
+  "tables": [
+    {
+      "name": "http_requests",
+      "description": "One row per HTTP request served.",
+      "timeField": "ts",
+      "columns": [
+        { "name": "ts", "type": "timestamp with time zone" },
+        { "name": "service", "type": "text" },
+        { "name": "route", "type": "text" },
+        { "name": "status", "type": "smallint" },
+        { "name": "duration_ms", "type": "double precision" },
+        { "name": "bytes", "type": "bigint" },
+        { "name": "client_ip", "type": "inet", "exposed": false }
+      ]
+    },
+    {
+      "name": "http_requests_1m",
+      "description": "Per-minute rollup of http_requests (a continuous aggregate).",
+      "timeField": "minute",
+      "columns": [
+        { "name": "minute", "type": "timestamp with time zone" },
+        { "name": "service", "type": "text" },
+        { "name": "route", "type": "text" },
+        { "name": "requests", "type": "bigint" },
+        { "name": "avg_duration_ms", "type": "double precision" },
+        { "name": "errors", "type": "bigint" },
+        { "name": "bytes_sum", "type": "numeric" }
+      ]
+    },
+    {
+      "name": "host_metrics",
+      "description": "Host resource samples, every 10 seconds.",
+      "timeField": "ts",
+      "columns": [
+        { "name": "ts", "type": "timestamp with time zone" },
+        { "name": "host", "type": "text" },
+        { "name": "region", "type": "text" },
+        { "name": "cpu_pct", "type": "double precision" },
+        { "name": "mem_pct", "type": "double precision" }
+      ]
+    },
+    {
+      "name": "service_status",
+      "description": "A row each time a service changes state.",
+      "timeField": "ts",
+      "columns": [
+        { "name": "ts", "type": "timestamp with time zone" },
+        { "name": "service", "type": "text" },
+        { "name": "state", "type": "text" }
+      ]
+    }
+  ]
+}
