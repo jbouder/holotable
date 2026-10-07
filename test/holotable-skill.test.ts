@@ -1,0 +1,199 @@
+import assert from "node:assert/strict";
+import { readdirSync, readFileSync } from "node:fs";
+import { join } from "node:path";
+import { test } from "node:test";
+import { DashboardExportFile } from "@/lib/dashboard-export";
+import { declaredVariables, hasQuery, ValueFormat } from "@/lib/ir";
+import { COLOR_TOKENS } from "@/lib/panels/colors";
+import { PANEL_KIND_NAMES, PANEL_KINDS } from "@/lib/panels/registry";
+import { CatalogTable, SourceConfig } from "@/lib/registry";
+import { checkSql } from "@/lib/sql/safety";
+
+/*
+ * The /holotable Claude Code skill (#147) teaches people and Claude to write
+ * specs by hand. Everything it shows has to be true of this build, so every
+ * example spec is parsed with the real IR, every query in it and every SQL
+ * example goes through the real guard, and the lists the reference spells out
+ * (panel kinds, formats, colors) are held to the code they describe.
+ */
+
+const SKILL = join(process.cwd(), ".claude/skills/holotable");
+const EXAMPLES = join(SKILL, "examples");
+
+function readJson(path: string): unknown {
+  return JSON.parse(readFileSync(path, "utf8"));
+}
+
+function read(path: string): string {
+  return readFileSync(join(SKILL, path), "utf8");
+}
+
+/** The example catalog, as the guard needs it. */
+function exampleSource(): { sourceId: string; config: SourceConfig } {
+  const catalog = readJson(join(EXAMPLES, "catalog.json")) as {
+    sourceId: string;
+    schema: string;
+    tables: unknown[];
+  };
+  // The skill has no connection details by design (no host, no credentials);
+  // the guard's config type wants them, so the test supplies placeholders.
+  const config = SourceConfig.parse({
+    host: "example.invalid",
+    port: 5432,
+    database: "example",
+    schema: catalog.schema,
+    tables: catalog.tables.map((t) => CatalogTable.parse(t)),
+  });
+  return { sourceId: catalog.sourceId, config };
+}
+
+const DASHBOARD_FILES = readdirSync(EXAMPLES).filter(
+  (f) => f.endsWith(".json") && !["catalog.json", "sql.json"].includes(f),
+);
+
+test("there are example dashboards to check", () => {
+  assert.ok(DASHBOARD_FILES.length >= 2, DASHBOARD_FILES.join(", "));
+});
+
+for (const file of DASHBOARD_FILES) {
+  test(`example ${file} imports, and every query passes the guard`, async () => {
+    const parsed = DashboardExportFile.safeParse(readJson(join(EXAMPLES, file)));
+    assert.ok(
+      parsed.success,
+      parsed.success ? "" : JSON.stringify(parsed.error.issues, null, 2),
+    );
+    const { spec } = parsed.data;
+    const { sourceId, config } = exampleSource();
+    const declared = declaredVariables(spec);
+
+    for (const panel of spec.panels.filter(hasQuery)) {
+      assert.equal(panel.query.sourceId, sourceId, `${file} ${panel.id}: sourceId`);
+      const check = await checkSql(panel.query.sql, config, declared);
+      assert.ok(check.ok, `${file} ${panel.id}: ${check.error}`);
+      const { timeField } = panel.query;
+      if (timeField) {
+        // The server filters on an OUTPUT column, so the time field has to be
+        // one the SELECT list produces: an alias, or the bare column itself.
+        const output = new RegExp(
+          `(\\bAS\\s+${timeField}\\b|^SELECT\\s+${timeField}\\b)`,
+          "i",
+        );
+        assert.match(
+          panel.query.sql,
+          output,
+          `${file} ${panel.id}: timeField ${timeField}`,
+        );
+      }
+    }
+    for (const variable of spec.variables ?? []) {
+      if (!variable.query) continue;
+      // A variable's own query declares no variables and has no time filter.
+      const check = await checkSql(variable.query.sql, config);
+      assert.ok(check.ok, `${file} variable ${variable.name}: ${check.error}`);
+    }
+  });
+}
+
+test("the examples between them use every panel kind", () => {
+  const used = new Set<string>();
+  for (const file of DASHBOARD_FILES) {
+    const { spec } = DashboardExportFile.parse(readJson(join(EXAMPLES, file)));
+    for (const panel of spec.panels) used.add(panel.viz);
+  }
+  assert.deepEqual(
+    PANEL_KIND_NAMES.filter((k) => !used.has(k)),
+    [],
+    "add an example panel of each missing kind",
+  );
+});
+
+interface SqlExample {
+  rule: string;
+  sql: string;
+  variables?: string[];
+  error?: string;
+}
+
+const SQL = readJson(join(EXAMPLES, "sql.json")) as {
+  accepted: SqlExample[];
+  rejected: SqlExample[];
+};
+
+test("every accepted SQL example passes the guard", async () => {
+  const { config } = exampleSource();
+  for (const ex of SQL.accepted) {
+    const check = await checkSql(ex.sql, config, new Set(ex.variables ?? []));
+    assert.ok(check.ok, `${ex.rule}: ${check.error}`);
+  }
+});
+
+test("every rejected SQL example fails the guard, for the reason it gives", async () => {
+  const { config } = exampleSource();
+  for (const ex of SQL.rejected) {
+    const check = await checkSql(ex.sql, config, new Set(ex.variables ?? []));
+    assert.equal(check.ok, false, `${ex.rule}: accepted ${ex.sql}`);
+    assert.ok(ex.error, `${ex.rule}: name the expected error`);
+    assert.ok(
+      check.error?.includes(ex.error),
+      `${ex.rule}: expected an error containing "${ex.error}", got "${check.error}"`,
+    );
+  }
+});
+
+test("the reference lists exactly the registered panel kinds, in order", () => {
+  const kinds = [
+    ...read("references/panel-kinds.md").matchAll(/^### `([a-z-]+)`$/gm),
+  ].map((m) => m[1]);
+  assert.deepEqual(kinds, [...PANEL_KIND_NAMES]);
+});
+
+test("the reference marks the kinds that run no query and the ones that need a time field", () => {
+  const text = read("references/panel-kinds.md");
+  for (const kind of PANEL_KINDS) {
+    const section = text.split(`### \`${kind.kind}\``)[1]?.split("\n### ")[0] ?? "";
+    assert.equal(
+      section.includes("Runs no query."),
+      kind.query === "none",
+      `${kind.kind}: "Runs no query." should appear exactly when the kind has no query`,
+    );
+    assert.equal(
+      section.includes("Requires `query.timeField`."),
+      kind.requiresTimeField === true,
+      `${kind.kind}: "Requires \`query.timeField\`." should appear exactly when it does`,
+    );
+  }
+});
+
+/** The backticked names on the reference line that starts with `label`. */
+function listed(label: string): string[] {
+  const line = read("references/ir.md")
+    .split("\n")
+    .find((l) => l.startsWith(label));
+  assert.ok(line, `references/ir.md has no line starting "${label}"`);
+  return [...line.matchAll(/`([^`]+)`/g)].map((m) => m[1]);
+}
+
+test("the reference's value formats and color tokens are the IR's", () => {
+  assert.deepEqual(listed("Value formats:"), [...ValueFormat.options]);
+  assert.deepEqual(listed("Color tokens:"), Object.keys(COLOR_TOKENS));
+});
+
+test("the skill carries no connection details, credentials or route calls", () => {
+  const files = [
+    "SKILL.md",
+    ...readdirSync(join(SKILL, "references")).map((f) => `references/${f}`),
+    ...readdirSync(EXAMPLES).map((f) => `examples/${f}`),
+  ];
+  for (const file of files) {
+    const text = read(file);
+    for (const pattern of [
+      /postgres(ql)?:\/\//i,
+      /"(host|port|password|user(name)?|secretRef)"\s*:/i,
+      /\/api\//,
+      /Authorization:/i,
+      /Bearer /,
+    ]) {
+      assert.doesNotMatch(text, pattern, `${file} matches ${pattern}`);
+    }
+  }
+});

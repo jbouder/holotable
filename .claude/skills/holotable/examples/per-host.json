@@ -1,0 +1,101 @@
+{
+  "format": "holotable.dashboard",
+  "formatVersion": 1,
+  "spec": {
+    "specVersion": 1,
+    "title": "Host resources",
+    "timeRange": { "from": "now-1h", "to": "now" },
+    "refreshIntervalMs": 30000,
+    "variables": [
+      {
+        "name": "region",
+        "label": "Region",
+        "type": "enum",
+        "values": ["us-east", "us-west", "eu-central"],
+        "default": "us-east"
+      },
+      {
+        "name": "host",
+        "label": "Hosts",
+        "type": "query",
+        "query": {
+          "sourceId": "ts-metrics",
+          "sql": "SELECT DISTINCT host FROM host_metrics ORDER BY 1"
+        },
+        "multi": true
+      }
+    ],
+    "panels": [
+      {
+        "id": "cpu",
+        "title": "CPU",
+        "description": "Average CPU utilization per minute for the selected hosts in the selected region, as a percentage.",
+        "viz": "line",
+        "query": {
+          "sourceId": "ts-metrics",
+          "sql": "SELECT time_bucket('1 minute', ts) AS minute, avg(cpu_pct) AS cpu FROM host_metrics WHERE region = :region AND host = ANY(:host) GROUP BY minute ORDER BY minute",
+          "timeField": "minute"
+        },
+        "format": "percent",
+        "options": {
+          "yAxis": { "min": 0, "max": 100 },
+          "thresholds": [
+            { "value": 80, "color": "warning" },
+            { "value": 95, "color": "danger" }
+          ]
+        },
+        "layout": { "x": 0, "y": 0, "w": 6, "h": 4 }
+      },
+      {
+        "id": "memory",
+        "title": "Memory",
+        "description": "Average memory utilization per minute for the selected hosts in the selected region, as a percentage.",
+        "viz": "line",
+        "query": {
+          "sourceId": "ts-metrics",
+          "sql": "SELECT time_bucket('1 minute', ts) AS minute, avg(mem_pct) AS memory FROM host_metrics WHERE region = :region AND host = ANY(:host) GROUP BY minute ORDER BY minute",
+          "timeField": "minute"
+        },
+        "format": "percent",
+        "options": { "yAxis": { "min": 0, "max": 100 } },
+        "layout": { "x": 6, "y": 0, "w": 6, "h": 4 }
+      },
+      {
+        "id": "fleet-by-region",
+        "title": "Fleet by region",
+        "description": "Number of distinct hosts reporting in each region over the window.",
+        "viz": "pie",
+        "query": {
+          "sourceId": "ts-metrics",
+          "sql": "SELECT region, count(DISTINCT host) AS hosts FROM host_metrics GROUP BY region ORDER BY hosts DESC"
+        },
+        "options": { "legend": "right" },
+        "layout": { "x": 0, "y": 4, "w": 4, "h": 4 }
+      },
+      {
+        "id": "busiest-today",
+        "title": "Peak CPU, last 24 hours",
+        "description": "The highest CPU sample per selected host over the last day, as a percentage.",
+        "viz": "table",
+        "query": {
+          "sourceId": "ts-metrics",
+          "sql": "SELECT host, max(cpu_pct) AS peak_cpu FROM host_metrics WHERE region = :region AND host = ANY(:host) GROUP BY host ORDER BY peak_cpu DESC"
+        },
+        "timeRange": { "from": "now-24h", "to": "now" },
+        "refreshIntervalMs": 300000,
+        "options": {
+          "columns": [
+            { "name": "host", "label": "Host" },
+            {
+              "name": "peak_cpu",
+              "label": "Peak CPU",
+              "format": "percent",
+              "decimals": 1
+            }
+          ]
+        },
+        "layout": { "x": 4, "y": 4, "w": 8, "h": 4 }
+      }
+    ]
+  }
+}

@@ -73,6 +73,12 @@ Key locations:
   root `tsconfig`, checked by `.github/workflows/demo.yml`)
 - `.github/` — CI workflows, issue forms, the pull request template, `CODEOWNERS`,
   `dependabot.yml`
+- `.claude/skills/holotable/` — the `/holotable` Claude Code skill (#147):
+  knowledge-only guidance for writing and reviewing specs, with no server
+  connection. `test/holotable-skill.test.ts` runs its examples through the IR
+  and the SQL guard and holds its lists of panel kinds, formats and color
+  tokens to the code, so a change to any of those updates the skill's
+  `references/` in the same pull request
 
 Important files:
 
