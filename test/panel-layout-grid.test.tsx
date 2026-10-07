@@ -147,3 +147,29 @@ test("without onDelete the keys do nothing, and the label does not promise them"
     h.unmount();
   }
 });
+
+test("with renderBody, the live panel sits inert under the handle (#357)", async () => {
+  const h = await mount();
+  const selected: string[] = [];
+  try {
+    h.render(
+      <PanelLayoutGrid
+        panels={PANELS}
+        selectedId="a"
+        onSelect={(id) => selected.push(id)}
+        onChange={() => {}}
+        renderBody={(panel) => <button type="button">inside {panel.title}</button>}
+      />,
+    );
+    const body = [...h.container.querySelectorAll("[inert]")];
+    assert.equal(body.length, 2, "each panel body is inert");
+    assert.ok(body[0].textContent?.includes("inside Requests"));
+    // The handle carries the selection, so a screen reader hears which one.
+    assert.equal(tile(h.container, "Requests,").getAttribute("aria-pressed"), "true");
+    assert.equal(tile(h.container, "Errors,").getAttribute("aria-pressed"), "false");
+    h.click(tile(h.container, "Errors,"));
+    assert.deepEqual(selected, ["b"]);
+  } finally {
+    h.unmount();
+  }
+});

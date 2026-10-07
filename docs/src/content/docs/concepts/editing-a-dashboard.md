@@ -16,15 +16,44 @@ nothing they propose is trusted until the save re-derives it — but it used to
 mean an editing session had exactly one outcome and no memory. This page
 describes what the session holds now.
 
+## The canvas and the inspector
+
+The editor is the dashboard itself. The **canvas** draws every panel with its
+live preview — each panel's guarded query run once through `/api/query`, and run
+again only when that panel's SQL, window or the variable values change, after a
+short pause in typing (`src/lib/preview-runs.ts`). Moving, resizing or restyling
+a panel reuses the rows it already has, and the chart is never recreated: the
+grid moves the panel's card.
+
+Click a panel (or focus it and press Enter) to select it. The **inspector**
+beside the canvas then edits that panel, top to bottom:
+
+- **Ask AI**: the natural-language edit, which runs the model once and shows
+  the change as a diff to accept, reject or regenerate.
+- **Data**: the source, the SQL with its guarded preview, the time field, and
+  the panel's own window and refresh. A text panel shows its Markdown here.
+- **Visualization**: title, kind, value format and description.
+- **Display**: the presentation options, collapsed until wanted.
+
+The panel's actions menu holds **Duplicate**, **Save as template** and
+**Delete**. Closing the panel (or selecting nothing) shows the dashboard's own
+settings instead: the time range (the same picker readers use), the refresh
+interval as presets with a custom value in seconds, the `Arrange: N-up`
+presets, **Variables**, **Annotations**, and the description and tags. The
+title is edited in place at the top of the page. On a narrow screen the
+inspector sits under the canvas.
+
 ## Saving
 
-There are two save actions and they differ only in where they leave you:
+There is one **Save**. It opens a small form with the optional version note and
+two ways to finish, which differ only in where they leave you:
 
 - **Save version** writes a new version and keeps you in the editor. The version
   number in the header goes up and the "unsaved changes" marker clears.
-- **Save & view** does the same and then opens the live dashboard.
+- **Save and view** does the same and then opens the live dashboard.
 
-Both take the optional **version note** next to the buttons: a short line about
+The keyboard shortcuts save directly, without the form. The **version note** is
+a short line about
 what changed, stored on the `dashboard_versions` row. Nothing reads it — it is
 not part of the spec, it never reaches the model, and it has no effect on
 execution. It is there so a version history reads as a sequence of intentions
@@ -54,35 +83,30 @@ hidden, the restore is refused and the current version stays.
 
 ## Details, which are not the spec
 
-The **details** button in the editor header (and the **Details…** action on a
-card in the dashboard list) edits the dashboard's *description* and *tags*.
+**Description and tags** in the dashboard settings (also in the editor's
+overflow menu, and the **Details…** action on a card in the dashboard list) edits the dashboard's *description* and *tags*.
 Those are columns on the `dashboards` row, not fields in the spec: they do not
 make the editor dirty, they are not undoable, they are saved the moment the
 dialog is confirmed, and they do not append a version.
 
-The **name** is the opposite case and is edited in the settings card with the
+The **name** is the opposite case and is edited in the page header with the
 rest of the spec. Renaming from the dashboard list does the same thing the long
 way round — it appends a version whose spec differs only in the title — because
 [the spec owns the title](/architecture/data-model/).
 
-## The panel list
+## Arranging panels
 
-The list on the left is the dashboard's panel *order*, which is what the
-`Arrange: N-up` presets flow onto the grid. Each row has an overflow menu with
-the actions that change it:
+Order, position and size live in one place: the canvas. Drag a panel to move
+it and drag its corner to resize it; with a panel focused, the arrow keys move
+it, Shift and the arrow keys resize it, and Delete removes it. Each gesture is
+one change to the spec, committed when the pointer comes up. There is no
+separate list to keep in step with the grid, and width is not a form field.
 
-- **Duplicate** copies the panel with a fresh id, `" (copy)"` on the title, and
-  the row directly below the original; anything already there is pushed down
-  rather than covered. The copy is selected, because the point of duplicating is
-  to then change it.
-- **Move up / down / to top / to bottom** move the panel through the order.
-  Dragging a row's handle does the same thing.
-
-Reordering touches the order and nothing else. A panel's position on the grid
-lives in its `layout`, so a dashboard you have arranged by hand survives a
-reorder unchanged — the new order reaches the grid only when you apply an
-`Arrange` preset. That is also why the actions are on the list and the dragging
-is on the grid: the two are different questions.
+The `Arrange: N-up` presets in the dashboard settings re-flow every panel into
+N columns in reading order, as one undoable step. **Duplicate** copies a panel
+with a fresh id, `" (copy)"` on the title, and the row directly below the
+original; anything already there is pushed down rather than covered. The copy
+is selected, because the point of duplicating is to then change it.
 
 Deleting is undoable, so it asks first only when there is work to lose — when
 the panel's SQL is no longer the starter the editor wrote for it.
@@ -99,22 +123,23 @@ Because every name in it comes from the source's allowlist, the starter is
 guaranteed to pass the SQL guard against that source — and it never filters time
 itself, because the server owns the range.
 
-**Describe** adds the same starter and puts the cursor in the
-natural-language box, so the first thing you do with the panel is say what it
+**Add panel** offers three starts: a **blank panel** (that starter), **describe
+it to the model**, or **from a template**. Describing adds the same starter and
+puts the cursor in the natural-language box, so the first thing you do with the panel is say what it
 should be. That runs the model once and lands as a reviewable diff, exactly like
 any other natural-language edit.
 
 ## Panel description
 
-The panel editor has a **Description** field: one sentence saying what the panel
+The inspector's **Visualization** section has a **Description** field: one sentence saying what the panel
 computes. The model writes one for every panel it generates, and this is where a
 human corrects it. It is shown to readers behind the info control on the panel
 header, never as a paragraph on the dashboard itself.
 
 ## Undo and redo
 
-Every change to the spec — adding, duplicating, reordering, deleting or editing
-a panel, arranging the grid, applying a template, accepting a natural-language
+Every change to the spec — adding, duplicating, moving, resizing, deleting or
+editing a panel, arranging the grid, applying a template, accepting a natural-language
 edit, re-pointing panels off a removed source — is one entry on a bounded
 history stack
 (`src/lib/editor/use-history.ts`). Undo and redo walk it; a new change after an
@@ -134,7 +159,7 @@ it again is correctly not a change.
 While there is a real change:
 
 - Closing or reloading the tab asks the browser's "leave site?" prompt.
-- Clicking a link out of the editor — including Cancel — asks first, and offers
+- Clicking a link out of the editor — including Close — asks first, and offers
   **Save and leave**, **Discard changes**, or **Keep editing**.
 
 ## Draft autosave

@@ -124,8 +124,10 @@ test("source → generate → save → stream → pause → resume → edit → 
       .getByRole("button", { name: /^Requests per minute/ })
       .first()
       .click();
-    // The selected panel's own title field (the dashboard has one too).
+    // Selecting a panel on the canvas opens it in the inspector (#357).
     await page.locator("#p-title").fill("Requests per minute, edited");
+    // One Save, which opens the optional version note.
+    await page.getByRole("button", { name: "Save", exact: true }).click();
     await page.getByRole("button", { name: "Save version" }).click();
 
     await expect

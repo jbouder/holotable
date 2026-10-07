@@ -444,7 +444,7 @@ before first paint (#212). The rules:
   `view-transition-name` is always written as `html[data-vt="<type>"] .thing`
   (the `html` type selector, not `:root`, so the reduce rule outranks it).
   Types in use: `theme` (`src/lib/theme-transition.ts`, the only way client
-  code changes the theme) and `tab` (the Editor/Preview tab
+  code changes the theme) and `tab` (the version history's Changes/Preview tab
   list; `.tab-panel` on exactly one element per tab).
 - **Entrances are keyframes.** `stagger-in` (with `--i` inline for a list),
   `drop-in` (alerts) and `pop-in` (an icon that swapped because something

@@ -3,16 +3,16 @@
 import * as React from "react";
 import { useRouter } from "next/navigation";
 import {
+  Keyboard,
+  Info,
+  LayoutTemplate,
+  Loader2,
+  MoreHorizontal,
   Plus,
+  Redo2,
   Save,
   SendHorizontal,
-  Loader2,
-  LayoutGrid,
-  LayoutTemplate,
-  Info,
-  Keyboard,
   Sparkles,
-  Redo2,
   Undo2,
   Unplug,
 } from "lucide-react";
@@ -22,37 +22,21 @@ import {
   declaredVariables,
   Panel,
   panelTimeRange,
-  type QueryPanel,
-  VizType,
-  ValueFormat,
   safeParseDashboard,
 } from "@/lib/ir";
-import { changePanelKind } from "@/lib/panel-kind-change";
 import { panelKind } from "@/lib/panels/registry";
-import { TEXT_CONTENT_MAX } from "@/lib/panels/kinds/text";
-import { MarkdownView } from "@/components/panels/text";
-import { autoLayoutPanels, COLUMN_PRESETS } from "@/lib/layout";
-import {
-  canMove,
-  duplicatePanel,
-  movePanel,
-  type PanelMove,
-  reorderPanels,
-} from "@/lib/panel-list";
-import { isStarterSql, panelStarter, starterPanel } from "@/lib/panel-starter";
-import { clampLayout } from "@/lib/grid-layout";
+import { autoLayoutPanels } from "@/lib/layout";
+import { duplicatePanel } from "@/lib/panel-list";
+import { isStarterSql, starterPanel } from "@/lib/panel-starter";
 import { AiUnavailable } from "@/components/ai-unavailable";
-import { Button, ButtonLabel } from "@/components/ui/button";
+import { Button } from "@/components/ui/button";
+import { buttonClassName } from "@/components/ui/button-styles";
 import { Input, Textarea, Label } from "@/components/ui/input";
-import { Select } from "@/components/ui/select";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { PreviewDashboard } from "@/components/dashboard/PreviewDashboard";
+import { Menu, MenuItem } from "@/components/ui/menu";
+import { Popover } from "@/components/ui/popover";
+import { PanelView } from "@/components/dashboard/PanelView";
 import { PanelLayoutGrid } from "@/components/dashboard/PanelLayoutGrid";
-import { PanelList } from "@/components/dashboard/PanelList";
-import { SqlEditor } from "@/components/sql/SqlEditor";
-import { TimeFieldPicker } from "@/components/sql/TimeFieldPicker";
-import type { SourceCatalog } from "@/lib/registry";
-import { PanelPreview, usePanelPreview } from "@/components/dashboard/PanelPreview";
+import { usePreviewStates } from "@/components/dashboard/use-preview-states";
 import { PanelDiffView } from "@/components/dashboard/PanelDiffView";
 import { PromptHistoryMenu, usePromptHistory } from "@/components/prompt-history";
 import { acceptedPanel, diffPanels, type PanelDraft } from "@/lib/panel-diff";
@@ -63,25 +47,23 @@ import { RepairingNote } from "@/components/repairing-note";
 import { useRepairingObject } from "@/components/use-repairing-object";
 import { type ApiError, apiErrorFromThrown, readApiError } from "@/lib/errors";
 import { appendTemplate, type Template } from "@/lib/templates";
-import { SaveAsTemplate } from "@/components/templates/SaveAsTemplate";
+import { useSaveAsTemplate } from "@/components/templates/SaveAsTemplate";
 import { TemplatePicker } from "@/components/templates/TemplatePicker";
 import { DraftBanner } from "@/components/editor/DraftBanner";
+import {
+  type EditIntent,
+  PanelInspector,
+  type SourceOption,
+} from "@/components/editor/PanelInspector";
+import { DashboardSettings } from "@/components/editor/DashboardSettings";
 import { Notice } from "@/components/notice";
 import { Dialog } from "@/components/ui/dialog";
 import { LeaveGuardDialog } from "@/components/editor/LeaveGuardDialog";
 import { ShortcutsDialog } from "@/components/editor/ShortcutsDialog";
 import { DashboardDetailsDialog } from "@/components/dashboard/DashboardDetailsDialog";
 import { useHistory } from "@/lib/editor/use-history";
-import { withViewTransition } from "@/lib/view-transition";
-import { useReducedMotion } from "@/components/motion-preference";
 import { formatShortcut, useIsMac, useShortcuts } from "@/lib/editor/use-shortcuts";
-import {
-  PanelPresentationFields,
-  PanelTimingFields,
-} from "@/components/editor/panel-settings";
-import { usePreviewValues, VariablesEditor } from "@/components/editor/variables-editor";
-import { AnnotationSettings } from "@/components/editor/annotation-settings";
-import type { VariableValues } from "@/lib/sql/variables";
+import { usePreviewValues } from "@/components/editor/variables-editor";
 import { bindShortcuts, EDITOR_SHORTCUTS } from "@/lib/shortcuts";
 import {
   interceptedHref,
@@ -103,35 +85,17 @@ import {
   writeDraft,
 } from "@/lib/editor/drafts";
 
-interface SourceOption {
-  id: string;
-  name: string;
-  workspaceId: string;
-  /** Tables and columns, for completion and the editor's allowlist hint. */
-  catalog: SourceCatalog;
-}
+/** Row height on the canvas: the viewer's, so a panel is edited at the size readers see. */
+const CANVAS_ROW_HEIGHT = 84;
 
-/** How a spec change is recorded in the undo stack. */
-interface EditIntent {
-  action: string;
-  /** Consecutive edits sharing a key coalesce into one history entry. */
-  key?: string | null;
-}
-
-const VIZ_OPTIONS = VizType.options.map((v) => ({ value: v, label: v }));
-/** `Panel.description` is `z.string().max(500)`; the box stops at the same place. */
-const PANEL_DESCRIPTION_MAX = 500;
-const WIDTH_PRESETS = [
-  { value: "12", label: "Full width" },
-  { value: "6", label: "Half (2-up)" },
-  { value: "4", label: "Third (3-up)" },
-  { value: "3", label: "Quarter (4-up)" },
-];
-const FORMAT_OPTIONS = [
-  { value: "", label: "none" },
-  ...ValueFormat.options.map((f) => ({ value: f, label: f })),
-];
-
+/**
+ * `/dashboards/[id]/edit` (#357): the live dashboard is the canvas, the
+ * inspector beside it edits whatever is selected — a panel, or with nothing
+ * selected the dashboard itself — and there is one Save.
+ *
+ * Every capability of the old two-tab editor is still here; what changed is
+ * where it sits. Order, position and size are edited only on the canvas.
+ */
 export function EditDashboardClient({
   dashboardId,
   workspaceId,
@@ -198,13 +162,11 @@ export function EditDashboardClient({
   const [showDetails, setShowDetails] = React.useState(false);
   const dirty = isDirty(spec, savedSpec);
 
+  // Nothing selected shows the dashboard's own settings; `?panel=` (how
+  // Explore hands off a saved result) opens on that panel instead.
   const [selectedId, setSelectedId] = React.useState<string | null>(
-    initialSpec.panels.find((p) => p.id === initialPanelId)?.id ??
-      initialSpec.panels[0]?.id ??
-      null,
+    initialSpec.panels.find((p) => p.id === initialPanelId)?.id ?? null,
   );
-  const [activeTab, setActiveTab] = React.useState<"editor" | "preview">("editor");
-  const reducedMotion = useReducedMotion();
   const [saving, setSaving] = React.useState(false);
   const [error, setError] = React.useState<ApiError | null>(null);
   const [nlPrompt, setNlPrompt] = React.useState("");
@@ -259,6 +221,20 @@ export function EditDashboardClient({
   const proposalBase = proposal
     ? (spec.panels.find((p) => p.id === proposal.panelId) ?? null)
     : null;
+
+  // The canvas: every panel's guarded preview, re-run only when its query,
+  // window or variables change, and only once typing pauses (#357).
+  const canvas = usePreviewStates(spec, previewValues, { debounceMs: 800 });
+
+  // "Save as template" from the panel's actions menu. The dialog lives here,
+  // outside the menu, which unmounts when it closes.
+  const panelTemplate = useSaveAsTemplate({
+    workspaceId,
+    subject: selected
+      ? { kind: "panel", panel: selected }
+      : { kind: "dashboard", dashboard: spec },
+    defaultName: selected?.title ?? spec.title,
+  });
 
   const {
     object,
@@ -336,7 +312,7 @@ export function EditDashboardClient({
     // Restoring is itself an edit, so it is one step to undo rather than a
     // decision the author cannot take back.
     history.set(offer.draft.spec, { action: "restore autosaved changes" });
-    setSelectedId(offer.draft.spec.panels[0]?.id ?? null);
+    setSelectedId(null);
     setOffer({ kind: "none" });
   }
 
@@ -411,19 +387,6 @@ export function EditDashboardClient({
     selectPanel(next.id);
   }
 
-  function move(id: string, to: PanelMove) {
-    if (!canMove(spec.panels, id, to)) return;
-    history.set((s) => ({ ...s, panels: movePanel(s.panels, id, to) }), {
-      action: `move panel ${to}`,
-    });
-  }
-
-  function reorder(id: string, to: number) {
-    history.set((s) => ({ ...s, panels: reorderPanels(s.panels, id, to) }), {
-      action: "reorder panels",
-    });
-  }
-
   /**
    * Delete, asking first when there is work to lose.
    *
@@ -467,11 +430,9 @@ export function EditDashboardClient({
       action: "delete panel",
     });
     if (proposal?.panelId === id) discardProposal();
-    // Select what is LEFT: falling back to `panels[0]` selected the panel that
-    // was just removed whenever it happened to be the first one.
-    if (selectedId === id) {
-      setSelectedId(spec.panels.find((p) => p.id !== id)?.id ?? null);
-    }
+    // Back to the dashboard's settings rather than onto some other panel the
+    // author did not pick.
+    if (selectedId === id) setSelectedId(null);
   }
 
   /** Drop the proposal, cancelling the run behind it if one is still going. */
@@ -480,7 +441,7 @@ export function EditDashboardClient({
     setProposal(null);
   }
 
-  function selectPanel(id: string) {
+  function selectPanel(id: string | null) {
     if (id === selectedId) return;
     discardProposal();
     setSelectedId(id);
@@ -721,13 +682,100 @@ export function EditDashboardClient({
       ? diffPanels(proposalBase, draft, { streaming: proposal.panel === null })
       : null;
 
+  const saveHint = hint("save");
+  const saveViewHint = hint("save-view");
+
+  const askAi = selected && (
+    <div className="space-y-2">
+      <div className="flex items-center justify-between gap-2">
+        <Label htmlFor="nl" className="mb-0">
+          Describe a change
+        </Label>
+        <PromptHistoryMenu history={prompts} disabled={isLoading} onPick={setNlPrompt} />
+      </div>
+      {aiUnavailable && <AiUnavailable message={aiUnavailable} />}
+      <form
+        className="relative"
+        onSubmit={(e) => {
+          e.preventDefault();
+          runNlEdit();
+        }}
+      >
+        <Textarea
+          id="nl"
+          disabled={aiUnavailable !== null}
+          rows={2}
+          className="pr-14"
+          placeholder="e.g. change to a bar chart grouped by status code"
+          value={nlPrompt}
+          onChange={(e) => setNlPrompt(e.target.value)}
+        />
+        <Button
+          type="submit"
+          size="icon"
+          disabled={isLoading || !nlPrompt.trim() || aiUnavailable !== null}
+          aria-label="Apply NL edit"
+          title={`Apply NL edit${hint("run")}`}
+          className="absolute bottom-4 right-2"
+        >
+          {isLoading ? (
+            <Loader2 className="h-4 w-4 animate-spin" />
+          ) : (
+            <SendHorizontal className="h-4 w-4" />
+          )}
+        </Button>
+      </form>
+      {model && !aiUnavailable && (
+        <p className="text-xs text-muted">
+          Runs <span className="text-foreground">{model}</span> once and shows the change
+          to accept or reject.
+        </p>
+      )}
+      <RepairingNote show={repairing} />
+      {genError && (
+        <ErrorDisplay
+          error={apiErrorFromThrown(genError)}
+          onRetry={runNlEdit}
+          retryLabel="Try again"
+          disabled={isLoading}
+        />
+      )}
+      {diff && proposal && proposalBase && (
+        <PanelDiffView
+          diff={diff}
+          model={model}
+          streaming={proposal.panel === null}
+          onAccept={acceptProposal}
+          onReject={discardProposal}
+          onRegenerate={(feedback) =>
+            generatePanel(proposalBase, proposal.prompt, feedback)
+          }
+        />
+      )}
+    </div>
+  );
+
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-semibold">Edit dashboard</h1>
+        <div className="min-w-0 flex-1">
+          {/* The title reads as the page heading and edits in place. */}
+          <h1 className="sr-only">Edit dashboard</h1>
+          <input
+            id="title"
+            aria-label="Dashboard title"
+            value={spec.title}
+            maxLength={200}
+            onChange={(e) =>
+              updateSpec(
+                { title: e.target.value },
+                { action: "edit dashboard title", key: "spec:title" },
+              )
+            }
+            className="w-full max-w-2xl truncate border-b border-transparent bg-transparent text-2xl font-semibold text-foreground transition-colors hover:border-border focus:border-primary focus:outline-none"
+          />
           <p className="mt-0.5 text-xs text-muted">
-            Version {version}
+            Editing · version {version}
             {dirty ? (
               <span className="text-warning"> &middot; unsaved changes</span>
             ) : (
@@ -736,7 +784,7 @@ export function EditDashboardClient({
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <div className="flex items-center gap-1">
+          <div className="flex items-center">
             <Button
               variant="ghost"
               size="icon"
@@ -757,60 +805,111 @@ export function EditDashboardClient({
             >
               <Redo2 className="h-4 w-4" />
             </Button>
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => setShowShortcuts(true)}
-              aria-label="Keyboard shortcuts"
-              title={`Keyboard shortcuts${hint("shortcuts")}`}
+            <Menu
+              label="More editor actions"
+              trigger={<MoreHorizontal className="h-4 w-4" />}
             >
-              <Keyboard className="h-4 w-4" />
-            </Button>
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => setShowDetails(true)}
-              aria-label="Dashboard details"
-              title="Description and tags (saved separately from the spec)"
-            >
-              <Info className="h-4 w-4" />
-            </Button>
+              <MenuItem onClick={() => setShowShortcuts(true)}>
+                <Keyboard className="h-4 w-4" /> Keyboard shortcuts
+              </MenuItem>
+              <MenuItem onClick={() => setShowDetails(true)}>
+                <Info className="h-4 w-4" /> Description and tags…
+              </MenuItem>
+            </Menu>
           </div>
-          <Input
-            aria-label="Version note"
-            placeholder="What changed? (optional)"
-            className="w-56"
-            maxLength={VERSION_NOTE_MAX}
-            value={note}
-            onChange={(e) => setNote(e.target.value)}
-          />
+          <Menu
+            label="Add panel"
+            className={buttonClassName({
+              variant: "secondary",
+              className:
+                "h-10 w-auto px-3 text-foreground hover:text-foreground data-[popup-open]:text-foreground",
+            })}
+            trigger={
+              <>
+                <Plus className="h-4 w-4" aria-hidden /> Add panel
+              </>
+            }
+          >
+            <MenuItem disabled={sources.length === 0} onClick={() => addPanel()}>
+              <Plus className="h-4 w-4" /> Blank panel
+            </MenuItem>
+            <MenuItem
+              disabled={sources.length === 0 || aiUnavailable !== null}
+              onClick={() => addPanel(true)}
+            >
+              <Sparkles className="h-4 w-4" /> Describe it to the model
+            </MenuItem>
+            <MenuItem disabled={sources.length === 0} onClick={() => setPicking(true)}>
+              <LayoutTemplate className="h-4 w-4" /> From a template…
+            </MenuItem>
+          </Menu>
           <Button
             variant="secondary"
             onClick={() => leave(`/dashboards/${dashboardId}`)}
             disabled={saving}
           >
-            Cancel
+            Close
           </Button>
-          <Button
-            variant="secondary"
-            onClick={() => void save({ navigate: true })}
-            disabled={saving}
-            title={`Save and view${hint("save-view")}`}
+          <Popover
+            label="Save"
+            align="end"
+            panelClassName="w-80 max-w-[min(20rem,calc(100vw-2rem))] p-4 text-sm"
+            className={buttonClassName({
+              variant: "primary",
+              className:
+                "h-10 w-auto px-4 text-primary-foreground hover:bg-primary hover:text-primary-foreground data-[popup-open]:bg-primary data-[popup-open]:text-primary-foreground",
+            })}
+            trigger={
+              <>
+                {saving ? (
+                  <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
+                ) : (
+                  <Save className="h-4 w-4" aria-hidden />
+                )}
+                Save
+              </>
+            }
           >
-            Save &amp; view
-          </Button>
-          <Button
-            onClick={() => void save({ navigate: false })}
-            disabled={saving}
-            title={`Save a version and keep editing${hint("save")}`}
-          >
-            {saving ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
-            ) : (
-              <Save className="h-4 w-4" />
+            {(close) => (
+              <form
+                className="space-y-3"
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  void save({ navigate: false }).then((ok) => ok && close());
+                }}
+              >
+                <div>
+                  <Label htmlFor="version-note">What changed? (optional)</Label>
+                  <Input
+                    id="version-note"
+                    aria-label="Version note"
+                    placeholder="e.g. Split errors by route"
+                    maxLength={VERSION_NOTE_MAX}
+                    value={note}
+                    onChange={(e) => setNote(e.target.value)}
+                  />
+                </div>
+                <div className="flex flex-wrap justify-end gap-2">
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    disabled={saving}
+                    title={`Save and view${saveViewHint}`}
+                    onClick={() => void save({ navigate: true })}
+                  >
+                    Save and view
+                  </Button>
+                  <Button
+                    type="submit"
+                    disabled={saving}
+                    title={`Save a version and keep editing${saveHint}`}
+                  >
+                    Save version
+                  </Button>
+                </div>
+              </form>
             )}
-            Save version
-          </Button>
+          </Popover>
         </div>
       </div>
       {error && (
@@ -863,337 +962,97 @@ export function EditDashboardClient({
         );
       })}
 
-      <div
-        className="flex w-fit border border-border bg-surface p-1"
-        role="tablist"
-        aria-label="Dashboard workspace"
-      >
-        {(["editor", "preview"] as const).map((tab) => (
-          <button
-            key={tab}
-            type="button"
-            role="tab"
-            aria-selected={activeTab === tab}
-            aria-controls={`edit-dashboard-${tab}-panel`}
-            id={`edit-dashboard-${tab}-tab`}
-            // A view transition: the panel crossfades and the selected
-            // highlight slides to this tab (`globals.css`, `data-vt="tab"`).
-            onClick={() =>
-              withViewTransition(() => setActiveTab(tab), !reducedMotion, "tab")
+      <div className="grid grid-cols-1 items-start gap-6 xl:grid-cols-[minmax(0,1fr)_26rem]">
+        <section aria-label="Canvas" className="min-w-0">
+          <PanelLayoutGrid
+            panels={spec.panels}
+            selectedId={selectedId}
+            onSelect={selectPanel}
+            onChange={setPanels}
+            onDelete={removePanel}
+            rowHeight={CANVAS_ROW_HEIGHT}
+            empty={
+              <div className="flex min-h-64 flex-col items-center justify-center gap-3 border border-dashed border-border p-8 text-center text-sm text-muted">
+                <p>No panels yet.</p>
+                <Button
+                  variant="secondary"
+                  onClick={() => addPanel()}
+                  disabled={sources.length === 0}
+                >
+                  <Plus className="h-4 w-4" /> Add a panel
+                </Button>
+              </div>
             }
-            className={`px-3 py-1.5 text-sm font-medium capitalize transition-colors ${
-              activeTab === tab
-                ? "bg-surface-2 text-foreground"
-                : "text-muted hover:text-foreground"
-            }`}
-          >
-            {tab}
-          </button>
-        ))}
+            renderBody={(panel) => (
+              <div className="relative h-full">
+                <PanelView
+                  panel={panel}
+                  state={canvas.states[panel.id]}
+                  timeRange={panelTimeRange(panel, spec.timeRange)}
+                />
+                {panel.query && missingSources.includes(panel.query.sourceId) && (
+                  <span className="absolute top-2 left-2 inline-flex items-center gap-1 border border-warning/40 bg-surface px-2 py-0.5 text-xs text-warning">
+                    <Unplug className="h-3 w-3" aria-hidden /> Source removed
+                  </span>
+                )}
+              </div>
+            )}
+          />
+          {spec.panels.length > 0 && (
+            <p className="mt-2 text-xs text-muted">
+              Click a panel to edit it. Drag to move, drag the corner to resize; arrow
+              keys move the focused panel, Shift and arrows resize it, Delete removes it.
+            </p>
+          )}
+        </section>
+
+        <aside
+          aria-label={selected ? "Panel inspector" : "Dashboard settings"}
+          className="min-w-0 border border-border bg-surface p-4 xl:sticky xl:top-20 xl:max-h-[calc(100vh-6rem)] xl:overflow-y-auto"
+        >
+          {selected ? (
+            <PanelInspector
+              // Remounting on selection drops the previous panel's preview
+              // rather than showing it under a different panel.
+              key={selected.id}
+              panel={selected}
+              sources={sources}
+              timeRange={spec.timeRange}
+              refreshIntervalMs={spec.refreshIntervalMs}
+              variables={previewValues.values}
+              sourceMissing={
+                selected.query !== undefined &&
+                missingSources.includes(selected.query.sourceId)
+              }
+              ai={askAi}
+              onRepoint={() => {
+                if (!selected.query) return;
+                setRepointing({
+                  sourceId: selected.query.sourceId,
+                  panelIds: [selected.id],
+                });
+              }}
+              onChange={(fn, intent) => updatePanel(selected.id, fn, intent)}
+              onClose={() => selectPanel(null)}
+              onDuplicate={() => duplicate(selected.id)}
+              onSaveAsTemplate={panelTemplate.openDialog}
+              onDelete={() => removePanel(selected.id)}
+            />
+          ) : (
+            <DashboardSettings
+              spec={spec}
+              sources={sources}
+              details={details}
+              variablesError={previewValues.error}
+              onChange={updateSpec}
+              onArrange={arrangeColumns}
+              onEditDetails={() => setShowDetails(true)}
+            />
+          )}
+        </aside>
       </div>
 
-      {activeTab === "editor" ? (
-        <>
-          <Card
-            role="tabpanel"
-            id="edit-dashboard-editor-panel"
-            aria-labelledby="edit-dashboard-editor-tab"
-            className="tab-panel"
-          >
-            <CardContent className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-4">
-              <div>
-                <Label htmlFor="title">Title</Label>
-                <Input
-                  id="title"
-                  value={spec.title}
-                  onChange={(e) =>
-                    updateSpec(
-                      { title: e.target.value },
-                      { action: "edit dashboard title", key: "spec:title" },
-                    )
-                  }
-                />
-              </div>
-              <div>
-                <Label htmlFor="refresh">Refresh (ms)</Label>
-                <Input
-                  id="refresh"
-                  type="number"
-                  value={spec.refreshIntervalMs}
-                  onChange={(e) =>
-                    updateSpec(
-                      { refreshIntervalMs: Number(e.target.value) },
-                      { action: "change refresh interval", key: "spec:refresh" },
-                    )
-                  }
-                />
-              </div>
-              <div>
-                <Label htmlFor="from">Time from</Label>
-                <Input
-                  id="from"
-                  value={spec.timeRange.from}
-                  onChange={(e) =>
-                    updateSpec(
-                      { timeRange: { ...spec.timeRange, from: e.target.value } },
-                      { action: "change time range", key: "spec:from" },
-                    )
-                  }
-                />
-              </div>
-              <div>
-                <Label htmlFor="to">Time to</Label>
-                <Input
-                  id="to"
-                  value={spec.timeRange.to}
-                  onChange={(e) =>
-                    updateSpec(
-                      { timeRange: { ...spec.timeRange, to: e.target.value } },
-                      { action: "change time range", key: "spec:to" },
-                    )
-                  }
-                />
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle>Variables</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <VariablesEditor
-                variables={spec.variables}
-                sources={sources}
-                onChange={(variables, action, key) =>
-                  updateSpec({ variables }, { action, key: key ? `spec:${key}` : null })
-                }
-              />
-              {previewValues.error && (
-                <ErrorDisplay error={previewValues.error} className="mt-3" />
-              )}
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle>Annotations</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <AnnotationSettings
-                value={spec.annotations}
-                onChange={(annotations, action, key) =>
-                  updateSpec({ annotations }, { action, key: key ? `spec:${key}` : null })
-                }
-              />
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle>Layout</CardTitle>
-              <div className="flex flex-wrap items-center gap-1.5 text-xs">
-                <LayoutGrid className="h-3.5 w-3.5 text-muted" />
-                <span className="mr-1 text-muted">Arrange:</span>
-                {COLUMN_PRESETS.map((n) => (
-                  <Button
-                    key={n}
-                    variant="secondary"
-                    size="sm"
-                    className="h-6 px-2 text-xs"
-                    onClick={() => arrangeColumns(n)}
-                  >
-                    {n}-up
-                  </Button>
-                ))}
-              </div>
-            </CardHeader>
-            <CardContent>
-              <p className="mb-3 text-xs text-muted">
-                Drag a panel to move it, drag its corner to resize. Arrow keys move the
-                focused panel; hold Shift to resize; Delete removes it.
-              </p>
-              <PanelLayoutGrid
-                panels={spec.panels}
-                selectedId={selectedId}
-                onSelect={selectPanel}
-                onChange={setPanels}
-                onDelete={removePanel}
-              />
-            </CardContent>
-          </Card>
-
-          <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
-            <Card className="lg:col-span-1">
-              <CardHeader>
-                <CardTitle>Panels</CardTitle>
-                <div className="flex items-center gap-2">
-                  <Button
-                    variant="secondary"
-                    size="sm"
-                    collapse
-                    title="Add a panel from a template"
-                    onClick={() => setPicking(true)}
-                    disabled={sources.length === 0}
-                  >
-                    <LayoutTemplate className="h-4 w-4" />{" "}
-                    <ButtonLabel>From template</ButtonLabel>
-                  </Button>
-                  <Button
-                    variant="secondary"
-                    size="sm"
-                    onClick={() => addPanel(true)}
-                    disabled={sources.length === 0 || aiUnavailable !== null}
-                    collapse
-                    title={aiUnavailable ?? "Add a panel and describe it to the model"}
-                  >
-                    <Sparkles className="h-4 w-4" /> <ButtonLabel>Describe</ButtonLabel>
-                  </Button>
-                  <Button
-                    variant="secondary"
-                    size="sm"
-                    onClick={() => addPanel()}
-                    disabled={sources.length === 0}
-                    collapse
-                    title={`Add a panel${hint("new-panel")}`}
-                  >
-                    <Plus className="h-4 w-4" /> <ButtonLabel>Add</ButtonLabel>
-                  </Button>
-                </div>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                <PanelList
-                  panels={spec.panels}
-                  selectedId={selectedId}
-                  onSelect={selectPanel}
-                  onMove={move}
-                  onReorder={reorder}
-                  onDuplicate={duplicate}
-                  onDelete={removePanel}
-                />
-                {spec.panels.length > 1 && (
-                  <p className="text-xs text-muted">
-                    Reordering changes the list only. Use Arrange above to flow the new
-                    order onto the grid.
-                  </p>
-                )}
-              </CardContent>
-            </Card>
-
-            <Card className="lg:col-span-2">
-              <CardHeader>
-                <CardTitle>{selected ? "Panel editor" : "No panel selected"}</CardTitle>
-                {selected && (
-                  <SaveAsTemplate
-                    // Keyed on the panel so the dialog's defaults follow the
-                    // selection instead of keeping the last panel's name.
-                    key={selected.id}
-                    workspaceId={workspaceId}
-                    defaultName={selected.title}
-                    subject={{ kind: "panel", panel: selected }}
-                  />
-                )}
-              </CardHeader>
-              <CardContent className="space-y-4">
-                {selected && (
-                  <PanelEditor
-                    // Remounting on selection drops the previous panel's
-                    // preview rather than showing it under a different panel.
-                    key={selected.id}
-                    panel={selected}
-                    sources={sources}
-                    timeRange={spec.timeRange}
-                    refreshIntervalMs={spec.refreshIntervalMs}
-                    variables={previewValues.values}
-                    sourceMissing={
-                      selected.query !== undefined &&
-                      missingSources.includes(selected.query.sourceId)
-                    }
-                    onRepoint={() => {
-                      if (!selected.query) return;
-                      setRepointing({
-                        sourceId: selected.query.sourceId,
-                        panelIds: [selected.id],
-                      });
-                    }}
-                    onChange={(fn, intent) => updatePanel(selected.id, fn, intent)}
-                  />
-                )}
-                {selected && (
-                  <div className="space-y-2 border-t border-border pt-4">
-                    <div className="flex items-center justify-between gap-2">
-                      <Label htmlFor="nl" className="mb-0">
-                        Natural-language edit (runs the model once)
-                      </Label>
-                      <PromptHistoryMenu
-                        history={prompts}
-                        disabled={isLoading}
-                        onPick={setNlPrompt}
-                      />
-                    </div>
-                    {aiUnavailable && <AiUnavailable message={aiUnavailable} />}
-                    <div className="relative">
-                      <Textarea
-                        id="nl"
-                        disabled={aiUnavailable !== null}
-                        rows={2}
-                        className="pr-14"
-                        placeholder="e.g. change to a bar chart grouped by status code"
-                        value={nlPrompt}
-                        onChange={(e) => setNlPrompt(e.target.value)}
-                      />
-                      <Button
-                        size="icon"
-                        onClick={runNlEdit}
-                        disabled={isLoading || !nlPrompt.trim() || aiUnavailable !== null}
-                        aria-label="Apply NL edit"
-                        title={`Apply NL edit${hint("run")}`}
-                        className="absolute bottom-4 right-2"
-                      >
-                        {isLoading ? (
-                          <Loader2 className="h-4 w-4 animate-spin" />
-                        ) : (
-                          <SendHorizontal className="h-4 w-4" />
-                        )}
-                      </Button>
-                    </div>
-                    <RepairingNote show={repairing} />
-                    {genError && (
-                      <ErrorDisplay
-                        error={apiErrorFromThrown(genError)}
-                        onRetry={runNlEdit}
-                        retryLabel="Try again"
-                        disabled={isLoading}
-                      />
-                    )}
-                    {diff && proposal && proposalBase && (
-                      <PanelDiffView
-                        diff={diff}
-                        model={model}
-                        streaming={proposal.panel === null}
-                        onAccept={acceptProposal}
-                        onReject={discardProposal}
-                        onRegenerate={(feedback) =>
-                          generatePanel(proposalBase, proposal.prompt, feedback)
-                        }
-                      />
-                    )}
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          </div>
-        </>
-      ) : (
-        <section
-          role="tabpanel"
-          id="edit-dashboard-preview-panel"
-          aria-labelledby="edit-dashboard-preview-tab"
-          className="tab-panel"
-        >
-          <PreviewDashboard spec={spec} />
-        </section>
-      )}
+      {panelTemplate.dialog}
 
       {picking && (
         <TemplatePicker
@@ -1250,9 +1109,9 @@ export function EditDashboardClient({
       <ShortcutsDialog open={showShortcuts} onOpenChange={setShowShortcuts} />
 
       {/*
-        No `allowRename`: the title is a spec field, edited in the settings
-        card above and saved with the version. Offering a second, immediately
-        applied rename here would be two names for the same thing.
+        No `allowRename`: the title is a spec field, edited in the header and
+        saved with the version. Offering a second, immediately applied rename
+        here would be two names for the same thing.
       */}
       <DashboardDetailsDialog
         dashboardId={dashboardId}
@@ -1281,323 +1140,6 @@ export function EditDashboardClient({
           });
         }}
       />
-    </div>
-  );
-}
-
-function PanelEditor({
-  panel,
-  sources,
-  timeRange,
-  refreshIntervalMs,
-  variables,
-  sourceMissing,
-  onRepoint,
-  onChange,
-}: {
-  panel: Panel;
-  sources: SourceOption[];
-  timeRange: Dashboard["timeRange"];
-  refreshIntervalMs: number;
-  /** The values the preview binds for the dashboard's variables (#67). */
-  variables: VariableValues;
-  /** This panel's source is not among the workspace's live sources. */
-  sourceMissing: boolean;
-  onRepoint: () => void;
-  /** Each control names its own undo step, so a burst of typing is one entry. */
-  onChange: (fn: (p: Panel) => Panel, intent: EditIntent) => void;
-}) {
-  const kind = panelKind(panel.viz);
-  // A removed source is still what the panel names, so it stays in the list
-  // rather than making the control read as some other source's panel.
-  const sourceOptions = sources.map((s) => ({ value: s.id, label: s.name }));
-  if (sourceMissing && panel.query) {
-    sourceOptions.unshift({
-      value: panel.query.sourceId,
-      label: `${panel.query.sourceId} (removed)`,
-    });
-  }
-  /** A query for a panel switched back from a kind that had none (#202). */
-  const starterQuery = () => {
-    const source = sources[0];
-    const starter = panelStarter(source?.catalog ?? null);
-    return { sourceId: source?.id ?? "", sql: starter.sql, timeField: starter.timeField };
-  };
-  const onQueryChange = (fn: (p: QueryPanel) => Panel, intent: EditIntent) =>
-    onChange((p) => (hasQuery(p) ? fn(p) : p), intent);
-
-  return (
-    <div className="space-y-3">
-      {sourceMissing && (
-        <div className="flex flex-wrap items-center justify-between gap-2 border border-warning/40 bg-warning/10 px-3 py-2 text-sm">
-          <span>This panel&rsquo;s data source has been removed.</span>
-          <Button variant="secondary" size="sm" onClick={onRepoint}>
-            Re-point to another source
-          </Button>
-        </div>
-      )}
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-        <div>
-          <Label htmlFor="p-title">Title</Label>
-          <Input
-            id="p-title"
-            value={panel.title}
-            onChange={(e) =>
-              onChange((p) => ({ ...p, title: e.target.value }), {
-                action: "edit panel title",
-                key: `${panel.id}:title`,
-              })
-            }
-          />
-        </div>
-        {panel.query && (
-          <div>
-            <Label htmlFor="p-source">Source</Label>
-            <Select
-              id="p-source"
-              value={panel.query.sourceId}
-              onValueChange={(v) =>
-                onQueryChange((p) => ({ ...p, query: { ...p.query, sourceId: v } }), {
-                  action: "change panel source",
-                })
-              }
-              options={sourceOptions}
-            />
-          </div>
-        )}
-        <div>
-          <Label htmlFor="p-viz">Visualization</Label>
-          <Select
-            id="p-viz"
-            value={panel.viz}
-            onValueChange={(v) =>
-              onChange((p) => changePanelKind(p, v as VizType, starterQuery), {
-                action: "change visualization",
-              })
-            }
-            options={VIZ_OPTIONS}
-          />
-        </div>
-        {panel.query && (
-          <div>
-            <Label htmlFor="p-format">Format</Label>
-            <Select
-              id="p-format"
-              value={panel.format ?? ""}
-              onValueChange={(v) =>
-                onChange(
-                  (p) => ({ ...p, format: v ? (v as Panel["format"]) : undefined }),
-                  { action: "change value format" },
-                )
-              }
-              options={FORMAT_OPTIONS}
-            />
-          </div>
-        )}
-      </div>
-
-      {/* A text panel computes nothing; its content is what it says. */}
-      {panel.query && (
-        <div>
-          <Label htmlFor="p-description">Description (what this panel computes)</Label>
-          <Textarea
-            id="p-description"
-            rows={2}
-            maxLength={PANEL_DESCRIPTION_MAX}
-            placeholder="e.g. Requests per minute, grouped by route"
-            value={panel.description ?? ""}
-            onChange={(e) =>
-              onChange((p) => ({ ...p, description: e.target.value || undefined }), {
-                action: "edit panel description",
-                key: `${panel.id}:description`,
-              })
-            }
-          />
-          <p className="mt-1 text-xs text-muted">
-            Shown to readers behind the info icon on the panel. The model writes one for
-            every panel it generates; this is where you correct it.
-          </p>
-        </div>
-      )}
-
-      {hasQuery(panel) ? (
-        <QueryFields
-          panel={panel}
-          sources={sources}
-          timeRange={timeRange}
-          variables={variables}
-          onChange={onQueryChange}
-        />
-      ) : (
-        <TextFields panel={panel} onChange={onChange} />
-      )}
-
-      {hasQuery(panel) && (
-        <PanelTimingFields
-          panel={panel}
-          dashboardRange={timeRange}
-          dashboardRefreshMs={refreshIntervalMs}
-          onChange={onChange}
-        />
-      )}
-
-      {/* A text panel's one option, its content, is edited above. */}
-      {kind.query === "required" && (
-        <PanelPresentationFields panel={panel} onChange={onChange} />
-      )}
-
-      <div>
-        <Label htmlFor="p-width">Width</Label>
-        <Select
-          id="p-width"
-          value={String(panel.layout.w)}
-          onValueChange={(v) =>
-            onChange(
-              (p) => ({ ...p, layout: clampLayout({ ...p.layout, w: Number(v) }) }),
-              { action: "change panel width" },
-            )
-          }
-          options={
-            WIDTH_PRESETS.some((o) => o.value === String(panel.layout.w))
-              ? WIDTH_PRESETS
-              : [
-                  ...WIDTH_PRESETS,
-                  {
-                    value: String(panel.layout.w),
-                    label: `Custom (${panel.layout.w}/12)`,
-                  },
-                ]
-          }
-        />
-        <p className="mt-1 text-xs text-muted">
-          Column span on the 12-col grid. Fine-tune exact position below.
-        </p>
-      </div>
-
-      {/*
-        Two up on a phone rather than four 60px-wide number inputs in a row
-        (#78); still one row from `sm`, where it fits.
-      */}
-      <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-        {(["x", "y", "w", "h"] as const).map((k) => (
-          <div key={k}>
-            <Label htmlFor={`p-${k}`}>{k}</Label>
-            <Input
-              id={`p-${k}`}
-              type="number"
-              value={panel.layout[k]}
-              onChange={(e) =>
-                onChange(
-                  (p) => ({
-                    ...p,
-                    layout: clampLayout({ ...p.layout, [k]: Number(e.target.value) }),
-                  }),
-                  { action: "edit panel position", key: `${panel.id}:layout` },
-                )
-              }
-            />
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-/** The SQL, its preview and its time field: a panel that runs a query. */
-function QueryFields({
-  panel,
-  sources,
-  timeRange,
-  variables,
-  onChange,
-}: {
-  panel: QueryPanel;
-  sources: SourceOption[];
-  timeRange: Dashboard["timeRange"];
-  variables: VariableValues;
-  onChange: (fn: (p: QueryPanel) => Panel, intent: EditIntent) => void;
-}) {
-  const preview = usePanelPreview(panel, panelTimeRange(panel, timeRange), variables);
-  const catalog = sources.find((s) => s.id === panel.query.sourceId)?.catalog ?? null;
-
-  return (
-    <>
-      <div className="space-y-2">
-        <Label htmlFor="p-sql">
-          SQL (SELECT only; no time filter — the server injects it)
-        </Label>
-        <SqlEditor
-          id="p-sql"
-          value={panel.query.sql}
-          catalog={catalog}
-          onChange={(sql) =>
-            onChange((p) => ({ ...p, query: { ...p.query, sql } }), {
-              action: "edit SQL",
-              key: `${panel.id}:sql`,
-            })
-          }
-          onRun={() => {
-            if (preview.busy === null) preview.run();
-          }}
-          placeholder="SELECT …"
-        />
-        <PanelPreview panel={panel} preview={preview} />
-      </div>
-
-      <TimeFieldPicker
-        id="p-tf"
-        value={panel.query.timeField}
-        sql={panel.query.sql}
-        catalog={catalog}
-        onChange={(timeField) =>
-          onChange((p) => ({ ...p, query: { ...p.query, timeField } }), {
-            action: "change time field",
-          })
-        }
-      />
-    </>
-  );
-}
-
-/**
- * A text panel's Markdown (#202), with the panel's own rendering of it as the
- * preview, so what is typed here is what readers get.
- */
-function TextFields({
-  panel,
-  onChange,
-}: {
-  panel: Panel;
-  onChange: (fn: (p: Panel) => Panel, intent: EditIntent) => void;
-}) {
-  const content = typeof panel.options?.content === "string" ? panel.options.content : "";
-  return (
-    <div className="space-y-2">
-      <Label htmlFor="p-content">Text (Markdown)</Label>
-      <Textarea
-        id="p-content"
-        rows={8}
-        maxLength={TEXT_CONTENT_MAX}
-        className="font-mono text-xs"
-        value={content}
-        onChange={(e) =>
-          onChange((p) => ({ ...p, options: { content: e.target.value } }), {
-            action: "edit text",
-            key: `${panel.id}:content`,
-          })
-        }
-      />
-      <p className="text-xs text-muted">
-        Headings, emphasis, lists, code, tables and http(s) or mailto links. HTML is shown
-        as text, and images are not loaded.
-      </p>
-      <div className="max-h-64 overflow-auto border border-border bg-surface p-3">
-        {content.trim() ? (
-          <MarkdownView source={content} />
-        ) : (
-          <p className="text-sm text-muted">Nothing to show yet.</p>
-        )}
-      </div>
     </div>
   );
 }

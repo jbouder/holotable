@@ -16,10 +16,12 @@ keep them from regressing (#77, #91).
 - **Dialogs** trap focus and give it back to what opened them on close (Base
   UI). A panel's fullscreen view is a dialog too: Escape closes it and focus
   returns to the control that opened it.
-- **Editor.** In the layout grid, a focused panel tile moves with the arrow
-  keys, resizes with Shift and the arrow keys, and is removed with Delete or
-  Backspace; the panel list's rows take Delete too. Every action is also in the
-  row's named menu, and every deletion is one step to undo. The keys are listed
+- **Editor.** On the canvas, each panel is a button named by its title and
+  position: Enter selects it (`aria-pressed`), the arrow keys move it, Shift and
+  the arrow keys resize it, and Delete or Backspace removes it. The live panel
+  under it is `inert`, so Tab reaches the handle and not the chart's own
+  controls. Duplicate, Save as template and Delete are also in the inspector's
+  named panel menu, and every deletion is one step to undo. The keys are listed
   under *Settings → Shortcuts*.
 - **Focus is always visible.** Every interactive primitive draws
   `focus-visible:outline-2 outline-primary`. A scroll container that can
