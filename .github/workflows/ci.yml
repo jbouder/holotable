@@ -63,9 +63,14 @@ jobs:
       # The server refuses to boot on an invalid configuration. This proves the
       # example file still starts a fresh checkout: in development mode missing
       # values are warnings, so a non-zero exit here means .env.example or the
-      # validation rules changed in a way that would stop `npm run dev`.
+      # validation rules changed in a way that would stop `npm run dev`. The
+      # copy is removed again: every script loads `.env` (scripts/lib/env.ts),
+      # and the replay below must run with no environment, as a checkout has.
       - name: Validate .env.example
-        run: cp .env.example .env && npm run config:check
+        run: |
+          cp .env.example .env
+          trap 'rm -f .env' EXIT
+          npm run config:check
 
       # Grades every case's recorded answer with the current prompt, schema and
       # SQL guard (#24): no provider, no key, no spend. A failure means a
