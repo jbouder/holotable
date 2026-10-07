@@ -96,6 +96,22 @@ export function identityFromPayload(payload: JWTPayload): Identity | null {
   };
 }
 
+/** The claims of a token the realm's keys verify, or null. */
+async function verifyRealmToken(
+  token: string,
+  keys: ReturnType<typeof createRemoteJWKSet>,
+): Promise<JWTPayload | null> {
+  try {
+    const { payload } = await jwtVerify(token, keys, {
+      issuer: process.env.OIDC_ISSUER,
+      audience: process.env.OIDC_AUDIENCE || undefined,
+    });
+    return payload;
+  } catch {
+    return null;
+  }
+}
+
 /**
  * Verify a raw session token string and return the derived identity, or null.
  */
@@ -104,15 +120,8 @@ export async function verifySessionToken(token: string): Promise<Identity | null
 
   const remote = realmJwks();
   if (remote) {
-    let payload: JWTPayload | null = null;
-    try {
-      ({ payload } = await jwtVerify(token, remote, {
-        issuer: process.env.OIDC_ISSUER,
-        audience: process.env.OIDC_AUDIENCE || undefined,
-      }));
-    } catch {
-      // Fall through to first-party session verification below.
-    }
+    // A failure falls through to first-party session verification below.
+    const payload = await verifyRealmToken(token, remote);
     if (payload) {
       // A token the realm minted for the MCP client (#149) is a credential
       // for `/api/mcp` only, never a session, whatever else it says.
