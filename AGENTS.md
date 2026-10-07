@@ -550,14 +550,19 @@ Before finalizing code changes, run the checks relevant to your change:
 - `npm test`
 - `npm run build` for framework/build-sensitive changes
 
-CI (`.github/workflows/ci.yml`) runs all four on every pull request, and
-those four (`Lint`, `Typecheck`, `Test`, `Build`) are the required checks on
-`main`. The same workflow also builds the Docker images, lints and renders the
-Helm chart, round-trips the migrations against TimescaleDB, and runs the
-real-database `Integration` suites, the Playwright and axe `End-to-end and
-accessibility` suite, the self-monitoring smoke test and a long fuzz of the SQL
-guard; those report on every pull request but do not gate the merge, so read
-them. Five constraints CI enforces that are easy to break accidentally:
+CI (`.github/workflows/ci.yml`) runs all four on every pull request as three
+jobs — `Static checks` (lint, typecheck), `Test` (tests, `config:check` on
+`.env.example`, the LLM eval replay) and `Build` — and those three are the
+required checks on `main`. The same workflow also round-trips the migrations
+and runs the real-database integration suites against one TimescaleDB
+(`Database`), lints and renders the Helm chart, builds the Docker images and
+runs the self-monitoring smoke test against exactly those images (`Images and
+smoke`), runs the Playwright and axe `End-to-end and accessibility` suite, and
+a long fuzz of the SQL guard; those report on every pull request but do not
+gate the merge, so read them. Every Node job starts with the composite action
+in `.github/actions/setup/` (Node 22, `npm ci`); a Node bump is one edit
+there, and `test/workflow-pins.test.ts` holds its pins like a workflow's.
+Five constraints CI enforces that are easy to break accidentally:
 
 - `lint` is **Biome**, linter and formatter in one tool, configured entirely in
   `biome.json`. CI runs `biome ci`, which never writes, so an unformatted file

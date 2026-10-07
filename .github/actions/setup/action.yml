@@ -1,0 +1,28 @@
+name: Set up Node and install
+description: >-
+  The prologue every Node job shares: Node 22 with the npm cache keyed on a
+  lockfile, then `npm ci`. Checkout is the caller's, so a job that checks out a
+  particular ref (demo.yml) still uses this. Three package trees share one
+  Node version here: the app, the docs site and the demo Worker.
+
+inputs:
+  lockfile:
+    description: The lockfile the npm cache is keyed on, relative to the repository root.
+    default: package-lock.json
+  working-directory:
+    description: Where `npm ci` runs; the directory that holds the lockfile.
+    default: .
+
+runs:
+  using: composite
+  steps:
+    - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+      with:
+        node-version: 22
+        cache: npm
+        cache-dependency-path: ${{ inputs.lockfile }}
+
+    - name: Install
+      shell: bash
+      working-directory: ${{ inputs.working-directory }}
+      run: npm ci

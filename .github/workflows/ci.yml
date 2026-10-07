@@ -1,6 +1,6 @@
 name: CI
 
-# Deliberately unfiltered by `paths`. The lint/typecheck/test/build jobs are
+# Deliberately unfiltered by `paths`. The static-checks/test/build jobs are
 # required status checks on `main`, and a required check that is skipped by a
 # path filter never reports a conclusion — GitHub then blocks the pull request
 # forever waiting for a run that will not happen. docs.yml can filter by path
@@ -8,6 +8,9 @@ name: CI
 #
 # A `v*` tag runs the whole pipeline too: `publish` below releases the images,
 # and it only runs once every check has passed on that exact commit.
+#
+# Every Node job starts with ./.github/actions/setup (Node 22, `npm ci`), so a
+# Node bump or an action update is one edit (#348).
 on:
   push:
     branches: [main]
@@ -22,20 +25,12 @@ permissions:
   contents: read
 
 jobs:
-  lint:
-    name: Lint
+  static:
+    name: Static checks
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-
-      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
-        with:
-          node-version: 22
-          cache: npm
-          cache-dependency-path: package-lock.json
-
-      - name: Install
-        run: npm ci
+      - uses: ./.github/actions/setup
 
       # `biome ci` is the non-writing variant: it checks formatting and lint in
       # one pass and never applies a fix, so an unformatted file fails the build
@@ -43,21 +38,6 @@ jobs:
       # the same checks for local use.
       - name: Lint and format
         run: npx biome ci
-
-  typecheck:
-    name: Typecheck
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-
-      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
-        with:
-          node-version: 22
-          cache: npm
-          cache-dependency-path: package-lock.json
-
-      - name: Install
-        run: npm ci
 
       # `npm run typecheck` is `next typegen && tsc --noEmit`. The typegen step
       # is not optional: Next 16 writes the global route helpers (RouteContext,
@@ -73,15 +53,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-
-      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
-        with:
-          node-version: 22
-          cache: npm
-          cache-dependency-path: package-lock.json
-
-      - name: Install
-        run: npm ci
+      - uses: ./.github/actions/setup
 
       # Covers the SQL guardrails, the IR schema, authorization and time
       # resolution — the invariants the product rests on.
@@ -95,42 +67,35 @@ jobs:
       - name: Validate .env.example
         run: cp .env.example .env && npm run config:check
 
-  eval:
-    name: LLM eval (replay)
+      # Grades every case's recorded answer with the current prompt, schema and
+      # SQL guard (#24): no provider, no key, no spend. A failure means a
+      # change made an answer that used to pass fail, and this job is required,
+      # so it gates the pull request. The live run against a real model is
+      # eval-nightly.yml, which reports and never gates.
+      - name: Replay the eval corpus
+        run: npm run eval -- --replay
+
+  build:
+    name: Build
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: ./.github/actions/setup
 
-      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
-        with:
-          node-version: 22
-          cache: npm
-          cache-dependency-path: package-lock.json
-
-      - name: Install
-        run: npm ci
-
-      # Grades every case's recorded answer with the current prompt, schema and
-      # SQL guard (#24): no provider, no key, no spend. A failure means a
-      # change made an answer that used to pass fail. The live run against a
-      # real model is eval-nightly.yml, which reports and never gates.
-      - name: Replay the eval corpus
-        run: npm run eval -- --replay
+      # No environment is provided on purpose: every value in src/lib/config.ts
+      # has a fallback, so a production build must succeed with no .env at all.
+      # If this job ever starts needing a secret to build, that is the bug.
+      - name: Build
+        run: npm run build
+        env:
+          NEXT_TELEMETRY_DISABLED: 1
 
   fuzz:
     name: Fuzz the SQL guard
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-
-      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
-        with:
-          node-version: 22
-          cache: npm
-          cache-dependency-path: package-lock.json
-
-      - name: Install
-        run: npm ci
+      - uses: ./.github/actions/setup
 
       # `npm test` already runs test/sql-safety.fuzz.test.ts with a fixed seed
       # and a small iteration count, so the required Test job is deterministic.
@@ -145,41 +110,48 @@ jobs:
           FUZZ_RUNS: 20000
           FUZZ_SEED: ${{ github.run_id }}
 
-  migrations:
-    name: Migrations
+  database:
+    name: Database
     runs-on: ubuntu-latest
-    # A scratch database the job may destroy: migrate-verify rolls every
-    # migration back, so it refuses to run against a schema that holds
-    # anything. TimescaleDB rather than plain Postgres on purpose — a rollback
-    # that fails only with the extension loaded is exactly what a parse-only
-    # dry run misses.
-    services:
-      postgres:
-        image: timescale/timescaledb:2.17.2-pg16
-        env:
-          POSTGRES_USER: holotable
-          POSTGRES_PASSWORD: holotable
-          POSTGRES_DB: holotable
-        ports:
-          - 5432:5432
-        options: >-
-          --health-cmd "pg_isready -U holotable"
-          --health-interval 5s
-          --health-timeout 5s
-          --health-retries 20
     env:
-      DATABASE_URL: postgresql://holotable:holotable@127.0.0.1:5432/holotable
+      # The migration checks run on a bare database, as they always have:
+      # the round-trip drops and recreates `public`, which also takes the
+      # TimescaleDB extension with it. The integration suites run on the
+      # database the init scripts set up, which that drop would have broken.
+      # Two databases, one server, one container.
+      DATABASE_URL: postgresql://holotable:holotable@127.0.0.1:5432/migrations
+      INTEGRATION_URL: postgresql://holotable:holotable@127.0.0.1:5432/holotable
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: ./.github/actions/setup
 
-      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
-        with:
-          node-version: 22
-          cache: npm
-          cache-dependency-path: package-lock.json
-
-      - name: Install
-        run: npm ci
+      # One scratch TimescaleDB for both halves of this job, started after the
+      # checkout so it can mount timescaledb/init: the same image, the same
+      # init scripts (the `metrics` schema, its hypertables, the read-only
+      # role) that compose and the Testcontainers path of
+      # `npm run test:integration` use. A `services:` container cannot mount
+      # the checkout, since it starts before there is one. TimescaleDB rather
+      # than plain Postgres on purpose — a rollback that fails only with the
+      # extension loaded is exactly what a parse-only dry run misses.
+      - name: Start TimescaleDB
+        run: |
+          docker run -d --name timescaledb -p 5432:5432 \
+            -e POSTGRES_USER=holotable -e POSTGRES_PASSWORD=holotable -e POSTGRES_DB=holotable \
+            -v "$PWD/timescaledb/init:/docker-entrypoint-initdb.d:ro" \
+            timescale/timescaledb:2.17.2-pg16
+          for _ in $(seq 1 40); do
+            # pg_isready answers during the init scripts too; the role they
+            # create last is what says they finished.
+            if docker exec timescaledb psql -U holotable -d holotable -tAc \
+                "SELECT 1 FROM pg_roles WHERE rolname = 'metrics_ro'" 2>/dev/null | grep -q 1; then
+              docker exec timescaledb psql -U holotable -d holotable -q -c 'CREATE DATABASE migrations'
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "::error::TimescaleDB did not come up"
+          docker logs timescaledb
+          exit 1
 
       # The deploy gate, proven in both directions. On a fresh database every
       # migration is pending, so --check must fail; after applying them it must
@@ -212,32 +184,23 @@ jobs:
       # must be a no-op. Needs the database it just migrated to be empty again.
       - name: Round-trip every migration
         run: |
-          psql "$DATABASE_URL" -q -c 'DROP SCHEMA public CASCADE; CREATE SCHEMA public;'
+          docker exec timescaledb psql -U holotable -d migrations -q -c 'DROP SCHEMA public CASCADE; CREATE SCHEMA public;'
           npm run migrate:verify
 
-  integration:
-    name: Integration
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-
-      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
-        with:
-          node-version: 22
-          cache: npm
-          cache-dependency-path: package-lock.json
-
-      - name: Install
-        run: npm ci
-
-      # Starts TimescaleDB with Testcontainers (#87), initialized by the same
-      # timescaledb/init scripts compose mounts, applies the migrations, and
-      # runs every real-server suite: read-only execution, statement timeouts,
+      # Every real-server suite (#87): read-only execution, statement timeouts,
       # SQLSTATE mapping, the allowlist end to end, repository round trips and
-      # a poller ticking over real rows. Under CI a missing Docker fails the
-      # job rather than skipping it.
+      # a poller ticking over real rows. Pointed at the init-script database
+      # above instead of starting a second server through Testcontainers; the
+      # runner applies the migrations itself first, exactly as `npm run
+      # migrate` does, so the suites see what a fresh container would give.
       - name: Integration tests
         run: npm run test:integration
+        env:
+          MIGRATE_TEST_DATABASE_URL: ${{ env.INTEGRATION_URL }}
+
+      - name: Logs
+        if: failure()
+        run: docker logs timescaledb --tail 200
 
   e2e:
     name: End-to-end and accessibility
@@ -249,15 +212,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-
-      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
-        with:
-          node-version: 22
-          cache: npm
-          cache-dependency-path: package-lock.json
-
-      - name: Install
-        run: npm ci
+      - uses: ./.github/actions/setup
 
       - name: Install Chromium
         run: npx playwright install --with-deps chromium
@@ -361,40 +316,20 @@ jobs:
             exit 1
           fi
 
-  build:
-    name: Build
+  images:
+    name: Images and smoke
+    # The images run `npm run build` inside their build stage, and the smoke
+    # test brings the whole compose stack up, so this waits for the cheaper
+    # jobs to have their say first: a type error or a failing unit test should
+    # not cost an image build and a stack bring-up to discover.
+    needs: [test, build]
     runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-
-      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
-        with:
-          node-version: 22
-          cache: npm
-          cache-dependency-path: package-lock.json
-
-      - name: Install
-        run: npm ci
-
-      # No environment is provided on purpose: every value in src/lib/config.ts
-      # has a fallback, so a production build must succeed with no .env at all.
-      # If this job ever starts needing a secret to build, that is the bug.
-      - name: Build
-        run: npm run build
-        env:
-          NEXT_TELEMETRY_DISABLED: 1
-
-  docker:
-    name: Docker build
-    # The image runs `npm run build` inside the build stage, so a broken build
-    # would fail here too. Waiting for `build` reports that failure once,
-    # against the faster job, instead of burning a second runner on it.
-    needs: build
-    # Pull requests only. On `main` and on a release tag `publish` builds the
-    # same targets for both architectures and pushes them, so building them a
-    # third time here would prove nothing new.
-    if: github.event_name == 'pull_request'
-    runs-on: ubuntu-latest
+    env:
+      # What docker-compose.yml names its images, with the tag below picked
+      # through HOLOTABLE_TAG, so the stack runs exactly the images this job
+      # built and never builds its own.
+      IMAGE: ghcr.io/jbouder/holotable
+      TAG: ci
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
@@ -402,28 +337,30 @@ jobs:
 
       # Build only — never pushed. A pull request runs with a read-only token
       # and may come from a fork; publishing is `publish` below, on `main`.
-      - name: Build image
+      # Loaded into the runner's Docker so the smoke test can run it.
+      - name: Build runtime image
         uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
         with:
           context: .
           push: false
-          load: false
-          tags: holotable:ci
+          load: true
+          tags: ${{ env.IMAGE }}:${{ env.TAG }}
+          build-args: GIT_COMMIT=${{ github.sha }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-      # The job image `docker compose` runs migrate and seed from. It shares
-      # the `deps` stage with the build above, so this is mostly a cache hit;
-      # it is here so a change to `scripts/` or `migrations/` that breaks the
-      # target fails CI instead of the next `docker compose up`.
+      # The job image compose runs migrate, seed, self-metrics and smoke from.
+      # It shares the `deps` stage with the build above, so this is mostly a
+      # cache hit; it is here so a change to `scripts/` or `migrations/` that
+      # breaks the target fails CI instead of the next `docker compose up`.
       - name: Build migrate image
         uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
         with:
           context: .
           target: migrate
           push: false
-          load: false
-          tags: holotable:ci-migrate
+          load: true
+          tags: ${{ env.IMAGE }}:${{ env.TAG }}-migrate
           cache-from: type=gha
 
       # The all-in-one quick-start image (#253): TimescaleDB, the server and
@@ -436,9 +373,56 @@ jobs:
           file: deploy/quickstart/Dockerfile
           push: false
           load: false
-          tags: holotable:ci-quickstart
+          tags: ${{ env.IMAGE }}:${{ env.TAG }}-quickstart
           cache-from: type=gha,scope=quickstart
           cache-to: type=gha,scope=quickstart,mode=max
+
+      # The app refuses to boot on an invalid configuration, and in production
+      # mode a missing OIDC client or model id is an error rather than a
+      # warning. None of it is exercised by this job — nothing logs in and no
+      # model is called — but the values have to be there for the server to
+      # start at all. The secret is generated per run; there is nothing to
+      # keep.
+      - name: Write a compose environment
+        run: |
+          cat > .env <<EOF
+          HOLOTABLE_TAG=${TAG}
+          SESSION_SECRET=$(openssl rand -hex 32)
+          METRICS_TOKEN=$(openssl rand -hex 32)
+          OIDC_ISSUER=http://localhost:8080/realms/holotable
+          OIDC_CLIENT_ID=holotable
+          OIDC_CLIENT_SECRET=$(openssl rand -hex 16)
+          OIDC_JWKS_URL=http://localhost:8080/realms/holotable/protocol/openid-connect/certs
+          AI_PROVIDER=openai-compatible
+          AI_MODEL=gpt-4o-mini
+          OPENAI_BASE_URL=http://127.0.0.1:1/v1
+          OPENAI_API_KEY=unused-in-ci
+          # Four scrapes a minute is the shipped default; CI has no time for it.
+          SELF_METRICS_INTERVAL_MS=5000
+          SMOKE_TIMEOUT_MS=240000
+          EOF
+
+      # No `--build`: the images above are already in the runner's Docker
+      # under the tag the .env names, and compose uses an image that exists.
+      # `--wait` holds until the app reports healthy, which is its own
+      # liveness probe, so a server that exited on a bad configuration fails
+      # here with its logs rather than 4 minutes later as a smoke timeout.
+      - name: Bring the stack up
+        run: docker compose up -d --wait app seed self-metrics
+
+      # The assertion: the seeded dashboard answers with rows the collector
+      # scraped out of the running app, through the same guard and executor
+      # POST /api/query uses.
+      - name: Smoke
+        run: docker compose --profile smoke run --rm smoke
+
+      - name: Logs
+        if: failure()
+        run: docker compose logs --no-color --tail 200
+
+      - name: Tear down
+        if: always()
+        run: docker compose down --volumes --remove-orphans
 
   # Publishes ghcr.io/<owner>/holotable (#250). Each target is built natively
   # on an amd64 and an arm64 runner and pushed by digest, then
@@ -459,12 +443,12 @@ jobs:
   # `docker run ghcr.io/jbouder/holotable:quickstart` and the hosted demo, both
   # of which should show what is on main.
   #
-  # Gated on every check, so nothing is published from a commit that fails
-  # lint, types, tests or the build.
+  # Gated on every required check, so nothing is published from a commit that
+  # fails lint, types, tests or the build.
   publish:
     name: Publish ${{ matrix.target }} (${{ matrix.arch }})
     if: github.event_name == 'push'
-    needs: [lint, typecheck, test, build]
+    needs: [static, test, build]
     strategy:
       fail-fast: true
       matrix:
@@ -592,57 +576,3 @@ jobs:
 
       - name: Inspect
         run: docker buildx imagetools inspect "$(jq -r '.tags[0]' <<< "$DOCKER_METADATA_OUTPUT_JSON")"
-
-  smoke:
-    name: Self-monitoring smoke test
-    # The whole compose stack has to build, so this waits for the cheaper jobs
-    # to have their say first: a type error or a failing unit test should not
-    # cost a stack bring-up to discover.
-    needs: [test, build]
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-
-      # The app refuses to boot on an invalid configuration, and in production
-      # mode a missing OIDC client or model id is an error rather than a
-      # warning. None of it is exercised by this job — nothing logs in and no
-      # model is called — but the values have to be there for the server to
-      # start at all. The secret is generated per run; there is nothing to
-      # keep.
-      - name: Write a compose environment
-        run: |
-          cat > .env <<EOF
-          SESSION_SECRET=$(openssl rand -hex 32)
-          METRICS_TOKEN=$(openssl rand -hex 32)
-          OIDC_ISSUER=http://localhost:8080/realms/holotable
-          OIDC_CLIENT_ID=holotable
-          OIDC_CLIENT_SECRET=$(openssl rand -hex 16)
-          OIDC_JWKS_URL=http://localhost:8080/realms/holotable/protocol/openid-connect/certs
-          AI_PROVIDER=openai-compatible
-          AI_MODEL=gpt-4o-mini
-          OPENAI_BASE_URL=http://127.0.0.1:1/v1
-          OPENAI_API_KEY=unused-in-ci
-          # Four scrapes a minute is the shipped default; CI has no time for it.
-          SELF_METRICS_INTERVAL_MS=5000
-          SMOKE_TIMEOUT_MS=240000
-          EOF
-
-      # `--wait` holds until the app reports healthy, which is its own
-      # liveness probe, so a server that exited on a bad configuration fails
-      # here with its logs rather than 4 minutes later as a smoke timeout.
-      - name: Bring the stack up
-        run: docker compose up -d --build --wait app seed self-metrics
-
-      # The assertion: the seeded dashboard answers with rows the collector
-      # scraped out of the running app, through the same guard and executor
-      # POST /api/query uses.
-      - name: Smoke
-        run: docker compose --profile smoke run --build --rm smoke
-
-      - name: Logs
-        if: failure()
-        run: docker compose logs --no-color --tail 200
-
-      - name: Tear down
-        if: always()
-        run: docker compose down --volumes --remove-orphans

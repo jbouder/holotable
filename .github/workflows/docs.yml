@@ -22,6 +22,7 @@ on:
       - "*.md"
       - ".github/pull_request_template.md"
       - ".github/workflows/docs.yml"
+      - ".github/actions/**"
   pull_request:
     paths:
       - "docs/**"
@@ -34,6 +35,7 @@ on:
       - "*.md"
       - ".github/pull_request_template.md"
       - ".github/workflows/docs.yml"
+      - ".github/actions/**"
 
 concurrency:
   group: docs-${{ github.ref }}
@@ -43,21 +45,20 @@ permissions:
   contents: read
 
 jobs:
-  build:
-    name: Build
+  # One job: the site is built once and the deploy steps run on the same
+  # checkout. Forked pull requests have no access to secrets; they stop after
+  # the build and the link check.
+  docs:
+    name: Build and deploy
     runs-on: ubuntu-latest
+    env:
+      DEPLOY: ${{ github.event_name == 'push' || github.event.pull_request.head.repo.full_name == github.repository }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-
-      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+      - uses: ./.github/actions/setup
         with:
-          node-version: 22
-          cache: npm
-          cache-dependency-path: docs/package-lock.json
-
-      - name: Install
-        working-directory: docs
-        run: npm ci
+          lockfile: docs/package-lock.json
+          working-directory: docs
 
       # `npm run build` runs scripts/generate-reference.mjs first, then Astro.
       # The build fails on a broken internal link (starlight-links-validator)
@@ -81,34 +82,12 @@ jobs:
           path: docs/dist
           retention-days: 7
 
-  deploy:
-    name: Deploy to Cloudflare
-    needs: build
-    runs-on: ubuntu-latest
-    # Forked pull requests have no access to secrets; they stop at `build`.
-    if: github.event_name == 'push' || github.event.pull_request.head.repo.full_name == github.repository
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-
-      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
-        with:
-          node-version: 22
-          cache: npm
-          cache-dependency-path: docs/package-lock.json
-
-      - name: Install
-        working-directory: docs
-        run: npm ci
-
-      - name: Build
-        working-directory: docs
-        run: npm run build
-
       # `versions upload` (the preview path) requires the Worker to already
       # exist, and the Worker is only created by the first `deploy` on main.
       # Look it up so the first pull request skips the preview instead of
       # failing on that chicken-and-egg.
       - name: Check whether the Worker exists
+        if: env.DEPLOY == 'true'
         id: worker
         env:
           CF_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
@@ -129,7 +108,7 @@ jobs:
           fi
 
       - name: Skip preview (Worker not created yet)
-        if: github.event_name == 'pull_request' && steps.worker.outputs.exists != 'true'
+        if: env.DEPLOY == 'true' && github.event_name == 'pull_request' && steps.worker.outputs.exists != 'true'
         run: |
           echo "::notice::Worker does not exist yet, so there is no version to \
           upload. It is created by the first deploy on main; preview deployments \
@@ -138,7 +117,7 @@ jobs:
       # main -> the live site. Pull requests -> an immutable preview URL,
       # uploaded as a new version without shifting production traffic.
       - name: Deploy
-        if: github.event_name == 'push' || steps.worker.outputs.exists == 'true'
+        if: env.DEPLOY == 'true' && (github.event_name == 'push' || steps.worker.outputs.exists == 'true')
         uses: cloudflare/wrangler-action@953926a2e2182532811c01a25e53647d93bf07c0 # v4.1.3
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}

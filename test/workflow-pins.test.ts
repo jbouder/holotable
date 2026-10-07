@@ -4,8 +4,8 @@ import { join } from "node:path";
 import { test } from "node:test";
 
 /*
- * Every third-party action in .github/workflows/ is pinned to a full commit
- * SHA. A tag such as `@v4` can be moved to different code by whoever controls
+ * Every third-party action in .github/workflows/ and in the local composite
+ * actions under .github/actions/ is pinned to a full commit SHA. A tag such as `@v4` can be moved to different code by whoever controls
  * the action's repository; a SHA cannot. The trailing `# vX.Y.Z` comment is
  * what Dependabot reads and rewrites when it proposes an update, so an update
  * stays a reviewable pull request that changes the SHA and the comment
@@ -13,13 +13,21 @@ import { test } from "node:test";
  */
 
 const WORKFLOWS = ".github/workflows";
+const ACTIONS = ".github/actions";
 const PINNED = /^[\w.-]+\/[\w./-]+@[0-9a-f]{40} # v\d+\.\d+\.\d+$/;
 
-function usesLines(): { file: string; line: number; ref: string }[] {
-  return readdirSync(WORKFLOWS)
+/** The workflows, and each composite action's `action.yml`. */
+function files(): string[] {
+  const workflows = readdirSync(WORKFLOWS)
     .filter((name) => /\.ya?ml$/.test(name))
-    .flatMap((name) => {
-      const file = join(WORKFLOWS, name);
+    .map((name) => join(WORKFLOWS, name));
+  const actions = readdirSync(ACTIONS).map((name) => join(ACTIONS, name, "action.yml"));
+  return [...workflows, ...actions];
+}
+
+function usesLines(): { file: string; line: number; ref: string }[] {
+  return files()
+    .flatMap((file) => {
       return readFileSync(file, "utf8")
         .split("\n")
         .flatMap((text, i) => {
@@ -29,8 +37,9 @@ function usesLines(): { file: string; line: number; ref: string }[] {
     });
 }
 
-test("the workflows use at least one action", () => {
+test("the workflows use at least one action, and so does the setup action", () => {
   assert.ok(usesLines().length > 0);
+  assert.ok(usesLines().some(({ file }) => file.startsWith(ACTIONS)));
 });
 
 test("every action is pinned to a commit SHA with its version in a comment", () => {

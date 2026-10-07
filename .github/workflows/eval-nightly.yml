@@ -3,7 +3,7 @@ name: LLM eval (nightly)
 # The eval corpus against a real model (#24). It measures the prompt and the
 # model as they are now and publishes a pass rate in the job summary; it never
 # gates anything, so it always exits 0 unless the harness itself breaks. The
-# replay that gates pull requests is the `eval` job in ci.yml.
+# replay that gates pull requests is the `Test` job in ci.yml.
 #
 # Configure the provider as the server's environment would be, with
 # repository secrets (AI_MODEL, OPENAI_API_KEY, OPENAI_BASE_URL) and an
@@ -21,8 +21,27 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  # A job-level `if` cannot read a secret, so this one reads it into an output
+  # and the live job keys off that, instead of every step repeating the check.
+  configured:
+    name: Model configured?
+    runs-on: ubuntu-latest
+    outputs:
+      model: ${{ steps.check.outputs.model }}
+    steps:
+      - id: check
+        env:
+          HAS_MODEL: ${{ secrets.AI_MODEL != '' }}
+        run: |
+          echo "model=${HAS_MODEL}" >> "$GITHUB_OUTPUT"
+          if [ "$HAS_MODEL" != "true" ]; then
+            echo "AI_MODEL is not set as a repository secret; nothing to evaluate." >> "$GITHUB_STEP_SUMMARY"
+          fi
+
   live:
     name: Live eval
+    needs: configured
+    if: needs.configured.outputs.model == 'true'
     runs-on: ubuntu-latest
     env:
       AI_PROVIDER: openai-compatible
@@ -31,30 +50,13 @@ jobs:
       OPENAI_BASE_URL: ${{ secrets.OPENAI_BASE_URL }}
       OPENAI_API: ${{ vars.OPENAI_API }}
     steps:
-      - name: Skip without a configured model
-        if: env.AI_MODEL == ''
-        run: echo "AI_MODEL is not set as a repository secret; nothing to evaluate." >> "$GITHUB_STEP_SUMMARY"
-
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        if: env.AI_MODEL != ''
-
-      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
-        if: env.AI_MODEL != ''
-        with:
-          node-version: 22
-          cache: npm
-          cache-dependency-path: package-lock.json
-
-      - name: Install
-        if: env.AI_MODEL != ''
-        run: npm ci
+      - uses: ./.github/actions/setup
 
       - name: Run the eval corpus against the model
-        if: env.AI_MODEL != ''
         run: npm run eval -- --live --json eval-report.json
 
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
-        if: env.AI_MODEL != ''
         with:
           name: eval-report
           path: eval-report.json

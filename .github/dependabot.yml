@@ -4,7 +4,7 @@
 # which is right for reproducibility and also means nothing moves unless
 # something proposes it. This file is that something. Each entry is reviewed
 # and merged by a person like any other pull request: nothing here
-# auto-merges, and CI's required checks (lint, typecheck, test, build) gate
+# auto-merges, and CI's required checks (static checks, test, build) gate
 # every update the same way they gate a hand-written change.
 #
 # Minor and patch updates arrive grouped, one pull request per ecosystem and
@@ -142,6 +142,23 @@ updates:
   # holds that); Dependabot updates the SHA and the comment together.
   - package-ecosystem: github-actions
     directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: chore
+      include: scope
+    groups:
+      actions:
+        update-types: [minor, patch]
+
+  # The local composite action every Node job starts with (#348). The entry
+  # above covers .github/workflows/ only; an action's own `uses:` lines are
+  # found by naming its directory. test/workflow-pins.test.ts holds every use
+  # of an action to one pin, so an update here and one above must land
+  # together.
+  - package-ecosystem: github-actions
+    directory: /.github/actions/setup
     schedule:
       interval: weekly
     open-pull-requests-limit: 5
