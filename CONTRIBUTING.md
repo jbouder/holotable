@@ -98,13 +98,15 @@ cd docs && npm install && npm run dev
 
 ## Checks
 
-Run these before you push. CI runs the same four on every pull request, and
-those four (`Lint`, `Typecheck`, `Test`, `Build`) are the checks required to
-merge. The same workflow also builds the Docker images, lints and renders the
-Helm chart, round-trips the migrations against a real TimescaleDB, runs the
-`Integration` suites, the `End-to-end and accessibility` suite and the
-self-monitoring smoke test, and fuzzes the SQL guard for longer; those report
-on every pull request without gating it, so look at them too.
+Run these before you push. CI runs the same four on every pull request, as
+three jobs — `Static checks` (lint and typecheck), `Test` (which also validates
+`.env.example` and replays the LLM eval corpus) and `Build` — and those three
+are the checks required to merge. The same workflow also round-trips the
+migrations and runs the integration suites against one TimescaleDB
+(`Database`), lints and renders the Helm chart, builds the Docker images and
+runs the self-monitoring smoke test against them (`Images and smoke`), runs
+the `End-to-end and accessibility` suite, and fuzzes the SQL guard for longer;
+those report on every pull request without gating it, so look at them too.
 
 ```bash
 npm run lint         # biome check (lint + format, no writes)
