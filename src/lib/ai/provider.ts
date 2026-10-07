@@ -85,9 +85,13 @@ function baseModel() {
   }
 
   if (provider === "openai-compatible") {
+    // Passed explicitly, and never the empty string: the SDK also reads
+    // these from the environment on its own, at import, and refuses an empty
+    // `OPENAI_BASE_URL` there — which is why an empty value is dropped before
+    // this module loads (`src/lib/env-hygiene.ts`, #350).
     const openai = createOpenAI({
       baseURL: process.env.OPENAI_BASE_URL || undefined,
-      apiKey: process.env.OPENAI_API_KEY,
+      apiKey: process.env.OPENAI_API_KEY || undefined,
     });
     // Two OpenAI-compatible surfaces exist and they are NOT interchangeable:
     //   - Responses API  (`/responses`)         -> SDK default, `openai(id)`

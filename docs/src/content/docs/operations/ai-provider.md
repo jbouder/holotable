@@ -19,6 +19,10 @@ The bare `AI_MODEL` string is routed by the AI SDK Gateway, using
 ## `AI_PROVIDER=openai-compatible`
 
 An OpenAI-compatible endpoint via `OPENAI_BASE_URL` and `OPENAI_API_KEY`.
+An empty value is read as unset, for every `OPENAI_*` and `AI_*` variable:
+the server drops empty ones at start and the scripts when they load `.env`
+([#350](https://github.com/jbouder/holotable/issues/350)), because the
+provider SDK reads `OPENAI_BASE_URL` itself and refuses an empty string.
 
 Two OpenAI-compatible surfaces exist and they are **not** interchangeable:
 

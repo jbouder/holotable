@@ -20,6 +20,12 @@ export async function register() {
   // `node:async_hooks` does not exist.
   const { log } = await import("@/lib/log");
 
+  // Before anything reads the environment: an empty `OPENAI_BASE_URL=` in
+  // `.env` would otherwise take the provider SDK down at import (#350).
+  const { unsetEmptyProviderVariables } = await import("@/lib/env-hygiene");
+  const dropped = unsetEmptyProviderVariables();
+  if (dropped.length > 0) log.info("config.empty_unset", { variables: dropped });
+
   const { runStartupChecks } = await import("@/lib/startup");
   const result = await runStartupChecks();
   if (result.report) {
