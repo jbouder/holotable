@@ -51,7 +51,9 @@ async function main(): Promise<number> {
     throw new Error(`unknown case: ${[...only].filter((n) => !known.has(n)).join(", ")}`);
   }
 
-  // Imported here so a replay never needs a provider configured.
+  // Resolved only for a live run, so a replay never needs a model configured.
+  // (The provider module itself is already loaded through the request path
+  // the replay drives; what it must not need is `AI_MODEL`.)
   const model = live ? (await import("@/lib/ai/provider")).getModel() : null;
 
   const results: CaseResult[] = [];
