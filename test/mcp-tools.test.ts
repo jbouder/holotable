@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import type { LanguageModelUsage } from "ai";
 import type { GenerationFinish, OnGenerationFinish } from "@/lib/ai/generate";
+import type { Model } from "@/lib/ai/provider";
 import type { Failure } from "@/lib/ai/repair";
 import { HttpError } from "@/lib/auth/authorize";
 import { parseGroups } from "@/lib/auth/claims";
@@ -200,6 +201,12 @@ function fakeDeps(
         },
       } as Awaited<ReturnType<McpDeps["enforceLlmLimits"]>>;
     },
+    requireModel: async () => ({
+      ok: true,
+      source: "workspace",
+      modelId: "ws-model",
+      model: {} as Model,
+    }),
     workspacePromptFor: async () => null,
     streamDashboard: ((input: { onFinish?: OnGenerationFinish; repair?: Failure }) => {
       calls.starts.push({ repair: input.repair !== undefined });
@@ -543,6 +550,11 @@ test("generate_dashboard is admitted, recorded and audited like the route, and r
   assert.deepEqual(calls.recorded, [usage]);
   assert.equal(calls.generations.length, 1);
   assert.equal((calls.generations[0] as { mode: string }).mode, "dashboard");
+  // Which level's model answered is recorded, as on the HTTP routes (#331).
+  assert.equal(
+    (calls.generations[0] as { modelConfig: string }).modelConfig,
+    "workspace",
+  );
   assert.deepEqual(calls.starts, [{ repair: false }]);
 
   assert.equal(
@@ -573,6 +585,22 @@ test("a rate limit or budget refusal is the tool's answer, before any model call
   });
   assert.equal(limited.ok, false);
   assert.match(limited.text, /^rate limit reached/);
+  assert.deepEqual(calls.starts, []);
+});
+
+test("a model that cannot be called is the tool's answer, before anything is admitted (#331)", async () => {
+  const { deps, calls } = fakeDeps({
+    requireModel: async () => {
+      throw new HttpError(503, "This workspace's model key can no longer be read");
+    },
+  });
+  const result = await call(mcpTools(deps), "generate_panel", {
+    sourceId: "src-app",
+    prompt: "x",
+  });
+  assert.equal(result.ok, false);
+  assert.match(result.text, /can no longer be read/);
+  assert.deepEqual(calls.admitted, []);
   assert.deepEqual(calls.starts, []);
 });
 

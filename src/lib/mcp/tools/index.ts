@@ -4,6 +4,7 @@ import {
   streamSourceDraft,
 } from "@/lib/ai/generate";
 import { recordGeneration } from "@/lib/ai/log";
+import { requireModel } from "@/lib/ai/model-resolution";
 import {
   createDashboard,
   getDashboardById,
@@ -38,6 +39,7 @@ export function defaultMcpDeps(): McpDeps {
     saveDashboardVersion,
     invalidatePoller,
     enforceLlmLimits,
+    requireModel,
     workspacePromptFor,
     streamDashboard,
     streamExplorePanel,
