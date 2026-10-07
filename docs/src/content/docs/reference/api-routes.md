@@ -116,6 +116,12 @@ hand.
 | `/api/workspaces/[id]/tokens` | GET, POST | source-admin | List the workspace's [API tokens](/operations/api-tokens/), or create one (`{ name, role, expiresInDays }`); the token is in the create response only. Audited as `token.create` |
 | `/api/workspaces/[id]/tokens/[tokenId]` | DELETE | source-admin | Revoke a token; refused from its next request. Audited as `token.revoke` |
 
+## MCP clients
+
+| Route | Method | Min role | Notes |
+| --- | --- | --- | --- |
+| `/api/mcp` | GET, POST | signed in (bearer) | The MCP endpoint ([#149](https://github.com/jbouder/holotable/issues/149)). The one route that accepts a realm-issued access token, in `Authorization: Bearer`, and the only credential it accepts besides a service-account `ht_` token: no session cookie. Unauthenticated, or refused, is a `401` whose `WWW-Authenticate` names the protected-resource metadata at `/.well-known/oauth-protected-resource/api/mcp` (RFC 9728), which sends an MCP client to the realm; see [Keycloak setup](/operations/keycloak/#5-mcp-clients). A `404` until `OIDC_MCP_CLIENT_ID` is set, and always in demo mode. Until the tools arrive ([#148](https://github.com/jbouder/holotable/issues/148)), GET answers with the caller's identity as `/api/me` does and POST is a `501` |
+
 ## Auth
 
 | Route | Method | Notes |

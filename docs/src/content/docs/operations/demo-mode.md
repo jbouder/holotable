@@ -48,7 +48,7 @@ startup checks. Each is an error, so the server refuses to boot:
 
 | Configuration | Why it is refused |
 | --- | --- |
-| Any of `OIDC_ISSUER`, `OIDC_CLIENT_ID`, `OIDC_CLIENT_SECRET`, `OIDC_JWKS_URL` | Demo mode would hand out sessions beside real ones. |
+| Any of `OIDC_ISSUER`, `OIDC_CLIENT_ID`, `OIDC_CLIENT_SECRET`, `OIDC_JWKS_URL`, `OIDC_MCP_CLIENT_ID` | Demo mode would hand out sessions beside real ones. |
 | `DEMO_GROUPS` granting `source-admin` | A visitor could register a source pointing at any host the server can reach. |
 | `DEMO_GROUPS` containing `/platform-admins` | A visitor would bypass every workspace check. |
 | `DEMO_GROUPS` granting no workspace | Every visitor would see an empty app. |

@@ -7,3 +7,4 @@ process.env.AUTH_MODE = "demo";
 process.env.DEMO_GROUPS = "/workspaces/demo/editor";
 delete process.env.OIDC_JWKS_URL;
 delete process.env.OIDC_ISSUER;
+delete process.env.OIDC_MCP_CLIENT_ID;

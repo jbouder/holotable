@@ -13,7 +13,8 @@ you must add a group-membership mapper.
 
 `docker compose up` starts Keycloak 26 on `http://localhost:8080` and imports
 `keycloak/holotable-realm.json`: the `holotable` realm, the `holotable` client
-with the settings below, the `demo` workspace's three role groups,
+with the settings below, the public `holotable-mcp` client [MCP clients](#5-mcp-clients)
+sign in through, the `demo` workspace's three role groups,
 `/platform-admins`, and two users: **`demo` / `demo`**, in
 `/workspaces/demo/source-admin` and `/platform-admins`, and **`viewer` /
 `viewer`**, in `/workspaces/demo/viewer`, which the end-to-end suite uses to
@@ -107,6 +108,88 @@ Decode an issued token and confirm it contains:
 If `groups` is missing or contains bare names rather than paths, revisit step 2.
 How those paths become roles is described in
 [Authorization model](/architecture/authorization/).
+
+## 5. MCP clients
+
+An MCP client — Claude Code, Claude Desktop — runs outside the browser and
+cannot hold the session cookie, so it signs in on its own
+([#149](https://github.com/jbouder/holotable/issues/149)): `/api/mcp` answers
+an unauthenticated call with `401` and a `WWW-Authenticate` header naming the
+server's protected-resource metadata (RFC 9728,
+`/.well-known/oauth-protected-resource/api/mcp`), which names the realm as the
+authorization server. The client then runs the authorization-code flow with
+PKCE in a browser, against a **second, public** realm client, and sends the
+access token as `Authorization: Bearer`. Nothing new is minted on the
+Holotable side: the token is the realm's, verified against the realm's keys
+on every request, and the `groups` it carries go through the same parser
+and `can()` as a session's.
+
+1. Create a second OpenID Connect client:
+   - Client ID: `holotable-mcp` (any id but the browser client's; the server
+     refuses to boot when the two are the same).
+   - Client authentication: **Off** (public). There is no secret to give a
+     client on someone's laptop, and PKCE binds the code to the client that
+     asked for it.
+   - Standard flow: enabled. Direct access grants: off.
+   - Valid redirect URIs: the loopback addresses the clients listen on.
+     Claude Desktop is fixed at `http://127.0.0.1:53280/callback`; Claude Code
+     picks a port unless `--callback-port` fixes one, so register
+     `http://localhost:<port>/callback` for the port you choose. The local
+     realm registers `http://localhost:*` and `http://127.0.0.1:*`, which is
+     fine for a development realm and too wide for a real one.
+   - Advanced → **Proof Key for Code Exchange Code Challenge Method**: `S256`.
+2. Add the same **Group Membership** mapper as in step 2, on this client's
+   dedicated scope, with *Full group path* on and *Add to access token* on.
+   The access token is what the server reads here, not the id_token.
+3. Add an **Audience** mapper (*By configuration* → **Audience**): *Included
+   Client Audience* `holotable-mcp`, *Add to access token* on. Keycloak does
+   not put a client's own id in its access tokens' `aud` by default, and the
+   server requires it.
+4. Set `OIDC_MCP_CLIENT_ID=holotable-mcp`. Until it is set, `/api/mcp` and the
+   metadata are a `404`; demo mode refuses it like every other `OIDC_*`
+   variable.
+5. Optionally set the same **Backchannel logout URL** as on the browser client,
+   so that a realm session ended in Keycloak ends the MCP session at once
+   rather than at the token's expiry. The logout token is accepted for either
+   client id.
+
+Then connect a client. Keycloak's dynamic client registration is closed to
+anonymous callers by default, so the client is told the id:
+
+```bash
+claude mcp add --transport http holotable http://localhost:3000/api/mcp \
+  --client-id holotable-mcp --callback-port 53280
+```
+
+Claude Desktop takes the same values under *Bring your own client* in its
+connector settings. Either client opens the realm's sign-in in a browser the
+first time, stores the tokens it is given and refreshes them itself. If a
+client does not follow the challenge to the metadata, point it at the realm
+directly: `authServerMetadataUrl` in `.mcp.json` is
+`<issuer>/.well-known/openid-configuration`.
+
+What the server checks on every request, in order: the signature against
+`OIDC_JWKS_URL`, `iss` against `OIDC_ISSUER`, `exp`, `aud` and `azp` against
+`OIDC_MCP_CLIENT_ID` (minted *for* the MCP client, not merely addressed to
+it), that it is an access token (`typ: Bearer`, no `nonce`: an id_token is
+refused), and that its realm session (`sid`) has not been revoked. A token
+that fails any of these is a `401` with `error="invalid_token"`, which tells
+the client to sign in again. A service-account token
+([`ht_…`](/operations/api-tokens/)) is accepted on `/api/mcp` too, by its
+prefix, and resolves exactly as it does elsewhere.
+
+A realm token is a credential for `/api/mcp` and nothing else. No other route
+reads one: `getIdentity()` knows only the session cookie and `ht_` tokens,
+and a token minted for the MCP client put in the session cookie is refused
+by `azp` even though the realm's keys verify it. The MCP route in turn reads
+no cookie, so a browser page cannot reach it with a session. Until the tools
+arrive ([#148](https://github.com/jbouder/holotable/issues/148)), an
+authenticated `GET /api/mcp` answers with the caller's own identity, the way
+`/api/me` does, so a configuration can be checked end to end:
+
+```bash
+curl -sS http://localhost:3000/api/mcp -H "Authorization: Bearer $TOKEN"
+```
 
 ## Session renewal
 

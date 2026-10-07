@@ -104,14 +104,21 @@ export async function verifySessionToken(token: string): Promise<Identity | null
 
   const remote = realmJwks();
   if (remote) {
+    let payload: JWTPayload | null = null;
     try {
-      const { payload } = await jwtVerify(token, remote, {
+      ({ payload } = await jwtVerify(token, remote, {
         issuer: process.env.OIDC_ISSUER,
         audience: process.env.OIDC_AUDIENCE || undefined,
-      });
-      return identityFromPayload(payload);
+      }));
     } catch {
       // Fall through to first-party session verification below.
+    }
+    if (payload) {
+      // A token the realm minted for the MCP client (#149) is a credential
+      // for `/api/mcp` only, never a session, whatever else it says.
+      const mcpClient = process.env.OIDC_MCP_CLIENT_ID;
+      if (mcpClient && payload.azp === mcpClient) return null;
+      return identityFromPayload(payload);
     }
   }
 

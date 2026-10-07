@@ -35,10 +35,13 @@ const MAX_BODY_BYTES = 16 * 1024;
 export const POST = route("auth.backchannel_logout", async (req: Request) => {
   const keys = realmJwks();
   const issuer = process.env.OIDC_ISSUER;
-  const audience = process.env.OIDC_CLIENT_ID;
-  if (config.authMode === "demo" || !keys || !issuer || !audience) {
+  const clientId = process.env.OIDC_CLIENT_ID;
+  if (config.authMode === "demo" || !keys || !issuer || !clientId) {
     throw new HttpError(404, "not found");
   }
+  // A logout token is addressed to one client; the realm sends one for the
+  // MCP client's sessions too (#149), and those end the same way.
+  const audience = config.oidcMcpClientId ? [clientId, config.oidcMcpClientId] : clientId;
 
   const body = await req.text();
   if (body.length > MAX_BODY_BYTES) return refuse();

@@ -100,6 +100,7 @@ services:
       OIDC_SCOPE: ${OIDC_SCOPE:-openid profile email}
       OIDC_AUDIENCE: ${OIDC_AUDIENCE:-}
       OIDC_ACCOUNT_URL: ${OIDC_ACCOUNT_URL:-}
+      OIDC_MCP_CLIENT_ID: ${OIDC_MCP_CLIENT_ID:-}
       # Prometheus scrape gate. /api/metrics answers 404 until one is set.
       METRICS_TOKEN: *metrics-token
       METRICS_ALLOWED_CIDRS: ${METRICS_ALLOWED_CIDRS:-}

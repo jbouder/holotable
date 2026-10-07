@@ -128,11 +128,13 @@ function isNavigation(request: NextRequest): boolean {
 
 export const config = {
   /*
-   * Everything except API routes and build assets. API responses are JSON or
-   * an SSE stream, neither of which a document policy applies to, and leaving
-   * `/api` out keeps the proxy off the stream path entirely. Prefetches are
+   * Everything except API routes, the well-known metadata and build assets.
+   * API responses are JSON or an SSE stream, neither of which a document
+   * policy applies to, and leaving `/api` out keeps the proxy off the stream
+   * path entirely; `/.well-known` is JSON an MCP client reads with no cookie
+   * (#149), which the demo redirect must never answer for. Prefetches are
    * deliberately *not* excluded: a nonce costs nothing, and a prefetched
    * document served without a policy would be a page without one.
    */
-  matcher: ["/((?!api|_next/static|_next/image|icon.svg).*)"],
+  matcher: ["/((?!api|\\.well-known|_next/static|_next/image|icon.svg).*)"],
 };

@@ -25,8 +25,12 @@ export interface LogoutClaims {
 
 export interface LogoutTokenOptions {
   issuer: string;
-  /** The client id: a logout token is addressed to one client. */
-  audience: string;
+  /**
+   * The client ids a logout token may be addressed to: the browser's, and the
+   * MCP client's (#149) when there is one, since a realm session an MCP
+   * client signed in through ends the same way.
+   */
+  audience: string | string[];
 }
 
 /**

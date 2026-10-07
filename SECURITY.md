@@ -164,6 +164,23 @@ because the origin check refuses it before authentication. Requests made with
 a token are audited as `token:<id>`. See
 [API tokens](docs/src/content/docs/operations/api-tokens.md).
 
+**MCP clients.** An MCP client (#149) reaches `/api/mcp`, and only that
+route, with an access token the realm minted for a second, public realm
+client (`OIDC_MCP_CLIENT_ID`), obtained by the client itself through the
+authorization-code flow with PKCE after a `401` that names the server's
+protected-resource metadata (RFC 9728). Holotable mints nothing for it. The
+token is verified on every request against the realm's keys, issuer, expiry,
+audience *and* `azp` (minted for the MCP client, not merely addressed to it),
+must be an access token rather than an id_token, and is refused once its
+realm session is revoked, so a back-channel logout ends an MCP session too.
+Its identity is the token's `groups` through the same parser, and `can()`
+decides every call as for a session. No other route reads a realm token:
+`getIdentity()` knows only the session cookie and `ht_` tokens, a token
+minted for the MCP client is refused as a session by `azp`, and the MCP route
+reads no cookie. A service-account token is accepted there as well, by its
+prefix, with the same resolution as elsewhere. See
+[Keycloak setup](docs/src/content/docs/operations/keycloak.md).
+
 **Cookies and cross-origin requests.** The session cookie is `httpOnly` and
 `SameSite=Lax`. When it is `Secure`, its name is `__Host-` prefixed, so the
 browser accepts it only from this host with `Path=/` and no `Domain`; a sibling
