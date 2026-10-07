@@ -7,6 +7,7 @@ import {
   splitClaimNames,
 } from "@/lib/auth/claims";
 import { isOrigin, splitOrigins } from "@/lib/auth/origin";
+import { invalidAllowlistEntries } from "@/lib/ai/base-url";
 import { parseCidr } from "@/lib/cidr";
 import { SECRET_REF_GRANTS_VAR, parseSecretRefGrants } from "@/lib/secret-refs";
 import { resolveTimeExpr, resolveTimeRange } from "@/lib/time";
@@ -185,6 +186,14 @@ export const config = {
    * default: 2.
    */
   aiMaxRetries: num("AI_MAX_RETRIES", 2),
+  /**
+   * Hosts and address ranges a model base URL entered in the app (#331) may
+   * reach although they are not public, and hosts it may reach over plain
+   * http: a local Ollama, a vLLM in the cluster. Comma-separated host names,
+   * addresses and CIDR ranges. Empty by default, so an in-app base URL must be
+   * public https. The environment's own OPENAI_BASE_URL is not held to it.
+   */
+  aiBaseUrlAllowlist: str("AI_BASE_URL_ALLOWLIST", ""),
 
   /**
    * Model requests per minute allowed per user in a workspace, on every
@@ -482,6 +491,12 @@ const EnvSchema = z.object({
       .int("must be an integer from 0 to 10 (0 disables retrying)")
       .min(0, "must be an integer from 0 to 10 (0 disables retrying)")
       .max(10, "must be an integer from 0 to 10 (0 disables retrying)"),
+  ),
+  AI_BASE_URL_ALLOWLIST: blank(
+    z.string().refine((v) => invalidAllowlistEntries(v).length === 0, {
+      error:
+        "must be a comma-separated list of host names, addresses and CIDR ranges, e.g. ollama.internal,10.0.0.0/8",
+    }),
   ),
   LLM_RATE_PER_MINUTE: blank(nonNegativeInt),
   LLM_DAILY_TOKEN_BUDGET: blank(nonNegativeInt),

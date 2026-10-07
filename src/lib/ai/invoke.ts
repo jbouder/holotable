@@ -1,3 +1,4 @@
+import { baseUrlRefusal } from "@/lib/ai/guarded-fetch";
 import { APICallError, type LanguageModelMiddleware, wrapLanguageModel } from "ai";
 import { log } from "@/lib/log";
 
@@ -219,6 +220,9 @@ export function backoffMs(retry: number, random: () => number): number {
  * cannot honor, a missing key) is permanent.
  */
 export function isRetryable(error: unknown): boolean {
+  // The base-URL guard refusing an address (#331) looks like a network
+  // failure to the SDK, and asking again gets the same answer.
+  if (baseUrlRefusal(error)) return false;
   return (
     typeof error === "object" &&
     error !== null &&

@@ -13,6 +13,7 @@ import {
 } from "@/lib/ai/generate";
 import { AdditionalSourceIds, resolveGenerationSources } from "@/lib/generation-sources";
 import { recordGeneration } from "@/lib/ai/log";
+import { requireModel } from "@/lib/ai/model-resolution";
 import { textResponseOnceStarted } from "@/lib/ai/provider-error";
 import {
   type Failure,
@@ -118,10 +119,15 @@ export const POST = route("generate", async (req: Request) => {
   });
   const sources = [source, ...additional];
 
+  // Before the limits: a workspace whose model cannot be called should not
+  // spend its rate allowance to be told so (#331).
+  const resolved = await requireModel({ identity, workspaceId: source.workspaceId });
+
   const usage = await enforceLlmLimits({
     identity,
     workspaceId: source.workspaceId,
     route: "generate",
+    model: resolved.modelId,
   });
 
   // The workspace's own context (#66), from the workspace that owns the
@@ -161,6 +167,7 @@ export const POST = route("generate", async (req: Request) => {
       catalog,
       spec: event.object,
       model: event.modelId,
+      modelConfig: resolved.source,
       usage: event.usage,
       attempts: repair ? 2 : 1,
       error: event.error,
@@ -177,6 +184,7 @@ export const POST = route("generate", async (req: Request) => {
         mode: body.mode,
         prompt: body.prompt,
         model: event.modelId,
+        modelConfig: resolved.source,
         ...(additional.length > 0 ? { sourceIds: sources.map((s) => s.id) } : {}),
         ...(repair ? { attempt: 2 } : {}),
       },
@@ -193,6 +201,7 @@ export const POST = route("generate", async (req: Request) => {
           prompt: body.prompt,
           workspacePrompt,
           onFinish,
+          model: resolved.model,
           repair,
         })
       : body.mode === "dashboard-refine"
@@ -203,6 +212,7 @@ export const POST = route("generate", async (req: Request) => {
             current: body.current,
             workspacePrompt,
             onFinish,
+            model: resolved.model,
             repair,
           })
         : body.mode === "explore"
@@ -211,6 +221,7 @@ export const POST = route("generate", async (req: Request) => {
               prompt: body.prompt,
               workspacePrompt,
               onFinish,
+              model: resolved.model,
               repair,
             })
           : streamPanel({
@@ -219,6 +230,7 @@ export const POST = route("generate", async (req: Request) => {
               current: body.current,
               workspacePrompt,
               onFinish,
+              model: resolved.model,
               repair,
             });
 

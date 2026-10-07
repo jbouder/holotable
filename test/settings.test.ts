@@ -55,3 +55,21 @@ test("the command palette offers Settings", () => {
   const command = STATIC_COMMANDS.find((c) => c.id === "page:settings");
   assert.deepEqual(command?.action, { type: "navigate", href: "/settings" });
 });
+
+test("the workspace model section is listed for whoever manages a workspace (#331)", () => {
+  assert.ok(!ids(["/workspaces/w/editor"]).includes("model"));
+  assert.ok(ids(["/workspaces/w/source-admin"]).includes("model"));
+  assert.ok(ids(["/platform-admins"]).includes("model"));
+});
+
+test("the personal model section is listed for a person who generates, never a token (#331)", () => {
+  assert.ok(!ids(["/workspaces/w/viewer"]).includes("personal-model"));
+  assert.ok(ids(["/workspaces/w/editor"]).includes("personal-model"));
+  const token = {
+    ...parseGroups("token:1", ["/workspaces/w/editor"]),
+    serviceAccount: { tokenId: "1", name: "ci" },
+  };
+  const tokenIds = visibleSections(token).map((s) => s.id);
+  assert.ok(!tokenIds.includes("personal-model"));
+  assert.ok(!tokenIds.includes("model"));
+});

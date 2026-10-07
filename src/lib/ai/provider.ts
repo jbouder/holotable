@@ -3,12 +3,18 @@ import { gateway } from "ai";
 import { resilientModel } from "@/lib/ai/invoke";
 import { logModelErrors } from "@/lib/ai/provider-error";
 import { stubModel } from "@/lib/ai/stub";
+import type { BaseUrlAllowlist } from "@/lib/ai/base-url";
+import { guardedFetch } from "@/lib/ai/guarded-fetch";
+import type { ModelSettings } from "@/lib/ai/model-config";
 import { config } from "@/lib/config";
 
 /**
  * Provider-agnostic model selection.
  *
- * The provider and model are chosen entirely from the environment. We do NOT
+ * This file builds models; which one a request gets is decided per request
+ * in `model-resolution.ts` (#331): a person's, a workspace's, or this
+ * environment's. For the environment, the provider and model are chosen
+ * entirely from these variables. We do NOT
  * hard-code any model catalog or model-specific data. Two strategies:
  *
  *   AI_PROVIDER=gateway            -> pass the model id string straight to the
@@ -43,7 +49,8 @@ export const PROVIDER_OPTIONS = {
 } as const;
 
 /**
- * What every `streamObject`/`streamText` call spreads in: the model, the
+ * What every `streamObject`/`streamText` call spreads in: the model the
+ * route resolved for this caller and workspace (#331), the
  * SDK's own retry turned off, because the model's middleware already retries
  * (with jitter, inside a deadline) and two loops would multiply,
  * {@link PROVIDER_OPTIONS}, and the `onError` that logs a failed call through
@@ -51,20 +58,59 @@ export const PROVIDER_OPTIONS = {
  * `test/ai-invoke.test.ts` fails on a call site that does not use it, or that
  * replaces its `onError`.
  */
-export function modelSettings() {
+export function modelSettings(model: Model) {
   return {
-    model: getModel(),
+    model,
     maxRetries: 0,
     providerOptions: PROVIDER_OPTIONS,
     onError: logModelErrors(),
   } as const;
 }
 
-export function getModel() {
-  return resilientModel(baseModel(), {
+/** A model ready to call: a provider's, wrapped with the deadline and retry. */
+export type Model = ReturnType<typeof resilient>;
+
+function resilient(model: Parameters<typeof resilientModel>[0]) {
+  return resilientModel(model, {
     timeoutMs: config.aiRequestTimeoutMs,
     maxRetries: config.aiMaxRetries,
   });
+}
+
+/**
+ * The environment's model: the last level of the resolution in
+ * `model-resolution.ts` (#331), and the only one a script or a demo uses.
+ */
+export function getModel(): Model {
+  return resilient(baseModel());
+}
+
+/**
+ * A model configured in the app (#331), for a workspace or a person. Unlike
+ * the environment's, everything comes from the arguments: the base URL is
+ * always passed, so `OPENAI_BASE_URL` is never read, and the key is always a
+ * string, so `OPENAI_API_KEY` is never read either (an endpoint that needs no
+ * key gets an empty one). Every request goes through the guarded fetch, which
+ * holds the base URL to the address rules in `base-url.ts` on each
+ * connection.
+ */
+export function configuredModel(
+  settings: ModelSettings,
+  apiKey: string | null,
+  allowlist: BaseUrlAllowlist,
+): Model {
+  switch (settings.provider) {
+    case "openai-compatible": {
+      const openai = createOpenAI({
+        baseURL: settings.baseUrl,
+        apiKey: apiKey ?? "",
+        fetch: guardedFetch(settings.baseUrl, allowlist),
+      });
+      return resilient(
+        settings.api === "chat" ? openai.chat(settings.model) : openai(settings.model),
+      );
+    }
+  }
 }
 
 function baseModel() {

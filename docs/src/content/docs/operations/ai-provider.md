@@ -5,11 +5,99 @@ sidebar:
   order: 3
 ---
 
-The provider and model are **environment-selected**. No model catalog or
-model-specific data is baked into the code (`src/lib/ai/provider.ts`).
+The server's provider and model are **environment-selected**. No model
+catalog or model-specific data is baked into the code
+(`src/lib/ai/provider.ts`).
 
 `AI_MODEL` must be set; **there is no default model**. Choosing the concrete
 provider and model is deliberately left to the deployment.
+
+A workspace, and a person, can also set a model in the app, which takes the
+place of the environment's for their generations; see
+[Models configured in the app](#models-configured-in-the-app).
+
+## Models configured in the app
+
+([#331](https://github.com/jbouder/holotable/issues/331)) Every generation
+(dashboard, refine, panel edit, Explore, source draft and dashboard chat)
+resolves its model per request, and the first level that is configured wins:
+
+1. **Personal**: the caller's own model, under Settings → Personal model,
+   when they have one **and** the workspace allows personal keys.
+2. **Workspace**: the workspace's model, under Settings → Workspace model,
+   which a source-admin sets.
+3. **Environment**: `AI_PROVIDER`, `AI_MODEL` and the rest, below. With
+   neither level set, nothing changes.
+
+A level that is configured but broken (its key can no longer be read, see
+[rotation](#rotating-session_secret)) is reported as such and generation
+refuses with a `503` naming the fix. It never falls through to the next level,
+which may be billed to someone else. The settings pages and every prompt box
+say which level a generation in that workspace uses.
+
+A configuration is an **OpenAI-compatible** endpoint: base URL, model id, API
+key, and the Responses or Chat Completions switch (`OPENAI_API` above). That
+covers OpenAI, OpenRouter, Groq, Together, Ollama, vLLM, LM Studio and
+anything else that speaks the OpenAI API. Native providers are a follow-up;
+the stored row names its provider and keeps its settings as JSON, so adding
+one needs no migration. "Test connection" makes one minimal model call with
+what is in the form, admitted by the workspace's rate limit and budget like a
+generation.
+
+Which level answered is recorded on every generation log row
+(`modelConfig`) and on the `dashboard.generate`, `source.draft` and
+`dashboard.chat` audit rows, never the key. Rate limits and the
+per-workspace budget apply whichever level is used. Both levels are off in
+[demo mode](/operations/demo-mode/): the settings sections are not listed and
+the routes refuse.
+
+### The API key
+
+- Sealed at rest with AES-256-GCM under a key derived from `SESSION_SECRET`
+  by HKDF with its own label (`src/lib/secrets/seal.ts`), the same
+  arrangement as the refresh token. A row edited in the database fails to
+  open rather than yielding a different key.
+- **Write-only.** No route returns it. A settings page shows whether one is
+  stored and, for a key of 16 characters or more, its last four characters.
+  A blank key field keeps the stored key; "Remove the stored key" clears it,
+  for an endpoint that needs none.
+- Kept only for the **same origin**. Changing the base URL to a different
+  host requires entering the key again, so a stored key cannot be redirected
+  to a host its owner never chose.
+- Never in a log line, the generation log or an audit row: each key is
+  registered with the log's redaction when it is opened or saved, so it is
+  removed wherever it appears, whatever its shape.
+
+### Rotating `SESSION_SECRET`
+
+Rotating it makes every stored key unreadable, the same way it ends every
+session. Nothing crashes: the settings page says the stored key can no longer
+be read, and a generation in that workspace refuses with "This workspace's
+model key can no longer be read … A source-admin must enter it again". Re-enter
+each key after a rotation.
+
+### The base URL guard
+
+A base URL typed into the app means the server makes requests, carrying a
+key, to an address someone chose. So:
+
+- it must be `https`, unless its host is in `AI_BASE_URL_ALLOWLIST`;
+- every address the host resolves to must be public: no private (RFC 1918,
+  unique-local), loopback, link-local (which holds the cloud metadata
+  endpoint), carrier-grade NAT, multicast or reserved address, unless the
+  host or the address is allowlisted. This is checked when the URL is saved
+  and again on **every connection**, at the moment the socket is opened, so a
+  name that changes what it resolves to later (DNS rebinding) is refused too;
+- it must not carry a user name or password;
+- redirects are not followed, and the client may reach only the configured
+  origin.
+
+| Variable | Default | What it does |
+|---|---|---|
+| `AI_BASE_URL_ALLOWLIST` | empty | Comma-separated host names, addresses and CIDR ranges an in-app base URL may reach although they are not public. A listed **host name** may also use plain `http` and reach whatever it resolves to; a listed **range** admits those addresses for any host. For example `ollama.internal,10.20.0.0/16`. A malformed entry is a startup error. |
+
+The environment's own `OPENAI_BASE_URL` is set by the operator and is not
+held to the allowlist.
 
 ## `AI_PROVIDER=gateway`
 
@@ -89,8 +177,7 @@ The server log has the provider's own reply, as `model.request_failed` with
 1. Try the other `OPENAI_API` value, and restart.
 2. If neither works, the model needs its vendor's own protocol. Use a model
    the aggregator serves over the OpenAI API, point `AI_PROVIDER=gateway` at
-   it, or use the vendor's native provider once that is supported
-   ([#331](https://github.com/jbouder/holotable/issues/331)).
+   it, or use the vendor's native provider once one is supported.
 
 `npm run eval -- --live --case <name>` with `AI_MODEL` set for that one run is a
 quick way to try a model before switching the server to it.
@@ -128,8 +215,9 @@ suite sets both.
   ([#22](https://github.com/jbouder/holotable/issues/22)); see
   [Timeouts and retries](#timeouts-and-retries) below. There is no fallback
   model.
-- `AI_MODEL` is also surfaced read-only in the UI so users can see which model
-  produced their specs.
+- The model a generation will use (the environment's `AI_MODEL`, or a
+  [workspace or personal](#models-configured-in-the-app) one) is surfaced
+  read-only in the UI so users can see which model produced their specs.
 
 ## Timeouts and retries
 
@@ -230,4 +318,4 @@ re-record to measure the new prompt. The evals grade a first attempt only; the
 
 ---
 
-*Last verified against the code at commit `4e4c5cf` (2026-10-05).*
+*Last verified against the code at commit `4e4c5cf` (2026-10-05); in-app models (#331) on 2026-10-07.*

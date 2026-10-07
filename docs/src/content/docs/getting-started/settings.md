@@ -32,6 +32,8 @@ bookmark one or send it to someone.
 | Keyboard shortcuts | `/settings/shortcuts` | Every key binding, grouped by where it works |
 | Workspaces | `/settings/workspaces` | AI usage and limits. Listed only if you are a source-admin somewhere or a platform admin |
 | AI context | `/settings/ai-context` | What the model is told about each workspace: a glossary, metric definitions and example panels, and the composed prompt. Listed if you are an editor somewhere; only a source-admin can change it |
+| Workspace model | `/settings/model` | The model each workspace you administer generates with, its key, and whether people may use their own. Listed only if you are a source-admin somewhere or a platform admin, and not in demo mode |
+| Personal model | `/settings/personal-model` | Your own model and key, for your generations in workspaces that allow it. Listed if you are an editor somewhere, and not in demo mode |
 | API tokens | `/settings/tokens` | Service-account tokens for scripts and pipelines. Listed only if you are a source-admin somewhere or a platform admin |
 
 ### Account
@@ -98,6 +100,23 @@ source before it can be saved, and the model is shown it only when generating
 against that source. Editors see the same page read-only, and anyone on it can
 show the composed system prompt for any of the workspace's sources. See
 [Workspace context](/concepts/generating-a-panel/#workspace-context).
+
+### Workspace model
+
+Point a workspace at its own OpenAI-compatible endpoint (base URL, model, API
+key, and the Responses or Chat Completions switch) instead of the server's
+model, and decide whether people may bring their own. "Test connection" makes
+one small model call with what is in the form. The key is encrypted at rest
+and never shown again: the page says only whether one is stored and its last
+four characters. The next generation in the workspace uses the change. See
+[Models configured in the app](/operations/ai-provider/#models-configured-in-the-app).
+
+### Personal model
+
+Your own endpoint and key, billed to you. It applies only in the workspaces
+listed under "Where it applies", the ones whose source-admins allow personal
+models, and the list says what a generation of yours in each will use.
+Elsewhere it is kept and ignored.
 
 ### API tokens
 

@@ -1,3 +1,4 @@
+import { baseUrlRefusal } from "@/lib/ai/guarded-fetch";
 import { APICallError, createTextStreamResponse } from "ai";
 import { HttpError } from "@/lib/auth/authorize";
 import { ModelTimeoutError } from "@/lib/ai/invoke";
@@ -32,6 +33,10 @@ export function isProtocolMismatch(error: unknown): boolean {
 /** The sentence an author sees for a provider failure. Safe to send to a browser. */
 export function providerErrorMessage(error: unknown): string {
   if (error instanceof ModelTimeoutError) return error.message;
+  // Written for the person who configured the base URL (#331), and names no
+  // more than the host they typed and the address it resolved to.
+  const refusal = baseUrlRefusal(error);
+  if (refusal) return refusal.message;
   if (isProtocolMismatch(error)) return PROTOCOL_MISMATCH_MESSAGE;
   if (APICallError.isInstance(error) && error.statusCode !== undefined) {
     return `The model provider refused the request (HTTP ${error.statusCode}). The server log has its reply.`;

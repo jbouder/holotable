@@ -66,6 +66,13 @@ natural-language edit and the dashboard chat show a notice naming the variables
 to set, instead of sending a request that can only fail. With
 `AUTH_MODE=oidc` a missing model is still an error in production.
 
+The [models configured in the app](/operations/ai-provider/#models-configured-in-the-app)
+are off in demo mode: the environment's model is the only one. The Workspace
+model and Personal model settings are not listed, their routes refuse, and a
+row left in the database from an earlier non-demo run is ignored, so a
+visitor can neither spend someone's stored key nor point the server at an
+address of their choosing.
+
 ## Not for auth development
 
 Demo mode is fine for working on dashboards, panels and charts. It is not a way

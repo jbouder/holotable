@@ -139,6 +139,19 @@ only a random id for it, in an `httpOnly` cookie scoped to `/api/auth`, whose
 SHA-256 is what the table stores. Sign-out deletes the row; a refused renewal
 deletes it too.
 
+**Model keys entered in the app.** A workspace's or a person's model API key
+(#331) is sealed the same way, AES-256-GCM under a key derived from
+`SESSION_SECRET` with its own HKDF label, and is write-only: no route returns
+it, a settings page shows at most its last four characters, and every key is
+registered with the log's redaction when it is opened or saved, so it cannot
+reach a log line, the generation log or an audit row. A stored key is kept
+only while the base URL stays on the same origin. Rotating `SESSION_SECRET`
+makes every stored key unreadable, which surfaces as "enter the key again".
+The base URL itself is untrusted: it must be `https` and resolve only to
+public addresses, checked again on every connection (so DNS rebinding does
+not get around it), unless the operator allowlists the host or range in
+`AI_BASE_URL_ALLOWLIST`; redirects are not followed.
+
 **Read-only share links.** A share link (#65) is the one credential that is
 not a session. Its `hts_` token is signed with a key derived from
 `SESSION_SECRET`, and only its SHA-256 is stored. Every use checks the token

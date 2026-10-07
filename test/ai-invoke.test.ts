@@ -351,7 +351,7 @@ test("every model call spreads modelSettings(), so the SDK's retry stays off and
       // The options object opens at the match; modelSettings() must be in it
       // before its first nested object closes the call's first lines.
       const head = text.slice(match.index, match.index + 200);
-      if (!head.includes("...modelSettings()")) offenders.push(where);
+      if (!head.includes("...modelSettings(")) offenders.push(where);
       // Its own onError would replace the one that logs through the redacting
       // log, and the SDK's raw dump never comes back, but neither does the
       // log line (#343).

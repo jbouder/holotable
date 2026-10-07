@@ -4,6 +4,7 @@ import type {
   streamSourceDraft,
 } from "@/lib/ai/generate";
 import type { recordGeneration } from "@/lib/ai/log";
+import type { requireModel } from "@/lib/ai/model-resolution";
 import type {
   createDashboard,
   getDashboardById,
@@ -34,6 +35,8 @@ export interface McpDeps {
   saveDashboardVersion: typeof saveDashboardVersion;
   invalidatePoller: typeof invalidatePoller;
   enforceLlmLimits: typeof enforceLlmLimits;
+  /** The caller's model in the workspace (#331): personal, workspace or environment. */
+  requireModel: typeof requireModel;
   workspacePromptFor: typeof workspacePromptFor;
   streamDashboard: typeof streamDashboard;
   streamExplorePanel: typeof streamExplorePanel;

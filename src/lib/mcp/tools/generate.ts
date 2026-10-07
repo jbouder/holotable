@@ -2,6 +2,8 @@ import { NoObjectGeneratedError } from "ai";
 import { z } from "zod";
 import type { GenerationFinish, OnGenerationFinish } from "@/lib/ai/generate";
 import type { GenerationMode } from "@/lib/ai/log";
+import type { ModelSource } from "@/lib/ai/model-config";
+import type { Model } from "@/lib/ai/provider";
 import { providerHttpError } from "@/lib/ai/provider-error";
 import type { Failure } from "@/lib/ai/repair";
 import { audit } from "@/lib/audit";
@@ -81,22 +83,39 @@ interface Generation<T> {
   sourceId: string | null;
   prompt: string;
   catalog: string | null;
-  /** The audit row for one attempt. */
-  auditAttempt: (event: GenerationFinish, attempt: number) => void;
+  /** The audit row for one attempt, with which level's model answered (#331). */
+  auditAttempt: (
+    event: GenerationFinish,
+    attempt: number,
+    modelConfig: ModelSource,
+  ) => void;
   /** Start one model call. */
-  start: (opts: { onFinish: OnGenerationFinish; repair?: Failure }) => StreamResult<T>;
+  start: (opts: {
+    onFinish: OnGenerationFinish;
+    model: Model;
+    repair?: Failure;
+  }) => StreamResult<T>;
 }
 
 /** Up to two model calls: the generation, and one repair when it failed the schema. */
 async function generate<T>(deps: McpDeps, input: Generation<T>): Promise<T> {
   const { identity, workspaceId, route, mode } = input;
+  // Resolved once, before anything is admitted: a workspace whose model
+  // cannot be called should not spend its rate allowance to be told so.
+  const resolved = await deps.requireModel({ identity, workspaceId });
   let repair: Failure | undefined;
   for (let attempt = 1; ; attempt++) {
     // Every call is admitted on its own, the repair included.
-    const usage = await deps.enforceLlmLimits({ identity, workspaceId, route });
+    const usage = await deps.enforceLlmLimits({
+      identity,
+      workspaceId,
+      route,
+      model: resolved.modelId,
+    });
     let finished: GenerationFinish | undefined;
     const result = input.start({
       repair,
+      model: resolved.model,
       onFinish: (event) => {
         finished = event;
         usage.record(event.usage);
@@ -111,11 +130,12 @@ async function generate<T>(deps: McpDeps, input: Generation<T>): Promise<T> {
           catalog: input.catalog,
           spec: event.object,
           model: event.modelId,
+          modelConfig: resolved.source,
           usage: event.usage,
           attempts: attempt,
           error: event.error,
         });
-        input.auditAttempt(event, attempt);
+        input.auditAttempt(event, attempt, resolved.source);
       },
     });
     try {
@@ -179,7 +199,7 @@ export function generationTools(deps: McpDeps): McpTool[] {
           sourceId: source.id,
           prompt: args.prompt,
           catalog,
-          auditAttempt: (event, attempt) =>
+          auditAttempt: (event, attempt, modelConfig) =>
             audit({
               actor: identity,
               action: "dashboard.generate",
@@ -190,18 +210,20 @@ export function generationTools(deps: McpDeps): McpTool[] {
                 mode: "dashboard",
                 prompt: args.prompt,
                 model: event.modelId,
+                modelConfig,
                 via: "mcp",
                 ...(additional.length > 0 ? { sourceIds: sources.map((s) => s.id) } : {}),
                 ...(attempt > 1 ? { attempt } : {}),
               },
             }),
-          start: ({ onFinish, repair }) =>
+          start: ({ onFinish, model, repair }) =>
             deps.streamDashboard({
               source,
               additionalSources: additional,
               prompt: args.prompt,
               workspacePrompt,
               onFinish,
+              model,
               repair,
             }),
         });
@@ -243,7 +265,7 @@ export function generationTools(deps: McpDeps): McpTool[] {
           sourceId: source.id,
           prompt: args.prompt,
           catalog: buildCatalogPrompt(source),
-          auditAttempt: (event, attempt) =>
+          auditAttempt: (event, attempt, modelConfig) =>
             audit({
               actor: identity,
               action: "dashboard.generate",
@@ -254,16 +276,18 @@ export function generationTools(deps: McpDeps): McpTool[] {
                 mode: "explore",
                 prompt: args.prompt,
                 model: event.modelId,
+                modelConfig,
                 via: "mcp",
                 ...(attempt > 1 ? { attempt } : {}),
               },
             }),
-          start: ({ onFinish, repair }) =>
+          start: ({ onFinish, model, repair }) =>
             deps.streamExplorePanel({
               source,
               prompt: args.prompt,
               workspacePrompt,
               onFinish,
+              model,
               repair,
             }),
         });
@@ -295,7 +319,7 @@ export function generationTools(deps: McpDeps): McpTool[] {
           sourceId: null,
           prompt: args.prompt,
           catalog: null,
-          auditAttempt: (event, attempt) =>
+          auditAttempt: (event, attempt, modelConfig) =>
             audit({
               actor: identity,
               action: "source.draft",
@@ -304,15 +328,17 @@ export function generationTools(deps: McpDeps): McpTool[] {
               detail: {
                 prompt: args.prompt,
                 model: event.modelId,
+                modelConfig,
                 via: "mcp",
                 ...(attempt > 1 ? { attempt } : {}),
               },
             }),
-          start: ({ onFinish, repair }) =>
+          start: ({ onFinish, model, repair }) =>
             deps.streamSourceDraft({
               prompt: args.prompt,
               grantedSecretRefs: grantedRefs(deps.secretRefGrants(), args.workspaceId),
               onFinish,
+              model,
               repair,
             }),
         });

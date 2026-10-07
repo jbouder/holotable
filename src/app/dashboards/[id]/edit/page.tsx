@@ -1,8 +1,7 @@
 import { notFound } from "next/navigation";
 import { getIdentity, can } from "@/lib/auth/authorize";
 import { sourceCatalog } from "@/lib/registry";
-import { config } from "@/lib/config";
-import { aiUnavailable } from "@/lib/ai/configured";
+import { effectiveModel } from "@/lib/ai/model-resolution";
 import { getDashboardById, listDashboardTags, listSources } from "@/lib/db/repo";
 import { SignIn } from "@/components/sign-in";
 import { EditDashboardClient } from "./edit-client";
@@ -38,6 +37,10 @@ export default async function EditDashboardPage({
     catalog: sourceCatalog(s.config),
   }));
 
+  // Which model a panel edit here uses: the editor's own, the workspace's or
+  // the server's (#331).
+  const model = await effectiveModel({ identity, workspaceId: dashboard.workspaceId });
+
   const tagSuggestions = (await listDashboardTags(dashboard.workspaceId)).map(
     (t) => t.tag,
   );
@@ -60,8 +63,8 @@ export default async function EditDashboardPage({
       // version (#119).
       metadata={{ description: dashboard.description, tags: dashboard.tags }}
       tagSuggestions={tagSuggestions}
-      model={config.aiModel}
-      aiUnavailable={aiUnavailable()}
+      model={model.model}
+      aiUnavailable={model.unavailable}
     />
   );
 }

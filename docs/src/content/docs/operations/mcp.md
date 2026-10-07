@@ -56,7 +56,10 @@ never as a protocol error.
 | `generate_panel` | `POST /api/generate` (`explore`) | editor | One panel from a question against a source |
 | `generate_source` | `POST /api/sources/generate` | source-admin | A source draft: the safe connection config and a best-effort catalog, naming a granted `secret_ref`. Registering it stays in the app |
 
-The three generation tools count against the workspace's
+The three generation tools use the same model the routes would for the
+caller in that workspace (their [personal or the workspace's
+model](/operations/ai-provider/#models-configured-in-the-app), else the
+server's), count against the workspace's
 [model rate limit and daily budget](/operations/llm-limits/) like the routes
 do, write the same [generation log](/operations/logging/) row, and return a
 spec the IR validated — never data. The routes stream to a browser and leave

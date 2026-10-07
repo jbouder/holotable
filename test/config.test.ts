@@ -739,6 +739,26 @@ test("METRICS_ALLOWED_CIDRS must parse, or the server does not boot", () => {
   );
 });
 
+test("AI_BASE_URL_ALLOWLIST must parse, or the server does not boot (#331)", () => {
+  // A dropped entry would quietly narrow what an operator meant to allow; an
+  // accepted junk entry could never be told apart from a typo.
+  const bad = validateConfig(
+    { ...VALID_PRODUCTION, AI_BASE_URL_ALLOWLIST: "ollama.internal, http://x" },
+    { production: true },
+  );
+  assert.deepEqual(variables(errors(bad)), ["AI_BASE_URL_ALLOWLIST"]);
+  assert.deepEqual(
+    validateConfig(
+      {
+        ...VALID_PRODUCTION,
+        AI_BASE_URL_ALLOWLIST: "ollama.internal, 10.0.0.0/8, fd00::/8, 192.168.1.10",
+      },
+      { production: true },
+    ),
+    [],
+  );
+});
+
 test("an unconfigured metrics endpoint is not a problem; it is the default", () => {
   // /api/metrics answers 404 until one of the two is set, so silence here is
   // correct — the endpoint is closed, not misconfigured.
