@@ -198,14 +198,50 @@ const PanelFields = z
 export const Panel = PanelFields.superRefine(fitsItsKind);
 export type Panel = z.infer<typeof Panel>;
 
+/*
+ * The panel the MODEL is asked for (#335). `Panel` keeps `query` optional,
+ * because a text panel (#202) has none, and says which kinds need one in a
+ * refinement — which JSON Schema cannot express, so a model reading the schema
+ * it is bound to saw `query` as optional and could leave it out of every panel.
+ * Here the two shapes are spelled out instead: a kind that runs a query has
+ * `query` required, and a query-less kind has no `query` (nor the window and
+ * cadence it would govern). Both are still held to `fitsItsKind`, and both are
+ * `Panel`s, so nothing downstream of generation changes.
+ */
+const kindsWhere = (query: "required" | "none") =>
+  PANEL_KINDS.filter((k) => k.query === query).map((k) => k.kind) as [
+    VizType,
+    ...VizType[],
+  ];
+
+/** A generated panel of a kind that runs a query: `query` is required. */
+const GeneratedQueryPanel = PanelFields.extend({
+  viz: z.enum(kindsWhere("required")),
+  query: PanelQuery,
+});
+
+/** A generated panel of a kind that runs no query: it has no `query`. */
+const GeneratedQuerylessPanel = PanelFields.omit({
+  query: true,
+  timeRange: true,
+  refreshIntervalMs: true,
+}).extend({ viz: z.enum(kindsWhere("none")) });
+
+/**
+ * What generation asks the model for when a panel may be of any kind. Typed as
+ * `Panel`, which both shapes are: the union is for the schema the model reads,
+ * and code downstream keeps reading `panel.query` through `hasQuery` as before.
+ */
+export const GeneratedPanel: z.ZodType<Panel> = z
+  .discriminatedUnion("viz", [GeneratedQueryPanel, GeneratedQuerylessPanel])
+  .superRefine(fitsItsKind);
+
 /**
  * A panel that answers a question from data: what explore asks the model for.
- * A text panel (#202) is a valid panel but no answer, so it is refused here.
+ * A text panel (#202) is a valid panel but no answer, so its kind is not
+ * offered at all.
  */
-export const ExplorePanel = Panel.refine((p) => p.query !== undefined, {
-  message: "explore answers from data: choose a kind that runs a query",
-  path: ["query"],
-});
+export const ExplorePanel = GeneratedQueryPanel.superRefine(fitsItsKind);
 
 /** A panel that runs a query: every kind but the query-less ones. */
 export type QueryPanel = Panel & { query: PanelQuery };
@@ -416,7 +452,11 @@ export type Dashboard = z.infer<typeof Dashboard>;
  * what it did produce.
  */
 export const DashboardGenerationSchema = z
-  .object(DashboardFields)
+  .object({
+    ...DashboardFields,
+    // Spelled out for the model; every one of these is a `Panel` (#335).
+    panels: z.array(GeneratedPanel).min(1).max(50),
+  })
   .strict()
   .superRefine(uniqueIds);
 export type GeneratedDashboard = z.infer<typeof DashboardGenerationSchema>;

@@ -63,14 +63,28 @@ the persisted type, and the client's render type:
 
 ```ts
 export const DashboardGenerationSchema = z
-  .object(DashboardFields) // the Dashboard's own fields, minus specVersion
+  .object({
+    ...DashboardFields, // the Dashboard's own fields, minus specVersion
+    panels: z.array(GeneratedPanel).min(1).max(50),
+  })
   .strict()
   .superRefine(uniqueIds);
 ```
 
-The one difference is `specVersion`: which shape a spec is in is a fact about
-the build, so `fromGenerated` stamps it rather than letting the model assert
-it. Because generation is bound to the same fields the client renders, a spec that
+There are two differences. The first is `specVersion`: which shape a spec is in
+is a fact about the build, so `fromGenerated` stamps it rather than letting the
+model assert it.
+
+The second is how a panel is spelled for the model
+([#335](https://github.com/jbouder/holotable/issues/335)). `Panel` keeps
+`query` optional because a text panel has none, and says which kinds need one
+in a refinement. JSON Schema cannot carry a refinement, so a model reading the
+schema it was bound to saw `query` as optional, and one model left it off every
+panel. `GeneratedPanel` says the same thing in its shape instead: a union on
+`viz`, in which a kind that runs a query requires `query` and a query-less kind
+has none. Explore's `ExplorePanel` offers only the first. Both shapes are
+`Panel`s, held to the same refinement, so everything after generation is
+unchanged. Because generation is bound to the same fields the client renders, a spec that
 would not render is a spec the model could not have emitted. This is why
 changing dashboard structure means changing the Zod schema *first* and updating
 every producer and consumer together — parallel ad-hoc types would reintroduce
