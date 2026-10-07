@@ -119,6 +119,7 @@
       "credentials": [
         { "type": "password", "value": "demo", "temporary": false }
       ],
+      "realmRoles": ["default-roles-holotable"],
       "groups": ["/workspaces/demo/source-admin", "/platform-admins"]
     },
     {
@@ -131,6 +132,7 @@
       "credentials": [
         { "type": "password", "value": "viewer", "temporary": false }
       ],
+      "realmRoles": ["default-roles-holotable"],
       "groups": ["/workspaces/demo/viewer"]
     }
   ]

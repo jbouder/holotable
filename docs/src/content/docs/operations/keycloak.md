@@ -138,6 +138,17 @@ and `can()` as a session's.
      realm registers `http://localhost:*` and `http://127.0.0.1:*`, which is
      fine for a development realm and too wide for a real one.
    - Advanced → **Proof Key for Code Exchange Code Challenge Method**: `S256`.
+   - Users who connect need the realm's **`offline_access`** role, which
+     `default-roles-<realm>` carries. Claude Code asks for the
+     `offline_access` scope whenever the realm advertises it, and Keycloak
+     fails the sign-in with *Offline tokens not allowed for the user or
+     client* for a user without the role. Removing the scope from the client
+     does not help: Keycloak then refuses the request as `invalid_scope`.
+     Users created in the console get the default roles; users in an
+     imported realm file get them only if they list
+     `"realmRoles": ["default-roles-<realm>"]`. An offline token's access
+     tokens carry the same `sid`, so back-channel logout still ends the MCP
+     session.
 2. Add the same **Group Membership** mapper as in step 2, on this client's
    dedicated scope, with *Full group path* on and *Add to access token* on.
    The access token is what the server reads here, not the id_token.
