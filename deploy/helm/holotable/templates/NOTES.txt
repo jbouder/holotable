@@ -34,7 +34,7 @@ WARNING: this release runs more than one app replica.
   subscriber for, so TimescaleDB sees the load multiplied, and two viewers of
   one dashboard can see different data. One instance is the supported
   topology: keep replicaCount at 1 and autoscaling disabled. See
-  https://holotable-docs.beskar.workers.dev/architecture/scaling/
+  https://holotable-docs.vibeproject.workers.dev/architecture/scaling/
 {{- end }}
 
 {{- if and .Values.podDisruptionBudget.enabled (eq (int .Values.replicaCount) 1) .Values.podDisruptionBudget.minAvailable (not .Values.autoscaling.enabled) }}

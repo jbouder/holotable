@@ -32,7 +32,7 @@ import type { CatalogHealth } from "@/lib/catalog/health";
  * link to a page points, the README's included.
  */
 export const FIRST_DASHBOARD_DOCS_URL =
-  "https://holotable-docs.beskar.workers.dev/getting-started/your-first-dashboard/";
+  "https://holotable-docs.vibeproject.workers.dev/getting-started/your-first-dashboard/";
 
 export type OnboardingStepId = "connect" | "verify" | "generate";
 

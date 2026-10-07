@@ -1,6 +1,6 @@
 {{- if .Values.autoscaling.enabled }}
 # Enabled at your own risk; one instance is the supported topology
-# (https://holotable-docs.beskar.workers.dev/architecture/scaling/).
+# (https://holotable-docs.vibeproject.workers.dev/architecture/scaling/).
 # The poller lives in the Node process and is keyed by dashboard in a
 # process-local map, so every replica polls every dashboard it has a subscriber
 # for. Scaling out multiplies the load on TimescaleDB and lets two viewers of
