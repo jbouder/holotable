@@ -19,6 +19,7 @@ import {
   storeForKey,
 } from "@/lib/local-data";
 import { PROMPT_HISTORY_PREFIX, promptHistoryKey } from "@/lib/prompt-history";
+import { LAST_SOURCE_KEY } from "@/lib/source-selection";
 import { MOTION_STORAGE_KEY } from "@/lib/motion";
 import { DEMO_BANNER_KEY } from "@/lib/demo-banner";
 import { THEME_STORAGE_KEY } from "@/lib/theme";
@@ -221,6 +222,7 @@ const files = sourceFiles(SRC).map((path) => ({
 const STORAGE_WRITERS: Record<string, string> = {
   "lib/editor/drafts.ts": `${DRAFT_KEY_PREFIX}d:u`,
   "lib/prompt-history.ts": `${PROMPT_HISTORY_PREFIX}dashboard:w`,
+  "lib/source-selection.ts": LAST_SOURCE_KEY,
   "lib/dashboard-list.ts": RECENT_KEY,
   "components/command-palette.tsx": RECENTS_STORAGE_KEY,
   "lib/theme.ts": THEME_STORAGE_KEY,

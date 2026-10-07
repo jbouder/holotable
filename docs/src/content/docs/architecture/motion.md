@@ -42,7 +42,7 @@ chart animation, entrances, slides and the theme crossfade are all still.
 | Durations and curves | Tokens in `globals.css`: `--duration-fast/base/slow`, `--ease-standard/emphasized`; no literal durations in components |
 | Dialogs, menus, popovers, selects | Base UI's `data-starting-style` / `data-ending-style` attributes, styled as Tailwind variants; Base UI holds the element until the exit transition ends |
 | Theme change | A `theme` view transition: the new root snapshot fades in over the old |
-| Editor/Preview and Chat/Preview tabs | A `tab` view transition: the panel crossfades and the selected tab's highlight slides |
+| Editor/Preview tabs | A `tab` view transition: the panel crossfades and the selected tab's highlight slides |
 | Cards, messages, results, alerts, icon swaps | Keyframe entrances (`stagger-in`, `drop-in`, `pop-in`) with `backwards` fill, so they share an element with hover transitions and hold nothing afterwards |
 | Inline notices and banners | `Notice` over the `notice` utility: stays mounted, toggles `data-open`, exits via `display … allow-discrete` |
 | Panel list, dashboard grid, dashboard list, command palette, arranger | `useFlip`: items marked `data-flip-id` slide to their new place with WAAPI; a delete runs `animateOut` first so the others close a real gap |

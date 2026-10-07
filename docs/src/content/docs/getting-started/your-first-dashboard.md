@@ -97,17 +97,23 @@ table count matches what you expect.
 
 **Dashboards → New dashboard.**
 
-Pick the source. Describe what you want to watch in plain English — the starter
-chips under the box are built from your own catalog, so they name your tables,
-not a demo's. Something concrete works better than something broad:
+The source chip above the prompt box starts on the source you last generated
+against (or the first one); open it to pick another, or to add up to two more
+from the same workspace. Describe what you want to watch in plain English —
+**Ideas** offers suggestions built from your own catalog, so they name your
+tables, not a demo's, along with your recent prompts and the templates.
+Something concrete works better than something broad:
 
 > Request volume over time and the five slowest routes, plus a stat panel with
 > the total error count
 
-Press send. The spec streams in and the preview fills as it arrives. Follow-ups
-refine it — "make the third one a bar chart", "add a 95th percentile line" —
-and each one is a single model call that returns the whole dashboard again.
-Nothing is written until you press **Save**.
+Press send. The dashboard takes shape beside the prompt as the spec streams in,
+then runs its queries against your source. Follow-ups refine it — "make the
+third one a bar chart", "add a 95th percentile line" — and each one is a single
+model call that returns the whole dashboard again. **Try again** on the version
+you are looking at asks for a different answer instead, and an earlier version
+can be restored. Nothing is written until you press **Save dashboard**, which
+lets you confirm the title first.
 
 Saving takes you to the live view: the server opens one stream for the whole
 dashboard, runs the guarded SQL on the refresh interval, and merges each tick

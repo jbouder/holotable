@@ -50,3 +50,52 @@ export function pruneAdditionalSources(
   const allowed = new Set(additionalSourceChoices(sources, primaryId).map((s) => s.id));
   return selected.filter((id) => allowed.has(id)).slice(0, MAX_ADDITIONAL_SOURCES);
 }
+
+/**
+ * Where `/dashboards/new` remembers the last source an author generated
+ * against (#356). A per-browser convenience, like recent prompts: the id is
+ * read back as untrusted and only ever used to pick from the list the server
+ * already authorized, so a stale or forged value just falls through.
+ */
+export const LAST_SOURCE_KEY = "holotable:last-source";
+
+/** The source to start on: the remembered one if still offered, else the first. */
+export function defaultSourceId(
+  sources: readonly { id: string }[],
+  remembered: string | null | undefined,
+): string | null {
+  if (remembered && sources.some((s) => s.id === remembered)) return remembered;
+  return sources[0]?.id ?? null;
+}
+
+/** Read the remembered source; never throws, whatever the storage does. */
+export function readLastSource(storage: Pick<Storage, "getItem"> | null): string | null {
+  try {
+    const value = storage?.getItem(LAST_SOURCE_KEY) ?? null;
+    // An id is short; anything else in that key is not one of ours.
+    return value && value.length <= 200 ? value : null;
+  } catch {
+    return null;
+  }
+}
+
+/** Forget the remembered source, from the local-data settings (#216). */
+export function forgetLastSource(storage: Pick<Storage, "removeItem"> | null): void {
+  try {
+    storage?.removeItem(LAST_SOURCE_KEY);
+  } catch {
+    // Nothing to do: the key is gone or unreachable either way.
+  }
+}
+
+/** Remember a source; a storage that refuses is not an error worth surfacing. */
+export function writeLastSource(
+  storage: Pick<Storage, "setItem"> | null,
+  sourceId: string,
+): void {
+  try {
+    storage?.setItem(LAST_SOURCE_KEY, sourceId);
+  } catch {
+    // Private mode or a full quota: the default is simply the first source.
+  }
+}
