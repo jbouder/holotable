@@ -17,7 +17,7 @@ import { ButtonLabel, ButtonLink } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
 import { dashboardListHref, EMPTY_QUERY } from "@/lib/dashboard-list";
 import { chatSuggestions } from "@/lib/chat-history";
-import { aiUnavailable } from "@/lib/ai/configured";
+import { effectiveModel } from "@/lib/ai/model-resolution";
 import { rangeFromParams } from "@/lib/time-range";
 import { DEMO_IDLE_PAUSE_MS } from "@/lib/stream-idle";
 
@@ -69,6 +69,8 @@ export default async function DashboardViewPage({
     workspaceId: dashboard.workspaceId,
   });
 
+  // Chat answers with the reader's model in this workspace (#331).
+  const model = await effectiveModel({ identity, workspaceId: dashboard.workspaceId });
   const canDelete = can(identity, "dashboard:delete", {
     workspaceId: dashboard.workspaceId,
     ownerSub: dashboard.createdBy,
@@ -195,7 +197,7 @@ export default async function DashboardViewPage({
         dashboardTitle={dashboard.spec.title}
         panels={dashboard.spec.panels.map((p) => ({ title: p.title, query: p.query }))}
         suggestions={chatSuggestions(dashboard.spec)}
-        aiUnavailable={aiUnavailable()}
+        aiUnavailable={model.unavailable}
       />
     </div>
   );

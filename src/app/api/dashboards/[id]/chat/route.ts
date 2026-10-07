@@ -13,6 +13,7 @@ import {
   listChatMessages,
 } from "@/lib/db/repo";
 import { resolveChatSources, streamDashboardChat } from "@/lib/ai/chat";
+import { requireModel } from "@/lib/ai/model-resolution";
 import { enforceLlmLimits } from "@/lib/limits/llm";
 import { messagesToPersist, parseStoredMessages } from "@/lib/chat-history";
 import { config } from "@/lib/config";
@@ -104,10 +105,13 @@ export const POST = route("dashboards.chat", async (req: Request, ctx: RoutePara
   const { identity, id, dashboard } = await authorizedDashboard(ctx);
   const body = await readJson(req, Body);
 
+  const resolved = await requireModel({ identity, workspaceId: dashboard.workspaceId });
+
   const usage = await enforceLlmLimits({
     identity,
     workspaceId: dashboard.workspaceId,
     route: "chat",
+    model: resolved.modelId,
   });
 
   const sources = await resolveChatSources({
@@ -127,13 +131,14 @@ export const POST = route("dashboards.chat", async (req: Request, ctx: RoutePara
     action: "dashboard.chat",
     workspaceId: dashboard.workspaceId,
     resource: { type: "dashboard", id },
-    detail: { messageCount: incoming.length },
+    detail: { messageCount: incoming.length, modelConfig: resolved.source },
   });
 
   const result = await streamDashboardChat({
     dashboard: dashboard.spec,
     sources,
     identity,
+    model: resolved.model,
     messages: incoming,
     onUsage: usage.record,
     // Each statement the model runs is the reader's execution, on their

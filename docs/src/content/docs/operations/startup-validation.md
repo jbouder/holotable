@@ -72,7 +72,9 @@ a non-negative integer (`0` disables that limit, which in production is a
 time expressions the server can resolve, and `CSP_REPORT_ONLY` must be `true`
 or `false`. Setting it to `true` in production is a **warning** on every boot:
 the [Content-Security-Policy](/operations/security-headers/) is then logged,
-not enforced. The full list of variables is in
+not enforced. `AI_BASE_URL_ALLOWLIST` must be a comma-separated list of host
+names, addresses and CIDR ranges; one entry that is none of those is an error.
+The full list of variables is in
 [Configuration](/reference/configuration/).
 
 ## Source credentials

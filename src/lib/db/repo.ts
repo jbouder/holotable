@@ -921,8 +921,9 @@ export async function insertGenerationLog(
     await client.query(
       `INSERT INTO generation_log
          (workspace_id, created_by, mode, source_id, prompt_redacted,
-          catalog_hash, spec, model, attempts, input_tokens, output_tokens, error)
-       VALUES ($1, $2, $3, $4, $5, $6, $7::jsonb, $8, $9, $10, $11, $12)`,
+          catalog_hash, spec, model, attempts, input_tokens, output_tokens, error,
+          model_config)
+       VALUES ($1, $2, $3, $4, $5, $6, $7::jsonb, $8, $9, $10, $11, $12, $13)`,
       [
         row.workspaceId,
         row.createdBy,
@@ -936,6 +937,7 @@ export async function insertGenerationLog(
         row.inputTokens,
         row.outputTokens,
         row.error,
+        row.modelConfig,
       ],
     );
     if (retentionDays > 0) {
@@ -964,6 +966,7 @@ type GenerationLogEntryRow = {
   input_tokens: number;
   output_tokens: number;
   error: string | null;
+  model_config: GenerationLogEntry["modelConfig"];
 };
 
 /**
@@ -983,7 +986,7 @@ export async function listGenerationLog(
   const rows = await query<GenerationLogEntryRow>(
     `SELECT id, workspace_id, created_by, created_at, mode, source_id,
             prompt_redacted, catalog_hash, spec, model, attempts,
-            input_tokens, output_tokens, error
+            input_tokens, output_tokens, error, model_config
        FROM generation_log
       WHERE workspace_id = ANY($1)
         AND ($3 <= 0 OR created_at > now() - make_interval(days => $3))
@@ -1006,6 +1009,7 @@ export async function listGenerationLog(
     inputTokens: row.input_tokens,
     outputTokens: row.output_tokens,
     error: row.error,
+    modelConfig: row.model_config,
   }));
 }
 

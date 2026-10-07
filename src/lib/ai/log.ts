@@ -1,5 +1,6 @@
 import { createHash } from "node:crypto";
 import type { LanguageModelUsage } from "ai";
+import type { ModelSource } from "@/lib/ai/model-config";
 import { config } from "@/lib/config";
 import { insertGenerationLog } from "@/lib/db/repo";
 import { tokensFromUsage } from "@/lib/limits/budget";
@@ -114,6 +115,8 @@ export interface GenerationEvent {
   /** The validated spec, or null/undefined when the run produced none. */
   spec: unknown;
   model: string;
+  /** Which level the model came from (#331): personal, workspace or environment. */
+  modelConfig: ModelSource;
   usage?: LanguageModelUsage;
   /** Model calls this action made. One, unless a future repair loop says otherwise. */
   attempts?: number;
@@ -130,6 +133,7 @@ export interface GenerationLogRow {
   catalogHash: string | null;
   spec: unknown;
   model: string;
+  modelConfig: ModelSource | null;
   attempts: number;
   inputTokens: number;
   outputTokens: number;
@@ -159,6 +163,7 @@ export function generationRow(event: GenerationEvent): GenerationLogRow {
     // The provider's own id when it reported one, so a row says which model
     // actually answered rather than which one was configured.
     model: event.model || config.aiModel || "unknown",
+    modelConfig: event.modelConfig,
     attempts: Math.max(1, Math.round(event.attempts ?? 1)),
     ...tokens,
     error: redactGenerationError(event.error),

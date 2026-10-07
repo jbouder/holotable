@@ -109,7 +109,13 @@ const fmt = new Intl.NumberFormat("en-US");
  * Call it after `assertAuthorized`, before the model is invoked.
  */
 export async function enforceLlmLimits(
-  input: { identity: Identity; workspaceId: string; route: LlmRoute },
+  input: {
+    identity: Identity;
+    workspaceId: string;
+    route: LlmRoute;
+    /** The resolved model's id (#331); the environment's when not given. */
+    model?: string;
+  },
   deps: LlmLimitDeps = defaultDeps(),
 ): Promise<LlmUsageRecorder> {
   const { identity, workspaceId, route } = input;
@@ -154,7 +160,7 @@ export async function enforceLlmLimits(
     );
   }
 
-  const model = deps.model();
+  const model = input.model || deps.model();
   recordLlmRequest(route, "admitted");
   return {
     record(usage) {

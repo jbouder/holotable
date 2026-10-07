@@ -212,6 +212,17 @@ Important files:
   `onError` that logs a failed call through `log` instead of the SDK's raw
   console dump (#343); `test/ai-invoke.test.ts` fails on a call site that does
   not, or that sets its own `onError`
+- `src/lib/ai/model-resolution.ts` and `src/lib/ai/model-config.ts` — models
+  configured in the app (#331): per request, the caller's personal model (when
+  the workspace allows personal keys), else the workspace's, else the
+  environment's. A generation route calls `requireModel` before the limits and
+  hands `resolved.model` to the stream, which spreads `...modelSettings(model)`;
+  `resolved.source` goes on the generation log row and the audit event. The
+  key is sealed (`src/lib/secrets/seal.ts`, its own HKDF label), never
+  returned, and registered with the log's redaction (`rememberSecret`) when it
+  is opened. The base URL is untrusted: `ai/base-url.ts` holds the rules and
+  `ai/guarded-fetch.ts` applies them at DNS time on every connection. Both
+  levels are off in demo mode
 - `src/lib/ai/repair.ts` and `src/components/use-repairing-object.ts` — the
   one automatic repair of output that failed its schema (#21). The browser
   sends only `{ repairOf: id }`; the request, the rejected output and the
@@ -238,7 +249,8 @@ Important files:
 
 The paths with a `CODEOWNERS` entry (`src/lib/sql/`, `src/lib/auth/`,
 `src/lib/secrets/`, `ir.ts` and `ir/`, `time.ts`, `registry.ts`,
-`metrics-access.ts`, `row-scope.ts`, `variables.ts`, `variable-selection.ts`) are
+`metrics-access.ts`, `row-scope.ts`, `variables.ts`, `variable-selection.ts`,
+`ai/base-url.ts`, `ai/guarded-fetch.ts`) are
 the ones where a quiet regression stops being a bug and becomes a
 vulnerability. Changes there need a test.
 

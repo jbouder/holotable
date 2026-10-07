@@ -28,6 +28,7 @@ function event(overrides: Partial<GenerationEvent> = {}): GenerationEvent {
     catalog: "http_requests(ts timestamptz, route text, duration_ms double precision)",
     spec: { title: "Service health", panels: [] },
     model: "gpt-4o-mini",
+    modelConfig: "environment",
     usage: { inputTokens: 1200, outputTokens: 340 } as LanguageModelUsage,
     ...overrides,
   };

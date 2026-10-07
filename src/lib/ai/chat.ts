@@ -7,7 +7,7 @@ import {
   type UIMessage,
 } from "ai";
 import { z } from "zod";
-import { modelSettings } from "@/lib/ai/provider";
+import { type Model, modelSettings } from "@/lib/ai/provider";
 import { renderCatalog } from "@/lib/timescaledb/catalog";
 import { fenceUntrustedBlock, sanitizePromptField } from "@/lib/ai/untrusted";
 import { SQL_RULES } from "@/lib/ai/generate";
@@ -270,6 +270,8 @@ export async function streamDashboardChat(input: {
   sources: SourceRecord[];
   /** The reader, whose rows a row-filtered source is narrowed to (#31). */
   identity: Identity;
+  /** The model the reader resolved to in the dashboard's workspace (#331). */
+  model: Model;
   messages: UIMessage[];
   /** Receives the usage summed over every step of the turn. */
   onUsage?: (usage: LanguageModelUsage) => void;
@@ -290,7 +292,7 @@ export async function streamDashboardChat(input: {
   const modelMessages = await convertToModelMessages(messages);
 
   return streamText({
-    ...modelSettings(),
+    ...modelSettings(input.model),
     system: buildSystemPrompt(dashboard, sources),
     messages: modelMessages,
     stopWhen: stepCountIs(MAX_STEPS),

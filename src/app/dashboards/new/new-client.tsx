@@ -1,5 +1,6 @@
 "use client";
 
+import type { EffectiveModel } from "@/lib/ai/model-config";
 import * as React from "react";
 import { useRouter } from "next/navigation";
 import {
@@ -71,17 +72,16 @@ interface SourceOption {
 
 export function NewDashboardClient({
   sources,
-  model,
-  aiUnavailable,
+  models,
   canManageSources,
 }: {
   sources: SourceOption[];
-  model: string;
   /**
-   * Why generation cannot be attempted on this server (no model configured),
-   * or null. Decided on the server, which is the only side with the env.
+   * The model a generation in each workspace would use, and why generation
+   * cannot be attempted there (no model configured), keyed by workspace id
+   * (#331). Decided on the server, the only side with the configuration.
    */
-  aiUnavailable: string | null;
+  models: Record<string, EffectiveModel>;
   /**
    * Whether this caller holds `source:manage` anywhere, which decides whether
    * the no-source empty state offers to add one or names who can.
@@ -110,6 +110,9 @@ export function NewDashboardClient({
     Object.fromEntries(sources.map((s) => [s.id, s.catalog])),
   );
   const source = sources.find((s) => s.id === sourceId);
+  const effective = source ? models[source.workspaceId] : undefined;
+  const model = effective?.model ?? "";
+  const aiUnavailable = effective?.unavailable ?? null;
   const additionalChoices = additionalSourceChoices(sources, sourceId);
   const additionalSources = additionalChoices.filter((s) => additionalIds.includes(s.id));
   // Chips for the selected source. Server-built from its catalog, so they

@@ -1,5 +1,6 @@
 import { authorizedWorkspaces } from "@/lib/auth/authorize";
 import type { Identity } from "@/lib/auth/claims";
+import { config } from "@/lib/config";
 
 /**
  * The sections of `/settings` (#209), as data.
@@ -19,6 +20,8 @@ export const SETTINGS_SECTION_IDS = [
   "shortcuts",
   "workspaces",
   "ai-context",
+  "model",
+  "personal-model",
   "tokens",
 ] as const;
 
@@ -46,6 +49,15 @@ function managesAWorkspace(identity: Identity): boolean {
   return (
     identity.platformAdmin || authorizedWorkspaces(identity, "source:manage").length > 0
   );
+}
+
+/**
+ * Model configuration in the app (#331) is off in demo mode, where the
+ * server's model is the only one, and for a service-account token, which is
+ * not a person.
+ */
+function configuresModels(identity: Identity): boolean {
+  return config.authMode !== "demo" && !identity.serviceAccount;
 }
 
 export const SETTINGS_SECTIONS: readonly SettingsSection[] = [
@@ -93,6 +105,22 @@ export const SETTINGS_SECTIONS: readonly SettingsSection[] = [
       "What the model is told about each workspace: its vocabulary, metrics and example panels.",
     href: "/settings/ai-context",
     visible: generatesInAWorkspace,
+  },
+  {
+    id: "model",
+    label: "Workspace model",
+    description:
+      "Which model each workspace you administer generates with, and whether people may bring their own.",
+    href: "/settings/model",
+    visible: (identity) => configuresModels(identity) && managesAWorkspace(identity),
+  },
+  {
+    id: "personal-model",
+    label: "Personal model",
+    description:
+      "Your own model and key, used for your generations in workspaces that allow it.",
+    href: "/settings/personal-model",
+    visible: (identity) => configuresModels(identity) && generatesInAWorkspace(identity),
   },
   {
     id: "tokens",

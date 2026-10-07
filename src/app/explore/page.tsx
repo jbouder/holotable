@@ -4,7 +4,7 @@ import { listSources } from "@/lib/db/repo";
 import { catalogHealth } from "@/lib/catalog/health";
 import { buildStarters } from "@/lib/prompts/starters";
 import { config } from "@/lib/config";
-import { aiUnavailable } from "@/lib/ai/configured";
+import { effectiveModels } from "@/lib/ai/model-resolution";
 import { SignIn } from "@/components/sign-in";
 import { ExploreClient } from "./explore-client";
 
@@ -37,8 +37,8 @@ export default async function ExplorePage() {
   return (
     <ExploreClient
       sources={sources}
-      model={config.aiModel}
-      aiUnavailable={aiUnavailable()}
+      // Per workspace: each may have its own model, or the caller theirs (#331).
+      models={await effectiveModels(identity, workspaces)}
       canManageSources={authorizedWorkspaces(identity, "source:manage").length > 0}
       // Defaults for a dashboard created from a result. The server stays the
       // authority for resolving these expressions at execution time.

@@ -125,9 +125,34 @@ const MAX_DEPTH = 6;
 const MAX_ARRAY_ITEMS = 50;
 const MAX_STRING_LENGTH = 2_000;
 
+/**
+ * Credentials this process holds whose shape the scrubbers may not know: an
+ * API key entered in the app for a model (#331) can be any string at all.
+ * Each is registered when it is opened, and every redaction pass replaces it
+ * wherever it appears. Bounded, oldest out; a key too short to be worth
+ * matching is not kept, since it would eat ordinary words.
+ */
+const KNOWN_SECRETS = new Set<string>();
+const MAX_KNOWN_SECRETS = 512;
+export const MIN_KNOWN_SECRET_LENGTH = 8;
+
+/** Redact `value` from every log line, audit row and generation log row from now on. */
+export function rememberSecret(value: string): void {
+  if (value.length < MIN_KNOWN_SECRET_LENGTH) return;
+  KNOWN_SECRETS.delete(value);
+  KNOWN_SECRETS.add(value);
+  if (KNOWN_SECRETS.size > MAX_KNOWN_SECRETS) {
+    const oldest = KNOWN_SECRETS.values().next().value;
+    if (oldest !== undefined) KNOWN_SECRETS.delete(oldest);
+  }
+}
+
 /** Scrub credential shapes out of a single string value. */
 export function redactString(value: string): string {
   let out = value;
+  for (const secret of KNOWN_SECRETS) {
+    if (out.includes(secret)) out = out.replaceAll(secret, REDACTED);
+  }
   for (const [pattern, replacement] of STRING_SCRUBBERS) {
     out = out.replace(pattern, replacement);
   }

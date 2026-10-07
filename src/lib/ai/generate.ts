@@ -1,7 +1,7 @@
 import { type LanguageModelUsage, streamObject } from "ai";
 import type { z } from "zod";
 import { describeFailure, type Failure, repairPrompt } from "@/lib/ai/repair";
-import { modelSettings } from "@/lib/ai/provider";
+import { type Model, modelSettings } from "@/lib/ai/provider";
 import { workspaceContextBlock } from "@/lib/ai/prompt";
 import { buildCatalogPrompt } from "@/lib/timescaledb/catalog";
 import {
@@ -283,12 +283,14 @@ export function streamDashboard(input: {
   /** The workspace's prompt customization (#66), when it has one. */
   workspacePrompt?: WorkspacePrompt | null;
   onFinish?: OnGenerationFinish;
+  /** The model this caller resolved to in this workspace (#331). */
+  model: Model;
   /** Set when this run repairs a failed one (#21). */
   repair?: Failure;
 }) {
   const request = dashboardRequest(input);
   return streamObject({
-    ...modelSettings(),
+    ...modelSettings(input.model),
     onFinish: finish(input.onFinish, request.schema),
     ...request,
   });
@@ -341,12 +343,14 @@ export function streamExplorePanel(input: {
   /** The workspace's prompt customization (#66), when it has one. */
   workspacePrompt?: WorkspacePrompt | null;
   onFinish?: OnGenerationFinish;
+  /** The model this caller resolved to in this workspace (#331). */
+  model: Model;
   /** Set when this run repairs a failed one (#21). */
   repair?: Failure;
 }) {
   const request = explorePanelRequest(input);
   return streamObject({
-    ...modelSettings(),
+    ...modelSettings(input.model),
     onFinish: finish(input.onFinish, request.schema),
     ...request,
   });
@@ -370,6 +374,8 @@ export function streamSourceDraft(input: {
   prompt: string;
   grantedSecretRefs: readonly string[];
   onFinish?: OnGenerationFinish;
+  /** The model this caller resolved to in this workspace (#331). */
+  model: Model;
   /** Set when this run repairs a failed one (#21). */
   repair?: Failure;
 }) {
@@ -381,7 +387,7 @@ export function streamSourceDraft(input: {
       : `No 'secretRef' is granted to this workspace yet. Use "TS_METRICS"; the
   user will choose a granted one before creating the source.`;
   return streamObject({
-    ...modelSettings(),
+    ...modelSettings(input.model),
     onFinish: finish(onFinish, ModelSourceDraft),
     schema: ModelSourceDraft,
     schemaName: "SourceDraft",
@@ -427,12 +433,14 @@ export function streamPanel(input: {
   workspacePrompt?: WorkspacePrompt | null;
   current: Panel;
   onFinish?: OnGenerationFinish;
+  /** The model this caller resolved to in this workspace (#331). */
+  model: Model;
   /** Set when this run repairs a failed one (#21). */
   repair?: Failure;
 }) {
   const { source, prompt, current, onFinish, repair, workspacePrompt } = input;
   return streamObject({
-    ...modelSettings(),
+    ...modelSettings(input.model),
     onFinish: finish(onFinish, GeneratedPanel),
     schema: GeneratedPanel,
     schemaName: "Panel",
@@ -465,6 +473,8 @@ export function streamDashboardRefinement(input: {
   workspacePrompt?: WorkspacePrompt | null;
   current: Dashboard;
   onFinish?: OnGenerationFinish;
+  /** The model this caller resolved to in this workspace (#331). */
+  model: Model;
   /** Set when this run repairs a failed one (#21). */
   repair?: Failure;
 }) {
@@ -478,7 +488,7 @@ export function streamDashboardRefinement(input: {
     additionalSources,
   } = input;
   return streamObject({
-    ...modelSettings(),
+    ...modelSettings(input.model),
     onFinish: finish(onFinish, DashboardGenerationSchema),
     schema: DashboardGenerationSchema,
     schemaName: "Dashboard",

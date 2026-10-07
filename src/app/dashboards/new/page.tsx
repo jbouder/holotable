@@ -3,8 +3,7 @@ import { accessibleWorkspaces, hasWorkspaceRole } from "@/lib/auth/claims";
 import { listSources } from "@/lib/db/repo";
 import { catalogHealth } from "@/lib/catalog/health";
 import { buildStarters } from "@/lib/prompts/starters";
-import { config } from "@/lib/config";
-import { aiUnavailable } from "@/lib/ai/configured";
+import { effectiveModels } from "@/lib/ai/model-resolution";
 import { SignIn } from "@/components/sign-in";
 import { NewDashboardClient } from "./new-client";
 
@@ -36,8 +35,8 @@ export default async function NewDashboardPage() {
   return (
     <NewDashboardClient
       sources={sources}
-      model={config.aiModel}
-      aiUnavailable={aiUnavailable()}
+      // Per workspace: each may have its own model, or the caller theirs (#331).
+      models={await effectiveModels(identity, workspaces)}
       canManageSources={authorizedWorkspaces(identity, "source:manage").length > 0}
     />
   );

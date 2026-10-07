@@ -1,11 +1,5 @@
-import {
-  createCipheriv,
-  createDecipheriv,
-  createHash,
-  hkdfSync,
-  randomBytes,
-} from "node:crypto";
-import { sessionSecret } from "@/lib/auth/session";
+import { createHash, randomBytes } from "node:crypto";
+import { openSecret, sealSecret } from "@/lib/secrets/seal";
 
 /**
  * The refresh token at rest, and the opaque id that names it (#27).
@@ -22,20 +16,11 @@ import { sessionSecret } from "@/lib/auth/session";
  * SHA-256 of it, so reading the table does not yield a usable cookie value.
  */
 
-const IV_BYTES = 12;
-const TAG_BYTES = 16;
 const KEY_LABEL = "holotable refresh-token v1";
 
-function encryptionKey(secret: Uint8Array = sessionSecret()): Buffer {
-  return Buffer.from(hkdfSync("sha256", secret, "holotable", KEY_LABEL, 32));
-}
-
-/** iv || tag || ciphertext. */
+/** iv || tag || ciphertext, sealed by `src/lib/secrets/seal.ts`. */
 export function sealRefreshToken(token: string, secret?: Uint8Array): Buffer {
-  const iv = randomBytes(IV_BYTES);
-  const cipher = createCipheriv("aes-256-gcm", encryptionKey(secret), iv);
-  const body = Buffer.concat([cipher.update(token, "utf8"), cipher.final()]);
-  return Buffer.concat([iv, cipher.getAuthTag(), body]);
+  return sealSecret(token, KEY_LABEL, secret);
 }
 
 /**
@@ -44,22 +29,7 @@ export function sealRefreshToken(token: string, secret?: Uint8Array): Buffer {
  * Either way the session cannot be renewed, which is the caller's answer.
  */
 export function openRefreshToken(sealed: Uint8Array, secret?: Uint8Array): string | null {
-  const buf = Buffer.from(sealed);
-  if (buf.length <= IV_BYTES + TAG_BYTES) return null;
-  try {
-    const decipher = createDecipheriv(
-      "aes-256-gcm",
-      encryptionKey(secret),
-      buf.subarray(0, IV_BYTES),
-    );
-    decipher.setAuthTag(buf.subarray(IV_BYTES, IV_BYTES + TAG_BYTES));
-    return Buffer.concat([
-      decipher.update(buf.subarray(IV_BYTES + TAG_BYTES)),
-      decipher.final(),
-    ]).toString("utf8");
-  } catch {
-    return null;
-  }
+  return openSecret(sealed, KEY_LABEL, secret);
 }
 
 /** 256 random bits, base64url: the value of the session-id cookie. */

@@ -5,6 +5,7 @@ import { readJson, route } from "@/lib/http";
 import { audit } from "@/lib/audit";
 import { type OnGenerationFinish, streamSourceDraft } from "@/lib/ai/generate";
 import { recordGeneration } from "@/lib/ai/log";
+import { requireModel } from "@/lib/ai/model-resolution";
 import { textResponseOnceStarted } from "@/lib/ai/provider-error";
 import {
   type Failure,
@@ -64,10 +65,13 @@ export const POST = route("sources.draft", async (req: Request) => {
     workspaceId: body.workspaceId,
   });
 
+  const resolved = await requireModel({ identity, workspaceId: body.workspaceId });
+
   const usage = await enforceLlmLimits({
     identity,
     workspaceId: body.workspaceId,
     route: "source-draft",
+    model: resolved.modelId,
   });
 
   // A source description is the prompt most likely to contain a pasted
@@ -95,6 +99,7 @@ export const POST = route("sources.draft", async (req: Request) => {
       catalog: null,
       spec: event.object,
       model: event.modelId,
+      modelConfig: resolved.source,
       usage: event.usage,
       attempts: repair ? 2 : 1,
       error: event.error,
@@ -107,6 +112,7 @@ export const POST = route("sources.draft", async (req: Request) => {
       detail: {
         prompt: body.prompt,
         model: event.modelId,
+        modelConfig: resolved.source,
         ...(repair ? { attempt: 2 } : {}),
       },
     });
@@ -116,6 +122,7 @@ export const POST = route("sources.draft", async (req: Request) => {
     prompt: body.prompt,
     grantedSecretRefs: grantedRefs(secretRefGrants(), body.workspaceId),
     onFinish,
+    model: resolved.model,
     repair,
   });
   // A provider that refused the request answers here, as an error that names
