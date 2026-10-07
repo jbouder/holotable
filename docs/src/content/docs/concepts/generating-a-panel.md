@@ -199,16 +199,25 @@ The turn history is client-side and unsaved (`src/lib/dashboard-turns.ts`): each
 turn keeps the prompt and the layout-normalized spec, an earlier turn can be
 restored before saving, and refining from a restored turn drops the turns that
 followed it. **Nothing is persisted until Save** — that is still the ordinary
-`POST /api/dashboards`. The data source is locked once the first turn lands,
-because every panel's `query.sourceId` must match the source the spec was
-generated against.
+`POST /api/dashboards`, after a dialog that lets the author confirm the title
+and names the workspace it lands in (the source's). The data source is fixed
+once the first turn lands, because every panel's `query.sourceId` must match
+the source the spec was generated against: the source chip shows a lock, and
+picking another source there asks to start over rather than being refused.
+
+The page is laid out around that loop: the preview (or its streaming skeleton)
+is the main surface, and the conversation — the versions so far and the prompt
+box — sits beside it, or under it on a narrow screen. Before the first prompt
+the only controls on screen are the prompt box, the source chip and an
+**Ideas** menu holding the starters, recent prompts and templates. The raw spec
+is behind **View JSON**.
 
 ## Asking again, and remembering what you asked
 
 Two affordances make a generation feel reversible rather than final.
 
-**Regenerate with feedback.** A follow-up talks the dashboard *forward*; a
-regenerate asks again for the turn you are looking at, with a note about what
+**Try again, with feedback.** A follow-up talks the dashboard *forward*; **Try
+again** on the version being previewed asks again for the turn you are looking at, with a note about what
 was wrong ("fewer panels, and put the error rate first"). It is one model call,
 carrying the turn's own prompt, the spec that turn was generated **from**, and
 the feedback — and it *replaces* that turn rather than adding one. Deliberately
@@ -217,13 +226,13 @@ compounds it, and pressing Regenerate twice would drift further each time. The
 panel editor's regenerate works the same way one level down, against the panel
 in the spec rather than the proposal on screen.
 
-Each turn is badged with the model that produced it, so the cost of asking
-again is visible; a turn applied from a template says *no model call*, because
-none was made.
+The model that answers is named once, under the prompt box, so the cost of
+asking again is visible; a version applied from a template says *no model
+call*, because none was made.
 
 **Recent prompts.** The prompt box keeps the last few prompts per workspace and
-offers them back in a dropdown; choosing one fills the box rather than
-submitting, so re-use and edit are the same gesture. The create box, the panel
+offers them back (on `/dashboards/new`, under **Ideas**); choosing one fills
+the box rather than submitting, so re-use and edit are the same gesture. The create box, the panel
 editor's NL edit and Explore keep separate lists — "make it a bar chart" is a
 panel edit and is nonsense as a dashboard description.
 

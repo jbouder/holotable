@@ -74,8 +74,9 @@ favorites are shown. A link that names a sort or filter still wins.
 ### Local data
 
 Some things are kept in the browser on purpose and never sent anywhere:
-editor drafts, recent prompts, recently viewed dashboards, command palette
-history, and which setup hints you dismissed. This section lists each one,
+editor drafts, recent prompts (and the source you last generated a dashboard
+from), recently viewed dashboards, command palette history, and which setup
+hints you dismissed. This section lists each one,
 how much it holds and a button to clear it. Drafts are listed one by one and
 only your own are shown, even on a shared machine. **Clear everything on this
 device** asks for confirmation first.

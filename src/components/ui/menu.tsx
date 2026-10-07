@@ -183,3 +183,52 @@ export function MenuRadioItem({
     </BaseMenu.RadioItem>
   );
 }
+
+/**
+ * A captioned group of items. Unlike {@link MenuRadioGroup}'s caption, this
+ * one is Base UI's `GroupLabel`, so the group is named by what is on screen.
+ */
+export function MenuGroup({
+  label,
+  children,
+}: {
+  label: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <BaseMenu.Group>
+      <BaseMenu.GroupLabel className="px-2 pt-1.5 pb-1 text-xs font-semibold uppercase tracking-wide text-muted">
+        {label}
+      </BaseMenu.GroupLabel>
+      {children}
+    </BaseMenu.Group>
+  );
+}
+
+/** An item that toggles. Stays open, so several can be ticked in one visit. */
+export function MenuCheckboxItem({
+  checked,
+  onCheckedChange,
+  disabled,
+  children,
+}: {
+  checked: boolean;
+  onCheckedChange: (checked: boolean) => void;
+  disabled?: boolean;
+  children: React.ReactNode;
+}) {
+  return (
+    <BaseMenu.CheckboxItem
+      checked={checked}
+      onCheckedChange={onCheckedChange}
+      disabled={disabled}
+      closeOnClick={false}
+      className={ITEM_CLASS}
+    >
+      {children}
+      <BaseMenu.CheckboxItemIndicator className="ml-auto text-primary">
+        <Check className="h-4 w-4" aria-hidden />
+      </BaseMenu.CheckboxItemIndicator>
+    </BaseMenu.CheckboxItem>
+  );
+}

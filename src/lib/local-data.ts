@@ -11,6 +11,7 @@ import {
   PROMPT_HISTORY_PREFIX,
 } from "@/lib/prompt-history";
 import { MOTION_STORAGE_KEY } from "@/lib/motion";
+import { forgetLastSource, LAST_SOURCE_KEY } from "@/lib/source-selection";
 import { THEME_STORAGE_KEY } from "@/lib/theme";
 
 /**
@@ -62,11 +63,16 @@ export const LOCAL_STORES: readonly LocalStore[] = [
     id: "prompts",
     label: "Recent prompts",
     description:
-      "What you asked the model for, offered back in the prompt boxes. Kept per workspace.",
+      "What you asked the model for, offered back in the prompt boxes, and the source you last generated a dashboard from. Kept per workspace.",
     unit: ["prompt", "prompts"],
-    keys: [{ prefix: PROMPT_HISTORY_PREFIX }],
+    // The last source rides along: it is the same kind of memory (what you
+    // last asked about) and too small to be a row of its own.
+    keys: [{ prefix: PROMPT_HISTORY_PREFIX }, { exact: LAST_SOURCE_KEY }],
     count: (storage, ctx) => countPromptHistory(storage, ctx.now),
-    clear: (storage) => clearAllPromptHistory(storage),
+    clear: (storage) => {
+      clearAllPromptHistory(storage);
+      forgetLastSource(storage);
+    },
   },
   {
     id: "recent-dashboards",

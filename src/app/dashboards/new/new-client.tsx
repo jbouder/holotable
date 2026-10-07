@@ -4,12 +4,18 @@ import type { EffectiveModel } from "@/lib/ai/model-config";
 import * as React from "react";
 import { useRouter } from "next/navigation";
 import {
+  Braces,
+  Database,
   LayoutTemplate,
+  Lightbulb,
   Loader2,
+  Lock,
   RefreshCw,
-  SendHorizontal,
-  Save,
   RotateCcw,
+  Save,
+  SendHorizontal,
+  Square,
+  Trash2,
   Undo2,
 } from "lucide-react";
 import { type Dashboard, DashboardGenerationSchema, safeParseDashboard } from "@/lib/ir";
@@ -22,24 +28,36 @@ import {
   restoreTurn,
   type TurnHistory,
 } from "@/lib/dashboard-turns";
-import { PromptHistoryMenu, usePromptHistory } from "@/components/prompt-history";
-import { PROMPT_MAX_LENGTH } from "@/lib/prompt-history";
+import { usePromptHistory } from "@/components/prompt-history";
+import { PROMPT_MAX_LENGTH, promptLabel } from "@/lib/prompt-history";
+import { browserStorage } from "@/lib/browser-storage";
 import { Button } from "@/components/ui/button";
 import { Input, Textarea, Label } from "@/components/ui/input";
 import { AiUnavailable } from "@/components/ai-unavailable";
-import { Select } from "@/components/ui/select";
-import { Checkbox } from "@/components/ui/checkbox";
+import {
+  Menu,
+  MenuCheckboxItem,
+  MenuGroup,
+  MenuItem,
+  MenuRadioGroup,
+  MenuRadioItem,
+  MenuSeparator,
+} from "@/components/ui/menu";
+import { Dialog } from "@/components/ui/dialog";
 import {
   additionalSourceChoices,
+  defaultSourceId,
   MAX_ADDITIONAL_SOURCES,
   pruneAdditionalSources,
+  readLastSource,
   toggleAdditionalSource,
+  writeLastSource,
 } from "@/lib/source-selection";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
+import { Card, CardContent } from "@/components/ui/card";
 import { PageHeader } from "@/components/ui/page-header";
 import { PreviewDashboard } from "@/components/dashboard/PreviewDashboard";
 import { GeneratingPanels } from "@/components/dashboard/GeneratingPanels";
+import { SaveDashboardDialog } from "@/components/dashboard/SaveDashboardDialog";
 import { ErrorDisplay } from "@/components/ui/error-display";
 import { RepairingNote } from "@/components/repairing-note";
 import { useRepairingObject } from "@/components/use-repairing-object";
@@ -52,8 +70,9 @@ import {
 import { type Template, templateSpec } from "@/lib/templates";
 import { TemplatePicker } from "@/components/templates/TemplatePicker";
 import { NoSources } from "@/components/onboarding/no-sources";
-import { withViewTransition } from "@/lib/view-transition";
+import { useFlip } from "@/components/use-flip";
 import { useReducedMotion } from "@/components/motion-preference";
+import { cn } from "@/lib/utils";
 
 interface SourceOption {
   id: string;
@@ -65,11 +84,21 @@ interface SourceOption {
   canRefresh: boolean;
   /**
    * One-click starters built from this source's catalog by `buildStarters`.
-   * Per source, so switching the picker switches the chips.
+   * Per source, so switching the picker switches the suggestions.
    */
   starters: string[];
 }
 
+/**
+ * `/dashboards/new` (#356): the dashboard is the canvas, the conversation sits
+ * beside it, and Save is the one primary action.
+ *
+ * Before the first prompt the author sees the prompt box, the source it will
+ * read (a chip, defaulted to the last one used here) and one Ideas menu —
+ * starters, recent prompts and templates are all one interaction away rather
+ * than on screen at once. After it, the generated dashboard is where they were
+ * already looking, with no tab to switch to.
+ */
 export function NewDashboardClient({
   sources,
   models,
@@ -89,22 +118,37 @@ export function NewDashboardClient({
   canManageSources: boolean;
 }) {
   const router = useRouter();
-  const [activeTab, setActiveTab] = React.useState<"chat" | "preview">("chat");
   const reducedMotion = useReducedMotion();
   const [sourceId, setSourceIdState] = React.useState<string | null>(
     sources[0]?.id ?? null,
   );
   // The dashboard's other sources (#104): same workspace, at most two more.
   const [additionalIds, setAdditionalIds] = React.useState<string[]>([]);
-  const setSourceId = (id: string | null) => {
-    setSourceIdState(id);
-    setAdditionalIds((ids) => pruneAdditionalSources(ids, sources, id));
-  };
+  const setSourceId = React.useCallback(
+    (id: string | null) => {
+      setSourceIdState(id);
+      setAdditionalIds((ids) => pruneAdditionalSources(ids, sources, id));
+    },
+    [sources],
+  );
+  // The source last generated against in this browser, once mounted: storage
+  // does not exist on the server, so reading it during render would be a
+  // hydration mismatch. Until then the first source stands in, which is also
+  // what a first visit gets.
+  React.useEffect(() => {
+    const remembered = defaultSourceId(sources, readLastSource(browserStorage()));
+    if (remembered) setSourceId(remembered);
+  }, [sources, setSourceId]);
+
   const [prompt, setPrompt] = React.useState("");
   const [history, setHistory] = React.useState<TurnHistory>(EMPTY_HISTORY);
   const [saveError, setSaveError] = React.useState<ApiError | null>(null);
   const [saving, setSaving] = React.useState(false);
+  const [confirmingSave, setConfirmingSave] = React.useState(false);
+  const [showJson, setShowJson] = React.useState(false);
   const [picking, setPicking] = React.useState(false);
+  // A source picked while a conversation is open, waiting on "start over?".
+  const [pendingSourceId, setPendingSourceId] = React.useState<string | null>(null);
   // Catalog state for the picker, corrected in place by a Refresh from here.
   const catalog = useCatalogRefresh(
     Object.fromEntries(sources.map((s) => [s.id, s.catalog])),
@@ -115,18 +159,19 @@ export function NewDashboardClient({
   const aiUnavailable = effective?.unavailable ?? null;
   const additionalChoices = additionalSourceChoices(sources, sourceId);
   const additionalSources = additionalChoices.filter((s) => additionalIds.includes(s.id));
-  // Chips for the selected source. Server-built from its catalog, so they
-  // change with the picker and never describe a table this source cannot read.
+  // Suggestions for the selected source. Server-built from its catalog, so they
+  // change with the source and never describe a table this source cannot read.
   const starters = source?.starters ?? [];
 
-  // Recent prompts for this workspace, offered back on the box (#83). Per
-  // workspace because a prompt names that workspace's tables; the list lives
-  // in `localStorage` and is never sent anywhere — the durable, redacted record
-  // of what was asked is the generation log (#23).
+  // Recent prompts for this workspace, offered back from the Ideas menu (#83).
+  // Per workspace because a prompt names that workspace's tables; the list
+  // lives in `localStorage` and is never sent anywhere — the durable, redacted
+  // record of what was asked is the generation log (#23).
   const prompts = usePromptHistory(source?.workspaceId, "dashboard");
 
-  // Feedback for a regenerate of the turn being previewed. Cleared whenever
-  // the turn under review changes, so it cannot be carried onto another one.
+  // "Try again" on the turn being previewed: whether its note box is open,
+  // and what it says. Both belong to that turn and are cleared when it changes.
+  const [retrying, setRetrying] = React.useState(false);
   const [feedback, setFeedback] = React.useState("");
 
   /**
@@ -142,6 +187,10 @@ export function NewDashboardClient({
 
   const finalSpec = activeSpec(history);
   const refining = history.turns.length > 0;
+  const activeTurn = history.turns[history.index];
+
+  const turnList = React.useRef<HTMLOListElement>(null);
+  useFlip(turnList, !reducedMotion);
 
   const { object, submit, isLoading, error, stop, repairing } = useRepairingObject({
     api: "/api/generate",
@@ -153,12 +202,11 @@ export function NewDashboardClient({
         running.current.replacing ? replaceTurn(h, turn) : appendTurn(h, turn),
       );
       setFeedback("");
+      setRetrying(false);
       // Clear the box only once the turn has landed, so a failed run keeps the
       // prompt for Try again — and only if the author has not started typing
       // the next follow-up into it while this one streamed.
       setPrompt((p) => (p === running.current.prompt ? "" : p));
-      // Stay on Chat: the next follow-up, Save and Start over are all here,
-      // and Preview is one click away when the author wants it.
     },
   });
 
@@ -176,6 +224,7 @@ export function NewDashboardClient({
   }) {
     if (!sourceId) return;
     setSaveError(null);
+    writeLastSource(browserStorage(), sourceId);
     running.current = { prompt: input.instruction, replacing: input.replacing };
     submit(
       input.base
@@ -205,7 +254,8 @@ export function NewDashboardClient({
   }
 
   /**
-   * Ask again for the turn being previewed, with a note about what was wrong.
+   * Ask again for the turn being previewed, with an optional note about what
+   * was wrong.
    *
    * One model call, carrying the turn's own prompt, the spec it was generated
    * from, and the feedback. It replaces that turn rather than adding one: the
@@ -213,12 +263,11 @@ export function NewDashboardClient({
    * to the step they are looking at.
    */
   function regenerate() {
-    const turn = history.turns[history.index];
-    if (!turn || isLoading || aiUnavailable) return;
+    if (!activeTurn || isLoading || aiUnavailable) return;
     const note = feedback.trim();
     const instruction = note
-      ? `${turn.prompt}\n\nAdditional feedback: ${note}`.slice(0, PROMPT_MAX_LENGTH)
-      : turn.prompt;
+      ? `${activeTurn.prompt}\n\nAdditional feedback: ${note}`.slice(0, PROMPT_MAX_LENGTH)
+      : activeTurn.prompt;
     runGeneration({
       instruction,
       base: history.turns[history.index - 1]?.spec ?? null,
@@ -248,24 +297,37 @@ export function NewDashboardClient({
   }
 
   function startOver() {
+    if (isLoading) stop();
     setHistory(EMPTY_HISTORY);
     setSaveError(null);
     setPrompt("");
     setFeedback("");
-    setActiveTab("chat");
+    setRetrying(false);
+  }
+
+  /**
+   * Every panel's `query.sourceId` must match the source the spec was
+   * generated against, so a conversation cannot change source midway. Picking
+   * another one asks to start over instead of being silently refused.
+   */
+  function chooseSource(id: string) {
+    if (id === sourceId) return;
+    if (refining) setPendingSourceId(id);
+    else setSourceId(id);
   }
 
   /** Preview an earlier turn. The feedback box belongs to the turn it was typed on. */
   function restore(index: number) {
     setHistory((h) => restoreTurn(h, index));
     setFeedback("");
+    setRetrying(false);
   }
 
-  async function save() {
+  async function save(title: string) {
     if (!finalSpec) return;
     setSaving(true);
     setSaveError(null);
-    const parsed = safeParseDashboard(finalSpec);
+    const parsed = safeParseDashboard({ ...finalSpec, title });
     if (!parsed.success) {
       setSaveError({
         error: `The generated spec is invalid: ${parsed.error.issues[0]?.message ?? "validation failed"}`,
@@ -274,13 +336,20 @@ export function NewDashboardClient({
       setSaving(false);
       return;
     }
-    const res = await fetch("/api/dashboards", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ spec: parsed.data }),
-    });
-    setSaving(false);
+    let res: Response;
+    try {
+      res = await fetch("/api/dashboards", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ spec: parsed.data }),
+      });
+    } catch (thrown) {
+      setSaving(false);
+      setSaveError(apiErrorFromThrown(thrown));
+      return;
+    }
     if (!res.ok) {
+      setSaving(false);
       setSaveError(await readApiError(res));
       return;
     }
@@ -288,389 +357,432 @@ export function NewDashboardClient({
     router.push(`/dashboards/${body.dashboard.id}`);
   }
 
-  const header = (actions?: React.ReactNode) => (
-    <PageHeader
-      title="New dashboard"
-      badge={model && <Badge title="Generation model">{model}</Badge>}
-      description="Describe the dashboard you want in plain English. The model generates a validated spec; refine it with follow-ups, then preview and save it as live panels."
-      actions={actions}
-    />
-  );
+  const description =
+    "Describe the dashboard you want in plain English. It is generated as a validated spec and previewed with live data; refine it, then save it.";
 
   if (sources.length === 0) {
     return (
       <div className="space-y-6">
-        {header()}
+        <PageHeader title="New dashboard" description={description} />
         <NoSources canManageSources={canManageSources} />
       </div>
     );
   }
 
+  const pendingSource = sources.find((s) => s.id === pendingSourceId);
+
   return (
     <div className="space-y-6">
-      {header(
-        <div
-          className="flex w-fit border border-border bg-surface p-1"
-          role="tablist"
-          aria-label="Dashboard workspace"
-        >
-          {(["chat", "preview"] as const).map((tab) => (
-            <button
-              key={tab}
-              type="button"
-              role="tab"
-              aria-selected={activeTab === tab}
-              aria-controls={`new-dashboard-${tab}-panel`}
-              id={`new-dashboard-${tab}-tab`}
-              onClick={() =>
-                withViewTransition(() => setActiveTab(tab), !reducedMotion, "tab")
-              }
-              className={`px-3 py-1.5 text-sm font-medium capitalize transition-colors ${
-                activeTab === tab
-                  ? "bg-surface-2 text-foreground"
-                  : "text-muted hover:text-foreground"
-              }`}
-            >
-              {tab}
-            </button>
-          ))}
-        </div>,
-      )}
+      <PageHeader title="New dashboard" description={description} />
 
-      {activeTab === "chat" ? (
-        <div
-          role="tabpanel"
-          id="new-dashboard-chat-panel"
-          aria-labelledby="new-dashboard-chat-tab"
-          className="tab-panel space-y-4"
-        >
-          <Card>
-            <CardContent className="space-y-4">
-              <div className="flex flex-wrap items-end gap-4">
-                <div>
-                  <Label htmlFor="source">Data source</Label>
-                  <Select
-                    id="source"
-                    value={sourceId}
-                    onValueChange={setSourceId}
-                    disabled={refining}
-                    options={sources.map((s) => ({
-                      value: s.id,
-                      label: `${s.name} (${s.workspaceId})`,
-                    }))}
-                  />
-                </div>
-                {!refining && (
-                  <Button
-                    variant="secondary"
-                    className="mb-0.5"
-                    onClick={() => setPicking(true)}
-                    disabled={isLoading}
-                  >
-                    <LayoutTemplate className="h-4 w-4" /> Start from a template
-                  </Button>
-                )}
-                {refining && (
-                  <p className="pb-3 text-xs text-muted">
-                    Locked while refining — start over to build from another source.
-                  </p>
-                )}
-              </div>
-              {additionalChoices.length > 0 && (
-                <fieldset className="space-y-2">
-                  <legend className="mb-1 text-sm font-medium text-muted">
-                    Also use (up to {MAX_ADDITIONAL_SOURCES} more from{" "}
-                    {source?.workspaceId})
-                  </legend>
-                  <div className="flex flex-wrap gap-x-6 gap-y-2">
-                    {additionalChoices.map((s) => {
-                      const checked = additionalIds.includes(s.id);
-                      return (
-                        <Checkbox
-                          key={s.id}
-                          checked={checked}
-                          disabled={
-                            refining ||
-                            isLoading ||
-                            (!checked && additionalIds.length >= MAX_ADDITIONAL_SOURCES)
-                          }
-                          onCheckedChange={(next) =>
-                            setAdditionalIds((ids) =>
-                              toggleAdditionalSource(ids, s.id, next),
-                            )
-                          }
-                          label={s.name}
-                        />
-                      );
-                    })}
-                  </div>
-                  <p className="text-xs text-muted">
-                    Each panel reads one source; a query never combines two.
-                  </p>
-                </fieldset>
-              )}
-              {[source, ...additionalSources].map(
-                (s) =>
-                  s && (
-                    <CatalogHealthNotice
-                      key={s.id}
-                      source={s}
-                      health={catalog.health[s.id]}
-                      canRefresh={s.canRefresh}
-                      onRefreshed={(health) => catalog.update(s.id, health)}
-                    />
-                  ),
-              )}
-              <div>
-                <div className="flex items-center justify-between gap-2">
-                  <Label htmlFor="prompt">
-                    {refining
-                      ? "Refine it — each follow-up is one more turn"
-                      : starters.length > 0
-                        ? "Describe the dashboard or try one below"
-                        : "Describe the dashboard"}
-                  </Label>
-                  <PromptHistoryMenu
-                    history={prompts}
-                    disabled={isLoading}
-                    onPick={setPrompt}
-                  />
-                </div>
-                {!refining && starters.length > 0 && (
-                  <div className="mb-2 flex flex-wrap items-center gap-2">
-                    {starters.map((preset) => (
-                      <button
-                        key={preset}
-                        type="button"
-                        disabled={isLoading}
-                        onClick={() => setPrompt(preset)}
-                        className="border border-border bg-surface px-3 py-1 text-xs text-muted transition-colors hover:border-primary hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50"
-                      >
-                        {preset}
-                      </button>
-                    ))}
-                  </div>
-                )}
-                {aiUnavailable && <AiUnavailable message={aiUnavailable} />}
-                <div className="relative">
-                  <Textarea
-                    id="prompt"
-                    disabled={aiUnavailable !== null}
-                    rows={3}
-                    className="pr-14"
-                    placeholder={
-                      refining
-                        ? "e.g. Make the third one a bar chart, and add a 95th percentile line"
-                        : starters[0]
-                          ? `e.g. ${starters[0]}`
-                          : "Describe the dashboard you want"
-                    }
-                    value={prompt}
-                    onChange={(e) => setPrompt(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter" && !e.shiftKey) {
-                        e.preventDefault();
-                        if (!isLoading && prompt.trim()) generate();
-                      }
-                    }}
-                  />
-                  <Button
-                    size="icon"
-                    onClick={generate}
-                    disabled={isLoading || !prompt.trim() || aiUnavailable !== null}
-                    aria-label={refining ? "Refine" : "Generate"}
-                    title={refining ? "Refine" : "Generate"}
-                    className="absolute bottom-4 right-2"
-                  >
-                    {isLoading ? (
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                    ) : (
-                      <SendHorizontal className="h-4 w-4" />
-                    )}
-                  </Button>
-                </div>
-              </div>
-              {(isLoading || finalSpec) && (
-                <div className="flex items-center gap-3">
-                  {isLoading && (
-                    <Button variant="ghost" size="sm" onClick={() => stop()}>
-                      Stop
-                    </Button>
-                  )}
-                  {finalSpec && (
-                    <>
-                      <Button variant="secondary" onClick={save} disabled={saving}>
-                        <Save className="h-4 w-4" /> Save
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={startOver}
-                        disabled={isLoading || saving}
-                      >
-                        <RotateCcw className="h-4 w-4" /> Start over
-                      </Button>
-                    </>
-                  )}
-                </div>
-              )}
-              <RepairingNote show={repairing} />
-              {error && (
-                <ErrorDisplay
-                  error={apiErrorFromThrown(error)}
-                  onRetry={generate}
-                  retryLabel="Try again"
-                  disabled={isLoading}
-                />
-              )}
-              {saveError && (
-                <ErrorDisplay
-                  error={saveError}
-                  onRetry={save}
-                  retryLabel="Save again"
-                  disabled={saving}
-                />
-              )}
-            </CardContent>
-          </Card>
-
-          {refining && (
-            <Card>
-              <CardHeader>
-                <CardTitle>Turns</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                <ol className="space-y-2">
-                  {history.turns.map((turn, i) => {
-                    const active = i === history.index;
-                    return (
-                      <li
-                        key={turn.id}
-                        className={`flex items-start justify-between gap-3 border p-3 ${
-                          active
-                            ? "border-primary bg-surface-2"
-                            : "border-border bg-surface"
-                        }`}
-                      >
-                        <div className="min-w-0">
-                          <div className="flex flex-wrap items-center gap-2 text-xs text-muted">
-                            <span>
-                              Turn {i + 1} · {turn.spec.panels.length}{" "}
-                              {turn.spec.panels.length === 1 ? "panel" : "panels"}
-                              {active && " · previewing"}
-                            </span>
-                            {/* What produced it, so the cost of a regenerate is
-                                visible. A turn applied from a template carries
-                                no model because nothing was asked of one. */}
-                            {turn.model ? (
-                              <Badge title="Generation model">{turn.model}</Badge>
-                            ) : (
-                              <span>no model call</span>
-                            )}
-                          </div>
-                          <p className="mt-1 break-words text-sm text-foreground">
-                            {turn.prompt}
-                          </p>
-                        </div>
-                        {!active && (
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            disabled={isLoading}
-                            onClick={() => restore(i)}
-                          >
-                            <Undo2 className="h-4 w-4" /> Restore
-                          </Button>
-                        )}
-                      </li>
-                    );
-                  })}
-                </ol>
-                {/* Not quite? Ask again for THIS turn with a note about what
-                    was wrong, rather than talking the dashboard forward. One
-                    model call, and it replaces the turn instead of adding one.
-                    Offered only for a turn a model produced. */}
-                {history.turns[history.index]?.model && (
-                  <div className="flex flex-wrap items-end gap-2 border-t border-border pt-3">
-                    <div className="min-w-48 flex-1">
-                      <Label htmlFor="regen-feedback">
-                        Not quite — what should change?
-                      </Label>
-                      <Input
-                        id="regen-feedback"
-                        value={feedback}
-                        placeholder="e.g. fewer panels, and put the error rate first"
-                        onChange={(e) => setFeedback(e.target.value)}
-                        onKeyDown={(e) => {
-                          if (e.key === "Enter" && !isLoading) regenerate();
-                        }}
-                      />
-                    </div>
-                    <Button variant="secondary" onClick={regenerate} disabled={isLoading}>
-                      <RefreshCw className="h-4 w-4" /> Regenerate
-                    </Button>
-                  </div>
-                )}
-                <p className="text-xs text-muted">
-                  Nothing is saved until you press Save. Refining from a restored turn
-                  drops the turns that followed it, and a regenerate replaces the turn you
-                  are previewing.
-                </p>
-              </CardContent>
-            </Card>
+      <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-[minmax(0,1fr)_24rem]">
+        {/*
+          The canvas. While a turn streams it is the panel-shaped skeleton that
+          fills in as titles arrive (#72); once a turn lands it is that turn's
+          live preview. Before the first prompt there is nothing to show, and
+          on a narrow screen it takes no room until there is.
+        */}
+        <section
+          aria-label="Dashboard preview"
+          className={cn(
+            "min-w-0 space-y-4",
+            !isLoading && !finalSpec && "hidden lg:block",
           )}
-
-          {/*
-            While it streams, the dashboard is drawn as panel-shaped cards
-            that fill in as their titles arrive; the JSON is what the finished
-            spec is, and stays available behind a disclosure once there is a
-            finished spec to read (#72).
-          */}
-          {isLoading && (
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
+        >
+          {isLoading ? (
+            <Card className="fade-in">
+              <CardContent className="space-y-4">
+                <h2 className="flex items-center gap-2 text-lg font-semibold">
                   <Loader2 className="h-4 w-4 animate-spin" />
                   <span>{object?.title || "Generating…"}</span>
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
+                </h2>
                 <GeneratingPanels panels={object?.panels} />
               </CardContent>
             </Card>
-          )}
-
-          {!isLoading && finalSpec && (
-            <Card>
-              <CardHeader>
-                <CardTitle>Generated config</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <pre className="max-h-96 overflow-auto border border-border bg-surface p-4 text-xs text-muted">
-                  {JSON.stringify(finalSpec, null, 2)}
-                </pre>
-              </CardContent>
-            </Card>
-          )}
-        </div>
-      ) : (
-        <section
-          role="tabpanel"
-          id="new-dashboard-preview-panel"
-          aria-labelledby="new-dashboard-preview-tab"
-          className="tab-panel"
-        >
-          {finalSpec ? (
-            <PreviewDashboard spec={finalSpec} />
+          ) : finalSpec ? (
+            <div className="fade-in space-y-4">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div className="min-w-0">
+                  <h2 className="truncate text-lg font-semibold">{finalSpec.title}</h2>
+                  <p className="text-xs text-muted">
+                    Version {history.index + 1} of {history.turns.length} ·{" "}
+                    {finalSpec.panels.length}{" "}
+                    {finalSpec.panels.length === 1 ? "panel" : "panels"} · not saved yet
+                  </p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Button variant="ghost" size="sm" onClick={() => setShowJson(true)}>
+                    <Braces className="h-4 w-4" /> View JSON
+                  </Button>
+                  <Button
+                    onClick={() => {
+                      setSaveError(null);
+                      setConfirmingSave(true);
+                    }}
+                    disabled={saving}
+                  >
+                    <Save className="h-4 w-4" /> Save dashboard
+                  </Button>
+                </div>
+              </div>
+              <PreviewDashboard spec={finalSpec} />
+            </div>
           ) : (
-            <Card>
-              <CardContent className="text-sm text-muted">
-                Generate a dashboard in the Chat tab to preview it.
-              </CardContent>
-            </Card>
+            <div className="flex min-h-80 items-center justify-center border border-dashed border-border p-8 text-center text-sm text-muted">
+              Your dashboard appears here as it is generated, with live data from the
+              source you picked.
+            </div>
           )}
         </section>
+
+        {/* The conversation: what was asked, then the box to ask the next thing. */}
+        <aside aria-label="Conversation" className="min-w-0 lg:sticky lg:top-20">
+          <Card>
+            <CardContent className="space-y-4">
+              {refining && (
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between gap-2">
+                    <h2 className="text-sm font-medium text-muted">Versions</h2>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={startOver}
+                      disabled={saving}
+                    >
+                      <RotateCcw className="h-4 w-4" /> Start over
+                    </Button>
+                  </div>
+                  <ol ref={turnList} className="space-y-2">
+                    {history.turns.map((turn, i) => {
+                      const active = i === history.index;
+                      return (
+                        <li
+                          key={turn.id}
+                          data-flip-id={turn.id}
+                          aria-current={active ? "true" : undefined}
+                          className={cn(
+                            "border p-3",
+                            active
+                              ? "border-primary bg-surface-2"
+                              : "border-border bg-surface",
+                          )}
+                        >
+                          <p className="break-words text-sm text-foreground">
+                            {turn.prompt}
+                          </p>
+                          <div className="mt-1 flex flex-wrap items-center justify-between gap-2">
+                            <span className="text-xs text-muted">
+                              Version {i + 1} · {turn.spec.panels.length}{" "}
+                              {turn.spec.panels.length === 1 ? "panel" : "panels"}
+                              {/* A template turn cost nothing; say so. */}
+                              {!turn.model && " · no model call"}
+                              {active && " · showing"}
+                            </span>
+                            {active ? (
+                              // Ask again for THIS turn, rather than talking the
+                              // dashboard forward. Only for a turn a model made.
+                              turn.model &&
+                              !retrying && (
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  disabled={isLoading || aiUnavailable !== null}
+                                  onClick={() => setRetrying(true)}
+                                >
+                                  <RefreshCw className="h-4 w-4" /> Try again
+                                </Button>
+                              )
+                            ) : (
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                disabled={isLoading}
+                                onClick={() => restore(i)}
+                                aria-label={`Restore version ${i + 1}`}
+                              >
+                                <Undo2 className="h-4 w-4" /> Restore
+                              </Button>
+                            )}
+                          </div>
+                          {active && retrying && (
+                            <form
+                              className="fade-in mt-3 space-y-2 border-t border-border pt-3"
+                              onSubmit={(e) => {
+                                e.preventDefault();
+                                regenerate();
+                              }}
+                            >
+                              <Label htmlFor="regen-feedback">
+                                What should change? (optional)
+                              </Label>
+                              <Input
+                                id="regen-feedback"
+                                value={feedback}
+                                autoFocus
+                                placeholder="e.g. fewer panels, and put the error rate first"
+                                onChange={(e) => setFeedback(e.target.value)}
+                              />
+                              <div className="flex justify-end gap-2">
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => {
+                                    setRetrying(false);
+                                    setFeedback("");
+                                  }}
+                                >
+                                  Cancel
+                                </Button>
+                                <Button
+                                  type="submit"
+                                  variant="secondary"
+                                  size="sm"
+                                  disabled={isLoading}
+                                >
+                                  <RefreshCw className="h-4 w-4" /> Regenerate
+                                </Button>
+                              </div>
+                            </form>
+                          )}
+                        </li>
+                      );
+                    })}
+                  </ol>
+                  <p className="text-xs text-muted">
+                    Nothing is saved until you save the dashboard. Try again replaces the
+                    version you are looking at; refining an earlier one drops the versions
+                    after it.
+                  </p>
+                </div>
+              )}
+
+              <div className={cn("space-y-3", refining && "border-t border-border pt-4")}>
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  {source && (
+                    <SourceMenu
+                      sources={sources}
+                      source={source}
+                      locked={refining}
+                      additionalChoices={additionalChoices}
+                      additionalIds={additionalIds}
+                      disabled={isLoading}
+                      onChoose={chooseSource}
+                      onToggleAdditional={(id, next) =>
+                        setAdditionalIds((ids) => toggleAdditionalSource(ids, id, next))
+                      }
+                    />
+                  )}
+                  <Menu
+                    label="Ideas: suggestions, recent prompts and templates"
+                    className="h-8 w-auto gap-1.5 px-2 text-sm"
+                    panelClassName="max-w-md"
+                    trigger={
+                      <>
+                        <Lightbulb className="h-4 w-4" aria-hidden /> Ideas
+                      </>
+                    }
+                  >
+                    {starters.length > 0 && (
+                      <MenuGroup label="Suggestions">
+                        {starters.map((preset) => (
+                          <MenuItem
+                            key={preset}
+                            disabled={isLoading}
+                            onClick={() => setPrompt(preset)}
+                          >
+                            <span className="truncate" title={preset}>
+                              {preset}
+                            </span>
+                          </MenuItem>
+                        ))}
+                      </MenuGroup>
+                    )}
+                    {prompts.entries.length > 0 && (
+                      <>
+                        {starters.length > 0 && <MenuSeparator />}
+                        <MenuGroup label="Recent prompts">
+                          {prompts.entries.map((entry) => (
+                            <MenuItem
+                              key={entry.prompt}
+                              disabled={isLoading}
+                              onClick={() => setPrompt(entry.prompt)}
+                            >
+                              <span className="truncate" title={entry.prompt}>
+                                {promptLabel(entry.prompt)}
+                              </span>
+                            </MenuItem>
+                          ))}
+                          <MenuItem onClick={prompts.clear}>
+                            <Trash2 className="h-4 w-4" /> Clear recent prompts
+                          </MenuItem>
+                        </MenuGroup>
+                      </>
+                    )}
+                    {(starters.length > 0 || prompts.entries.length > 0) && (
+                      <MenuSeparator />
+                    )}
+                    {/* A template starts a conversation; it cannot join one. */}
+                    <MenuItem
+                      disabled={refining || isLoading}
+                      onClick={() => setPicking(true)}
+                    >
+                      <LayoutTemplate className="h-4 w-4" /> Start from a template…
+                    </MenuItem>
+                  </Menu>
+                </div>
+
+                {[source, ...additionalSources].map(
+                  (s) =>
+                    s && (
+                      <CatalogHealthNotice
+                        key={s.id}
+                        source={s}
+                        health={catalog.health[s.id]}
+                        canRefresh={s.canRefresh}
+                        onRefreshed={(health) => catalog.update(s.id, health)}
+                      />
+                    ),
+                )}
+                {aiUnavailable && <AiUnavailable message={aiUnavailable} />}
+
+                <form
+                  onSubmit={(e) => {
+                    e.preventDefault();
+                    generate();
+                  }}
+                >
+                  <Label htmlFor="prompt">
+                    {refining ? "Refine it" : "Describe the dashboard"}
+                  </Label>
+                  <div className="relative">
+                    <Textarea
+                      id="prompt"
+                      disabled={aiUnavailable !== null}
+                      rows={3}
+                      className="pr-14"
+                      placeholder={
+                        refining
+                          ? "e.g. Make the third one a bar chart, and add a 95th percentile line"
+                          : starters[0]
+                            ? `e.g. ${starters[0]}`
+                            : "Describe the dashboard you want"
+                      }
+                      value={prompt}
+                      onChange={(e) => setPrompt(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" && !e.shiftKey) {
+                          e.preventDefault();
+                          generate();
+                        }
+                      }}
+                    />
+                    {isLoading ? (
+                      <Button
+                        type="button"
+                        size="icon"
+                        variant="secondary"
+                        onClick={() => stop()}
+                        aria-label="Stop"
+                        title="Stop"
+                        className="absolute bottom-4 right-2"
+                      >
+                        <Square className="h-4 w-4" />
+                      </Button>
+                    ) : (
+                      <Button
+                        type="submit"
+                        size="icon"
+                        disabled={!prompt.trim() || aiUnavailable !== null}
+                        aria-label={refining ? "Refine" : "Generate"}
+                        title={refining ? "Refine" : "Generate"}
+                        className="absolute bottom-4 right-2"
+                      >
+                        <SendHorizontal className="h-4 w-4" />
+                      </Button>
+                    )}
+                  </div>
+                  {model && (
+                    <p className="text-xs text-muted">
+                      Generates with <span className="text-foreground">{model}</span>.
+                      Enter sends, Shift+Enter adds a line.
+                    </p>
+                  )}
+                </form>
+
+                <RepairingNote show={repairing} />
+                {error && (
+                  <ErrorDisplay
+                    error={apiErrorFromThrown(error)}
+                    onRetry={generate}
+                    retryLabel="Try again"
+                    disabled={isLoading}
+                  />
+                )}
+              </div>
+            </CardContent>
+          </Card>
+        </aside>
+      </div>
+
+      {finalSpec && source && (
+        <SaveDashboardDialog
+          open={confirmingSave}
+          onOpenChange={setConfirmingSave}
+          defaultTitle={finalSpec.title}
+          workspaceId={source.workspaceId}
+          saving={saving}
+          error={saveError}
+          onSave={(title) => void save(title)}
+        />
       )}
+
+      <Dialog
+        open={showJson && finalSpec !== null}
+        onOpenChange={setShowJson}
+        title="Dashboard spec"
+      >
+        <p className="mb-3 text-sm text-muted">
+          The validated spec this version would save. It holds queries and layout, never
+          data or connection details.
+        </p>
+        <pre className="max-h-[60vh] overflow-auto border border-border bg-surface-2 p-4 text-xs text-muted">
+          {JSON.stringify(finalSpec, null, 2)}
+        </pre>
+      </Dialog>
+
+      <Dialog
+        open={pendingSource !== undefined}
+        onOpenChange={(open) => {
+          if (!open) setPendingSourceId(null);
+        }}
+        title="Start over with another source?"
+        className="max-w-md"
+      >
+        <div className="space-y-4">
+          <p className="text-sm text-muted">
+            Every panel reads the source it was generated against, so switching to{" "}
+            <span className="text-foreground">{pendingSource?.name}</span> starts a new
+            conversation. Your {history.turns.length} unsaved{" "}
+            {history.turns.length === 1 ? "version is" : "versions are"} discarded.
+          </p>
+          <div className="flex justify-end gap-2">
+            <Button variant="secondary" onClick={() => setPendingSourceId(null)}>
+              Keep this source
+            </Button>
+            <Button
+              onClick={() => {
+                if (!pendingSourceId) return;
+                startOver();
+                setSourceId(pendingSourceId);
+                setPendingSourceId(null);
+              }}
+            >
+              Start over
+            </Button>
+          </div>
+        </div>
+      </Dialog>
 
       {picking && source && (
         <TemplatePicker
@@ -685,5 +797,96 @@ export function NewDashboardClient({
         />
       )}
     </div>
+  );
+}
+
+/**
+ * The source chip: what the dashboard will read, and the one place to change
+ * it or add the others (#104). A menu of radio and checkbox items rather than
+ * a form field, so before the first prompt it is one compact control.
+ */
+function SourceMenu({
+  sources,
+  source,
+  locked,
+  additionalChoices,
+  additionalIds,
+  disabled,
+  onChoose,
+  onToggleAdditional,
+}: {
+  sources: SourceOption[];
+  source: SourceOption;
+  /** A conversation is open: choosing another source asks to start over. */
+  locked: boolean;
+  additionalChoices: SourceOption[];
+  additionalIds: string[];
+  disabled: boolean;
+  onChoose: (id: string) => void;
+  onToggleAdditional: (id: string, checked: boolean) => void;
+}) {
+  const extra = additionalIds.length;
+  return (
+    <Menu
+      label={`Data source: ${source.name}, workspace ${source.workspaceId}${extra > 0 ? `, and ${extra} more` : ""}`}
+      className="h-8 w-auto max-w-full gap-1.5 border border-border bg-surface px-2 text-sm text-foreground"
+      panelClassName="max-w-sm"
+      trigger={
+        <>
+          {locked ? (
+            <Lock className="h-3.5 w-3.5 shrink-0 text-muted" aria-hidden />
+          ) : (
+            <Database className="h-3.5 w-3.5 shrink-0 text-muted" aria-hidden />
+          )}
+          <span className="truncate">{source.name}</span>
+          <span className="shrink-0 text-xs text-muted">
+            {source.workspaceId}
+            {extra > 0 && ` +${extra}`}
+          </span>
+        </>
+      }
+    >
+      <MenuRadioGroup
+        label={locked ? "Source (changing it starts over)" : "Source"}
+        value={source.id}
+        onValueChange={onChoose}
+      >
+        {sources.map((s) => (
+          <MenuRadioItem key={s.id} value={s.id}>
+            <span className="truncate">{s.name}</span>
+            <span className="text-xs text-muted">{s.workspaceId}</span>
+          </MenuRadioItem>
+        ))}
+      </MenuRadioGroup>
+      {additionalChoices.length > 0 && (
+        <>
+          <MenuSeparator />
+          <MenuGroup label={`Also use (up to ${MAX_ADDITIONAL_SOURCES} more)`}>
+            {additionalChoices.map((s) => {
+              const checked = additionalIds.includes(s.id);
+              return (
+                <MenuCheckboxItem
+                  key={s.id}
+                  checked={checked}
+                  disabled={
+                    locked ||
+                    disabled ||
+                    (!checked && additionalIds.length >= MAX_ADDITIONAL_SOURCES)
+                  }
+                  onCheckedChange={(next) => onToggleAdditional(s.id, next)}
+                >
+                  <span className="truncate">{s.name}</span>
+                </MenuCheckboxItem>
+              );
+            })}
+          </MenuGroup>
+          <p className="px-2 pt-1 pb-1.5 text-xs text-muted">
+            {locked
+              ? "Fixed for this conversation; start over to change them."
+              : "Each panel reads one source; a query never combines two."}
+          </p>
+        </>
+      )}
+    </Menu>
   );
 }

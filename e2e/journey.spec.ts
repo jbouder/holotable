@@ -60,16 +60,21 @@ test("source → generate → save → stream → pause → resume → edit → 
   let dashboardUrl = "";
   await test.step("generate a dashboard from a prompt and save it", async () => {
     await page.goto("/dashboards/new");
-    await page.getByRole("combobox", { name: "Data source" }).click();
-    await page.getByRole("option", { name: sourceName }).click();
-    await page
-      .getByLabel(/describe|prompt|what/i)
-      .first()
-      .fill("Checkout service health");
+    // The source is a chip (#356); its menu holds the picker.
+    await page.getByRole("button", { name: /^Data source:/ }).click();
+    await page.getByRole("menuitemradio", { name: new RegExp(sourceName) }).click();
+    await page.keyboard.press("Escape");
+    await page.getByLabel("Describe the dashboard").fill("Checkout service health");
     await page.getByRole("button", { name: "Generate" }).click();
-    // The recorded spec (src/lib/ai/stub.ts).
-    await expect(page.getByText("Checkout service health").first()).toBeVisible();
-    await page.getByRole("button", { name: "Save" }).click();
+    // The recorded spec (src/lib/ai/stub.ts), previewed where the author is
+    // already looking: no tab to switch to.
+    const preview = page.getByRole("region", { name: "Dashboard preview" });
+    await expect(preview.getByText("Checkout service health").first()).toBeVisible();
+    await preview.getByRole("button", { name: "Save dashboard" }).click();
+    // Save confirms the title before anything is written.
+    const save = page.getByRole("dialog", { name: "Save dashboard" });
+    await expect(save.getByLabel("Title")).toHaveValue("Checkout service health");
+    await save.getByRole("button", { name: "Save dashboard" }).click();
     await page.waitForURL(/\/dashboards\/[0-9a-f-]{36}$/);
     dashboardUrl = page.url();
   });
