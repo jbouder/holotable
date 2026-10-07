@@ -8,7 +8,8 @@ import {
   DashboardGenerationSchema,
   ExplorePanel,
   forGeneration,
-  Panel,
+  GeneratedPanel,
+  type Panel,
 } from "@/lib/ir";
 import { config } from "@/lib/config";
 import { PANEL_KINDS } from "@/lib/panels/registry";
@@ -348,8 +349,8 @@ export function streamPanel(input: {
   const { source, prompt, current, onFinish, repair } = input;
   return streamObject({
     ...modelSettings(),
-    onFinish: finish(onFinish, Panel),
-    schema: Panel,
+    onFinish: finish(onFinish, GeneratedPanel),
+    schema: GeneratedPanel,
     schemaName: "Panel",
     schemaDescription: "A single dashboard panel specification (viz spec, not data).",
     system: baseSystem(source),
