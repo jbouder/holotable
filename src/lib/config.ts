@@ -232,6 +232,16 @@ export const config = {
   oidcAccountUrl: str("OIDC_ACCOUNT_URL", ""),
 
   /**
+   * The realm client an MCP client signs in through (#149): a public (PKCE)
+   * client beside the confidential one the browser uses, whose access tokens
+   * name it in `aud` and `azp`. `/api/mcp` accepts a realm token only when it
+   * was minted for this client, and no other route accepts one at all. Unset
+   * (the default) keeps `/api/mcp` closed, and demo mode refuses it like every
+   * other `OIDC_*` variable.
+   */
+  oidcMcpClientId: str("OIDC_MCP_CLIENT_ID", ""),
+
+  /**
    * How people sign in (#251). `oidc` is Keycloak and the default. `demo` is
    * for evaluation and the public demo only: `/api/auth/login` mints a session
    * for every visitor with no login screen, holding {@link demoGroups}.
@@ -505,6 +515,7 @@ const EnvSchema = z.object({
   OIDC_ACCOUNT_URL: blank(
     httpUrl("the identity provider's account page, e.g. <issuer>/account"),
   ),
+  OIDC_MCP_CLIENT_ID: blank(z.string()),
 
   DEFAULT_REFRESH_INTERVAL_MS: blank(positiveInt),
   MIN_REFRESH_INTERVAL_MS: blank(positiveInt),
@@ -758,6 +769,7 @@ export function validateConfig(
     "OIDC_CLIENT_ID",
     "OIDC_CLIENT_SECRET",
     "OIDC_JWKS_URL",
+    "OIDC_MCP_CLIENT_ID",
   ] as const;
   if (demo) {
     for (const variable of oidcVariables) {
@@ -863,6 +875,27 @@ export function validateConfig(
       warning(
         "OIDC_JWKS_URL",
         `is served from ${jwks.origin} while OIDC_ISSUER is ${issuer.origin}; Keycloak publishes the JWKS under the issuer at /protocol/openid-connect/certs. Check for a copy-paste mismatch.`,
+      );
+    }
+  }
+
+  // --- MCP clients (#149) --------------------------------------------------
+  // The MCP client is a second, public realm client, and `/api/mcp` tells a
+  // token minted for it from one minted for the browser's confidential client
+  // by `aud` and `azp`. The same id for both would make every browser sign-in's
+  // access token a valid MCP credential, and the public client's tokens valid
+  // wherever the confidential client's are checked by audience.
+  if (!demo && values.OIDC_MCP_CLIENT_ID) {
+    if (values.OIDC_MCP_CLIENT_ID === values.OIDC_CLIENT_ID) {
+      error(
+        "OIDC_MCP_CLIENT_ID",
+        `is "${values.OIDC_MCP_CLIENT_ID}", the same as OIDC_CLIENT_ID. Register a separate public client for MCP clients (docs/operations/keycloak, "MCP clients").`,
+      );
+    }
+    if (!production && !(values.OIDC_ISSUER && values.OIDC_JWKS_URL)) {
+      warning(
+        "OIDC_MCP_CLIENT_ID",
+        "is set but OIDC_ISSUER or OIDC_JWKS_URL is not; /api/mcp cannot verify a realm token until both are.",
       );
     }
   }

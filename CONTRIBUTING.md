@@ -361,6 +361,7 @@ request:
 | `src/lib/sql/variables.ts`, `src/lib/variables.ts`, `variable-selection.ts` | `concepts/variables.md` |
 | `src/lib/auth/authorize.ts` (an action or rule in `can()`) | `architecture/authorization.md` (the action matrix), `SECURITY.md` |
 | `src/lib/auth/` sessions, renewal, revocation, share links, API tokens | `architecture/authorization.md`, `operations/share-links.md`, `operations/api-tokens.md`, `SECURITY.md` |
+| `src/lib/auth/mcp-token.ts`, `/api/mcp`, the realm's MCP client | `operations/keycloak.md` ("MCP clients"), `SECURITY.md` |
 | `src/lib/config.ts` (a variable) | The configuration reference is generated; a startup rule goes in `operations/startup-validation.md`, and the variable in `.env.example` |
 | A route under `src/app/api/` | `reference/api-routes.md` (`test/docs-drift.test.ts` fails until it has a row) |
 | `AUDIT_ACTIONS` in `src/lib/audit.ts` | `operations/audit-log.md` (held by the same test) |

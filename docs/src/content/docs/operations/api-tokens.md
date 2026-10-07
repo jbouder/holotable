@@ -52,6 +52,9 @@ curl -fsS -X POST "$HOLOTABLE_URL/api/workspaces/ops/annotations" \
 - **Not a session.** A bearer header that is not a valid token is refused, never
   passed over in favor of a cookie. A token cannot open a dashboard stream, and
   cannot create or revoke tokens.
+- **Also an MCP credential.** `/api/mcp` accepts one in the same header, by its
+  prefix, resolving exactly as above; see
+  [MCP clients](/operations/keycloak/#5-mcp-clients).
 - **Not from a browser page.** A mutation that carries an `Origin` from another
   site is refused before authentication, token or not. A token is for a server
   calling the API, not for JavaScript on a web page.

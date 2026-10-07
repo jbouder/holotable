@@ -129,6 +129,14 @@ Important files:
   on one dashboard and nothing else. Only the stream route and
   `src/app/embed/` accept one, never `getIdentity()`; `test/share.test.ts`
   holds that list. The page gets `sharedSpec()` (no SQL or source ids)
+- `src/lib/auth/mcp-token.ts` — how an MCP client authenticates (#149): the
+  one route that accepts a realm-issued access token is `/api/mcp`, in a
+  bearer header, minted for the public `OIDC_MCP_CLIENT_ID` client (`aud` and
+  `azp`), verified on every request and refused once its `sid` is revoked.
+  The 401 challenge and `/.well-known/oauth-protected-resource` send the
+  client to the realm itself; Holotable mints nothing. `getIdentity()` never
+  reaches it, `verifySessionToken` refuses a token minted for that client,
+  and `test/mcp-auth.test.ts` holds the list of routes that import it
 - `src/lib/auth/authorize.ts` — the central `can()` check
 - `src/lib/auth/renewal.ts` — session renewal (#27): the realm's refresh token
   is sealed in `sessions` (`refresh-token.ts`) and never reaches the browser,

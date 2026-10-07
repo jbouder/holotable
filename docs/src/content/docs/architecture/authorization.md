@@ -73,6 +73,14 @@ A share link (#65) may view one dashboard, through the stream and the embed
 page only, and `can()` checks it before anything else, the admin bypass
 included; see [Share links](/operations/share-links/).
 
+An MCP client (#149) is a person, but not a session: it sends an access token
+the realm minted for a second, public client in `Authorization: Bearer`, and
+only `/api/mcp` reads one, verifying it on every request (keys, issuer,
+expiry, audience and `azp`, access token not id_token, realm session not
+revoked) and parsing its `groups` exactly as a session's. A token minted for
+that client is refused as a session cookie; see
+[MCP clients](/operations/keycloak/#5-mcp-clients).
+
 Either way, only the validated `sub` and `groups` claims are ever trusted for
 authorization. `name` and `email` are carried into the session as display-only
 fields for the account menu and **Settings → Account**; `can()` never reads

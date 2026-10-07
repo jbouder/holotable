@@ -257,6 +257,44 @@ test("development: only the OIDC issuer and client id are called out, as warning
   assert.ok(oidc.every((p) => p.severity === "warning"));
 });
 
+test("OIDC_MCP_CLIENT_ID is a separate public client, and demo mode refuses it (#149)", () => {
+  // Optional: a complete configuration without it has nothing to say.
+  assert.deepEqual(validateConfig(VALID_PRODUCTION, { production: true }), []);
+  assert.deepEqual(
+    validateConfig(
+      { ...VALID_PRODUCTION, OIDC_MCP_CLIENT_ID: "holotable-mcp" },
+      { production: true },
+    ),
+    [],
+  );
+  // The browser client's id would make every sign-in's token an MCP credential.
+  const same = validateConfig(
+    { ...VALID_PRODUCTION, OIDC_MCP_CLIENT_ID: VALID_PRODUCTION.OIDC_CLIENT_ID },
+    { production: true },
+  );
+  assert.deepEqual(variables(errors(same)), ["OIDC_MCP_CLIENT_ID"]);
+  assert.match(same[0].message, /separate public client/);
+  // Like every other realm variable, it has no place beside demo mode.
+  const demo = validateConfig(
+    {
+      SESSION_SECRET: VALID_PRODUCTION.SESSION_SECRET,
+      AUTH_MODE: "demo",
+      OIDC_MCP_CLIENT_ID: "holotable-mcp",
+    },
+    { production: false },
+  );
+  assert.deepEqual(variables(errors(demo)), ["OIDC_MCP_CLIENT_ID"]);
+  // In development, set without a realm to check against is a warning that says so.
+  const alone = validateConfig(
+    { OIDC_MCP_CLIENT_ID: "holotable-mcp" },
+    { production: false },
+  );
+  const mcp = alone.filter((p) => p.variable === "OIDC_MCP_CLIENT_ID");
+  assert.equal(mcp.length, 1);
+  assert.equal(mcp[0].severity, "warning");
+  assert.match(mcp[0].message, /\/api\/mcp cannot verify/);
+});
+
 test("a JWKS URL on a different origin from the issuer is a warning", () => {
   const problems = validateConfig(
     { ...VALID_PRODUCTION, OIDC_JWKS_URL: "https://other.example.com/certs" },
