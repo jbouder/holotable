@@ -1,0 +1,12 @@
+{
+  "name": "api-health",
+  "mode": "dashboard",
+  "catalog": "demo",
+  "prompt": "API health overview: request rate over time, p95 latency over time, and the current 5xx error rate.",
+  "expect": {
+    "tables": ["http_requests"],
+    "plausibleViz": ["line", "area", "bar", "stat", "gauge", "table", "heatmap"],
+    "minPanels": 3,
+    "maxPanels": 10
+  }
+}

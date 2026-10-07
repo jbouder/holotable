@@ -1,0 +1,11 @@
+{
+  "name": "host-resources",
+  "mode": "dashboard",
+  "catalog": "demo",
+  "prompt": "Infrastructure: CPU and memory usage per host over time, and network in/out bytes by region.",
+  "expect": {
+    "tables": ["system_metrics"],
+    "plausibleViz": ["line", "area", "bar", "stat", "gauge", "table", "heatmap"],
+    "minPanels": 2
+  }
+}

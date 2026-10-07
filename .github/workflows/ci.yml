@@ -95,6 +95,28 @@ jobs:
       - name: Validate .env.example
         run: cp .env.example .env && npm run config:check
 
+  eval:
+    name: LLM eval (replay)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: package-lock.json
+
+      - name: Install
+        run: npm ci
+
+      # Grades every case's recorded answer with the current prompt, schema and
+      # SQL guard (#24): no provider, no key, no spend. A failure means a
+      # change made an answer that used to pass fail. The live run against a
+      # real model is eval-nightly.yml, which reports and never gates.
+      - name: Replay the eval corpus
+        run: npm run eval -- --replay
+
   fuzz:
     name: Fuzz the SQL guard
     runs-on: ubuntu-latest

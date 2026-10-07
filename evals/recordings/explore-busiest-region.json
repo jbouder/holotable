@@ -1,0 +1,6 @@
+{
+  "model": "glm-5.3",
+  "recordedAt": "2026-10-06T23:14:09.935Z",
+  "requestDigest": "ef1423e5f924aa7bc3c23ccb92432e323e35f97e603d5ee7184df0c0b97534e2",
+  "text": "{\n\"id\": \"explore\",\n\"title\": \"Average Memory Usage by Region\",\n\"viz\": \"table\",\n\"layout\": {\"x\": 0, \"y\": 0, \"w\": 12, \"h\": 4},\n\"description\": \"Computes the average memory usage percentage per region from system_metrics, ordered from highest to lowest average.\",\n\"query\": {\n\"sourceId\": \"eval-demo\",\n\"sql\": \"SELECT region, AVG(mem_pct) AS avg_mem_pct FROM system_metrics GROUP BY region ORDER BY avg_mem_pct DESC\"\n},\n\"options\": {\n\"columns\": [\n{\"name\": \"region\", \"label\": \"Region\", \"align\": \"left\"},\n{\"name\": \"avg_mem_pct\", \"label\": \"Avg Memory Usage\", \"format\": \"percent\", \"decimals\": 1, \"align\": \"right\"}\n],\n\"sort\": {\"column\": \"avg_mem_pct\", \"order\": \"desc\"}\n}\n}"
+}

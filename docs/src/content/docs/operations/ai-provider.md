@@ -142,6 +142,38 @@ audit row with `attempt: 2`, and a count in `holotable_llm_repairs_total`
 (`outcome` is `repaired` or `failed`; see [Prometheus
 metrics](/operations/metrics/)).
 
+## Measuring generation quality
+
+`npm run eval` runs a fixed corpus of prompts (`evals/corpus/`, one JSON file
+each, against a catalog in `evals/catalogs/`) through the same request the
+generate route makes, and grades each answer
+([#24](https://github.com/jbouder/holotable/issues/24)):
+
+1. it parses against the IR the route binds it to;
+2. every panel's SQL passes the guard, as a save would re-check it;
+3. every `timeField` is a column its query returns;
+4. the case's own expectations hold: which viz kinds are plausible or
+   required, which tables must be read, whether panels are time series, and
+   how many panels there are.
+
+| Command | What it does |
+|---|---|
+| `npm run eval` (`--replay`) | Grades each case's recorded answer in `evals/recordings/`. No provider, no spend, deterministic. CI runs it on every pull request and fails on any case that does not pass. |
+| `npm run eval -- --live` | Asks the provider configured in the environment, as the server would, and reports a pass rate. Never fails the run. The `LLM eval (nightly)` workflow runs it with the `AI_MODEL`, `OPENAI_API_KEY` and `OPENAI_BASE_URL` repository secrets and writes the table to the job summary. |
+| `npm run eval -- --live --record` | The same, writing each answer to `evals/recordings/` so replay grades it from then on. |
+
+`--case <name>` narrows any of them and `--json <file>` writes the results.
+Only a call that finished is recorded; a provider error or a
+[timeout](#timeouts-and-retries) fails the case and leaves the old recording
+in place. A slow model may need a longer `AI_REQUEST_TIMEOUT_MS` to record a
+whole dashboard. The nightly run keeps the default on purpose, because a
+model that cannot finish within it fails for authors too.
+
+A recording keeps a digest of the prompt it answered. When the generation
+prompt changes, replay still grades the old answer but reports it as stale:
+re-record to measure the new prompt. The evals grade a first attempt only; the
+[repair](#structured-output-repair) is not part of the score.
+
 ---
 
 *Last verified against the code at commit `4e4c5cf` (2026-10-05).*

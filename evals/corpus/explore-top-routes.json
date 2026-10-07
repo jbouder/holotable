@@ -1,0 +1,11 @@
+{
+  "name": "explore-top-routes",
+  "mode": "explore",
+  "catalog": "demo",
+  "prompt": "Which 10 routes get the most traffic?",
+  "expect": {
+    "tables": ["http_requests"],
+    "plausibleViz": ["table", "bar"],
+    "timeField": "absent"
+  }
+}

@@ -1,0 +1,6 @@
+{
+  "model": "glm-5.3",
+  "recordedAt": "2026-10-06T23:15:16.627Z",
+  "requestDigest": "aa924b0a1c6e8e026937a233a48eb80a321042d6bbe57103320414db2f599a0b",
+  "text": "{\n\"id\": \"explore\",\n\"title\": \"Top 10 Routes by Request Volume\",\n\"description\": \"Counts the total number of requests per route in http_requests, grouped by route, ranked in descending order and limited to the 10 busiest routes.\",\n\"viz\": \"table\",\n\"layout\": {\"x\": 0, \"y\": 0, \"w\": 12, \"h\": 4},\n\"query\": {\n\"sourceId\": \"eval-demo\",\n\"sql\": \"SELECT route, count(*) AS requests FROM http_requests GROUP BY route ORDER BY requests DESC LIMIT 10\"\n},\n\"options\": {\n\"columns\": [\n{\"name\": \"route\", \"label\": \"Route\"},\n{\"name\": \"requests\", \"label\": \"Requests\", \"format\": \"number\", \"decimals\": 0, \"align\": \"right\"}\n],\n\"sort\": {\"column\": \"requests\", \"order\": \"desc\"}\n}\n}"
+}

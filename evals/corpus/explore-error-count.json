@@ -1,0 +1,11 @@
+{
+  "name": "explore-error-count",
+  "mode": "explore",
+  "catalog": "demo",
+  "prompt": "How many 5xx responses were there?",
+  "expect": {
+    "tables": ["http_requests"],
+    "plausibleViz": ["stat", "table"],
+    "timeField": "absent"
+  }
+}

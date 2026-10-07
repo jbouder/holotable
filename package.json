@@ -23,6 +23,7 @@
     "self-metrics": "tsx scripts/self-metrics.ts",
     "smoke": "tsx scripts/smoke.ts",
     "fixture:capture": "tsx scripts/capture-spec-fixture.ts",
+    "eval": "LOG_LEVEL=silent tsx scripts/eval.ts",
     "e2e": "tsx e2e/prepare.ts && playwright test -c e2e",
     "e2e:down": "docker compose -f e2e/compose.yml down --volumes"
   },

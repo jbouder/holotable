@@ -1,0 +1,383 @@
+import { createHash } from "node:crypto";
+import { readdirSync, readFileSync } from "node:fs";
+import { join } from "node:path";
+import { type LanguageModel, streamObject } from "ai";
+import { z } from "zod";
+import { dashboardRequest, explorePanelRequest } from "@/lib/ai/generate";
+import { describeFailure } from "@/lib/ai/repair";
+import { resolveAndValidateDashboard } from "@/lib/dashboard-service";
+import {
+  Dashboard,
+  declaredVariables,
+  hasQuery,
+  type Panel,
+  SPEC_VERSION,
+} from "@/lib/ir";
+import { PANEL_KINDS } from "@/lib/panels/registry";
+import {
+  type SourceConfig,
+  SourceConfig as SourceConfigSchema,
+  type SourceRecord,
+} from "@/lib/registry";
+import { analyzeSelect } from "@/lib/sql/ast";
+import { selectOutputs, timeFieldWarning } from "@/lib/sql/hints";
+import { validateSql } from "@/lib/sql/safety";
+
+/*
+ * The LLM eval harness (#24): a fixed corpus of prompts, each run through the
+ * same request the app makes, and graded on what the app would do with the
+ * answer.
+ *
+ * Every case is held to four checks:
+ *   1. the output parses against the IR the route binds it to;
+ *   2. every panel's SQL passes the guard against the case's catalog, the way
+ *      a save re-validates it (`resolveAndValidateDashboard`);
+ *   3. a `timeField` is a column the query actually returns;
+ *   4. the case's own expectations: which viz kinds are plausible or required,
+ *      which tables must be read, whether panels are time series.
+ *
+ * Recorded answers make the same grading free and deterministic (`--replay`,
+ * every pull request); a live run against the configured provider measures
+ * the model and the prompt as they are now (`--live`, nightly).
+ */
+
+export const EVALS_DIR = join(process.cwd(), "evals");
+
+const VIZ_KINDS = PANEL_KINDS.map((k) => k.kind) as [string, ...string[]];
+const Viz = z.enum(VIZ_KINDS);
+
+export const EvalCase = z
+  .object({
+    /** Also the file name, `evals/corpus/<name>.json`. */
+    name: z.string().regex(/^[a-z0-9-]+$/),
+    /** Which generation the case runs: a whole dashboard, or one explore panel. */
+    mode: z.enum(["dashboard", "explore"]),
+    /** A catalog in `evals/catalogs/<catalog>.json`: a `SourceConfig`. */
+    catalog: z.string().regex(/^[a-z0-9-]+$/),
+    prompt: z.string().min(1).max(4000),
+    expect: z
+      .object({
+        /** Every query panel's viz must be one of these. */
+        plausibleViz: z.array(Viz).min(1).optional(),
+        /** At least one panel of each of these. */
+        requiredViz: z.array(Viz).min(1).optional(),
+        /** Each table must be read by at least one panel. */
+        tables: z.array(z.string()).min(1).optional(),
+        /** Every query panel sets `query.timeField` (`required`) or none does (`absent`). */
+        timeField: z.enum(["required", "absent"]).optional(),
+        minPanels: z.number().int().positive().optional(),
+        maxPanels: z.number().int().positive().optional(),
+      })
+      .strict(),
+  })
+  .strict();
+export type EvalCase = z.infer<typeof EvalCase>;
+
+/** A model's answer to one case, as it streamed. */
+export const Recording = z
+  .object({
+    /** The model that answered. */
+    model: z.string(),
+    recordedAt: z.string(),
+    /**
+     * A digest of the request (system and user prompt, schema name) the answer
+     * was given to. When the prompt has changed since, the recording still
+     * grades, but it no longer says how the current prompt does.
+     */
+    requestDigest: z.string(),
+    text: z.string(),
+  })
+  .strict();
+export type Recording = z.infer<typeof Recording>;
+
+export interface CaseResult {
+  name: string;
+  ok: boolean;
+  failures: string[];
+  /** Set in replay when the recording was made against a different prompt. */
+  stale?: boolean;
+  /** The raw answer, for recording. */
+  text: string;
+  /**
+   * The model call finished. False for a provider error or a timeout, whose
+   * partial text is not an answer and must never be recorded as one.
+   */
+  completed: boolean;
+  model: string;
+  requestDigest: string;
+}
+
+export function loadCases(dir: string = EVALS_DIR): EvalCase[] {
+  const corpus = join(dir, "corpus");
+  return readdirSync(corpus)
+    .filter((f) => f.endsWith(".json"))
+    .sort()
+    .map((file) => {
+      const parsed = EvalCase.parse(JSON.parse(readFileSync(join(corpus, file), "utf8")));
+      if (`${parsed.name}.json` !== file) {
+        throw new Error(`evals/corpus/${file}: "name" must match the file name`);
+      }
+      return parsed;
+    });
+}
+
+/** The case's catalog as a registered, refreshed source, the way a route sees one. */
+export function loadSource(catalog: string, dir: string = EVALS_DIR): SourceRecord {
+  const config: SourceConfig = SourceConfigSchema.parse(
+    JSON.parse(readFileSync(join(dir, "catalogs", `${catalog}.json`), "utf8")),
+  );
+  const at = "2026-01-01T00:00:00.000Z";
+  return {
+    id: `eval-${catalog}`,
+    workspaceId: "eval",
+    name: catalog,
+    kind: "timescaledb",
+    config,
+    secretRef: "TS_METRICS",
+    catalogRefreshedAt: at,
+    catalogMissingTables: [],
+    createdBy: "eval",
+    createdAt: at,
+    updatedAt: at,
+    tombstonedAt: null,
+  };
+}
+
+export function loadRecording(name: string, dir: string = EVALS_DIR): Recording | null {
+  try {
+    return Recording.parse(
+      JSON.parse(readFileSync(join(dir, "recordings", `${name}.json`), "utf8")),
+    );
+  } catch (err) {
+    if ((err as NodeJS.ErrnoException).code === "ENOENT") return null;
+    throw err;
+  }
+}
+
+/** The request the route would make for this case. */
+export function caseRequest(c: EvalCase, source: SourceRecord) {
+  return c.mode === "dashboard"
+    ? dashboardRequest({ source, prompt: c.prompt })
+    : explorePanelRequest({ source, prompt: c.prompt });
+}
+
+export function requestDigest(request: {
+  system: string;
+  prompt: string;
+  schemaName: string;
+}): string {
+  // The catalog is fenced with a fresh random token on every call
+  // (`fenceUntrustedBlock`); the same prompt must hash the same.
+  const stable = (text: string) =>
+    text.replace(/(===== (?:BEGIN|END) [A-Z_]+ )[0-9a-f]{32}( =====)/g, "$1<token>$2");
+  return createHash("sha256")
+    .update(`${request.schemaName}\n${stable(request.system)}\n${stable(request.prompt)}`)
+    .digest("hex");
+}
+
+/**
+ * A model that answers with `text`, streamed in a few pieces, as a recording
+ * plays back. It reports the recorded model's id.
+ */
+export function replayModel(recording: Recording): LanguageModel {
+  type V4 = Extract<LanguageModel, { specificationVersion: "v4" }>;
+  type Part =
+    Awaited<ReturnType<V4["doStream"]>>["stream"] extends ReadableStream<infer P>
+      ? P
+      : never;
+  const usage = {
+    inputTokens: { total: 0, noCache: 0, cacheRead: 0, cacheWrite: 0 },
+    outputTokens: { total: 0, text: 0, reasoning: 0 },
+  };
+  const model: V4 = {
+    specificationVersion: "v4",
+    provider: "replay",
+    modelId: recording.model,
+    supportedUrls: {},
+    doGenerate: () => Promise.reject(new Error("replay supports streaming only")),
+    async doStream() {
+      const { text } = recording;
+      const size = Math.max(1, Math.ceil(text.length / 4));
+      const parts: Part[] = [
+        { type: "stream-start", warnings: [] },
+        {
+          type: "response-metadata",
+          id: "replay",
+          modelId: recording.model,
+          timestamp: new Date(0),
+        },
+        { type: "text-start", id: "t" },
+      ];
+      for (let i = 0; i < text.length; i += size) {
+        parts.push({ type: "text-delta", id: "t", delta: text.slice(i, i + size) });
+      }
+      parts.push(
+        { type: "text-end", id: "t" },
+        { type: "finish", finishReason: { unified: "stop", raw: "stop" }, usage },
+      );
+      return {
+        stream: new ReadableStream<Part>({
+          start(controller) {
+            for (const part of parts) controller.enqueue(part);
+            controller.close();
+          },
+        }),
+      };
+    },
+  };
+  return model;
+}
+
+/** Run one case against `model` and grade the answer. */
+export async function runCase(
+  c: EvalCase,
+  source: SourceRecord,
+  model: LanguageModel,
+): Promise<CaseResult> {
+  const request = caseRequest(c, source);
+  const digest = requestDigest(request);
+  let modelId = "";
+  // A failed provider call arrives here and nowhere else: the SDK never
+  // settles `result.object` for it, so awaiting that would hang the run.
+  let streamError: unknown;
+  const settings = {
+    model,
+    maxRetries: 0,
+    onFinish: (event: { response: { modelId?: string } }) => {
+      modelId = event.response.modelId ?? "";
+    },
+    onError: ({ error }: { error: unknown }) => {
+      streamError ??= error;
+    },
+  };
+  // One call per mode: `streamObject` infers its output from the schema, and
+  // a union of the two requests has no single schema to infer from.
+  const result =
+    c.mode === "dashboard"
+      ? streamObject({ ...settings, ...(request as ReturnType<typeof dashboardRequest>) })
+      : streamObject({
+          ...settings,
+          ...(request as ReturnType<typeof explorePanelRequest>),
+        });
+  let text = "";
+  for await (const delta of result.textStream) text += delta;
+  let object: unknown;
+  let error: unknown = streamError;
+  if (streamError === undefined) {
+    try {
+      object = await result.object;
+    } catch (err) {
+      error = err;
+    }
+  }
+  const failures =
+    object === undefined
+      ? [schemaFailure(error, request.schema)]
+      : await grade(c, source, object as GradedOutput);
+  return {
+    name: c.name,
+    ok: failures.length === 0,
+    failures,
+    text,
+    model: modelId,
+    completed: streamError === undefined,
+    requestDigest: digest,
+  };
+}
+
+function schemaFailure(error: unknown, schema: z.ZodType): string {
+  const failure = describeFailure(error, schema);
+  if (failure) return `does not match the schema: ${failure.issues.join("; ")}`;
+  return `no output: ${error instanceof Error ? error.message : String(error)}`;
+}
+
+/** A generated dashboard (without `specVersion`), or one explore panel. */
+type GradedOutput = { panels: Panel[] } | Panel;
+
+/** Checks 2–4 on output that already parsed. Returns the failures, if any. */
+export async function grade(
+  c: EvalCase,
+  source: SourceRecord,
+  output: GradedOutput,
+): Promise<string[]> {
+  const failures: string[] = [];
+  const panels = "panels" in output ? output.panels : [output];
+  const queried = panels.filter(hasQuery);
+
+  // 2. The guard, as a save would run it.
+  if ("panels" in output) {
+    try {
+      const spec = Dashboard.parse({ ...output, specVersion: SPEC_VERSION });
+      await resolveAndValidateDashboard(spec, async (id) =>
+        id === source.id ? source : null,
+      );
+    } catch (err) {
+      failures.push(
+        `rejected on save: ${err instanceof Error ? err.message : String(err)}`,
+      );
+    }
+  } else {
+    for (const panel of queried) {
+      if (panel.query.sourceId !== source.id) {
+        failures.push(`panel "${panel.id}" names source "${panel.query.sourceId}"`);
+      }
+      const check = await validateSql(
+        panel.query.sql,
+        source.config,
+        declaredVariables({}),
+      );
+      if (!check.ok) failures.push(`panel "${panel.id}": ${check.error}`);
+    }
+  }
+
+  // 3. The time field is a column the query returns.
+  for (const panel of queried) {
+    const warning = timeFieldWarning(
+      panel.query.timeField,
+      selectOutputs(panel.query.sql),
+    );
+    if (warning) failures.push(`panel "${panel.id}": ${warning}`);
+  }
+
+  // 4. The case's expectations.
+  const { expect } = c;
+  if (expect.plausibleViz) {
+    for (const panel of queried) {
+      if (!expect.plausibleViz.includes(panel.viz)) {
+        failures.push(
+          `panel "${panel.id}" is a ${panel.viz}; expected one of ${expect.plausibleViz.join(", ")}`,
+        );
+      }
+    }
+  }
+  for (const viz of expect.requiredViz ?? []) {
+    if (!panels.some((p) => p.viz === viz)) failures.push(`no ${viz} panel`);
+  }
+  if (expect.tables) {
+    const read = new Set<string>();
+    for (const panel of queried) {
+      const analyzed = await analyzeSelect(panel.query.sql);
+      if (analyzed.ok) for (const t of analyzed.analysis.tables) read.add(t.name);
+    }
+    for (const table of expect.tables) {
+      if (!read.has(table)) failures.push(`no panel reads ${table}`);
+    }
+  }
+  if (expect.timeField) {
+    for (const panel of queried) {
+      const has = panel.query.timeField !== undefined;
+      if (expect.timeField === "required" && !has) {
+        failures.push(`panel "${panel.id}" has no timeField`);
+      } else if (expect.timeField === "absent" && has) {
+        failures.push(`panel "${panel.id}" sets timeField "${panel.query.timeField}"`);
+      }
+    }
+  }
+  if (expect.minPanels !== undefined && panels.length < expect.minPanels) {
+    failures.push(`${panels.length} panels; expected at least ${expect.minPanels}`);
+  }
+  if (expect.maxPanels !== undefined && panels.length > expect.maxPanels) {
+    failures.push(`${panels.length} panels; expected at most ${expect.maxPanels}`);
+  }
+  return failures;
+}

@@ -1,0 +1,11 @@
+{
+  "name": "status-breakdown",
+  "mode": "dashboard",
+  "catalog": "demo",
+  "prompt": "Show the share of responses by HTTP status class (2xx, 3xx, 4xx, 5xx) and how many requests each service handled.",
+  "expect": {
+    "tables": ["http_requests"],
+    "plausibleViz": ["pie", "donut", "bar", "table", "stat"],
+    "minPanels": 2
+  }
+}

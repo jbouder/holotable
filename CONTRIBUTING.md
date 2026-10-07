@@ -171,6 +171,19 @@ required to merge. If it fails, the output has the exact statement and a
 `test/fixtures/sql-fuzz-corpus.ts` with the verdict it should have, and a named
 test explaining why.
 
+`npm run eval` grades generation quality against a fixed corpus of prompts
+(`evals/corpus/`): each recorded answer must parse against the IR, pass the
+SQL guard against the case's catalog, name a `timeField` its query returns,
+and meet the case's own expectations (plausible viz kinds, tables read). CI
+replays the recordings on every pull request, which costs nothing, so a change
+to the prompt, the IR or the guard that breaks an answer that used to pass
+fails there. A nightly workflow runs the same corpus against a real model and
+publishes a pass rate without gating anything. To add a case, write
+`evals/corpus/<name>.json` and record the model's answer with
+`npm run eval -- --live --record --case <name>`, which uses your `.env`
+provider. When you change the generation prompt, re-record: replay says
+"stale recording" for answers given to an older prompt.
+
 Three notes on the less obvious ones:
 
 - `npm run lint` is [Biome](https://biomejs.dev) — linter *and* formatter in one

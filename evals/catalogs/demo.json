@@ -1,0 +1,35 @@
+{
+  "host": "localhost",
+  "port": 5432,
+  "database": "holotable",
+  "schema": "metrics",
+  "ssl": false,
+  "tables": [
+    {
+      "name": "http_requests",
+      "timeField": "ts",
+      "columns": [
+        { "name": "ts", "type": "timestamp with time zone" },
+        { "name": "service", "type": "text" },
+        { "name": "route", "type": "text" },
+        { "name": "status", "type": "smallint" },
+        { "name": "duration_ms", "type": "double precision" },
+        { "name": "bytes", "type": "bigint" }
+      ]
+    },
+    {
+      "name": "system_metrics",
+      "timeField": "ts",
+      "columns": [
+        { "name": "ts", "type": "timestamp with time zone" },
+        { "name": "host", "type": "text" },
+        { "name": "region", "type": "text" },
+        { "name": "cpu_pct", "type": "double precision" },
+        { "name": "mem_pct", "type": "double precision" },
+        { "name": "disk_pct", "type": "double precision" },
+        { "name": "net_in_bytes", "type": "bigint" },
+        { "name": "net_out_bytes", "type": "bigint" }
+      ]
+    }
+  ]
+}

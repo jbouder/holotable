@@ -1,0 +1,6 @@
+{
+  "model": "glm-5.3",
+  "recordedAt": "2026-10-06T23:14:41.424Z",
+  "requestDigest": "914b80e05305f35f6d1c4098ce37e901355893bcb5b4a8d1c9dc1c23ae1526c9",
+  "text": "{\n\"layout\": {\"x\":0,\"y\":0,\"w\":12,\"h\":4},\n\"id\": \"explore\",\n\"title\": \"Response Bytes Share by Service\",\n\"description\": \"Each service's proportion of total response bytes, computed by summing the bytes column per service.\",\n\"viz\": \"pie\",\n\"format\": \"bytes\",\n\"query\": {\n\"sourceId\": \"eval-demo\",\n\"sql\": \"SELECT service, SUM(bytes) AS bytes_served FROM http_requests GROUP BY service ORDER BY bytes_served DESC\"\n},\n\"options\": {\n\"legend\": \"right\",\n\"compact\": true\n}\n}"
+}
