@@ -8,7 +8,6 @@ import {
   Database,
   History,
   LayoutTemplate,
-  Lightbulb,
   Loader2,
   Lock,
   RefreshCw,
@@ -16,7 +15,6 @@ import {
   Save,
   SendHorizontal,
   Square,
-  Trash2,
 } from "lucide-react";
 import { type Dashboard, DashboardGenerationSchema, safeParseDashboard } from "@/lib/ir";
 import {
@@ -28,7 +26,7 @@ import {
   restoreTurn,
   type TurnHistory,
 } from "@/lib/dashboard-turns";
-import { usePromptHistory } from "@/components/prompt-history";
+import { PromptHistoryMenu, usePromptHistory } from "@/components/prompt-history";
 import { PROMPT_MAX_LENGTH, promptLabel } from "@/lib/prompt-history";
 import { browserStorage } from "@/lib/browser-storage";
 import { Button } from "@/components/ui/button";
@@ -91,9 +89,10 @@ interface SourceOption {
  * across the top of the page above it, and Save is the one primary action.
  *
  * The composer is one line for the whole conversation: the source it reads (a
- * chip, defaulted to the last one used here), the prompt, and the Ideas menu,
- * which holds the source's starters, recent prompts and templates. It stays
- * put after the first prompt, so a follow-up is typed where the first one was.
+ * chip, defaulted to the last one used here), then the prompt. On a fresh
+ * screen the source's starters, a template and recent prompts sit under it;
+ * they go once a generation starts. The bar stays put after the first prompt,
+ * so a follow-up is typed where the first one was.
  * The versions, Try again, View JSON and Save sit in the canvas's header, next
  * to the dashboard they act on.
  */
@@ -160,7 +159,7 @@ export function NewDashboardClient({
   // change with the source and never describe a table this source cannot read.
   const starters = source?.starters ?? [];
 
-  // Recent prompts for this workspace, offered back from the Ideas menu (#83).
+  // Recent prompts for this workspace, offered back on a fresh screen (#83).
   // Per workspace because a prompt names that workspace's tables; the list
   // lives in `localStorage` and is never sent anywhere — the durable, redacted
   // record of what was asked is the generation log (#23).
@@ -371,7 +370,7 @@ export function NewDashboardClient({
 
       {/*
         The composer, across the top for the whole conversation: the source it
-        reads, one line to say what to build or what to change, and Ideas.
+        reads, then one line to say what to build or what to change.
       */}
       <section aria-label="Prompt" className="space-y-3">
         <form
@@ -440,59 +439,37 @@ export function NewDashboardClient({
               </Button>
             )}
           </div>
-          <Menu
-            label="Ideas: suggestions, recent prompts and templates"
-            className="h-10 w-auto gap-1.5 border border-border bg-surface px-3 text-sm text-foreground"
-            panelClassName="max-w-md"
-            trigger={
-              <>
-                <Lightbulb className="h-4 w-4" aria-hidden /> Ideas
-              </>
-            }
-          >
-            {starters.length > 0 && (
-              <MenuGroup label="Suggestions">
-                {starters.map((preset) => (
-                  <MenuItem
-                    key={preset}
-                    disabled={isLoading}
-                    onClick={() => setPrompt(preset)}
-                  >
-                    <span className="truncate" title={preset}>
-                      {preset}
-                    </span>
-                  </MenuItem>
-                ))}
-              </MenuGroup>
-            )}
-            {prompts.entries.length > 0 && (
-              <>
-                {starters.length > 0 && <MenuSeparator />}
-                <MenuGroup label="Recent prompts">
-                  {prompts.entries.map((entry) => (
-                    <MenuItem
-                      key={entry.prompt}
-                      disabled={isLoading}
-                      onClick={() => setPrompt(entry.prompt)}
-                    >
-                      <span className="truncate" title={entry.prompt}>
-                        {promptLabel(entry.prompt)}
-                      </span>
-                    </MenuItem>
-                  ))}
-                  <MenuItem onClick={prompts.clear}>
-                    <Trash2 className="h-4 w-4" /> Clear recent prompts
-                  </MenuItem>
-                </MenuGroup>
-              </>
-            )}
-            {(starters.length > 0 || prompts.entries.length > 0) && <MenuSeparator />}
-            {/* A template starts a conversation; it cannot join one. */}
-            <MenuItem disabled={refining || isLoading} onClick={() => setPicking(true)}>
-              <LayoutTemplate className="h-4 w-4" /> Start from a template…
-            </MenuItem>
-          </Menu>
         </form>
+        {/*
+          Where to start, on a fresh screen only: the source's starters, a
+          template, and this workspace's recent prompts. A pick fills the box
+          rather than sending. Gone once a generation starts, since none of
+          them is a follow-up.
+        */}
+        {!refining && !isLoading && (
+          <div className="flex flex-wrap items-center gap-2">
+            {starters.map((preset) => (
+              <button
+                key={preset}
+                type="button"
+                disabled={aiUnavailable !== null}
+                onClick={() => setPrompt(preset)}
+                className="border border-border bg-surface px-3 py-1 text-left text-xs text-muted transition-colors hover:border-primary hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {preset}
+              </button>
+            ))}
+            <button
+              type="button"
+              onClick={() => setPicking(true)}
+              className="inline-flex items-center gap-1.5 border border-dashed border-border px-3 py-1 text-xs text-muted transition-colors hover:border-primary hover:text-foreground"
+            >
+              <LayoutTemplate className="h-3.5 w-3.5" aria-hidden /> Start from a
+              template…
+            </button>
+            <PromptHistoryMenu history={prompts} onPick={setPrompt} />
+          </div>
+        )}
         {model && (
           <p className="text-xs text-muted">
             Generates with <span className="text-foreground">{model}</span>. Enter sends.

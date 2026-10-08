@@ -205,12 +205,12 @@ once the first turn lands, because every panel's `query.sourceId` must match
 the source the spec was generated against: the source chip shows a lock, and
 picking another source there asks to start over rather than being refused.
 
-The page is laid out around that loop: the preview (or its streaming skeleton)
-is the main surface, and the conversation — the versions so far and the prompt
-box — sits beside it, or under it on a narrow screen. Before the first prompt
-the only controls on screen are the prompt box, the source chip and an
-**Ideas** menu holding the starters, recent prompts and templates. The raw spec
-is behind **View JSON**.
+The page is laid out around that loop: a single-line prompt bar runs across
+the top, with the source chip at its start, and the preview (or its streaming
+skeleton) fills the page under it. Before the first prompt, the starters, a
+template and recent prompts sit under the bar; after it, the **Version** menu,
+**Try again**, **View JSON** (the raw spec) and **Save dashboard** sit above the
+preview.
 
 ## Asking again, and remembering what you asked
 
@@ -231,7 +231,8 @@ asking again is visible; a version applied from a template says *no model
 call*, because none was made.
 
 **Recent prompts.** The prompt box keeps the last few prompts per workspace and
-offers them back (on `/dashboards/new`, under **Ideas**); choosing one fills
+offers them back (on `/dashboards/new`, under the bar on a fresh screen);
+choosing one fills
 the box rather than submitting, so re-use and edit are the same gesture. The create box, the panel
 editor's NL edit and Explore keep separate lists — "make it a bar chart" is a
 panel edit and is nonsense as a dashboard description.
