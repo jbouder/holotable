@@ -9,9 +9,10 @@ import { SessionKeepalive } from "@/components/session-keepalive";
 import { config } from "@/lib/config";
 import { getIdentity } from "@/lib/auth/authorize";
 import { tokenExpiry } from "@/lib/auth/session";
-import { timeDisplayOf } from "@/lib/preferences";
+import { historyOf, KEEP_ALL_HISTORY, timeDisplayOf } from "@/lib/preferences";
 import { requestPreferences } from "@/lib/preferences-server";
 import { LOCAL_TIME_DISPLAY } from "@/lib/time-display";
+import { HistoryPreferencesProvider } from "@/components/history-preferences";
 import { TimeDisplayProvider } from "@/components/time-display";
 import { EMBED_REQUEST_HEADER, NONCE_REQUEST_HEADER } from "@/lib/security-headers";
 import { BOOTSTRAP_SCRIPT } from "@/lib/bootstrap";
@@ -65,9 +66,10 @@ export default async function RootLayout({
       : null;
   // How this person wants times shown (#214). Signed out it is browser-local;
   // a database that does not answer yields the same, never an error page.
-  const timeDisplay = identity
-    ? timeDisplayOf(await requestPreferences(identity))
-    : LOCAL_TIME_DISPLAY;
+  const prefs = identity ? await requestPreferences(identity) : null;
+  const timeDisplay = prefs ? timeDisplayOf(prefs) : LOCAL_TIME_DISPLAY;
+  // Which recents this browser may keep (signed out, nothing records anyway).
+  const history = prefs ? historyOf(prefs) : KEEP_ALL_HISTORY;
   return (
     <html
       lang="en"
@@ -101,32 +103,34 @@ export default async function RootLayout({
             <main className="flex-1 p-3 sm:p-4">{children}</main>
           </TimeDisplayProvider>
         ) : (
-          <TimeDisplayProvider value={timeDisplay}>
-            {/*
-              The first stop for a keyboard (#77): past the navigation, straight
-              to the page. Visible only while it has focus. `main` takes focus
-              from it (tabIndex -1) so the next Tab continues from there.
-            */}
-            <a
-              href="#main"
-              className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-3 focus:z-50 focus:bg-surface focus:px-3 focus:py-2 focus:text-sm focus:outline-2 focus:outline-primary"
-            >
-              Skip to content
-            </a>
-            <NavBar account={account} />
-            {config.authMode === "demo" && <DemoBanner />}
-            {sessionExpiresAt !== null && (
-              <SessionKeepalive expiresAt={sessionExpiresAt} />
-            )}
-            <main
-              id="main"
-              tabIndex={-1}
-              className="flex flex-1 flex-col px-4 py-6 outline-none sm:px-6"
-            >
-              {children}
-            </main>
-            {signedIn && <CommandPalette />}
-          </TimeDisplayProvider>
+          <HistoryPreferencesProvider value={history}>
+            <TimeDisplayProvider value={timeDisplay}>
+              {/*
+                The first stop for a keyboard (#77): past the navigation, straight
+                to the page. Visible only while it has focus. `main` takes focus
+                from it (tabIndex -1) so the next Tab continues from there.
+              */}
+              <a
+                href="#main"
+                className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-3 focus:z-50 focus:bg-surface focus:px-3 focus:py-2 focus:text-sm focus:outline-2 focus:outline-primary"
+              >
+                Skip to content
+              </a>
+              <NavBar account={account} />
+              {config.authMode === "demo" && <DemoBanner />}
+              {sessionExpiresAt !== null && (
+                <SessionKeepalive expiresAt={sessionExpiresAt} />
+              )}
+              <main
+                id="main"
+                tabIndex={-1}
+                className="flex flex-1 flex-col px-4 py-6 outline-none sm:px-6"
+              >
+                {children}
+              </main>
+              {signedIn && <CommandPalette />}
+            </TimeDisplayProvider>
+          </HistoryPreferencesProvider>
         )}
       </body>
     </html>

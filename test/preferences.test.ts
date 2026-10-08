@@ -4,6 +4,9 @@ import { HttpError } from "@/lib/auth/authorize";
 import { parseGroups } from "@/lib/auth/claims";
 import {
   DEFAULT_PREFERENCES,
+  exploreDefaultsOf,
+  historyOf,
+  historyTurnedOff,
   parsePreferences,
   parsePreferencesPatch,
   startDashboardId,
@@ -165,4 +168,52 @@ test("the start page resolves, and a vanished or unreadable dashboard falls back
     await startHref(viewer, start, failing),
     "/dashboards?notice=start-unavailable",
   );
+});
+
+test("history and Explore defaults: on and as before unless the person says otherwise", () => {
+  const prefs = parsePreferences(null);
+  assert.deepEqual(historyOf(prefs), {
+    prompts: true,
+    recentDashboards: true,
+    paletteHistory: true,
+  });
+  assert.deepEqual(exploreDefaultsOf(prefs), {
+    timeRange: "now-24h",
+    refreshMs: 0,
+    startView: "model",
+    keepSession: false,
+  });
+});
+
+test("history and Explore fields validate like the rest, and turning recents off names the stores", () => {
+  const ok = parsePreferencesPatch({
+    rememberPrompts: false,
+    rememberPaletteHistory: true,
+    exploreTimeRange: "now-7d",
+    exploreRefreshMs: 60_000,
+    exploreStartView: "table",
+    exploreKeepSession: true,
+  });
+  assert.equal(ok.ok, true);
+  if (ok.ok) assert.deepEqual(historyTurnedOff(ok.patch), ["prompts"]);
+  assert.deepEqual(
+    historyTurnedOff({ rememberRecentDashboards: false, rememberPaletteHistory: false }),
+    ["recent-dashboards", "palette-recents"],
+  );
+
+  // Only the ranges and refresh rates Explore offers.
+  for (const [field, value] of [
+    ["exploreTimeRange", "now-3y"],
+    ["exploreRefreshMs", 1000],
+    ["exploreStartView", "pie"],
+    ["rememberPrompts", "no"],
+  ] as const) {
+    const bad = parsePreferencesPatch({ [field]: value });
+    assert.equal(bad.ok, false, field);
+    if (!bad.ok) assert.equal(bad.field, field);
+  }
+  // A stored value that no longer parses falls back alone.
+  const stored = parsePreferences({ exploreRefreshMs: 7, rememberPrompts: false });
+  assert.equal(stored.exploreRefreshMs, 0);
+  assert.equal(stored.rememberPrompts, false);
 });

@@ -1,4 +1,5 @@
 import type { BrowserStorage } from "@/lib/browser-storage";
+import { EXPLORE_SESSION_KEY } from "@/lib/explore-session-store";
 import { clearRecents, parseRecents, RECENTS_STORAGE_KEY } from "@/lib/command-palette";
 import { clearRecent, readRecent, RECENT_KEY } from "@/lib/dashboard-list";
 import { DEMO_BANNER_KEY } from "@/lib/demo-banner";
@@ -128,6 +129,11 @@ export const LOCAL_STORAGE_EXCLUSIONS: readonly { key: KeyMatch; reason: string 
     key: { exact: RESUME_ATTEMPT_KEY },
     reason:
       "Session storage: stops the sign-in page retrying a silent renewal in a loop. Gone with the tab.",
+  },
+  {
+    key: { exact: EXPLORE_SESSION_KEY },
+    reason:
+      "Session storage: Explore's questions in this tab, kept across a reload only while Preferences says so. Never rows; cleared by Start over and gone with the tab.",
   },
 ];
 

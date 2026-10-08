@@ -5,6 +5,7 @@ import Link from "next/link";
 import { History } from "lucide-react";
 import { readRecent } from "@/lib/dashboard-list";
 import type { DashboardSummary } from "@/lib/dashboard-metadata";
+import { useHistoryPreferences } from "@/components/history-preferences";
 
 /**
  * The dashboards this browser opened most recently, newest first.
@@ -16,12 +17,18 @@ import type { DashboardSummary } from "@/lib/dashboard-metadata";
  * workspace they have since left, comes back missing and is dropped.
  *
  * It renders nothing at all until it has something to show, so a first-time
- * reader never sees an empty "Recent" heading.
+ * reader never sees an empty "Recent" heading, nor one with the row turned
+ * off in Preferences.
  */
 export function RecentDashboards() {
+  const { recentDashboards: enabled } = useHistoryPreferences();
   const [recent, setRecent] = React.useState<DashboardSummary[]>([]);
 
   React.useEffect(() => {
+    if (!enabled) {
+      setRecent([]);
+      return;
+    }
     const ids = readRecent(window.localStorage);
     if (ids.length === 0) return;
 
@@ -50,9 +57,9 @@ export function RecentDashboards() {
     })();
 
     return () => controller.abort();
-  }, []);
+  }, [enabled]);
 
-  if (recent.length === 0) return null;
+  if (!enabled || recent.length === 0) return null;
 
   return (
     <section className="mb-6">
