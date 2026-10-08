@@ -7,7 +7,6 @@ import {
   ArrowUpRight,
   Clock,
   Columns3,
-  Compass,
   Copy,
   Download,
   Filter,
@@ -42,6 +41,7 @@ import {
   MenuRadioItem,
 } from "@/components/ui/menu";
 import { COMPOSER_CHIP_CLASS, SourceChipLabel } from "@/components/composer-chip";
+import { CanvasPlaceholder, ComposingStatus } from "@/components/composing";
 import { AccessibleChart } from "@/components/charts/AccessibleChart";
 import type { PanelData } from "@/components/charts/options";
 import { panelRenderer } from "@/components/panels/registry";
@@ -488,7 +488,7 @@ export function ExploreClient({
   const savingEntry = session.entries.find((e) => e.id === savingId);
 
   return (
-    <div className="w-full space-y-6">
+    <div className="flex w-full flex-1 flex-col space-y-6">
       {header}
 
       {/* The composer: the source asked of, and one line to ask in. */}
@@ -604,7 +604,17 @@ export function ExploreClient({
         )}
       </section>
 
-      {(session.entries.length > 0 || isLoading) && (
+      {session.entries.length === 0 ? (
+        // Before the first answer: where it will appear, then the first one
+        // being written.
+        <CanvasPlaceholder>
+          {isLoading ? (
+            <ComposingStatus what="a query" title={object?.title} />
+          ) : (
+            "Your answer appears here, with live rows from the source you picked."
+          )}
+        </CanvasPlaceholder>
+      ) : (
         <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-[minmax(0,1fr)_18rem]">
           <div
             className={cn(
@@ -613,9 +623,8 @@ export function ExploreClient({
             )}
           >
             {isLoading && (
-              <div className="flex items-center gap-2 text-sm text-muted xl:col-span-2">
-                <Compass className="h-4 w-4 animate-pulse" />
-                {object?.title ? `Composing “${object.title}”…` : "Composing a query…"}
+              <div className="xl:col-span-2">
+                <ComposingStatus what="a query" title={object?.title} />
               </div>
             )}
             {visible.map((e) => (

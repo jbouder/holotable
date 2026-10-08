@@ -7,7 +7,10 @@ import type * as React from "react";
  * outside this, and holds still. There is no exit: the old page is gone
  * before the new one mounts, and animating that needs the View Transitions
  * integration, which is experimental in Next 16 and deliberately not on.
+ *
+ * It is a flex column filling `main`, so a page whose root is `flex-1` can
+ * give one box the rest of the viewport (the generation canvases' placeholder).
  */
 export default function Template({ children }: { children: React.ReactNode }) {
-  return <div className="page">{children}</div>;
+  return <div className="page flex flex-1 flex-col">{children}</div>;
 }

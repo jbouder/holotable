@@ -195,7 +195,7 @@ export function SourcesClient({
 
   if (workspaces.length === 0) {
     return (
-      <div className="mx-auto max-w-2xl">
+      <div className="mx-auto w-full max-w-2xl">
         <Card>
           <CardContent className="text-sm text-muted">
             You need a role in a workspace to see its data sources.
