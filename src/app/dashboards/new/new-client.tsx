@@ -7,7 +7,6 @@ import {
   Braces,
   History,
   LayoutTemplate,
-  Loader2,
   RefreshCw,
   RotateCcw,
   Save,
@@ -51,10 +50,10 @@ import {
   toggleSource,
   writeLastSource,
 } from "@/lib/source-selection";
-import { Card, CardContent } from "@/components/ui/card";
 import { PageHeader } from "@/components/ui/page-header";
 import { PreviewDashboard } from "@/components/dashboard/PreviewDashboard";
-import { GeneratingPanels } from "@/components/dashboard/GeneratingPanels";
+import { CanvasPlaceholder, ComposingStatus } from "@/components/composing";
+import { cn } from "@/lib/utils";
 import { SaveDashboardDialog } from "@/components/dashboard/SaveDashboardDialog";
 import { ErrorDisplay } from "@/components/ui/error-display";
 import { RepairingNote } from "@/components/repairing-note";
@@ -376,8 +375,15 @@ export function NewDashboardClient({
 
   const pendingSource = sources.find((s) => s.id === pendingSourceId);
 
+  // How far the stream has got, beside the title while it is written.
+  const streamed = (object?.panels ?? []).filter((panel) => panel?.title).length;
+  const panelsSoFar =
+    streamed > 0
+      ? `${streamed} ${streamed === 1 ? "panel" : "panels"} so far`
+      : undefined;
+
   return (
-    <div className="space-y-6">
+    <div className="flex flex-1 flex-col space-y-6">
       <PageHeader
         title="New dashboard"
         badge={model && <Badge title="Generation model">{model}</Badge>}
@@ -521,23 +527,31 @@ export function NewDashboardClient({
       </section>
 
       {/*
-        The canvas. While a turn streams it is the panel-shaped skeleton that
-        fills in as titles arrive (#72); once a turn lands it is that turn's
-        live preview, with the versions and Save above it.
+        The canvas. Before the first version, a placeholder filling the page,
+        which holds the composing status while that version is written. After
+        it, the version's live preview with the versions and Save above it; a
+        refinement being written keeps it on screen, dimmed and inert, under
+        the same status line Explore shows.
       */}
-      <section aria-label="Dashboard preview" className="min-w-0 space-y-4">
-        {isLoading ? (
-          <Card className="fade-in">
-            <CardContent className="space-y-4">
-              <h2 className="flex items-center gap-2 text-lg font-semibold">
-                <Loader2 className="h-4 w-4 animate-spin" />
-                <span>{object?.title || "Generating…"}</span>
-              </h2>
-              <GeneratingPanels panels={object?.panels} />
-            </CardContent>
-          </Card>
-        ) : finalSpec ? (
-          <div className="fade-in space-y-4">
+      <section
+        aria-label="Dashboard preview"
+        className={cn("min-w-0 space-y-4", !finalSpec && "flex flex-1 flex-col")}
+      >
+        {isLoading && finalSpec && (
+          <ComposingStatus
+            what="a dashboard"
+            title={object?.title}
+            detail={panelsSoFar}
+          />
+        )}
+        {finalSpec ? (
+          <div
+            inert={isLoading}
+            className={cn(
+              "fade-in space-y-4 transition-opacity duration-(--duration-base) ease-standard",
+              isLoading && "opacity-50",
+            )}
+          >
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div className="min-w-0">
                 <h2 className="truncate text-lg font-semibold">{finalSpec.title}</h2>
@@ -651,10 +665,17 @@ export function NewDashboardClient({
             <PreviewDashboard spec={finalSpec} />
           </div>
         ) : (
-          <div className="hidden min-h-80 items-center justify-center border border-dashed border-border p-8 text-center text-sm text-muted sm:flex">
-            Your dashboard appears here as it is generated, with live data from the source
-            you picked.
-          </div>
+          <CanvasPlaceholder>
+            {isLoading ? (
+              <ComposingStatus
+                what="a dashboard"
+                title={object?.title}
+                detail={panelsSoFar}
+              />
+            ) : (
+              "Your dashboard appears here as it is generated, with live data from the source you picked."
+            )}
+          </CanvasPlaceholder>
         )}
       </section>
 

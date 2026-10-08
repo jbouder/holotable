@@ -206,8 +206,11 @@ the source the spec was generated against: the source chip shows a lock, and
 picking another source there asks to start over rather than being refused.
 
 The page is laid out around that loop: a single-line prompt bar runs across
-the top, with the source chip at its start, and the preview (or its streaming
-skeleton) fills the page under it. Before the first prompt, a few starters sit
+the top, with the source chip at its start, and the preview fills the page
+under it. Before there is one, a placeholder takes that space; while a version
+is written, one line says what is being composed (the same line Explore shows),
+and a refinement keeps the current preview on screen, dimmed, until the next
+version lands. Before the first prompt, a few starters sit
 under the bar, and **Start from a template…** and recent prompts sit on the
 right of the page title; after it, the **Version** menu, **Try again**, **View
 JSON** (the raw spec) and **Save dashboard** sit above the preview.

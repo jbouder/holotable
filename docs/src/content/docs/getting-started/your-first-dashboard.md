@@ -109,8 +109,9 @@ broad:
 > Request volume over time and the five slowest routes, plus a stat panel with
 > the total error count
 
-Press Enter. The dashboard takes shape under the prompt bar as the spec
-streams in, then runs its queries against your source. Follow-ups, typed into
+Press Enter. While the spec streams in, the space under the prompt bar says
+what is being composed, by title and panel count; then the dashboard appears
+there and runs its queries against your source. Follow-ups, typed into
 the same bar, refine it — "make the third one a bar chart", "add a 95th
 percentile line" — and each one is a single model call that returns the whole
 dashboard again. **Try again** asks for a different answer to the version you

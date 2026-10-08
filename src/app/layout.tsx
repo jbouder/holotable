@@ -121,7 +121,7 @@ export default async function RootLayout({
             <main
               id="main"
               tabIndex={-1}
-              className="flex-1 px-4 py-6 outline-none sm:px-6"
+              className="flex flex-1 flex-col px-4 py-6 outline-none sm:px-6"
             >
               {children}
             </main>
