@@ -17,7 +17,8 @@ export const dynamic = "force-dynamic";
 const PICKER_LIMIT = 200;
 
 /**
- * Where you start and how times are shown (#214, #215). Saved to the account,
+ * Where you start, how times are shown (#214, #215), which recents are kept
+ * and how Explore opens. Saved to the account,
  * so both follow the person to any device they sign in on.
  */
 export default async function PreferencesSettings() {

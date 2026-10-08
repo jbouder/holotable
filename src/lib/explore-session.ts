@@ -2,8 +2,10 @@
  * The questions asked on one visit to Explore, newest first.
  *
  * Browser-safe and pure, generic over what an entry holds. It lives in React
- * state only: nothing here is stored or sent, so a reload starts a new
- * session, and the rows it holds are the ones the guarded query returned.
+ * state, and the rows it holds are the ones the guarded query returned. A
+ * reload starts a new session unless the person keeps it in the tab
+ * (`src/lib/explore-session-store.ts`), which stores the questions, never the
+ * rows.
  */
 
 /** How many results a session keeps; the oldest unpinned one goes first. */

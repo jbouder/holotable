@@ -14,6 +14,7 @@ import {
   rememberPrompt,
 } from "@/lib/prompt-history";
 import { Menu, MenuItem, MenuSeparator } from "@/components/ui/menu";
+import { useHistoryPreferences } from "@/components/history-preferences";
 
 /**
  * Recent prompts on a generation box (#83).
@@ -37,11 +38,15 @@ export interface PromptHistory {
  * server, and a list rendered from it would be a hydration mismatch by
  * definition. Until the effect runs the list is empty, which is also what a
  * browser with no history shows — so there is nothing to flash.
+ *
+ * With recent prompts turned off in Preferences the list is always empty and
+ * `remember` records nothing.
  */
 export function usePromptHistory(
   workspaceId: string | null | undefined,
   scope: PromptScope,
 ): PromptHistory {
+  const { prompts: enabled } = useHistoryPreferences();
   const [entries, setEntries] = React.useState<RememberedPrompt[]>([]);
   const storageRef = React.useRef<BrowserStorage | null>(null);
 
@@ -54,7 +59,7 @@ export function usePromptHistory(
   }, []);
 
   React.useEffect(() => {
-    if (!workspaceId) {
+    if (!workspaceId || !enabled) {
       setEntries([]);
       return;
     }
@@ -65,11 +70,11 @@ export function usePromptHistory(
         Date.now(),
       ),
     );
-  }, [workspaceId, scope]);
+  }, [workspaceId, scope, enabled]);
 
   const remember = React.useCallback(
     (prompt: string) => {
-      if (!workspaceId) return;
+      if (!workspaceId || !enabled) return;
       setEntries(
         rememberPrompt(
           storageRef.current,
@@ -79,7 +84,7 @@ export function usePromptHistory(
         ),
       );
     },
-    [workspaceId, scope],
+    [workspaceId, scope, enabled],
   );
 
   const clear = React.useCallback(() => {

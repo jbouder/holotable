@@ -23,6 +23,7 @@ import { isMotionActive } from "@/lib/motion";
 import { useReducedMotion } from "@/components/motion-preference";
 import { useFlip } from "@/components/use-flip";
 import { cn } from "@/lib/utils";
+import { useHistoryPreferences } from "@/components/history-preferences";
 import { RefreshCatalogDialog } from "@/components/sources/catalog-refresh";
 
 const ICONS: Record<CommandKind, typeof Search> = {
@@ -50,6 +51,8 @@ const ICONS: Record<CommandKind, typeof Search> = {
 export function CommandPalette() {
   const router = useRouter();
   const [open, setOpen] = React.useState(false);
+  // Recent commands are kept only while Preferences says so.
+  const { paletteHistory: keepHistory } = useHistoryPreferences();
   const [query, setQuery] = React.useState("");
   const [results, setResults] = React.useState<SearchResults>(EMPTY_RESULTS);
   const [recents, setRecents] = React.useState<string[]>([]);
@@ -92,12 +95,16 @@ export function CommandPalette() {
     setQuery("");
     setActive(0);
     setNotice(null);
+    if (!keepHistory) {
+      setRecents([]);
+      return;
+    }
     try {
       setRecents(parseRecents(window.localStorage.getItem(RECENTS_STORAGE_KEY)));
     } catch {
       setRecents([]);
     }
-  }, [open]);
+  }, [open, keepHistory]);
 
   // The URL follows what has been typed, once typing pauses — one request per
   // pause rather than one per keystroke. The first fetch runs on open with an
@@ -140,6 +147,8 @@ export function CommandPalette() {
   }, [active]);
 
   function remember(id: string) {
+    // Turned off in Preferences: nothing is recorded.
+    if (!keepHistory) return;
     const next = pushRecent(recents, id);
     setRecents(next);
     try {

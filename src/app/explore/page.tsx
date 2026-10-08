@@ -5,6 +5,8 @@ import { catalogHealth } from "@/lib/catalog/health";
 import { buildStarters } from "@/lib/prompts/starters";
 import { config } from "@/lib/config";
 import { effectiveModels } from "@/lib/ai/model-resolution";
+import { exploreDefaultsOf } from "@/lib/preferences";
+import { requestPreferences } from "@/lib/preferences-server";
 import { SignIn } from "@/components/sign-in";
 import { ExploreClient } from "./explore-client";
 
@@ -44,6 +46,10 @@ export default async function ExplorePage() {
       // authority for resolving these expressions at execution time.
       defaultTimeRange={{ from: config.defaultTimeFrom, to: config.defaultTimeTo }}
       defaultRefreshIntervalMs={config.defaultRefreshIntervalMs}
+      // How this person likes Explore to open, from their preferences.
+      exploreDefaults={exploreDefaultsOf(await requestPreferences(identity))}
+      // A kept session is only ever restored for the person who kept it.
+      userSub={identity.sub}
     />
   );
 }

@@ -51,6 +51,7 @@ import {
   writeLastSource,
 } from "@/lib/source-selection";
 import { PageHeader } from "@/components/ui/page-header";
+import { useHistoryPreferences } from "@/components/history-preferences";
 import { PreviewDashboard } from "@/components/dashboard/PreviewDashboard";
 import { CanvasPlaceholder, ComposingStatus } from "@/components/composing";
 import { cn } from "@/lib/utils";
@@ -130,10 +131,13 @@ export function NewDashboardClient({
   // does not exist on the server, so reading it during render would be a
   // hydration mismatch. Until then the first source stands in, which is also
   // what a first visit gets.
+  // With recent prompts off in Preferences, the last source is not kept either.
+  const { prompts: rememberPrompts } = useHistoryPreferences();
   React.useEffect(() => {
+    if (!rememberPrompts) return;
     const remembered = defaultSourceId(sources, readLastSource(browserStorage()));
     if (remembered) setSourceId(remembered);
-  }, [sources, setSourceId]);
+  }, [sources, setSourceId, rememberPrompts]);
 
   const [prompt, setPrompt] = React.useState("");
   const [history, setHistory] = React.useState<TurnHistory>(EMPTY_HISTORY);
@@ -217,7 +221,7 @@ export function NewDashboardClient({
   }) {
     if (!sourceId) return;
     setSaveError(null);
-    writeLastSource(browserStorage(), sourceId);
+    if (rememberPrompts) writeLastSource(browserStorage(), sourceId);
     running.current = { prompt: input.instruction, replacing: input.replacing };
     submit(
       input.base

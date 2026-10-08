@@ -95,6 +95,19 @@ import {
   visibleEntries,
 } from "@/lib/explore-session";
 import { cn } from "@/lib/utils";
+import {
+  EXPLORE_REFRESH_CHOICES,
+  EXPLORE_TIME_RANGES,
+  type ExploreDefaults,
+  type ExploreStartView,
+  refreshShortLabel,
+  timeRangeLabel,
+} from "@/lib/explore-defaults";
+import {
+  readStoredSession,
+  tabStorage,
+  writeStoredSession,
+} from "@/lib/explore-session-store";
 import { SavePanelDialog, type SavedPanel } from "./save-panel-dialog";
 
 interface SourceOption {
@@ -150,25 +163,6 @@ const MAX_TABLE_ROWS = 500;
 const HEADER_CHIP_CLASS =
   "h-8 w-auto gap-1.5 border border-border bg-surface px-2.5 text-sm text-foreground";
 
-const TIME_PRESETS: { value: string; label: string }[] = [
-  { value: "now-5m", label: "Last 5 minutes" },
-  { value: "now-15m", label: "Last 15 minutes" },
-  { value: "now-1h", label: "Last 1 hour" },
-  { value: "now-6h", label: "Last 6 hours" },
-  { value: "now-12h", label: "Last 12 hours" },
-  { value: "now-24h", label: "Last 24 hours" },
-  { value: "now-7d", label: "Last 7 days" },
-  { value: "now-30d", label: "Last 30 days" },
-];
-
-/** Auto-refresh choices, in milliseconds; 0 is off. */
-const REFRESH_CHOICES: { value: string; label: string }[] = [
-  { value: "0", label: "Off" },
-  { value: "30000", label: "30s" },
-  { value: "60000", label: "1m" },
-  { value: "300000", label: "5m" },
-];
-
 const VIEW_LABELS: Partial<Record<string, string>> = {
   line: "Line",
   area: "Area",
@@ -177,8 +171,22 @@ const VIEW_LABELS: Partial<Record<string, string>> = {
   stat: "Stat",
 };
 
-function rangeLabel(from: string): string {
-  return TIME_PRESETS.find((p) => p.value === from)?.label ?? from;
+/**
+ * How a new answer is first drawn: as the model proposed it, or as a table
+ * when the person prefers that (and the panel allows it).
+ */
+function startingView(
+  panel: QueryPanel,
+  start: ExploreStartView,
+): Pick<Entry, "shown" | "view" | "table"> {
+  const view = initialView(panel);
+  const table = initialTableView(panel);
+  if (start === "table" && view.viz !== "table") {
+    const asTable = { ...view, viz: "table" as const };
+    const shown = viewPanel(panel, asTable, table);
+    if (shown) return { shown, view: asTable, table };
+  }
+  return { shown: panel, view, table };
 }
 
 /** A toggle in a row of toggles: the same pill the dashboard list's tags use. */
@@ -232,6 +240,8 @@ export function ExploreClient({
   canManageSources,
   defaultTimeRange,
   defaultRefreshIntervalMs,
+  exploreDefaults,
+  userSub,
 }: {
   sources: SourceOption[];
   /**
@@ -248,11 +258,15 @@ export function ExploreClient({
   /** Server-configured defaults, used when Explore creates a dashboard. */
   defaultTimeRange: TimeRange;
   defaultRefreshIntervalMs: number;
+  /** The person's own defaults for this page (Settings → Preferences). */
+  exploreDefaults: ExploreDefaults;
+  /** Who a kept session belongs to; another person's is never restored. */
+  userSub: string;
 }) {
   const reducedMotion = useReducedMotion();
   const [sourceId, setSourceId] = React.useState<string | null>(sources[0]?.id ?? null);
-  const [from, setFrom] = React.useState("now-24h");
-  const [refreshMs, setRefreshMs] = React.useState(0);
+  const [from, setFrom] = React.useState<string>(exploreDefaults.timeRange);
+  const [refreshMs, setRefreshMs] = React.useState<number>(exploreDefaults.refreshMs);
   const [prompt, setPrompt] = React.useState("");
   const [session, setSession] = React.useState<Session<Entry>>(emptySession);
   const [confirmingStartOver, setConfirmingStartOver] = React.useState(false);
@@ -335,9 +349,7 @@ export function ExploreClient({
         workspaceId: question.source.workspaceId,
         from: question.from,
         panel,
-        shown: panel,
-        view: initialView(panel),
-        table: initialTableView(panel),
+        ...startingView(panel, exploreDefaults.startView),
         filters: EMPTY_FILTERS,
         result: { data: EMPTY_ROWS, status: "loading" },
         saved: null,
@@ -357,6 +369,69 @@ export function ExploreClient({
   }
 
   const visible = visibleEntries(session);
+
+  /** Run an answer's query if it has not run yet (one restored from the tab). */
+  function ensureRan(id: string) {
+    if (runs.current.has(id)) return;
+    const entry = session.entries.find((e) => e.id === id);
+    if (entry) void runEntry(id, entry.shown, entry.from);
+  }
+
+  // Keep the session in this tab across a reload, when Preferences says so.
+  // Restored once, on mount: the questions and views come back, the rows are
+  // fetched again through the guarded route, starting with what is on screen.
+  const restored = React.useRef(false);
+  React.useEffect(() => {
+    if (restored.current) return;
+    restored.current = true;
+    if (!exploreDefaults.keepSession) {
+      writeStoredSession(tabStorage(), userSub, null);
+      return;
+    }
+    const kept = readStoredSession(tabStorage(), userSub);
+    if (!kept) return;
+    const entries: Entry[] = kept.entries.map((e) => {
+      nextId.current += 1;
+      return {
+        ...e,
+        id: `q${nextId.current}`,
+        shown: viewPanel(e.panel, e.view, e.table) ?? e.panel,
+        filters: EMPTY_FILTERS,
+        result: { data: EMPTY_ROWS, status: "loading" },
+        saved: null,
+      };
+    });
+    const idAt = (i: number | null) => (i === null ? null : (entries[i]?.id ?? null));
+    const next = {
+      entries,
+      activeId: idAt(kept.activeIndex),
+      pinnedId: idAt(kept.pinnedIndex),
+    };
+    setSession(next);
+    for (const e of visibleEntries(next)) void runEntry(e.id, e.shown, e.from);
+  }, [exploreDefaults.keepSession, userSub, runEntry]);
+
+  React.useEffect(() => {
+    if (!exploreDefaults.keepSession || !restored.current) return;
+    const index = (id: string | null) => {
+      const i = session.entries.findIndex((e) => e.id === id);
+      return i < 0 ? null : i;
+    };
+    writeStoredSession(tabStorage(), userSub, {
+      entries: session.entries.map((e) => ({
+        prompt: e.prompt,
+        askedAt: e.askedAt,
+        sourceName: e.sourceName,
+        workspaceId: e.workspaceId,
+        from: e.from,
+        panel: e.panel,
+        view: e.view,
+        table: e.table,
+      })),
+      activeIndex: index(session.activeId),
+      pinnedIndex: index(session.pinnedId),
+    });
+  }, [session, exploreDefaults.keepSession, userSub]);
 
   // The window applies to what is on screen: re-run each over the new one.
   function changeRange(next: string) {
@@ -421,17 +496,17 @@ export function ExploreClient({
         // dashboard keeps its time picker; then recent questions.
         <>
           <Menu
-            label={`Time range: ${rangeLabel(from)}`}
+            label={`Time range: ${timeRangeLabel(from)}`}
             className={HEADER_CHIP_CLASS}
             trigger={
               <>
                 <Clock className="h-3.5 w-3.5 shrink-0 text-muted" aria-hidden />
-                <span className="truncate">{rangeLabel(from)}</span>
+                <span className="truncate">{timeRangeLabel(from)}</span>
               </>
             }
           >
             <MenuRadioGroup label="Time range" value={from} onValueChange={changeRange}>
-              {TIME_PRESETS.map((p) => (
+              {EXPLORE_TIME_RANGES.map((p) => (
                 <MenuRadioItem key={p.value} value={p.value}>
                   {p.label}
                 </MenuRadioItem>
@@ -439,7 +514,7 @@ export function ExploreClient({
             </MenuRadioGroup>
           </Menu>
           <Menu
-            label={`Auto-refresh: ${refreshMs > 0 ? `every ${REFRESH_CHOICES.find((c) => c.value === String(refreshMs))?.label}` : "off"}`}
+            label={`Auto-refresh: ${refreshMs > 0 ? `every ${refreshShortLabel(refreshMs)}` : "off"}`}
             className={HEADER_CHIP_CLASS}
             trigger={
               <>
@@ -450,10 +525,7 @@ export function ExploreClient({
                   )}
                   aria-hidden
                 />
-                <span>
-                  {REFRESH_CHOICES.find((c) => c.value === String(refreshMs))?.label ??
-                    "Off"}
-                </span>
+                <span>{refreshShortLabel(refreshMs)}</span>
               </>
             }
           >
@@ -462,9 +534,9 @@ export function ExploreClient({
               value={String(refreshMs)}
               onValueChange={(v) => setRefreshMs(Number(v))}
             >
-              {REFRESH_CHOICES.map((c) => (
-                <MenuRadioItem key={c.value} value={c.value}>
-                  {c.value === "0" ? "Off" : `Every ${c.label}`}
+              {EXPLORE_REFRESH_CHOICES.map((c) => (
+                <MenuRadioItem key={c.value} value={String(c.value)}>
+                  {c.label}
                 </MenuRadioItem>
               ))}
             </MenuRadioGroup>
@@ -645,10 +717,17 @@ export function ExploreClient({
           </div>
           <SessionList
             session={session}
-            onShow={(id) => setSession((s) => showEntry(s, id))}
-            onPin={(id) => setSession((s) => togglePin(s, id))}
+            onShow={(id) => {
+              ensureRan(id);
+              setSession((s) => showEntry(s, id));
+            }}
+            onPin={(id) => {
+              ensureRan(id);
+              setSession((s) => togglePin(s, id));
+            }}
             onRemove={(id, row) => void remove(id, row)}
             onStartOver={() => setConfirmingStartOver(true)}
+            keptInTab={exploreDefaults.keepSession}
           />
         </div>
       )}
@@ -700,12 +779,15 @@ function SessionList({
   onPin,
   onRemove,
   onStartOver,
+  keptInTab,
 }: {
   session: Session<Entry>;
   onShow: (id: string) => void;
   onPin: (id: string) => void;
   onRemove: (id: string, row: HTMLElement | null) => void;
   onStartOver: () => void;
+  /** The session survives a reload of this tab (Settings → Preferences). */
+  keptInTab: boolean;
 }) {
   const display = useTimeDisplay();
   const reducedMotion = useReducedMotion();
@@ -783,8 +865,11 @@ function SessionList({
         </ol>
       )}
       <p className="text-xs text-muted">
-        Kept for this visit only. Pin one to compare it beside the result you are looking
-        at; Start over clears them all.
+        {keptInTab
+          ? "Kept in this tab, even across a reload."
+          : "Kept for this visit only."}{" "}
+        Pin one to compare it beside the result you are looking at; Start over clears them
+        all.
       </p>
     </aside>
   );
@@ -832,7 +917,7 @@ function ResultView({
           </h2>
           {shown.description && <p className="text-sm text-muted">{shown.description}</p>}
           <p className="flex flex-wrap items-center gap-1 text-xs text-muted">
-            {entry.sourceName} · {rangeLabel(entry.from)}
+            {entry.sourceName} · {timeRangeLabel(entry.from)}
             {result.status === "done" && ` · ${rowCount} row${rowCount === 1 ? "" : "s"}`}
             {result.ranAt && ` · ran ${formatClock(new Date(result.ranAt), display)}`}
             {result.refreshing && (

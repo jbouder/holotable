@@ -1,4 +1,5 @@
 import { test } from "node:test";
+import { EXPLORE_SESSION_KEY } from "@/lib/explore-session-store";
 import assert from "node:assert/strict";
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join, relative } from "node:path";
@@ -230,6 +231,7 @@ const STORAGE_WRITERS: Record<string, string> = {
   "lib/demo-banner.ts": DEMO_BANNER_KEY,
   "lib/session-renewal.ts": SESSION_EXPIRY_KEY,
   "components/resume-session.tsx": RESUME_ATTEMPT_KEY,
+  "lib/explore-session-store.ts": EXPLORE_SESSION_KEY,
 };
 
 test("every file that writes browser storage is accounted for", () => {

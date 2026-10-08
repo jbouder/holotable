@@ -6,7 +6,20 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/input";
 import { Select, type SelectOption } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
-import type { Preferences, PreferencesPatch } from "@/lib/preferences";
+import {
+  historyTurnedOff,
+  type Preferences,
+  type PreferencesPatch,
+} from "@/lib/preferences";
+import {
+  EXPLORE_REFRESH_CHOICES,
+  EXPLORE_TIME_RANGES,
+  type ExploreRefreshMs,
+  type ExploreStartView,
+  type ExploreTimeRange,
+} from "@/lib/explore-defaults";
+import { LOCAL_STORES } from "@/lib/local-data";
+import { browserStorage } from "@/lib/browser-storage";
 import { formatDateTime, runtimeTimeZone } from "@/lib/time-display";
 
 export interface StartDashboardOption {
@@ -20,6 +33,47 @@ const CLOCK_OPTIONS: SelectOption[] = [
   { value: "12h", label: "12-hour" },
   { value: "24h", label: "24-hour" },
 ];
+
+const TIME_RANGE_OPTIONS: SelectOption[] = EXPLORE_TIME_RANGES.map((r) => ({
+  value: r.value,
+  label: r.label,
+}));
+
+const REFRESH_OPTIONS: SelectOption[] = EXPLORE_REFRESH_CHOICES.map((c) => ({
+  value: String(c.value),
+  label: c.label,
+}));
+
+const START_VIEW_OPTIONS: SelectOption[] = [
+  { value: "model", label: "As the model drew it" },
+  { value: "table", label: "A table" },
+];
+
+/** The history switches, each with the local store it keeps. */
+const HISTORY_SWITCHES: {
+  key: "rememberPrompts" | "rememberRecentDashboards" | "rememberPaletteHistory";
+  label: string;
+  description: string;
+}[] = [
+  {
+    key: "rememberPrompts",
+    label: "Remember recent prompts",
+    description:
+      "Offered back in the prompt boxes, with the source you last generated a dashboard from.",
+  },
+  {
+    key: "rememberRecentDashboards",
+    label: "Remember recently viewed dashboards",
+    description: "The Recent row at the top of the dashboard list.",
+  },
+  {
+    key: "rememberPaletteHistory",
+    label: "Remember command palette history",
+    description: "The commands the palette lists first when nothing is typed.",
+  },
+];
+
+const HISTORY_KEYS = HISTORY_SWITCHES.map((h) => h.key);
 
 const SORT_OPTIONS: SelectOption[] = [
   { value: "updated", label: "Recently updated" },
@@ -90,7 +144,20 @@ export function PreferencesForm({
       }
       setPrefs(body as Preferences);
       setState({ kind: "saved" });
-      if ("timeZone" in patch || "clock" in patch) router.refresh();
+      // Turning a recent off also forgets what this browser already kept.
+      // These stores clear by key alone; only drafts need the subject.
+      const forget: string[] = historyTurnedOff(patch);
+      for (const store of LOCAL_STORES.filter((s) => forget.includes(s.id))) {
+        store.clear(browserStorage(), { userSub: "", now: Date.now() });
+      }
+      // The root layout hands times and history down once per request.
+      if (
+        "timeZone" in patch ||
+        "clock" in patch ||
+        HISTORY_KEYS.some((k) => k in patch)
+      ) {
+        router.refresh();
+      }
     } catch {
       setPrefs(previous);
       setState({
@@ -127,8 +194,12 @@ export function PreferencesForm({
   );
 
   return (
-    <div className="flex flex-col gap-6">
-      <p role="status" className="min-h-5 text-sm">
+    <div className="relative flex flex-col gap-6">
+      {/*
+        Out of the flow, in the band above the first card, so the section
+        keeps the same spacing as every other and nothing shifts on save.
+      */}
+      <p role="status" className="absolute right-0 -top-6 h-6 text-sm leading-6">
         {state.kind === "saving" && <span className="fade-in text-muted">Saving…</span>}
         {state.kind === "saved" && (
           <span className="fade-in text-success">Saved to your account.</span>
@@ -204,6 +275,71 @@ export function PreferencesForm({
           </span>
         </CardContent>
       </Card>
+      <Card>
+        <CardHeader>
+          <CardTitle>History</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {HISTORY_SWITCHES.map((h) => (
+            <div key={h.key} className="space-y-1">
+              <Checkbox
+                checked={prefs[h.key]}
+                onCheckedChange={(checked) => void save({ [h.key]: checked })}
+                label={h.label}
+              />
+              <p className="pl-6 text-xs text-muted">{h.description}</p>
+            </div>
+          ))}
+          <p className="text-xs text-muted">
+            The lists themselves stay in this browser. Turning one off stops recording it
+            on every device you sign in on, and clears it here.
+          </p>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Explore</CardTitle>
+        </CardHeader>
+        <CardContent className="grid grid-cols-1 gap-4 sm:grid-cols-[12rem_1fr] sm:items-center">
+          <Label className="mb-0" htmlFor="pref-explore-range">
+            Time range
+          </Label>
+          <Select
+            id="pref-explore-range"
+            value={prefs.exploreTimeRange}
+            options={TIME_RANGE_OPTIONS}
+            onValueChange={(v) => void save({ exploreTimeRange: v as ExploreTimeRange })}
+          />
+          <Label className="mb-0" htmlFor="pref-explore-refresh">
+            Auto-refresh
+          </Label>
+          <Select
+            id="pref-explore-refresh"
+            value={String(prefs.exploreRefreshMs)}
+            options={REFRESH_OPTIONS}
+            onValueChange={(v) =>
+              void save({ exploreRefreshMs: Number(v) as ExploreRefreshMs })
+            }
+          />
+          <Label className="mb-0" htmlFor="pref-explore-view">
+            Answers start as
+          </Label>
+          <Select
+            id="pref-explore-view"
+            value={prefs.exploreStartView}
+            options={START_VIEW_OPTIONS}
+            onValueChange={(v) => void save({ exploreStartView: v as ExploreStartView })}
+          />
+          <span className="text-sm">Session</span>
+          <Checkbox
+            checked={prefs.exploreKeepSession}
+            onCheckedChange={(checked) => void save({ exploreKeepSession: checked })}
+            label="Keep this tab's answers when the page reloads"
+          />
+        </CardContent>
+      </Card>
+
       <p className="text-xs text-muted">
         These follow you to any device you sign in on. Every time is still stored in UTC,
         and the server still decides which window each chart queries.

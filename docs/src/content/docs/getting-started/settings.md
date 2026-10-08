@@ -71,12 +71,28 @@ with a one-time notice instead.
 **Dashboard list** defaults set the sort order and whether only your
 favorites are shown. A link that names a sort or filter still wins.
 
+**History** turns each kind of recent on or off: recent prompts (with the
+source you last generated a dashboard from), recently viewed dashboards, and
+command palette history. All are on by default. Off means nothing is recorded,
+not merely hidden: the prompt boxes, the dashboard list's Recent row and the
+palette stop writing, and turning one off also clears what this browser had.
+The switch follows you; the lists never leave the browser either way.
+
+**Explore** sets how the page opens: the time range (5 minutes to 30 days),
+auto-refresh (off, 30s, 1m, 5m), whether an answer starts as the model drew it
+or as a table, and whether this tab's answers survive a reload. A kept session
+is the questions and how each was drawn, never the rows: on reload every panel
+is checked against the IR again and its query re-run through the guarded
+route. It lives in the tab's `sessionStorage`, belongs to the person who kept
+it, and ends with the tab or with **Start over**.
+
 ### Local data
 
 Some things are kept in the browser on purpose and never sent anywhere:
 editor drafts, recent prompts (and the source you last generated a dashboard
 from), recently viewed dashboards, command palette history, and which setup
-hints you dismissed. This section lists each one,
+hints you dismissed. The three kinds of recents can be turned off entirely
+under **Preferences → History**. This section lists each one,
 how much it holds and a button to clear it. Drafts are listed one by one and
 only your own are shown, even on a shared machine. **Clear everything on this
 device** asks for confirmation first.
@@ -129,9 +145,10 @@ once. See [Service-account API tokens](/operations/api-tokens/).
 
 | Setting | Stored | Why |
 | --- | --- | --- |
-| Time zone, clock, start page, dashboard list defaults | Server, per user | They are choices about you, and should survive a new laptop or a cleared browser |
+| Time zone, clock, start page, dashboard list defaults, Explore defaults, which recents to keep | Server, per user | They are choices about you, and should survive a new laptop or a cleared browser |
 | Theme, motion | This browser | They must apply before the page first draws, which cannot wait for the server. A device-specific choice is often what people want anyway |
 | Drafts, recents, dismissed hints | This browser | They describe what you did on this device |
+| A kept Explore session | This tab | It is one sitting's work; it ends with the tab |
 
 Preferences are stored per user, never per workspace, and nobody else's can be
 read or changed through the API, including by a platform admin.
