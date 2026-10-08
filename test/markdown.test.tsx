@@ -138,7 +138,10 @@ afterEach(() => {
   harness = null;
 });
 
-test("a text panel renders at once, with no query, status or SQL to show", async () => {
+// Whether it offers SQL is a menu item, and Base UI's menu popup does not
+// mount under jsdom (see test/panel-actions.test.tsx); PanelView gates it on
+// `hasQuery`, as it does the status badge asserted here.
+test("a text panel renders at once, with no query or status", async () => {
   const panel = Panel.parse({
     id: "t",
     title: "About",
@@ -153,9 +156,4 @@ test("a text panel renders at once, with no query, status or SQL to show", async
   assert.match(text, /DB on-call/);
   assert.equal(harness.container.querySelector(".skeleton"), null, "no loading skeleton");
   assert.doesNotMatch(text, /Loading|live/i, "no status badge");
-  assert.equal(
-    harness.container.querySelector('[aria-label^="Show generated SQL"]'),
-    null,
-    "no SQL to show",
-  );
 });

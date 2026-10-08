@@ -292,7 +292,10 @@ stream.
 
 ## Fullscreen and export
 
-Each panel's header carries an overflow menu with three local actions (#76):
+Each panel's header carries an overflow menu (the ⋯ trigger). Besides
+**Show generated SQL**, which opens the panel's statement, source and time
+field in a dialog (not offered for a text panel or through a share link), and
+**Ask about this panel** (#366), it holds three local actions (#76):
 
 - **Fullscreen** expands the panel over the viewport. It is not a portal: the
   same card simply becomes `fixed`, so the panel's position in the React tree

@@ -33,9 +33,12 @@ test("a dialog traps focus and gives it back to what opened it", async ({
 }) => {
   await page.goto(`/dashboards/${await dashboardId(request, DEMO_DASHBOARD)}`);
   await waitForPanels(page);
-  const opener = page.getByRole("button", { name: /^Show generated SQL for/ }).first();
+  // The SQL dialog opens from the panel's actions menu, and closing it hands
+  // focus back to that menu's trigger.
+  const opener = page.getByRole("button", { name: /^Actions for / }).first();
   await opener.focus();
   await page.keyboard.press("Enter");
+  await page.getByRole("menuitem", { name: "Show generated SQL" }).click();
   const dialog = page.getByRole("dialog");
   await expect(dialog).toBeVisible();
 

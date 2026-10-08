@@ -2,11 +2,13 @@
 
 import type * as React from "react";
 import {
+  Code,
   Download,
   Image as ImageIcon,
   Maximize2,
   MessageSquare,
   Minimize2,
+  MoreHorizontal,
 } from "lucide-react";
 import { Menu, MenuItem, MenuSeparator } from "@/components/ui/menu";
 import type { EChartHandle } from "@/components/charts/EChart";
@@ -20,8 +22,9 @@ import {
 import { resolveColor } from "@/lib/color/oklch";
 
 /**
- * The per-panel overflow menu: enlarge it, ask the dashboard chat about it
- * (#366), or take what it holds out of the browser (#76).
+ * The per-panel overflow menu: enlarge it, see the SQL behind it, ask the
+ * dashboard chat about it (#366), or take what it holds out of the browser
+ * (#76).
  *
  * The exports are local. Nothing asks the server for anything, so an
  * export cannot contain a row the panel was not already showing and cannot
@@ -36,6 +39,7 @@ export function PanelActions({
   exportable = true,
   expanded,
   onToggleExpanded,
+  onShowSql,
   onAskAbout,
 }: {
   panelTitle: string;
@@ -47,6 +51,8 @@ export function PanelActions({
   chart?: React.RefObject<EChartHandle | null>;
   expanded: boolean;
   onToggleExpanded: () => void;
+  /** Open the generated SQL dialog. Absent for a text panel and a share link (#65). */
+  onShowSql?: () => void;
   /**
    * Open the dashboard chat about this panel (#366). Absent where there is no
    * chat: an embed, the editor, Explore.
@@ -78,9 +84,7 @@ export function PanelActions({
   return (
     <Menu
       label={`Actions for ${panelTitle}`}
-      trigger={
-        expanded ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />
-      }
+      trigger={<MoreHorizontal className="h-4 w-4" />}
     >
       <MenuItem onClick={onToggleExpanded}>
         {expanded ? (
@@ -93,6 +97,11 @@ export function PanelActions({
           </>
         )}
       </MenuItem>
+      {onShowSql && (
+        <MenuItem onClick={onShowSql}>
+          <Code className="h-4 w-4" /> Show generated SQL
+        </MenuItem>
+      )}
       {onAskAbout && (
         <MenuItem onClick={onAskAbout}>
           <MessageSquare className="h-4 w-4" /> Ask about this panel
