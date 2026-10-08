@@ -108,8 +108,9 @@ something broad:
 > Request volume over time and the five slowest routes, plus a stat panel with
 > the total error count
 
-Press send. The prompt box moves into a column beside the dashboard, which takes
-shape as the spec streams in and then runs its queries against your source. Follow-ups refine it — "make the
+Press send. The prompt box moves into a column on the left, and the dashboard
+takes shape to its right as the spec streams in, then runs its queries against
+your source. Follow-ups refine it — "make the
 third one a bar chart", "add a 95th percentile line" — and each one is a single
 model call that returns the whole dashboard again. **Try again** on the version
 you are looking at asks for a different answer instead, and an earlier version

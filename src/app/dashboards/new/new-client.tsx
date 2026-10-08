@@ -91,14 +91,16 @@ interface SourceOption {
 
 /**
  * `/dashboards/new` (#356): the dashboard is the canvas, the conversation sits
- * beside it, and Save is the one primary action.
+ * to its left, and Save is the one primary action. Left, because the author
+ * starts by typing and reads toward what it made.
  *
  * Before the first prompt there is nothing to put on the canvas, so the
  * composer runs across the top of the page: the prompt box, the source it will
  * read (a chip, defaulted to the last one used here), the Ideas menu, and a
  * few of the source's starters as one-click suggestions. Once a generation
- * starts it docks into the side column, where the versions list grows above
- * it, and the generated dashboard takes the canvas. The move is CSS only (the
+ * starts it docks into the column on the left, where the versions list grows
+ * above it, and the generated dashboard takes the canvas to its right (below
+ * it on a narrow screen, where the dashboard comes first). The move is CSS only (the
  * same element, re-placed by the grid), so the prompt box keeps its focus and
  * its text, and FLIP slides it to where it landed.
  */
@@ -389,7 +391,7 @@ export function NewDashboardClient({
         ref={layout}
         className={cn(
           "grid grid-cols-1 items-start gap-6",
-          docked && "lg:grid-cols-[minmax(0,1fr)_24rem]",
+          docked && "lg:grid-cols-[24rem_minmax(0,1fr)]",
         )}
       >
         {/*
@@ -453,7 +455,10 @@ export function NewDashboardClient({
         <aside
           aria-label="Conversation"
           data-flip-id="composer"
-          className={cn("min-w-0", docked ? "lg:sticky lg:top-20" : "order-first")}
+          className={cn(
+            "min-w-0",
+            docked ? "lg:sticky lg:top-20 lg:order-first" : "order-first",
+          )}
         >
           <Card>
             <CardContent className="space-y-4">
