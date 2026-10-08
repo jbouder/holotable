@@ -100,15 +100,16 @@ table count matches what you expect.
 The source chip above the prompt box starts on the source you last generated
 against (or the first one); open it to pick another, or to add up to two more
 from the same workspace. Describe what you want to watch in plain English —
-**Ideas** offers suggestions built from your own catalog, so they name your
-tables, not a demo's, along with your recent prompts and the templates.
-Something concrete works better than something broad:
+the suggestions under the prompt box, and **Ideas** beside the chip, are built
+from your own catalog, so they name your tables, not a demo's; Ideas also holds
+your recent prompts and the templates. Something concrete works better than
+something broad:
 
 > Request volume over time and the five slowest routes, plus a stat panel with
 > the total error count
 
-Press send. The dashboard takes shape beside the prompt as the spec streams in,
-then runs its queries against your source. Follow-ups refine it — "make the
+Press send. The prompt box moves into a column beside the dashboard, which takes
+shape as the spec streams in and then runs its queries against your source. Follow-ups refine it — "make the
 third one a bar chart", "add a 95th percentile line" — and each one is a single
 model call that returns the whole dashboard again. **Try again** on the version
 you are looking at asks for a different answer instead, and an earlier version

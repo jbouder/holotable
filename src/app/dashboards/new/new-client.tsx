@@ -93,11 +93,14 @@ interface SourceOption {
  * `/dashboards/new` (#356): the dashboard is the canvas, the conversation sits
  * beside it, and Save is the one primary action.
  *
- * Before the first prompt the author sees the prompt box, the source it will
- * read (a chip, defaulted to the last one used here) and one Ideas menu —
- * starters, recent prompts and templates are all one interaction away rather
- * than on screen at once. After it, the generated dashboard is where they were
- * already looking, with no tab to switch to.
+ * Before the first prompt there is nothing to put on the canvas, so the
+ * composer runs across the top of the page: the prompt box, the source it will
+ * read (a chip, defaulted to the last one used here), the Ideas menu, and a
+ * few of the source's starters as one-click suggestions. Once a generation
+ * starts it docks into the side column, where the versions list grows above
+ * it, and the generated dashboard takes the canvas. The move is CSS only (the
+ * same element, re-placed by the grid), so the prompt box keeps its focus and
+ * its text, and FLIP slides it to where it landed.
  */
 export function NewDashboardClient({
   sources,
@@ -191,6 +194,10 @@ export function NewDashboardClient({
 
   const turnList = React.useRef<HTMLOListElement>(null);
   useFlip(turnList, !reducedMotion);
+  // The composer and the canvas, which trade places when the composer docks.
+  const layout = React.useRef<HTMLDivElement>(null);
+  useFlip(layout, !reducedMotion);
+  const prompter = React.useRef<HTMLTextAreaElement>(null);
 
   const { object, submit, isLoading, error, stop, repairing } = useRepairingObject({
     api: "/api/generate",
@@ -370,12 +377,21 @@ export function NewDashboardClient({
   }
 
   const pendingSource = sources.find((s) => s.id === pendingSourceId);
+  // Top of the page until there is something for the canvas to show; beside
+  // the canvas from the first generation on. A first run that fails undocks.
+  const docked = refining || isLoading;
 
   return (
     <div className="space-y-6">
       <PageHeader title="New dashboard" description={description} />
 
-      <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-[minmax(0,1fr)_24rem]">
+      <div
+        ref={layout}
+        className={cn(
+          "grid grid-cols-1 items-start gap-6",
+          docked && "lg:grid-cols-[minmax(0,1fr)_24rem]",
+        )}
+      >
         {/*
           The canvas. While a turn streams it is the panel-shaped skeleton that
           fills in as titles arrive (#72); once a turn lands it is that turn's
@@ -384,10 +400,8 @@ export function NewDashboardClient({
         */}
         <section
           aria-label="Dashboard preview"
-          className={cn(
-            "min-w-0 space-y-4",
-            !isLoading && !finalSpec && "hidden lg:block",
-          )}
+          data-flip-id="canvas"
+          className={cn("min-w-0 space-y-4", !docked && "hidden lg:block")}
         >
           {isLoading ? (
             <Card className="fade-in">
@@ -436,7 +450,11 @@ export function NewDashboardClient({
         </section>
 
         {/* The conversation: what was asked, then the box to ask the next thing. */}
-        <aside aria-label="Conversation" className="min-w-0 lg:sticky lg:top-20">
+        <aside
+          aria-label="Conversation"
+          data-flip-id="composer"
+          className={cn("min-w-0", docked ? "lg:sticky lg:top-20" : "order-first")}
+        >
           <Card>
             <CardContent className="space-y-4">
               {refining && (
@@ -657,6 +675,7 @@ export function NewDashboardClient({
                   </Label>
                   <div className="relative">
                     <Textarea
+                      ref={prompter}
                       id="prompt"
                       disabled={aiUnavailable !== null}
                       rows={3}
@@ -709,6 +728,31 @@ export function NewDashboardClient({
                     </p>
                   )}
                 </form>
+
+                {/*
+                  Undocked, the composer has the width for a few of the
+                  source's starters on screen; the rest, and recent prompts and
+                  templates, stay in Ideas. A pick fills the box, like Ideas.
+                */}
+                {!docked && starters.length > 0 && (
+                  <ul aria-label="Suggestions" className="flex flex-wrap gap-2">
+                    {starters.slice(0, 3).map((preset) => (
+                      <li key={preset} className="min-w-0">
+                        <button
+                          type="button"
+                          disabled={aiUnavailable !== null}
+                          onClick={() => {
+                            setPrompt(preset);
+                            prompter.current?.focus();
+                          }}
+                          className="border border-border bg-surface px-3 py-1.5 text-left text-xs text-muted transition-colors duration-(--duration-fast) ease-standard hover:bg-surface-2 hover:text-foreground disabled:opacity-50"
+                        >
+                          {preset}
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                )}
 
                 <RepairingNote show={repairing} />
                 {error && (
