@@ -15,6 +15,7 @@ import {
   Pin,
   PinOff,
   RefreshCw,
+  RotateCcw,
   Save,
   Search,
   SendHorizontal,
@@ -143,6 +144,10 @@ interface Entry {
 }
 
 const MAX_TABLE_ROWS = 500;
+
+/** The time range and auto-refresh menus in the page header. */
+const HEADER_CHIP_CLASS =
+  "h-8 w-auto gap-1.5 border border-border bg-surface px-2.5 text-sm text-foreground";
 
 const TIME_PRESETS: { value: string; label: string }[] = [
   { value: "now-5m", label: "Last 5 minutes" },
@@ -382,6 +387,16 @@ export function ExploreClient({
     );
   }
 
+  /** Clear every answer and start the visit again; a question in flight is stopped. */
+  function startOver() {
+    if (isLoading) stop();
+    asked.current = null;
+    runs.current.clear();
+    setSession(emptySession());
+    setSavingId(null);
+    setPrompt("");
+  }
+
   async function remove(id: string, row: HTMLElement | null) {
     if (row) await animateOut(row, !reducedMotion);
     runs.current.delete(id);
@@ -400,7 +415,60 @@ export function ExploreClient({
         </>
       }
       actions={
-        <PromptHistoryMenu history={prompts} disabled={isLoading} onPick={setPrompt} />
+        // The window and refresh every answer on screen is read over, where a
+        // dashboard keeps its time picker; then recent questions.
+        <>
+          <Menu
+            label={`Time range: ${rangeLabel(from)}`}
+            className={HEADER_CHIP_CLASS}
+            trigger={
+              <>
+                <Clock className="h-3.5 w-3.5 shrink-0 text-muted" aria-hidden />
+                <span className="truncate">{rangeLabel(from)}</span>
+              </>
+            }
+          >
+            <MenuRadioGroup label="Time range" value={from} onValueChange={changeRange}>
+              {TIME_PRESETS.map((p) => (
+                <MenuRadioItem key={p.value} value={p.value}>
+                  {p.label}
+                </MenuRadioItem>
+              ))}
+            </MenuRadioGroup>
+          </Menu>
+          <Menu
+            label={`Auto-refresh: ${refreshMs > 0 ? `every ${REFRESH_CHOICES.find((c) => c.value === String(refreshMs))?.label}` : "off"}`}
+            className={HEADER_CHIP_CLASS}
+            trigger={
+              <>
+                <RefreshCw
+                  className={cn(
+                    "h-3.5 w-3.5 shrink-0",
+                    refreshMs > 0 ? "text-primary" : "text-muted",
+                  )}
+                  aria-hidden
+                />
+                <span>
+                  {REFRESH_CHOICES.find((c) => c.value === String(refreshMs))?.label ??
+                    "Off"}
+                </span>
+              </>
+            }
+          >
+            <MenuRadioGroup
+              label="Auto-refresh"
+              value={String(refreshMs)}
+              onValueChange={(v) => setRefreshMs(Number(v))}
+            >
+              {REFRESH_CHOICES.map((c) => (
+                <MenuRadioItem key={c.value} value={c.value}>
+                  {c.value === "0" ? "Off" : `Every ${c.label}`}
+                </MenuRadioItem>
+              ))}
+            </MenuRadioGroup>
+          </Menu>
+          <PromptHistoryMenu history={prompts} disabled={isLoading} onPick={setPrompt} />
+        </>
       }
     />
   );
@@ -421,13 +489,10 @@ export function ExploreClient({
     <div className="w-full space-y-6">
       {header}
 
-      {/*
-        The composer: the source asked of, one line to ask in, and the window
-        and refresh every answer on screen is read over.
-      */}
+      {/* The composer: the source asked of, and one line to ask in. */}
       <section aria-label="Question" className="space-y-3">
         <form
-          className="flex flex-wrap items-center gap-2 lg:flex-nowrap"
+          className="flex flex-wrap items-center gap-2 sm:flex-nowrap"
           onSubmit={(e) => {
             e.preventDefault();
             ask();
@@ -459,8 +524,8 @@ export function ExploreClient({
           <Label htmlFor="prompt" className="sr-only">
             Ask a question
           </Label>
-          {/* On a narrow screen the box takes its own row under the chips. */}
-          <div className="relative order-last min-w-0 flex-1 basis-full lg:order-none lg:basis-auto">
+          {/* On a phone the box takes its own row under the chip. */}
+          <div className="relative min-w-0 flex-1 basis-full sm:basis-auto">
             <Input
               id="prompt"
               disabled={aiUnavailable !== null}
@@ -498,55 +563,6 @@ export function ExploreClient({
               </Button>
             )}
           </div>
-          <Menu
-            label={`Time range: ${rangeLabel(from)}`}
-            className={COMPOSER_CHIP_CLASS}
-            trigger={
-              <>
-                <Clock className="h-3.5 w-3.5 shrink-0 text-muted" aria-hidden />
-                <span className="truncate">{rangeLabel(from)}</span>
-              </>
-            }
-          >
-            <MenuRadioGroup label="Time range" value={from} onValueChange={changeRange}>
-              {TIME_PRESETS.map((p) => (
-                <MenuRadioItem key={p.value} value={p.value}>
-                  {p.label}
-                </MenuRadioItem>
-              ))}
-            </MenuRadioGroup>
-          </Menu>
-          <Menu
-            label={`Auto-refresh: ${refreshMs > 0 ? `every ${REFRESH_CHOICES.find((c) => c.value === String(refreshMs))?.label}` : "off"}`}
-            className={COMPOSER_CHIP_CLASS}
-            trigger={
-              <>
-                <RefreshCw
-                  className={cn(
-                    "h-3.5 w-3.5 shrink-0",
-                    refreshMs > 0 ? "text-primary" : "text-muted",
-                  )}
-                  aria-hidden
-                />
-                <span>
-                  {REFRESH_CHOICES.find((c) => c.value === String(refreshMs))?.label ??
-                    "Off"}
-                </span>
-              </>
-            }
-          >
-            <MenuRadioGroup
-              label="Auto-refresh"
-              value={String(refreshMs)}
-              onValueChange={(v) => setRefreshMs(Number(v))}
-            >
-              {REFRESH_CHOICES.map((c) => (
-                <MenuRadioItem key={c.value} value={c.value}>
-                  {c.value === "0" ? "Off" : `Every ${c.label}`}
-                </MenuRadioItem>
-              ))}
-            </MenuRadioGroup>
-          </Menu>
         </form>
 
         {/* A few of the source's starters, before the first question only. */}
@@ -621,6 +637,7 @@ export function ExploreClient({
             onShow={(id) => setSession((s) => showEntry(s, id))}
             onPin={(id) => setSession((s) => togglePin(s, id))}
             onRemove={(id, row) => void remove(id, row)}
+            onStartOver={startOver}
           />
         </div>
       )}
@@ -650,11 +667,13 @@ function SessionList({
   onShow,
   onPin,
   onRemove,
+  onStartOver,
 }: {
   session: Session<Entry>;
   onShow: (id: string) => void;
   onPin: (id: string) => void;
   onRemove: (id: string, row: HTMLElement | null) => void;
+  onStartOver: () => void;
 }) {
   const display = useTimeDisplay();
   const reducedMotion = useReducedMotion();
@@ -662,7 +681,12 @@ function SessionList({
   useFlip(list, !reducedMotion);
   return (
     <aside aria-label="This session" className="min-w-0 space-y-2 lg:sticky lg:top-20">
-      <h2 className="text-sm font-medium text-muted">This session</h2>
+      <div className="flex items-center justify-between gap-2">
+        <h2 className="text-sm font-medium text-muted">This session</h2>
+        <Button variant="ghost" size="sm" onClick={onStartOver}>
+          <RotateCcw className="h-4 w-4" /> Start over
+        </Button>
+      </div>
       {session.entries.length === 0 ? (
         <p className="text-xs text-muted">Your questions will be listed here.</p>
       ) : (
@@ -728,7 +752,7 @@ function SessionList({
       )}
       <p className="text-xs text-muted">
         Kept for this visit only. Pin one to compare it beside the result you are looking
-        at.
+        at; Start over clears them all.
       </p>
     </aside>
   );

@@ -246,9 +246,10 @@ that came back, and is readable only by a workspace source-admin — see
 
 ## Looking at an Explore answer
 
-Explore's prompt bar is the one `/dashboards/new` has: the source chip, one line
-to ask in, then the **time range** (5 minutes to 30 days) and **auto-refresh**
-(off, 30s, 1m, 5m). Both apply to the answers on screen: a new range re-runs
+Explore's prompt bar is the one `/dashboards/new` has: the source chip and one
+line to ask in. The **time range** (5 minutes to 30 days) and **auto-refresh**
+(off, 30s, 1m, 5m) sit in the page header, and both apply to the answers on
+screen: a new range re-runs
 them, and a refresh re-runs them quietly, keeping the rows on screen until the
 new ones land and skipping a hidden tab. Each run is the ordinary guarded
 `POST /api/query`; the server resolves the window, as it does everywhere.
@@ -268,8 +269,8 @@ Once an answer is back, nothing on it asks the model again:
   Filtering narrows what is shown, never what was read.
 - **This session** lists every question asked on the visit, newest first, up to
   20 (`src/lib/explore-session.ts`). One click brings an answer back; **Pin**
-  holds one beside the current answer to compare them. The list lives in page
-  state only, so a reload starts over.
+  holds one beside the current answer to compare them, and **Start over**
+  clears the list. It lives in page state only, so a reload starts over too.
 
 ## Keeping an Explore answer
 
