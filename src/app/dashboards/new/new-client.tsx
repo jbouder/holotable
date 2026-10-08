@@ -5,11 +5,9 @@ import * as React from "react";
 import { useRouter } from "next/navigation";
 import {
   Braces,
-  Database,
   History,
   LayoutTemplate,
   Loader2,
-  Lock,
   RefreshCw,
   RotateCcw,
   Save,
@@ -29,6 +27,7 @@ import {
 import { PromptHistoryMenu, usePromptHistory } from "@/components/prompt-history";
 import { PROMPT_MAX_LENGTH, promptLabel } from "@/lib/prompt-history";
 import { browserStorage } from "@/lib/browser-storage";
+import { COMPOSER_CHIP_CLASS, SourceChipLabel } from "@/components/composer-chip";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input, Label } from "@/components/ui/input";
@@ -756,21 +755,15 @@ function SourceMenu({
   return (
     <Menu
       label={`Data source: ${source.name}, workspace ${source.workspaceId}${extra > 0 ? `, and ${extra} more` : ""}`}
-      className="h-10 w-auto max-w-full gap-1.5 border border-border bg-surface px-3 text-sm text-foreground"
+      className={COMPOSER_CHIP_CLASS}
       panelClassName="max-w-sm"
       trigger={
-        <>
-          {locked ? (
-            <Lock className="h-3.5 w-3.5 shrink-0 text-muted" aria-hidden />
-          ) : (
-            <Database className="h-3.5 w-3.5 shrink-0 text-muted" aria-hidden />
-          )}
-          <span className="truncate">{source.name}</span>
-          <span className="shrink-0 text-xs text-muted">
-            {source.workspaceId}
-            {extra > 0 && ` +${extra}`}
-          </span>
-        </>
+        <SourceChipLabel
+          name={source.name}
+          workspaceId={source.workspaceId}
+          extra={extra}
+          locked={locked}
+        />
       }
     >
       <MenuGroup label={`Sources (up to ${MAX_ADDITIONAL_SOURCES + 1}, one workspace)`}>

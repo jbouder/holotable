@@ -11,8 +11,10 @@ import { DEMO_DASHBOARD, dashboardId, waitForPanels } from "./support/app";
 
 test("explore answers a question with a guarded query", async ({ page }) => {
   await page.goto("/explore");
-  await page.getByRole("combobox", { name: "Data source" }).click();
-  await page.getByRole("option", { name: "Demo TimescaleDB metrics" }).click();
+  // The source is a chip in the prompt bar, like /dashboards/new (#362).
+  await page.getByRole("button", { name: /^Data source:/ }).click();
+  await page.getByRole("menuitemradio", { name: /Demo TimescaleDB metrics/ }).click();
+  await page.keyboard.press("Escape");
   await page.locator("#prompt").fill("Which service is busiest?");
   await page.getByRole("button", { name: "Explore" }).click();
   // The recorded panel's SQL ran on the server: real rows, real services.
