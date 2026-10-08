@@ -270,7 +270,7 @@ Once an answer is back, nothing on it asks the model again:
 - **This session** lists every question asked on the visit, newest first, up to
   20 (`src/lib/explore-session.ts`). One click brings an answer back; **Pin**
   holds one beside the current answer to compare them, and **Start over**
-  clears the list. It lives in page state only, so a reload starts over too.
+  asks, then clears the list. It lives in page state only, so a reload starts over too.
 
 ## Keeping an Explore answer
 

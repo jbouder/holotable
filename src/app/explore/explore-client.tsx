@@ -30,6 +30,7 @@ import {
   type TimeRange,
 } from "@/lib/ir";
 import { Button } from "@/components/ui/button";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { Input, Label } from "@/components/ui/input";
 import { AiUnavailable } from "@/components/ai-unavailable";
 import { Badge } from "@/components/ui/badge";
@@ -254,6 +255,7 @@ export function ExploreClient({
   const [refreshMs, setRefreshMs] = React.useState(0);
   const [prompt, setPrompt] = React.useState("");
   const [session, setSession] = React.useState<Session<Entry>>(emptySession);
+  const [confirmingStartOver, setConfirmingStartOver] = React.useState(false);
   // The entry whose Save as panel dialog is open.
   const [savingId, setSavingId] = React.useState<string | null>(null);
   // Catalog state for the picker, corrected in place by a Refresh from here.
@@ -637,10 +639,31 @@ export function ExploreClient({
             onShow={(id) => setSession((s) => showEntry(s, id))}
             onPin={(id) => setSession((s) => togglePin(s, id))}
             onRemove={(id, row) => void remove(id, row)}
-            onStartOver={startOver}
+            onStartOver={() => setConfirmingStartOver(true)}
           />
         </div>
       )}
+
+      <ConfirmDialog
+        open={confirmingStartOver}
+        onOpenChange={setConfirmingStartOver}
+        title="Start over?"
+        confirmLabel="Start over"
+        danger
+        onConfirm={startOver}
+      >
+        {session.entries.length > 0 ? (
+          <>
+            The {session.entries.length}{" "}
+            {session.entries.length === 1 ? "answer" : "answers"} from this visit{" "}
+            {session.entries.length === 1 ? "is" : "are"} cleared
+            {isLoading && ", and the question being answered is stopped"}. Anything saved
+            as a panel stays saved.
+          </>
+        ) : (
+          "The question being answered is stopped."
+        )}
+      </ConfirmDialog>
 
       {savingEntry && (
         <SavePanelDialog

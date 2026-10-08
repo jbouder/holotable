@@ -20,6 +20,14 @@ test("explore answers a question with a guarded query", async ({ page }) => {
   // The recorded panel's SQL ran on the server: real rows, real services.
   const table = page.getByRole("region", { name: "Requests by service, table" });
   await expect(table.getByRole("cell", { name: "api", exact: true })).toBeVisible();
+
+  // Start over asks, then clears the visit's answers.
+  await page.locator("#main").getByRole("button", { name: "Start over" }).click();
+  const dialog = page.getByRole("dialog", { name: "Start over?" });
+  await expect(dialog).toContainText("The 1 answer from this visit is cleared");
+  await dialog.getByRole("button", { name: "Start over" }).click();
+  await expect(table).toHaveCount(0);
+  await expect(page.getByRole("complementary", { name: "This session" })).toHaveCount(0);
 });
 
 test("new dashboard: Start over asks, then clears every version", async ({ page }) => {
