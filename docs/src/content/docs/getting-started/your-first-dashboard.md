@@ -98,12 +98,13 @@ table count matches what you expect.
 **Dashboards → New dashboard.**
 
 The source chip at the start of the prompt bar starts on the source you last
-generated against (or the first one); open it to pick another, or to add up to
-two more from the same workspace. Describe what you want to watch in plain
-English. Until you send the first prompt, suggestions built from your own
-catalog (so they name your tables, not a demo's) sit under the bar, and **Start
-from a template…** and your recent prompts sit above it on the right. Something concrete works better than
-something broad:
+generated against (or the first one); open it and tick the sources to use, up
+to three from one workspace. Describe what you want to watch in plain English.
+Until you send the first prompt, suggestions built from your own catalog (so
+they name your tables, not a demo's) sit under the bar, and **Start from a
+template…** and your recent prompts sit on the right of the page title, beside
+the model that will answer. Something concrete works better than something
+broad:
 
 > Request volume over time and the five slowest routes, plus a stat panel with
 > the total error count

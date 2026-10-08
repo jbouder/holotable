@@ -28,17 +28,56 @@ export function additionalSourceChoices<T extends PickableSource>(
   );
 }
 
-/** Tick or untick one; a tick past the cap is ignored. */
-export function toggleAdditionalSource(
-  selected: readonly string[],
+/** The sources a generation reads: the first one picked, and the others. */
+export interface SourceSelection {
+  primaryId: string | null;
+  additionalIds: string[];
+}
+
+/**
+ * Tick or untick one source in the single list the form shows. The first one
+ * picked is the primary and the rest are its others, so unticking the primary
+ * promotes the next. A tick in another workspace starts the selection over
+ * with that source, since a dashboard belongs to one; a tick past the cap, and
+ * unticking the last source, are ignored.
+ */
+export function toggleSource(
+  sources: readonly PickableSource[],
+  selection: SourceSelection,
   id: string,
   checked: boolean,
-): string[] {
-  if (!checked) return selected.filter((s) => s !== id);
-  if (selected.includes(id) || selected.length >= MAX_ADDITIONAL_SOURCES) {
-    return [...selected];
+): SourceSelection {
+  const { primaryId, additionalIds } = selection;
+  const unchanged = { primaryId, additionalIds: [...additionalIds] };
+  if (!checked) {
+    if (id === primaryId) {
+      const [next, ...rest] = additionalIds;
+      return next ? { primaryId: next, additionalIds: rest } : unchanged;
+    }
+    return { primaryId, additionalIds: additionalIds.filter((s) => s !== id) };
   }
-  return [...selected, id];
+  const picked = sources.find((s) => s.id === id);
+  if (!picked || id === primaryId || additionalIds.includes(id)) return unchanged;
+  const primary = sources.find((s) => s.id === primaryId);
+  if (!primary || primary.workspaceId !== picked.workspaceId) {
+    return { primaryId: id, additionalIds: [] };
+  }
+  if (additionalIds.length >= MAX_ADDITIONAL_SOURCES) return unchanged;
+  return { primaryId, additionalIds: [...additionalIds, id] };
+}
+
+/** Whether {@link toggleSource} would do anything for this source. */
+export function canToggleSource(
+  sources: readonly PickableSource[],
+  selection: SourceSelection,
+  id: string,
+): boolean {
+  const checked = id === selection.primaryId || selection.additionalIds.includes(id);
+  const next = toggleSource(sources, selection, id, !checked);
+  return (
+    next.primaryId !== selection.primaryId ||
+    next.additionalIds.join() !== selection.additionalIds.join()
+  );
 }
 
 /** What is still valid after the primary changed. */

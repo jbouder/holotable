@@ -53,9 +53,9 @@ data.
 ## More than one source
 
 A dashboard can be generated over up to three sources of one workspace: on
-`/dashboards/new`, pick the data source and tick up to two more under **Also
-use** (`additionalSourceIds` on the `dashboard` and `dashboard-refine`
-modes). It is still one model call. Each source is resolved and authorized on
+`/dashboards/new`, tick up to three in the source chip; the first one ticked
+is the primary and the others are sent as `additionalSourceIds` on the
+`dashboard` and `dashboard-refine` modes. It is still one model call. Each source is resolved and authorized on
 its own record, and one that is missing, removed, unchecked, outside the
 workspace or not the caller's to use refuses the request rather than being
 dropped.
@@ -208,9 +208,9 @@ picking another source there asks to start over rather than being refused.
 The page is laid out around that loop: a single-line prompt bar runs across
 the top, with the source chip at its start, and the preview (or its streaming
 skeleton) fills the page under it. Before the first prompt, a few starters sit
-under the bar, and **Start from a template…** and recent prompts above it; after it, the **Version** menu,
-**Try again**, **View JSON** (the raw spec) and **Save dashboard** sit above the
-preview.
+under the bar, and **Start from a template…** and recent prompts sit on the
+right of the page title; after it, the **Version** menu, **Try again**, **View
+JSON** (the raw spec) and **Save dashboard** sit above the preview.
 
 ## Asking again, and remembering what you asked
 
@@ -226,13 +226,13 @@ compounds it, and pressing Regenerate twice would drift further each time. The
 panel editor's regenerate works the same way one level down, against the panel
 in the spec rather than the proposal on screen.
 
-The model that answers is named once, under the prompt box, so the cost of
+The model that answers is named once, beside the page title, so the cost of
 asking again is visible; a version applied from a template says *no model
 call*, because none was made.
 
 **Recent prompts.** The prompt box keeps the last few prompts per workspace and
-offers them back (on `/dashboards/new`, above the bar on a fresh screen);
-choosing one fills
+offers them back (on `/dashboards/new`, beside the page title on a fresh
+screen); choosing one fills
 the box rather than submitting, so re-use and edit are the same gesture. The create box, the panel
 editor's NL edit and Explore keep separate lists — "make it a bar chart" is a
 panel edit and is nonsense as a dashboard description.

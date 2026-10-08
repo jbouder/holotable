@@ -29,6 +29,7 @@ import {
 import { PromptHistoryMenu, usePromptHistory } from "@/components/prompt-history";
 import { PROMPT_MAX_LENGTH, promptLabel } from "@/lib/prompt-history";
 import { browserStorage } from "@/lib/browser-storage";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input, Label } from "@/components/ui/input";
 import { AiUnavailable } from "@/components/ai-unavailable";
@@ -44,11 +45,12 @@ import {
 import { Dialog } from "@/components/ui/dialog";
 import {
   additionalSourceChoices,
+  canToggleSource,
   defaultSourceId,
   MAX_ADDITIONAL_SOURCES,
   pruneAdditionalSources,
   readLastSource,
-  toggleAdditionalSource,
+  toggleSource,
   writeLastSource,
 } from "@/lib/source-selection";
 import { Card, CardContent } from "@/components/ui/card";
@@ -298,15 +300,26 @@ export function NewDashboardClient({
     setRetrying(false);
   }
 
+  /** Tick or untick a source in the chip's one list (`toggleSource`). */
+  function applySourceToggle(id: string, checked: boolean) {
+    const next = toggleSource(
+      sources,
+      { primaryId: sourceId, additionalIds },
+      id,
+      checked,
+    );
+    setSourceIdState(next.primaryId);
+    setAdditionalIds(next.additionalIds);
+  }
+
   /**
-   * Every panel's `query.sourceId` must match the source the spec was
-   * generated against, so a conversation cannot change source midway. Picking
+   * Every panel's `query.sourceId` must match a source the spec was generated
+   * against, so a conversation cannot change its sources midway. Ticking
    * another one asks to start over instead of being silently refused.
    */
-  function chooseSource(id: string) {
-    if (id === sourceId) return;
-    if (refining) setPendingSourceId(id);
-    else setSourceId(id);
+  function pickSource(id: string, checked: boolean) {
+    if (!refining) applySourceToggle(id, checked);
+    else if (checked) setPendingSourceId(id);
   }
 
   /** Preview an earlier turn. The feedback box belongs to the turn it was typed on. */
@@ -366,26 +379,31 @@ export function NewDashboardClient({
 
   return (
     <div className="space-y-6">
-      <PageHeader title="New dashboard" description={description} />
+      <PageHeader
+        title="New dashboard"
+        badge={model && <Badge title="Generation model">{model}</Badge>}
+        description={description}
+        actions={
+          // Other ways to start, on a fresh screen only: a template (which
+          // starts a conversation and cannot join one) and this workspace's
+          // recent prompts, which fill the box rather than sending.
+          !refining &&
+          !isLoading && (
+            <>
+              <Button variant="ghost" size="sm" onClick={() => setPicking(true)}>
+                <LayoutTemplate className="h-4 w-4" aria-hidden /> Start from a template…
+              </Button>
+              <PromptHistoryMenu history={prompts} onPick={setPrompt} />
+            </>
+          )
+        }
+      />
 
       {/*
         The composer, across the top for the whole conversation: the source it
         reads, then one line to say what to build or what to change.
       */}
       <section aria-label="Prompt" className="space-y-3">
-        {/*
-          Other ways to start, on a fresh screen only: a template (which starts
-          a conversation and cannot join one) and this workspace's recent
-          prompts, which fill the box rather than sending.
-        */}
-        {!refining && !isLoading && (
-          <div className="flex items-center justify-end gap-1">
-            <Button variant="ghost" size="sm" onClick={() => setPicking(true)}>
-              <LayoutTemplate className="h-4 w-4" aria-hidden /> Start from a template…
-            </Button>
-            <PromptHistoryMenu history={prompts} onPick={setPrompt} />
-          </div>
-        )}
         <form
           className="flex flex-wrap items-center gap-2 sm:flex-nowrap"
           onSubmit={(e) => {
@@ -398,13 +416,9 @@ export function NewDashboardClient({
               sources={sources}
               source={source}
               locked={refining}
-              additionalChoices={additionalChoices}
               additionalIds={additionalIds}
               disabled={isLoading}
-              onChoose={chooseSource}
-              onToggleAdditional={(id, next) =>
-                setAdditionalIds((ids) => toggleAdditionalSource(ids, id, next))
-              }
+              onToggle={pickSource}
             />
           )}
           <Label htmlFor="prompt" className="sr-only">
@@ -472,11 +486,6 @@ export function NewDashboardClient({
               </button>
             ))}
           </div>
-        )}
-        {model && (
-          <p className="text-xs text-muted">
-            Generates with <span className="text-foreground">{model}</span>. Enter sends.
-          </p>
         )}
 
         {[source, ...additionalSources].map(
@@ -681,7 +690,7 @@ export function NewDashboardClient({
       >
         <div className="space-y-4">
           <p className="text-sm text-muted">
-            Every panel reads the source it was generated against, so switching to{" "}
+            Every panel reads the source it was generated against, so using{" "}
             <span className="text-foreground">{pendingSource?.name}</span> starts a new
             conversation. Your {history.turns.length} unsaved{" "}
             {history.turns.length === 1 ? "version is" : "versions are"} discarded.
@@ -694,7 +703,7 @@ export function NewDashboardClient({
               onClick={() => {
                 if (!pendingSourceId) return;
                 startOver();
-                setSourceId(pendingSourceId);
+                applySourceToggle(pendingSourceId, true);
                 setPendingSourceId(null);
               }}
             >
@@ -721,31 +730,29 @@ export function NewDashboardClient({
 }
 
 /**
- * The source chip: what the dashboard will read, and the one place to change
- * it or add the others (#104). A menu of radio and checkbox items rather than
- * a form field, so before the first prompt it is one compact control.
+ * The source chip: what the dashboard will read (#104), and the one place to
+ * change it. One list of checkbox items: the first ticked is the primary, up
+ * to {@link MAX_ADDITIONAL_SOURCES} more come from its workspace, and a tick in
+ * another workspace starts over with that source (`toggleSource`).
  */
 function SourceMenu({
   sources,
   source,
   locked,
-  additionalChoices,
   additionalIds,
   disabled,
-  onChoose,
-  onToggleAdditional,
+  onToggle,
 }: {
   sources: SourceOption[];
   source: SourceOption;
-  /** A conversation is open: choosing another source asks to start over. */
+  /** A conversation is open: ticking another source asks to start over. */
   locked: boolean;
-  additionalChoices: SourceOption[];
   additionalIds: string[];
   disabled: boolean;
-  onChoose: (id: string) => void;
-  onToggleAdditional: (id: string, checked: boolean) => void;
+  onToggle: (id: string, checked: boolean) => void;
 }) {
   const extra = additionalIds.length;
+  const selection = { primaryId: source.id, additionalIds };
   return (
     <Menu
       label={`Data source: ${source.name}, workspace ${source.workspaceId}${extra > 0 ? `, and ${extra} more` : ""}`}
@@ -766,47 +773,30 @@ function SourceMenu({
         </>
       }
     >
-      <MenuRadioGroup
-        label={locked ? "Source (changing it starts over)" : "Source"}
-        value={source.id}
-        onValueChange={onChoose}
-      >
-        {sources.map((s) => (
-          <MenuRadioItem key={s.id} value={s.id}>
-            <span className="truncate">{s.name}</span>
-            <span className="text-xs text-muted">{s.workspaceId}</span>
-          </MenuRadioItem>
-        ))}
-      </MenuRadioGroup>
-      {additionalChoices.length > 0 && (
-        <>
-          <MenuSeparator />
-          <MenuGroup label={`Also use (up to ${MAX_ADDITIONAL_SOURCES} more)`}>
-            {additionalChoices.map((s) => {
-              const checked = additionalIds.includes(s.id);
-              return (
-                <MenuCheckboxItem
-                  key={s.id}
-                  checked={checked}
-                  disabled={
-                    locked ||
-                    disabled ||
-                    (!checked && additionalIds.length >= MAX_ADDITIONAL_SOURCES)
-                  }
-                  onCheckedChange={(next) => onToggleAdditional(s.id, next)}
-                >
-                  <span className="truncate">{s.name}</span>
-                </MenuCheckboxItem>
-              );
-            })}
-          </MenuGroup>
-          <p className="px-2 pt-1 pb-1.5 text-xs text-muted">
-            {locked
-              ? "Fixed for this conversation; start over to change them."
-              : "Each panel reads one source; a query never combines two."}
-          </p>
-        </>
-      )}
+      <MenuGroup label={`Sources (up to ${MAX_ADDITIONAL_SOURCES + 1}, one workspace)`}>
+        {sources.map((s) => {
+          const checked = s.id === source.id || additionalIds.includes(s.id);
+          return (
+            <MenuCheckboxItem
+              key={s.id}
+              checked={checked}
+              disabled={
+                disabled ||
+                (locked ? checked : !canToggleSource(sources, selection, s.id))
+              }
+              onCheckedChange={(next) => onToggle(s.id, next)}
+            >
+              <span className="truncate">{s.name}</span>
+              <span className="text-xs text-muted">{s.workspaceId}</span>
+            </MenuCheckboxItem>
+          );
+        })}
+      </MenuGroup>
+      <p className="px-2 pt-1 pb-1.5 text-xs text-muted">
+        {locked
+          ? "Fixed for this conversation; ticking another starts over."
+          : "Each panel reads one source; a query never combines two."}
+      </p>
     </Menu>
   );
 }

@@ -17,8 +17,10 @@ import { SourceConfig, type SourceRecord } from "@/lib/registry";
 import {
   additionalSourceChoices,
   MAX_ADDITIONAL_SOURCES,
+  canToggleSource,
   pruneAdditionalSources,
-  toggleAdditionalSource,
+  type SourceSelection,
+  toggleSource,
 } from "@/lib/source-selection";
 import { WorkspacePrompt } from "@/lib/workspace-prompt";
 import { usableWorkspacePrompt } from "@/lib/workspace-prompt-service";
@@ -311,12 +313,48 @@ test("the form offers only the primary's workspace, and at most two more", () =>
   );
   assert.deepEqual(additionalSourceChoices(all, null), []);
 
-  let picked = toggleAdditionalSource([], "src-infra", true);
-  picked = toggleAdditionalSource(picked, "src-logs", true);
-  assert.deepEqual(toggleAdditionalSource(picked, "src-x", true), picked);
-  assert.deepEqual(toggleAdditionalSource(picked, "src-infra", false), ["src-logs"]);
-
   // Changing the primary drops what is no longer a valid other.
+  const picked = ["src-infra", "src-logs"];
   assert.deepEqual(pruneAdditionalSources(picked, all, "src-infra"), ["src-logs"]);
   assert.deepEqual(pruneAdditionalSources(picked, all, "src-other"), []);
+});
+
+test("one source list: the first pick is primary, the rest its others", () => {
+  const other = makeSource("src-other", "t", { workspaceId: "ws-2" });
+  const fourth = makeSource("src-fourth", "t");
+  const all = [app, infra, logs, fourth, other];
+  const start: SourceSelection = { primaryId: "src-app", additionalIds: [] };
+
+  let sel = toggleSource(all, start, "src-infra", true);
+  sel = toggleSource(all, sel, "src-logs", true);
+  assert.deepEqual(sel, {
+    primaryId: "src-app",
+    additionalIds: ["src-infra", "src-logs"],
+  });
+
+  // Three in all: a fourth tick in the workspace is ignored, and offered as such.
+  assert.deepEqual(toggleSource(all, sel, "src-fourth", true), sel);
+  assert.equal(canToggleSource(all, sel, "src-fourth"), false);
+
+  // Unticking the primary promotes the next pick.
+  assert.deepEqual(toggleSource(all, sel, "src-app", false), {
+    primaryId: "src-infra",
+    additionalIds: ["src-logs"],
+  });
+  assert.deepEqual(toggleSource(all, sel, "src-infra", false), {
+    primaryId: "src-app",
+    additionalIds: ["src-logs"],
+  });
+
+  // Another workspace starts over with that source alone, even when full.
+  assert.deepEqual(toggleSource(all, sel, "src-other", true), {
+    primaryId: "src-other",
+    additionalIds: [],
+  });
+  assert.equal(canToggleSource(all, sel, "src-other"), true);
+
+  // The last source cannot be unticked; an unknown id changes nothing.
+  assert.deepEqual(toggleSource(all, start, "src-app", false), start);
+  assert.equal(canToggleSource(all, start, "src-app"), false);
+  assert.deepEqual(toggleSource(all, start, "src-x", true), start);
 });
