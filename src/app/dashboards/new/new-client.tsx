@@ -36,12 +36,11 @@ import {
   Menu,
   MenuCheckboxItem,
   MenuGroup,
-  MenuItem,
   MenuRadioGroup,
   MenuRadioItem,
-  MenuSeparator,
 } from "@/components/ui/menu";
 import { Dialog } from "@/components/ui/dialog";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import {
   additionalSourceChoices,
   canToggleSource,
@@ -143,6 +142,7 @@ export function NewDashboardClient({
   const [saving, setSaving] = React.useState(false);
   const [confirmingSave, setConfirmingSave] = React.useState(false);
   const [showJson, setShowJson] = React.useState(false);
+  const [confirmingStartOver, setConfirmingStartOver] = React.useState(false);
   const [picking, setPicking] = React.useState(false);
   // A source picked while a conversation is open, waiting on "start over?".
   const [pendingSourceId, setPendingSourceId] = React.useState<string | null>(null);
@@ -383,11 +383,20 @@ export function NewDashboardClient({
         badge={model && <Badge title="Generation model">{model}</Badge>}
         description={description}
         actions={
-          // Other ways to start, on a fresh screen only: a template (which
-          // starts a conversation and cannot join one) and this workspace's
-          // recent prompts, which fill the box rather than sending.
-          !refining &&
-          !isLoading && (
+          // On a fresh screen, other ways to start: a template (which starts
+          // a conversation and cannot join one) and this workspace's recent
+          // prompts, which fill the box rather than sending. Once there is
+          // something to lose, the way back to that screen.
+          refining || isLoading ? (
+            <Button
+              variant="ghost"
+              size="sm"
+              disabled={saving}
+              onClick={() => setConfirmingStartOver(true)}
+            >
+              <RotateCcw className="h-4 w-4" aria-hidden /> Start over
+            </Button>
+          ) : (
             <>
               <Button variant="ghost" size="sm" onClick={() => setPicking(true)}>
                 <LayoutTemplate className="h-4 w-4" aria-hidden /> Start from a template…
@@ -577,10 +586,6 @@ export function NewDashboardClient({
                       </MenuRadioItem>
                     ))}
                   </MenuRadioGroup>
-                  <MenuSeparator />
-                  <MenuItem onClick={startOver} disabled={saving}>
-                    <RotateCcw className="h-4 w-4" /> Start over
-                  </MenuItem>
                 </Menu>
                 {/*
                   Ask again for THIS version, rather than talking the dashboard
@@ -664,6 +669,26 @@ export function NewDashboardClient({
           onSave={(title) => void save(title)}
         />
       )}
+
+      <ConfirmDialog
+        open={confirmingStartOver}
+        onOpenChange={setConfirmingStartOver}
+        title="Start over?"
+        confirmLabel="Start over"
+        danger
+        onConfirm={startOver}
+      >
+        {history.turns.length > 0 ? (
+          <>
+            Your {history.turns.length} unsaved{" "}
+            {history.turns.length === 1 ? "version is" : "versions are"} discarded
+            {isLoading && ", and the one being generated is stopped"}. Nothing has been
+            saved.
+          </>
+        ) : (
+          "The dashboard being generated is stopped and discarded."
+        )}
+      </ConfirmDialog>
 
       <Dialog
         open={showJson && finalSpec !== null}

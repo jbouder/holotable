@@ -22,6 +22,28 @@ test("explore answers a question with a guarded query", async ({ page }) => {
   await expect(table.getByRole("cell", { name: "api", exact: true })).toBeVisible();
 });
 
+test("new dashboard: Start over asks, then clears every version", async ({ page }) => {
+  await page.goto("/dashboards/new");
+  await page.getByLabel("Describe the dashboard").fill("Checkout service health");
+  await page.getByRole("button", { name: "Generate" }).click();
+  const preview = page.getByRole("region", { name: "Dashboard preview" });
+  await expect(preview.getByRole("button", { name: "Save dashboard" })).toBeVisible();
+  const startOver = page.locator("#main").getByRole("button", { name: "Start over" });
+  const dialog = page.getByRole("dialog", { name: "Start over?" });
+
+  // Cancel keeps the work.
+  await startOver.click();
+  await expect(dialog).toContainText("1 unsaved version is discarded");
+  await dialog.getByRole("button", { name: "Cancel" }).click();
+  await expect(preview.getByRole("button", { name: "Save dashboard" })).toBeVisible();
+
+  // Confirming goes back to a fresh screen.
+  await startOver.click();
+  await dialog.getByRole("button", { name: "Start over" }).click();
+  await expect(preview.getByRole("button", { name: "Save dashboard" })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: /Start from a template/ })).toBeVisible();
+});
+
 test("dashboard chat answers in the panel", async ({ page, request }) => {
   await page.goto(`/dashboards/${await dashboardId(request, DEMO_DASHBOARD)}`);
   await page.getByRole("button", { name: "Ask about this dashboard" }).click();
