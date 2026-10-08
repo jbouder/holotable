@@ -60,10 +60,23 @@ test("source → generate → save → stream → pause → resume → edit → 
   let dashboardUrl = "";
   await test.step("generate a dashboard from a prompt and save it", async () => {
     await page.goto("/dashboards/new");
-    // The source is a chip (#356); its menu holds the picker.
+    // The source is a chip (#356) holding one checkbox list (#362): tick this
+    // source, then untick the one the page started on, so it is the only one.
     await page.getByRole("button", { name: /^Data source:/ }).click();
-    await page.getByRole("menuitemradio", { name: new RegExp(sourceName) }).click();
+    const sources = page.getByRole("menu");
+    const pick = sources.getByRole("menuitemcheckbox", { name: new RegExp(sourceName) });
+    if ((await pick.getAttribute("aria-checked")) !== "true") await pick.click();
+    await expect(pick).toHaveAttribute("aria-checked", "true");
+    const others = sources
+      .getByRole("menuitemcheckbox", { checked: true })
+      .filter({ hasNotText: sourceName });
+    while ((await others.count()) > 0) await others.first().click();
     await page.keyboard.press("Escape");
+    await expect(
+      page.getByRole("button", {
+        name: new RegExp(`^Data source: ${sourceName}, workspace [^,]+$`),
+      }),
+    ).toBeVisible();
     await page.getByLabel("Describe the dashboard").fill("Checkout service health");
     await page.getByRole("button", { name: "Generate" }).click();
     // The recorded spec (src/lib/ai/stub.ts), previewed where the author is
