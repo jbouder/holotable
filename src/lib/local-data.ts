@@ -1,4 +1,5 @@
 import type { BrowserStorage } from "@/lib/browser-storage";
+import { CHAT_EXPANDED_KEY } from "@/lib/chat-layout";
 import { EXPLORE_SESSION_KEY } from "@/lib/explore-session-store";
 import { clearRecents, parseRecents, RECENTS_STORAGE_KEY } from "@/lib/command-palette";
 import { clearRecent, readRecent, RECENT_KEY } from "@/lib/dashboard-list";
@@ -134,6 +135,11 @@ export const LOCAL_STORAGE_EXCLUSIONS: readonly { key: KeyMatch; reason: string 
     key: { exact: EXPLORE_SESSION_KEY },
     reason:
       "Session storage: Explore's questions in this tab, kept across a reload only while Preferences says so. Never rows; cleared by Start over and gone with the tab.",
+  },
+  {
+    key: { exact: CHAT_EXPANDED_KEY },
+    reason:
+      "A layout choice: whether the dashboard chat opens expanded. Set from the chat's own expand button.",
   },
 ];
 

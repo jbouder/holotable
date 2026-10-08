@@ -1,5 +1,6 @@
 import type * as React from "react";
 import { Compass } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 /**
  * While the model writes a spec: one line, the compass pulsing, and the title
@@ -19,12 +20,32 @@ export function ComposingStatus({
   detail?: string;
 }) {
   return (
-    <p role="status" className="flex items-center gap-2 text-sm text-muted">
+    <WorkingStatus>
+      {title ? `Composing “${title}”…` : `Composing ${what}…`}
+      {detail && ` · ${detail}`}
+    </WorkingStatus>
+  );
+}
+
+/**
+ * The pulsing compass and a short line of what the model is doing. The one
+ * waiting state every model surface shows: Explore, a new dashboard, and the
+ * dashboard chat's "Thinking…" and "Querying data…" (#366).
+ */
+export function WorkingStatus({
+  children,
+  className,
+}: {
+  children: React.ReactNode;
+  className?: string;
+}) {
+  return (
+    <p
+      role="status"
+      className={cn("flex items-center gap-2 text-sm text-muted", className)}
+    >
       <Compass className="h-4 w-4 shrink-0 animate-pulse" aria-hidden />
-      <span>
-        {title ? `Composing “${title}”…` : `Composing ${what}…`}
-        {detail && ` · ${detail}`}
-      </span>
+      <span>{children}</span>
     </p>
   );
 }

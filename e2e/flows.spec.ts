@@ -53,14 +53,64 @@ test("new dashboard: Start over asks, then clears every version", async ({ page 
 });
 
 test("dashboard chat answers in the panel", async ({ page, request }) => {
-  await page.goto(`/dashboards/${await dashboardId(request, DEMO_DASHBOARD)}`);
-  await page.getByRole("button", { name: "Ask about this dashboard" }).click();
-  const chat = page
-    .getByRole("complementary", { name: "Dashboard chat" })
-    .or(page.locator('[aria-label="Dashboard chat"]'));
+  // A window that is not the dashboard's own, so the URL carries it (#366).
+  await page.goto(
+    `/dashboards/${await dashboardId(request, DEMO_DASHBOARD)}?from=now-2d&to=now`,
+  );
+  const launcher = page.getByRole("button", { name: "Ask about this dashboard" });
+  await launcher.click();
+  const chat = page.getByRole("dialog", { name: "Dashboard chat" });
+  // Start clean: an earlier run's conversation is stored per person.
+  const clear = chat.getByRole("button", { name: "Clear chat" });
+  if (await clear.isVisible()) await clear.click();
+  const suggestions = chat.getByRole("group", { name: "Suggested questions" });
+  await expect(suggestions).toBeVisible();
+
+  const sent = page.waitForRequest(
+    (r) => r.method() === "POST" && r.url().endsWith("/chat"),
+  );
   await chat.getByRole("textbox", { name: "Message" }).fill("What is on this dashboard?");
   await chat.getByRole("button", { name: "Send" }).click();
+  // The question carries the window on screen; the server resolves it.
+  expect((await sent).postDataJSON().timeRange).toEqual({ from: "now-2d", to: "now" });
   await expect(chat.getByText(STUB_CHAT_REPLY)).toBeVisible();
+
+  // Once a conversation has started, the suggestions are not offered again.
+  await expect(suggestions).toHaveCount(0);
+  await expect(chat.getByRole("button", { name: "Copy answer" })).toBeVisible();
+  await expect(chat.getByRole("button", { name: "Try again" })).toBeVisible();
+
+  // Escape closes it and hands focus back; C opens it again.
+  await chat.getByRole("textbox", { name: "Message" }).press("Escape");
+  await expect(chat).toHaveCount(0);
+  await expect(launcher).toBeFocused();
+  await page.keyboard.press("c");
+  await expect(chat.getByText(STUB_CHAT_REPLY)).toBeVisible();
+
+  // Clearing brings the suggestions back.
+  await chat.getByRole("button", { name: "Clear chat" }).click();
+  await expect(suggestions).toBeVisible();
+  await chat.getByRole("button", { name: "Close chat" }).click();
+  await expect(chat).toHaveCount(0);
+
+  // "Ask about this panel" opens the chat on that panel, and sends only its id.
+  const actions = page.getByRole("button", { name: /^Actions for / }).first();
+  const title = ((await actions.getAttribute("aria-label")) ?? "").replace(
+    /^Actions for /,
+    "",
+  );
+  await actions.click();
+  await page.getByRole("menuitem", { name: "Ask about this panel" }).click();
+  await expect(chat.getByText(title, { exact: false }).first()).toBeVisible();
+  const about = page.waitForRequest(
+    (r) => r.method() === "POST" && r.url().endsWith("/chat"),
+  );
+  await chat.getByRole("button", { name: /^Explain what / }).click();
+  const body = (await about).postDataJSON();
+  expect(typeof body.panelId).toBe("string");
+  expect(JSON.stringify(body)).not.toMatch(/SELECT/i);
+  await expect(chat.getByText(STUB_CHAT_REPLY)).toBeVisible();
+  await chat.getByRole("button", { name: "Clear chat" }).click();
 });
 
 test("a deleted source tombstones the panels that used it", async ({ page, request }) => {

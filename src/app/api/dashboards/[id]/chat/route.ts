@@ -12,7 +12,17 @@ import {
   getSourceById,
   listChatMessages,
 } from "@/lib/db/repo";
-import { resolveChatSources, streamDashboardChat } from "@/lib/ai/chat";
+import { resolveChatSources, resolveChatView, streamDashboardChat } from "@/lib/ai/chat";
+import {
+  Panel,
+  TimeRange,
+  VARIABLE_VALUES_MAX,
+  VariableName,
+  VariableText,
+} from "@/lib/ir";
+import { resolveTimeRange } from "@/lib/time";
+import { rowScopeFor } from "@/lib/row-scope";
+import { checkedSelection, variableSourceIds } from "@/lib/variables";
 import { requireModel } from "@/lib/ai/model-resolution";
 import { enforceLlmLimits } from "@/lib/limits/llm";
 import { messagesToPersist, parseStoredMessages } from "@/lib/chat-history";
@@ -25,8 +35,19 @@ export const maxDuration = 60;
 // UIMessage has a rich, evolving shape owned by the AI SDK; we validate the
 // envelope (a bounded, non-empty array) and let convertToModelMessages enforce
 // the rest. The SQL/query surface is guarded server-side regardless of input.
+//
+// The rest is what the reader has on screen (#366), every field a request the
+// server checks rather than a fact: the range is an IR time expression it
+// resolves itself, the picks go through the stream's allowlist, and the panel
+// is an id looked up in the stored spec. None of them carries SQL.
 const Body = z.object({
   messages: z.array(z.unknown()).min(1).max(100),
+  timeRange: TimeRange.optional(),
+  variables: z
+    .record(VariableName, z.array(VariableText).max(VARIABLE_VALUES_MAX))
+    .refine((v) => Object.keys(v).length <= 20, "at most 20 variables")
+    .optional(),
+  panelId: Panel.shape.id.optional(),
 });
 
 type RouteParams = { params: Promise<{ id: string }> };
@@ -114,10 +135,36 @@ export const POST = route("dashboards.chat", async (req: Request, ctx: RoutePara
     model: resolved.modelId,
   });
 
+  if (body.timeRange) {
+    try {
+      resolveTimeRange(body.timeRange);
+    } catch {
+      throw new HttpError(400, "invalid time range", {}, "validation");
+    }
+  }
+
   const sources = await resolveChatSources({
     identity,
     dashboard: dashboard.spec,
     getSource: getSourceById,
+  });
+
+  // The picks are checked exactly as the stream checks them: against what
+  // each variable offers this reader, under their row scope.
+  const variableSources = (
+    await Promise.all(variableSourceIds(dashboard.spec.variables).map(getSourceById))
+  ).filter(
+    (s): s is NonNullable<typeof s> =>
+      s !== null && !s.tombstonedAt && s.workspaceId === dashboard.workspaceId,
+  );
+  const scope = rowScopeFor(identity, [...sources, ...variableSources]);
+  const { dashboard: viewed, view } = await resolveChatView({
+    dashboard: dashboard.spec,
+    timeRange: body.timeRange,
+    picks: body.variables ?? {},
+    panelId: body.panelId,
+    check: (picks) =>
+      checkedSelection(dashboard.spec.variables, picks, dashboard.workspaceId, scope),
   });
 
   const incoming = body.messages as UIMessage[];
@@ -131,13 +178,20 @@ export const POST = route("dashboards.chat", async (req: Request, ctx: RoutePara
     action: "dashboard.chat",
     workspaceId: dashboard.workspaceId,
     resource: { type: "dashboard", id },
-    detail: { messageCount: incoming.length, modelConfig: resolved.source },
+    detail: {
+      messageCount: incoming.length,
+      modelConfig: resolved.source,
+      timeRange: viewed.timeRange,
+      variables: view.variables,
+      panelId: view.focusPanelId,
+    },
   });
 
   const result = await streamDashboardChat({
-    dashboard: dashboard.spec,
+    dashboard: viewed,
     sources,
     identity,
+    view,
     model: resolved.model,
     messages: incoming,
     onUsage: usage.record,

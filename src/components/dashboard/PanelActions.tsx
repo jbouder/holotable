@@ -1,7 +1,13 @@
 "use client";
 
 import type * as React from "react";
-import { Download, Image as ImageIcon, Maximize2, Minimize2 } from "lucide-react";
+import {
+  Download,
+  Image as ImageIcon,
+  Maximize2,
+  MessageSquare,
+  Minimize2,
+} from "lucide-react";
 import { Menu, MenuItem, MenuSeparator } from "@/components/ui/menu";
 import type { EChartHandle } from "@/components/charts/EChart";
 import {
@@ -14,10 +20,10 @@ import {
 import { resolveColor } from "@/lib/color/oklch";
 
 /**
- * The per-panel overflow menu: enlarge it, or take what it holds out of the
- * browser (#76).
+ * The per-panel overflow menu: enlarge it, ask the dashboard chat about it
+ * (#366), or take what it holds out of the browser (#76).
  *
- * Every action here is local. Nothing asks the server for anything, so an
+ * The exports are local. Nothing asks the server for anything, so an
  * export cannot contain a row the panel was not already showing and cannot
  * become a second, unguarded way to run a query — which is also why the CSV
  * item says out loud that it is the current window.
@@ -30,6 +36,7 @@ export function PanelActions({
   exportable = true,
   expanded,
   onToggleExpanded,
+  onAskAbout,
 }: {
   panelTitle: string;
   dashboardTitle?: string;
@@ -40,6 +47,11 @@ export function PanelActions({
   chart?: React.RefObject<EChartHandle | null>;
   expanded: boolean;
   onToggleExpanded: () => void;
+  /**
+   * Open the dashboard chat about this panel (#366). Absent where there is no
+   * chat: an embed, the editor, Explore.
+   */
+  onAskAbout?: () => void;
 }) {
   const hasRows = data.columns.length > 0 && data.rows.length > 0;
 
@@ -81,6 +93,11 @@ export function PanelActions({
           </>
         )}
       </MenuItem>
+      {onAskAbout && (
+        <MenuItem onClick={onAskAbout}>
+          <MessageSquare className="h-4 w-4" /> Ask about this panel
+        </MenuItem>
+      )}
       {exportable && <MenuSeparator />}
       {exportable && (
         <MenuItem onClick={exportCsv} disabled={!hasRows}>
