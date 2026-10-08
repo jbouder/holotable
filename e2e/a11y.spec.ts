@@ -45,6 +45,24 @@ for (const theme of THEMES) {
       await expectNoA11yViolations(page);
     });
 
+    test("explore with an answer: the view toggles, table tools and session", async ({
+      page,
+    }) => {
+      await page.goto("/explore");
+      await page.getByRole("button", { name: /^Data source:/ }).click();
+      await page.getByRole("menuitemradio", { name: /Demo TimescaleDB metrics/ }).click();
+      await page.keyboard.press("Escape");
+      await page.locator("#prompt").fill("Which service is busiest?");
+      await page.getByRole("button", { name: "Explore" }).click();
+      const table = page.getByRole("region", { name: "Requests by service, table" });
+      await expect(table.getByRole("cell", { name: "api", exact: true })).toBeVisible();
+      // Every control the answer brings: pin it, open the column filters.
+      await page.getByRole("button", { name: "Pin", exact: true }).click();
+      await page.getByRole("button", { name: "Column filters" }).click();
+      await expect(page.getByRole("textbox", { name: /^Filter / }).first()).toBeVisible();
+      await expectNoA11yViolations(page);
+    });
+
     test("data sources", async ({ page }) => {
       await page.goto("/data-sources");
       await expect(page.getByRole("heading", { level: 1 })).toBeVisible();

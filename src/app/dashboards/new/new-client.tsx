@@ -5,11 +5,9 @@ import * as React from "react";
 import { useRouter } from "next/navigation";
 import {
   Braces,
-  Database,
   History,
   LayoutTemplate,
   Loader2,
-  Lock,
   RefreshCw,
   RotateCcw,
   Save,
@@ -29,6 +27,7 @@ import {
 import { PromptHistoryMenu, usePromptHistory } from "@/components/prompt-history";
 import { PROMPT_MAX_LENGTH, promptLabel } from "@/lib/prompt-history";
 import { browserStorage } from "@/lib/browser-storage";
+import { COMPOSER_CHIP_CLASS, SourceChipLabel } from "@/components/composer-chip";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input, Label } from "@/components/ui/input";
@@ -37,12 +36,11 @@ import {
   Menu,
   MenuCheckboxItem,
   MenuGroup,
-  MenuItem,
   MenuRadioGroup,
   MenuRadioItem,
-  MenuSeparator,
 } from "@/components/ui/menu";
 import { Dialog } from "@/components/ui/dialog";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import {
   additionalSourceChoices,
   canToggleSource,
@@ -144,6 +142,7 @@ export function NewDashboardClient({
   const [saving, setSaving] = React.useState(false);
   const [confirmingSave, setConfirmingSave] = React.useState(false);
   const [showJson, setShowJson] = React.useState(false);
+  const [confirmingStartOver, setConfirmingStartOver] = React.useState(false);
   const [picking, setPicking] = React.useState(false);
   // A source picked while a conversation is open, waiting on "start over?".
   const [pendingSourceId, setPendingSourceId] = React.useState<string | null>(null);
@@ -384,11 +383,20 @@ export function NewDashboardClient({
         badge={model && <Badge title="Generation model">{model}</Badge>}
         description={description}
         actions={
-          // Other ways to start, on a fresh screen only: a template (which
-          // starts a conversation and cannot join one) and this workspace's
-          // recent prompts, which fill the box rather than sending.
-          !refining &&
-          !isLoading && (
+          // On a fresh screen, other ways to start: a template (which starts
+          // a conversation and cannot join one) and this workspace's recent
+          // prompts, which fill the box rather than sending. Once there is
+          // something to lose, the way back to that screen.
+          refining || isLoading ? (
+            <Button
+              variant="ghost"
+              size="sm"
+              disabled={saving}
+              onClick={() => setConfirmingStartOver(true)}
+            >
+              <RotateCcw className="h-4 w-4" aria-hidden /> Start over
+            </Button>
+          ) : (
             <>
               <Button variant="ghost" size="sm" onClick={() => setPicking(true)}>
                 <LayoutTemplate className="h-4 w-4" aria-hidden /> Start from a template…
@@ -578,10 +586,6 @@ export function NewDashboardClient({
                       </MenuRadioItem>
                     ))}
                   </MenuRadioGroup>
-                  <MenuSeparator />
-                  <MenuItem onClick={startOver} disabled={saving}>
-                    <RotateCcw className="h-4 w-4" /> Start over
-                  </MenuItem>
                 </Menu>
                 {/*
                   Ask again for THIS version, rather than talking the dashboard
@@ -665,6 +669,26 @@ export function NewDashboardClient({
           onSave={(title) => void save(title)}
         />
       )}
+
+      <ConfirmDialog
+        open={confirmingStartOver}
+        onOpenChange={setConfirmingStartOver}
+        title="Start over?"
+        confirmLabel="Start over"
+        danger
+        onConfirm={startOver}
+      >
+        {history.turns.length > 0 ? (
+          <>
+            Your {history.turns.length} unsaved{" "}
+            {history.turns.length === 1 ? "version is" : "versions are"} discarded
+            {isLoading && ", and the one being generated is stopped"}. Nothing has been
+            saved.
+          </>
+        ) : (
+          "The dashboard being generated is stopped and discarded."
+        )}
+      </ConfirmDialog>
 
       <Dialog
         open={showJson && finalSpec !== null}
@@ -756,21 +780,15 @@ function SourceMenu({
   return (
     <Menu
       label={`Data source: ${source.name}, workspace ${source.workspaceId}${extra > 0 ? `, and ${extra} more` : ""}`}
-      className="h-10 w-auto max-w-full gap-1.5 border border-border bg-surface px-3 text-sm text-foreground"
+      className={COMPOSER_CHIP_CLASS}
       panelClassName="max-w-sm"
       trigger={
-        <>
-          {locked ? (
-            <Lock className="h-3.5 w-3.5 shrink-0 text-muted" aria-hidden />
-          ) : (
-            <Database className="h-3.5 w-3.5 shrink-0 text-muted" aria-hidden />
-          )}
-          <span className="truncate">{source.name}</span>
-          <span className="shrink-0 text-xs text-muted">
-            {source.workspaceId}
-            {extra > 0 && ` +${extra}`}
-          </span>
-        </>
+        <SourceChipLabel
+          name={source.name}
+          workspaceId={source.workspaceId}
+          extra={extra}
+          locked={locked}
+        />
       }
     >
       <MenuGroup label={`Sources (up to ${MAX_ADDITIONAL_SOURCES + 1}, one workspace)`}>

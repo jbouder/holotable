@@ -116,7 +116,8 @@ percentile line" — and each one is a single model call that returns the whole
 dashboard again. **Try again** asks for a different answer to the version you
 are looking at instead, and the **Version** menu above the dashboard previews
 or restores an earlier one. Nothing is written until you press **Save dashboard**, which
-lets you confirm the title first.
+lets you confirm the title first; **Start over**, at the top right, asks and then
+discards every unsaved version.
 
 Saving takes you to the live view: the server opens one stream for the whole
 dashboard, runs the guarded SQL on the refresh interval, and merges each tick

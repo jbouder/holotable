@@ -244,10 +244,39 @@ stores a redacted prompt, a hash of the catalog that was in context and the spec
 that came back, and is readable only by a workspace source-admin — see
 [Data model](/architecture/data-model/).
 
+## Looking at an Explore answer
+
+Explore's prompt bar is the one `/dashboards/new` has: the source chip and one
+line to ask in. The **time range** (5 minutes to 30 days) and **auto-refresh**
+(off, 30s, 1m, 5m) sit in the page header, and both apply to the answers on
+screen: a new range re-runs
+them, and a refresh re-runs them quietly, keeping the rows on screen until the
+new ones land and skipping a hidden tab. Each run is the ordinary guarded
+`POST /api/query`; the server resolves the window, as it does everywhere.
+
+Once an answer is back, nothing on it asks the model again:
+
+- **Show as** redraws the same rows as a line, area, bar, table or stat (line
+  and area only when the query has a time field), and a chart takes **Legend**,
+  **Stack** and **Log scale**. Every switch is checked against the IR's `Panel`
+  schema first (`src/lib/explore-view.ts`), so a toggle that would make an
+  invalid spec, such as a log axis over a fixed minimum of zero, is disabled
+  rather than drawn.
+- The **table** filters rows by text, anywhere or per column, sorts on a header
+  click, hides columns, and downloads the matching rows as CSV
+  (`src/lib/result-table.ts`). The CSV is built in the browser from rows already
+  returned, and a cell a spreadsheet would run as a formula is prefixed with `'`.
+  Filtering narrows what is shown, never what was read.
+- **This session** lists every question asked on the visit, newest first, up to
+  20 (`src/lib/explore-session.ts`). One click brings an answer back; **Pin**
+  holds one beside the current answer to compare them, and **Start over**
+  asks, then clears the list. It lives in page state only, so a reload starts over too.
+
 ## Keeping an Explore answer
 
 An explore panel is a spec like any other, so Explore can pin it to a dashboard
-instead of discarding it. **Save as panel** offers the dashboards in the
+instead of discarding it. **Save as panel** saves it as it is shown, with the
+view, chart toggles, hidden columns and sort applied, and offers the dashboards in the
 *source's* workspace that the caller may update (`GET
 /api/dashboards?workspaceId=…&editable=true`), plus a new dashboard.
 

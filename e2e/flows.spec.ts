@@ -11,13 +11,45 @@ import { DEMO_DASHBOARD, dashboardId, waitForPanels } from "./support/app";
 
 test("explore answers a question with a guarded query", async ({ page }) => {
   await page.goto("/explore");
-  await page.getByRole("combobox", { name: "Data source" }).click();
-  await page.getByRole("option", { name: "Demo TimescaleDB metrics" }).click();
+  // The source is a chip in the prompt bar, like /dashboards/new (#362).
+  await page.getByRole("button", { name: /^Data source:/ }).click();
+  await page.getByRole("menuitemradio", { name: /Demo TimescaleDB metrics/ }).click();
+  await page.keyboard.press("Escape");
   await page.locator("#prompt").fill("Which service is busiest?");
   await page.getByRole("button", { name: "Explore" }).click();
   // The recorded panel's SQL ran on the server: real rows, real services.
   const table = page.getByRole("region", { name: "Requests by service, table" });
   await expect(table.getByRole("cell", { name: "api", exact: true })).toBeVisible();
+
+  // Start over asks, then clears the visit's answers.
+  await page.locator("#main").getByRole("button", { name: "Start over" }).click();
+  const dialog = page.getByRole("dialog", { name: "Start over?" });
+  await expect(dialog).toContainText("The 1 answer from this visit is cleared");
+  await dialog.getByRole("button", { name: "Start over" }).click();
+  await expect(table).toHaveCount(0);
+  await expect(page.getByRole("complementary", { name: "This session" })).toHaveCount(0);
+});
+
+test("new dashboard: Start over asks, then clears every version", async ({ page }) => {
+  await page.goto("/dashboards/new");
+  await page.getByLabel("Describe the dashboard").fill("Checkout service health");
+  await page.getByRole("button", { name: "Generate" }).click();
+  const preview = page.getByRole("region", { name: "Dashboard preview" });
+  await expect(preview.getByRole("button", { name: "Save dashboard" })).toBeVisible();
+  const startOver = page.locator("#main").getByRole("button", { name: "Start over" });
+  const dialog = page.getByRole("dialog", { name: "Start over?" });
+
+  // Cancel keeps the work.
+  await startOver.click();
+  await expect(dialog).toContainText("1 unsaved version is discarded");
+  await dialog.getByRole("button", { name: "Cancel" }).click();
+  await expect(preview.getByRole("button", { name: "Save dashboard" })).toBeVisible();
+
+  // Confirming goes back to a fresh screen.
+  await startOver.click();
+  await dialog.getByRole("button", { name: "Start over" }).click();
+  await expect(preview.getByRole("button", { name: "Save dashboard" })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: /Start from a template/ })).toBeVisible();
 });
 
 test("dashboard chat answers in the panel", async ({ page, request }) => {
