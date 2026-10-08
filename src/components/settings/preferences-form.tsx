@@ -194,8 +194,12 @@ export function PreferencesForm({
   );
 
   return (
-    <div className="flex flex-col gap-6">
-      <p role="status" className="min-h-5 text-sm">
+    <div className="relative flex flex-col gap-6">
+      {/*
+        Out of the flow, in the band above the first card, so the section
+        keeps the same spacing as every other and nothing shifts on save.
+      */}
+      <p role="status" className="absolute right-0 -top-6 h-6 text-sm leading-6">
         {state.kind === "saving" && <span className="fade-in text-muted">Saving…</span>}
         {state.kind === "saved" && (
           <span className="fade-in text-success">Saved to your account.</span>
