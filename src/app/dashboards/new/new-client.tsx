@@ -90,8 +90,8 @@ interface SourceOption {
  *
  * The composer is one line for the whole conversation: the source it reads (a
  * chip, defaulted to the last one used here), then the prompt. On a fresh
- * screen the source's starters, a template and recent prompts sit under it;
- * they go once a generation starts. The bar stays put after the first prompt,
+ * screen, Start from a template and recent prompts sit above its right end and
+ * three of the source's starters under it; they go once a generation starts. The bar stays put after the first prompt,
  * so a follow-up is typed where the first one was.
  * The versions, Try again, View JSON and Save sit in the canvas's header, next
  * to the dashboard they act on.
@@ -373,6 +373,19 @@ export function NewDashboardClient({
         reads, then one line to say what to build or what to change.
       */}
       <section aria-label="Prompt" className="space-y-3">
+        {/*
+          Other ways to start, on a fresh screen only: a template (which starts
+          a conversation and cannot join one) and this workspace's recent
+          prompts, which fill the box rather than sending.
+        */}
+        {!refining && !isLoading && (
+          <div className="flex items-center justify-end gap-1">
+            <Button variant="ghost" size="sm" onClick={() => setPicking(true)}>
+              <LayoutTemplate className="h-4 w-4" aria-hidden /> Start from a template…
+            </Button>
+            <PromptHistoryMenu history={prompts} onPick={setPrompt} />
+          </div>
+        )}
         <form
           className="flex flex-wrap items-center gap-2 sm:flex-nowrap"
           onSubmit={(e) => {
@@ -441,14 +454,13 @@ export function NewDashboardClient({
           </div>
         </form>
         {/*
-          Where to start, on a fresh screen only: the source's starters, a
-          template, and this workspace's recent prompts. A pick fills the box
-          rather than sending. Gone once a generation starts, since none of
-          them is a follow-up.
+          A few of the source's starters, on a fresh screen only. A pick fills
+          the box rather than sending. Gone once a generation starts, since none
+          of them is a follow-up.
         */}
-        {!refining && !isLoading && (
+        {!refining && !isLoading && starters.length > 0 && (
           <div className="flex flex-wrap items-center gap-2">
-            {starters.map((preset) => (
+            {starters.slice(0, 3).map((preset) => (
               <button
                 key={preset}
                 type="button"
@@ -459,15 +471,6 @@ export function NewDashboardClient({
                 {preset}
               </button>
             ))}
-            <button
-              type="button"
-              onClick={() => setPicking(true)}
-              className="inline-flex items-center gap-1.5 border border-dashed border-border px-3 py-1 text-xs text-muted transition-colors hover:border-primary hover:text-foreground"
-            >
-              <LayoutTemplate className="h-3.5 w-3.5" aria-hidden /> Start from a
-              template…
-            </button>
-            <PromptHistoryMenu history={prompts} onPick={setPrompt} />
           </div>
         )}
         {model && (

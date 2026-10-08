@@ -100,9 +100,9 @@ table count matches what you expect.
 The source chip at the start of the prompt bar starts on the source you last
 generated against (or the first one); open it to pick another, or to add up to
 two more from the same workspace. Describe what you want to watch in plain
-English. Under the bar, until you send the first prompt, are suggestions built
-from your own catalog (so they name your tables, not a demo's), **Start from a
-template…**, and your recent prompts. Something concrete works better than
+English. Until you send the first prompt, suggestions built from your own
+catalog (so they name your tables, not a demo's) sit under the bar, and **Start
+from a template…** and your recent prompts sit above it on the right. Something concrete works better than
 something broad:
 
 > Request volume over time and the five slowest routes, plus a stat panel with
