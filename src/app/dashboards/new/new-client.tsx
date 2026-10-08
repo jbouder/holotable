@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import {
   Braces,
   Database,
+  History,
   LayoutTemplate,
   Lightbulb,
   Loader2,
@@ -16,7 +17,6 @@ import {
   SendHorizontal,
   Square,
   Trash2,
-  Undo2,
 } from "lucide-react";
 import { type Dashboard, DashboardGenerationSchema, safeParseDashboard } from "@/lib/ir";
 import {
@@ -32,7 +32,7 @@ import { usePromptHistory } from "@/components/prompt-history";
 import { PROMPT_MAX_LENGTH, promptLabel } from "@/lib/prompt-history";
 import { browserStorage } from "@/lib/browser-storage";
 import { Button } from "@/components/ui/button";
-import { Input, Textarea, Label } from "@/components/ui/input";
+import { Input, Label } from "@/components/ui/input";
 import { AiUnavailable } from "@/components/ai-unavailable";
 import {
   Menu,
@@ -70,9 +70,6 @@ import {
 import { type Template, templateSpec } from "@/lib/templates";
 import { TemplatePicker } from "@/components/templates/TemplatePicker";
 import { NoSources } from "@/components/onboarding/no-sources";
-import { useFlip } from "@/components/use-flip";
-import { useReducedMotion } from "@/components/motion-preference";
-import { cn } from "@/lib/utils";
 
 interface SourceOption {
   id: string;
@@ -90,19 +87,15 @@ interface SourceOption {
 }
 
 /**
- * `/dashboards/new` (#356): the dashboard is the canvas, the conversation sits
- * to its left, and Save is the one primary action. Left, because the author
- * starts by typing and reads toward what it made.
+ * `/dashboards/new` (#356): the dashboard is the canvas, the composer runs
+ * across the top of the page above it, and Save is the one primary action.
  *
- * Before the first prompt there is nothing to put on the canvas, so the
- * composer runs across the top of the page: the prompt box, the source it will
- * read (a chip, defaulted to the last one used here), the Ideas menu, and a
- * few of the source's starters as one-click suggestions. Once a generation
- * starts it docks into the column on the left, where the versions list grows
- * above it, and the generated dashboard takes the canvas to its right (below
- * it on a narrow screen, where the dashboard comes first). The move is CSS only (the
- * same element, re-placed by the grid), so the prompt box keeps its focus and
- * its text, and FLIP slides it to where it landed.
+ * The composer is one line for the whole conversation: the source it reads (a
+ * chip, defaulted to the last one used here), the prompt, and the Ideas menu,
+ * which holds the source's starters, recent prompts and templates. It stays
+ * put after the first prompt, so a follow-up is typed where the first one was.
+ * The versions, Try again, View JSON and Save sit in the canvas's header, next
+ * to the dashboard they act on.
  */
 export function NewDashboardClient({
   sources,
@@ -123,7 +116,6 @@ export function NewDashboardClient({
   canManageSources: boolean;
 }) {
   const router = useRouter();
-  const reducedMotion = useReducedMotion();
   const [sourceId, setSourceIdState] = React.useState<string | null>(
     sources[0]?.id ?? null,
   );
@@ -193,13 +185,6 @@ export function NewDashboardClient({
   const finalSpec = activeSpec(history);
   const refining = history.turns.length > 0;
   const activeTurn = history.turns[history.index];
-
-  const turnList = React.useRef<HTMLOListElement>(null);
-  useFlip(turnList, !reducedMotion);
-  // The composer and the canvas, which trade places when the composer docks.
-  const layout = React.useRef<HTMLDivElement>(null);
-  useFlip(layout, !reducedMotion);
-  const prompter = React.useRef<HTMLTextAreaElement>(null);
 
   const { object, submit, isLoading, error, stop, repairing } = useRepairingObject({
     api: "/api/generate",
@@ -379,400 +364,306 @@ export function NewDashboardClient({
   }
 
   const pendingSource = sources.find((s) => s.id === pendingSourceId);
-  // Top of the page until there is something for the canvas to show; beside
-  // the canvas from the first generation on. A first run that fails undocks.
-  const docked = refining || isLoading;
 
   return (
     <div className="space-y-6">
       <PageHeader title="New dashboard" description={description} />
 
-      <div
-        ref={layout}
-        className={cn(
-          "grid grid-cols-1 items-start gap-6",
-          docked && "lg:grid-cols-[24rem_minmax(0,1fr)]",
-        )}
-      >
-        {/*
-          The canvas. While a turn streams it is the panel-shaped skeleton that
-          fills in as titles arrive (#72); once a turn lands it is that turn's
-          live preview. Before the first prompt there is nothing to show, and
-          on a narrow screen it takes no room until there is.
-        */}
-        <section
-          aria-label="Dashboard preview"
-          data-flip-id="canvas"
-          className={cn("min-w-0 space-y-4", !docked && "hidden lg:block")}
+      {/*
+        The composer, across the top for the whole conversation: the source it
+        reads, one line to say what to build or what to change, and Ideas.
+      */}
+      <section aria-label="Prompt" className="space-y-3">
+        <form
+          className="flex flex-wrap items-center gap-2 sm:flex-nowrap"
+          onSubmit={(e) => {
+            e.preventDefault();
+            generate();
+          }}
         >
-          {isLoading ? (
-            <Card className="fade-in">
-              <CardContent className="space-y-4">
-                <h2 className="flex items-center gap-2 text-lg font-semibold">
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                  <span>{object?.title || "Generating…"}</span>
-                </h2>
-                <GeneratingPanels panels={object?.panels} />
-              </CardContent>
-            </Card>
-          ) : finalSpec ? (
-            <div className="fade-in space-y-4">
-              <div className="flex flex-wrap items-center justify-between gap-3">
-                <div className="min-w-0">
-                  <h2 className="truncate text-lg font-semibold">{finalSpec.title}</h2>
-                  <p className="text-xs text-muted">
-                    Version {history.index + 1} of {history.turns.length} ·{" "}
-                    {finalSpec.panels.length}{" "}
-                    {finalSpec.panels.length === 1 ? "panel" : "panels"} · not saved yet
-                  </p>
-                </div>
-                <div className="flex items-center gap-2">
-                  <Button variant="ghost" size="sm" onClick={() => setShowJson(true)}>
-                    <Braces className="h-4 w-4" /> View JSON
-                  </Button>
-                  <Button
-                    onClick={() => {
-                      setSaveError(null);
-                      setConfirmingSave(true);
-                    }}
-                    disabled={saving}
-                  >
-                    <Save className="h-4 w-4" /> Save dashboard
-                  </Button>
-                </div>
-              </div>
-              <PreviewDashboard spec={finalSpec} />
-            </div>
-          ) : (
-            <div className="flex min-h-80 items-center justify-center border border-dashed border-border p-8 text-center text-sm text-muted">
-              Your dashboard appears here as it is generated, with live data from the
-              source you picked.
-            </div>
+          {source && (
+            <SourceMenu
+              sources={sources}
+              source={source}
+              locked={refining}
+              additionalChoices={additionalChoices}
+              additionalIds={additionalIds}
+              disabled={isLoading}
+              onChoose={chooseSource}
+              onToggleAdditional={(id, next) =>
+                setAdditionalIds((ids) => toggleAdditionalSource(ids, id, next))
+              }
+            />
           )}
-        </section>
-
-        {/* The conversation: what was asked, then the box to ask the next thing. */}
-        <aside
-          aria-label="Conversation"
-          data-flip-id="composer"
-          className={cn(
-            "min-w-0",
-            docked ? "lg:sticky lg:top-20 lg:order-first" : "order-first",
-          )}
-        >
-          <Card>
-            <CardContent className="space-y-4">
-              {refining && (
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between gap-2">
-                    <h2 className="text-sm font-medium text-muted">Versions</h2>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={startOver}
-                      disabled={saving}
-                    >
-                      <RotateCcw className="h-4 w-4" /> Start over
-                    </Button>
-                  </div>
-                  <ol ref={turnList} className="space-y-2">
-                    {history.turns.map((turn, i) => {
-                      const active = i === history.index;
-                      return (
-                        <li
-                          key={turn.id}
-                          data-flip-id={turn.id}
-                          aria-current={active ? "true" : undefined}
-                          className={cn(
-                            "border p-3",
-                            active
-                              ? "border-primary bg-surface-2"
-                              : "border-border bg-surface",
-                          )}
-                        >
-                          <p className="break-words text-sm text-foreground">
-                            {turn.prompt}
-                          </p>
-                          <div className="mt-1 flex flex-wrap items-center justify-between gap-2">
-                            <span className="text-xs text-muted">
-                              Version {i + 1} · {turn.spec.panels.length}{" "}
-                              {turn.spec.panels.length === 1 ? "panel" : "panels"}
-                              {/* A template turn cost nothing; say so. */}
-                              {!turn.model && " · no model call"}
-                              {active && " · showing"}
-                            </span>
-                            {active ? (
-                              // Ask again for THIS turn, rather than talking the
-                              // dashboard forward. Only for a turn a model made.
-                              turn.model &&
-                              !retrying && (
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  disabled={isLoading || aiUnavailable !== null}
-                                  onClick={() => setRetrying(true)}
-                                >
-                                  <RefreshCw className="h-4 w-4" /> Try again
-                                </Button>
-                              )
-                            ) : (
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                disabled={isLoading}
-                                onClick={() => restore(i)}
-                                aria-label={`Restore version ${i + 1}`}
-                              >
-                                <Undo2 className="h-4 w-4" /> Restore
-                              </Button>
-                            )}
-                          </div>
-                          {active && retrying && (
-                            <form
-                              className="fade-in mt-3 space-y-2 border-t border-border pt-3"
-                              onSubmit={(e) => {
-                                e.preventDefault();
-                                regenerate();
-                              }}
-                            >
-                              <Label htmlFor="regen-feedback">
-                                What should change? (optional)
-                              </Label>
-                              <Input
-                                id="regen-feedback"
-                                value={feedback}
-                                autoFocus
-                                placeholder="e.g. fewer panels, and put the error rate first"
-                                onChange={(e) => setFeedback(e.target.value)}
-                              />
-                              <div className="flex justify-end gap-2">
-                                <Button
-                                  type="button"
-                                  variant="ghost"
-                                  size="sm"
-                                  onClick={() => {
-                                    setRetrying(false);
-                                    setFeedback("");
-                                  }}
-                                >
-                                  Cancel
-                                </Button>
-                                <Button
-                                  type="submit"
-                                  variant="secondary"
-                                  size="sm"
-                                  disabled={isLoading}
-                                >
-                                  <RefreshCw className="h-4 w-4" /> Regenerate
-                                </Button>
-                              </div>
-                            </form>
-                          )}
-                        </li>
-                      );
-                    })}
-                  </ol>
-                  <p className="text-xs text-muted">
-                    Nothing is saved until you save the dashboard. Try again replaces the
-                    version you are looking at; refining an earlier one drops the versions
-                    after it.
-                  </p>
-                </div>
-              )}
-
-              <div className={cn("space-y-3", refining && "border-t border-border pt-4")}>
-                <div className="flex flex-wrap items-center justify-between gap-2">
-                  {source && (
-                    <SourceMenu
-                      sources={sources}
-                      source={source}
-                      locked={refining}
-                      additionalChoices={additionalChoices}
-                      additionalIds={additionalIds}
-                      disabled={isLoading}
-                      onChoose={chooseSource}
-                      onToggleAdditional={(id, next) =>
-                        setAdditionalIds((ids) => toggleAdditionalSource(ids, id, next))
-                      }
-                    />
-                  )}
-                  <Menu
-                    label="Ideas: suggestions, recent prompts and templates"
-                    className="h-8 w-auto gap-1.5 px-2 text-sm"
-                    panelClassName="max-w-md"
-                    trigger={
-                      <>
-                        <Lightbulb className="h-4 w-4" aria-hidden /> Ideas
-                      </>
-                    }
-                  >
-                    {starters.length > 0 && (
-                      <MenuGroup label="Suggestions">
-                        {starters.map((preset) => (
-                          <MenuItem
-                            key={preset}
-                            disabled={isLoading}
-                            onClick={() => setPrompt(preset)}
-                          >
-                            <span className="truncate" title={preset}>
-                              {preset}
-                            </span>
-                          </MenuItem>
-                        ))}
-                      </MenuGroup>
-                    )}
-                    {prompts.entries.length > 0 && (
-                      <>
-                        {starters.length > 0 && <MenuSeparator />}
-                        <MenuGroup label="Recent prompts">
-                          {prompts.entries.map((entry) => (
-                            <MenuItem
-                              key={entry.prompt}
-                              disabled={isLoading}
-                              onClick={() => setPrompt(entry.prompt)}
-                            >
-                              <span className="truncate" title={entry.prompt}>
-                                {promptLabel(entry.prompt)}
-                              </span>
-                            </MenuItem>
-                          ))}
-                          <MenuItem onClick={prompts.clear}>
-                            <Trash2 className="h-4 w-4" /> Clear recent prompts
-                          </MenuItem>
-                        </MenuGroup>
-                      </>
-                    )}
-                    {(starters.length > 0 || prompts.entries.length > 0) && (
-                      <MenuSeparator />
-                    )}
-                    {/* A template starts a conversation; it cannot join one. */}
-                    <MenuItem
-                      disabled={refining || isLoading}
-                      onClick={() => setPicking(true)}
-                    >
-                      <LayoutTemplate className="h-4 w-4" /> Start from a template…
-                    </MenuItem>
-                  </Menu>
-                </div>
-
-                {[source, ...additionalSources].map(
-                  (s) =>
-                    s && (
-                      <CatalogHealthNotice
-                        key={s.id}
-                        source={s}
-                        health={catalog.health[s.id]}
-                        canRefresh={s.canRefresh}
-                        onRefreshed={(health) => catalog.update(s.id, health)}
-                      />
-                    ),
-                )}
-                {aiUnavailable && <AiUnavailable message={aiUnavailable} />}
-
-                <form
-                  onSubmit={(e) => {
-                    e.preventDefault();
-                    generate();
-                  }}
-                >
-                  <Label htmlFor="prompt">
-                    {refining ? "Refine it" : "Describe the dashboard"}
-                  </Label>
-                  <div className="relative">
-                    <Textarea
-                      ref={prompter}
-                      id="prompt"
-                      disabled={aiUnavailable !== null}
-                      rows={3}
-                      className="pr-14"
-                      placeholder={
-                        refining
-                          ? "e.g. Make the third one a bar chart, and add a 95th percentile line"
-                          : starters[0]
-                            ? `e.g. ${starters[0]}`
-                            : "Describe the dashboard you want"
-                      }
-                      value={prompt}
-                      onChange={(e) => setPrompt(e.target.value)}
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter" && !e.shiftKey) {
-                          e.preventDefault();
-                          generate();
-                        }
-                      }}
-                    />
-                    {isLoading ? (
-                      <Button
-                        type="button"
-                        size="icon"
-                        variant="secondary"
-                        onClick={() => stop()}
-                        aria-label="Stop"
-                        title="Stop"
-                        className="absolute bottom-4 right-2"
-                      >
-                        <Square className="h-4 w-4" />
-                      </Button>
-                    ) : (
-                      <Button
-                        type="submit"
-                        size="icon"
-                        disabled={!prompt.trim() || aiUnavailable !== null}
-                        aria-label={refining ? "Refine" : "Generate"}
-                        title={refining ? "Refine" : "Generate"}
-                        className="absolute bottom-4 right-2"
-                      >
-                        <SendHorizontal className="h-4 w-4" />
-                      </Button>
-                    )}
-                  </div>
-                  {model && (
-                    <p className="text-xs text-muted">
-                      Generates with <span className="text-foreground">{model}</span>.
-                      Enter sends, Shift+Enter adds a line.
-                    </p>
-                  )}
-                </form>
-
-                {/*
-                  Undocked, the composer has the width for a few of the
-                  source's starters on screen; the rest, and recent prompts and
-                  templates, stay in Ideas. A pick fills the box, like Ideas.
-                */}
-                {!docked && starters.length > 0 && (
-                  <ul aria-label="Suggestions" className="flex flex-wrap gap-2">
-                    {starters.slice(0, 3).map((preset) => (
-                      <li key={preset} className="min-w-0">
-                        <button
-                          type="button"
-                          disabled={aiUnavailable !== null}
-                          onClick={() => {
-                            setPrompt(preset);
-                            prompter.current?.focus();
-                          }}
-                          className="border border-border bg-surface px-3 py-1.5 text-left text-xs text-muted transition-colors duration-(--duration-fast) ease-standard hover:bg-surface-2 hover:text-foreground disabled:opacity-50"
-                        >
-                          {preset}
-                        </button>
-                      </li>
-                    ))}
-                  </ul>
-                )}
-
-                <RepairingNote show={repairing} />
-                {error && (
-                  <ErrorDisplay
-                    error={apiErrorFromThrown(error)}
-                    onRetry={generate}
-                    retryLabel="Try again"
+          <Label htmlFor="prompt" className="sr-only">
+            {refining ? "Refine it" : "Describe the dashboard"}
+          </Label>
+          {/* On a phone the box takes its own row under the two menus. */}
+          <div className="relative order-last min-w-0 flex-1 basis-full sm:order-none sm:basis-auto">
+            <Input
+              id="prompt"
+              disabled={aiUnavailable !== null}
+              maxLength={PROMPT_MAX_LENGTH}
+              className="pr-12"
+              placeholder={
+                refining
+                  ? "e.g. Make the third one a bar chart, and add a 95th percentile line"
+                  : starters[0]
+                    ? `e.g. ${starters[0]}`
+                    : "Describe the dashboard you want"
+              }
+              value={prompt}
+              onChange={(e) => setPrompt(e.target.value)}
+            />
+            {isLoading ? (
+              <Button
+                type="button"
+                size="icon"
+                variant="secondary"
+                onClick={() => stop()}
+                aria-label="Stop"
+                title="Stop"
+                className="absolute top-1 right-1 h-8 w-8"
+              >
+                <Square className="h-4 w-4" />
+              </Button>
+            ) : (
+              <Button
+                type="submit"
+                size="icon"
+                disabled={!prompt.trim() || aiUnavailable !== null}
+                aria-label={refining ? "Refine" : "Generate"}
+                title={refining ? "Refine" : "Generate"}
+                className="absolute top-1 right-1 h-8 w-8"
+              >
+                <SendHorizontal className="h-4 w-4" />
+              </Button>
+            )}
+          </div>
+          <Menu
+            label="Ideas: suggestions, recent prompts and templates"
+            className="h-10 w-auto gap-1.5 border border-border bg-surface px-3 text-sm text-foreground"
+            panelClassName="max-w-md"
+            trigger={
+              <>
+                <Lightbulb className="h-4 w-4" aria-hidden /> Ideas
+              </>
+            }
+          >
+            {starters.length > 0 && (
+              <MenuGroup label="Suggestions">
+                {starters.map((preset) => (
+                  <MenuItem
+                    key={preset}
                     disabled={isLoading}
-                  />
-                )}
-              </div>
+                    onClick={() => setPrompt(preset)}
+                  >
+                    <span className="truncate" title={preset}>
+                      {preset}
+                    </span>
+                  </MenuItem>
+                ))}
+              </MenuGroup>
+            )}
+            {prompts.entries.length > 0 && (
+              <>
+                {starters.length > 0 && <MenuSeparator />}
+                <MenuGroup label="Recent prompts">
+                  {prompts.entries.map((entry) => (
+                    <MenuItem
+                      key={entry.prompt}
+                      disabled={isLoading}
+                      onClick={() => setPrompt(entry.prompt)}
+                    >
+                      <span className="truncate" title={entry.prompt}>
+                        {promptLabel(entry.prompt)}
+                      </span>
+                    </MenuItem>
+                  ))}
+                  <MenuItem onClick={prompts.clear}>
+                    <Trash2 className="h-4 w-4" /> Clear recent prompts
+                  </MenuItem>
+                </MenuGroup>
+              </>
+            )}
+            {(starters.length > 0 || prompts.entries.length > 0) && <MenuSeparator />}
+            {/* A template starts a conversation; it cannot join one. */}
+            <MenuItem disabled={refining || isLoading} onClick={() => setPicking(true)}>
+              <LayoutTemplate className="h-4 w-4" /> Start from a template…
+            </MenuItem>
+          </Menu>
+        </form>
+        {model && (
+          <p className="text-xs text-muted">
+            Generates with <span className="text-foreground">{model}</span>. Enter sends.
+          </p>
+        )}
+
+        {[source, ...additionalSources].map(
+          (s) =>
+            s && (
+              <CatalogHealthNotice
+                key={s.id}
+                source={s}
+                health={catalog.health[s.id]}
+                canRefresh={s.canRefresh}
+                onRefreshed={(health) => catalog.update(s.id, health)}
+              />
+            ),
+        )}
+        {aiUnavailable && <AiUnavailable message={aiUnavailable} />}
+        <RepairingNote show={repairing} />
+        {error && (
+          <ErrorDisplay
+            error={apiErrorFromThrown(error)}
+            onRetry={generate}
+            retryLabel="Try again"
+            disabled={isLoading}
+          />
+        )}
+      </section>
+
+      {/*
+        The canvas. While a turn streams it is the panel-shaped skeleton that
+        fills in as titles arrive (#72); once a turn lands it is that turn's
+        live preview, with the versions and Save above it.
+      */}
+      <section aria-label="Dashboard preview" className="min-w-0 space-y-4">
+        {isLoading ? (
+          <Card className="fade-in">
+            <CardContent className="space-y-4">
+              <h2 className="flex items-center gap-2 text-lg font-semibold">
+                <Loader2 className="h-4 w-4 animate-spin" />
+                <span>{object?.title || "Generating…"}</span>
+              </h2>
+              <GeneratingPanels panels={object?.panels} />
             </CardContent>
           </Card>
-        </aside>
-      </div>
+        ) : finalSpec ? (
+          <div className="fade-in space-y-4">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div className="min-w-0">
+                <h2 className="truncate text-lg font-semibold">{finalSpec.title}</h2>
+                <p className="text-xs text-muted">
+                  {finalSpec.panels.length}{" "}
+                  {finalSpec.panels.length === 1 ? "panel" : "panels"} · not saved yet
+                </p>
+              </div>
+              <div className="flex flex-wrap items-center gap-2">
+                {/*
+                  Every version of this conversation. Picking one previews it
+                  and keeps the menu open, so they can be compared in place;
+                  refining an earlier one drops the versions after it.
+                */}
+                <Menu
+                  label={`Versions: showing ${history.index + 1} of ${history.turns.length}`}
+                  className="h-8 w-auto gap-1.5 px-2 text-sm"
+                  panelClassName="max-w-md"
+                  trigger={
+                    <>
+                      <History className="h-4 w-4" aria-hidden />
+                      Version {history.index + 1} of {history.turns.length}
+                    </>
+                  }
+                >
+                  <MenuRadioGroup
+                    label="Versions"
+                    value={String(history.index)}
+                    onValueChange={(value) => {
+                      if (!isLoading) restore(Number(value));
+                    }}
+                  >
+                    {history.turns.map((turn, i) => (
+                      <MenuRadioItem key={turn.id} value={String(i)}>
+                        <span className="min-w-0">
+                          <span className="block truncate" title={turn.prompt}>
+                            {i + 1}. {promptLabel(turn.prompt)}
+                          </span>
+                          <span className="block text-xs text-muted">
+                            {turn.spec.panels.length}{" "}
+                            {turn.spec.panels.length === 1 ? "panel" : "panels"}
+                            {/* A template turn cost nothing; say so. */}
+                            {!turn.model && " · no model call"}
+                          </span>
+                        </span>
+                      </MenuRadioItem>
+                    ))}
+                  </MenuRadioGroup>
+                  <MenuSeparator />
+                  <MenuItem onClick={startOver} disabled={saving}>
+                    <RotateCcw className="h-4 w-4" /> Start over
+                  </MenuItem>
+                </Menu>
+                {/*
+                  Ask again for THIS version, rather than talking the dashboard
+                  forward. Only for a version a model made.
+                */}
+                {activeTurn?.model && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    disabled={retrying || aiUnavailable !== null}
+                    onClick={() => setRetrying(true)}
+                  >
+                    <RefreshCw className="h-4 w-4" /> Try again
+                  </Button>
+                )}
+                <Button variant="ghost" size="sm" onClick={() => setShowJson(true)}>
+                  <Braces className="h-4 w-4" /> View JSON
+                </Button>
+                <Button
+                  onClick={() => {
+                    setSaveError(null);
+                    setConfirmingSave(true);
+                  }}
+                  disabled={saving}
+                >
+                  <Save className="h-4 w-4" /> Save dashboard
+                </Button>
+              </div>
+            </div>
+            {retrying && (
+              <form
+                className="fade-in flex flex-wrap items-end gap-2 border border-border bg-surface p-3"
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  regenerate();
+                }}
+              >
+                <div className="min-w-0 flex-1 basis-64">
+                  <Label htmlFor="regen-feedback">What should change? (optional)</Label>
+                  <Input
+                    id="regen-feedback"
+                    value={feedback}
+                    autoFocus
+                    placeholder="e.g. fewer panels, and put the error rate first"
+                    onChange={(e) => setFeedback(e.target.value)}
+                  />
+                </div>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  onClick={() => {
+                    setRetrying(false);
+                    setFeedback("");
+                  }}
+                >
+                  Cancel
+                </Button>
+                <Button type="submit" variant="secondary">
+                  <RefreshCw className="h-4 w-4" /> Regenerate
+                </Button>
+              </form>
+            )}
+            <PreviewDashboard spec={finalSpec} />
+          </div>
+        ) : (
+          <div className="hidden min-h-80 items-center justify-center border border-dashed border-border p-8 text-center text-sm text-muted sm:flex">
+            Your dashboard appears here as it is generated, with live data from the source
+            you picked.
+          </div>
+        )}
+      </section>
 
       {finalSpec && source && (
         <SaveDashboardDialog
@@ -878,7 +769,7 @@ function SourceMenu({
   return (
     <Menu
       label={`Data source: ${source.name}, workspace ${source.workspaceId}${extra > 0 ? `, and ${extra} more` : ""}`}
-      className="h-8 w-auto max-w-full gap-1.5 border border-border bg-surface px-2 text-sm text-foreground"
+      className="h-10 w-auto max-w-full gap-1.5 border border-border bg-surface px-3 text-sm text-foreground"
       panelClassName="max-w-sm"
       trigger={
         <>
