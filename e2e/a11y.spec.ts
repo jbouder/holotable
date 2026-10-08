@@ -78,7 +78,11 @@ for (const theme of THEMES) {
     test("an open dialog: the panel's SQL", async ({ page, request }) => {
       await page.goto(`/dashboards/${await dashboardId(request, DEMO_DASHBOARD)}`);
       await waitForPanels(page);
-      await page.getByRole("button", { name: /sql/i }).first().click();
+      await page
+        .getByRole("button", { name: /^Actions for / })
+        .first()
+        .click();
+      await page.getByRole("menuitem", { name: "Show generated SQL" }).click();
       await expect(page.getByRole("dialog")).toBeVisible();
       await expectNoA11yViolations(page);
     });

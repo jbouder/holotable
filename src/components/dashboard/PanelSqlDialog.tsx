@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { Check, Code, Copy } from "lucide-react";
+import { Check, Copy } from "lucide-react";
 import { hasQuery, type Panel, type QueryPanel, type TimeRange } from "@/lib/ir";
 import { Button } from "@/components/ui/button";
 import { Dialog } from "@/components/ui/dialog";
@@ -14,34 +14,28 @@ const COPIED_RESET_MS = 2_000;
  * Viewer-side "how was this computed?" affordance. The SQL, source id and time
  * field are already in the spec the client holds, so this reveals nothing new —
  * it just stops the editor being the only place to see it.
+ *
+ * It has no trigger of its own: the panel's overflow menu opens it.
  */
 export function PanelSqlDialog({
   panel,
   timeRange,
+  open,
+  onOpenChange,
 }: {
   panel: Panel;
   /** Enables the "what actually runs" section; absent on surfaces with no window. */
   timeRange?: TimeRange;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
 }) {
-  const [open, setOpen] = React.useState(false);
   // A text panel (#202) computes nothing, so there is nothing to show.
   if (!hasQuery(panel)) return null;
 
   return (
-    <>
-      <Button
-        aria-label={`Show generated SQL for ${panel.title}`}
-        className="h-7 w-7 text-muted"
-        onClick={() => setOpen(true)}
-        size="icon"
-        variant="ghost"
-      >
-        <Code className="h-4 w-4" />
-      </Button>
-      <Dialog onOpenChange={setOpen} open={open} title="Generated SQL">
-        <PanelSqlBody panel={panel} timeRange={timeRange} />
-      </Dialog>
-    </>
+    <Dialog onOpenChange={onOpenChange} open={open} title="Generated SQL">
+      <PanelSqlBody panel={panel} timeRange={timeRange} />
+    </Dialog>
   );
 }
 

@@ -104,6 +104,7 @@ export function PanelView({
   const chart = React.useRef<EChartHandle | null>(null);
   const expansion = useExpanded();
   const askAbout = useAskAboutPanel();
+  const [sqlOpen, setSqlOpen] = React.useState(false);
 
   // While paused, suppress the transient "live"/"loading" badges — they no
   // longer reflect reality. Error/tombstoned states remain meaningful. A text
@@ -144,13 +145,14 @@ export function PanelView({
         )}
       >
         <CardHeader>
-          <CardTitle className="min-w-0 truncate">{panel.title}</CardTitle>
+          {/* The description reads as part of the title, so it sits beside it. */}
+          <div className="flex min-w-0 items-center gap-0.5">
+            <CardTitle className="min-w-0 truncate">{panel.title}</CardTitle>
+            <PanelDescription panel={panel} />
+          </div>
           <div className="flex shrink-0 items-center gap-1">
             <OverrideBadge panel={panel} />
             {showBadge && <StatusBadge status={status} updatedAt={state?.updatedAt} />}
-            <PanelDescription panel={panel} />
-            {/* A share link (#65) carries no SQL to show. */}
-            {!embedded && <PanelSqlDialog panel={panel} timeRange={timeRange} />}
             <PanelActions
               panelTitle={panel.title}
               dashboardTitle={dashboardTitle}
@@ -159,6 +161,8 @@ export function PanelView({
               chart={supportsImageExport(panel.viz) ? chart : undefined}
               expanded={expansion.expanded}
               onToggleExpanded={expansion.toggle}
+              // A share link (#65) carries no SQL to show; a text panel has none.
+              onShowSql={!embedded && queried ? () => setSqlOpen(true) : undefined}
               onAskAbout={
                 askAbout && !embedded
                   ? () => {
@@ -185,6 +189,14 @@ export function PanelView({
           />
         </CardContent>
       </Card>
+      {!embedded && (
+        <PanelSqlDialog
+          panel={panel}
+          timeRange={timeRange}
+          open={sqlOpen}
+          onOpenChange={setSqlOpen}
+        />
+      )}
     </>
   );
 }
@@ -287,6 +299,8 @@ function PanelDescription({ panel }: { panel: Panel }) {
   return (
     <Popover
       label={`What "${panel.title}" computes`}
+      // Beside the title, on the card's left: open rightward, into the card.
+      align="start"
       trigger={<Info className="h-4 w-4" />}
     >
       {panel.description}
