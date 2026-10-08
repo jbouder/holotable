@@ -99,6 +99,18 @@ for (const theme of THEMES) {
         .click();
       await expect(page.getByRole("textbox").first()).toBeVisible();
       await expectNoA11yViolations(page);
+
+      // An answer, with its Copy and Try again buttons, in the expanded chat.
+      const chat = page.getByRole("dialog", { name: "Dashboard chat" });
+      await chat.getByRole("textbox", { name: "Message" }).fill("Hello");
+      await chat.getByRole("button", { name: "Send" }).click();
+      await expect(chat.getByRole("button", { name: "Copy answer" })).toBeVisible();
+      await chat.getByRole("button", { name: "Expand chat" }).click();
+      // Past the size FLIP, so axe measures the settled box.
+      await page.waitForTimeout(600);
+      await expectNoA11yViolations(page);
+      await chat.getByRole("button", { name: "Shrink chat" }).click();
+      await chat.getByRole("button", { name: "Clear chat" }).click();
     });
   });
 }

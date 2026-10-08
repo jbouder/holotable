@@ -9,6 +9,7 @@ import type { EChartHandle } from "@/components/charts/EChart";
 import { AccessibleChart } from "@/components/charts/AccessibleChart";
 import { PanelSqlDialog } from "@/components/dashboard/PanelSqlDialog";
 import { PanelActions } from "@/components/dashboard/PanelActions";
+import { useAskAboutPanel } from "@/components/dashboard/chat-bridge";
 import { LoadingLabel, PanelSkeleton } from "@/components/dashboard/PanelSkeleton";
 import { Popover } from "@/components/ui/popover";
 import type { ChartContext, PanelData } from "@/components/charts/options";
@@ -102,6 +103,7 @@ export function PanelView({
   const status = queried ? (state?.status ?? "loading") : "live";
   const chart = React.useRef<EChartHandle | null>(null);
   const expansion = useExpanded();
+  const askAbout = useAskAboutPanel();
 
   // While paused, suppress the transient "live"/"loading" badges — they no
   // longer reflect reality. Error/tombstoned states remain meaningful. A text
@@ -157,6 +159,15 @@ export function PanelView({
               chart={supportsImageExport(panel.viz) ? chart : undefined}
               expanded={expansion.expanded}
               onToggleExpanded={expansion.toggle}
+              onAskAbout={
+                askAbout && !embedded
+                  ? () => {
+                      // The chat floats over the page; a fullscreen panel would cover it.
+                      if (expansion.expanded) expansion.toggle();
+                      askAbout(panel.id);
+                    }
+                  : undefined
+              }
             />
           </div>
         </CardHeader>

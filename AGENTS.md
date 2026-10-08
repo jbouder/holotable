@@ -461,8 +461,9 @@ before first paint (#212). The rules:
   takes `pinnedId` for that.
 - **Charts merge, never recreate.** FLIP a panel's card, never its chart;
   `EChart`'s `ResizeObserver` picks up the final size. The fullscreen expand
-  in `PanelView` is the one single-element size FLIP (`flipFrom` in
-  `src/lib/motion.ts`): `translate` and `scale` on the same card element.
+  in `PanelView` and the dashboard chat's expand are the single-element size
+  FLIPs (`flipFrom` in `src/lib/motion.ts`): `translate` and `scale` on the
+  same element, measured before the class swap.
 - **Pages enter through `src/app/template.tsx`.** Its `.page` element is new
   on every navigation and carries the only whole-page entrance; a page never
   adds another. Next's `experimental.viewTransition` is off on purpose; see

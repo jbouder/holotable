@@ -41,6 +41,17 @@ export const PANEL_EXIT_SHORTCUT = {
   description: "Leave a panel's fullscreen view",
 } as const satisfies Shortcut;
 
+/**
+ * Opens the dashboard chat (#366). A bare letter, so it never fires while
+ * someone is typing, and so no browser binding is taken from them.
+ */
+export const CHAT_OPEN_SHORTCUT = {
+  id: "chat-open",
+  key: "c",
+  group: "Chat",
+  description: "Ask this dashboard (open the chat)",
+} as const satisfies Shortcut;
+
 /** The dashboard editor's bindings (#121), bound by {@link bindShortcuts}. */
 export const EDITOR_SHORTCUTS = [
   {
@@ -113,6 +124,13 @@ export const FIELD_SHORTCUTS = [
     description: "Send the prompt (Shift+Enter starts a new line)",
   },
   {
+    id: "chat-close",
+    key: "Escape",
+    inTextField: true,
+    group: "Prompts and chat",
+    description: "Close the dashboard chat",
+  },
+  {
     id: "sql-run",
     key: "Enter",
     mod: true,
@@ -176,7 +194,7 @@ export const SHORTCUT_SECTIONS: readonly ShortcutSection[] = [
     id: "viewer",
     title: "Dashboards",
     description: "While viewing a dashboard.",
-    shortcuts: [PANEL_EXIT_SHORTCUT],
+    shortcuts: [PANEL_EXIT_SHORTCUT, CHAT_OPEN_SHORTCUT],
   },
   {
     id: "editor",

@@ -5,6 +5,7 @@ import { join } from "node:path";
 import { formatShortcut } from "@/lib/editor/use-shortcuts";
 import {
   bindShortcuts,
+  CHAT_OPEN_SHORTCUT,
   EDITOR_SHORTCUTS,
   FIELD_SHORTCUTS,
   PALETTE_SHORTCUT,
@@ -44,6 +45,7 @@ test("the settings page lists every registered shortcut, each id once per sectio
   for (const shortcut of [
     PALETTE_SHORTCUT,
     PANEL_EXIT_SHORTCUT,
+    CHAT_OPEN_SHORTCUT,
     ...EDITOR_SHORTCUTS,
     ...FIELD_SHORTCUTS,
   ]) {

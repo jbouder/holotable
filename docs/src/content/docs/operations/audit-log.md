@@ -26,7 +26,7 @@ configure.
 | `dashboard.delete` | Delete | dashboard |
 | `dashboard.stream` | A viewer opens or resumes a dashboard's live stream | dashboard |
 | `dashboard.generate` | A generation finishes, or fails (`modelConfig`: which [level](/operations/ai-provider/#models-configured-in-the-app) answered) | source |
-| `dashboard.chat` | A chat turn starts (`modelConfig`) | dashboard |
+| `dashboard.chat` | A chat turn starts (`modelConfig`, and the `timeRange`, `variables` and `panelId` it runs with) | dashboard |
 | `query.execute` | A statement run from preview or Explore (`via: "preview"`), by a chat (`via: "chat"`) or by an MCP client's `run_query` (`via: "mcp"`) | source |
 | `source.create`, `source.update`, `source.delete` | Source changes, including hiding a column (`fields: ["catalog"]`) | source |
 | `source.test`, `source.refresh`, `source.discover`, `source.draft` | Connection test, applied catalog refresh, table discovery, drafted source | source, or — before one exists |

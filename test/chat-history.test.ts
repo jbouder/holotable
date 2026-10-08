@@ -4,11 +4,13 @@ import type { UIMessage } from "ai";
 import type { Dashboard, Panel } from "@/lib/ir";
 import {
   chatSuggestions,
+  chatViewFromSearch,
   citationsFromMessage,
   matchingPanels,
   MAX_SUGGESTIONS,
   messagesToPersist,
   parseStoredMessage,
+  panelChatSuggestions,
   parseStoredMessages,
   type StoredChatMessage,
 } from "@/lib/chat-history";
@@ -240,4 +242,74 @@ test("an absurd panel title is left out of the chips rather than truncated into 
 test("suggestions are deterministic — the same spec gives the same chips", () => {
   const spec = dashboard([panel(), panel({ id: "p2", title: "Errors", viz: "stat" })]);
   assert.deepEqual(chatSuggestions(spec), chatSuggestions(spec));
+});
+
+/* The reader's view, and questions about one panel (#366) ----------------- */
+
+test("a citation says which window and values the server narrowed the rows to", () => {
+  const message = {
+    parts: [
+      {
+        type: "tool-runQuery",
+        state: "output-available",
+        input: { sourceId: "src-1", sql: "SELECT max(v) FROM cpu" },
+        output: {
+          columns: [],
+          rows: [],
+          timeRange: { from: "now-7d", to: "now" },
+          variables: { host: ["a", "b"], region: "eu" },
+        },
+      },
+    ],
+  } as unknown as UIMessage;
+
+  assert.deepEqual(citationsFromMessage(message, [panel()]), [
+    {
+      sourceId: "src-1",
+      sql: "SELECT max(v) FROM cpu",
+      panelTitles: [],
+      timeRange: { from: "now-7d", to: "now" },
+      variables: { host: ["a", "b"], region: ["eu"] },
+    },
+  ]);
+});
+
+test("a failed query's output adds no window to its citation", () => {
+  const message = {
+    parts: [
+      {
+        type: "tool-runQuery",
+        state: "output-available",
+        input: { sourceId: "src-1", sql: "SELECT 1" },
+        output: { error: "bad" },
+      },
+    ],
+  } as unknown as UIMessage;
+  const [citation] = citationsFromMessage(message, []);
+  assert.equal(citation.timeRange, undefined);
+  assert.equal(citation.variables, undefined);
+});
+
+test("the view is read from the dashboard's URL: range when set, and every pick", () => {
+  assert.deepEqual(chatViewFromSearch("?from=now-7d&to=now&var-host=a&var-host=b"), {
+    timeRange: { from: "now-7d", to: "now" },
+    variables: { host: ["a", "b"] },
+  });
+  // No range in the URL is the dashboard's own range: the server's default.
+  assert.deepEqual(chatViewFromSearch(""), { variables: {} });
+  // Half a range is no range; the server would refuse it anyway.
+  assert.deepEqual(chatViewFromSearch("?from=now-7d"), { variables: {} });
+});
+
+test("questions about one panel name it, and fit what it draws", () => {
+  const line = panelChatSuggestions(panel());
+  assert.ok(line.length >= 2 && line.length <= MAX_SUGGESTIONS);
+  assert.ok(line.every((q) => q.includes('"Requests"')));
+  assert.ok(line.some((q) => /changed over this window/.test(q)));
+
+  const stat = panelChatSuggestions(panel({ viz: "stat", title: "Errors" }));
+  assert.ok(stat.some((q) => /behind the "Errors" number/.test(q)));
+
+  const long = panelChatSuggestions(panel({ title: "x".repeat(120) }));
+  assert.ok(long.every((q) => q.includes("this panel")));
 });
