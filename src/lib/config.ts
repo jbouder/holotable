@@ -27,24 +27,8 @@ function num(name: string, fallback: number): number {
   return Number.isFinite(parsed) ? parsed : fallback;
 }
 
+/** A single-unit duration, as `PROMQL_MAX_RANGE` takes one: `7d`, `12h`. */
 const DURATION = /^(\d+)(ms|s|m|h|d|w)$/;
-const DURATION_UNIT_MS: Record<string, number> = {
-  ms: 1,
-  s: 1_000,
-  m: 60_000,
-  h: 3_600_000,
-  d: 86_400_000,
-  w: 604_800_000,
-};
-
-/** A single-unit duration (`7d`, `12h`) in milliseconds, or the fallback's. */
-function promDuration(name: string, fallback: string): number {
-  const raw = process.env[name];
-  const match =
-    DURATION.exec(raw === undefined || raw === "" ? fallback : raw) ??
-    DURATION.exec(fallback);
-  return match ? Number(match[1]) * DURATION_UNIT_MS[match[2]] : 0;
-}
 
 function str(name: string, fallback: string): string {
   const raw = process.env[name];
@@ -144,7 +128,7 @@ export const config = {
    * for (#384), so one selector cannot ask the endpoint for a year. A
    * duration such as `7d` or `12h`.
    */
-  promqlMaxRangeMs: promDuration("PROMQL_MAX_RANGE", "7d"),
+  promqlMaxRange: str("PROMQL_MAX_RANGE", "7d"),
   /** Max points retained per series in the browser rolling window. */
   maxWindowPoints: num("MAX_WINDOW_POINTS", 720),
   /** Statement timeout (seconds) applied to every metrics query. */

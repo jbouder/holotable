@@ -53,7 +53,8 @@ export const PROMQL_MAX_LENGTH = 8_000;
 
 export function defaultLimits(): PromqlLimits {
   return {
-    maxRangeMs: config.promqlMaxRangeMs,
+    // Validated at boot (`validateConfig`); the fallback is the documented default.
+    maxRangeMs: durationMs(config.promqlMaxRange) ?? 7 * 86_400_000,
     maxSelectors: 32,
     maxDepth: 64,
     maxSubqueryPoints: 11_000,
