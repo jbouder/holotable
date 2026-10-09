@@ -201,7 +201,10 @@ A recorded model for the end-to-end suite (`src/lib/ai/stub.ts`). It never
 calls a network: every request is answered with a fixed spec, chosen by the
 output asked for (a dashboard, a panel, a source draft, a chat reply), and
 that spec goes through the same schema, SQL guard and server-side execution as
-a real model's. It needs no `AI_MODEL` or key. Because it would otherwise let
+a real model's. A request against a Prometheus source gets a recorded PromQL
+dashboard or Explore panel over Holotable's own metrics
+(`holotable_query_duration_seconds_*`, `holotable_pollers_active`), which the
+compose stack's Prometheus scrapes. It needs no `AI_MODEL` or key. Because it would otherwise let
 a deployment that forgot to configure a model boot green, it is a startup
 error in production unless `AI_STUB_IN_PRODUCTION=true` is also set; the e2e
 suite sets both.
@@ -292,11 +295,18 @@ generate route makes, and grades each answer
 ([#24](https://github.com/jbouder/holotable/issues/24)):
 
 1. it parses against the IR the route binds it to;
-2. every panel's SQL passes the guard, as a save would re-check it;
-3. every `timeField` is a column its query returns;
+2. every panel's query passes its source's guard, SQL or PromQL, as a save
+   would re-check it;
+3. every SQL `timeField` is a column its query returns, and every PromQL
+   `rate()`, `irate()` or `increase()` is over a counter;
 4. the case's own expectations hold: which viz kinds are plausible or
-   required, which tables must be read, whether panels are time series, and
-   how many panels there are.
+   required, which tables or metrics must be read, whether panels are time
+   series, and how many panels there are.
+
+The prompt is per kind (#387). A case against `evals/catalogs/prometheus-demo.json`,
+a Prometheus catalog of Holotable's own metrics, runs the PromQL prompt and is
+graded by the PromQL guard; a case against a TimescaleDB catalog runs the SQL
+prompt, which is unchanged by PromQL.
 
 | Command | What it does |
 |---|---|

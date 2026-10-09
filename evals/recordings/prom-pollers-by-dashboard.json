@@ -1,0 +1,6 @@
+{
+  "model": "kimi-k3",
+  "recordedAt": "2026-10-09T22:42:27.127Z",
+  "requestDigest": "de7e50c086a5575baa1401d38279e4d48fc15744eb1941e00ed6450f87466a2c",
+  "text": "{\"title\":\"Poller health\",\"timeRange\":{\"from\":\"now-1h\",\"to\":\"now\"},\"refreshIntervalMs\":15000,\"panels\":[{\"id\":\"p95-tick-duration\",\"title\":\"Poller tick duration p95\",\"viz\":\"line\",\"query\":{\"sourceId\":\"eval-prometheus-demo\",\"promql\":\"histogram_quantile(0.95, sum by (le) (rate(holotable_poller_tick_duration_seconds_bucket{dashboard=\\\":dashboard\\\"}[5m])))\"},\"format\":\"number\",\"layout\":{\"x\":0,\"y\":0,\"w\":6,\"h\":4}},{\"id\":\"open-streams\",\"title\":\"Open streams\",\"viz\":\"area\",\"query\":{\"sourceId\":\"eval-prometheus-demo\",\"promql\":\"sum(holotable_sse_subscribers{dashboard=\\\":dashboard\\\"})\"},\"format\":\"number\",\"layout\":{\"x\":6,\"y\":0,\"w\":6,\"h\":4}}],\"variables\":[{\"name\":\"dashboard\",\"label\":\"Dashboard\",\"type\":\"query\",\"query\":{\"sourceId\":\"eval-prometheus-demo\",\"label\":\"dashboard\",\"match\":\"holotable_sse_subscribers\"}}]}"
+}

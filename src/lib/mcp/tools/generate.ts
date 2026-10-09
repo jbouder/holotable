@@ -10,7 +10,11 @@ import { audit } from "@/lib/audit";
 import { assertAuthorized, HttpError } from "@/lib/auth/authorize";
 import type { Identity } from "@/lib/auth/claims";
 import { AdditionalSourceIds, resolveGenerationSources } from "@/lib/generation-sources";
-import { DashboardGenerationSchema, ExplorePanel, fromGenerated } from "@/lib/ir";
+import {
+  DashboardGenerationSchemaAnyLanguage,
+  ExplorePanelAnyLanguage,
+  fromGenerated,
+} from "@/lib/ir";
 import { ModelSourceDraft } from "@/lib/registry";
 import type { LlmRoute } from "@/lib/limits/budget";
 import { log } from "@/lib/log";
@@ -237,7 +241,9 @@ export function generationTools(deps: McpDeps): McpTool[] {
             }),
         });
         // Validated by the stream already; parsed again to be typed, not trusted less.
-        return { spec: fromGenerated(DashboardGenerationSchema.parse(generated)) };
+        return {
+          spec: fromGenerated(DashboardGenerationSchemaAnyLanguage.parse(generated)),
+        };
       },
     }),
 
@@ -300,7 +306,7 @@ export function generationTools(deps: McpDeps): McpTool[] {
               repair,
             }),
         });
-        return { panel: ExplorePanel.parse(panel) };
+        return { panel: ExplorePanelAnyLanguage.parse(panel) };
       },
     }),
 

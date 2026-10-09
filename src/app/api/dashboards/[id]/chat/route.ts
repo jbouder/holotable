@@ -204,7 +204,12 @@ export const POST = route("dashboards.chat", async (req: Request, ctx: RoutePara
         workspaceId: dashboard.workspaceId,
         resource: { type: "source", id: q.sourceId },
         outcome: q.outcome,
-        detail: { via: "chat", dashboardId: id, sql: q.sql, stage: q.stage },
+        detail: {
+          via: "chat",
+          dashboardId: id,
+          ...(q.promql !== undefined ? { promql: q.promql } : { sql: q.sql }),
+          stage: q.stage,
+        },
       }),
     abortSignal: req.signal,
   });

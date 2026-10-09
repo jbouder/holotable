@@ -9,6 +9,8 @@ export const pie = definePanelKind({
     "Proportional breakdown across a small set of categories. Omits `query.timeField`.",
   promptHint:
     "a proportional breakdown of a small set of categories: one label column and one numeric value column; OMIT 'query.timeField', it is not a time series.",
+  promqlHint:
+    "an instant query ('instant': true) aggregated by one label; each series is a slice: sum by (status) (increase(http_requests_total[1h])).",
   canvas: true,
   timeBrush: false,
   skeleton: "radial",

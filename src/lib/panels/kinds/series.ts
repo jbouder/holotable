@@ -10,6 +10,8 @@ export const line = definePanelKind({
   summary: "Time series as a continuous line. Requires `query.timeField`.",
   promptHint:
     "a numeric trend over time; bucket the time column, alias it and set the alias as 'query.timeField'.",
+  promqlHint:
+    "a range query (no 'instant'); each series is a line, so aggregate to a few: sum by (route) (rate(http_requests_total[5m])).",
   canvas: true,
   timeBrush: true,
   skeleton: "chart",
@@ -22,6 +24,7 @@ export const area = definePanelKind({
   kind: "area",
   summary: "Filled time series. Requires `query.timeField`.",
   promptHint: "a filled time series, for a volume or a total over time.",
+  promqlHint: "a range query drawn filled, for a volume or a total over time.",
   canvas: true,
   timeBrush: true,
   skeleton: "chart",
@@ -34,6 +37,8 @@ export const bar = definePanelKind({
   kind: "bar",
   summary: "Bars over time or across a categorical dimension.",
   promptHint: "values per time bucket, or compared across a categorical dimension.",
+  promqlHint:
+    "a range query drawn as bars per step, or an instant query ('instant': true) compared across one label: sum by (status) (increase(http_requests_total[1h])).",
   canvas: true,
   timeBrush: true,
   skeleton: "chart",

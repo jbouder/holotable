@@ -36,6 +36,8 @@ export const gauge = definePanelKind({
     'One value against its limits (`options.min`/`options.max`), as a dial or, with `options.variant: "bar"`, one bar per row. Colored by `options.thresholds`.',
   promptHint:
     "a value with natural bounds (a percentage, utilization, saturation, a quota or budget left): the latest row is shown against options.min and options.max (numbers, or result column names; default 0 and 100), colored by options.thresholds ([{value, color}] ascending). options.variant \"bar\" draws one bar per row of a label column, e.g. one per host. Use 'stat' instead for an unbounded count.",
+  promqlHint:
+    "an instant query ('instant': true) for a value with natural bounds, against options.min and options.max; options.variant \"bar\" draws one bar per series.",
   canvas: true,
   timeBrush: false,
   skeleton: "radial",

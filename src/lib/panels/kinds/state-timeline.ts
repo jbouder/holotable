@@ -48,6 +48,8 @@ export const stateTimeline = definePanelKind({
     "Discrete states over time, one lane per entity: a span runs from a row's time to the next row's for the same entity. Requires `query.timeField`.",
   promptHint:
     "discrete states over time (up/down, deploy phase, job status, circuit-breaker state): return the raw time column (set as 'query.timeField'), an entity column and a state column, ordered by time, without bucketing; name them in options.entity and options.state, and color known states with options.states ([{state, color}]).",
+  promqlHint:
+    "not for a Prometheus source: it needs an entity column and a state column per row; draw the state value as a 'line' instead.",
   canvas: true,
   timeBrush: false,
   skeleton: "lanes",

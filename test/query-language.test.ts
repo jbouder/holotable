@@ -231,8 +231,8 @@ const SQL_SPECIFIC = [
   "src/lib/ir.ts",
   "src/lib/timescaledb/",
 ];
-/** Reads a partial, still-streaming draft, which is not a `PanelQuery` yet. */
-const DRAFT_READERS = ["src/lib/panel-diff.ts"];
+/** Read a partial, still-streaming draft, or raw model output, which is not a `PanelQuery` yet. */
+const DRAFT_READERS = ["src/lib/panel-diff.ts", "src/lib/ai/source-languages.ts"];
 
 function files(dir: string): string[] {
   const out: string[] = [];

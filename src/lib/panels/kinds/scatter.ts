@@ -5,6 +5,8 @@ export const scatter = definePanelKind({
   summary: "Relationship between two numeric dimensions.",
   promptHint:
     "the relationship between two numeric dimensions; the first numeric column is the x-axis.",
+  promqlHint:
+    "not for a Prometheus source: its rows are a time and one column per series.",
   canvas: true,
   timeBrush: false,
   skeleton: "chart",

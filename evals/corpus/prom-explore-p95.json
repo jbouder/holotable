@@ -1,0 +1,11 @@
+{
+  "name": "prom-explore-p95",
+  "mode": "explore",
+  "catalog": "prometheus-demo",
+  "prompt": "Plot the p95 panel query latency over time.",
+  "expect": {
+    "metrics": ["holotable_query_duration_seconds_bucket"],
+    "plausibleViz": ["line", "area"],
+    "timeField": "required"
+  }
+}

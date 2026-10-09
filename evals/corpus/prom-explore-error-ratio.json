@@ -1,0 +1,10 @@
+{
+  "name": "prom-explore-error-ratio",
+  "mode": "explore",
+  "catalog": "prometheus-demo",
+  "prompt": "What share of panel queries failed?",
+  "expect": {
+    "plausibleViz": ["stat", "gauge", "table", "pie", "donut"],
+    "timeField": "absent"
+  }
+}

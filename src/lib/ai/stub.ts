@@ -70,6 +70,69 @@ export function recordedDashboard(sourceId: string) {
   };
 }
 
+/**
+ * The recorded dashboard for a Prometheus source (#387), against Holotable's
+ * own metrics as a Prometheus scraping `/api/metrics` holds them, so the
+ * compose stack's Prometheus can answer it.
+ */
+export function recordedPromqlDashboard(sourceId: string) {
+  return {
+    title: "Holotable query load",
+    timeRange: { from: "now-1h", to: "now" },
+    refreshIntervalMs: 15000,
+    panels: [
+      {
+        id: "query-rate",
+        title: "Queries per second by source",
+        description: "Rate of executed panel queries over 5 minutes, per source.",
+        viz: "line",
+        query: {
+          sourceId,
+          promql: "sum by (source) (rate(holotable_query_duration_seconds_count[5m]))",
+        },
+        format: "number",
+        layout: { x: 0, y: 0, w: 6, h: 4 },
+      },
+      {
+        id: "query-p95",
+        title: "p95 query latency",
+        description: "The 95th percentile of query duration over 5 minutes, in seconds.",
+        viz: "line",
+        query: {
+          sourceId,
+          promql:
+            "histogram_quantile(0.95, sum by (le) (rate(holotable_query_duration_seconds_bucket[5m])))",
+        },
+        layout: { x: 6, y: 0, w: 6, h: 4 },
+      },
+      {
+        id: "pollers",
+        title: "Active pollers",
+        description: "The number of dashboard pollers running now.",
+        viz: "stat",
+        query: { sourceId, promql: "sum(holotable_pollers_active)", instant: true },
+        layout: { x: 0, y: 4, w: 4, h: 2 },
+      },
+    ],
+  };
+}
+
+/** The recorded Explore answer for a Prometheus source (#387). */
+export function recordedPromqlExplorePanel(sourceId: string) {
+  return {
+    id: "explore",
+    title: "Queries by source",
+    description: "Rate of executed panel queries over 5 minutes, per source.",
+    viz: "table",
+    query: {
+      sourceId,
+      promql: "sum by (source) (rate(holotable_query_duration_seconds_count[5m]))",
+      instant: true,
+    },
+    layout: { x: 0, y: 0, w: 12, h: 4 },
+  };
+}
+
 /** The recorded Explore answer. */
 export function recordedExplorePanel(sourceId: string) {
   return {
@@ -172,6 +235,9 @@ function currentSpecAfter(text: string, marker: string): Record<string, unknown>
 export function stubAnswer(options: CallOptions): string {
   const { system, user } = textOf(options);
   const sourceId = /^sourceId: (\S+)$/m.exec(system)?.[1] ?? "unknown-source";
+  // A request against a Prometheus source (its catalog line says so) gets the
+  // PromQL recordings (#387).
+  const promql = system.includes(`(id: ${sourceId}, kind: prometheus)`);
   const format = options.responseFormat;
   if (format?.type !== "json") return STUB_CHAT_REPLY;
 
@@ -184,7 +250,9 @@ export function stubAnswer(options: CallOptions): string {
           title: `${String(current.title)} (refined)`,
         });
       }
-      return JSON.stringify(recordedDashboard(sourceId));
+      return JSON.stringify(
+        promql ? recordedPromqlDashboard(sourceId) : recordedDashboard(sourceId),
+      );
     }
     case "Panel": {
       const current = currentSpecAfter(user, "Here is the current panel spec:");
@@ -194,7 +262,9 @@ export function stubAnswer(options: CallOptions): string {
           title: `${String(current.title)}${STUB_PANEL_EDIT_SUFFIX}`,
         });
       }
-      return JSON.stringify(recordedExplorePanel(sourceId));
+      return JSON.stringify(
+        promql ? recordedPromqlExplorePanel(sourceId) : recordedExplorePanel(sourceId),
+      );
     }
     case "SourceDraft": {
       const granted = /MUST be one of: "([^"]+)"/.exec(system)?.[1] ?? "TS_METRICS";

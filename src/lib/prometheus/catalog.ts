@@ -54,6 +54,25 @@ export function metricSelector(name: string): string {
 }
 
 /**
+ * The series names a metric family is queried by. Metadata names a family;
+ * a classic histogram's series are `_bucket` (what `histogram_quantile` reads),
+ * `_count` and `_sum`, which are counters, and a summary adds those two to its
+ * quantile series. The allowlist holds the names a selector uses.
+ */
+function seriesNames(
+  family: string,
+  type: DiscoveredMetric["type"],
+): { name: string; type: DiscoveredMetric["type"] }[] {
+  const totals = [
+    { name: `${family}_count`, type: "counter" as const },
+    { name: `${family}_sum`, type: "counter" as const },
+  ];
+  if (type === "histogram") return [{ name: `${family}_bucket`, type }, ...totals];
+  if (type === "summary") return [{ name: family, type }, ...totals];
+  return [{ name: family, type }];
+}
+
+/**
  * Every metric the endpoint describes, from `/api/v1/metadata`; an endpoint
  * that keeps no metadata (VictoriaMetrics, some Mimir setups) answers names
  * only, from `__name__`'s values over the discovery window.
@@ -71,15 +90,16 @@ export async function discoverMetrics(
   const described = Object.entries(
     (metadata ?? {}) as Record<string, { type?: string; help?: string }[]>,
   )
-    .map(([name, entries]) => {
+    .flatMap(([name, entries]) => {
       const first = entries?.[0] ?? {};
-      return {
-        name,
-        type: (TYPES.has(first.type ?? "")
-          ? first.type
-          : "unknown") as DiscoveredMetric["type"],
+      const type = (
+        TYPES.has(first.type ?? "") ? first.type : "unknown"
+      ) as DiscoveredMetric["type"];
+      return seriesNames(name, type).map((series) => ({
+        name: series.name,
+        type: series.type,
         ...(first.help ? { help: first.help.slice(0, 500) } : {}),
-      };
+      }));
     })
     .filter((m) => PrometheusMetric.shape.name.safeParse(m.name).success);
   if (described.length > 0) return described.sort((a, b) => a.name.localeCompare(b.name));

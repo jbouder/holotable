@@ -1,0 +1,11 @@
+{
+  "name": "prom-explore-tokens-by-model",
+  "mode": "explore",
+  "catalog": "prometheus-demo",
+  "prompt": "Which model spent the most tokens in this window?",
+  "expect": {
+    "metrics": ["holotable_llm_tokens_total"],
+    "plausibleViz": ["table", "bar", "pie", "donut", "stat"],
+    "timeField": "absent"
+  }
+}

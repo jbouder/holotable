@@ -1,0 +1,115 @@
+{
+  "kind": "prometheus",
+  "url": "http://prometheus:9090",
+  "auth": "none",
+  "metrics": [
+    {
+      "name": "up",
+      "type": "gauge",
+      "help": "1 if the last scrape of the target succeeded, 0 if it did not.",
+      "labels": ["instance", "job"]
+    },
+    {
+      "name": "holotable_query_duration_seconds_bucket",
+      "type": "histogram",
+      "help": "Panel query latency, from checkout to rollback, in seconds.",
+      "labels": ["instance", "job", "le", "outcome", "source"]
+    },
+    {
+      "name": "holotable_query_duration_seconds_count",
+      "type": "counter",
+      "help": "Panel query latency, from checkout to rollback, in seconds. (count)",
+      "labels": ["instance", "job", "outcome", "source"]
+    },
+    {
+      "name": "holotable_query_duration_seconds_sum",
+      "type": "counter",
+      "help": "Panel query latency, from checkout to rollback, in seconds. (sum)",
+      "labels": ["instance", "job", "outcome", "source"]
+    },
+    {
+      "name": "holotable_query_rows_bucket",
+      "type": "histogram",
+      "help": "Rows returned per panel query.",
+      "labels": ["instance", "job", "le", "source"]
+    },
+    {
+      "name": "holotable_query_rows_count",
+      "type": "counter",
+      "help": "Rows returned per panel query. (count)",
+      "labels": ["instance", "job", "source"]
+    },
+    {
+      "name": "holotable_query_rows_sum",
+      "type": "counter",
+      "help": "Rows returned per panel query. (sum)",
+      "labels": ["instance", "job", "source"]
+    },
+    {
+      "name": "holotable_poller_tick_duration_seconds_bucket",
+      "type": "histogram",
+      "help": "Time to run one poller cycle, in seconds.",
+      "labels": ["dashboard", "instance", "job", "le"]
+    },
+    {
+      "name": "holotable_poller_tick_duration_seconds_count",
+      "type": "counter",
+      "help": "Time to run one poller cycle, in seconds. (count)",
+      "labels": ["dashboard", "instance", "job"]
+    },
+    {
+      "name": "holotable_poller_tick_duration_seconds_sum",
+      "type": "counter",
+      "help": "Time to run one poller cycle, in seconds. (sum)",
+      "labels": ["dashboard", "instance", "job"]
+    },
+    {
+      "name": "holotable_sse_subscribers",
+      "type": "gauge",
+      "help": "Open dashboard streams.",
+      "labels": ["dashboard", "instance", "job"]
+    },
+    {
+      "name": "holotable_pollers_active",
+      "type": "gauge",
+      "help": "Dashboard pollers running.",
+      "labels": ["instance", "job"]
+    },
+    {
+      "name": "holotable_llm_tokens_total",
+      "type": "counter",
+      "help": "Model tokens spent, by direction.",
+      "labels": ["direction", "instance", "job", "model", "workspace"]
+    },
+    {
+      "name": "holotable_llm_requests_total",
+      "type": "counter",
+      "help": "Model requests at the admission gate.",
+      "labels": ["instance", "job", "outcome", "route"]
+    },
+    {
+      "name": "holotable_sql_validation_rejections_total",
+      "type": "counter",
+      "help": "Statements refused by the SQL guard.",
+      "labels": ["instance", "job", "reason"]
+    },
+    {
+      "name": "holotable_promql_validation_rejections_total",
+      "type": "counter",
+      "help": "Expressions refused by the PromQL guard.",
+      "labels": ["instance", "job", "reason"]
+    },
+    {
+      "name": "holotable_process_cpu_seconds_total",
+      "type": "counter",
+      "help": "CPU time spent by the server process, in seconds.",
+      "labels": ["instance", "job"]
+    },
+    {
+      "name": "holotable_process_resident_memory_bytes",
+      "type": "gauge",
+      "help": "Resident memory of the server process, in bytes.",
+      "labels": ["instance", "job"]
+    }
+  ]
+}

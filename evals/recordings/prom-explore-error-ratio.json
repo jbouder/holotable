@@ -1,0 +1,6 @@
+{
+  "model": "kimi-k3",
+  "recordedAt": "2026-10-09T22:41:55.481Z",
+  "requestDigest": "c21fd01b10f93ace97b13d6ff848fd4d87e1f87068980e15cdf7b4ac63bbed56",
+  "text": "{\"id\":\"explore\",\"title\":\"Share of panel queries by outcome\",\"viz\":\"donut\",\"query\":{\"sourceId\":\"eval-prometheus-demo\",\"promql\":\"sum by (outcome) (increase(holotable_query_duration_seconds_count[1h]))\",\"instant\":true},\"layout\":{\"x\":0,\"y\":0,\"w\":12,\"h\":4}}"
+}

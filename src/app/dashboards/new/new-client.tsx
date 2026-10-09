@@ -13,7 +13,11 @@ import {
   SendHorizontal,
   Square,
 } from "lucide-react";
-import { type Dashboard, DashboardGenerationSchema, safeParseDashboard } from "@/lib/ir";
+import {
+  type Dashboard,
+  DashboardGenerationSchemaAnyLanguage,
+  safeParseDashboard,
+} from "@/lib/ir";
 import {
   activeSpec,
   appendTurn,
@@ -191,7 +195,7 @@ export function NewDashboardClient({
 
   const { object, submit, isLoading, error, stop, repairing } = useRepairingObject({
     api: "/api/generate",
-    schema: DashboardGenerationSchema,
+    schema: DashboardGenerationSchemaAnyLanguage,
     onFinish({ object }) {
       if (!object) return;
       const turn = normalizeTurn(running.current.prompt, object, model);

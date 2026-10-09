@@ -183,6 +183,45 @@ time column — a `stat` scalar or a categorical breakdown — `timeField` is
 omitted entirely.
 :::
 
+## Against a Prometheus source: the PromQL rules
+
+A source's kind decides the language its panels are written in
+([#387](https://github.com/jbouder/holotable/issues/387)). A generation over
+TimescaleDB sources only is asked exactly what it always was. When a Prometheus
+source is among the sources, the prompt changes in four ways:
+
+- The catalog block lists the source's metrics with their type, help and labels.
+  It never includes the URL or the auth mode.
+- `PROMQL_RULES` follows the SQL rules, or replaces them when every source is
+  Prometheus. It covers:
+  - one expression per panel, in `query.promql`;
+  - every selector naming a listed metric;
+  - never `@` and never a time of the model's own;
+  - `rate()` or `increase()` over a counter, with a range of a few scrape
+    intervals;
+  - `sum by (…)` to keep series few;
+  - `histogram_quantile(0.95, sum by (le) (rate(x_bucket[5m])))` for
+    percentiles;
+  - `"instant": true` for a stat, gauge, pie, donut or table;
+  - a variable only as a whole matcher value, `{host=":host"}`.
+- Each panel kind's hint has a PromQL form where the SQL one talks about
+  `timeField`. Heatmap, scatter and state timeline tell the model not to use them
+  with a Prometheus source, because PromQL's rows are a time and one column per
+  series.
+- A `query` variable can list a label's values:
+  `{"sourceId": …, "label": "instance", "match": "up{job=\"api\"}"}`.
+
+With several sources of both kinds, a panel's language is its source's. The
+schema the model is bound to says so too: a panel that writes `query.sql`
+against a Prometheus source fails it, and the one
+[repair](/operations/ai-provider/#structured-output-repair) tells the model to
+write `query.promql` instead. The [PromQL guard](/concepts/executing-a-panel/#the-promql-guard)
+is still the enforcement, on save and on every run.
+
+Explore and the dashboard chat work the same way. On a dashboard with a
+Prometheus source, the chat's `runQuery` tool takes `promql` (and `instant`)
+beside `sql`, and the source's kind refuses the other language by name.
+
 ## Every panel says what it computes
 
 Alongside `SQL_RULES`, the shared system prompt carries `DESCRIPTION_RULE`:
