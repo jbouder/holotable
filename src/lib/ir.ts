@@ -428,13 +428,20 @@ const kindsWhere = (query: "required" | "none") =>
   ];
 
 /**
- * A generated panel of a kind that runs a query: `query` is required. SQL
- * only, for now: the model is taught PromQL, and shown the branch, when a
- * Prometheus source can be generated against (#387).
+ * A generated panel of a kind that runs a query: `query` is required. A
+ * generation over SQL sources only is shown the SQL branch alone, so its
+ * prompt is what it was before PromQL existed; one with a Prometheus source is
+ * shown both (#387), through {@link generationSchemas}.
  */
 const GeneratedQueryPanel = PanelFields.extend({
   viz: z.enum(kindsWhere("required")),
   query: SqlQuery,
+});
+
+/** As {@link GeneratedQueryPanel}, in either language. */
+const GeneratedAnyQueryPanel = PanelFields.extend({
+  viz: z.enum(kindsWhere("required")),
+  query: PanelQuery,
 });
 
 /** A generated panel of a kind that runs no query: it has no `query`. */
@@ -463,6 +470,16 @@ export const GeneratedPanel: z.ZodType<Panel> = z
 export const ExplorePanel = GeneratedQueryPanel.omit({ links: true }).superRefine(
   fitsItsKind,
 );
+
+/** {@link GeneratedPanel} in either query language (#387). */
+export const GeneratedPanelAnyLanguage: z.ZodType<Panel> = z
+  .discriminatedUnion("viz", [GeneratedAnyQueryPanel, GeneratedQuerylessPanel])
+  .superRefine(fitsItsKind);
+
+/** {@link ExplorePanel} in either query language (#387). */
+export const ExplorePanelAnyLanguage = GeneratedAnyQueryPanel.omit({
+  links: true,
+}).superRefine(fitsItsKind);
 
 /** A panel that runs a query: every kind but the query-less ones. */
 export type QueryPanel = Panel & { query: PanelQuery };
@@ -770,7 +787,38 @@ export const DashboardGenerationSchema = z
   })
   .strict()
   .superRefine(dashboardRules);
-export type GeneratedDashboard = z.infer<typeof DashboardGenerationSchema>;
+/**
+ * {@link DashboardGenerationSchema} in either query language (#387): what a
+ * generation with a Prometheus source is bound to, and what a client parses
+ * any generated dashboard with, since it accepts everything the SQL one does.
+ */
+export const DashboardGenerationSchemaAnyLanguage = z
+  .object({
+    ...DashboardFields,
+    panels: z.array(GeneratedPanelAnyLanguage).min(1).max(50),
+  })
+  .strict()
+  .superRefine(dashboardRules);
+export type GeneratedDashboard = z.infer<typeof DashboardGenerationSchemaAnyLanguage>;
+
+/**
+ * The schemas a generation is bound to: SQL only unless one of its sources
+ * answers PromQL, so a generation over SQL sources is asked for exactly what
+ * it was before PromQL existed.
+ */
+export function generationSchemas(promql: boolean) {
+  return promql
+    ? {
+        dashboard: DashboardGenerationSchemaAnyLanguage,
+        panel: GeneratedPanelAnyLanguage,
+        explore: ExplorePanelAnyLanguage,
+      }
+    : {
+        dashboard: DashboardGenerationSchema,
+        panel: GeneratedPanel,
+        explore: ExplorePanel,
+      };
+}
 
 /**
  * A generated dashboard as a spec of this build's version. Only for output of

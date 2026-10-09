@@ -10,6 +10,8 @@ import {
   workspaceContextBlock,
 } from "@/lib/ai/prompt";
 import { withKnownLinkTargets } from "@/lib/ai/link-targets";
+import { withSourceLanguages } from "@/lib/ai/source-languages";
+import { sourceKind } from "@/lib/sources/registry";
 import { serverKind } from "@/lib/sources/server/registry";
 import {
   type Dashboard,
@@ -18,6 +20,7 @@ import {
   forGeneration,
   GeneratedPanel,
   type Panel,
+  generationSchemas,
 } from "@/lib/ir";
 import { config } from "@/lib/config";
 import { PANEL_KINDS } from "@/lib/panels/registry";
@@ -92,6 +95,27 @@ function finish(onFinish: OnGenerationFinish | undefined, schema: z.ZodType) {
     });
 }
 
+/**
+ * The schemas a generation over `sources` is bound to: SQL only unless one
+ * of them answers PromQL (#387), so a SQL generation is asked for exactly
+ * what it always was.
+ */
+function schemasFor(sources: readonly SourceRecord[]) {
+  const promql = sourceLanguages(sources).has("promql");
+  const schemas = generationSchemas(promql);
+  if (!promql) return schemas;
+  // A panel in the other language fails the schema, so the repair names the
+  // field to write; a SQL generation is bound exactly as it was.
+  const languages = Object.fromEntries(
+    sources.map((s) => [s.id, sourceKind(s).language]),
+  );
+  return {
+    dashboard: withSourceLanguages(schemas.dashboard, languages),
+    panel: withSourceLanguages(schemas.panel, languages),
+    explore: withSourceLanguages(schemas.explore, languages),
+  };
+}
+
 /** The most sources one generation may be given (#104): the primary and its others. */
 export const MAX_GENERATION_SOURCES = 1 + MAX_ADDITIONAL_SOURCES;
 
@@ -128,6 +152,85 @@ export function sqlRules(sourceCount: number): string {
     ? SQL_RULES.replace(SINGLE_SOURCE_RULE, MULTI_SOURCE_RULE)
     : SQL_RULES;
 }
+
+const PROMQL_SINGLE_SOURCE_RULE =
+  "- Every panel's query.sourceId MUST equal the provided sourceId.";
+
+const PROMQL_MULTI_SOURCE_RULE = `- Every panel's query.sourceId MUST be one of the provided sourceIds, and its
+  PromQL may name ONLY metrics from the catalog block of THAT source.`;
+
+/**
+ * The PromQL rules (#387), in the voice of {@link SQL_RULES}, for a source
+ * whose catalog says `kind: prometheus`. They are the guard's rules said
+ * forward (`src/lib/promql/safety.ts`), plus what makes a query worth drawing.
+ */
+export const PROMQL_RULES = `PromQL rules (STRICT) — for a source whose catalog says kind: prometheus:
+- Write the panel's query as 'query.promql': ONE PromQL expression, no comments.
+  Never 'query.sql' and never 'query.timeField' for this source.
+- Every selector MUST name a metric listed in that source's catalog, by its name:
+  http_requests_total{job="api"}. Never a selector without a metric name, never
+  a __name__ pattern.
+- NEVER use the @ modifier and never write a time of your own: the server sets
+  start, end and step. Keep ranges, subqueries and offsets within 7d.
+- A counter (catalog type counter) is plotted through rate() or increase() over a
+  range of at least four scrape intervals, e.g. rate(x[5m]); never a raw
+  counter. A gauge is plotted as it is.
+- Keep series few: aggregate with sum by (<label>) (...) on labels the catalog
+  lists for the metric.
+- Latency percentiles: histogram_quantile(0.95, sum by (le) (rate(<name>_bucket[5m])))
+  over a *_bucket metric with an "le" label.
+- Set "instant": true for a stat, gauge, pie, donut or table panel (one value per
+  series, at the end of the window). Leave it out for a time series: its rows
+  carry a "time" column, and the chart draws one line per series.
+- A dashboard variable appears ONLY as a whole label-matcher value: {host=":host"},
+  or {host=~":host"} for a multi variable. Never anywhere else.
+${PROMQL_SINGLE_SOURCE_RULE}`;
+
+/** Which languages a generation's sources answer. */
+export function sourceLanguages(sources: readonly SourceRecord[]): Set<"sql" | "promql"> {
+  return new Set(sources.map((s) => sourceKind(s).language));
+}
+
+/**
+ * The query rules for a generation over `sources`. Sources that all answer
+ * SQL get {@link sqlRules} exactly, so a SQL prompt is unchanged by #387. A
+ * Prometheus source adds {@link PROMQL_RULES}, and a mix of the two adds the
+ * rule that a panel's language is its source's.
+ */
+export function queryRules(sources: readonly SourceRecord[]): string {
+  const languages = sourceLanguages(sources);
+  if (!languages.has("promql")) return sqlRules(sources.length);
+  const promql =
+    sources.length > 1
+      ? PROMQL_RULES.replace(PROMQL_SINGLE_SOURCE_RULE, PROMQL_MULTI_SOURCE_RULE)
+      : PROMQL_RULES;
+  if (!languages.has("sql")) return promql;
+  return `${sqlRules(sources.length)}
+
+${promql}
+
+- Each panel's query language is its source's: 'query.sql' for a source whose
+  catalog says kind: timescaledb, 'query.promql' for kind: prometheus.`;
+}
+
+/**
+ * The kinds a panel can be, for a generation over these languages. SQL alone
+ * gets {@link VIZ_GUIDE} exactly; PromQL takes each kind's `promqlHint` where
+ * it has one, and a mix gives both.
+ */
+export function vizGuide(languages: ReadonlySet<"sql" | "promql">): string {
+  if (!languages.has("promql")) return VIZ_GUIDE;
+  return PANEL_KINDS.map((k) => {
+    if (!k.promqlHint) return `- '${k.kind}': ${k.promptHint}`;
+    if (!languages.has("sql")) return `- '${k.kind}': ${k.promqlHint}`;
+    return `- '${k.kind}': ${k.promptHint} With PromQL: ${k.promqlHint}`;
+  }).join("\n");
+}
+
+/** How a PromQL dashboard declares a variable (#383): the values of a label. */
+const PROMQL_VARIABLES_GUIDE = `- For a Prometheus source, a 'query' variable lists a label's values:
+  {"name":"host","type":"query","query":{"sourceId":"<this source>","label":"instance","match":"up{job="api"}"}}.
+  'match' is ONE selector of a listed metric, or omit it.`;
 
 /**
  * Every panel carries its own one-sentence explanation.
@@ -240,12 +343,14 @@ export function baseSystem(
   );
   const targets = dashboardsBlock(dashboards);
   const hasTargets = linkableIds(dashboards ?? []).length > 0;
+  const languages = sourceLanguages(sources);
+  const promql = languages.has("promql");
   return `You design monitoring dashboards as a strict JSON spec.
-You NEVER return data rows — only a viz specification (SQL + layout).
+You NEVER return data rows — only a viz specification (${promql ? "a SQL or PromQL query" : "SQL"} + layout).
 
 ${sourcesSection(sources)}
 ${workspace ? `\n${workspace}\n` : ""}${targets ? `\n${targets}\n` : ""}
-${sqlRules(sources.length)}
+${queryRules(sources)}
 
 ${DESCRIPTION_RULE}
 
@@ -254,13 +359,13 @@ and 4 rows tall (h=4), laid out left-to-right, top-to-bottom, without overlaps.
 Use a wider or taller panel only when a request clearly calls for it.
 
 Choose each panel's 'viz' from these kinds, and no other:
-${VIZ_GUIDE}
+${vizGuide(languages)}
 
 Use 'format' (number|bytes|percent|ms) where meaningful.
 
 ${PRESENTATION_GUIDE}
 
-${VARIABLES_GUIDE}${dashboards === undefined ? "" : `\n\n${linksGuide(hasTargets)}`}`;
+${VARIABLES_GUIDE}${promql ? `\n${PROMQL_VARIABLES_GUIDE}` : ""}${dashboards === undefined ? "" : `\n\n${linksGuide(hasTargets)}`}`;
 }
 
 /**
@@ -282,8 +387,9 @@ export function dashboardRequest(input: {
 }) {
   const { source, prompt, repair, workspacePrompt, additionalSources, dashboards } =
     input;
+  const schemas = schemasFor([source, ...(additionalSources ?? [])]);
   return {
-    schema: linkedSchema(DashboardGenerationSchema, dashboards),
+    schema: linkedSchema(schemas.dashboard, dashboards),
     schemaName: "Dashboard",
     schemaDescription: "A monitoring dashboard specification (viz spec, not data).",
     system: baseSystem(source, workspacePrompt, additionalSources, dashboards),
@@ -347,7 +453,7 @@ export function explorePanelRequest(input: {
 }) {
   const { source, prompt, repair, workspacePrompt } = input;
   return {
-    schema: ExplorePanel,
+    schema: schemasFor([source]).explore,
     schemaName: "Panel",
     schemaDescription: "A single panel specification (viz spec, not data).",
     system: baseSystem(source, workspacePrompt),
@@ -491,7 +597,7 @@ export function streamPanel(input: {
 }) {
   const { source, prompt, current, onFinish, repair, workspacePrompt, dashboards } =
     input;
-  const schema = linkedSchema(GeneratedPanel, dashboards);
+  const schema = linkedSchema(schemasFor([source]).panel, dashboards);
   return streamObject({
     ...modelSettings(input.model),
     onFinish: finish(onFinish, schema),
@@ -543,7 +649,10 @@ export function streamDashboardRefinement(input: {
     additionalSources,
     dashboards,
   } = input;
-  const schema = linkedSchema(DashboardGenerationSchema, dashboards);
+  const schema = linkedSchema(
+    schemasFor([source, ...(additionalSources ?? [])]).dashboard,
+    dashboards,
+  );
   return streamObject({
     ...modelSettings(input.model),
     onFinish: finish(onFinish, schema),

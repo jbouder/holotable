@@ -13,20 +13,20 @@ import {
   hasQuery,
   type Panel,
   SPEC_VERSION,
+  isPromqlQuery,
   isSqlQuery,
+  type PromqlQuery,
   queryTimeField,
   type QueryPanel,
   type SqlQuery,
 } from "@/lib/ir";
 import { PANEL_KINDS } from "@/lib/panels/registry";
-import {
-  type SqlSourceConfig,
-  TimescaleDbConfig as SourceConfigSchema,
-  type SqlSourceRecord as SourceRecord,
-} from "@/lib/registry";
+import { nodes, parsePromql, text as nodeText } from "@/lib/promql/parse";
+import { selectorsOf } from "@/lib/promql/safety";
+import { SourceConfig as SourceConfigSchema, type SourceRecord } from "@/lib/registry";
+import { serverKind } from "@/lib/sources/server/registry";
 import { analyzeSelect } from "@/lib/sql/ast";
 import { selectOutputs, timeFieldWarning } from "@/lib/sql/hints";
-import { validateSql } from "@/lib/sql/safety";
 
 /*
  * The LLM eval harness (#24): a fixed corpus of prompts, each run through the
@@ -84,6 +84,8 @@ export const EvalCase = z
         requiredViz: z.array(Viz).min(1).optional(),
         /** Each table must be read by at least one panel. */
         tables: z.array(z.string()).min(1).optional(),
+        /** Each metric must be named by at least one PromQL panel (#387). */
+        metrics: z.array(z.string()).min(1).optional(),
         /** Every query panel sets `query.timeField` (`required`) or none does (`absent`). */
         timeField: z.enum(["required", "absent"]).optional(),
         minPanels: z.number().int().positive().optional(),
@@ -156,7 +158,7 @@ export function loadCases(dir: string = EVALS_DIR): EvalCase[] {
 
 /** The case's catalog as a registered, refreshed source, the way a route sees one. */
 export function loadSource(catalog: string, dir: string = EVALS_DIR): SourceRecord {
-  const config: SqlSourceConfig = SourceConfigSchema.parse(
+  const config = SourceConfigSchema.parse(
     JSON.parse(readFileSync(join(dir, "catalogs", `${catalog}.json`), "utf8")),
   );
   const at = "2026-01-01T00:00:00.000Z";
@@ -164,9 +166,10 @@ export function loadSource(catalog: string, dir: string = EVALS_DIR): SourceReco
     id: `eval-${catalog}`,
     workspaceId: "eval",
     name: catalog,
-    kind: "timescaledb",
+    kind: config.kind,
     config,
-    secretRef: "TS_METRICS",
+    // A Prometheus catalog with no auth names no reference (#385).
+    secretRef: "auth" in config && config.auth === "none" ? null : "TS_METRICS",
     catalogRefreshedAt: at,
     catalogMissingTables: [],
     createdBy: "eval",
@@ -331,8 +334,41 @@ function schemaFailure(error: unknown, schema: z.ZodType): string {
 type GradedOutput = { panels: Panel[] } | Panel;
 
 /** Checks 2–4 on output that already parsed. Returns the failures, if any. */
-/** A panel whose query is SQL: what the corpus grades. */
+/** A panel whose query is SQL. */
 type SqlPanel = QueryPanel & { query: SqlQuery };
+/** A panel whose query is PromQL (#387). */
+type PromqlPanel = QueryPanel & { query: PromqlQuery };
+
+/** Series names a counter-only function may be taken over: counters, and a histogram's or summary's totals. */
+function isCounterLike(name: string, type: string | undefined): boolean {
+  if (type === "counter") return true;
+  return (
+    (type === "histogram" || type === "summary") && /_(bucket|count|sum)$/.test(name)
+  );
+}
+
+/** `rate()`, `irate()` and `increase()` over a metric that is not a counter. */
+function rateOverNonCounters(promql: string, source: SourceRecord): string[] {
+  const parsed = parsePromql(promql);
+  if (!parsed.ok || !("metrics" in source.config)) return [];
+  const types = new Map(source.config.metrics.map((m) => [m.name, m.type]));
+  const found: string[] = [];
+  for (const { node } of nodes(parsed.root)) {
+    if (node.type !== "FunctionCall") continue;
+    const fn = node.children[0]?.children[0]?.type;
+    if (fn !== "Rate" && fn !== "Irate" && fn !== "Increase") continue;
+    const body = node.children.find((c) => c.type === "FunctionCallBody");
+    if (!body) continue;
+    for (const selector of selectorsOf(promql, body)) {
+      if (!isCounterLike(selector.metric, types.get(selector.metric))) {
+        found.push(
+          `${nodeText(promql, node.children[0])}() over ${selector.metric}, a ${types.get(selector.metric) ?? "unknown"}`,
+        );
+      }
+    }
+  }
+  return found;
+}
 
 export async function grade(
   c: EvalCase,
@@ -341,16 +377,12 @@ export async function grade(
 ): Promise<string[]> {
   const failures: string[] = [];
   const panels = "panels" in output ? output.panels : [output];
-  // The corpus grades SQL generation; a PromQL panel fails it by name until
-  // the evals learn PromQL (#387).
-  const queried = panels
-    .filter(hasQuery)
-    .filter((p): p is SqlPanel => isSqlQuery(p.query));
-  for (const panel of panels.filter(hasQuery)) {
-    if (!isSqlQuery(panel.query)) failures.push(`panel "${panel.id}" is PromQL`);
-  }
+  const queried = panels.filter(hasQuery);
+  const sqlPanels = queried.filter((p): p is SqlPanel => isSqlQuery(p.query));
+  const promqlPanels = queried.filter((p): p is PromqlPanel => isPromqlQuery(p.query));
 
-  // 2. The guard, as a save would run it.
+  // 2. The guard, as a save would run it: the source's kind checks each
+  // panel's language first, so SQL against a Prometheus source fails here.
   if ("panels" in output) {
     try {
       const spec = Dashboard.parse({ ...output, specVersion: SPEC_VERSION });
@@ -367,22 +399,28 @@ export async function grade(
       if (panel.query.sourceId !== source.id) {
         failures.push(`panel "${panel.id}" names source "${panel.query.sourceId}"`);
       }
-      const check = await validateSql(
-        panel.query.sql,
-        source.config,
+      const check = await serverKind(source).check(
+        source,
+        panel.query,
         declaredVariables({}),
       );
       if (!check.ok) failures.push(`panel "${panel.id}": ${check.error}`);
     }
   }
 
-  // 3. The time field is a column the query returns.
-  for (const panel of queried) {
+  // 3. The time field is a column the query returns (SQL); a counter is
+  // taken through rate() and nothing else is (PromQL).
+  for (const panel of sqlPanels) {
     const warning = timeFieldWarning(
       panel.query.timeField,
       selectOutputs(panel.query.sql),
     );
     if (warning) failures.push(`panel "${panel.id}": ${warning}`);
+  }
+  for (const panel of promqlPanels) {
+    for (const problem of rateOverNonCounters(panel.query.promql, source)) {
+      failures.push(`panel "${panel.id}": ${problem}`);
+    }
   }
 
   // 4. The case's expectations.
@@ -401,7 +439,7 @@ export async function grade(
   }
   if (expect.tables) {
     const read = new Set<string>();
-    for (const panel of queried) {
+    for (const panel of sqlPanels) {
       const analyzed = await analyzeSelect(panel.query.sql);
       if (analyzed.ok) for (const t of analyzed.analysis.tables) read.add(t.name);
     }
@@ -409,13 +447,29 @@ export async function grade(
       if (!read.has(table)) failures.push(`no panel reads ${table}`);
     }
   }
+  if (expect.metrics) {
+    const named = new Set<string>();
+    for (const panel of promqlPanels) {
+      const parsed = parsePromql(panel.query.promql);
+      if (!parsed.ok) continue;
+      try {
+        for (const s of selectorsOf(panel.query.promql, parsed.root)) named.add(s.metric);
+      } catch {
+        // A selector the guard refuses was already reported in step 2.
+      }
+    }
+    for (const metric of expect.metrics) {
+      if (!named.has(metric)) failures.push(`no panel reads ${metric}`);
+    }
+  }
   if (expect.timeField) {
+    // A PromQL range query's rows carry "time"; an instant one has none.
     for (const panel of queried) {
-      const has = queryTimeField(panel.query) !== undefined;
-      if (expect.timeField === "required" && !has) {
+      const field = queryTimeField(panel.query);
+      if (expect.timeField === "required" && field === undefined) {
         failures.push(`panel "${panel.id}" has no timeField`);
-      } else if (expect.timeField === "absent" && has) {
-        failures.push(`panel "${panel.id}" sets timeField "${panel.query.timeField}"`);
+      } else if (expect.timeField === "absent" && field !== undefined) {
+        failures.push(`panel "${panel.id}" sets timeField "${field}"`);
       }
     }
   }

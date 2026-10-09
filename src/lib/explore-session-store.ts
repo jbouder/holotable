@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { ExplorePanel, hasQuery, type QueryPanel, VizType } from "@/lib/ir";
+import { ExplorePanelAnyLanguage, hasQuery, type QueryPanel, VizType } from "@/lib/ir";
 import { MAX_SESSION_ENTRIES } from "@/lib/explore-session";
 import {
   initialTableView,
@@ -86,7 +86,7 @@ export function serializeSession(sub: string, session: StoredSession): string {
 function restoreEntry(raw: unknown): StoredEntry | null {
   const shape = EntryShape.safeParse(raw);
   if (!shape.success) return null;
-  const parsed = ExplorePanel.safeParse(shape.data.panel);
+  const parsed = ExplorePanelAnyLanguage.safeParse(shape.data.panel);
   if (!parsed.success || !hasQuery(parsed.data)) return null;
   const panel = parsed.data as QueryPanel;
   // A view or table that no longer makes a valid panel falls back to the

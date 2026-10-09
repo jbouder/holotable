@@ -23,7 +23,7 @@ import {
 } from "lucide-react";
 import {
   hasQuery,
-  ExplorePanel,
+  ExplorePanelAnyLanguage,
   panelTimeRange,
   type QueryPanel,
   type TimeRange,
@@ -331,7 +331,7 @@ export function ExploreClient({
 
   const { object, submit, isLoading, error, stop, repairing } = useRepairingObject({
     api: "/api/generate",
-    schema: ExplorePanel,
+    schema: ExplorePanelAnyLanguage,
     onFinish({ object }) {
       const question = asked.current;
       // `ExplorePanel` refuses a query-less panel; the guard says so to the type.

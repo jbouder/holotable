@@ -49,6 +49,12 @@ export interface PanelKind<K extends string = string> {
    * `panel.query` skips it.
    */
   readonly query: "required" | "none";
+  /**
+   * The hint for a panel against a Prometheus source (#387), where it differs
+   * from `promptHint`: PromQL has no `timeField`, and its rows are wide (one
+   * column per series), so the shape a kind asks for is said differently.
+   */
+  readonly promqlHint?: string;
   /** The kind cannot be drawn without `query.timeField` (#201). */
   readonly requiresTimeField?: boolean;
   /**

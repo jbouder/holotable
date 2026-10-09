@@ -9,7 +9,8 @@ import {
 import { z } from "zod";
 import { type Model, modelSettings } from "@/lib/ai/provider";
 import { fenceUntrustedBlock, sanitizePromptField } from "@/lib/ai/untrusted";
-import { SQL_RULES } from "@/lib/ai/generate";
+import { PROMQL_RULES, SQL_RULES } from "@/lib/ai/generate";
+import { sourceKind } from "@/lib/sources/registry";
 import type { SourcePlan } from "@/lib/sources/server/types";
 import { resolveTimeRange } from "@/lib/time";
 import { QueryExecutionError } from "@/lib/sources/execution";
@@ -57,10 +58,17 @@ export const MAX_TOOL_ROWS = 200;
 /** How many model<->tool steps a single turn may take. */
 const MAX_STEPS = 6;
 
+/**
+ * What the model asks `runQuery` to run: SQL for a SQL source, PromQL for a
+ * Prometheus one (#387). The tool offers `promql` only on a dashboard that
+ * has a Prometheus source.
+ */
 type ChatQueryArgs = {
   sourceId: string;
-  sql: string;
+  sql?: string;
   timeField?: string;
+  promql?: string;
+  instant?: boolean;
 };
 
 export type ChatQueryPlan =
@@ -188,13 +196,23 @@ export async function buildChatQueryPlan(input: {
   // makes a statement that needs it refused by name.
   const variables = input.variables ?? chatVariableValues(dashboard);
   const kind = serverKind(source);
-  // The tool writes SQL (#387 teaches it PromQL); a PromQL source refuses it
-  // by name, as the guard refuses a table it does not have.
-  const query = {
-    sourceId: source.id,
-    sql: args.sql,
-    ...(args.timeField ? { timeField: args.timeField } : {}),
-  };
+  // Exactly one statement, in either language; the source's kind refuses the
+  // other one by name, as the guard refuses a table it does not have.
+  if ((args.sql === undefined) === (args.promql === undefined)) {
+    return { ok: false, error: "give exactly one of sql or promql" };
+  }
+  const query =
+    args.promql !== undefined
+      ? {
+          sourceId: source.id,
+          promql: args.promql,
+          ...(args.instant ? { instant: true } : {}),
+        }
+      : {
+          sourceId: source.id,
+          sql: args.sql ?? "",
+          ...(args.timeField ? { timeField: args.timeField } : {}),
+        };
   const check = await kind.check(source, query, declaredVariables(dashboard));
   if (!check.ok) return { ok: false, error: check.error ?? "invalid sql" };
 
@@ -372,16 +390,74 @@ Using runQuery:
 - The server automatically restricts results to the dashboard's time range; do
   NOT write any time filter yourself.
 - Follow these SQL rules exactly:
-${SQL_RULES}
+${SQL_RULES}${
+  sources.some((s) => sourceKind(s).language === "promql")
+    ? `
+- For a source whose catalog says kind: prometheus, pass 'promql' instead of
+  'sql', following these rules:
+${PROMQL_RULES}`
+    : ""
+}
 
 Queryable source catalogs (metadata only — never the underlying data):
 ${catalogs}`;
 }
 
+const SQL_TOOL_INPUT = z.object({
+  sourceId: z
+    .string()
+    .describe("One of the dashboard's source ids (see the panel list)."),
+  sql: z
+    .string()
+    .max(8000)
+    .describe("A single SELECT/WITH statement following the SQL rules."),
+  timeField: z
+    .string()
+    .max(128)
+    .optional()
+    .describe(
+      "Output alias of the time column, when the result is time-series. Omit for scalars/breakdowns.",
+    ),
+});
+
+/** The tool's input on a dashboard with a Prometheus source (#387). */
+const PROMQL_TOOL_INPUT = z.object({
+  sourceId: z
+    .string()
+    .describe("One of the dashboard's source ids (see the panel list)."),
+  sql: z
+    .string()
+    .max(8000)
+    .optional()
+    .describe(
+      "For a SQL source: a single SELECT/WITH statement following the SQL rules.",
+    ),
+  timeField: z
+    .string()
+    .max(128)
+    .optional()
+    .describe(
+      "For SQL: the output alias of the time column, when the result is time-series.",
+    ),
+  promql: z
+    .string()
+    .max(8000)
+    .optional()
+    .describe(
+      "For a Prometheus source: one PromQL expression following the PromQL rules.",
+    ),
+  instant: z
+    .boolean()
+    .optional()
+    .describe("For PromQL: true for one value per series at the end of the window."),
+});
+
 /** One statement the model asked to run, as the audit log records it. */
 export interface ChatQueryOutcome {
   sourceId: string;
-  sql: string;
+  /** The statement, under its language's name. */
+  sql?: string;
+  promql?: string;
   outcome: "success" | "failure";
   /** Where a failure happened: refused by the guard, or failed on the source. */
   stage?: string;
@@ -420,6 +496,9 @@ export async function streamDashboardChat(input: {
     input;
   const modelMessages = await convertToModelMessages(messages);
 
+  // The tool learns PromQL only on a dashboard with a Prometheus source, so
+  // a SQL dashboard's chat is asked exactly what it always was (#387).
+  const promql = sources.some((s) => sourceKind(s).language === "promql");
   return streamText({
     ...modelSettings(input.model),
     system: buildSystemPrompt(dashboard, sources, view),
@@ -429,24 +508,14 @@ export async function streamDashboardChat(input: {
     onFinish: ({ usage }) => onUsage?.(usage),
     tools: {
       runQuery: tool({
-        description:
-          "Run a read-only SQL SELECT against one of this dashboard's data sources to fetch fresh data. The server injects the dashboard's time range automatically; do not add a time filter. Returns columns and rows.",
-        inputSchema: z.object({
-          sourceId: z
-            .string()
-            .describe("One of the dashboard's source ids (see the panel list)."),
-          sql: z
-            .string()
-            .max(8000)
-            .describe("A single SELECT/WITH statement following the SQL rules."),
-          timeField: z
-            .string()
-            .max(128)
-            .optional()
-            .describe(
-              "Output alias of the time column, when the result is time-series. Omit for scalars/breakdowns.",
-            ),
-        }),
+        description: promql
+          ? "Run one read-only query against one of this dashboard's data sources to fetch fresh data: 'sql' (a SELECT) for a SQL source, 'promql' for a Prometheus one. The server injects the dashboard's time range automatically; do not add a time filter. Returns columns and rows."
+          : "Run a read-only SQL SELECT against one of this dashboard's data sources to fetch fresh data. The server injects the dashboard's time range automatically; do not add a time filter. Returns columns and rows.",
+        // The SQL schema's input is a case of the PromQL one's, so the tool is
+        // typed by the wider; a SQL dashboard is still shown only the SQL one.
+        inputSchema: (promql
+          ? PROMQL_TOOL_INPUT
+          : SQL_TOOL_INPUT) as typeof PROMQL_TOOL_INPUT,
         execute: async (args) => {
           const built = await buildChatQueryPlan({
             dashboard,
@@ -456,7 +525,14 @@ export async function streamDashboardChat(input: {
             variables: view?.variables,
           });
           const report = (outcome: ChatQueryOutcome["outcome"], stage?: string) =>
-            onQuery?.({ sourceId: args.sourceId, sql: args.sql, outcome, stage });
+            onQuery?.({
+              sourceId: args.sourceId,
+              ...("promql" in args && args.promql !== undefined
+                ? { promql: args.promql }
+                : { sql: args.sql }),
+              outcome,
+              stage,
+            });
           if (!built.ok) {
             report("failure", "validate");
             return { error: built.error };

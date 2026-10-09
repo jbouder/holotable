@@ -1,0 +1,12 @@
+{
+  "name": "prom-query-load",
+  "mode": "dashboard",
+  "catalog": "prometheus-demo",
+  "prompt": "Query load dashboard: queries per second by source, p95 query latency over time, and the share of queries that failed.",
+  "expect": {
+    "metrics": ["holotable_query_duration_seconds_bucket"],
+    "requiredViz": ["line"],
+    "plausibleViz": ["line", "area", "bar", "stat", "gauge", "table", "pie", "donut"],
+    "minPanels": 2
+  }
+}

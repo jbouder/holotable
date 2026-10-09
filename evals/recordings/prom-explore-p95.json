@@ -1,0 +1,6 @@
+{
+  "model": "kimi-k3",
+  "recordedAt": "2026-10-09T22:42:00.774Z",
+  "requestDigest": "bcc2d1254225655dd51057ebe5d75b12105e2f9cba6153fa409ee6e6307f76e4",
+  "text": "{\"id\":\"explore\",\"title\":\"p95 panel query latency over time\",\"viz\":\"line\",\"query\":{\"sourceId\":\"eval-prometheus-demo\",\"promql\":\"histogram_quantile(0.95, sum by (le) (rate(holotable_query_duration_seconds_bucket[5m])))\"},\"layout\":{\"x\":0,\"y\":0,\"w\":12,\"h\":4}}"
+}

@@ -1,0 +1,14 @@
+{
+  "name": "prom-pollers-by-dashboard",
+  "mode": "dashboard",
+  "catalog": "prometheus-demo",
+  "prompt": "Poller health with a variable to pick the dashboard: p95 poller tick duration and open streams for the chosen dashboard.",
+  "expect": {
+    "metrics": [
+      "holotable_poller_tick_duration_seconds_bucket",
+      "holotable_sse_subscribers"
+    ],
+    "plausibleViz": ["line", "area", "bar", "stat", "gauge", "table"],
+    "minPanels": 2
+  }
+}

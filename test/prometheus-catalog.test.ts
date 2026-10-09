@@ -101,6 +101,27 @@ test("discovery reads the metadata, sorted, and falls back to names when there i
   assert.ok(fallback && params(fallback).get("start") && params(fallback).get("end"));
 });
 
+test("a histogram or summary family is offered by the series names a query reads (#387)", async () => {
+  fake.handle = (r) =>
+    r.path === "/api/v1/metadata"
+      ? success({
+          req_seconds: [{ type: "histogram", help: "Latency." }],
+          rpc_seconds: [{ type: "summary", help: "RPC." }],
+        })
+      : { status: 404 };
+  assert.deepEqual(
+    (await discoverMetrics(target())).map((m) => [m.name, m.type]),
+    [
+      ["req_seconds_bucket", "histogram"],
+      ["req_seconds_count", "counter"],
+      ["req_seconds_sum", "counter"],
+      ["rpc_seconds", "summary"],
+      ["rpc_seconds_count", "counter"],
+      ["rpc_seconds_sum", "counter"],
+    ],
+  );
+});
+
 test("labels are asked per picked metric, by an exact __name__ selector, without __name__", async () => {
   fake.seen.length = 0;
   fake.handle = labelsAnswer({ up: ["__name__", "job", "instance"], 'odd"name': ["x"] });
