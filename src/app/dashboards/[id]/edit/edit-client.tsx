@@ -471,6 +471,8 @@ export function EditDashboardClient({
       sourceId,
       prompt: instruction,
       current: base,
+      // So a link back to this dashboard is written as a self link (#375).
+      dashboardId,
     });
   }
 

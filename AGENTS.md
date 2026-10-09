@@ -245,6 +245,12 @@ Important files:
   Every field is capped, so the prompt stays bounded; an example's SQL passes
   the guard against a live source in the same workspace before it is saved,
   and again against the current catalog before it is shown to the model
+- `src/lib/ai/prompt-dashboards.ts` and `src/lib/ai/link-targets.ts` — what a
+  generation may link to (#375): the workspace's dashboards the caller may
+  view, as a fenced `DASHBOARDS` block (`dashboardsBlock` in
+  `src/lib/ai/prompt.ts`). A generated link to any other id fails the schema
+  on the server and, through the `X-Link-Targets` header that
+  `useRepairingObject` reads, in the browser, so the one repair runs
 - `src/lib/self-monitoring/` — the committed self-monitoring demo: the
   dashboard spec (also an IR snapshot), the source catalog, and the Prometheus
   text-format parser the collector uses. `test/self-monitoring.test.ts` holds

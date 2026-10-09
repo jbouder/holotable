@@ -10,6 +10,7 @@ import {
   getDashboardById,
   getSourceById,
   listDashboards,
+  listLinkableDashboards,
   listSources,
   saveDashboardVersion,
 } from "@/lib/db/repo";
@@ -41,6 +42,7 @@ export function defaultMcpDeps(): McpDeps {
     enforceLlmLimits,
     requireModel,
     workspacePromptFor,
+    listLinkableDashboards,
     streamDashboard,
     streamExplorePanel,
     streamSourceDraft,

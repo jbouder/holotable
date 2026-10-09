@@ -3,7 +3,13 @@
 import { experimental_useObject as useObject } from "@ai-sdk/react";
 import type { FlexibleSchema, InferSchema } from "ai";
 import * as React from "react";
+import type { z } from "zod";
 import { GENERATION_ID_HEADER } from "@/lib/ai/generation-id";
+import {
+  LINK_TARGETS_HEADER,
+  parseLinkTargetsHeader,
+  unknownLinkTargets,
+} from "@/lib/ai/link-targets";
 
 /** What the browser shows when the repair did not validate either. */
 export const REPAIR_FAILED =
@@ -33,6 +39,12 @@ export function useRepairingObject<
   INPUT = unknown,
 >(options: Options<SCHEMA, RESULT>) {
   const generationId = React.useRef<string | null>(null);
+  // The dashboards this generation's links may name (#375), from the
+  // response. The schema below refuses any other, as the route does, so a
+  // link to an invented id is repaired rather than shown.
+  const linkTargets = React.useRef<string[] | null>(null);
+  // biome-ignore lint/correctness/useExhaustiveDependencies: the schema is the caller's constant; the targets are read through a ref
+  const schema = React.useMemo(() => withLinkTargetsRef(options.schema, linkTargets), []);
   // Refs, not state, for what onFinish reads: it runs from inside the stream
   // and must see the values of this run, not of the render that started it.
   const repairingRef = React.useRef(false);
@@ -47,9 +59,13 @@ export function useRepairingObject<
 
   const base = useObject<SCHEMA, RESULT, INPUT | { repairOf: string }>({
     ...options,
+    schema,
     fetch: async (input, init) => {
       const response = await (baseFetch ?? fetch)(input, init);
       generationId.current = response.headers.get(GENERATION_ID_HEADER);
+      linkTargets.current = parseLinkTargetsHeader(
+        response.headers.get(LINK_TARGETS_HEADER),
+      );
       return response;
     },
     onFinish: async (event) => {
@@ -99,4 +115,27 @@ export function useRepairingObject<
     error: base.error ?? failure,
     repairing,
   };
+}
+
+/**
+ * The caller's schema, refusing a link to a dashboard the response did not
+ * list (#375). A schema that is not zod, or a response with no list, is
+ * left as it is.
+ */
+function withLinkTargetsRef<SCHEMA extends FlexibleSchema>(
+  schema: SCHEMA,
+  targets: React.RefObject<string[] | null>,
+): SCHEMA {
+  const zod = schema as unknown as Partial<z.ZodType>;
+  if (typeof zod.superRefine !== "function") return schema;
+  return zod.superRefine((value, ctx) => {
+    const allowed = targets.current;
+    if (allowed === null) return;
+    for (const bad of unknownLinkTargets(value, allowed)) {
+      ctx.addIssue({
+        code: "custom",
+        message: `link "${bad.title}" names a dashboard that was not offered`,
+      });
+    }
+  }) as unknown as SCHEMA;
 }

@@ -56,6 +56,22 @@ export const EvalCase = z
     /** A catalog in `evals/catalogs/<catalog>.json`: a `SourceConfig`. */
     catalog: z.string().regex(/^[a-z0-9-]+$/),
     prompt: z.string().min(1).max(4000),
+    /**
+     * The workspace's other dashboards (#375), as the route would list them
+     * for the DASHBOARDS block. Absent: a dashboard case runs with none.
+     */
+    dashboards: z
+      .array(
+        z
+          .object({
+            id: z.string().min(1),
+            title: z.string().min(1),
+            variables: z.array(z.string()),
+          })
+          .strict(),
+      )
+      .max(30)
+      .optional(),
     expect: z
       .object({
         /** Every query panel's viz must be one of these. */
@@ -68,6 +84,18 @@ export const EvalCase = z
         timeField: z.enum(["required", "absent"]).optional(),
         minPanels: z.number().int().positive().optional(),
         maxPanels: z.number().int().positive().optional(),
+        /**
+         * Some panel links to `dashboard`, setting `variable` from one of
+         * `columns` of the clicked row (#375).
+         */
+        link: z
+          .object({
+            dashboard: z.string().min(1),
+            variable: z.string().min(1),
+            columns: z.array(z.string()).min(1),
+          })
+          .strict()
+          .optional(),
       })
       .strict(),
   })
@@ -158,7 +186,7 @@ export function loadRecording(name: string, dir: string = EVALS_DIR): Recording 
 /** The request the route would make for this case. */
 export function caseRequest(c: EvalCase, source: SourceRecord) {
   return c.mode === "dashboard"
-    ? dashboardRequest({ source, prompt: c.prompt })
+    ? dashboardRequest({ source, prompt: c.prompt, dashboards: c.dashboards ?? [] })
     : explorePanelRequest({ source, prompt: c.prompt });
 }
 
@@ -382,6 +410,25 @@ export async function grade(
   }
   if (expect.maxPanels !== undefined && panels.length > expect.maxPanels) {
     failures.push(`${panels.length} panels; expected at most ${expect.maxPanels}`);
+  }
+  if (expect.link) {
+    const want = expect.link;
+    const found = panels.some((p) =>
+      (p.links ?? []).some((l) => {
+        const pick = l.set?.[want.variable];
+        return (
+          l.dashboard === want.dashboard &&
+          pick !== undefined &&
+          "column" in pick &&
+          want.columns.includes(pick.column)
+        );
+      }),
+    );
+    if (!found) {
+      failures.push(
+        `no panel links to ${want.dashboard} setting ${want.variable} from column ${want.columns.join(" or ")}`,
+      );
+    }
   }
   return failures;
 }

@@ -16,6 +16,7 @@ import type { LlmRoute } from "@/lib/limits/budget";
 import { log } from "@/lib/log";
 import { defineTool, type McpTool, type McpToolAnnotations } from "@/lib/mcp/tool";
 import type { McpDeps } from "@/lib/mcp/tools/deps";
+import { promptDashboards } from "@/lib/ai/prompt-dashboards";
 import { recordLlmRepair } from "@/lib/metrics";
 import { grantedRefs } from "@/lib/secret-refs";
 import { buildCatalogPrompt } from "@/lib/timescaledb/catalog";
@@ -191,6 +192,13 @@ export function generationTools(deps: McpDeps): McpTool[] {
             return null;
           });
         const catalog = sources.map((s) => buildCatalogPrompt(s)).join("\n\n");
+        // What a link may lead to (#375), as the route builds it: this
+        // workspace's dashboards, for a caller who may view them.
+        const dashboards = await promptDashboards({
+          identity,
+          workspaceId: source.workspaceId,
+          load: deps.listLinkableDashboards,
+        });
         const generated = await generate(deps, {
           identity,
           workspaceId: source.workspaceId,
@@ -218,6 +226,7 @@ export function generationTools(deps: McpDeps): McpTool[] {
             }),
           start: ({ onFinish, model, repair }) =>
             deps.streamDashboard({
+              dashboards,
               source,
               additionalSources: additional,
               prompt: args.prompt,

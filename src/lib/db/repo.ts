@@ -554,6 +554,42 @@ export async function getDashboardTitles(
   return new Map(rows.map((r) => [r.id, r.title]));
 }
 
+/**
+ * The workspace's dashboards a generation may link to (#375): the most
+ * recently updated first, with the variable names each declares. The spec is
+ * read whole and upgraded here, never as raw jsonb, so a dashboard saved at
+ * an older IR version lists the variables it has today.
+ */
+export async function listLinkableDashboards(
+  workspaceId: string,
+  limit: number,
+): Promise<{ id: string; title: string; variables: string[] }[]> {
+  const rows = await query<{ id: string; title: string; spec: unknown }>(
+    `SELECT d.id, d.title, dv.spec
+     FROM dashboards d
+     JOIN dashboard_versions dv ON dv.id = d.current_version_id
+     WHERE d.workspace_id = $1 AND d.deleted_at IS NULL
+     ORDER BY d.updated_at DESC
+     LIMIT $2`,
+    [workspaceId, limit],
+  );
+  return rows.flatMap((r) => {
+    try {
+      const spec = upgradeSpec(r.spec);
+      return [
+        {
+          id: r.id,
+          title: r.title,
+          variables: (spec.variables ?? []).map((v) => v.name),
+        },
+      ];
+    } catch {
+      // A spec this build cannot read is not offered as a target.
+      return [];
+    }
+  });
+}
+
 export async function createDashboard(input: {
   workspaceId: string;
   createdBy: string;
