@@ -1,4 +1,4 @@
-import type { Panel } from "@/lib/ir";
+import { linkCarries, type Panel, PanelLink } from "@/lib/ir";
 
 /**
  * Field- and line-level diff between the panel being edited and the one a
@@ -27,6 +27,8 @@ export interface PanelDraft {
   options?: Record<string, unknown>;
   timeRange?: { from?: string; to?: string };
   refreshIntervalMs?: number;
+  /** Partial while streaming; each is read through `PanelLink` before it is shown. */
+  links?: unknown[];
   layout?: { x?: number; y?: number; w?: number; h?: number };
 }
 
@@ -215,6 +217,65 @@ interface FieldSpec {
  * never counts as a change; once the object is final, an absent optional field
  * is a real removal and is reported as such.
  */
+/**
+ * A link in words (#374): where it goes, what it sets and from what, and how
+ * it differs from the defaults. The target is shown by id: the diff is pure,
+ * and a title would be a lookup.
+ */
+export function describeLink(link: PanelLink): string {
+  const target =
+    link.dashboard === undefined
+      ? "this dashboard"
+      : `dashboard ${link.dashboard.slice(0, 8)}`;
+  const sets = Object.entries(link.set ?? {}).map(([name, v]) =>
+    "value" in v
+      ? `${name} = "${v.value}"`
+      : "column" in v
+        ? `${name} from column ${v.column}`
+        : `${name} from the clicked series`,
+  );
+  const carry = linkCarries(link);
+  return [
+    `to ${target}`,
+    sets.length > 0 ? `sets ${sets.join(", ")}` : "",
+    carry.timeRange ? "" : "not carrying the time range",
+    carry.variables ? "" : "not carrying the picks",
+    link.newTab ? "in a new tab" : "",
+  ]
+    .filter(Boolean)
+    .join("; ");
+}
+
+/**
+ * One row per link, named by its title, in the order of the newer side and
+ * then the removed ones: an added link reads "none" before, a removed one
+ * "none" after, and a changed one as its two descriptions. While streaming,
+ * links the model has not produced yet are pending.
+ */
+function linkSpecs(before: Panel, after: PanelDraft, streaming: boolean): FieldSpec[] {
+  const was = new Map((before.links ?? []).map((l) => [l.title, describeLink(l)]));
+  if (streaming && after.links === undefined) {
+    return [...was].map(([title, text]) => ({
+      key: `link:${title}`,
+      label: `Link "${title}"`,
+      before: text,
+      after: undefined,
+    }));
+  }
+  const now = new Map<string, string>();
+  for (const raw of after.links ?? []) {
+    const link = PanelLink.safeParse(raw);
+    if (link.success) now.set(link.data.title, describeLink(link.data));
+  }
+  const titles = [...now.keys(), ...[...was.keys()].filter((t) => !now.has(t))];
+  return titles.map((title) => ({
+    key: `link:${title}`,
+    label: `Link "${title}"`,
+    before: was.get(title) ?? NONE,
+    after: now.get(title) ?? NONE,
+  }));
+}
+
 export function diffPanels(
   before: Panel,
   after: PanelDraft,
@@ -286,6 +347,7 @@ export function diffPanels(
           ? undefined
           : (after.query?.timeField ?? NONE),
     },
+    ...linkSpecs(before, after, streaming),
     {
       key: "layout",
       label: "Layout",

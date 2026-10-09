@@ -20,7 +20,8 @@ link that reads it comes with
 ## What a link is
 
 A link is part of the spec, in the panel's `links` array, so it is versioned,
-diffed and exported with everything else. See
+diffed and exported with everything else. Authors edit links in the editor's
+[Links section](/concepts/editing-a-dashboard/#links). See
 [The shared IR](/concepts/the-shared-ir/#links) for the fields.
 
 ```json

@@ -223,6 +223,53 @@ test("a panel link carries the window and picks to its target (#372)", async ({
   await waitForPanels(page);
 });
 
+test("an author adds a link in the inspector, and a reader follows it (#374)", async ({
+  page,
+  request,
+}) => {
+  const { source, target } = await createLinkedDashboards(request);
+  const res = await request.get(`/api/dashboards/${target}`);
+  const targetTitle = ((await res.json()) as { dashboard: { title: string } }).dashboard
+    .title;
+
+  await page.goto(`/dashboards/${source}/edit`);
+  await page
+    .getByRole("button", { name: /^Requests by route/ })
+    .first()
+    .click();
+  await page.getByRole("button", { name: "Add link" }).click();
+  const form = page.getByRole("group", { name: "New link" });
+  await form.getByRole("radio", { name: "Another dashboard" }).click();
+  await form.getByLabel("Find a dashboard").fill(targetTitle);
+  await form.getByRole("button", { name: targetTitle }).click();
+  await form.getByLabel("Title").fill("Search detail");
+  await form.getByRole("button", { name: "Add a pick" }).click();
+  await form.getByRole("combobox", { name: "Pick 1 variable" }).click();
+  await page.getByRole("option", { name: "route" }).click();
+  await form.getByLabel("Pick 1 value").fill("/search");
+  await form.getByRole("button", { name: "Save link" }).click();
+  await expect(page.getByRole("list", { name: "Links" })).toContainText("Search detail");
+
+  await page.getByRole("button", { name: "Save", exact: true }).click();
+  await page.getByRole("button", { name: "Save version" }).click();
+  await expect
+    .poll(async () => {
+      const saved = await request.get(`/api/dashboards/${source}`);
+      const { dashboard } = (await saved.json()) as {
+        dashboard: { spec: { panels: { links?: { title: string }[] }[] } };
+      };
+      return dashboard.spec.panels[0]?.links?.map((l) => l.title);
+    })
+    .toContain("Search detail");
+
+  await page.goto(`/dashboards/${source}`);
+  await waitForPanels(page);
+  await page.getByRole("button", { name: "Actions for Requests by route" }).click();
+  await page.getByRole("menuitem", { name: "Search detail" }).click();
+  await page.waitForURL(new RegExp(`/dashboards/${target}\\?`));
+  expect(new URL(page.url()).searchParams.getAll("var-route")).toEqual(["/search"]);
+});
+
 test.describe("as a viewer", () => {
   test.use({ storageState: storageStatePath("viewer") });
 

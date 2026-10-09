@@ -1037,6 +1037,12 @@ export function EditDashboardClient({
               onDuplicate={() => duplicate(selected.id)}
               onSaveAsTemplate={panelTemplate.openDialog}
               onDelete={() => removePanel(selected.id)}
+              links={{
+                workspaceId,
+                dashboardId,
+                ownVariables: (spec.variables ?? []).map((v) => v.name),
+                resultColumns: canvas.states[selected.id]?.data.columns ?? [],
+              }}
             />
           ) : (
             <DashboardSettings

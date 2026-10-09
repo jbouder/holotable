@@ -101,6 +101,20 @@ for (const theme of THEMES) {
       await expectNoA11yViolations(page);
     });
 
+    test("the editor's link form", async ({ page, request }) => {
+      const { source } = await createLinkedDashboards(request);
+      await page.goto(`/dashboards/${source}/edit`);
+      await page
+        .getByRole("button", { name: /^Requests by route/ })
+        .first()
+        .click();
+      await page.getByRole("button", { name: "Add link" }).click();
+      const form = page.getByRole("group", { name: "New link" });
+      await form.getByRole("radio", { name: "Another dashboard" }).click();
+      await expect(form.getByRole("list", { name: "Dashboards" })).toBeVisible();
+      await expectNoA11yViolations(page);
+    });
+
     test("an open menu: the account menu", async ({ page }) => {
       await page.goto("/dashboards");
       await page.getByRole("button", { name: /account menu/i }).click();

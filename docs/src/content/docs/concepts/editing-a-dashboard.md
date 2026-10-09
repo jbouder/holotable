@@ -34,6 +34,8 @@ beside the canvas then edits that panel, top to bottom:
   the panel's own window and refresh. A text panel shows its Markdown here.
 - **Visualization**: title, kind, value format and description.
 - **Display**: the presentation options, collapsed until wanted.
+- **Links**: where the panel leads (see [Links](#links) below). Not on a text
+  panel.
 
 The panel's actions menu holds **Duplicate**, **Save as template** and
 **Delete**. Closing the panel (or selecting nothing) shows the dashboard's own
@@ -63,6 +65,31 @@ version.
 A failed save leaves you exactly where you were, with the error and every
 change still in the editor. Nothing about a failure is recoverable by retrying
 from a different place, so the editor does not send you to one.
+
+## Links
+
+The **Links** section edits the panel's [drilldown](/concepts/drilldown/)
+links without JSON. Each link is a row with its title and target, which can be
+edited, moved up or down, or removed. **Add link** opens a form:
+
+- **Leads to**: this dashboard, or another one in the workspace, found by
+  title. The list comes from the server for this workspace, and the form keeps
+  the id it came with; it never takes a typed id.
+- **Title**: what the menu item or the click says. It follows the target's
+  title until it is changed.
+- **Carry the time range** and **Carry the variable picks**, on by default,
+  and **Open in a new tab** for a link to another dashboard.
+- **Set on arrival**: one row per pick. The variable is chosen from the ones
+  the target declares (this dashboard's own for a self link). Its value is a
+  literal, a column of the clicked row (the columns this panel's last preview
+  returned), or the clicked series. A pick the target does not declare is
+  flagged, since the target would ignore it.
+
+A link that stays on this dashboard must set at least one of its variables;
+the form refuses it with the same message the schema does. **Links (JSON)**
+edits the whole list as JSON for anything the form does not cover. Link
+changes show in the edit review and in version history, one row per link
+title.
 
 ## Version history and restore
 
