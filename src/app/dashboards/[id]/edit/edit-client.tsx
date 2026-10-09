@@ -23,12 +23,11 @@ import {
   Panel,
   panelTimeRange,
   safeParseDashboard,
-  isSqlQuery,
 } from "@/lib/ir";
 import { panelKind } from "@/lib/panels/registry";
 import { autoLayoutPanels } from "@/lib/layout";
 import { duplicatePanel } from "@/lib/panel-list";
-import { isStarterSql, starterPanel } from "@/lib/panel-starter";
+import { isStarterQuery, starterPanel } from "@/lib/panel-starter";
 import { AiUnavailable } from "@/components/ai-unavailable";
 import { Button } from "@/components/ui/button";
 import { buttonClassName } from "@/components/ui/button-styles";
@@ -408,8 +407,7 @@ export function EditDashboardClient({
       return;
     }
     const catalog = sources.find((s) => s.id === panel.query.sourceId)?.catalog ?? null;
-    if (isSqlQuery(panel.query) && isStarterSql(panel.query.sql, catalog))
-      deletePanel(id);
+    if (isStarterQuery(panel.query, catalog)) deletePanel(id);
     else setConfirmDelete(panel);
   }
 

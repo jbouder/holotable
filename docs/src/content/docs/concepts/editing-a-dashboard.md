@@ -30,8 +30,13 @@ beside the canvas then edits that panel, top to bottom:
 
 - **Ask AI**: the natural-language edit, which runs the model once and shows
   the change as a diff to accept, reject or regenerate.
-- **Data**: the source, the SQL with its guarded preview, the time field, and
-  the panel's own window and refresh. A text panel shows its Markdown here.
+- **Data**: the source, the query with its guarded preview, and the panel's
+  own window and refresh. For a SQL source that is the SQL and its time field;
+  for a Prometheus source it is the PromQL, **Instant** and **Min step** (see
+  [Writing the query](/concepts/executing-a-panel/#a-promql-panel)). Choosing a
+  source of the other kind restarts the query from that source's starter
+  rather than keeping one its source cannot run. A text panel shows its
+  Markdown here.
 - **Visualization**: title, kind, value format and description.
 - **Display**: the presentation options, collapsed until wanted.
 - **Links**: where the panel leads (see [Links](#links) below). Not on a text
@@ -149,6 +154,13 @@ all falls back to `SELECT 1 AS value`.
 Because every name in it comes from the source's allowlist, the starter is
 guaranteed to pass the SQL guard against that source — and it never filters time
 itself, because the server owns the range.
+
+A new panel on a Prometheus source starts from PromQL instead: a counter's
+`sum(rate(…[5m]))`, else a histogram's p95, else a gauge's sum, else a count of
+any listed metric's series, else `vector(1)`. It is a range query for a line
+and an instant query for a stat, gauge, table or pie. The template picker's
+built-ins for a Prometheus source are golden signals built the same way, from
+its counters, histograms and gauges (`src/lib/builtin-templates-promql.ts`).
 
 **Add panel** offers three starts: a **blank panel** (that starter), **describe
 it to the model**, or **from a template**. Describing adds the same starter and

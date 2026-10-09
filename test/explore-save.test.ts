@@ -251,3 +251,17 @@ test("a rejected create is surfaced with the server's error", async () => {
   assert.equal(outcome.ok, false);
   assert.match(outcome.ok === false ? outcome.error.error : "", /same workspace/);
 });
+
+test("a PromQL answer is saved with its expression and how it is evaluated (#388)", () => {
+  const prom = panel({
+    viz: "stat",
+    query: { sourceId: "prom", promql: "sum(up)", instant: true, minStep: "1m" },
+  });
+  const saved = appendPanel(dashboard([]), prom);
+  assert.deepEqual(saved.panels[0].query, {
+    sourceId: "prom",
+    promql: "sum(up)",
+    instant: true,
+    minStep: "1m",
+  });
+});

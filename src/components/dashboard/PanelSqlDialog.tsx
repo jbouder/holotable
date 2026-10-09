@@ -33,7 +33,7 @@ export function PanelSqlDialog({
   if (!hasQuery(panel)) return null;
 
   return (
-    <Dialog onOpenChange={onOpenChange} open={open} title="Generated SQL">
+    <Dialog onOpenChange={onOpenChange} open={open} title="Query">
       <PanelSqlBody panel={panel} timeRange={timeRange} />
     </Dialog>
   );
@@ -79,13 +79,28 @@ function PanelSqlBody({
       <dl className="grid grid-cols-[auto_minmax(0,1fr)] gap-x-4 gap-y-1 text-xs">
         <dt className="text-muted">Source</dt>
         <dd className="truncate font-mono">{details.sourceId}</dd>
-        <dt className="text-muted">Time field</dt>
-        <dd className="truncate font-mono">{details.timeField ?? "—"}</dd>
+        {"sql" in details ? (
+          <>
+            <dt className="text-muted">Time field</dt>
+            <dd className="truncate font-mono">{details.timeField ?? "—"}</dd>
+          </>
+        ) : (
+          <>
+            <dt className="text-muted">Evaluated</dt>
+            <dd>
+              {details.instant
+                ? "At one instant, the window's end"
+                : `Over the window${details.minStep ? `, at least every ${details.minStep}` : ""}`}
+            </dd>
+          </>
+        )}
       </dl>
 
       <div className="border border-border bg-surface-2">
         <div className="flex items-center justify-between gap-4 border-b border-border px-3 py-2">
-          <span className="text-xs font-medium text-muted">SQL</span>
+          <span className="text-xs font-medium text-muted">
+            {"sql" in details ? "SQL" : "PromQL"}
+          </span>
           <Button onClick={() => void copy()} size="sm" variant="secondary">
             {copied ? (
               <Check className="h-3.5 w-3.5 text-success" />
@@ -108,7 +123,7 @@ function PanelSqlBody({
 
       <p className="text-xs text-muted">
         The dashboard time range is applied by the server at execution time and is not
-        part of this statement.
+        part of this {"sql" in details ? "statement" : "expression"}.
       </p>
 
       {timeRange && <QueryPlanSection query={panel.query} timeRange={timeRange} />}

@@ -147,3 +147,56 @@ export async function clickChart(page: Page, panelId: string) {
   // The pie sits a little below the middle, under its legend.
   await page.mouse.click(box.x + box.width / 2 + 10, box.y + box.height * 0.56);
 }
+
+/**
+ * A Prometheus source and a dashboard with one PromQL panel on it (#388), for
+ * the editor in PromQL mode. The URL is a public address literal the save
+ * checks against SOURCE_URL_ALLOWLIST without resolving; nothing here needs
+ * it to answer, because the editor's guard runs against the catalog.
+ */
+export async function createPromqlDashboard(request: APIRequestContext) {
+  const stamp = Date.now().toString(36);
+  const sourceId = `e2e-promql-${stamp}`;
+  const source = await request.post("/api/sources", {
+    data: {
+      workspaceId: "demo",
+      id: sourceId,
+      name: `PromQL ${stamp}`,
+      config: {
+        kind: "prometheus",
+        url: "https://93.184.216.34",
+        auth: "none",
+        metrics: [
+          { name: "up", type: "gauge", labels: ["instance", "job"] },
+          {
+            name: "http_requests_total",
+            type: "counter",
+            labels: ["code", "instance", "job"],
+          },
+        ],
+      },
+    },
+  });
+  expect(source.status(), await source.text()).toBe(201);
+  const res = await request.post("/api/dashboards", {
+    data: {
+      spec: {
+        specVersion: 1,
+        title: `PromQL editor ${stamp}`,
+        timeRange: { from: "now-1h", to: "now" },
+        refreshIntervalMs: 30_000,
+        panels: [
+          {
+            id: "rate",
+            title: "Request rate",
+            viz: "line",
+            query: { sourceId, promql: "sum(rate(http_requests_total[5m]))" },
+            layout: { x: 0, y: 0, w: 12, h: 6 },
+          },
+        ],
+      },
+    },
+  });
+  expect(res.ok(), await res.text()).toBe(true);
+  return ((await res.json()) as { dashboard: { id: string } }).dashboard.id;
+}

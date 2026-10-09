@@ -1,7 +1,11 @@
 "use client";
 
-import type { QueryPlanView as Plan } from "@/lib/query-plan";
-import { summarizeLimits } from "@/lib/query-plan";
+import type {
+  AnyPlanView,
+  PromqlPlanView,
+  QueryPlanView as SqlPlan,
+} from "@/lib/query-plan";
+import { isPromqlPlanView, summarizeLimits } from "@/lib/query-plan";
 
 /**
  * "What actually runs": the statement the server sends, the values it bound,
@@ -12,7 +16,12 @@ import { summarizeLimits } from "@/lib/query-plan";
  * `/api/sql/plan`, which derives it from the same functions execution uses —
  * nothing is described twice.
  */
-export function QueryPlanView({ plan, stale }: { plan: Plan; stale?: boolean }) {
+export function QueryPlanView({ plan, stale }: { plan: AnyPlanView; stale?: boolean }) {
+  if (isPromqlPlanView(plan)) return <PromqlPlan plan={plan} stale={stale} />;
+  return <SqlPlanView plan={plan} stale={stale} />;
+}
+
+function SqlPlanView({ plan, stale }: { plan: SqlPlan; stale?: boolean }) {
   return (
     <div className="space-y-3">
       <div className="border border-border bg-surface-2">
@@ -70,6 +79,61 @@ export function QueryPlanView({ plan, stale }: { plan: Plan; stale?: boolean }) 
       <p className="text-xs text-muted">
         Nothing was executed to produce this. The statement is wrapped, the window is
         resolved and the limits are applied by the server on every run.
+        {stale && " The panel has been edited since this was built."}
+      </p>
+    </div>
+  );
+}
+
+/**
+ * The PromQL variant (#388): the expression as the endpoint receives it, with
+ * the tenant matcher and the variable values already in it, then where each
+ * value came from. The endpoint's URL is not part of the view.
+ */
+function PromqlPlan({ plan, stale }: { plan: PromqlPlanView; stale?: boolean }) {
+  return (
+    <div className="space-y-3">
+      <div className="border border-border bg-surface-2">
+        <div className="border-b border-border px-3 py-2 text-xs font-medium text-muted">
+          Expression sent to /api/v1/{plan.endpoint}
+        </div>
+        <pre className="max-h-64 overflow-auto whitespace-pre-wrap break-words px-3 py-3 font-mono text-xs leading-relaxed">
+          {plan.executedPromql}
+        </pre>
+      </div>
+
+      <div className="space-y-1">
+        <p className="text-xs font-medium text-muted">
+          Parameters — supplied by the server, not by the panel or the model
+        </p>
+        <dl className="grid grid-cols-[auto_minmax(0,1fr)] gap-x-4 gap-y-1 text-xs">
+          {[
+            ...plan.params,
+            ...plan.variables.map((v) => ({ ...v, name: `:${v.name}` })),
+          ].map((param) => (
+            <div key={param.name} className="contents">
+              <dt className="font-mono text-muted">{param.name}</dt>
+              <dd className="min-w-0 break-words font-mono">
+                {param.value}
+                <span className="ml-2 font-sans text-muted">
+                  resolved from {param.from}
+                </span>
+              </dd>
+            </div>
+          ))}
+        </dl>
+      </div>
+
+      <dl className="grid grid-cols-[auto_minmax(0,1fr)] gap-x-4 gap-y-1 text-xs">
+        <dt className="text-muted">Query</dt>
+        <dd>{plan.endpoint === "query" ? "One instant" : "A range, stepped"}</dd>
+        <dt className="text-muted">Limits</dt>
+        <dd>{summarizeLimits(plan)}</dd>
+      </dl>
+
+      <p className="text-xs text-muted">
+        Nothing was executed to produce this. The window, the step and the limits are the
+        server&rsquo;s on every run.
         {stale && " The panel has been edited since this was built."}
       </p>
     </div>

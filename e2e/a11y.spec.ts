@@ -4,6 +4,7 @@ import {
   clickChart,
   createDrilldownDashboards,
   createLinkedDashboards,
+  createPromqlDashboard,
   DEMO_DASHBOARD,
   dashboardId,
   waitForPanels,
@@ -43,6 +44,21 @@ for (const theme of THEMES) {
     test("dashboard editor", async ({ page, request }) => {
       await page.goto(`/dashboards/${await dashboardId(request, DEMO_DASHBOARD)}/edit`);
       await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
+      await expectNoA11yViolations(page);
+    });
+
+    test("dashboard editor, a PromQL panel in the inspector (#388)", async ({
+      page,
+      request,
+    }) => {
+      await page.goto(`/dashboards/${await createPromqlDashboard(request)}/edit`);
+      await page
+        .getByRole("button", { name: /^Request rate/ })
+        .first()
+        .click();
+      // The CodeMirror editor replaces the textarea once its chunk loads.
+      await expect(page.getByRole("textbox", { name: "Panel PromQL" })).toBeVisible();
+      await expect(page.getByLabel("Min step")).toBeVisible();
       await expectNoA11yViolations(page);
     });
 
@@ -89,7 +105,7 @@ for (const theme of THEMES) {
         .getByRole("button", { name: /^Actions for / })
         .first()
         .click();
-      await page.getByRole("menuitem", { name: "Show generated SQL" }).click();
+      await page.getByRole("menuitem", { name: "Show query" }).click();
       await expect(page.getByRole("dialog")).toBeVisible();
       await expectNoA11yViolations(page);
     });

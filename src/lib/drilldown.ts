@@ -74,6 +74,34 @@ function pickText(value: unknown): string | undefined {
     : undefined;
 }
 
+/** One `name="value"` pair of a series name; the value is a JSON string. */
+const SERIES_LABEL = /([A-Za-z_][A-Za-z0-9_]*)=("(?:[^"\\]|\\.)*")/g;
+
+/**
+ * One label's value out of a PromQL series' legend name (#388), as
+ * `src/lib/prometheus/rows.ts` writes it: `metric{a="1", b="2"}`, each value
+ * a JSON string. Anything else, or a label the series lacks, is undefined:
+ * the pick is left unset rather than guessed.
+ */
+export function seriesLabel(
+  series: string | undefined,
+  label: string,
+): string | undefined {
+  if (!series) return undefined;
+  const open = series.indexOf("{");
+  if (open < 0 || !series.endsWith("}")) return undefined;
+  for (const match of series.slice(open + 1, -1).matchAll(SERIES_LABEL)) {
+    if (match[1] !== label) continue;
+    try {
+      const value: unknown = JSON.parse(match[2]);
+      return typeof value === "string" ? value : undefined;
+    } catch {
+      return undefined;
+    }
+  }
+  return undefined;
+}
+
 /**
  * The picks a link makes: its literals, and, given what was clicked, its
  * `column` and `series` entries read from it. A column the row lacks, or a
@@ -92,7 +120,9 @@ export function linkPicks(link: PanelLink, datum?: Datum): Selection {
               ? Object.hasOwn(datum.row, v.column)
                 ? pickText(datum.row[v.column])
                 : undefined
-              : pickText(datum.series);
+              : "label" in v
+                ? pickText(seriesLabel(datum.series, v.label))
+                : pickText(datum.series);
       return text === undefined ? [] : [[name, [text]]];
     }),
   );

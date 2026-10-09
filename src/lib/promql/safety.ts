@@ -35,7 +35,7 @@ import {
 
 /** What the guard needs of a Prometheus source's catalog: its metric allowlist. */
 export interface PromqlCatalog {
-  metrics: ReadonlyArray<{ name: string; labels?: readonly string[] }>;
+  metrics: ReadonlyArray<{ name: string; type?: string; labels?: readonly string[] }>;
 }
 
 export interface PromqlLimits {
@@ -511,6 +511,54 @@ function checkVariables(
   }
 }
 
+/** The functions a counter is read through: what turns its total into a change. */
+const COUNTER_FUNCTIONS = new Set(["Rate", "Irate", "Increase", "Resets", "Changes"]);
+/** The functions that only mean something over a counter. */
+const RATE_FUNCTIONS = new Set(["Rate", "Irate", "Increase"]);
+
+function counterLike(name: string, type: string | undefined): boolean {
+  if (type === "counter") return true;
+  return (
+    (type === "histogram" || type === "summary") && /_(bucket|count|sum)$/.test(name)
+  );
+}
+
+/**
+ * Counters read the wrong way (#388): `rate()` over a gauge, and a counter
+ * plotted as its raw, ever-growing total. Hints, not refusals: both are
+ * legal PromQL, and only the catalog's type says they are probably wrong.
+ */
+function counterHints(expr: string, root: PromqlNode, catalog: PromqlCatalog): string[] {
+  const types = new Map(catalog.metrics.map((m) => [m.name, m.type]));
+  const hints: string[] = [];
+  const throughCounterFunction = new Set<PromqlNode>();
+  for (const { node } of nodes(root)) {
+    if (node.type !== "FunctionCall") continue;
+    const fn = node.children[0]?.children[0]?.type ?? "";
+    if (!COUNTER_FUNCTIONS.has(fn)) continue;
+    const body = child(node, "FunctionCallBody");
+    if (!body) continue;
+    for (const selector of selectorsOf(expr, body)) {
+      throughCounterFunction.add(selector.node);
+      const type = types.get(selector.metric);
+      if (RATE_FUNCTIONS.has(fn) && type && !counterLike(selector.metric, type)) {
+        hints.push(
+          `${text(expr, node.children[0])}() over ${selector.metric}, a ${type}: it is meant for counters`,
+        );
+      }
+    }
+  }
+  for (const selector of selectorsOf(expr, root)) {
+    if (throughCounterFunction.has(selector.node)) continue;
+    if (types.get(selector.metric) === "counter") {
+      hints.push(
+        `${selector.metric} is a counter, which only grows; plot rate(${selector.metric}[5m]) or increase(...)`,
+      );
+    }
+  }
+  return hints;
+}
+
 /** Labels the catalog does not list for the metrics an expression reads. */
 function catalogHints(
   expr: string,
@@ -621,7 +669,10 @@ export function validatePromql(
         );
       }
     }
-    const hints = catalogHints(expr, root, selectors, catalog);
+    const hints = [
+      ...catalogHints(expr, root, selectors, catalog),
+      ...counterHints(expr, root, catalog),
+    ];
     return hints.length > 0 ? { ok: true, hints } : { ok: true };
   } catch (err) {
     if (err instanceof Refusal) {

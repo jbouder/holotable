@@ -2,7 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import "./support/prometheus-env";
 import { PanelQuery } from "@/lib/ir";
-import { buildPromqlPlanView } from "@/lib/query-plan";
+import { buildPromqlPlanView, summarizeLimits } from "@/lib/query-plan";
 import {
   SourceConfig,
   type SourceRecord,
@@ -171,23 +171,34 @@ test("the PromQL plan view is an explicit field list, with where each parameter 
       timeoutMs: 20_000,
     },
     rowFilterClaim: "sub",
-    limits: { maxResultBytes: 1024, maxSeries: 100 },
+    variables: [{ name: "host", value: ["a", "b"] }],
+    limits: { maxResultBytes: 1024, maxSeries: 100, maxPoints: 1000, minStepMs: 15_000 },
   });
   assert.deepEqual(Object.keys(view).sort(), [
     "endpoint",
     "executedPromql",
+    "maxPoints",
     "maxResultBytes",
     "maxSeries",
     "params",
     "promql",
     "timeoutMs",
+    "variables",
   ]);
+  assert.deepEqual(view.variables, [
+    { name: "host", value: '["a","b"]', from: "the :host selection" },
+  ]);
+  assert.equal(summarizeLimits(view), "1,000 points · 20 s · 0.0 MiB · 100 series");
   assert.deepEqual(
     view.params.map((p) => [p.name, p.value, p.from]),
     [
       ["start", "2026-10-09T11:00:00.000Z", "now-1h, aligned to the step"],
       ["end", "2026-10-09T12:00:00.000Z", "now, aligned to the step"],
-      ["step", "30s", "the window, at least the panel's minStep of 30s"],
+      [
+        "step",
+        "30s",
+        "the window ÷ 1,000 points, floored at 15 s, and at the panel's minimum step of 30s",
+      ],
       ["tenant", "(your value)", 'your "sub" claim'],
     ],
   );

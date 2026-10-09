@@ -1,4 +1,5 @@
 import { test } from "node:test";
+import { isDatumLink } from "@/lib/ir";
 import assert from "node:assert/strict";
 import { datumClick, isBrushClick } from "@/components/charts/EChart";
 import type { PanelData } from "@/components/charts/options";
@@ -9,6 +10,7 @@ import {
   linkHref,
   linkPicks,
   menuLinks,
+  seriesLabel,
 } from "@/lib/drilldown";
 import { type DatumClick, datumOf, datumOfRow } from "@/lib/drilldown-datum";
 import type { Panel, PanelLink, VizType } from "@/lib/ir";
@@ -337,4 +339,30 @@ test("a click during a brush, or the release that ends one, is not a datum click
   assert.equal(isBrushClick({ active: false, endedAt: now - 100 }, now), true);
   assert.equal(isBrushClick({ active: false, endedAt: now - 1_000 }, now), false);
   assert.equal(isBrushClick({ active: false, endedAt: 0 }, now), false);
+});
+
+/* A label of a PromQL series (#388) ---------------------------------------- */
+
+test("a label pick reads one label out of the clicked PromQL series' name", () => {
+  const l = link({ set: { host: { label: "instance" }, job: { label: "job" } } });
+  const series = 'up{instance="web-01:9100", job="node"}';
+  assert.deepEqual(linkPicks(l, { row: { time: 1, [series]: 1 }, series }), {
+    host: ["web-01:9100"],
+    job: ["node"],
+  });
+  assert.equal(isDatumLink(l), true);
+});
+
+test("a label the series lacks, or a name that is not a series, is left unset", () => {
+  const l = link({ set: { host: { label: "instance" } } });
+  assert.deepEqual(linkPicks(l, { row: {}, series: '{job="node"}' }), {});
+  assert.deepEqual(linkPicks(l, { row: {}, series: "cpu" }), {});
+  assert.deepEqual(linkPicks(l, { row: {} }), {});
+});
+
+test("a series label's value is read as the JSON string it was written as, never split", () => {
+  assert.equal(seriesLabel('{route="/a, b=\\"c\\""}', "route"), '/a, b="c"');
+  // A label name inside another label's value is not a label.
+  assert.equal(seriesLabel('{route="/a, b=\\"c\\""}', "b"), undefined);
+  assert.equal(seriesLabel('{host="a\\"b"}', "host"), 'a"b');
 });

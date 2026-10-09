@@ -189,6 +189,33 @@ the editor's wrapper so `Tab` continues into the rest of the form; `Tab` itself
 is left alone rather than bound to indentation, so the editor is never a
 keyboard trap.
 
+### A PromQL panel
+
+A panel on a Prometheus source gets a PromQL editor in the same place
+(`src/components/promql/PromqlEditor.tsx`), built the same way: loaded on
+demand, a textarea until then, the same keys. Its catalog is the source's
+metric allowlist and each metric's labels, from the kind's own projection; the
+endpoint's URL and credential never reach the browser.
+
+- **Completion** offers the allowlisted metrics (with their type and help) and
+  the functions the guard allows where an expression can start, and a metric's
+  labels inside its selector's braces (`src/lib/promql/completion.ts`).
+- **Hints** are the guard's own. A pause in typing posts the expression to
+  `/api/sql/validate`, and the answer is drawn in place: a refusal as an error,
+  and the guard's hints as warnings on the name they mention. The hints are a
+  label the allowlist does not list, `rate()` over a gauge, and a counter
+  drawn without `rate()` or `increase()`. A hint never refuses.
+- **Instant** and **Min step** stand where the time-field picker does. There
+  is no time field: a range query's rows are always keyed by `time`, an
+  instant query has none, and the server picks the step. Min step only raises
+  it.
+
+Changing a panel's source to one of the other kind does not carry the query
+across, because its language is wrong there. The panel starts over from the
+new source's starter for its kind (`src/lib/panel-starter.ts`): a counter's
+rate, as a range for a line and an instant for a stat. Undo brings the old one
+back.
+
 One operational detail: the page's Content-Security-Policy has no
 `'unsafe-inline'` for styles, and CodeMirror builds its stylesheet at runtime.
 The editor reads this document's nonce back out of the DOM
@@ -284,8 +311,22 @@ The response shape is an explicit allowlist (`src/lib/query-plan.ts`), like
 user or `secret_ref` has a field to travel in.
 
 It is reachable from the panel editor (**What runs**) and from the viewer's
-generated-SQL dialog, which is where a reader who did not write the panel can
-check that the window really is the server's.
+query dialog (**Show query** in the panel's menu), which is where a reader who
+did not write the panel can check that the window really is the server's.
+
+For a PromQL panel the same route answers with the PromQL plan:
+
+- the expression the endpoint receives, with the viewer's tenant matcher
+  spliced in and each variable's value already bound, so both are visible as
+  the row-filter subquery is for SQL;
+- `/api/v1/query` with `time`, or `/api/v1/query_range` with `start`, `end` and
+  `step`, each with what the server resolved it from: `now-1h`, aligned to the
+  step, and for the step "the window ÷ 1,000 points, floored at 15 s", plus
+  the panel's Min step when it has one;
+- each variable the expression references and the value bound for it;
+- the limits, as "1,000 points · 30 s · 4.0 MiB · 100 series".
+
+The endpoint's URL and auth mode have no field in the view.
 
 ## Actionable errors versus opaque ones
 

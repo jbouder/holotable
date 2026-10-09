@@ -12,14 +12,17 @@ import {
  * the rules are tested without a render and the component only draws them.
  */
 
-/** Where one pick comes from: a literal, a result column, or the clicked series. */
-export type PickSource = "value" | "column" | "series";
+/**
+ * Where one pick comes from: a literal, a result column, the clicked series,
+ * or one label of the clicked PromQL series (#388).
+ */
+export type PickSource = "value" | "column" | "series" | "label";
 
 export interface LinkSetRow {
   /** The target's variable. */
   name: string;
   source: PickSource;
-  /** The literal, or the column's name; unused for the series. */
+  /** The literal, the column's name or the label's; unused for the series. */
   text: string;
 }
 
@@ -63,7 +66,9 @@ export function formFromLink(link: PanelLink, targetTitle?: string): LinkForm {
         ? { name, source: "value", text: v.value }
         : "column" in v
           ? { name, source: "column", text: v.column }
-          : { name, source: "series", text: "" },
+          : "label" in v
+            ? { name, source: "label", text: v.label }
+            : { name, source: "series", text: "" },
     ),
     newTab: link.newTab === true,
   };
@@ -102,7 +107,7 @@ export function linkFromForm(
     names.add(row.name);
     if (row.source !== "series" && row.text.trim() === "") {
       problems.push(
-        `Pick ${n}: ${row.source === "value" ? "enter a value" : "choose a column"}.`,
+        `Pick ${n}: ${row.source === "value" ? "enter a value" : row.source === "label" ? "name the label" : "choose a column"}.`,
       );
     }
   }
@@ -130,7 +135,9 @@ export function linkFromForm(
                 ? { value: row.text }
                 : row.source === "column"
                   ? { column: row.text.trim() }
-                  : { series: true },
+                  : row.source === "label"
+                    ? { label: row.text.trim() }
+                    : { series: true },
             ]),
           ),
         }

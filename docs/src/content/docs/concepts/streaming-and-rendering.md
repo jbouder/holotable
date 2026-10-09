@@ -293,8 +293,8 @@ stream.
 ## Fullscreen and export
 
 Each panel's header carries an overflow menu (the ⋯ trigger). Besides
-**Show generated SQL**, which opens the panel's statement, source and time
-field in a dialog (not offered for a text panel or through a share link), and
+**Show query**, which opens the panel's statement (SQL or PromQL), source and
+time field, or for PromQL how it is evaluated, in a dialog (not offered for a text panel or through a share link), and
 **Ask about this panel** (#366) and the panel's links (see
 [Drilldown](/concepts/drilldown/)), it holds three local actions (#76):
 

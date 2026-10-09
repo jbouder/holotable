@@ -188,3 +188,53 @@ test("diffing does not mutate either panel, so rejecting leaves it untouched", (
   acceptedPanel(before, generated);
   assert.deepEqual(before, snapshot);
 });
+
+/* PromQL (#388) ----------------------------------------------------------- */
+
+function promPanel(query: Record<string, unknown>): Panel {
+  return panel({ query: { sourceId: "prom", promql: "up", ...query } as Panel["query"] });
+}
+
+test("a SQL panel's diff has no evaluation row", () => {
+  const before = panel();
+  assert.equal(
+    diffPanels(before, { ...before }).fields.some((f) => f.key === "evaluation"),
+    false,
+  );
+  assert.equal(diffPanels(before, { ...before }).bodyLabel, "SQL");
+});
+
+test("a PromQL diff names its body PromQL and diffs the expression", () => {
+  const before = promPanel({});
+  const diff = diffPanels(before, {
+    ...before,
+    query: { sourceId: "prom", promql: "sum(up)" },
+  });
+  assert.equal(diff.bodyLabel, "PromQL");
+  assert.equal(diff.sql.changed, true);
+  assert.equal(field(diff, "evaluation").changed, false);
+});
+
+test("instant and minStep changes show as an evaluation change", () => {
+  const before = promPanel({ minStep: "1m" });
+  const diff = diffPanels(before, {
+    ...before,
+    query: { sourceId: "prom", promql: "up", instant: true },
+  });
+  const evaluation = field(diff, "evaluation");
+  assert.equal(evaluation.before, "range, min step 1m");
+  assert.equal(evaluation.after, "instant");
+  assert.equal(evaluation.changed, true);
+  assert.equal(diff.sql.changed, false);
+});
+
+test("an edit that moves a panel from SQL to PromQL shows both sides", () => {
+  const before = panel();
+  const diff = diffPanels(before, {
+    ...before,
+    query: { sourceId: "prom", promql: "up", instant: true },
+  });
+  assert.equal(diff.bodyLabel, "PromQL");
+  assert.equal(field(diff, "evaluation").before, "none");
+  assert.equal(field(diff, "evaluation").after, "instant");
+});

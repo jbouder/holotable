@@ -135,6 +135,8 @@ test("details and a share carry the statement by its language's name, and nothin
   const promqlPanel = Panel.parse(panel("stat", INSTANT));
   assert.deepEqual(panelDetails(promqlPanel), {
     promql: RANGE.promql,
+    // How it is evaluated is part of how it is computed (#388).
+    instant: true,
     sourceId: "prom",
     timeField: undefined,
     description: undefined,

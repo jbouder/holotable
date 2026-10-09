@@ -2,11 +2,17 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { Panel } from "@/lib/ir";
 import {
+  isStarterQuery,
   isStarterSql,
+  PLACEHOLDER_PROMQL,
   panelStarter,
   PLACEHOLDER_SQL,
+  promqlStarter,
   starterPanel,
+  starterQuery,
 } from "@/lib/panel-starter";
+import { validatePromql } from "@/lib/promql/safety";
+import type { PrometheusCatalog } from "@/lib/sources/kinds/prometheus";
 import type { CatalogTable, SqlSourceConfig } from "@/lib/registry";
 import { validateSql } from "@/lib/sql/safety";
 import { queryOf } from "./support/panels";
@@ -189,4 +195,89 @@ test("reflowed whitespace is still the starter", () => {
   const catalog = { tables: [HTTP_REQUESTS] };
   const reflowed = panelStarter(catalog).sql.replace(/\n/g, " ");
   assert.equal(isStarterSql(reflowed, catalog), true);
+});
+
+/* -------------------------------------------------------------------------- */
+/* PromQL (#388)                                                              */
+/* -------------------------------------------------------------------------- */
+
+const PROM: PrometheusCatalog = {
+  metrics: [
+    { name: "up", type: "gauge", labels: ["instance", "job"] },
+    { name: "http_requests_total", type: "counter", labels: ["code", "job"] },
+    { name: "req_seconds_bucket", type: "histogram", labels: ["le"] },
+  ],
+};
+
+function promConfig(catalog: PrometheusCatalog) {
+  return { metrics: catalog.metrics.map((m) => ({ ...m })) };
+}
+
+test("a PromQL starter is a counter's rate, as a range for a line and an instant for a stat", () => {
+  assert.deepEqual(promqlStarter(PROM), {
+    promql: "sum(rate(http_requests_total[5m]))",
+    viz: "line",
+    title: "http_requests_total per second",
+  });
+  assert.equal(promqlStarter(PROM, "stat").instant, true);
+  assert.equal(promqlStarter(PROM, "table").instant, true);
+  assert.equal("instant" in promqlStarter(PROM, "bar"), false);
+});
+
+test("without a counter, a histogram's p95, then a gauge, then a count, then a constant", () => {
+  const noCounter = { metrics: PROM.metrics.filter((m) => m.type !== "counter") };
+  assert.match(promqlStarter(noCounter).promql, /^histogram_quantile\(0\.95/);
+  const gaugeOnly = { metrics: [PROM.metrics[0]] };
+  assert.equal(promqlStarter(gaugeOnly).promql, "sum(up)");
+  const unknown = { metrics: [{ name: "x", type: "unknown" as const, labels: [] }] };
+  assert.equal(promqlStarter(unknown).promql, "count(x)");
+  assert.equal(promqlStarter({ metrics: [] }).promql, PLACEHOLDER_PROMQL);
+});
+
+test("every PromQL starter passes the real guard against its catalog", () => {
+  for (const catalog of [PROM, { metrics: [PROM.metrics[0]] }, { metrics: [] }]) {
+    for (const viz of ["line", "stat", "table"] as const) {
+      const starter = promqlStarter(catalog, viz);
+      const check = validatePromql(starter.promql, promConfig(catalog));
+      assert.ok(check.ok, `${starter.promql}: ${check.ok ? "" : check.error}`);
+    }
+  }
+});
+
+test("a metric name the guard would not read bare is skipped", () => {
+  const hostile = {
+    metrics: [
+      { name: 'x"}or vector(1)', type: "counter" as const, labels: [] },
+      ...PROM.metrics,
+    ],
+  };
+  assert.doesNotMatch(promqlStarter(hostile).promql, /vector/);
+});
+
+test("starterQuery writes in the catalog's language, and a new panel on a Prometheus source is PromQL", () => {
+  assert.deepEqual(starterQuery("prom", PROM, "gauge").query, {
+    sourceId: "prom",
+    promql: "sum(rate(http_requests_total[5m]))",
+    instant: true,
+  });
+  const sql = starterQuery("ts", { tables: [HTTP_REQUESTS] }).query;
+  assert.ok("sql" in sql);
+  const panel = starterPanel("p", "prom", PROM, LAYOUT);
+  assert.ok(Panel.safeParse(panel).success);
+  assert.ok(panel.query && "promql" in panel.query);
+});
+
+test("a PromQL starter counts as untouched for the delete confirmation; an edit does not", () => {
+  const panel = starterPanel("p", "prom", PROM, LAYOUT);
+  assert.ok(panel.query);
+  assert.equal(isStarterQuery(panel.query, PROM), true);
+  assert.equal(
+    isStarterQuery({ sourceId: "prom", promql: PLACEHOLDER_PROMQL }, PROM),
+    true,
+  );
+  assert.equal(isStarterQuery({ sourceId: "prom", promql: "sum(up)" }, PROM), false);
+  assert.equal(
+    isStarterQuery({ sourceId: "ts", sql: PLACEHOLDER_SQL }, { tables: [HTTP_REQUESTS] }),
+    true,
+  );
 });

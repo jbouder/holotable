@@ -38,7 +38,7 @@ test("a dialog traps focus and gives it back to what opened it", async ({
   const opener = page.getByRole("button", { name: /^Actions for / }).first();
   await opener.focus();
   await page.keyboard.press("Enter");
-  await page.getByRole("menuitem", { name: "Show generated SQL" }).click();
+  await page.getByRole("menuitem", { name: "Show query" }).click();
   const dialog = page.getByRole("dialog");
   await expect(dialog).toBeVisible();
 
