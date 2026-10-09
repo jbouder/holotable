@@ -324,7 +324,7 @@ For a PromQL panel the same route answers with the PromQL plan:
   step, and for the step "the window ÷ 1,000 points, floored at 15 s", plus
   the panel's Min step when it has one;
 - each variable the expression references and the value bound for it;
-- the limits, as "1,000 points · 30 s · 4.0 MiB · 100 series".
+- the limits, as "1,000 points · 20 s · 4.0 MiB · 100 series".
 
 The endpoint's URL and auth mode have no field in the view.
 

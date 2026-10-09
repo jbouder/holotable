@@ -78,6 +78,9 @@ services:
       # the demo sources in the `demo` workspace; a ref not granted here never
       # resolves, whatever credentials the environment holds.
       SOURCE_SECRET_REFS: ${SOURCE_SECRET_REFS:-TS_METRICS:demo}
+      # The Prometheus below, which the seeder registers as `prometheus-self`
+      # (#390). A source URL outside this list must be public https.
+      SOURCE_URL_ALLOWLIST: ${SOURCE_URL_ALLOWLIST:-prometheus}
       # Credentials the app resolves for the 'TS_METRICS' source secret_ref.
       TS_METRICS_USERNAME: ${TS_METRICS_USERNAME:-metrics_ro}
       TS_METRICS_PASSWORD: ${TS_METRICS_PASSWORD:-readonly}
@@ -147,6 +150,7 @@ services:
       TS_METRICS_HOST: postgres
       TS_METRICS_PORT: "5432"
       SEED_INTERVAL_MS: "2000"
+      PROMETHEUS_SELF_URL: http://prometheus:9090
       # History to write before streaming (#252), e.g. 6h. Empty writes none.
       SEED_BACKFILL: ${SEED_BACKFILL:-}
     depends_on:
@@ -158,9 +162,9 @@ services:
   # The self-monitoring demo (#54). Scrapes the app's own /api/metrics and
   # lands the samples in metrics.holotable_self, which `seed` registers as the
   # `holotable-self` source — so the shipped demo is Holotable reading guarded
-  # SQL over data it produced itself. Prometheus below is not in this path;
-  # Holotable reads SQL, not PromQL, so something has to land the samples in a
-  # table, and a ~100-line collector is the smaller honest answer.
+  # SQL over data it produced itself. Prometheus below scrapes the same
+  # endpoint, and `seed` registers it as `prometheus-self`, so the second
+  # self-monitoring dashboard asks the same questions in PromQL (#390).
   self-metrics:
     image: *migrate-image
     build:
@@ -198,6 +202,8 @@ services:
       SOURCE_SECRET_REFS: ${SOURCE_SECRET_REFS:-TS_METRICS:demo}
       TS_METRICS_USERNAME: ${TS_METRICS_USERNAME:-metrics_ro}
       TS_METRICS_PASSWORD: ${TS_METRICS_PASSWORD:-readonly}
+      # The Prometheus source's endpoint, allowed exactly as the app allows it.
+      SOURCE_URL_ALLOWLIST: ${SOURCE_URL_ALLOWLIST:-prometheus}
       SMOKE_TIMEOUT_MS: ${SMOKE_TIMEOUT_MS:-180000}
       LOG_LEVEL: ${LOG_LEVEL:-warn}
     depends_on:
@@ -206,13 +212,12 @@ services:
       migrate:
         condition: service_completed_successfully
 
-  # Scrapes the app's /api/metrics. Off by default — start it with
-  # `docker compose --profile metrics up -d prometheus`. Not part of the
-  # self-monitoring demo above, which reads SQL rather than PromQL; this is
-  # here for anyone who wants the real scraper and its alerting.
+  # Scrapes the app's /api/metrics, and answers the `prometheus-self` source
+  # the seeder registers (#390): the PromQL self-monitoring dashboard reads
+  # it. Unauthenticated on the compose network; the app reaches it because
+  # SOURCE_URL_ALLOWLIST names `prometheus`.
   prometheus:
     image: prom/prometheus:v3.1.0
-    profiles: ["metrics"]
     command:
       - --config.file=/etc/prometheus/prometheus.yml
       - --storage.tsdb.retention.time=6h

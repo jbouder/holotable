@@ -27,6 +27,12 @@ the `Dashboard` schema without `specVersion`: the version is stamped by the
 app, never asserted by the model). Output is re-parsed with Zod before it is
 trusted.
 
+When a Prometheus source is in the call, the schema is the variant whose panel
+query may be PromQL, and each panel is held to the language of the source it
+names: a panel that writes SQL against a Prometheus source fails the schema and
+is repaired with a message saying which field to write. A call over SQL sources
+only is bound to the SQL schema, exactly as before.
+
 ## 3. Specs are immutable and versioned
 
 Each save inserts a new `dashboard_versions` row containing the whole spec as
@@ -257,6 +263,14 @@ model run) the same way. This is a second line of defense: the model's output
 is untrusted regardless (invariant 7), which is what actually contains a
 successful injection.
 
+**For a Prometheus source**, the catalog is the metric allowlist: each metric's
+name, type, help line and labels, read by discovery from an endpoint the
+operator may not control. The kind's `renderCatalog`
+(`src/lib/sources/server/prometheus.ts`) puts it in a prompt through the same
+`sanitizePromptField` and `fenceUntrustedBlock`, with a help line clamped to 500
+characters, and leaves out a metric the last refresh could not find. The URL and
+the auth mode are never in it.
+
 ## 10. One poller per dashboard
 
 Shared across independently authorized subscribers. Each browser opens **one**
@@ -295,7 +309,8 @@ point and the only place the platform-admin bypass applies.
 
 `/api/dashboards/[id]/chat` authorizes `dashboard:view` and exposes the model a
 single `runQuery` tool, scoped to sources the dashboard already references and
-the caller may use. It runs the same validate → plan → execute pipeline, injects
+the caller may use. It takes `sql` or `promql`, whichever the source answers,
+and runs the same validate → plan → execute pipeline, injects
 the dashboard's own time range, caps rows and steps, and cannot mutate the
 dashboard.
 

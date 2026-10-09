@@ -34,6 +34,11 @@ are full within seconds.
 image follows `main`; `ghcr.io/jbouder/holotable:<version>-quickstart` pins a
 release.
 
+The quick-start image has no Prometheus, so it shows the three SQL demo
+sources only. The [Prometheus self-monitoring
+dashboard](/getting-started/demo-data/#the-prometheus-twin) and a Prometheus
+source to try PromQL against come with Docker Compose, below.
+
 :::caution
 Everyone who can reach this container is signed in to the same demo workspace.
 It is for trying Holotable, never for real data or credentials.
@@ -47,7 +52,7 @@ cp .env.example .env
 #   SESSION_SECRET        32+ random characters (openssl rand -hex 32)
 #   AI_MODEL + its key    see AI provider; AI_PROVIDER defaults to openai-compatible
 #   OIDC_CLIENT_SECRET=holotable-dev-secret   the local realm's client secret
-docker compose up                  # timescaledb, keycloak, migrate, app, seed
+docker compose up                  # timescaledb, keycloak, migrate, app, seed, prometheus
 ```
 
 The app service runs with `NODE_ENV=production`, so
@@ -56,8 +61,10 @@ an error: the placeholder `SESSION_SECRET`, an empty `AI_MODEL` or an empty
 `OIDC_CLIENT_SECRET` stops it from booting, and `docker compose logs app` says
 which.
 
-This brings up TimescaleDB, Keycloak, a one-shot migration job, the app, and the
-seeder as separate services, with real OIDC sign-in. Sign in at
+This brings up TimescaleDB, Keycloak, a one-shot migration job, the app, the
+seeder and a Prometheus that scrapes the app, as separate services, with real
+OIDC sign-in. The seeder registers that Prometheus as the `prometheus-self`
+source, so the stack has SQL and PromQL sources to compare. Sign in at
 `http://localhost:3000` as **`demo` / `demo`**, a source-admin in the `demo`
 workspace and a platform admin; see [the local realm](/operations/keycloak/#the-local-realm). The `seed` service
 continuously inserts demo metrics and, once, creates the demo `demo`

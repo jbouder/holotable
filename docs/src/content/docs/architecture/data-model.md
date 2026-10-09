@@ -14,9 +14,22 @@ Metrics **data** never lives here — only configuration and validated specs.
 
 ### `sources`
 
-The registry: safe `config` (jsonb), `secret_ref`, `workspace_id`,
+The registry: `kind`, safe `config` (jsonb), `secret_ref`, `workspace_id`,
 `tombstoned_at`. Credentials are never stored; `secret_ref` names an environment
 variable family from which they are resolved at execution time.
+
+`kind` says which shape `config` holds and which language the source's queries
+are written in ([ADR 2](/architecture/decisions/0002-source-kinds/)), and a row
+whose `config.kind` disagrees with it is refused when it is read:
+
+| `kind` | `config` | Queries |
+| --- | --- | --- |
+| `timescaledb` | `host`, `port`, `database`, `schema`, `ssl`, `tables` (each with its `columns` and `timeField`), optional `rowFilter` `{ column, claim }` | SQL |
+| `prometheus` | `url`, `auth` (`none`, `bearer` or `basic`), `metrics` (each with its `type`, `help` and `labels`), optional `rowFilter` `{ label, claim }` | PromQL |
+
+`secret_ref` is nullable (migration 018) for a Prometheus source with
+`auth: none`, which needs no credential; a TimescaleDB source and an
+authenticated Prometheus source always name one.
 
 Referenced sources are **tombstoned** rather than deleted, so dashboards
 referencing them keep resolving to a tombstone marker instead of breaking

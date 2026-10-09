@@ -115,18 +115,23 @@ Important files:
   kind's server half has (#385): `check`, `plan`, `execute`, `planView`,
   `labelValues`, `test`, `checkConfig`. The poller, `/api/query`, `/api/sql/*`,
   variables, chat and the MCP tools call it and never ask which language they
-  hold; each kind refuses a query in the other language itself. SQL-only
-  management (discover, refresh, hide a column) is behind `requireSqlSource`
-  until #386. `src/lib/prometheus/` is the HTTP client (guarded fetch under
+  hold; each kind refuses a query in the other language itself. Discovery,
+  refresh and the connection test are per kind too (#386); only what is SQL by
+  nature (hiding a column, its impact) stays behind `requireSqlSource`.
+  `src/lib/prometheus/` is the HTTP client (guarded fetch under
   `SOURCE_URL_ALLOWLIST`, credentials per request, byte cap as the body
-  arrives) and the conversion of results to wide rows
+  arrives), discovery and the test, and the conversion of results to wide
+  rows. A query is read through the IR's helpers (`isSqlQuery`, `queryText`,
+  `queryTimeField`), never its fields, outside the SQL modules;
+  `test/query-language.test.ts` holds that
 - `src/lib/promql/` — the PromQL guard (#384), the same guard for a
   Prometheus source: `parse.ts` (the real grammar, `@prometheus-io/lezer-promql`),
   `safety.ts` (`validatePromql`: allowlisted node types, the metric allowlist,
   `@` refused, ranges bounded by `PROMQL_MAX_RANGE`, variables only as a
   matcher's whole value), `variables.ts` and `row-filter.ts` (the rewrites,
-  each verified by re-parse) and `plan.ts`. `npm run test:fuzz` runs its fuzz
-  suite beside the SQL one
+  each verified by re-parse) and `plan.ts`, and `completion.ts` (the editor's
+  metric and label completion, #388). `npm run test:fuzz` runs its fuzz suite
+  beside the SQL one
 - `src/lib/sql/ast.ts` — the PostgreSQL parse-tree walk the guard is built on
 - `src/lib/sql/row-filter.ts` — row-level filters (#31): every real table a
   statement reads is spliced, at the parser's byte offsets, into a subquery
@@ -278,9 +283,11 @@ Important files:
   `useRepairingObject` reads, in the browser, so the one repair runs
 - `src/lib/self-monitoring/` — the committed self-monitoring demo: the
   dashboard spec (also an IR snapshot), the source catalog, and the Prometheus
-  text-format parser the collector uses. `test/self-monitoring.test.ts` holds
-  the spec, the catalog and the collector's metric allowlist to one contract,
-  so a panel cannot be written against a metric nothing collects
+  text-format parser the collector uses; and `prometheus.ts`, its PromQL twin
+  over the compose stack's Prometheus (#390), the `prometheus-self` source.
+  `test/self-monitoring.test.ts` holds both specs, both catalogs and the
+  collector's metric allowlist to one contract, so a panel cannot be written
+  against a metric nothing collects or the app never exports
 - `src/app/globals.css` — design tokens and Tailwind v4 theme setup
 - `next.config.ts` — standalone output, `pg` externalization
 - `package.json` — authoritative scripts/tooling
@@ -606,7 +613,7 @@ npm run migrate    # apply Postgres migrations (--check, --dry-run, --down)
 npm run migrate:verify # round-trip every migration (scratch database)
 npm run seed       # looping metrics seeder
 npm run self-metrics # scrape the app's own /api/metrics into metrics.holotable_self
-npm run smoke      # end-to-end check of the self-monitoring demo dashboard
+npm run smoke      # end-to-end check of both self-monitoring demo dashboards
 ```
 
 Before finalizing code changes, run the checks relevant to your change:

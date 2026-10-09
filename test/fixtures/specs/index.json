@@ -48,5 +48,10 @@
     "authoredAt": 1,
     "digest": "23ab6e197cc52b508d39bc198d76150c470277c8c9762dec49131e3eb1683c3e",
     "origin": "hand-written (#384): PromQL panels, range and instant, a label-values variable, beside a SQL panel"
+  },
+  "v1-seeded-prometheus-self-monitoring.json": {
+    "authoredAt": 1,
+    "digest": "45b522022bb669f425179bdc855c1ecba9c80e1d9906b7549e806b10eed4f805",
+    "origin": "committed (#390): dashboard \"Holotable self-monitoring (Prometheus)\", the PromQL self-monitoring demo the seeder stores"
   }
 }

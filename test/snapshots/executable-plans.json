@@ -320,6 +320,58 @@
     "sql": "SELECT * FROM (SELECT region, round(avg(cpu_pct)::numeric, 1) AS avg_cpu FROM system_metrics GROUP BY region ORDER BY avg_cpu DESC) AS _holo LIMIT 5000",
     "params": []
   },
+  "v1-seeded-prometheus-self-monitoring.json#tick-p95": {
+    "instant": false,
+    "expr": "histogram_quantile(0.95, sum by (le) (rate(holotable_poller_tick_duration_seconds_bucket[5m])))",
+    "start": "2026-01-01T00:00:00.000Z",
+    "end": "2026-01-01T01:00:00.000Z",
+    "stepSeconds": 15,
+    "timeoutMs": 20000
+  },
+  "v1-seeded-prometheus-self-monitoring.json#query-latency": {
+    "instant": false,
+    "expr": "1000 * sum by (source) (rate(holotable_query_duration_seconds_sum[5m])) / sum by (source) (rate(holotable_query_duration_seconds_count[5m]))",
+    "start": "2026-01-01T00:00:00.000Z",
+    "end": "2026-01-01T01:00:00.000Z",
+    "stepSeconds": 15,
+    "timeoutMs": 20000
+  },
+  "v1-seeded-prometheus-self-monitoring.json#resident-memory": {
+    "instant": false,
+    "expr": "max(holotable_process_resident_memory_bytes)",
+    "start": "2026-01-01T00:00:00.000Z",
+    "end": "2026-01-01T01:00:00.000Z",
+    "stepSeconds": 15,
+    "timeoutMs": 20000
+  },
+  "v1-seeded-prometheus-self-monitoring.json#sse-subscribers": {
+    "instant": false,
+    "expr": "sum(holotable_sse_subscribers)",
+    "start": "2026-01-01T00:00:00.000Z",
+    "end": "2026-01-01T01:00:00.000Z",
+    "stepSeconds": 15,
+    "timeoutMs": 20000
+  },
+  "v1-seeded-prometheus-self-monitoring.json#pollers-active": {
+    "instant": true,
+    "expr": "max(holotable_pollers_active)",
+    "time": "2026-01-01T01:00:00.000Z",
+    "timeoutMs": 20000
+  },
+  "v1-seeded-prometheus-self-monitoring.json#llm-tokens": {
+    "instant": false,
+    "expr": "sum by (direction) (increase(holotable_llm_tokens_total[5m]))",
+    "start": "2026-01-01T00:00:00.000Z",
+    "end": "2026-01-01T01:00:00.000Z",
+    "stepSeconds": 300,
+    "timeoutMs": 20000
+  },
+  "v1-seeded-prometheus-self-monitoring.json#sql-rejections": {
+    "instant": true,
+    "expr": "sum by (reason) (increase(holotable_sql_validation_rejections_total[1h]))",
+    "time": "2026-01-01T01:00:00.000Z",
+    "timeoutMs": 20000
+  },
   "v1-seeded-self-monitoring.json#tick-p95": {
     "sql": "SELECT * FROM (WITH scraped AS (\n  SELECT ts, le, sum(value) AS cumulative\n  FROM holotable_self\n  WHERE metric = 'holotable_poller_tick_duration_seconds_bucket' AND le IS NOT NULL\n  GROUP BY ts, le\n), buckets AS (\n  SELECT time_bucket('1 minute', ts) AS minute, le, max(cumulative) - min(cumulative) AS hits\n  FROM scraped\n  GROUP BY minute, le\n), counted AS (\n  SELECT ts, sum(value) AS cumulative\n  FROM holotable_self\n  WHERE metric = 'holotable_poller_tick_duration_seconds_count'\n  GROUP BY ts\n), totals AS (\n  SELECT time_bucket('1 minute', ts) AS minute, max(cumulative) - min(cumulative) AS ticks\n  FROM counted\n  GROUP BY minute\n)\nSELECT buckets.minute, min(buckets.le) AS p95_seconds\nFROM buckets JOIN totals ON totals.minute = buckets.minute\nWHERE totals.ticks > 0 AND buckets.hits >= 0.95 * totals.ticks\nGROUP BY buckets.minute\nORDER BY buckets.minute) AS _holo\nWHERE _holo.minute >= $1::timestamptz\n  AND _holo.minute < $2::timestamptz\nLIMIT 5000",
     "params": ["2026-01-01T00:00:00.000Z", "2026-01-01T01:00:00.000Z"],

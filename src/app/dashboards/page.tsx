@@ -321,7 +321,9 @@ function PagerLink({
 }) {
   if (disabled) {
     return (
-      <span className="border border-border px-3 py-1.5 opacity-40">{children}</span>
+      // Muted rather than faded: the token pairing meets AA in both themes,
+      // where an opacity on body text does not.
+      <span className="border border-border px-3 py-1.5 text-muted">{children}</span>
     );
   }
   return (

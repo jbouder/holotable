@@ -22,6 +22,14 @@ import {
   toRow,
 } from "@/lib/self-monitoring/exposition";
 import { type SqlSourceConfig, TimescaleDbConfig } from "@/lib/registry";
+import { renderMetrics, resetMetricsForTests } from "@/lib/metrics";
+import { validatePromql } from "@/lib/promql/safety";
+import {
+  PROMETHEUS_SELF_SOURCE_ID,
+  prometheusSelfConfig,
+  prometheusSelfMetrics,
+  prometheusSelfMonitoringSpec,
+} from "@/lib/self-monitoring/prometheus";
 import { buildExecutablePlan, validateSql } from "@/lib/sql/safety";
 import { resolveTimeRange } from "@/lib/time";
 import { queryOf } from "./support/panels";
@@ -325,4 +333,68 @@ test("a real scrape's multi-label series survive as distinct rows", () => {
   assert.match(row.labels, /^major=/);
   assert.match(row.labels, /version="v\d+/);
   for (const promoted of PROMOTED_LABELS) assert.equal(row[promoted], null);
+});
+
+// --- the PromQL dashboard (#390) ---------------------------------------------
+
+/**
+ * The second self-monitoring dashboard asks the compose stack's Prometheus
+ * the same questions in PromQL. Its catalog is held to what the app's own
+ * registry exports, every panel goes through the real PromQL guard with no
+ * hint, and it answers the same panels the SQL dashboard does.
+ */
+test("the PromQL dashboard parses, reads only prometheus-self, and matches the SQL panels", () => {
+  const prom = prometheusSelfMonitoringSpec();
+  const sql = selfMonitoringSpec();
+  assert.deepEqual(
+    prom.panels.map((p) => [p.id, p.viz]),
+    sql.panels.map((p) => [p.id, p.viz]),
+  );
+  for (const panel of prom.panels) {
+    assert.equal(panel.query?.sourceId, PROMETHEUS_SELF_SOURCE_ID, panel.id);
+  }
+});
+
+test("every PromQL panel passes the guard against the committed catalog, with no hint", () => {
+  const catalog = prometheusSelfConfig();
+  for (const panel of prometheusSelfMonitoringSpec().panels) {
+    const query = panel.query;
+    assert.ok(query && "promql" in query, panel.id);
+    const check = validatePromql(query.promql, catalog);
+    assert.ok(check.ok, `${panel.id}: ${check.ok ? "" : check.error}`);
+    assert.deepEqual(check.hints ?? [], [], `${panel.id}: hints`);
+  }
+});
+
+test("the PromQL catalog lists only metrics the app's registry really exports", async () => {
+  resetMetricsForTests();
+  const exported = new Set(
+    [...(await renderMetrics()).matchAll(/^# TYPE (\S+) /gm)].map((m) => m[1]),
+  );
+  for (const metric of prometheusSelfMetrics()) {
+    if (metric.name === "up") continue;
+    assert.ok(
+      exported.has(metricFamily(metric.name)),
+      `${metric.name} is allowlisted but the app never exports it`,
+    );
+  }
+  // And the panels read the same families the SQL dashboard does.
+  const read = new Set<string>();
+  for (const panel of prometheusSelfMonitoringSpec().panels) {
+    const query = panel.query;
+    if (!query || !("promql" in query)) continue;
+    for (const m of query.promql.matchAll(/\b(holotable_[a-z0-9_]+)/g)) {
+      read.add(metricFamily(m[1]));
+    }
+  }
+  assert.deepEqual([...read].sort(), [...PANEL_METRIC_FAMILIES].sort());
+});
+
+test("the PromQL source and dashboard carry no credential", () => {
+  const cfg = prometheusSelfConfig();
+  assert.equal(cfg.auth, "none");
+  const serialized = JSON.stringify(prometheusSelfMonitoringSpec());
+  for (const forbidden of ["http://", "password", "secretRef", "Bearer"]) {
+    assert.equal(serialized.includes(forbidden), false, forbidden);
+  }
 });

@@ -222,8 +222,9 @@ jobs:
       - name: Install Chromium
         run: npx playwright install --with-deps chromium
 
-      # e2e/prepare.ts brings up e2e/compose.yml (TimescaleDB and Keycloak
-      # with the dev realm) and migrates; Playwright then starts the seeder
+      # e2e/prepare.ts brings up e2e/compose.yml (TimescaleDB, Keycloak with
+      # the dev realm, and a Prometheus that scrapes the app, #390) and
+      # migrates; Playwright then starts the seeder
       # and the production build, signs in through the realm, and runs the
       # journey (#88) and the axe scans in both themes (#91). The model is
       # the recorded stub, so nothing here calls a provider.
@@ -413,11 +414,12 @@ jobs:
       # liveness probe, so a server that exited on a bad configuration fails
       # here with its logs rather than 4 minutes later as a smoke timeout.
       - name: Bring the stack up
-        run: docker compose up -d --wait app seed self-metrics
+        run: docker compose up -d --wait app seed self-metrics prometheus
 
-      # The assertion: the seeded dashboard answers with rows the collector
-      # scraped out of the running app, through the same guard and executor
-      # POST /api/query uses.
+      # The assertion: both seeded self-monitoring dashboards answer with
+      # rows, the SQL one from what the collector scraped out of the running
+      # app and the PromQL one from what Prometheus scraped (#390), through
+      # the same guard and executor POST /api/query uses.
       - name: Smoke
         run: docker compose --profile smoke run --rm smoke
 

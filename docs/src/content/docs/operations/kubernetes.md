@@ -93,6 +93,12 @@ Three wirings, each a runnable values file under
 | Vault, through the Agent injector | `values-vault-agent.yaml` | Vault, no operator |
 | Secrets Store CSI driver | `values-secrets-store-csi.yaml` | AWS/Azure/GCP/Vault CSI |
 
+One more example is not a wiring but a source: `values-prometheus-source.yaml`
+lets source admins register an in-cluster Prometheus, with
+`SOURCE_URL_ALLOWLIST` naming it, a bearer-token `secret_ref`, and a network
+policy whose egress rule names the same endpoint. See
+[Prometheus sources](/operations/prometheus/).
+
 The Vault one is the only one that needs a trick. The Agent injector writes a
 *file*; the app reads its environment. The injected template therefore renders
 `export` lines and `app.command` wraps the entrypoint:
