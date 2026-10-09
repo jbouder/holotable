@@ -124,7 +124,10 @@ Important files:
   The page resolves targets on the server (same workspace, `can()` on every
   load) and the browser builds hrefs only to those; an href carries time
   expressions and `var-*` picks, which the target re-checks like a typed URL.
-  Share links and embeds show no links
+  Share links and embeds show no links. A click maps back to its row through
+  `datumOf` in `src/lib/drilldown-datum.ts`, one mapping per panel kind (a new
+  kind does not compile without one); the clickable bodies read
+  `useDatumLinks()` from `src/components/dashboard/DatumLinks.tsx`
 - `src/lib/annotations.ts`, `src/lib/annotation-service.ts` and
   `src/lib/db/annotations.ts` — annotations (#68): workspace-scoped events
   drawn on time-series panels. Reads take the workspace from the dashboard

@@ -3,6 +3,8 @@ import { STUB_CHAT_REPLY } from "../src/lib/ai/stub";
 import { SPEC_VERSION } from "../src/lib/ir";
 import { PG_PORT, storageStatePath } from "./env";
 import {
+  clickChart,
+  createDrilldownDashboards,
   createLinkedDashboards,
   DEMO_DASHBOARD,
   dashboardId,
@@ -221,6 +223,50 @@ test("a panel link carries the window and picks to its target (#372)", async ({
   expect(url.searchParams.get("to")).toBe("now");
   expect(url.searchParams.getAll("var-route")).toEqual(["/checkout"]);
   await waitForPanels(page);
+});
+
+test("clicking a slice opens the host dashboard with that host picked (#373)", async ({
+  page,
+  request,
+}) => {
+  const { fleet, target } = await createDrilldownDashboards(request);
+  await page.goto(`/dashboards/${fleet}`);
+  await waitForPanels(page);
+  await clickChart(page, "hosts");
+  await page.waitForURL(new RegExp(`/dashboards/${target}\\?`));
+  const picked = new URL(page.url()).searchParams.getAll("var-host");
+  expect(picked).toHaveLength(1);
+  expect(picked[0]).not.toBe("");
+  await waitForPanels(page);
+
+  // The keyboard reaches the same link through the chart's data table, which
+  // shows itself once a link in it has focus.
+  await page.goto(`/dashboards/${fleet}`);
+  await waitForPanels(page);
+  const rowLink = page
+    .locator('[data-panel-id="hosts"]')
+    .getByRole("link", { name: /: Host detail$/ });
+  await expect(rowLink).not.toBeInViewport();
+  await rowLink.focus();
+  await expect(rowLink).toBeInViewport();
+  await page.keyboard.press("Enter");
+  await page.waitForURL(new RegExp(`/dashboards/${target}\\?.*var-host=`));
+});
+
+test("a slice with two links lists them, and the self link filters in place (#373)", async ({
+  page,
+  request,
+}) => {
+  const { fleet } = await createDrilldownDashboards(request, { withSelf: true });
+  await page.goto(`/dashboards/${fleet}?var-host=nowhere`);
+  await waitForPanels(page);
+  await clickChart(page, "hosts");
+  const choices = page.getByRole("dialog", { name: "Links from Hosts" });
+  await expect(choices.getByRole("link", { name: "Host detail" })).toBeVisible();
+  await choices.getByRole("button", { name: "Filter to this host" }).click();
+  await expect(choices).toBeHidden();
+  await expect(page).toHaveURL(new RegExp(`/dashboards/${fleet}\\?.*var-host=`));
+  expect(new URL(page.url()).searchParams.get("var-host")).not.toBe("nowhere");
 });
 
 test.describe("as a viewer", () => {

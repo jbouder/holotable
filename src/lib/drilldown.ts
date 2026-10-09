@@ -46,25 +46,68 @@ export function linkTargetIds(spec: Pick<Dashboard, "panels">): string[] {
   return [...new Set(ids)];
 }
 
-/** The picks a link sets from literals alone, as a selection. */
-function literalPicks(link: PanelLink): Selection {
+/**
+ * What was clicked (#373): the result row a point, slice, cell or row was
+ * drawn from, and the name of the series it belongs to when the kind has one.
+ * The browser already holds the row; a click only says which.
+ */
+export interface Datum {
+  row: Record<string, unknown>;
+  series?: string;
+}
+
+/** The most a pick may be, as `VariableText` allows. */
+const PICK_MAX = 256;
+
+/** A cell as a pick, or nothing: a value the IR would refuse is never sent. */
+function pickText(value: unknown): string | undefined {
+  const text =
+    typeof value === "string"
+      ? value
+      : typeof value === "number" ||
+          typeof value === "boolean" ||
+          typeof value === "bigint"
+        ? String(value)
+        : undefined;
+  return text !== undefined && text.length > 0 && text.length <= PICK_MAX
+    ? text
+    : undefined;
+}
+
+/**
+ * The picks a link makes: its literals, and, given what was clicked, its
+ * `column` and `series` entries read from it. A column the row lacks, or a
+ * series the click did not name, leaves that variable unset, so the target
+ * falls back to its default; nothing is guessed.
+ */
+export function linkPicks(link: PanelLink, datum?: Datum): Selection {
   return Object.fromEntries(
-    Object.entries(link.set ?? {}).flatMap(([name, v]) =>
-      "value" in v ? [[name, [v.value]]] : [],
-    ),
+    Object.entries(link.set ?? {}).flatMap(([name, v]) => {
+      const text =
+        "value" in v
+          ? v.value
+          : !datum
+            ? undefined
+            : "column" in v
+              ? Object.hasOwn(datum.row, v.column)
+                ? pickText(datum.row[v.column])
+                : undefined
+              : pickText(datum.series);
+      return text === undefined ? [] : [[name, [text]]];
+    }),
   );
 }
 
 /**
  * The href of a link to another dashboard: its page, the viewer's window and
- * picks unless the link says not to carry them, and the link's literal picks
- * over those. Datum picks need a click on a point and are not this function's
- * (Phase 3, #373).
+ * picks unless the link says not to carry them, and the link's own picks over
+ * those: its literals, and what it reads from the clicked datum, if any.
  */
 export function linkHref(
   link: PanelLink,
   targetId: string,
   context: LinkContext,
+  datum?: Datum,
 ): string {
   const carry = linkCarries(link);
   const params = new URLSearchParams();
@@ -74,7 +117,7 @@ export function linkHref(
   }
   const selection: Selection = {
     ...(carry.variables ? context.selection : {}),
-    ...literalPicks(link),
+    ...linkPicks(link, datum),
   };
   for (const [key, value] of selectionParams(selection)) params.append(key, value);
   const search = params.toString();
@@ -83,18 +126,46 @@ export function linkHref(
 
 /**
  * The selection after following a self link: the current picks with the
- * link's literal ones over them. The page sets it like a picker change, so the
- * URL and the stream follow and the stream checks every pick again.
+ * link's over them. The page sets it like a picker change, so the URL and the
+ * stream follow and the stream checks every pick again.
  */
-export function applySelfLink(link: PanelLink, selection: Selection): Selection {
-  return { ...selection, ...literalPicks(link) };
+export function applySelfLink(
+  link: PanelLink,
+  selection: Selection,
+  datum?: Datum,
+): Selection {
+  return { ...selection, ...linkPicks(link, datum) };
 }
 
-/** One link as the panel menu offers it. */
+/**
+ * One link as the panel offers it. A self link carries the picks it makes,
+ * which the page lays over the current selection.
+ */
 export type MenuLinkItem =
   | { kind: "navigate"; title: string; href: string; newTab: boolean; target: string }
-  | { kind: "self"; title: string; link: PanelLink }
+  | { kind: "self"; title: string; picks: Selection }
   | { kind: "unavailable"; title: string };
+
+function linkItem(
+  link: PanelLink,
+  targets: LinkTargets,
+  context: LinkContext,
+  datum?: Datum,
+): MenuLinkItem {
+  if (isSelfLink(link)) {
+    return { kind: "self", title: link.title, picks: linkPicks(link, datum) };
+  }
+  const id = link.dashboard as string;
+  const target = Object.hasOwn(targets, id) ? targets[id] : undefined;
+  if (!target) return { kind: "unavailable", title: link.title };
+  return {
+    kind: "navigate",
+    title: link.title,
+    href: linkHref(link, id, context, datum),
+    newTab: link.newTab === true,
+    target: target.title,
+  };
+}
 
 /**
  * A panel's links as its menu shows them: the ones followed from the menu
@@ -108,19 +179,37 @@ export function menuLinks(
 ): MenuLinkItem[] {
   return (panel.links ?? [])
     .filter((link) => !isDatumLink(link))
-    .map((link): MenuLinkItem => {
-      if (isSelfLink(link)) return { kind: "self", title: link.title, link };
-      const id = link.dashboard as string;
-      const target = Object.hasOwn(targets, id) ? targets[id] : undefined;
-      if (!target) return { kind: "unavailable", title: link.title };
-      return {
-        kind: "navigate",
-        title: link.title,
-        href: linkHref(link, id, context),
-        newTab: link.newTab === true,
-        target: target.title,
-      };
-    });
+    .map((link) => linkItem(link, targets, context));
+}
+
+/** The datum links a viewer can follow: self links, and those whose target the server named. */
+function usableDatumLinks(panel: Panel, targets: LinkTargets): PanelLink[] {
+  return (panel.links ?? []).filter(
+    (link) =>
+      isDatumLink(link) &&
+      (isSelfLink(link) || Object.hasOwn(targets, link.dashboard as string)),
+  );
+}
+
+/** Whether a click on this panel's data leads anywhere: what turns clicks on. */
+export function hasDatumLinks(panel: Panel, targets: LinkTargets): boolean {
+  return usableDatumLinks(panel, targets).length > 0;
+}
+
+/**
+ * What a click on a datum offers: the panel's usable datum links, each with
+ * the picks read from what was clicked. A link the viewer cannot follow is
+ * left out rather than shown disabled; the panel menu already says so.
+ */
+export function datumLinkItems(
+  panel: Panel,
+  targets: LinkTargets,
+  context: LinkContext,
+  datum: Datum,
+): MenuLinkItem[] {
+  return usableDatumLinks(panel, targets).map((link) =>
+    linkItem(link, targets, context, datum),
+  );
 }
 
 /** Whether a panel leads anywhere the viewer can go: what the header's glyph says. */

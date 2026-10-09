@@ -13,7 +13,12 @@ import { AnnotationsControl, useAnnotations } from "@/components/dashboard/Annot
 import type { PollerEvent } from "@/lib/poller/registry";
 import { DashboardGrid } from "@/components/dashboard/DashboardGrid";
 import { PanelView, type PanelState } from "@/components/dashboard/PanelView";
-import { applySelfLink, type LinkTargets, menuLinks } from "@/lib/drilldown";
+import {
+  datumLinkItems,
+  hasDatumLinks,
+  type LinkTargets,
+  menuLinks,
+} from "@/lib/drilldown";
 import { ErrorDisplay } from "@/components/ui/error-display";
 import { type ApiError, presentError } from "@/lib/errors";
 import { ConnectionIndicator } from "@/components/dashboard/ConnectionIndicator";
@@ -132,6 +137,12 @@ export function LiveDashboard({
 }) {
   const shared = shareToken !== undefined;
   const [selection, setSelection] = React.useState<Selection>(initialSelection);
+  // A self link (#372, #373) lays its picks over the current ones, as a
+  // picker change would; the stream checks every one again.
+  const pick = React.useCallback(
+    (picks: Selection) => setSelection((s) => ({ ...s, ...picks })),
+    [],
+  );
   const [states, setStates] = React.useState<Record<string, PanelState>>({});
   const [live, setLive] = React.useState(true);
   // Set when the idle timer, not the user, paused the stream, so the page can
@@ -586,9 +597,13 @@ export function LiveDashboard({
             links={
               shared ? undefined : menuLinks(panel, linkTargets, { timeRange, selection })
             }
-            onSelfLink={
-              shared ? undefined : (link) => setSelection((s) => applySelfLink(link, s))
+            datumLinks={
+              !shared && hasDatumLinks(panel, linkTargets)
+                ? (datum) =>
+                    datumLinkItems(panel, linkTargets, { timeRange, selection }, datum)
+                : undefined
             }
+            onPick={shared ? undefined : pick}
             // A panel with its own window (#114) is sent it with its rows.
             window={panel.timeRange ? undefined : resolvedWindow}
             // Hidden is an empty list rather than none, so the merge clears

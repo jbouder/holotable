@@ -1,6 +1,8 @@
 import { expect, test } from "@playwright/test";
 import { expectNoA11yViolations, type Theme, setAppearance } from "./support/a11y";
 import {
+  clickChart,
+  createDrilldownDashboards,
   createLinkedDashboards,
   DEMO_DASHBOARD,
   dashboardId,
@@ -98,6 +100,15 @@ for (const theme of THEMES) {
       await waitForPanels(page);
       await page.getByRole("button", { name: "Actions for Requests by route" }).click();
       await expect(page.getByRole("menuitem", { name: "Checkout detail" })).toBeVisible();
+      await expectNoA11yViolations(page);
+    });
+
+    test("an open popover: the links a click offers", async ({ page, request }) => {
+      const { fleet } = await createDrilldownDashboards(request, { withSelf: true });
+      await page.goto(`/dashboards/${fleet}`);
+      await waitForPanels(page);
+      await clickChart(page, "hosts");
+      await expect(page.getByRole("dialog", { name: "Links from Hosts" })).toBeVisible();
       await expectNoA11yViolations(page);
     });
 

@@ -90,12 +90,15 @@ export function stateColor(state: string, panel: Panel): ColorToken {
   return mapped?.color ?? SEMANTIC[state.toLowerCase()] ?? fallbackToken(state);
 }
 
-/** Build the lanes and spans for these rows. Pure. */
-export function buildStateTimeline(
+/**
+ * Which columns a state timeline reads: the time, the state and the entity
+ * (one lane each). Shared with the drilldown (#373), which maps a clicked span
+ * back to a row through the same columns.
+ */
+export function stateTimelineKeys(
   panel: Panel,
   data: PanelData,
-  window?: ChartContext["window"],
-): StateTimeline {
+): { timeField?: string; stateKey?: string; entityKey?: string } {
   const options = stateTimelineOptions(panel);
   const timeField = panel.query?.timeField ?? data.columns[0];
   const text = data.columns.filter((c) => c !== timeField);
@@ -106,6 +109,17 @@ export function buildStateTimeline(
     (options.entity && data.columns.includes(options.entity)
       ? options.entity
       : undefined) ?? text.find((c) => c !== stateKey && !isNumeric(data.rows, c));
+  return { timeField, stateKey, entityKey };
+}
+
+/** Build the lanes and spans for these rows. Pure. */
+export function buildStateTimeline(
+  panel: Panel,
+  data: PanelData,
+  window?: ChartContext["window"],
+): StateTimeline {
+  const options = stateTimelineOptions(panel);
+  const { timeField, stateKey, entityKey } = stateTimelineKeys(panel, data);
 
   const empty: StateTimeline = {
     lanes: [],

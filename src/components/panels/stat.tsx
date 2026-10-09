@@ -1,4 +1,6 @@
+import { DatumLinksBody } from "@/components/dashboard/DatumLinks";
 import type { PanelBodyProps } from "@/components/panels/types";
+import { datumOf } from "@/lib/drilldown-datum";
 import { tokenHex } from "@/lib/panels/colors";
 import { statReading } from "@/lib/panel-reading";
 
@@ -10,6 +12,21 @@ import { statReading } from "@/lib/panel-reading";
 export function StatView({ panel, data }: PanelBodyProps) {
   const reading = statReading(panel, data);
   const color = reading.color ? tokenHex(reading.color) : undefined;
+  // The whole number is the datum (#373): with a datum link, the body is one control.
+  return (
+    <DatumLinksBody datum={datumOf(panel, data, {})} label={panel.title}>
+      <StatBody reading={reading} color={color} />
+    </DatumLinksBody>
+  );
+}
+
+function StatBody({
+  reading,
+  color,
+}: {
+  reading: ReturnType<typeof statReading>;
+  color?: string;
+}) {
   return (
     <div className="relative flex h-full items-center justify-center">
       {reading.spark.length > 1 && <Sparkline values={reading.spark} color={color} />}
