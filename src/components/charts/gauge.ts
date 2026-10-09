@@ -38,6 +38,8 @@ export interface GaugeReading {
   /** The true value, formatted per `panel.format`. */
   text: string;
   color: ColorToken;
+  /** The result row the reading was read from: what a click on it drills into (#373). */
+  row: Record<string, unknown>;
 }
 
 /** A panel's gauge options, or the defaults when they do not parse. */
@@ -86,6 +88,7 @@ export function gaugeReadings(panel: Panel, data: PanelData): GaugeReading[] {
       fraction,
       text: formatValue(value, panel.format, options),
       color: thresholdColor(options.thresholds, value) ?? DEFAULT_COLOR,
+      row,
     };
   };
 

@@ -1,4 +1,6 @@
 import type { PanelBodyProps } from "@/components/panels/types";
+import { DatumLinksControl, useDatumLinks } from "@/components/dashboard/DatumLinks";
+import { toText } from "@/components/charts/options";
 import { tableView } from "@/lib/panel-reading";
 import { cn } from "@/lib/utils";
 
@@ -16,6 +18,9 @@ const ALIGN = { left: "text-left", center: "text-center", right: "text-right" } 
  */
 export function TableView({ panel, data }: PanelBodyProps) {
   const { columns, rows } = tableView(panel, data);
+  // Datum links (#373) sit in a trailing cell per row; the row itself stays
+  // text to read and copy, not a click target.
+  const links = useDatumLinks();
   return (
     // Focusable, so a keyboard can scroll a table that overflows its panel;
     // named, so what took focus is announced (#77).
@@ -41,6 +46,11 @@ export function TableView({ panel, data }: PanelBodyProps) {
                 {c.label}
               </th>
             ))}
+            {links && (
+              <th className="px-2 py-1">
+                <span className="sr-only">Links</span>
+              </th>
+            )}
           </tr>
         </thead>
         <tbody>
@@ -61,6 +71,14 @@ export function TableView({ panel, data }: PanelBodyProps) {
                   {c.text(r[c.name])}
                 </td>
               ))}
+              {links && (
+                <td className="px-1 py-0.5 text-right">
+                  <DatumLinksControl
+                    datum={{ row: r }}
+                    label={toText(r[columns[0]?.name ?? ""]) || panel.title}
+                  />
+                </td>
+              )}
             </tr>
           ))}
         </tbody>
