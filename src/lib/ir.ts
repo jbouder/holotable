@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { DashboardAnnotations } from "@/lib/annotations";
-import { ValueFormat } from "@/lib/panels/presentation";
+import { Column, ValueFormat } from "@/lib/panels/presentation";
 import { findPanelKind, PANEL_KIND_NAMES, PANEL_KINDS } from "@/lib/panels/registry";
 
 /**
@@ -79,6 +79,102 @@ export const PanelLayout = z
 export type PanelLayout = z.infer<typeof PanelLayout>;
 
 /**
+ * Dashboard variables (#67): a name panel SQL references as `:name`, and the
+ * values a viewer may pick for it. A value is only ever a bound parameter
+ * (`src/lib/sql/variables.ts`), and the server checks every value it is sent
+ * against this declaration: the listed `values` of an `enum`, or what the
+ * variable's own guarded `query` returns.
+ */
+export const VariableName = z
+  .string()
+  .regex(
+    /^[a-z][a-z0-9_]{0,31}$/,
+    "a variable name is lowercase letters, digits and _, starting with a letter, at most 32",
+  );
+
+/** One value, as a viewer selects it and the statement is bound with it. */
+export const VariableText = z.string().min(1).max(256);
+
+/**
+ * Where a link's pick for one variable comes from (#371): a literal, the
+ * clicked row's value in a result column, or the clicked series' name (the
+ * pivot value on a line, area or bar; the slice on a pie). Whatever it reads,
+ * the target checks the value against its own variable on arrival, exactly as
+ * it checks a hand-typed `var-*` pick.
+ */
+export const LinkValue = z.union([
+  z.object({ value: VariableText }).strict(),
+  z.object({ column: Column }).strict(),
+  z.object({ series: z.literal(true) }).strict(),
+]);
+export type LinkValue = z.infer<typeof LinkValue>;
+
+/** The most links one panel declares, and the most variables one link sets. */
+export const PANEL_LINKS_MAX = 5;
+export const LINK_SET_MAX = 10;
+
+/**
+ * Where a panel leads (#370, #371): another dashboard in the same workspace,
+ * or, with no `dashboard`, this one ("click to filter"). The target is an
+ * opaque dashboard id, like `sourceId`, and never a URL: there is nothing here
+ * a model could point outside the app. A link carries time expressions and
+ * variable picks, never SQL; which values a viewer may bind stays the target's
+ * decision when the viewer arrives, and the server still owns time.
+ */
+export const PanelLink = z
+  .object({
+    /** What the menu item or the click says. */
+    title: z.string().min(1).max(64),
+    /** The target dashboard's id. Absent: this dashboard. */
+    dashboard: z.string().min(1).max(128).optional(),
+    /**
+     * Whether the viewer's current window and variable picks go along. Each is
+     * `true` when absent; read them through `linkCarries`.
+     */
+    carry: z
+      .object({
+        timeRange: z.boolean().optional(),
+        variables: z.boolean().optional(),
+      })
+      .strict()
+      .optional(),
+    /** Picks to make on arrival, by variable name. */
+    set: z
+      .record(VariableName, LinkValue)
+      .refine((set) => Object.keys(set).length <= LINK_SET_MAX, {
+        message: `a link sets at most ${LINK_SET_MAX} variables`,
+      })
+      .optional(),
+    /** Open in a new tab rather than this one. */
+    newTab: z.boolean().optional(),
+  })
+  .strict();
+export type PanelLink = z.infer<typeof PanelLink>;
+
+/**
+ * Whether a link reads the datum that was clicked: any pick from a `column`
+ * or the `series`. It is followed by clicking a point, slice, cell or row; a
+ * link with only literals (or no `set`) is a panel link, followed from the
+ * panel's menu.
+ */
+export function isDatumLink(link: PanelLink): boolean {
+  return Object.values(link.set ?? {}).some((v) => !("value" in v));
+}
+
+/** Whether a link stays on this dashboard and sets its variables in place. */
+export function isSelfLink(link: PanelLink): boolean {
+  return link.dashboard === undefined;
+}
+
+/** What a link carries along, with the defaults applied. */
+export function linkCarries(link: PanelLink): { timeRange: boolean; variables: boolean } {
+  return {
+    timeRange: link.carry?.timeRange ?? true,
+    variables: link.carry?.variables ?? true,
+  };
+}
+
+/**
  * A panel's presentation options (#61): one of the registered kinds' option
  * schemas. Which one is the kind's, and `Panel` holds it to that below; the
  * union is what tells the model the shapes there are.
@@ -136,7 +232,7 @@ function fitsItsKind(panel: z.infer<typeof PanelFields>, ctx: z.RefinementCtx): 
   }
   if (kind.query === "none") {
     // Nothing runs, so there is no window to own and nothing to refresh.
-    for (const key of ["timeRange", "refreshIntervalMs"] as const) {
+    for (const key of ["timeRange", "refreshIntervalMs", "links"] as const) {
       if (panel[key] !== undefined) {
         ctx.addIssue({
           code: "custom",
@@ -146,6 +242,17 @@ function fitsItsKind(panel: z.infer<typeof PanelFields>, ctx: z.RefinementCtx): 
       }
     }
   }
+  const titles = new Set<string>();
+  panel.links?.forEach((link, i) => {
+    if (titles.has(link.title)) {
+      ctx.addIssue({
+        code: "custom",
+        message: `duplicate link title "${link.title}"`,
+        path: ["links", i, "title"],
+      });
+    }
+    titles.add(link.title);
+  });
   if (!kind.options) {
     if (panel.options !== undefined) {
       ctx.addIssue({
@@ -191,6 +298,11 @@ const PanelFields = z
     timeRange: TimeRange.optional(),
     /** The panel's own cadence, under the same bounds and floor as the dashboard's. */
     refreshIntervalMs: RefreshIntervalMs.optional(),
+    /**
+     * Where the panel leads (#370): other dashboards in the workspace, or this
+     * one with a variable set. Never on a kind that runs no query.
+     */
+    links: z.array(PanelLink).min(1).max(PANEL_LINKS_MAX).optional(),
     layout: PanelLayout,
   })
   .strict();
@@ -225,6 +337,7 @@ const GeneratedQuerylessPanel = PanelFields.omit({
   query: true,
   timeRange: true,
   refreshIntervalMs: true,
+  links: true,
 }).extend({ viz: z.enum(kindsWhere("none")) });
 
 /**
@@ -239,9 +352,12 @@ export const GeneratedPanel: z.ZodType<Panel> = z
 /**
  * A panel that answers a question from data: what explore asks the model for.
  * A text panel (#202) is a valid panel but no answer, so its kind is not
- * offered at all.
+ * offered at all. Nor are links (#371): an explored panel is on no dashboard,
+ * so it has nowhere to lead from.
  */
-export const ExplorePanel = GeneratedQueryPanel.superRefine(fitsItsKind);
+export const ExplorePanel = GeneratedQueryPanel.omit({ links: true }).superRefine(
+  fitsItsKind,
+);
 
 /** A panel that runs a query: every kind but the query-less ones. */
 export type QueryPanel = Panel & { query: PanelQuery };
@@ -283,22 +399,10 @@ export function cycleMs(spec: Pick<Dashboard, "panels" | "refreshIntervalMs">): 
   return cadences.length > 0 ? Math.min(...cadences) : spec.refreshIntervalMs;
 }
 
-/**
- * Dashboard variables (#67): a name panel SQL references as `:name`, and the
- * values a viewer may pick for it. A value is only ever a bound parameter
- * (`src/lib/sql/variables.ts`), and the server checks every value it is sent
- * against this declaration: the listed `values` of an `enum`, or what the
- * variable's own guarded `query` returns.
+/*
+ * Dashboard variables (#67): see `Variable` below. The name and the value
+ * shapes are declared here because a panel's links (#371) set them too.
  */
-export const VariableName = z
-  .string()
-  .regex(
-    /^[a-z][a-z0-9_]{0,31}$/,
-    "a variable name is lowercase letters, digits and _, starting with a letter, at most 32",
-  );
-
-/** One value, as a viewer selects it and the statement is bound with it. */
-export const VariableText = z.string().min(1).max(256);
 
 /** The most values a variable lists, or its query offers. */
 export const VARIABLE_VALUES_MAX = 200;
@@ -432,6 +536,48 @@ function uniqueIds(
   });
 }
 
+/**
+ * A self link (#371) sets this dashboard's variables in place, so it must set
+ * at least one, and only ones the dashboard declares; otherwise it does
+ * nothing, and the model should hear that at generation rather than a viewer
+ * at click time. A link to another dashboard is not checked here: the IR
+ * cannot see the target, and the target ignores a name it does not declare.
+ */
+function selfLinksSetDeclared(
+  dash: { panels: Panel[]; variables?: Variable[] },
+  ctx: z.RefinementCtx,
+): void {
+  const declared = declaredVariables(dash);
+  dash.panels.forEach((panel, p) => {
+    panel.links?.forEach((link, l) => {
+      if (!isSelfLink(link)) return;
+      const names = Object.keys(link.set ?? {});
+      if (names.length === 0) {
+        ctx.addIssue({
+          code: "custom",
+          message: `link "${link.title}" stays on this dashboard, so it must "set" a variable (or name a "dashboard")`,
+          path: ["panels", p, "links", l, "set"],
+        });
+      }
+      for (const name of names.filter((n) => !declared.has(n))) {
+        ctx.addIssue({
+          code: "custom",
+          message: `link "${link.title}" sets "${name}", which this dashboard does not declare`,
+          path: ["panels", p, "links", l, "set", name],
+        });
+      }
+    });
+  });
+}
+
+function dashboardRules(
+  dash: { panels: Panel[]; variables?: Variable[] },
+  ctx: z.RefinementCtx,
+): void {
+  uniqueIds(dash, ctx);
+  selfLinksSetDeclared(dash, ctx);
+}
+
 export const Dashboard = z
   .object({
     specVersion: z.literal(SPEC_VERSION, {
@@ -440,7 +586,7 @@ export const Dashboard = z
     ...DashboardFields,
   })
   .strict()
-  .superRefine(uniqueIds);
+  .superRefine(dashboardRules);
 export type Dashboard = z.infer<typeof Dashboard>;
 
 /**
@@ -458,7 +604,7 @@ export const DashboardGenerationSchema = z
     panels: z.array(GeneratedPanel).min(1).max(50),
   })
   .strict()
-  .superRefine(uniqueIds);
+  .superRefine(dashboardRules);
 export type GeneratedDashboard = z.infer<typeof DashboardGenerationSchema>;
 
 /**

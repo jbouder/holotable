@@ -11,7 +11,8 @@ import { Thresholds } from "@/lib/panels/thresholds";
  * did before they existed.
  */
 
-const Column = z.string().min(1).max(128);
+/** A result column, by name. Also what a drilldown link reads a clicked row's value from (#371). */
+export const Column = z.string().min(1).max(128);
 
 /**
  * How a value is written. Here rather than in `src/lib/ir.ts`, which re-exports

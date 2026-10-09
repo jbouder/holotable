@@ -11,9 +11,16 @@ import { DraftEnvelope } from "@/lib/editor/drafts";
 import {
   Dashboard,
   DashboardGenerationSchema,
+  ExplorePanel,
   forGeneration,
   fromGenerated,
+  isDatumLink,
+  isSelfLink,
+  LINK_SET_MAX,
+  linkCarries,
+  PANEL_LINKS_MAX,
   Panel,
+  type PanelLink,
   parseDashboard,
   SPEC_VERSION,
   safeParseDashboard,
@@ -318,4 +325,182 @@ test("every reader of a stored spec upgrades it: drafts, export files, templates
   });
   assert.equal(future.success, false);
   assert.match(issues(future), /newer version of Holotable/);
+});
+
+// ---------------------------------------------------------------------------
+// Panel links (#371)
+// ---------------------------------------------------------------------------
+
+const withService = {
+  ...validDashboard,
+  variables: [{ name: "service", type: "enum", values: ["api", "web"] }],
+};
+
+function linked(links: unknown, spec: object = withService) {
+  return safeParseDashboard({
+    ...spec,
+    panels: [{ ...validPanel, links }],
+  });
+}
+
+function messages(result: ReturnType<typeof safeParseDashboard>): string {
+  return result.success ? "" : result.error.issues.map((i) => i.message).join("\n");
+}
+
+test("a panel declares links in each form, and a spec without them is unchanged", () => {
+  const result = linked([
+    { title: "Host detail", dashboard: "9b2c", set: { host: { column: "host" } } },
+    { title: "Service", dashboard: "svc", set: { service: { series: true } } },
+    { title: "Filter here", set: { service: { series: true } } },
+    { title: "Runbook", dashboard: "rb", newTab: true, carry: { timeRange: false } },
+    { title: "Web", dashboard: "w", set: { service: { value: "web" } }, carry: {} },
+  ]);
+  assert.ok(result.success, messages(result));
+  assert.equal(parseDashboard(validDashboard).panels[0]?.links, undefined);
+});
+
+test("a link's target is an id, never a URL or anything else", () => {
+  for (const extra of [
+    { url: "https://x" },
+    { href: "/dashboards/x" },
+    { sql: "SELECT 1" },
+  ]) {
+    assert.equal(
+      linked([{ title: "x", dashboard: "d", ...extra }]).success,
+      false,
+      JSON.stringify(extra),
+    );
+  }
+  assert.equal(linked([{ title: "x", dashboard: "" }]).success, false);
+  assert.equal(linked([{ title: "x", dashboard: "d".repeat(129) }]).success, false);
+});
+
+test("a link value is exactly one of a literal, a column or the series", () => {
+  const value = (v: unknown) =>
+    linked([{ title: "x", dashboard: "d", set: { service: v } }]);
+  assert.ok(value({ value: "api" }).success);
+  assert.ok(value({ column: "service" }).success);
+  assert.ok(value({ series: true }).success);
+  for (const bad of [
+    { series: false },
+    { value: "" },
+    { value: "x".repeat(257) },
+    { column: "" },
+    { value: "api", column: "service" },
+    {},
+    "api",
+  ]) {
+    assert.equal(value(bad).success, false, JSON.stringify(bad));
+  }
+  // The key is a variable name.
+  assert.equal(
+    linked([{ title: "x", dashboard: "d", set: { "Not A Name": { value: "a" } } }])
+      .success,
+    false,
+  );
+});
+
+test("the limits: five links a panel, ten picks a link, 64-character titles", () => {
+  const link = (i: number) => ({ title: `L${i}`, dashboard: "d" });
+  assert.ok(linked(Array.from({ length: PANEL_LINKS_MAX }, (_, i) => link(i))).success);
+  assert.equal(
+    linked(Array.from({ length: PANEL_LINKS_MAX + 1 }, (_, i) => link(i))).success,
+    false,
+  );
+  assert.equal(linked([]).success, false);
+
+  const set = (n: number) =>
+    Object.fromEntries(Array.from({ length: n }, (_, i) => [`v${i}`, { value: "a" }]));
+  assert.ok(linked([{ title: "x", dashboard: "d", set: set(LINK_SET_MAX) }]).success);
+  const over = linked([{ title: "x", dashboard: "d", set: set(LINK_SET_MAX + 1) }]);
+  assert.match(messages(over), /at most 10 variables/);
+
+  assert.ok(linked([{ title: "t".repeat(64), dashboard: "d" }]).success);
+  assert.equal(linked([{ title: "t".repeat(65), dashboard: "d" }]).success, false);
+  assert.equal(linked([{ title: "", dashboard: "d" }]).success, false);
+});
+
+test("link titles are unique within a panel", () => {
+  const result = linked([
+    { title: "Detail", dashboard: "a" },
+    { title: "Detail", dashboard: "b" },
+  ]);
+  assert.match(messages(result), /duplicate link title "Detail"/);
+});
+
+test("a self link sets at least one variable, and only declared ones", () => {
+  assert.match(
+    messages(linked([{ title: "Nowhere" }])),
+    /stays on this dashboard, so it must "set" a variable/,
+  );
+  assert.match(
+    messages(linked([{ title: "Nowhere", set: {} }])),
+    /must "set" a variable/,
+  );
+  const undeclared = linked([{ title: "Host", set: { host: { column: "host" } } }]);
+  assert.match(
+    messages(undeclared),
+    /sets "host", which this dashboard does not declare/,
+  );
+  assert.deepEqual(undeclared.success ? [] : undeclared.error.issues.map((i) => i.path), [
+    ["panels", 0, "links", 0, "set", "host"],
+  ]);
+  // A link to another dashboard is not held to this one's variables.
+  assert.ok(
+    linked([{ title: "Host", dashboard: "d", set: { host: { column: "host" } } }])
+      .success,
+  );
+});
+
+test("generation is held to the same link rules", () => {
+  const { specVersion: _, ...generated } = withService;
+  const result = DashboardGenerationSchema.safeParse({
+    ...generated,
+    panels: [{ ...validPanel, links: [{ title: "Nowhere" }] }],
+  });
+  assert.equal(result.success, false);
+});
+
+test("a text panel takes no links, and says so by its kind", () => {
+  const text = {
+    id: "t",
+    title: "About",
+    viz: "text",
+    options: { content: "hello" },
+    layout: { x: 0, y: 0, w: 6, h: 2 },
+    links: [{ title: "x", dashboard: "d" }],
+  };
+  const result = Panel.safeParse(text);
+  assert.equal(result.success, false);
+  assert.match(
+    result.success ? "" : result.error.issues.map((i) => i.message).join(),
+    /a text panel runs no query; remove "links"/,
+  );
+});
+
+test("an explored panel offers no links", () => {
+  assert.ok(ExplorePanel.safeParse(validPanel).success);
+  assert.equal(
+    ExplorePanel.safeParse({ ...validPanel, links: [{ title: "x", dashboard: "d" }] })
+      .success,
+    false,
+  );
+});
+
+test("isDatumLink, isSelfLink and linkCarries", () => {
+  const link = (l: Partial<PanelLink>): PanelLink => ({ title: "x", ...l });
+  assert.equal(isDatumLink(link({ dashboard: "d" })), false);
+  assert.equal(isDatumLink(link({ set: { a: { value: "v" } } })), false);
+  assert.equal(
+    isDatumLink(link({ set: { a: { value: "v" }, b: { column: "c" } } })),
+    true,
+  );
+  assert.equal(isDatumLink(link({ set: { a: { series: true } } })), true);
+  assert.equal(isSelfLink(link({})), true);
+  assert.equal(isSelfLink(link({ dashboard: "d" })), false);
+  assert.deepEqual(linkCarries(link({})), { timeRange: true, variables: true });
+  assert.deepEqual(linkCarries(link({ carry: { variables: false } })), {
+    timeRange: true,
+    variables: false,
+  });
 });

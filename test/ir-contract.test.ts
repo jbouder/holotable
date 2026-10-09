@@ -6,6 +6,8 @@ import {
   Dashboard,
   declaredVariables,
   hasQuery,
+  isDatumLink,
+  isSelfLink,
   PanelQuery,
   type QueryPanel,
   SPEC_VERSION,
@@ -292,6 +294,28 @@ test("the library covers every panel kind and the shapes a spec can take", () =>
         authoredVersion(l.raw) === 1 &&
         (l.raw as { specVersion?: unknown }).specVersion === undefined,
     ),
+  );
+  const links = panels.flatMap((p) => p.links ?? []);
+  has(
+    "a panel link",
+    links.some((l) => !isDatumLink(l) && !isSelfLink(l)),
+  );
+  has(
+    "a datum link reading a column",
+    links.some((l) => Object.values(l.set ?? {}).some((v) => "column" in v)),
+  );
+  has(
+    "a datum link reading the series",
+    links.some((l) => Object.values(l.set ?? {}).some((v) => "series" in v)),
+  );
+  has("a self link", links.some(isSelfLink));
+  has(
+    "a link that carries nothing along",
+    links.some((l) => l.carry?.timeRange === false && l.carry?.variables === false),
+  );
+  has(
+    "a link that opens a new tab",
+    links.some((l) => l.newTab === true),
   );
   has(
     "a non-ASCII title",

@@ -38,5 +38,10 @@
     "authoredAt": 1,
     "digest": "0c62254466dc58c200feaeb8d54e3d4f9644602d6141b9e6353c3a1185986606",
     "origin": "hand-written (#90): the most panels and variables, the longest SQL, the longest title, ids and descriptions, unicode titles, an absolute time range"
+  },
+  "v1-links.json": {
+    "authoredAt": 1,
+    "digest": "1c77890ac5a5311b78b00f93996b5f48924fa2d4760ff3dbbe1afecd60202627",
+    "origin": "hand-written (#371): every panel link form — panel links (no set, literals only, carry false, newTab), datum links by column and by series, self links, a literal beside a datum pick"
   }
 }
