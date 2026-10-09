@@ -1,0 +1,138 @@
+---
+/**
+ * A segmented light / dark / system switch in place of Starlight's select.
+ * It keeps Starlight's storage contract (`starlight-theme` in localStorage,
+ * empty for system) and `data-theme` on <html>, which ThemeProvider's inline
+ * script sets before first paint, so there is no flash.
+ */
+import { Icon } from "@astrojs/starlight/components";
+
+const options = [
+  { value: "light", label: "Light", icon: "sun" },
+  { value: "dark", label: "Dark", icon: "moon" },
+  { value: "auto", label: "System", icon: "laptop" },
+] as const;
+---
+
+<holotable-theme-switch>
+  <div class="switch" role="radiogroup" aria-label={Astro.locals.t("themeSelect.accessibleLabel")}>
+    {
+      options.map(({ value, label, icon }) => (
+        <button type="button" role="radio" aria-checked="false" data-theme-value={value} title={label}>
+          <Icon name={icon} size="1rem" />
+          <span class="sr-only">{label}</span>
+        </button>
+      ))
+    }
+  </div>
+</holotable-theme-switch>
+
+<script>
+  type Theme = "auto" | "dark" | "light";
+  const storageKey = "starlight-theme";
+
+  const parseTheme = (theme: unknown): Theme =>
+    theme === "dark" || theme === "light" ? theme : "auto";
+
+  function loadTheme(): Theme {
+    try {
+      return parseTheme(localStorage.getItem(storageKey));
+    } catch {
+      return "auto";
+    }
+  }
+
+  const systemTheme = (): "dark" | "light" =>
+    matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark";
+
+  function apply(theme: Theme): void {
+    document.documentElement.dataset.theme = theme === "auto" ? systemTheme() : theme;
+    for (const button of document.querySelectorAll<HTMLButtonElement>(
+      "holotable-theme-switch [data-theme-value]",
+    )) {
+      const on = button.dataset.themeValue === theme;
+      button.setAttribute("aria-checked", String(on));
+      button.tabIndex = on ? 0 : -1;
+    }
+  }
+
+  function choose(theme: Theme): void {
+    try {
+      localStorage.setItem(storageKey, theme === "auto" ? "" : theme);
+    } catch {}
+    apply(theme);
+  }
+
+  matchMedia("(prefers-color-scheme: light)").addEventListener("change", () => {
+    if (loadTheme() === "auto") apply("auto");
+  });
+
+  class HolotableThemeSwitch extends HTMLElement {
+    connectedCallback() {
+      apply(loadTheme());
+      const buttons = [...this.querySelectorAll<HTMLButtonElement>("[data-theme-value]")];
+      for (const button of buttons) {
+        button.addEventListener("click", () => choose(parseTheme(button.dataset.themeValue)));
+      }
+      // Radio-group arrow keys: move and select, wrapping at the ends.
+      this.addEventListener("keydown", (event) => {
+        const step = { ArrowRight: 1, ArrowDown: 1, ArrowLeft: -1, ArrowUp: -1 }[event.key];
+        if (!step) return;
+        event.preventDefault();
+        const current = buttons.findIndex((b) => b.getAttribute("aria-checked") === "true");
+        const next = buttons[(current + step + buttons.length) % buttons.length];
+        choose(parseTheme(next.dataset.themeValue));
+        next.focus();
+      });
+    }
+  }
+  customElements.define("holotable-theme-switch", HolotableThemeSwitch);
+</script>
+
+<style>
+  .switch {
+    display: inline-flex;
+    gap: 0.125rem;
+    padding: 0.1875rem;
+    border: 1px solid var(--sl-color-gray-5);
+    border-radius: 999px;
+    background-color: var(--sl-color-black);
+  }
+
+  button {
+    display: grid;
+    place-items: center;
+    width: 1.75rem;
+    height: 1.75rem;
+    padding: 0;
+    border: 0;
+    border-radius: 999px;
+    background: transparent;
+    color: var(--sl-color-gray-3);
+    cursor: pointer;
+    transition:
+      background-color 150ms ease,
+      color 150ms ease;
+  }
+
+  button:hover {
+    color: var(--sl-color-white);
+  }
+
+  button[aria-checked="true"] {
+    background-color: var(--sl-color-gray-6);
+    color: var(--sl-color-text-accent);
+    box-shadow: inset 0 0 0 1px var(--sl-color-gray-5);
+  }
+
+  button:focus-visible {
+    outline: 2px solid var(--sl-color-text-accent);
+    outline-offset: 1px;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    button {
+      transition: none;
+    }
+  }
+</style>

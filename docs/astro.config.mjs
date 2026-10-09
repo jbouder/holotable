@@ -32,6 +32,20 @@ export default defineConfig({
         baseUrl: "https://github.com/jbouder/holotable/edit/main/docs/",
       },
       lastUpdated: true,
+      customCss: ["./src/styles/custom.css"],
+      // The app's header mark (lucide LayoutDashboard in --primary), beside
+      // the title rather than replacing it, as the app's nav bar has it.
+      logo: {
+        light: "./src/assets/logo-light.svg",
+        dark: "./src/assets/logo-dark.svg",
+        alt: "",
+      },
+      favicon: "/favicon.svg",
+      components: {
+        Header: "./src/components/Header.astro",
+        ThemeSelect: "./src/components/ThemeSelect.astro",
+        SocialIcons: "./src/components/SocialIcons.astro",
+      },
       // Fails the build on a broken internal link or heading anchor, so a
       // renamed page cannot silently orphan a reference.
       plugins: [starlightLinksValidator({ errorOnRelativeLinks: false })],

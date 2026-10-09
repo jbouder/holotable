@@ -29,8 +29,12 @@ OIDC with group-based authorization · Server-Sent Events.
 
 ## The contract
 
-One shared Zod schema in `src/lib/ir.ts` is used by the model's output, the API
-layer, persistence, and the client. There is exactly one definition, so the
+That spec is the **IR**, short for *intermediate representation*: the format
+that sits between the prompt and the rendered dashboard, the way a compiler's
+IR sits between source and machine code. The rest of these docs call it the IR.
+
+One shared Zod schema in `src/lib/ir.ts` defines it, and it is used by the
+model's output, the API layer, persistence, and the client. There is exactly one definition, so the
 contract cannot drift. See [The shared IR](/concepts/the-shared-ir/).
 
 ## What it deliberately does not do

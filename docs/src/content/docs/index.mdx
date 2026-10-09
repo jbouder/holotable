@@ -2,10 +2,12 @@
 title: Holotable
 description: Natural-language monitoring dashboards. A language model authors a validated visualization spec; the server executes the guarded SQL.
 template: splash
+# Starlight titles a page "<title> | <site>", which reads "Holotable | Holotable" here.
+head:
+  - tag: title
+    content: Holotable — Dashboards from plain English
 hero:
   tagline: Describe the dashboard you want. A language model authors a validated spec — never the data — and Holotable executes the guarded SQL against TimescaleDB and streams the results live.
-  image:
-    file: ../../../public/images/dashboard-view.png
   actions:
     - text: Quick start
       link: /getting-started/quick-start/
@@ -16,28 +18,106 @@ hero:
       variant: minimal
 ---
 
-import { Card, CardGrid } from '@astrojs/starlight/components';
+import { Card, CardGrid, LinkCard } from '@astrojs/starlight/components';
+import { Image } from 'astro:assets';
+import dashboardView from '../../../public/images/dashboard-view.png';
 
-<CardGrid stagger>
-  <Card title="The model writes specs, not data" icon="pencil">
-    Generation is bound to a shared Zod schema, so the model emits a
-    visualization specification — SQL plus chart configuration. Real metric
-    values are only ever produced by the server executing guarded SQL.
-    [How it works](/concepts/how-it-works/)
+{/* Not hero.image: Starlight renders that as a 400×400 crop, which suits a
+    logo but cuts a wide screenshot down to an illegible square. */}
+<figure class="hero-screenshot">
+  <Image
+    src={dashboardView}
+    widths={[720, 1440, 2160, 2880]}
+    sizes="(min-width: 72rem) 68rem, 100vw"
+    loading="eager"
+    alt="A live Holotable dashboard: request rate and p95 latency charts, a 5xx error count and requests by route."
+  />
+</figure>
+
+## From a sentence to a live dashboard
+
+<ol class="home-steps">
+  <li>
+    <strong>Describe it</strong>
+    <span>“p95 latency by route for the last hour, red past 300 ms.”
+    Holotable reads your source's catalog, so the model writes against your
+    real tables and columns.</span>
+  </li>
+  <li>
+    <strong>Refine it</strong>
+    <span>Ask for changes in the same chat — “make the third one a bar chart” —
+    or edit any panel's SQL, layout and thresholds by hand. Every save is a
+    version you can diff and restore.</span>
+  </li>
+  <li>
+    <strong>Watch it live</strong>
+    <span>Panels stream fresh rows over one connection, each on its own
+    refresh cadence, with a shared time picker, variables and annotations
+    across the whole dashboard.</span>
+  </li>
+</ol>
+
+## Everything a monitoring team needs
+
+<CardGrid>
+  <Card title="Nine panel kinds" icon="seti:pipeline">
+    Time series, stats, gauges, tables, heatmaps, state timelines, pie and
+    scatter charts, plus Markdown text — with units, thresholds and legends.
+    [Visualization types](/reference/visualization-types/)
   </Card>
-  <Card title="All model SQL is untrusted" icon="approve-check">
-    SELECT-only, single statement, catalog allowlist, no comments, no
-    time or non-deterministic functions — re-validated on every save and every
-    execution. [Invariants](/architecture/invariants/)
+  <Card title="Variables and annotations" icon="list-format">
+    One dashboard, every environment: `:service` and `:region` pickers that
+    drive every panel, and deploys and incidents drawn right on the charts.
+    [Variables](/concepts/variables/)
   </Card>
-  <Card title="The server owns time" icon="setting">
-    The IR carries relative expressions like `now-15m`, but the server resolves
-    them and injects the bounds as bound parameters. The model cannot choose
-    the window or the row limit. [Executing a panel](/concepts/executing-a-panel/)
+  <Card title="Share and embed" icon="external">
+    Hand a read-only link to someone without an account, or embed a live
+    dashboard in a wiki or status page. Revoke it in one click.
+    [Share links](/operations/share-links/)
   </Card>
-  <Card title="Panels carry only an opaque id" icon="seti:lock">
-    No host, port, database, or credential ever lives in a spec. The registry
-    owns the connection config and a `secret_ref` resolved from the server
-    environment. [Secret references](/operations/secret-references/)
+  <Card title="Works with your agent" icon="rocket">
+    An MCP server lets Claude Code and Claude Desktop generate, inspect and
+    query dashboards with the same guardrails as the app.
+    [MCP server](/operations/mcp/)
+  </Card>
+  <Card title="Your model, your key" icon="setting">
+    Point it at any OpenAI-compatible endpoint — hosted or local — per
+    workspace or per person, and teach it your team's glossary and metrics.
+    [AI provider](/operations/ai-provider/)
+  </Card>
+  <Card title="Runs where you do" icon="laptop">
+    One `docker run` to try it, Docker Compose to integrate, and a Helm chart
+    for Kubernetes, with Keycloak SSO and per-workspace roles.
+    [Kubernetes](/operations/kubernetes/)
   </Card>
 </CardGrid>
+
+## Safe by construction
+
+The model writes a **spec**, never the data. Every query it proposes is parsed
+and checked — SELECT-only, catalog allowlist, server-owned time window, row
+limits, and per-viewer row filters — before it runs, and again on every save.
+Connection details and credentials never leave the server.
+
+<CardGrid>
+  <LinkCard
+    title="The invariants"
+    description="The four rules every change to Holotable preserves."
+    href="/architecture/invariants/"
+  />
+  <LinkCard
+    title="How a panel executes"
+    description="From a stored spec to guarded, parameterized SQL."
+    href="/concepts/executing-a-panel/"
+  />
+</CardGrid>
+
+## Try it in one command
+
+```sh
+docker run -p 3000:3000 ghcr.io/jbouder/holotable:quickstart
+```
+
+Open `http://localhost:3000`: a demo database, live sample
+metrics and a ready-made dashboard, with no account to create.
+[Quick start](/getting-started/quick-start/)
