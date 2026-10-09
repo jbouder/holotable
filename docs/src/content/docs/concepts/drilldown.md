@@ -12,10 +12,10 @@ variable picks go along, so landing on the host dashboard from the fleet
 overview keeps the window they were looking at.
 
 Drilldown is being built in phases under
-[#370](https://github.com/jbouder/holotable/issues/370). Today a panel's links
-are followed from its menu. Clicking a point, slice, cell or row to follow a
-link that reads it comes with
-[#373](https://github.com/jbouder/holotable/issues/373).
+[#370](https://github.com/jbouder/holotable/issues/370). A link that only
+carries the view is followed from the panel's menu. A link that reads what was
+clicked is followed by clicking a point, slice, cell or row
+([#373](https://github.com/jbouder/holotable/issues/373)).
 
 ## What a link is
 
@@ -52,6 +52,34 @@ header, and each link is an item in the panel's ⋯ menu:
   navigate.
 - **A link the viewer cannot follow** is a disabled item that says the
   dashboard is not available. The page holds no href for it.
+
+## Clicking a datum
+
+A link whose `set` reads a `column` (`{ "column": "host" }`) or the series
+(`{ "series": true }`) is a **datum link**. It needs to know what was clicked,
+so it is not in the panel's menu. Instead the panel's data is clickable:
+
+- **A chart.** Click a point, bar, slice, cell, span or gauge. With one link,
+  the click follows it. With several, a small list opens at the point, and
+  Escape or a click outside closes it. A click that ends a time brush never
+  follows a link.
+- **A table.** Each row has a link control in a trailing cell; the row itself
+  stays text to read and copy.
+- **A stat.** The whole number is the control.
+- **The keyboard.** Every chart has a visually hidden table of its rows. With
+  datum links, each row there has the same link control, and the table shows
+  itself over the chart while one has focus.
+
+A click is mapped back to the result row the panel already holds
+(`datumOf` in `src/lib/drilldown-datum.ts`, one mapping per panel kind). No
+query runs. A `column` pick reads that column of the row. A `series` pick reads
+the series: the column a line, area or bar point belongs to, a slice's label, a
+heatmap cell's y value, a timeline's lane or a gauge bar's label. A value the
+row does not have, or one longer than a pick may be, leaves that variable
+unset, and the target falls back to its default.
+
+A **self datum link** filters in place: clicking a host's slice sets `host` on
+this dashboard, the picker and the URL follow, and the picker puts it back.
 
 ## Who decides where a link may lead
 

@@ -3,6 +3,10 @@ import assert from "node:assert/strict";
 import type { MenuLinkItem } from "@/lib/drilldown";
 import type { Panel } from "@/lib/ir";
 import { PanelView } from "@/components/dashboard/PanelView";
+import {
+  AppRouterContext,
+  type AppRouterInstance,
+} from "next/dist/shared/lib/app-router-context.shared-runtime";
 import { mount } from "./support/dom";
 
 /**
@@ -89,4 +93,59 @@ test("a panel that leads somewhere says so in its header, except through a share
   assert.match(await text(usable), /Has links/);
   assert.doesNotMatch(await text(unavailable), /Has links/);
   assert.doesNotMatch(await text(usable, true), /Has links/);
+});
+
+/** The App Router a dashboard page provides; a following link pushes through it. */
+function WithRouter({ children }: { children: React.ReactNode }) {
+  const router = {
+    push: () => {},
+    replace: () => {},
+    refresh: () => {},
+    back: () => {},
+    forward: () => {},
+    prefetch: () => {},
+  } as unknown as AppRouterInstance;
+  return <AppRouterContext.Provider value={router}>{children}</AppRouterContext.Provider>;
+}
+
+test("a table row and a stat body offer their datum links (#373)", async () => {
+  const items = (datum: { row: Record<string, unknown> }) => [
+    {
+      kind: "navigate" as const,
+      title: "Detail",
+      href: `/dashboards/x?var-v=${String(datum.row.v)}`,
+      newTab: false,
+      target: "X",
+    },
+  ];
+  const h = await mount();
+  h.render(
+    <WithRouter>
+      <PanelView panel={panel()} state={STATE} datumLinks={items} />
+    </WithRouter>,
+  );
+  const rowLink = h.container.querySelector('a[aria-label$=": Detail"]');
+  assert.equal(rowLink?.getAttribute("href"), "/dashboards/x?var-v=1");
+  h.unmount();
+
+  const s = await mount();
+  s.render(
+    <WithRouter>
+      <PanelView
+        panel={panel({ viz: "stat" })}
+        state={{ ...STATE, data: { columns: ["v"], rows: [{ v: 7 }] } }}
+        datumLinks={items}
+      />
+    </WithRouter>,
+  );
+  const body = s.container.querySelector('a[aria-label="Errors: Detail"]');
+  assert.equal(body?.getAttribute("href"), "/dashboards/x?var-v=7");
+  assert.match(body?.textContent ?? "", /7/);
+  s.unmount();
+
+  // Through a share link nothing in the body is a link.
+  const e = await mount();
+  e.render(<PanelView panel={panel()} state={STATE} datumLinks={items} embedded />);
+  assert.equal(e.container.querySelector("a[aria-label]"), null);
+  e.unmount();
 });

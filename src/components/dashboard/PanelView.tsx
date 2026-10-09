@@ -2,8 +2,10 @@
 
 import * as React from "react";
 import { Clock, Info, Link2 } from "lucide-react";
-import { hasQuery, type Panel, type PanelLink, type TimeRange } from "@/lib/ir";
-import { hasUsableLinks, type MenuLinkItem } from "@/lib/drilldown";
+import { hasQuery, type Panel, type TimeRange } from "@/lib/ir";
+import { type Datum, hasUsableLinks, type MenuLinkItem } from "@/lib/drilldown";
+import type { Selection } from "@/lib/variable-selection";
+import { DatumLinksProvider } from "@/components/dashboard/DatumLinks";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ErrorDisplay } from "@/components/ui/error-display";
 import type { EChartHandle } from "@/components/charts/EChart";
@@ -68,7 +70,8 @@ export function PanelView({
   annotations,
   embedded = false,
   links,
-  onSelfLink,
+  datumLinks,
+  onPick,
 }: {
   panel: Panel;
   state?: PanelState;
@@ -104,8 +107,14 @@ export function PanelView({
    * draw links (a share link, the editor, Explore) passes none.
    */
   links?: MenuLinkItem[];
-  /** Follow a self link: set this dashboard's variables in place. */
-  onSelfLink?: (link: PanelLink) => void;
+  /**
+   * What a click on a point, slice, cell or row offers (#373), when the panel
+   * has datum links the viewer can follow. Absent: nothing in the body is a
+   * link, and a chart click does nothing.
+   */
+  datumLinks?: (datum: Datum) => MenuLinkItem[];
+  /** Set this dashboard's picks in place: what a self link does. */
+  onPick?: (picks: Selection) => void;
 }) {
   const data = state?.data ?? EMPTY;
   // A panel that runs no query (text, #202) has nothing to load or go stale.
@@ -180,7 +189,7 @@ export function PanelView({
               // A share link (#65) carries no SQL to show; a text panel has none.
               onShowSql={!embedded && queried ? () => setSqlOpen(true) : undefined}
               links={embedded ? undefined : links}
-              onSelfLink={embedded ? undefined : onSelfLink}
+              onPick={embedded ? undefined : onPick}
               onAskAbout={
                 askAbout && !embedded
                   ? () => {
@@ -194,17 +203,23 @@ export function PanelView({
           </div>
         </CardHeader>
         <CardContent className="flex-1 min-h-0">
-          <PanelBody
-            panel={panel}
-            data={data}
-            state={queried ? state : { data, status: "live" }}
-            onRetry={onRetry}
-            chartRef={chart}
-            crosshairGroup={crosshairGroup}
-            onSelectTimeRange={onSelectTimeRange}
-            window={window}
-            annotations={annotations}
-          />
+          <WithDatumLinks
+            datumLinks={embedded ? undefined : datumLinks}
+            onPick={onPick}
+            window={window ?? data.window}
+          >
+            <PanelBody
+              panel={panel}
+              data={data}
+              state={queried ? state : { data, status: "live" }}
+              onRetry={onRetry}
+              chartRef={chart}
+              crosshairGroup={crosshairGroup}
+              onSelectTimeRange={onSelectTimeRange}
+              window={window}
+              annotations={annotations}
+            />
+          </WithDatumLinks>
         </CardContent>
       </Card>
       {!embedded && (
@@ -304,6 +319,28 @@ function useExpanded() {
     },
   };
 }
+
+/** Provides the panel's datum links to its body (#373), when it has any. */
+function WithDatumLinks({
+  datumLinks,
+  onPick,
+  window,
+  children,
+}: {
+  datumLinks?: (datum: Datum) => MenuLinkItem[];
+  onPick?: (picks: Selection) => void;
+  window?: ChartContext["window"];
+  children: React.ReactNode;
+}) {
+  if (!datumLinks) return <>{children}</>;
+  return (
+    <DatumLinksProvider itemsFor={datumLinks} onPick={onPick ?? noPick} window={window}>
+      {children}
+    </DatumLinksProvider>
+  );
+}
+
+function noPick(): void {}
 
 /**
  * What the panel computes, on demand (#106).

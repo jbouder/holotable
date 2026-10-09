@@ -22,7 +22,7 @@ import {
 } from "@/lib/panel-export";
 import { resolveColor } from "@/lib/color/oklch";
 import type { MenuLinkItem } from "@/lib/drilldown";
-import type { PanelLink } from "@/lib/ir";
+import type { Selection } from "@/lib/variable-selection";
 
 /**
  * The per-panel overflow menu: enlarge it, see the SQL behind it, ask the
@@ -45,7 +45,7 @@ export function PanelActions({
   onShowSql,
   onAskAbout,
   links = [],
-  onSelfLink,
+  onPick,
 }: {
   panelTitle: string;
   dashboardTitle?: string;
@@ -69,7 +69,8 @@ export function PanelActions({
    * the viewer cannot reach. None on a share link.
    */
   links?: MenuLinkItem[];
-  onSelfLink?: (link: PanelLink) => void;
+  /** Set this dashboard's picks in place: what a self link does. */
+  onPick?: (picks: Selection) => void;
 }) {
   const hasRows = data.columns.length > 0 && data.rows.length > 0;
 
@@ -132,8 +133,8 @@ export function PanelActions({
         ) : item.kind === "self" ? (
           <MenuItem
             key={item.title}
-            onClick={onSelfLink ? () => onSelfLink(item.link) : undefined}
-            disabled={!onSelfLink}
+            onClick={onPick ? () => onPick(item.picks) : undefined}
+            disabled={!onPick}
           >
             <ArrowUpRight className="h-4 w-4" /> {item.title}
           </MenuItem>
