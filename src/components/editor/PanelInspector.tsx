@@ -30,6 +30,7 @@ import {
   PanelTimingFields,
 } from "@/components/editor/panel-settings";
 import { InspectorSection } from "@/components/editor/InspectorSection";
+import { LinksEditor } from "@/components/editor/links-editor";
 
 export interface SourceOption {
   id: string;
@@ -76,6 +77,7 @@ export function PanelInspector({
   onDuplicate,
   onSaveAsTemplate,
   onDelete,
+  links,
 }: {
   panel: Panel;
   sources: SourceOption[];
@@ -95,6 +97,17 @@ export function PanelInspector({
   onDuplicate: () => void;
   onSaveAsTemplate: () => void;
   onDelete: () => void;
+  /**
+   * What the Links section needs (#374): the workspace its targets are
+   * listed from, this dashboard, its own variables and the columns this
+   * panel's last preview returned.
+   */
+  links: {
+    workspaceId: string;
+    dashboardId: string;
+    ownVariables: string[];
+    resultColumns: string[];
+  };
 }) {
   const kind = panelKind(panel.viz);
   // A removed source is still what the panel names, so it stays in the list
@@ -270,6 +283,13 @@ export function PanelInspector({
       {kind.query === "required" && (
         <InspectorSection title="Display">
           <PanelPresentationFields panel={panel} onChange={onChange} />
+        </InspectorSection>
+      )}
+
+      {/* Links are not options, and a panel that runs no query takes none. */}
+      {kind.query === "required" && (
+        <InspectorSection title="Links" defaultOpen={(panel.links?.length ?? 0) > 0}>
+          <LinksEditor panel={panel} onChange={onChange} {...links} />
         </InspectorSection>
       )}
     </div>
