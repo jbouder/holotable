@@ -1,0 +1,180 @@
+{
+  "format": "holotable.dashboard",
+  "formatVersion": 1,
+  "spec": {
+    "specVersion": 1,
+    "title": "Fleet (Prometheus)",
+    "timeRange": { "from": "now-1h", "to": "now" },
+    "refreshIntervalMs": 30000,
+    "variables": [
+      {
+        "name": "instance",
+        "label": "Instances",
+        "type": "query",
+        "query": {
+          "sourceId": "prom-fleet",
+          "label": "instance",
+          "match": "up{job=\"node\"}"
+        },
+        "multi": true
+      }
+    ],
+    "panels": [
+      {
+        "id": "about",
+        "title": "About this dashboard",
+        "viz": "text",
+        "options": {
+          "content": "Request traffic, errors and latency for the API, and memory on the nodes picked above. Click an instance's line to filter to it."
+        },
+        "layout": { "x": 0, "y": 0, "w": 12, "h": 2 }
+      },
+      {
+        "id": "rps",
+        "title": "Requests per second",
+        "description": "Requests served per second, across the picked instances.",
+        "viz": "stat",
+        "format": "number",
+        "options": { "decimals": 1, "unit": "/s" },
+        "query": {
+          "sourceId": "prom-fleet",
+          "promql": "sum(rate(http_requests_total{instance=~\":instance\"}[5m]))",
+          "instant": true
+        },
+        "layout": { "x": 0, "y": 2, "w": 4, "h": 3 }
+      },
+      {
+        "id": "errors",
+        "title": "5xx share",
+        "description": "The share of requests answered with a 5xx, in percent.",
+        "viz": "stat",
+        "format": "percent",
+        "options": {
+          "thresholds": [
+            { "value": 1, "color": "warning" },
+            { "value": 5, "color": "danger" }
+          ]
+        },
+        "query": {
+          "sourceId": "prom-fleet",
+          "promql": "100 * sum(rate(http_requests_total{code=~\"5..\", instance=~\":instance\"}[5m])) / sum(rate(http_requests_total{instance=~\":instance\"}[5m]))",
+          "instant": true
+        },
+        "layout": { "x": 4, "y": 2, "w": 4, "h": 3 }
+      },
+      {
+        "id": "memory",
+        "title": "Memory used",
+        "description": "Memory in use on each picked node, against its total.",
+        "viz": "gauge",
+        "format": "percent",
+        "options": {
+          "variant": "bar",
+          "min": 0,
+          "max": 100,
+          "thresholds": [
+            { "value": 80, "color": "warning" },
+            { "value": 95, "color": "danger" }
+          ]
+        },
+        "query": {
+          "sourceId": "prom-fleet",
+          "promql": "100 * (1 - sum by (instance) (node_memory_MemAvailable_bytes{instance=~\":instance\"}) / sum by (instance) (node_memory_MemTotal_bytes{instance=~\":instance\"}))",
+          "instant": true
+        },
+        "layout": { "x": 8, "y": 2, "w": 4, "h": 3 }
+      },
+      {
+        "id": "latency",
+        "title": "p95 latency by instance",
+        "description": "The 95th percentile of request latency on each picked instance.",
+        "viz": "line",
+        "format": "ms",
+        "query": {
+          "sourceId": "prom-fleet",
+          "promql": "1000 * histogram_quantile(0.95, sum by (le, instance) (rate(http_request_duration_seconds_bucket{instance=~\":instance\"}[5m])))",
+          "minStep": "1m"
+        },
+        "links": [
+          {
+            "title": "Filter to this instance",
+            "set": { "instance": { "label": "instance" } }
+          }
+        ],
+        "layout": { "x": 0, "y": 5, "w": 6, "h": 4 }
+      },
+      {
+        "id": "traffic",
+        "title": "Traffic by route",
+        "description": "Requests per second, stacked by route.",
+        "viz": "area",
+        "format": "number",
+        "options": { "stacked": true, "unit": "/s" },
+        "query": {
+          "sourceId": "prom-fleet",
+          "promql": "sum by (route) (rate(http_requests_total{instance=~\":instance\"}[5m]))"
+        },
+        "layout": { "x": 6, "y": 5, "w": 6, "h": 4 }
+      },
+      {
+        "id": "codes",
+        "title": "Requests by status code, last hour",
+        "description": "How many requests each status code answered over the last hour.",
+        "viz": "bar",
+        "format": "number",
+        "query": {
+          "sourceId": "prom-fleet",
+          "promql": "sum by (code) (increase(http_requests_total{instance=~\":instance\"}[1h]))",
+          "instant": true
+        },
+        "layout": { "x": 0, "y": 9, "w": 4, "h": 4 }
+      },
+      {
+        "id": "routes",
+        "title": "Share of traffic by route",
+        "description": "Each route's share of the last hour's requests.",
+        "viz": "pie",
+        "options": { "legend": "right" },
+        "query": {
+          "sourceId": "prom-fleet",
+          "promql": "sum by (route) (increase(http_requests_total{instance=~\":instance\"}[1h]))",
+          "instant": true
+        },
+        "layout": { "x": 4, "y": 9, "w": 4, "h": 4 }
+      },
+      {
+        "id": "cpu-modes",
+        "title": "CPU time by mode",
+        "description": "Where the picked nodes' CPUs spend their time, other than idle.",
+        "viz": "donut",
+        "options": { "legend": "right" },
+        "query": {
+          "sourceId": "prom-fleet",
+          "promql": "sum by (mode) (rate(node_cpu_seconds_total{instance=~\":instance\", mode!=\"idle\"}[5m]))",
+          "instant": true
+        },
+        "layout": { "x": 8, "y": 9, "w": 4, "h": 4 }
+      },
+      {
+        "id": "targets",
+        "title": "Scrape targets",
+        "description": "Every target, and whether its last scrape succeeded (1) or not (0).",
+        "viz": "table",
+        "options": {
+          "columns": [
+            { "name": "job", "label": "Job" },
+            { "name": "instance", "label": "Instance" },
+            { "name": "value", "label": "Up" }
+          ],
+          "sort": { "column": "value", "order": "asc" }
+        },
+        "query": {
+          "sourceId": "prom-fleet",
+          "promql": "up",
+          "instant": true
+        },
+        "layout": { "x": 0, "y": 13, "w": 12, "h": 4 }
+      }
+    ]
+  }
+}

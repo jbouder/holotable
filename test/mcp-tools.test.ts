@@ -13,10 +13,13 @@ import { callTool, type McpTool } from "@/lib/mcp/tool";
 import { type McpDeps, MCP_INSTRUCTIONS, mcpTools } from "@/lib/mcp/tools";
 import { MAX_TOOL_ROWS } from "@/lib/mcp/tools/sql";
 import {
+  type SourceRecord,
   type SqlSourceConfig,
   type SqlSourceRecord,
   TimescaleDbConfig,
 } from "@/lib/registry";
+import { PrometheusConfig } from "@/lib/sources/kinds/prometheus";
+import type { PromqlPlan } from "@/lib/promql/plan";
 import type { ExecutablePlan } from "@/lib/sql/safety";
 
 /**
@@ -66,6 +69,34 @@ function makeSource(
 }
 
 const app = makeSource("src-app");
+/** A Prometheus source in the same workspace (#389). */
+const prom = {
+  id: "src-prom",
+  workspaceId: "ws-1",
+  name: "Prom",
+  kind: "prometheus",
+  config: PrometheusConfig.parse({
+    kind: "prometheus",
+    url: "https://prometheus.internal:9090",
+    auth: "bearer",
+    metrics: [
+      { name: "up", type: "gauge", labels: ["instance", "job"] },
+      {
+        name: "http_requests_total",
+        type: "counter",
+        help: "Requests served.",
+        labels: ["code", "instance", "job"],
+      },
+    ],
+  }),
+  secretRef: "PROM_TOKEN",
+  catalogRefreshedAt: new Date().toISOString(),
+  catalogMissingTables: [],
+  createdBy: "user-1",
+  createdAt: "2026-01-01T00:00:00.000Z",
+  updatedAt: "2026-01-01T00:00:00.000Z",
+  tombstonedAt: null,
+} as unknown as SourceRecord;
 const other = makeSource("src-other", "ws-2");
 const removed = makeSource("src-gone", "ws-1", {
   tombstonedAt: "2026-02-01T00:00:00.000Z",
@@ -141,6 +172,8 @@ function stream(
 
 interface Calls {
   executed: ExecutablePlan[];
+  /** PromQL plans the executor got (#389). */
+  promql: PromqlPlan[];
   created: unknown[];
   saved: unknown[];
   invalidated: string[];
@@ -156,6 +189,7 @@ function fakeDeps(
 ): { deps: McpDeps; calls: Calls } {
   const calls: Calls = {
     executed: [],
+    promql: [],
     created: [],
     saved: [],
     invalidated: [],
@@ -164,7 +198,7 @@ function fakeDeps(
     generations: [],
     starts: [],
   };
-  const sources = [app, other, removed];
+  const sources: SourceRecord[] = [app, prom, other, removed];
   const rows = Array.from({ length: MAX_TOOL_ROWS + 50 }, (_, i) => ({
     ts: `2026-01-01T00:${String(i % 60).padStart(2, "0")}:00Z`,
     value: i,
@@ -179,6 +213,13 @@ function fakeDeps(
     listSources: async (workspaceId) =>
       sources.filter((s) => s.workspaceId === workspaceId && !s.tombstonedAt),
     executePlan: async (_source, plan) => {
+      if (plan.language === "promql") {
+        calls.promql.push(plan.plan);
+        return {
+          columns: ["time", '{job="api"}'],
+          rows: [{ time: "2026-01-01T00:00:00Z", '{job="api"}': 1.5 }],
+        };
+      }
       calls.executed.push(sqlPlanOf(plan));
       return { columns: ["ts", "value"], rows };
     },
@@ -306,13 +347,26 @@ test("list_sources shows the caller's workspaces, and never a connection detail"
         workspaceId: "ws-1",
         name: "Source src-app",
         kind: "timescaledb",
+        language: "sql",
         schema: "metrics",
         tableCount: 1,
         catalog: "ok",
       },
+      {
+        id: "src-prom",
+        workspaceId: "ws-1",
+        name: "Prom",
+        kind: "prometheus",
+        language: "promql",
+        metricCount: 2,
+        catalog: "ok",
+      },
     ],
   });
-  assert.doesNotMatch(mine.text, /db\.internal|TS_SECRET_REF|5432/);
+  assert.doesNotMatch(
+    mine.text,
+    /db\.internal|TS_SECRET_REF|5432|prometheus\.internal|PROM_TOKEN|bearer/,
+  );
 
   const none = await call(tools, "list_sources", {}, parseGroups("nobody", []));
   assert.deepEqual(none.data, { sources: [] });
@@ -713,4 +767,152 @@ test("generate_dashboard tells the model which dashboards a link may lead to (#3
   assert.deepEqual(seen, [
     { dashboards: [{ id: DASH, title: "Host detail", variables: ["host"] }] },
   ]);
+});
+
+/* -------------------------------------------------------------------------- */
+/* PromQL (#389)                                                              */
+/* -------------------------------------------------------------------------- */
+
+test("describe_source on a Prometheus source is its metrics and labels, never its URL or auth", async () => {
+  const tools = mcpTools(fakeDeps().deps);
+  const described = await call(
+    tools,
+    "describe_source",
+    { sourceId: "src-prom" },
+    viewer,
+  );
+  assert.ok(described.ok, described.text);
+  assert.equal(described.data.kind, "prometheus");
+  assert.equal(described.data.language, "promql");
+  const metrics = described.data.metrics as {
+    name: string;
+    type: string;
+    labels: string[];
+  }[];
+  assert.deepEqual(
+    metrics.map((m) => [m.name, m.type, m.labels]),
+    [
+      ["up", "gauge", ["instance", "job"]],
+      ["http_requests_total", "counter", ["code", "instance", "job"]],
+    ],
+  );
+  assert.doesNotMatch(
+    described.text,
+    /prometheus\.internal|PROM_TOKEN|bearer|url|canManage/,
+  );
+});
+
+test("validate_sql takes PromQL for a Prometheus source, with the guard's hints", async () => {
+  const tools = mcpTools(fakeDeps().deps);
+  const ok = await call(tools, "validate_sql", {
+    sourceId: "src-prom",
+    promql: "sum(rate(http_requests_total[5m]))",
+  });
+  assert.deepEqual(ok.data, { ok: true });
+  const hinted = await call(tools, "validate_sql", {
+    sourceId: "src-prom",
+    promql: "rate(up[5m])",
+  });
+  assert.equal(hinted.data.ok, true);
+  assert.match(String((hinted.data.hints as string[])[0]), /a gauge/);
+  const refused = await call(tools, "validate_sql", {
+    sourceId: "src-prom",
+    promql: "secret_metric",
+  });
+  assert.equal(refused.data.ok, false);
+  // The wrong language for the source is refused by name.
+  const wrong = await call(tools, "validate_sql", {
+    sourceId: "src-prom",
+    sql: "SELECT 1",
+  });
+  assert.equal(wrong.data.ok, false);
+  assert.match(String(wrong.data.error), /answers PromQL; this query is SQL/);
+  const sqlSource = await call(tools, "validate_sql", {
+    sourceId: "src-app",
+    promql: "up",
+  });
+  assert.match(String(sqlSource.data.error), /answers SQL; this query is PromQL/);
+});
+
+test("exactly one language per call, and the options of the other are refused", async () => {
+  const tools = mcpTools(fakeDeps().deps);
+  const both = await call(tools, "validate_sql", {
+    sourceId: "src-prom",
+    sql: "SELECT 1",
+    promql: "up",
+  });
+  assert.equal(both.ok, false);
+  assert.match(both.text, /exactly one of sql and promql/);
+  const neither = await call(tools, "validate_sql", { sourceId: "src-prom" });
+  assert.equal(neither.ok, false);
+  const instantSql = await call(tools, "run_query", {
+    sourceId: "src-app",
+    sql: "SELECT 1",
+    instant: true,
+  });
+  assert.equal(instantSql.ok, false);
+  assert.match(instantSql.text, /for promql only/);
+  const timeFieldPromql = await call(tools, "run_query", {
+    sourceId: "src-prom",
+    promql: "up",
+    timeField: "ts",
+  });
+  assert.equal(timeFieldPromql.ok, false);
+  assert.match(timeFieldPromql.text, /timeField is for sql only/);
+});
+
+test("run_query runs PromQL through the plan the server builds, and audits the expression", async () => {
+  const { deps, calls } = fakeDeps();
+  const tools = mcpTools(deps);
+  const ran = await call(tools, "run_query", {
+    sourceId: "src-prom",
+    promql: "sum by (job) (rate(http_requests_total[5m]))",
+    timeRange: { from: "now-1h", to: "now" },
+    minStep: "1m",
+  });
+  assert.ok(ran.ok, ran.text);
+  assert.deepEqual(ran.data.columns, ["time", '{job="api"}']);
+  assert.equal(calls.promql.length, 1);
+  const plan = calls.promql[0];
+  assert.equal(plan.instant, false);
+  assert.ok(!plan.instant && plan.stepSeconds >= 60);
+  assert.equal(calls.executed.length, 0);
+
+  const instant = await call(tools, "run_query", {
+    sourceId: "src-prom",
+    promql: "sum(up)",
+    instant: true,
+  });
+  assert.ok(instant.ok, instant.text);
+  assert.equal(calls.promql[1].instant, true);
+});
+
+test("generate_source drafts the kind it is asked for, and refuses a draft of the other", async () => {
+  const promDraft = {
+    id: "prom",
+    name: "Prom",
+    config: {
+      kind: "prometheus",
+      url: "https://prometheus.example.com",
+      auth: "none",
+      metrics: [{ name: "up", type: "gauge", labels: ["job"] }],
+    },
+  };
+  const { deps } = fakeDeps({}, [{ object: promDraft }, { object: promDraft }]);
+  const tools = mcpTools(deps);
+  const drafted = await call(
+    tools,
+    "generate_source",
+    { workspaceId: "ws-1", prompt: "our Prometheus", kind: "prometheus" },
+    admin,
+  );
+  assert.ok(drafted.ok, drafted.text);
+  const other = await call(
+    tools,
+    "generate_source",
+    { workspaceId: "ws-1", prompt: "our database", kind: "timescaledb" },
+    admin,
+  );
+  assert.equal(other.ok, false);
+  assert.match(other.text, /drafted a Prometheus source, not a TimescaleDB one/);
 });

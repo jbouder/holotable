@@ -15,7 +15,10 @@ import {
   SqlQuery,
   PromqlQuery,
   LabelValuesQuery,
+  isSqlQuery,
 } from "@/lib/ir";
+import { validatePromql, validatePromqlLabelValues } from "@/lib/promql/safety";
+import { PrometheusMetric } from "@/lib/sources/kinds/prometheus";
 import { COLOR_TOKENS } from "@/lib/panels/colors";
 import { PANEL_KIND_NAMES, PANEL_KINDS } from "@/lib/panels/registry";
 import { CatalogTable, type SqlSourceConfig, TimescaleDbConfig } from "@/lib/registry";
@@ -59,8 +62,30 @@ function exampleSource(): { sourceId: string; config: SqlSourceConfig } {
   return { sourceId: catalog.sourceId, config };
 }
 
+/** The example Prometheus catalog (#389), as the PromQL guard reads it. */
+function prometheusSource(): {
+  sourceId: string;
+  catalog: { metrics: PrometheusMetric[] };
+} {
+  const catalog = readJson(join(EXAMPLES, "prometheus-catalog.json")) as {
+    sourceId: string;
+    metrics: unknown[];
+  };
+  return {
+    sourceId: catalog.sourceId,
+    catalog: { metrics: catalog.metrics.map((m) => PrometheusMetric.parse(m)) },
+  };
+}
+
+const NOT_DASHBOARDS = [
+  "catalog.json",
+  "prometheus-catalog.json",
+  "sql.json",
+  "promql.json",
+];
+
 const DASHBOARD_FILES = readdirSync(EXAMPLES).filter(
-  (f) => f.endsWith(".json") && !["catalog.json", "sql.json"].includes(f),
+  (f) => f.endsWith(".json") && !NOT_DASHBOARDS.includes(f),
 );
 
 test("there are example dashboards to check", () => {
@@ -76,9 +101,23 @@ for (const file of DASHBOARD_FILES) {
     );
     const { spec } = parsed.data;
     const { sourceId, config } = exampleSource();
+    const prom = prometheusSource();
     const declared = declaredVariables(spec);
 
     for (const panel of spec.panels.filter(hasQuery)) {
+      if (!isSqlQuery(panel.query)) {
+        // PromQL, against the Prometheus catalog: accepted, and with no hint,
+        // because an example should not teach what the guard warns about.
+        assert.equal(
+          panel.query.sourceId,
+          prom.sourceId,
+          `${file} ${panel.id}: sourceId`,
+        );
+        const check = validatePromql(queryText(panel.query), prom.catalog, declared);
+        assert.ok(check.ok, `${file} ${panel.id}: ${check.ok ? "" : check.error}`);
+        assert.deepEqual(check.hints ?? [], [], `${file} ${panel.id}: hints`);
+        continue;
+      }
       assert.equal(panel.query.sourceId, sourceId, `${file} ${panel.id}: sourceId`);
       const check = await checkSql(queryText(panel.query), config, declared);
       assert.ok(check.ok, `${file} ${panel.id}: ${check.error}`);
@@ -99,6 +138,14 @@ for (const file of DASHBOARD_FILES) {
     }
     for (const variable of spec.variables ?? []) {
       if (!variable.query) continue;
+      if ("label" in variable.query) {
+        const check = validatePromqlLabelValues(variable.query, prom.catalog);
+        assert.ok(
+          check.ok,
+          `${file} variable ${variable.name}: ${check.ok ? "" : check.error}`,
+        );
+        continue;
+      }
       // A variable's own query declares no variables and has no time filter.
       const check = await checkSql(queryText(variable.query), config);
       assert.ok(check.ok, `${file} variable ${variable.name}: ${check.error}`);
@@ -149,6 +196,77 @@ test("every rejected SQL example fails the guard, for the reason it gives", asyn
       check.error?.includes(ex.error),
       `${ex.rule}: expected an error containing "${ex.error}", got "${check.error}"`,
     );
+  }
+});
+
+interface PromqlExample {
+  rule: string;
+  promql: string;
+  variables?: string[];
+  error?: string;
+}
+
+const PROMQL = readJson(join(EXAMPLES, "promql.json")) as {
+  accepted: PromqlExample[];
+  rejected: PromqlExample[];
+};
+
+test("every accepted PromQL example passes the guard, with no hint (#389)", () => {
+  const { catalog } = prometheusSource();
+  for (const ex of PROMQL.accepted) {
+    const check = validatePromql(ex.promql, catalog, new Set(ex.variables ?? []));
+    assert.ok(check.ok, `${ex.rule}: ${check.ok ? "" : check.error}`);
+    assert.deepEqual(check.hints ?? [], [], `${ex.rule}: hints`);
+  }
+});
+
+/** What the guard says about each rejected PromQL example. */
+function promqlRejections(): string[] {
+  const { catalog } = prometheusSource();
+  return PROMQL.rejected.map((ex) => {
+    const check = validatePromql(ex.promql, catalog, new Set(ex.variables ?? []));
+    assert.equal(check.ok, false, `${ex.rule}: accepted ${ex.promql}`);
+    assert.ok(ex.error, `${ex.rule}: name the expected error`);
+    const error = check.ok ? "" : (check.error ?? "");
+    assert.ok(
+      error.includes(ex.error),
+      `${ex.rule}: expected an error containing "${ex.error}", got "${error}"`,
+    );
+    return error;
+  });
+}
+
+test("every rejected PromQL example fails the guard, for the reason it gives", () => {
+  promqlRejections();
+});
+
+test("every error in the PromQL rules table is one the guard gives for an example", () => {
+  const errors = promqlRejections();
+  const rows = read("references/promql-rules.md")
+    .split("\n")
+    .filter((l) => l.startsWith("| ") && !l.startsWith("| Rule"))
+    .map(
+      (l) =>
+        l
+          .split(" | ")
+          .at(-1)
+          ?.replace(/^`|` \|$/g, "") ?? "",
+    );
+  assert.ok(rows.length >= 10, rows.join("\n"));
+  for (const row of rows) {
+    assert.ok(
+      errors.some((e) => e.includes(row)),
+      `promql-rules.md says "${row}", which no rejected example in promql.json produces`,
+    );
+  }
+});
+
+test("each kind that runs a query says what it is with PromQL", () => {
+  const text = read("references/panel-kinds.md");
+  for (const kind of PANEL_KINDS) {
+    if (kind.query === "none") continue;
+    const section = text.split(`### \`${kind.kind}\``)[1]?.split("\n### ")[0] ?? "";
+    assert.match(section, /With PromQL:/, `${kind.kind}: add a "With PromQL:" line`);
   }
 });
 

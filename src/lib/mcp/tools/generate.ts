@@ -15,7 +15,13 @@ import {
   ExplorePanelAnyLanguage,
   fromGenerated,
 } from "@/lib/ir";
-import { ModelSourceDraft } from "@/lib/registry";
+import { ModelSourceDraft, SourceConfig } from "@/lib/registry";
+import {
+  SOURCE_KIND_NAMES,
+  type SourceKindName,
+  sameKind,
+  sourceKind,
+} from "@/lib/sources/registry";
 import type { LlmRoute } from "@/lib/limits/budget";
 import { log } from "@/lib/log";
 import { defineTool, type McpTool, type McpToolAnnotations } from "@/lib/mcp/tool";
@@ -314,9 +320,15 @@ export function generationTools(deps: McpDeps): McpTool[] {
       name: "generate_source",
       title: "Draft a data source",
       description:
-        "Ask the model to draft a data-source registration from a description: the safe connection config (host, port, database, schema) and a best-effort table catalog, naming one of the workspace's granted secret references for the credentials. Never credentials, never live data. The draft is registered, tested and its catalog refreshed in the app; no tool creates a source. Needs source-admin in the workspace.",
+        "Ask the model to draft a data-source registration from a description. For a timescaledb (SQL) source: the safe connection config (host, port, database, schema) and a best-effort table catalog. For a prometheus (PromQL) source: the endpoint URL, the auth mode and a best-effort metric catalog. Either names one of the workspace's granted secret references for the credentials when it needs one. Never credentials, never live data. The draft is registered, tested and its catalog refreshed or discovered in the app; no tool creates a source. Needs source-admin in the workspace.",
       input: z.object({
         workspaceId: z.string().min(1).max(128),
+        kind: z
+          .enum(SOURCE_KIND_NAMES as [SourceKindName, ...SourceKindName[]])
+          .optional()
+          .describe(
+            "The source's kind, when known: timescaledb or prometheus. Without it the model decides from the description.",
+          ),
         prompt: z
           .string()
           .min(1)
@@ -352,12 +364,22 @@ export function generationTools(deps: McpDeps): McpTool[] {
             deps.streamSourceDraft({
               prompt: args.prompt,
               grantedSecretRefs: grantedRefs(deps.secretRefGrants(), args.workspaceId),
+              ...(args.kind ? { kindLabel: sourceKind(args.kind).label } : {}),
               onFinish,
               model,
               repair,
             }),
         });
-        return { draft: ModelSourceDraft.parse(draft) };
+        const parsed = ModelSourceDraft.parse(draft);
+        // A draft of the other kind is not what was asked for.
+        const drafted = SourceConfig.parse(parsed.config).kind;
+        if (args.kind && !sameKind({ kind: drafted }, { kind: args.kind })) {
+          throw new HttpError(
+            422,
+            `the model drafted a ${sourceKind(drafted).label} source, not a ${sourceKind(args.kind).label} one; describe the source again`,
+          );
+        }
+        return { draft: parsed };
       },
     }),
   ];

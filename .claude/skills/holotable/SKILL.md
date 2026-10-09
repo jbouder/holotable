@@ -1,14 +1,16 @@
 ---
 name: holotable
-description: Write, review and fix Holotable dashboard and panel specs (the JSON IR) and their guarded SQL. Use when someone wants a Holotable dashboard or panel written from a description and a table catalog, asks why a spec or query is rejected, wants a spec reviewed or explained, or asks which panel kind, format, threshold or layout to use. Knowledge only; it never connects to a Holotable server.
+description: Write, review and fix Holotable dashboard and panel specs (the JSON IR) and their guarded SQL or PromQL. Use when someone wants a Holotable dashboard or panel written from a description and a table or metric catalog, asks why a spec or query is rejected, wants a spec reviewed or explained, or asks which panel kind, format, threshold or layout to use. Knowledge only; it never connects to a Holotable server.
 ---
 
 # Holotable specs
 
 Holotable renders live monitoring dashboards from a **spec**: a JSON document
 that says what to query and how to draw it, never the data. Specs are checked
-by a shared Zod schema (the IR, `src/lib/ir.ts`) and every query by a SQL guard
-(`src/lib/sql/safety.ts`). This skill writes specs that pass both on the first
+by a shared Zod schema (the IR, `src/lib/ir.ts`) and every query by its
+source's guard: SQL for a TimescaleDB/PostgreSQL source
+(`src/lib/sql/safety.ts`), PromQL for a Prometheus source
+(`src/lib/promql/safety.ts`). This skill writes specs that pass both on the first
 try and advises on making them readable.
 
 It is knowledge only. Do not call a Holotable server, sign in, or ask for a
@@ -23,31 +25,44 @@ repeat them.
   review.
 - `references/panel-kinds.md`: each `viz` kind, the result shape its query must
   return, and its `options`.
-- `references/sql-rules.md`: what the guard refuses and the exact error text;
-  how the server injects the time window. Load before writing SQL or
-  explaining a rejection.
+- `references/sql-rules.md`: what the SQL guard refuses and the exact error
+  text; how the server injects the time window. Load before writing SQL or
+  explaining a SQL rejection.
+- `references/promql-rules.md`: the same for PromQL: what is refused, the
+  hints, how the server picks `start`, `end` and `step`, `instant` and
+  `minStep`, variables as matcher values. Load before writing PromQL or
+  explaining a PromQL rejection.
 - `references/guidance.md`: which kind answers which question, measures,
   formats, thresholds, layout and naming.
-- `examples/`: `catalog.json` (a source catalog), `service-health.json` and
-  `per-host.json` (complete import files using every kind and variables),
-  `sql.json` (accepted and rejected statements per rule). All are tested
-  against the real schema and guard.
+- `examples/`: `catalog.json` (a SQL source catalog), `service-health.json`
+  and `per-host.json` (complete import files using every kind and variables),
+  `sql.json` (accepted and rejected statements per rule);
+  `prometheus-catalog.json` (a metric catalog), `fleet-prometheus.json` (a
+  complete PromQL import file with a label-values variable) and `promql.json`
+  (accepted and rejected expressions per rule). All are tested against the
+  real schema and guards.
 
 ## Write a spec from a description
 
-1. **Get the catalog.** You need the source's tables, columns and their types,
-   and its `sourceId`. Ask the person to paste or describe them (Holotable's
-   Data sources page lists each source's id and has a catalog browser showing
-   its tables and columns), or read them from a schema in the repository. Never
-   invent a table or column. If a column is marked `"exposed": false`, or the
-   person says it is hidden, do not use it.
+1. **Get the catalog.** First ask which kind the source is: a
+   TimescaleDB/PostgreSQL database (queries are SQL) or a Prometheus-compatible
+   endpoint (queries are PromQL). Then you need its `sourceId` and, for SQL,
+   its tables, columns and their types, or, for Prometheus, its metrics with
+   their type and labels. Ask the person to paste or describe them
+   (Holotable's Data sources page lists each source's id and kind and has a
+   catalog browser), or read them from a schema in the repository. Never
+   invent a table, column, metric or label. If a column is marked
+   `"exposed": false`, or the person says it is hidden, do not use it.
 2. **Plan the panels** with `references/guidance.md`: the questions the
    dashboard answers, one panel per question, the kind that answers each, and
    the top-row stats.
-3. **Write each query** to `references/sql-rules.md`: SELECT only; no time
-   filter; bucket and alias the time column and set `query.timeField` to the
-   alias for every time series; omit it otherwise; only catalog tables and
-   exposed columns.
+3. **Write each query** in the source's language. SQL, to
+   `references/sql-rules.md`: SELECT only; no time filter; bucket and alias the
+   time column and set `query.timeField` to the alias for every time series;
+   omit it otherwise; only catalog tables and exposed columns. PromQL, to
+   `references/promql-rules.md`: `query.promql`, never `sql` or `timeField`;
+   only listed metrics and labels; rate a counter; aggregate to the series you
+   want drawn; `"instant": true` for a stat, gauge, table or pie.
 4. **Assemble the file** in the import wrapper from `references/ir.md`, with
    `specVersion: 1`, unique panel ids, a one-sentence `description` per panel
    (intent, never values), and a layout with no overlaps on the 12-column
@@ -78,7 +93,8 @@ report, most serious first:
 
 ## Explain and fix a rejection
 
-Match the message to the table in `references/sql-rules.md` (for SQL) or to
+Match the message to the table in `references/sql-rules.md` (for SQL), in
+`references/promql-rules.md` (for PromQL), or to
 the field rules in `references/ir.md` (for the schema; messages read
 `path: problem`, such as `panels.2.options.thresholds.1.value: threshold steps
 must be in strictly ascending order of value`). Say which rule it is, why the
