@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { Clock, Info, Link2 } from "lucide-react";
-import { hasQuery, type Panel, type TimeRange } from "@/lib/ir";
+import { hasQuery, type Panel, type TimeRange, panelTimeField } from "@/lib/ir";
 import { type Datum, hasUsableLinks, type MenuLinkItem } from "@/lib/drilldown";
 import type { Selection } from "@/lib/variable-selection";
 import { DatumLinksProvider } from "@/components/dashboard/DatumLinks";
@@ -495,7 +495,7 @@ function PanelContent({
               // window alone rather than guessing at one.
               const range = brushedRange(
                 data.rows,
-                panel.query?.timeField,
+                panelTimeField(panel),
                 startIndex,
                 endIndex,
               );

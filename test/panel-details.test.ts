@@ -30,7 +30,9 @@ test("exposes the sql, source id, time field and description", () => {
 
 test("copies the sql verbatim", () => {
   const sql = "SELECT\n  ts,\n  avg(value) AS v\nFROM metrics\nGROUP BY 1";
-  assert.equal(panelDetails(panel({ query: { sourceId: "s", sql } }))?.sql, sql);
+  const details = panelDetails(panel({ query: { sourceId: "s", sql } }));
+  assert.ok(details && "sql" in details);
+  assert.equal(details.sql, sql);
 });
 
 test("omits an absent time field and description rather than inventing one", () => {

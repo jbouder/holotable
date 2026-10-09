@@ -59,6 +59,7 @@ test("the query request carries the source id, sql, time field and range — not
 
 test("the request omits an absent time field rather than inventing one", () => {
   const request = queryRequest({ sourceId: "s", sql: "SELECT 1 AS v" }, RANGE);
+  assert.ok("sql" in request);
   assert.equal(request.timeField, undefined);
   assert.deepEqual(Object.keys(request).sort(), [
     "sourceId",

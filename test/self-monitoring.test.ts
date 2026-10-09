@@ -1,3 +1,4 @@
+import { queryTimeField } from "@/lib/ir";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { test } from "node:test";
@@ -229,7 +230,7 @@ test("every panel builds an executable plan with the server's time range", () =>
   for (const panel of spec.panels) {
     const plan = buildExecutablePlan({
       sql: queryOf(panel).sql,
-      timeField: panel.query?.timeField,
+      timeField: panel.query ? queryTimeField(panel.query) : undefined,
       from: range.from,
       to: range.to,
       rowFilter: null,
@@ -237,7 +238,11 @@ test("every panel builds an executable plan with the server's time range", () =>
     assert.match(plan.sql, /LIMIT \d+$/);
     // A panel that declares a time field is filtered by the server, never by
     // the SQL: two bound parameters, and no time expression in the spec.
-    assert.equal(plan.params.length, panel.query?.timeField ? 2 : 0, panel.id);
+    assert.equal(
+      plan.params.length,
+      (panel.query ? queryTimeField(panel.query) : undefined) ? 2 : 0,
+      panel.id,
+    );
   }
 });
 

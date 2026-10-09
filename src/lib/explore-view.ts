@@ -1,4 +1,4 @@
-import { Panel, type QueryPanel, type VizType } from "@/lib/ir";
+import { Panel, type QueryPanel, type VizType, queryTimeField } from "@/lib/ir";
 
 /**
  * Redrawing an Explore result as another kind, without asking the model again.
@@ -52,7 +52,7 @@ function optionsOf(panel: QueryPanel): Options {
  * switchable kind the query can feed (line and area only with a time field).
  */
 export function viewChoices(panel: QueryPanel): VizType[] {
-  const timed = Boolean(panel.query.timeField);
+  const timed = Boolean(queryTimeField(panel.query));
   const views: VizType[] = EXPLORE_VIEWS.filter(
     (v) => timed || (v !== "line" && v !== "area"),
   );

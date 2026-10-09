@@ -1,3 +1,4 @@
+import { queryText } from "@/lib/ir";
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import type { Dashboard, Panel } from "@/lib/ir";
@@ -148,7 +149,10 @@ test("the spec is copied verbatim, down to the SQL text", () => {
   const original = spec({ panels: [panel({ query: { sourceId: "src-a", sql } })] });
   const file = buildDashboardExport({ spec: original, version: 1 }, AT);
   assert.deepEqual(file.spec, original);
-  assert.equal(file.spec.panels[0].query?.sql, sql);
+  assert.equal(
+    file.spec.panels[0].query ? queryText(file.spec.panels[0].query) : undefined,
+    sql,
+  );
 });
 
 /* -------------------------------------------------------------------------- */

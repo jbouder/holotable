@@ -15,7 +15,7 @@ import { rowScopeFor } from "@/lib/row-scope";
 import { defaultPanelExecutor, getPoller, type PollerEvent } from "@/lib/poller/registry";
 import { selectionFromParams } from "@/lib/variable-selection";
 import { checkedSelection, variableSourceIds } from "@/lib/variables";
-import { hasQuery, TimeRange } from "@/lib/ir";
+import { hasQuery, TimeRange, queryStatement } from "@/lib/ir";
 import {
   accessEndedFrame,
   drainFrame,
@@ -155,7 +155,7 @@ export const GET = route(
         queries: spec.panels.filter(hasQuery).map((p) => ({
           panelId: p.id,
           sourceId: p.query.sourceId,
-          sql: p.query.sql,
+          ...queryStatement(p.query),
         })),
       },
     });

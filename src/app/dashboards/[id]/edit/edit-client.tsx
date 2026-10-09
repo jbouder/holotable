@@ -23,6 +23,7 @@ import {
   Panel,
   panelTimeRange,
   safeParseDashboard,
+  isSqlQuery,
 } from "@/lib/ir";
 import { panelKind } from "@/lib/panels/registry";
 import { autoLayoutPanels } from "@/lib/layout";
@@ -407,7 +408,8 @@ export function EditDashboardClient({
       return;
     }
     const catalog = sources.find((s) => s.id === panel.query.sourceId)?.catalog ?? null;
-    if (isStarterSql(panel.query.sql, catalog)) deletePanel(id);
+    if (isSqlQuery(panel.query) && isStarterSql(panel.query.sql, catalog))
+      deletePanel(id);
     else setConfirmDelete(panel);
   }
 

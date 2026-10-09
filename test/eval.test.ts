@@ -1,3 +1,4 @@
+import { isSqlQuery } from "@/lib/ir";
 import assert from "node:assert/strict";
 import { readdirSync } from "node:fs";
 import { join } from "node:path";
@@ -59,8 +60,9 @@ test("a sound dashboard passes the hard checks", async () => {
 
 test("SQL the guard refuses fails the case, as a save would", async () => {
   const spec = good();
-  if (!spec.panels[0].query) throw new Error("fixture has no query");
-  spec.panels[0].query.sql = "SELECT * FROM pg_shadow";
+  const query = spec.panels[0].query;
+  if (!query || !isSqlQuery(query)) throw new Error("fixture has no SQL query");
+  query.sql = "SELECT * FROM pg_shadow";
   const failures = await grade(dashboardCase(), source, spec);
   assert.equal(failures.length, 1);
   assert.match(failures[0], /rejected on save/);
@@ -74,8 +76,9 @@ test("a panel naming another source fails", async () => {
 
 test("a timeField the query does not return fails", async () => {
   const spec = good();
-  if (!spec.panels[0].query) throw new Error("fixture has no query");
-  spec.panels[0].query.timeField = "ts";
+  const query = spec.panels[0].query;
+  if (!query || !isSqlQuery(query)) throw new Error("fixture has no SQL query");
+  query.timeField = "ts";
   const failures = await grade(dashboardCase(), source, spec);
   assert.match(failures.join("\n"), /does not return a column called "ts"/);
 });

@@ -1,3 +1,4 @@
+import { isSqlQuery, queryTimeField } from "@/lib/ir";
 import type { Panel } from "@/lib/ir";
 
 /**
@@ -8,20 +9,21 @@ import type { Panel } from "@/lib/ir";
  * reaching this shape may carry connection details or a `secret_ref`. Widening
  * it is a deliberate act, and `test/panel-details.test.ts` pins the field set.
  */
-export interface PanelDetails {
-  sql: string;
+export type PanelDetails = {
   sourceId: string;
   timeField?: string;
   description?: string;
-}
+} & ({ sql: string } | { promql: string });
 
 /** How a panel is computed, or null for one that computes nothing (#202). */
 export function panelDetails(panel: Panel): PanelDetails | null {
   if (!panel.query) return null;
+  // The statement under its language's name, each named rather than spread.
+  const query = panel.query;
   return {
-    sql: panel.query.sql,
-    sourceId: panel.query.sourceId,
-    timeField: panel.query.timeField,
+    ...(isSqlQuery(query) ? { sql: query.sql } : { promql: query.promql }),
+    sourceId: query.sourceId,
+    timeField: queryTimeField(query),
     description: panel.description,
   };
 }

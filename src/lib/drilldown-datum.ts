@@ -1,3 +1,4 @@
+import { panelTimeField } from "@/lib/ir";
 import { gaugeOptions, gaugeReadings } from "@/components/charts/gauge";
 import {
   asInstant,
@@ -64,7 +65,7 @@ function seriesOfColumns(
 const byRowIndex: DatumMapper = (panel, data, click) => {
   const row = at(data.rows, click.dataIndex);
   if (!row) return null;
-  const x = panel.query?.timeField ?? data.columns[0];
+  const x = panelTimeField(panel) ?? data.columns[0];
   return { row, series: seriesOfColumns(data, click, x) };
 };
 
@@ -80,7 +81,7 @@ const scatterDatum: DatumMapper = (_panel, data, click) => {
 const sliceDatum: DatumMapper = (panel, data, click) => {
   const row = at(data.rows, click.dataIndex);
   if (!row) return null;
-  const x = panel.query?.timeField ?? data.columns[0] ?? "x";
+  const x = panelTimeField(panel) ?? data.columns[0] ?? "x";
   return { row, series: click.name ?? toText(row[x]) };
 };
 

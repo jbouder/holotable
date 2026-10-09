@@ -1,14 +1,15 @@
 import type { z } from "zod";
+import type { QueryLanguage } from "@/lib/ir";
 import type { SourceRecord } from "@/lib/registry";
 import type { SourceListing } from "@/lib/source-listing";
 import type { SourceCatalog } from "@/lib/sources/catalog";
 
 /**
- * The query language a panel against a source carries. A property of the
+ * The query language a panel against a source carries is a property of the
  * source's kind, never of the panel's: a time series and a table can be drawn
  * from either language, but a source can only answer one.
  */
-export type QueryLanguage = "sql";
+export type { QueryLanguage };
 
 /**
  * What a source kind declares about itself, in plain data and functions, for

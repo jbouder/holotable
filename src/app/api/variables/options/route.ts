@@ -3,7 +3,7 @@ import { assertAuthorized, HttpError, requireIdentity } from "@/lib/auth/authori
 import { audit } from "@/lib/audit";
 import { getSourceById } from "@/lib/db/repo";
 import { json, readJson, route } from "@/lib/http";
-import { Variable } from "@/lib/ir";
+import { Variable, queryStatement } from "@/lib/ir";
 import { rowFilterHttpError, rowScopeFor } from "@/lib/row-scope";
 import { VariableSelectionError } from "@/lib/variable-selection";
 import { variableOptions } from "@/lib/variables";
@@ -42,7 +42,11 @@ export const POST = route("variables.options", async (req: Request) => {
       workspaceId: source.workspaceId,
       resource: { type: "source", id: source.id },
       outcome,
-      detail: { via: "variable", variable: variable.name, sql: variable.query?.sql },
+      detail: {
+        via: "variable",
+        variable: variable.name,
+        ...(variable.query ? queryStatement(variable.query) : {}),
+      },
     });
   const scope = rowScopeFor(identity, [source]);
   try {

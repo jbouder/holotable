@@ -48,6 +48,7 @@ function PanelSqlBody({
 }) {
   // Never null: the dialog is only offered for a panel with a query.
   const details = panelDetails(panel) ?? { sql: "", sourceId: "" };
+  const statement = "sql" in details ? details.sql : details.promql;
   const [copied, setCopied] = React.useState(false);
   const [copyFailed, setCopyFailed] = React.useState(false);
 
@@ -61,7 +62,7 @@ function PanelSqlBody({
   // access itself can throw. Both failure modes land in the same notice.
   async function copy() {
     try {
-      await navigator.clipboard.writeText(details.sql);
+      await navigator.clipboard.writeText(statement);
       setCopyFailed(false);
       setCopied(true);
     } catch {
@@ -95,7 +96,7 @@ function PanelSqlBody({
           </Button>
         </div>
         <pre className="max-h-[50vh] overflow-auto whitespace-pre-wrap break-words px-3 py-3 font-mono text-xs leading-relaxed">
-          {details.sql}
+          {statement}
         </pre>
       </div>
 

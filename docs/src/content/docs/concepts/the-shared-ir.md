@@ -19,11 +19,18 @@ Panel = {
   title: string,
   description?: string,       // intent only, populated for ad-hoc exploration
   viz: VizType,               // see Reference → Visualization types
-  query?: {                   // absent exactly for a kind that runs none (text)
-    sourceId: string,         // opaque reference into the source registry
-    sql: string,              // UNTRUSTED SELECT — validated before it ever runs
-    timeField?: string,       // the column the SERVER filters time on
-  },
+  query?:                     // absent exactly for a kind that runs none (text)
+    | {
+        sourceId: string,     // opaque reference into the source registry
+        sql: string,          // UNTRUSTED SELECT — validated before it ever runs
+        timeField?: string,   // the column the SERVER filters time on
+      }
+    | {
+        sourceId: string,
+        promql: string,       // UNTRUSTED PromQL, for a Prometheus source
+        instant?: boolean,    // one sample per series instead of a range
+        minStep?: Duration,   // a floor on the step the SERVER picks ("15s")
+      },
   options?: object,           // the kind's own; see Reference → Panel options
   format?: "number" | "bytes" | "percent" | "ms",
   timeRange?: { from, to },   // the panel's own window, in place of the dashboard's
@@ -60,6 +67,33 @@ every save and on every execution — never trusted because "we generated it."
 **There is no time filter in the query.** The model is explicitly forbidden from
 filtering time. `timeField` merely *names* the column; the **server** injects
 the `from`/`to` bounds. Time authority never leaves the server.
+
+## A query's language follows its source
+
+A panel's query is SQL or PromQL, decided by which of `sql` and `promql` it
+carries ([#383](https://github.com/jbouder/holotable/issues/383)). Both shapes
+are strict and each has a field the other lacks, so every spec saved before
+PromQL existed parses exactly as it did, with no `specVersion` bump, and a query
+carrying both is refused.
+
+Which language a panel may use is not the panel's choice. It is a property of
+its source's kind ([ADR 2](/architecture/decisions/0002-source-kinds/)): a
+TimescaleDB source answers SQL, a Prometheus source answers PromQL, and a query
+in the other language is refused on save and at execution like a table the
+source does not have.
+
+A PromQL query carries no time either. The server picks `start`, `end` and
+`step` for the window it resolved, and `minStep` can only raise the step. A
+range query's rows always carry their time in a column called `time`. An
+`instant` query has one sample per series and no time column, so a kind that
+needs time, such as a state timeline, needs a range query.
+
+Code never reads a query's fields to decide what it is. It asks the helpers
+beside `hasQuery` in `src/lib/ir.ts`: `isSqlQuery`, `queryLanguage`,
+`queryTimeField` (the declared column for SQL, `time` for a PromQL range query,
+nothing for an instant one) and `queryText` (the statement, for display, digests
+and diffs). A `query` variable has the same two shapes: a SELECT, or
+`{ sourceId, label, match? }`, the values of a Prometheus label.
 
 ## One definition, no drift
 

@@ -10,6 +10,7 @@ import {
   type QueryPanel,
   ValueFormat,
   VizType,
+  isSqlQuery,
 } from "@/lib/ir";
 import { changePanelKind } from "@/lib/panel-kind-change";
 import { panelKind } from "@/lib/panels/registry";
@@ -312,6 +313,26 @@ function QueryFields({
 }) {
   const preview = usePanelPreview(panel, panelTimeRange(panel, timeRange), variables);
   const catalog = sources.find((s) => s.id === panel.query.sourceId)?.catalog ?? null;
+  const query = panel.query;
+
+  if (!isSqlQuery(query)) {
+    // A PromQL panel (#383) loads and saves, but this editor writes SQL; it
+    // learns PromQL with the Prometheus editor (#388).
+    return (
+      <div className="space-y-2">
+        <Label htmlFor="p-promql">PromQL</Label>
+        <pre
+          id="p-promql"
+          className="overflow-auto rounded-md border border-border bg-surface px-3 py-2 font-mono text-xs"
+        >
+          {query.promql}
+        </pre>
+        <p className="text-sm text-muted">
+          This editor cannot change a PromQL query yet.
+        </p>
+      </div>
+    );
+  }
 
   return (
     <>
@@ -321,7 +342,7 @@ function QueryFields({
         </Label>
         <SqlEditor
           id="p-sql"
-          value={panel.query.sql}
+          value={query.sql}
           catalog={catalog}
           onChange={(sql) =>
             onChange((p) => ({ ...p, query: { ...p.query, sql } }), {
@@ -339,8 +360,8 @@ function QueryFields({
 
       <TimeFieldPicker
         id="p-tf"
-        value={panel.query.timeField}
-        sql={panel.query.sql}
+        value={query.timeField}
+        sql={query.sql}
         catalog={catalog}
         onChange={(timeField) =>
           onChange((p) => ({ ...p, query: { ...p.query, timeField } }), {

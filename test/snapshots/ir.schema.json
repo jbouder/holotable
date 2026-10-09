@@ -74,26 +74,55 @@
             ]
           },
           "query": {
-            "type": "object",
-            "properties": {
-              "sourceId": {
-                "type": "string",
-                "minLength": 1,
-                "maxLength": 128
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "sourceId": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 128
+                  },
+                  "sql": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 8000
+                  },
+                  "timeField": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 128
+                  }
+                },
+                "required": ["sourceId", "sql"],
+                "additionalProperties": false
               },
-              "sql": {
-                "type": "string",
-                "minLength": 1,
-                "maxLength": 8000
-              },
-              "timeField": {
-                "type": "string",
-                "minLength": 1,
-                "maxLength": 128
+              {
+                "type": "object",
+                "properties": {
+                  "sourceId": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 128
+                  },
+                  "promql": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 8000
+                  },
+                  "instant": {
+                    "type": "boolean"
+                  },
+                  "minStep": {
+                    "type": "string",
+                    "maxLength": 16,
+                    "pattern": "^\\d+(ms|s|m|h|d)$"
+                  }
+                },
+                "required": ["sourceId", "promql"],
+                "additionalProperties": false
               }
-            },
-            "required": ["sourceId", "sql"],
-            "additionalProperties": false
+            ]
           },
           "options": {
             "anyOf": [
@@ -803,21 +832,47 @@
             }
           },
           "query": {
-            "type": "object",
-            "properties": {
-              "sourceId": {
-                "type": "string",
-                "minLength": 1,
-                "maxLength": 128
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "sourceId": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 128
+                  },
+                  "sql": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 8000
+                  }
+                },
+                "required": ["sourceId", "sql"],
+                "additionalProperties": false
               },
-              "sql": {
-                "type": "string",
-                "minLength": 1,
-                "maxLength": 8000
+              {
+                "type": "object",
+                "properties": {
+                  "sourceId": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 128
+                  },
+                  "label": {
+                    "type": "string",
+                    "maxLength": 128,
+                    "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
+                  },
+                  "match": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 1000
+                  }
+                },
+                "required": ["sourceId", "label"],
+                "additionalProperties": false
               }
-            },
-            "required": ["sourceId", "sql"],
-            "additionalProperties": false
+            ]
           },
           "multi": {
             "type": "boolean"

@@ -1,4 +1,11 @@
 import { z } from "zod";
+import {
+  isPromqlQuery,
+  isSqlQuery,
+  type PanelQuery,
+  type QueryLanguage,
+  type VariableQuery,
+} from "@/lib/ir";
 import { timescaledb } from "@/lib/sources/kinds/timescaledb";
 
 /**
@@ -83,4 +90,41 @@ export function sameKind(
   b: { kind: SourceKindName },
 ): boolean {
   return a.kind === b.kind;
+}
+
+const LANGUAGE_NAMES: Record<QueryLanguage, string> = { sql: "SQL", promql: "PromQL" };
+
+/** The language a panel's or a variable's query is written in. */
+function writtenIn(query: PanelQuery | VariableQuery): QueryLanguage {
+  return isSqlQuery(query) ? "sql" : "promql";
+}
+
+/**
+ * Why a query cannot run against a source: it is written in a language the
+ * source's kind does not answer. `null` when it is the source's own. A query
+ * in the wrong language is refused like a wrong table name, as the author's
+ * to fix, wherever it would run.
+ */
+export function wrongLanguage(
+  source: { id: string; kind: SourceKindName },
+  query: PanelQuery | VariableQuery,
+): string | null {
+  const answers = sourceKind(source).language;
+  const written = writtenIn(query);
+  if (answers === written) return null;
+  return `source "${source.id}" answers ${LANGUAGE_NAMES[answers]}; this query is ${LANGUAGE_NAMES[written]}`;
+}
+
+/**
+ * The refusal for a query no source this server knows can run yet: PromQL,
+ * until the Prometheus kind is registered (#385).
+ */
+export function cannotRun(
+  source: { id: string; kind: SourceKindName },
+  query: PanelQuery | VariableQuery,
+): string {
+  return (
+    wrongLanguage(source, query) ??
+    `${isPromqlQuery(query) ? "PromQL" : "this"} query cannot run on this server yet`
+  );
 }

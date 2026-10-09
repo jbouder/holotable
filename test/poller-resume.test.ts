@@ -1,3 +1,4 @@
+import { queryTimeField } from "@/lib/ir";
 import { test, mock, afterEach } from "node:test";
 import assert from "node:assert/strict";
 import { getPoller, type PanelExecutor, type PollerEvent } from "@/lib/poller/registry";
@@ -53,7 +54,7 @@ const ts = (n: number) => `2026-10-04T10:00:${String(n).padStart(2, "0")}.000Z`;
 function growingSource() {
   const table: { ts: string; v: number }[] = [];
   const executor: PanelExecutor = async (panel) => [
-    panel.query.timeField
+    queryTimeField(panel.query)
       ? {
           type: "panel",
           panelId: panel.id,

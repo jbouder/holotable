@@ -1,3 +1,4 @@
+import { queryText, queryTimeField } from "@/lib/ir";
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import type { CatalogSubject } from "@/lib/catalog/health";
@@ -87,7 +88,7 @@ test("every built-in statement passes the real guard against its own source", as
         const check = await validateSql(queryOf(panel).sql, cfg);
         assert.ok(
           check.ok,
-          `${template.name} / ${panel.title}: ${check.error}\n${panel.query?.sql}`,
+          `${template.name} / ${panel.title}: ${check.error}\n${panel.query ? queryText(panel.query) : undefined}`,
         );
       }
     }
@@ -97,8 +98,8 @@ test("every built-in statement passes the real guard against its own source", as
 test("every built-in panel declares the time field the server injects on", () => {
   for (const template of buildBuiltinTemplates(source([HTTP_REQUESTS]))) {
     for (const panel of templatePanels(template.body)) {
-      assert.equal(panel.query?.timeField, "bucket");
-      assert.match(panel.query?.sql, /AS bucket\b/);
+      assert.equal(panel.query ? queryTimeField(panel.query) : undefined, "bucket");
+      assert.match(queryText(queryOf(panel)), /AS bucket\b/);
     }
   }
 });

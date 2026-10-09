@@ -49,13 +49,24 @@ export const TimeRange = z
 export type TimeRange = z.infer<typeof TimeRange>;
 
 /**
- * A panel query. `sourceId` is a stable, opaque reference into the source
+ * A length of time, for the places a query may name one (`15s`, `1m`, `6h`).
+ * Kept beside `TimeExpr` because it is the other half of how the IR talks
+ * about time: a duration says how long, never when.
+ */
+export const Duration = z
+  .string()
+  .max(16)
+  .regex(/^\d+(ms|s|m|h|d)$/, "must be a duration such as 15s, 1m or 6h");
+export type Duration = z.infer<typeof Duration>;
+
+/**
+ * A SQL panel query. `sourceId` is a stable, opaque reference into the source
  * registry. The panel NEVER carries connection details or credentials — only
  * this id. `sql` is untrusted and validated/guarded before execution. There is
  * intentionally no model-provided time filter: the server injects the
  * dashboard time range at execution time via `timeField`.
  */
-export const PanelQuery = z
+export const SqlQuery = z
   .object({
     sourceId: z.string().min(1).max(128),
     sql: z.string().min(1).max(8_000),
@@ -63,7 +74,90 @@ export const PanelQuery = z
     timeField: z.string().min(1).max(128).optional(),
   })
   .strict();
+export type SqlQuery = z.infer<typeof SqlQuery>;
+
+/**
+ * A PromQL panel query (#383), against a Prometheus-compatible source. Like
+ * SQL it is untrusted, and is validated and rewritten by the guard before it
+ * runs. It carries no time: the server picks `start`, `end` and `step` for
+ * the window it resolved, and a range query's rows always carry a `time`
+ * column.
+ */
+export const PromqlQuery = z
+  .object({
+    sourceId: z.string().min(1).max(128),
+    /** The PromQL expression. Untrusted; validated and rewritten by the guard before execution. */
+    promql: z.string().min(1).max(8_000),
+    /**
+     * One sample per series at the end of the window (`/api/v1/query`)
+     * instead of a range. For stat, gauge, pie and table panels.
+     */
+    instant: z.boolean().optional(),
+    /** A floor on the step. The server picks the step; this only raises it. */
+    minStep: Duration.optional(),
+  })
+  .strict();
+export type PromqlQuery = z.infer<typeof PromqlQuery>;
+
+/**
+ * A panel query: SQL or PromQL, decided by which of `sql` and `promql` it
+ * carries. Both branches are strict and each has a field the other lacks, so
+ * every spec stored before PromQL existed parses through `SqlQuery` exactly
+ * as it did, and a query carrying both is refused. Which language a panel may
+ * use is its source's kind's to say (ADR 2), and is checked where it runs.
+ *
+ * Code reads a query through the helpers below (`isSqlQuery`,
+ * `queryLanguage`, `queryTimeField`, `queryText`), never its fields, outside
+ * the SQL-specific modules; `test/query-language.test.ts` holds that.
+ */
+export const PanelQuery = z.union([SqlQuery, PromqlQuery]);
 export type PanelQuery = z.infer<typeof PanelQuery>;
+
+/** The language a query is written in. */
+export type QueryLanguage = "sql" | "promql";
+
+export function isSqlQuery<Q extends { sourceId: string }>(
+  query: Q,
+): query is Extract<Q, { sql: string }> {
+  return "sql" in query && typeof query.sql === "string";
+}
+
+export function isPromqlQuery<Q extends { sourceId: string }>(
+  query: Q,
+): query is Extract<Q, { promql: string }> {
+  return "promql" in query && typeof query.promql === "string";
+}
+
+export function queryLanguage(query: PanelQuery): QueryLanguage {
+  return isSqlQuery(query) ? "sql" : "promql";
+}
+
+/**
+ * The output column the server filters time on and a chart draws time from:
+ * the declared `timeField` of a SQL query; `time` for a PromQL range query,
+ * whose rows always carry it; nothing for an instant query, which has one
+ * sample per series and no axis.
+ */
+export function queryTimeField(query: PanelQuery): string | undefined {
+  if (isSqlQuery(query)) return query.timeField;
+  return query.instant ? undefined : PROMQL_TIME_FIELD;
+}
+
+/** The column a PromQL range query's rows carry their time in. */
+export const PROMQL_TIME_FIELD = "time";
+
+/**
+ * The statement, for the places that only display, digest or diff it. Never
+ * for running it: execution goes through the source's kind, which knows what
+ * language it is.
+ */
+export function queryText(query: PanelQuery | VariableQuery): string {
+  if (isSqlQuery(query)) return query.sql;
+  if (isPromqlQuery(query)) return query.promql;
+  return query.match
+    ? `label_values(${query.match}, ${query.label})`
+    : `label_values(${query.label})`;
+}
 
 /** How often a dashboard, or a panel with its own cadence, is re-run. */
 export const RefreshIntervalMs = z.number().int().min(1_000).max(3_600_000);
@@ -223,11 +317,18 @@ function fitsItsKind(panel: z.infer<typeof PanelFields>, ctx: z.RefinementCtx): 
       path: ["query"],
     });
   }
-  if (kind.requiresTimeField && panel.query && panel.query.timeField === undefined) {
+  if (
+    kind.requiresTimeField &&
+    panel.query &&
+    queryTimeField(panel.query) === undefined
+  ) {
+    const sql = isSqlQuery(panel.query);
     ctx.addIssue({
       code: "custom",
-      message: `a ${kind.kind} panel needs "query.timeField"`,
-      path: ["query", "timeField"],
+      message: sql
+        ? `a ${kind.kind} panel needs "query.timeField"`
+        : `a ${kind.kind} panel needs a range query; remove "query.instant"`,
+      path: ["query", sql ? "timeField" : "instant"],
     });
   }
   if (kind.query === "none") {
@@ -326,10 +427,14 @@ const kindsWhere = (query: "required" | "none") =>
     ...VizType[],
   ];
 
-/** A generated panel of a kind that runs a query: `query` is required. */
+/**
+ * A generated panel of a kind that runs a query: `query` is required. SQL
+ * only, for now: the model is taught PromQL, and shown the branch, when a
+ * Prometheus source can be generated against (#387).
+ */
 const GeneratedQueryPanel = PanelFields.extend({
   viz: z.enum(kindsWhere("required")),
-  query: PanelQuery,
+  query: SqlQuery,
 });
 
 /** A generated panel of a kind that runs no query: it has no `query`. */
@@ -371,6 +476,27 @@ export function hasQuery(panel: Panel): panel is QueryPanel {
 }
 
 /**
+ * A query's statement under the name of its language, for an audit row or a
+ * log line: `{ sql }` or `{ promql }`, each of which the log reduces to a
+ * digest.
+ */
+export function queryStatement(
+  query: PanelQuery | VariableQuery,
+): { sql: string } | { promql: string } {
+  return isSqlQuery(query) ? { sql: query.sql } : { promql: queryText(query) };
+}
+
+/** A panel's time column, through {@link queryTimeField}; none for a panel with no query. */
+export function panelTimeField(panel: Panel): string | undefined {
+  return panel.query ? queryTimeField(panel.query) : undefined;
+}
+
+/** A panel's statement, through {@link queryText}; none for a panel with no query. */
+export function panelQueryText(panel: Panel): string | undefined {
+  return panel.query ? queryText(panel.query) : undefined;
+}
+
+/**
  * The window a panel is run over: its own (#114), or else the one it is shown
  * in, which is the dashboard's or the one a viewer picked. The server resolves
  * whichever it is; this only says which.
@@ -408,16 +534,36 @@ export function cycleMs(spec: Pick<Dashboard, "panels" | "refreshIntervalMs">): 
 export const VARIABLE_VALUES_MAX = 200;
 
 /**
- * Where a `query` variable's values come from: the first column of a guarded
- * SELECT against a source in the dashboard's workspace. No time filter, and
- * no variables of its own.
+ * Where a `query` variable's values come from, against a source in the
+ * dashboard's workspace, with no time filter and no variables of its own:
+ *
+ * - the first column of a guarded SELECT, for a SQL source;
+ * - the values of a label (`label_values(match, label)` in Grafana's terms),
+ *   optionally narrowed by a series selector the PromQL guard checks, for a
+ *   Prometheus one.
  */
-export const VariableQuery = z
+export const SqlVariableQuery = z
   .object({
     sourceId: z.string().min(1).max(128),
     sql: z.string().min(1).max(8_000),
   })
   .strict();
+
+export const LabelValuesQuery = z
+  .object({
+    sourceId: z.string().min(1).max(128),
+    /** The label whose values are offered. */
+    label: z
+      .string()
+      .max(128)
+      .regex(/^[A-Za-z_][A-Za-z0-9_]*$/, "must be a label name"),
+    /** A series selector the values are narrowed to, such as `up{job="api"}`. */
+    match: z.string().min(1).max(1_000).optional(),
+  })
+  .strict();
+
+export const VariableQuery = z.union([SqlVariableQuery, LabelValuesQuery]);
+export type VariableQuery = z.infer<typeof VariableQuery>;
 
 export const Variable = z
   .object({

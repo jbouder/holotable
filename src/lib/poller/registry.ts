@@ -1,4 +1,12 @@
-import { type Dashboard, hasQuery, panelRefreshMs, type QueryPanel } from "@/lib/ir";
+import {
+  type Dashboard,
+  hasQuery,
+  isSqlQuery,
+  panelRefreshMs,
+  type QueryPanel,
+  queryTimeField,
+} from "@/lib/ir";
+import { cannotRun } from "@/lib/sources/registry";
 import { getSourceById } from "@/lib/db/repo";
 import type { SourceRecord } from "@/lib/registry";
 import type { ExecutablePlan } from "@/lib/sql/safety";
@@ -194,8 +202,19 @@ export function makePanelExecutor(
     }
 
     const kind = serverKind(source);
+    const query = panel.query;
+    if (!isSqlQuery(query)) {
+      return [
+        {
+          type: "panel-error",
+          panelId: panel.id,
+          error: cannotRun(source, query),
+          kind: "statement",
+        },
+      ];
+    }
     const check = await kind.validate(
-      panel.query.sql,
+      query.sql,
       source.config,
       new Set(Object.keys(variables)),
     );
@@ -213,8 +232,8 @@ export function makePanelExecutor(
     let plan: ExecutablePlan;
     try {
       plan = kind.plan({
-        sql: panel.query.sql,
-        timeField: panel.query.timeField,
+        sql: query.sql,
+        timeField: query.timeField,
         from: window.from,
         to: window.to,
         // Re-bound every tick from the source as it is now, so a filter
@@ -436,7 +455,7 @@ class DashboardPoller {
    * advanced cursors as its event id.
    */
   private deliver(sub: Subscriber, panel: QueryPanel, event: PollerEvent) {
-    const timeField = panel.query.timeField;
+    const timeField = queryTimeField(panel.query);
     if (event.type !== "panel" || !timeField) {
       this.send(sub, event);
       return;
