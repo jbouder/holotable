@@ -8,7 +8,7 @@ sidebar:
 The repository ships a [Claude Code](https://claude.com/claude-code) skill,
 `/holotable`, that knows the [spec format](/concepts/the-shared-ir/), every
 [panel kind](/reference/visualization-types/) and the rules the
-[SQL guard](/concepts/executing-a-panel/) enforces. Use it to draft a dashboard
+[SQL and PromQL guards](/concepts/executing-a-panel/) enforce. Use it to draft a dashboard
 next to the code and schema it monitors, to review a spec in a pull request, or
 to understand why an import was refused.
 
@@ -25,6 +25,10 @@ Open Claude Code in a checkout of this repository (the skill lives in
   latency. Here are my tables: …"* Paste the tables and columns, or point at
   a schema file. The source id and the catalog browser on the **Data sources**
   page show what the source exposes.
+- *"Same, but it's in Prometheus. Here are the metrics and their labels: …"*
+  The skill asks which kind the source is first, and writes PromQL for a
+  Prometheus source: rated counters, `instant` for a stat or a table, and
+  label-values variables.
 - *"Review this spec"*, with a file or a pasted export.
 - *"Import said `panels.3.query.sql: table not in catalog allowlist:
   public.events`. Why?"*
@@ -40,16 +44,18 @@ again, schema and SQL, before anything runs.
 | `SKILL.md` | The three workflows: write, review, explain a rejection. |
 | `references/ir.md` | Every field, its type and bounds, the import wrapper, time expressions, variables, layout. |
 | `references/panel-kinds.md` | Each `viz` kind, the result shape its query returns, and its options. |
-| `references/sql-rules.md` | What the guard refuses, with the exact error text, and how the server injects the time window. |
+| `references/sql-rules.md` | What the SQL guard refuses, with the exact error text, and how the server injects the time window. |
+| `references/promql-rules.md` | What the PromQL guard refuses and hints at, with the exact text, how the server picks the step, `instant` and `minStep`, and variables as matcher values. |
 | `references/guidance.md` | Which kind answers which question, measures, formats, thresholds, layout and naming. |
-| `examples/` | A catalog, two complete dashboards using every kind and variables, and accepted and rejected SQL for each rule. |
+| `examples/` | A SQL catalog, two complete dashboards using every kind and variables, and accepted and rejected SQL for each rule; a Prometheus metric catalog, a complete PromQL dashboard with a label-values variable, and accepted and rejected PromQL for each rule. |
 
 ## Why it stays correct
 
 `test/holotable-skill.test.ts` runs under `npm test`. It imports every example
 dashboard through the real export schema, runs every query in them and every
-SQL example through the real guard against the example catalog (accepted ones
-must pass, rejected ones must fail with the error the reference quotes), and
+SQL and PromQL example through the real guard against its example catalog
+(accepted ones must pass, rejected ones must fail with the error the reference
+quotes, and every error in the PromQL rules table must come from one), and
 checks the reference's lists of panel kinds, value formats and color tokens
 against the code. A change to the IR or the guard that the skill no longer
 describes fails the build.

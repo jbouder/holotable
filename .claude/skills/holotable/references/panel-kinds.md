@@ -25,10 +25,14 @@ bucket: `time_bucket('1 minute', ts) AS minute` with `query.timeField:
 Options: number, legend, thresholds, `yAxis` (`{ min, max, log, label }`;
 `min` below `max`, and a `log` axis starts above zero), `stacked` (`true`).
 
+With PromQL: a range query (no `instant`); each series is a line, so aggregate to a few, `sum by (route) (rate(http_requests_total[5m]))`.
+
 ### `area`
 
 A filled time series, for a volume or a total over time. Same query shape and
 options as `line`.
+
+With PromQL: a range query drawn filled, for a volume or a total over time.
 
 ### `bar`
 
@@ -36,10 +40,14 @@ Values per time bucket (with `query.timeField`), or compared across a
 categorical dimension (one label column plus numeric columns, no
 `query.timeField`). Same options as `line`.
 
+With PromQL: a range query drawn as bars per step, or an instant query (`"instant": true`) compared across one label, `sum by (code) (increase(http_requests_total[1h]))`.
+
 ### `scatter`
 
 The relationship between two numeric dimensions. The first numeric column is
 the x-axis, the second the y-axis; a label column may follow. No options.
+
+With PromQL: not for a Prometheus source; a PromQL result is a time and one column per series.
 
 ### `stat`
 
@@ -49,6 +57,8 @@ returns one row per time bucket (and then sets `query.timeField`), and the
 history is drawn behind the latest value.
 
 Options: number, thresholds, `value` (the column shown), `sparkline`.
+
+With PromQL: an instant query returning one series, `sum(rate(http_requests_total[5m]))`.
 
 ### `table`
 
@@ -60,10 +70,14 @@ unit, compact, align: "left"|"center"|"right", width: 40–800 }`; listed column
 come first, in order, and each name once), `sort` (`{ column, order:
 "asc"|"desc" }`).
 
+With PromQL: an instant query; one row per series, a column per label, then `value`.
+
 ### `heatmap`
 
 Two dimensions against an intensity: exactly three columns, x (often a time
 bucket, then set as `query.timeField`), y, and value. No options.
+
+With PromQL: not for a Prometheus source; a PromQL result is a time and one column per series.
 
 ### `pie`
 
@@ -73,9 +87,13 @@ time series.
 
 Options: number, legend.
 
+With PromQL: an instant query aggregated by one label, each series a slice, `sum by (route) (increase(http_requests_total[1h]))`.
+
 ### `donut`
 
 The same as `pie`, drawn as a ring. Same query shape and options.
+
+With PromQL: as `pie`.
 
 ### `gauge`
 
@@ -88,6 +106,8 @@ Options: number, thresholds, `variant` (`"radial"`, the default, or `"bar"`),
 `value` (the column shown), `min` and `max` (numbers, or the name of a result
 column holding the bound; default 0 and 100; `min` below `max`).
 
+With PromQL: an instant query; with `variant: "bar"`, one bar per series, `sum by (instance) (…)`.
+
 ### `state-timeline`
 
 Discrete states over time (up/down, deploy phase, job status), one lane per
@@ -99,6 +119,8 @@ Options: `entity` (the lane column; default the first text column other than
 the state), `state` (default the last text column), `states` (up to 50
 `{ state, color }` pairs, each state once), `variant` (`"spans"`, the
 default, or `"history"`: fixed cells, each showing the state at its middle).
+
+With PromQL: not for a Prometheus source; it needs an entity column and a state column per row. Draw the state value as a `line` instead.
 
 ### `text`
 

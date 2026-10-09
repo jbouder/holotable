@@ -34,6 +34,32 @@ dashboard readable during an incident.
   for 1–6 h, 5 minutes for 24 h, 1 hour for 7 d. Prefer a rollup table (a
   continuous aggregate such as `…_1m`) when the catalog has one.
 
+## The same measures in PromQL
+
+For a Prometheus source (see `references/promql-rules.md`):
+
+- **Counter or gauge.** A counter (`…_total`, `…_count`, `…_sum`, a histogram's
+  `…_bucket`) only grows; draw its `rate(…[5m])` per second, or its
+  `increase(…[1h])` for a count over a period. A gauge is a level; draw it as
+  it is, or `avg_over_time`/`max_over_time` to smooth it. The guard hints when
+  a counter is drawn raw or a gauge is rated.
+- **Rate ranges.** `[5m]` is a good default: at least four scrape intervals,
+  so a missed scrape does not break the line. The server picks the step; set
+  `query.minStep` only to make a noisy line coarser.
+- **Aggregate to what is drawn.** Each series is a line, a slice or a row, and
+  a result is capped at 100 series. `sum by (route) (rate(…))` draws one line
+  per route; `sum(rate(…))` draws one.
+- **Error rate**: `100 * sum(rate(http_requests_total{code=~"5.."}[5m])) /
+  sum(rate(http_requests_total[5m]))` with `"format": "percent"`.
+- **Latency**: `histogram_quantile(0.95, sum by (le) (rate(…_bucket[5m])))`,
+  keeping `le` in the `by`. Multiply a `…_seconds` histogram by 1000 for
+  `"format": "ms"`.
+- **`instant`**: set it for a stat, a gauge, a table, a pie or donut, and a
+  bar compared across a label; they draw one value per series. Leave it out
+  for anything over time.
+- **Not for PromQL**: `heatmap`, `scatter` and `state-timeline` read row shapes
+  a PromQL result does not have.
+
 ## Formats, units and thresholds
 
 - Pick the `format` the raw value is in: `ms` for milliseconds, `bytes` for

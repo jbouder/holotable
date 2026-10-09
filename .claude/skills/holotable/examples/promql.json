@@ -1,0 +1,109 @@
+{
+  "catalog": "prometheus-catalog.json",
+  "accepted": [
+    {
+      "rule": "A counter is drawn as a rate, aggregated to the series you want",
+      "promql": "sum by (route) (rate(http_requests_total[5m]))"
+    },
+    {
+      "rule": "A ratio of two rates, in percent",
+      "promql": "100 * sum(rate(http_requests_total{code=~\"5..\"}[5m])) / sum(rate(http_requests_total[5m]))"
+    },
+    {
+      "rule": "A percentile from a histogram's buckets keeps le in the by clause",
+      "promql": "histogram_quantile(0.95, sum by (le) (rate(http_request_duration_seconds_bucket[5m])))"
+    },
+    {
+      "rule": "A gauge is drawn as it is, or aggregated",
+      "promql": "1 - sum by (instance) (node_memory_MemAvailable_bytes) / sum by (instance) (node_memory_MemTotal_bytes)"
+    },
+    {
+      "rule": "A declared variable is a matcher's whole value",
+      "variables": ["instance"],
+      "promql": "sum(rate(node_cpu_seconds_total{instance=\":instance\", mode!=\"idle\"}[5m]))"
+    },
+    {
+      "rule": "A multi-value variable matches with =~",
+      "variables": ["instance"],
+      "promql": "sum by (instance) (rate(http_requests_total{instance=~\":instance\"}[5m]))"
+    },
+    {
+      "rule": "Subqueries and offsets within the server's range are fine",
+      "promql": "max_over_time(sum(rate(http_requests_total[5m]))[1h:1m]) - sum(rate(http_requests_total[5m] offset 1d))"
+    }
+  ],
+  "rejected": [
+    {
+      "rule": "Only listed metrics",
+      "promql": "node_load1",
+      "error": "metric \"node_load1\" is not in this source's catalog"
+    },
+    {
+      "rule": "Every selector names its metric",
+      "promql": "sum(rate({job=\"api\"}[5m]))",
+      "error": "every selector must name a metric"
+    },
+    {
+      "rule": "No pattern on the metric name",
+      "promql": "{__name__=~\"http_.*\"}",
+      "error": "__name__ may only be matched with \"=\""
+    },
+    {
+      "rule": "No @ modifier: the server owns time",
+      "promql": "up @ end()",
+      "error": "the @ modifier is not allowed"
+    },
+    {
+      "rule": "No comments",
+      "promql": "up # every target",
+      "error": "comments are not allowed"
+    },
+    {
+      "rule": "Only the stable functions",
+      "promql": "info(up)",
+      "error": "function info() is not allowed"
+    },
+    {
+      "rule": "A range no longer than the server allows",
+      "promql": "increase(http_requests_total[30d])",
+      "error": "is longer than the 7d this server allows"
+    },
+    {
+      "rule": "A subquery step of at least one second",
+      "promql": "max_over_time(up[1h:500ms])",
+      "error": "a subquery step must be at least 1s"
+    },
+    {
+      "rule": "A subquery evaluates at most 11,000 points",
+      "promql": "max_over_time(up[7d:10s])",
+      "error": "evaluates more than 11000 points"
+    },
+    {
+      "rule": "A variable is never a metric name",
+      "variables": ["metric"],
+      "promql": "sum(:metric)",
+      "error": "a variable may appear only as a label matcher's value, not as a metric name"
+    },
+    {
+      "rule": "A variable only as a matcher's whole value",
+      "variables": ["instance"],
+      "promql": "label_replace(up, \"host\", \":instance\", \"instance\", \"(.*)\")",
+      "error": "may appear only as a label matcher's whole value"
+    },
+    {
+      "rule": "Only declared variables",
+      "promql": "up{instance=\":instance\"}",
+      "error": "variable :instance is not declared on this dashboard"
+    },
+    {
+      "rule": "It has to parse",
+      "promql": "sum(rate(http_requests_total[5m])",
+      "error": "PromQL does not parse"
+    },
+    {
+      "rule": "At most 32 selectors",
+      "promql": "up + up + up + up + up + up + up + up + up + up + up + up + up + up + up + up + up + up + up + up + up + up + up + up + up + up + up + up + up + up + up + up + up",
+      "error": "the query has more than 32 selectors"
+    }
+  ]
+}

@@ -513,6 +513,12 @@ export function streamExplorePanel(input: {
 export function streamSourceDraft(input: {
   prompt: string;
   grantedSecretRefs: readonly string[];
+  /**
+   * The kind the caller says the source is (#389), as its label, such as
+   * "Prometheus". Absent, the model decides from the description, and the
+   * prompt is what it always was.
+   */
+  kindLabel?: string;
   onFinish?: OnGenerationFinish;
   /** The model this caller resolved to in this workspace (#331). */
   model: Model;
@@ -576,7 +582,9 @@ For a Prometheus endpoint, 'config' is instead:
   user will discover the real ones.`,
     prompt: withRepair(
       repair,
-      `Draft a data source for this description:\n"""${prompt}"""`,
+      `Draft a data source for this description:\n"""${prompt}"""${
+        input.kindLabel ? `\nThe source is a ${input.kindLabel} source.` : ""
+      }`,
     ),
   });
 }

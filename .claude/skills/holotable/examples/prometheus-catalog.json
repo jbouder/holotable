@@ -1,0 +1,48 @@
+{
+  "sourceId": "prom-fleet",
+  "kind": "prometheus",
+  "metrics": [
+    {
+      "name": "up",
+      "type": "gauge",
+      "help": "1 if the last scrape of the target succeeded, 0 if it did not.",
+      "labels": ["instance", "job"]
+    },
+    {
+      "name": "http_requests_total",
+      "type": "counter",
+      "help": "HTTP requests served.",
+      "labels": ["code", "instance", "job", "route"]
+    },
+    {
+      "name": "http_request_duration_seconds_bucket",
+      "type": "histogram",
+      "help": "HTTP request latency, in seconds.",
+      "labels": ["instance", "job", "le", "route"]
+    },
+    {
+      "name": "http_request_duration_seconds_count",
+      "type": "counter",
+      "help": "HTTP request latency, in seconds. (count)",
+      "labels": ["instance", "job", "route"]
+    },
+    {
+      "name": "node_cpu_seconds_total",
+      "type": "counter",
+      "help": "Seconds the CPUs spent in each mode.",
+      "labels": ["cpu", "instance", "mode"]
+    },
+    {
+      "name": "node_memory_MemAvailable_bytes",
+      "type": "gauge",
+      "help": "Memory available to new work, in bytes.",
+      "labels": ["instance"]
+    },
+    {
+      "name": "node_memory_MemTotal_bytes",
+      "type": "gauge",
+      "help": "Total memory, in bytes.",
+      "labels": ["instance"]
+    }
+  ]
+}

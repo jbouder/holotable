@@ -1,7 +1,7 @@
 import { z } from "zod";
-import { isSqlSource } from "@/lib/sources/registry";
+import { sourceKind } from "@/lib/sources/registry";
+import { serverKind } from "@/lib/sources/server/registry";
 import { assertAuthorized, authorizedWorkspaces, HttpError } from "@/lib/auth/authorize";
-import { catalogView } from "@/lib/catalog/browse";
 import { catalogHealth } from "@/lib/catalog/health";
 import { defineTool, type McpTool, READ_ONLY } from "@/lib/mcp/tool";
 import type { McpDeps } from "@/lib/mcp/tools/deps";
@@ -31,6 +31,8 @@ const SourceSummary = z.object({
   name: z.string(),
   /** `timescaledb` (SQL) or `prometheus` (PromQL, #385). */
   kind: z.string(),
+  /** What its queries are written in: `sql` or `promql`. */
+  language: z.string(),
   /** A SQL source's schema and allowlisted table count. */
   schema: z.string().optional(),
   tableCount: z.int().optional(),
@@ -46,7 +48,7 @@ export function sourceTools(deps: McpDeps): McpTool[] {
       name: "list_sources",
       title: "List data sources",
       description:
-        "The data sources the caller may query, across every workspace they can reach, or in one workspace. Each has an id (the only way a panel refers to a source), a name, the schema it exposes and how many tables, and the state of its catalog. Call describe_source for the tables and columns.",
+        "The data sources the caller may query, across every workspace they can reach, or in one workspace. Each has an id (the only way a panel refers to a source), a name, its kind and the language its queries are written in (timescaledb: SQL; prometheus: PromQL), how many tables or metrics it allowlists, and the state of its catalog. Call describe_source for the tables and columns, or the metrics and labels.",
       input: z.object({
         workspaceId: z
           .string()
@@ -74,6 +76,7 @@ export function sourceTools(deps: McpDeps): McpTool[] {
               workspaceId: listing.workspaceId,
               name: listing.name,
               kind: listing.kind,
+              language: sourceKind(source.config).language,
               ...("schema" in listing
                 ? { schema: listing.schema, tableCount: listing.tableCount }
                 : { metricCount: listing.metricCount }),
@@ -89,7 +92,7 @@ export function sourceTools(deps: McpDeps): McpTool[] {
       name: "describe_source",
       title: "Describe a data source",
       description:
-        "One source's catalog: every table and column a query may use, with types, and the catalog's health. Only these tables and columns pass the SQL guard; a query that names anything else is refused. Hidden columns are not listed and cannot be used.",
+        "One source's catalog and the catalog's health. A SQL source (kind timescaledb) lists every table and column a query may use, with types; only these pass the SQL guard, and hidden columns are not listed and cannot be used. A Prometheus source (kind prometheus) lists the metrics a PromQL expression may select, each with its type (counter, gauge, histogram, summary), help and the labels its series carry; a selector of any other metric is refused. Never where the source lives or how it authenticates.",
       input: z.object({
         sourceId: z.string().min(1).describe("A source id from list_sources."),
       }),
@@ -102,16 +105,11 @@ export function sourceTools(deps: McpDeps): McpTool[] {
           { workspaceId: live.workspaceId },
           { type: "source", id: live.id },
         );
-        if (!isSqlSource(live)) {
-          throw new HttpError(
-            400,
-            "describe_source covers SQL sources until the MCP tools learn PromQL",
-          );
-        }
         const source = live;
         // Never the admin view: a hidden column stays hidden to an agent, and
-        // the view carries no connection detail either way.
-        const { canManage: _, ...view } = catalogView(
+        // the view carries no connection detail either way. Each kind's own
+        // view (#389): tables and columns, or metrics and labels.
+        const { canManage: _, ...view } = serverKind(source).catalogView(
           source,
           catalogHealth(source),
           false,
@@ -120,6 +118,8 @@ export function sourceTools(deps: McpDeps): McpTool[] {
           id: source.id,
           workspaceId: source.workspaceId,
           name: source.name,
+          kind: source.config.kind,
+          language: sourceKind(source.config).language,
           ...view,
         };
       },
