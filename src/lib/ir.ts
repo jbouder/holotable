@@ -550,24 +550,43 @@ function selfLinksSetDeclared(
   const declared = declaredVariables(dash);
   dash.panels.forEach((panel, p) => {
     panel.links?.forEach((link, l) => {
-      if (!isSelfLink(link)) return;
-      const names = Object.keys(link.set ?? {});
-      if (names.length === 0) {
+      for (const problem of selfLinkProblems(link, declared)) {
         ctx.addIssue({
           code: "custom",
-          message: `link "${link.title}" stays on this dashboard, so it must "set" a variable (or name a "dashboard")`,
-          path: ["panels", p, "links", l, "set"],
-        });
-      }
-      for (const name of names.filter((n) => !declared.has(n))) {
-        ctx.addIssue({
-          code: "custom",
-          message: `link "${link.title}" sets "${name}", which this dashboard does not declare`,
-          path: ["panels", p, "links", l, "set", name],
+          message: problem.message,
+          path: ["panels", p, "links", l, ...problem.path],
         });
       }
     });
   });
+}
+
+/**
+ * What is wrong with a self link on a dashboard declaring `declared`: it sets
+ * nothing, or it sets a name the dashboard does not declare. The editor shows
+ * the same messages the schema refuses with (#374). Empty for a link to
+ * another dashboard.
+ */
+export function selfLinkProblems(
+  link: PanelLink,
+  declared: ReadonlySet<string>,
+): { path: string[]; message: string }[] {
+  if (!isSelfLink(link)) return [];
+  const names = Object.keys(link.set ?? {});
+  if (names.length === 0) {
+    return [
+      {
+        path: ["set"],
+        message: `link "${link.title}" stays on this dashboard, so it must "set" a variable (or name a "dashboard")`,
+      },
+    ];
+  }
+  return names
+    .filter((n) => !declared.has(n))
+    .map((name) => ({
+      path: ["set", name],
+      message: `link "${link.title}" sets "${name}", which this dashboard does not declare`,
+    }));
 }
 
 function dashboardRules(
