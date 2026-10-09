@@ -111,6 +111,13 @@ Important files:
   route: ask `sourceKind(record)` or `serverKind(record)` and use what comes
   back. `test/source-kinds.test.ts` fails on either outside `src/lib/sources/`
 - `src/lib/sql/safety.ts` — the SQL guard every generated query passes through
+- `src/lib/promql/` — the PromQL guard (#384), the same guard for a
+  Prometheus source: `parse.ts` (the real grammar, `@prometheus-io/lezer-promql`),
+  `safety.ts` (`validatePromql`: allowlisted node types, the metric allowlist,
+  `@` refused, ranges bounded by `PROMQL_MAX_RANGE`, variables only as a
+  matcher's whole value), `variables.ts` and `row-filter.ts` (the rewrites,
+  each verified by re-parse) and `plan.ts`. `npm run test:fuzz` runs its fuzz
+  suite beside the SQL one
 - `src/lib/sql/ast.ts` — the PostgreSQL parse-tree walk the guard is built on
 - `src/lib/sql/row-filter.ts` — row-level filters (#31): every real table a
   statement reads is spliced, at the parser's byte offsets, into a subquery
@@ -271,7 +278,7 @@ Important files:
 - `SECURITY.md` — the trust model and the disclosure process
 - `CONTRIBUTING.md` — the human-facing version of this file
 
-The paths with a `CODEOWNERS` entry (`src/lib/sql/`, `src/lib/auth/`,
+The paths with a `CODEOWNERS` entry (`src/lib/sql/`, `src/lib/promql/`, `src/lib/auth/`,
 `src/lib/secrets/`, `ir.ts` and `ir/`, `time.ts`, `registry.ts`,
 `metrics-access.ts`, `row-scope.ts`, `variables.ts`, `variable-selection.ts`,
 `ai/base-url.ts`, `ai/guarded-fetch.ts`) are
@@ -284,7 +291,9 @@ checks that poisoned ones are rejected, benign ones accepted, and accepted ones
 satisfy an independent parse-tree oracle. Run `npm run test:fuzz` after any
 guard change; a failure prints the statement and a replay line. Promote the
 counterexample into `test/fixtures/sql-fuzz-corpus.ts` and a named test rather
-than adjusting the generator to avoid it.
+than adjusting the generator to avoid it. `src/lib/promql/` has the same
+pair: `test/promql-safety.fuzz.test.ts`, with its corpus in
+`test/fixtures/promql-corpus.ts`, and `npm run test:fuzz` runs both.
 
 Component tests are deliberately rare. `react-dom/server` does not run error
 boundaries — a throwing child propagates straight out of `renderToStaticMarkup`
@@ -578,7 +587,7 @@ npm run lint:fix   # biome check --write
 npm run format     # biome format --write
 npm run typecheck  # next typegen && tsc --noEmit
 npm test           # node --test via tsx
-npm run test:fuzz  # property-based SQL guard suite alone (FUZZ_RUNS, FUZZ_SEED)
+npm run test:fuzz  # property-based SQL and PromQL guard suites alone (FUZZ_RUNS, FUZZ_SEED)
 npm run test:integration # real-server suites against TimescaleDB (Testcontainers, or MIGRATE_TEST_DATABASE_URL)
 npm run e2e        # Playwright journey + axe scans (e2e/; Docker; AI_PROVIDER=stub; realm sign-in)
 npm run fixture:capture  # add a stored dashboard spec to the IR fixture library

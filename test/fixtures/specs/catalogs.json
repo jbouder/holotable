@@ -320,5 +320,25 @@
         ]
       }
     ]
+  },
+  "prom-metrics": {
+    "metrics": [
+      {
+        "name": "http_requests_total",
+        "labels": ["job", "instance", "route", "status", "tenant"]
+      },
+      {
+        "name": "http_request_duration_seconds_bucket",
+        "labels": ["job", "instance", "route", "le", "tenant"]
+      },
+      {
+        "name": "up",
+        "labels": ["job", "instance", "tenant"]
+      }
+    ],
+    "rowFilter": {
+      "label": "tenant",
+      "claim": "tenant"
+    }
   }
 }

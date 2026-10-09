@@ -13,6 +13,12 @@
 # function denylist, row and time limits, read-only execution.
 /src/lib/sql/                   @jbouder
 
+# The PromQL guard (#384), the same guard for a Prometheus source: one
+# expression built from allowlisted parse-tree nodes, the metric allowlist,
+# the @ modifier refused, bounded ranges, and the variable and tenant-matcher
+# rewrites verified by re-parse.
+/src/lib/promql/                @jbouder
+
 # Row-level filters at the edges: which tenant's value a viewer's queries and
 # pollers are narrowed to. A wrong binding serves one tenant another's rows.
 /src/lib/row-scope.ts           @jbouder

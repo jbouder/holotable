@@ -117,6 +117,29 @@ checked as the `$n` it runs as; a statement's own `$n` is still refused. The
 picked value is a bound parameter, never part of the text, and is checked
 against what the variable allows the viewer before anything runs.
 
+**For a Prometheus source** (#384), `validatePromql` (`src/lib/promql/`) is the
+same guard for PromQL. It parses with the Prometheus project's own grammar
+(`@prometheus-io/lezer-promql`) and walks the tree. There is one expression,
+built only from allowlisted node types, so the experimental functions, the
+modifiers and a comment are refused until someone lists them. Every vector and
+matrix selector must name exactly one metric on the catalog's allowlist: as the
+bare name, a quoted name, or a `__name__="…"` equality. A selector with no
+metric name, or `__name__` matched by a pattern or a negation, would read every
+series the endpoint holds. It is PromQL's `query_to_xml`, and it is refused.
+`info()` is refused for the same reason, since it joins in `target_info` series
+the expression never names. A string literal the grammar's tokenizer would let
+run unterminated is refused too. `test/promql-safety.fuzz.test.ts` generates
+expressions from adversarial shapes beside the SQL suite, with an independent
+oracle walking the raw parse tree.
+
+A variable in PromQL may only be a label matcher's whole value,
+`{host=":host"}`, and must be declared; anywhere else its shape is refused. The
+HTTP API has no bound parameters, so here the value is written into the text.
+That happens only after the pick is checked, only as an escaped string literal
+in that one position, and the rewrite is re-parsed and compared node by node
+with the original. A value can change which series match, never what the
+expression is.
+
 ## 8. The server owns the time range
 
 Blocking `now()` and `current_timestamp` is not sufficient on PostgreSQL:
@@ -144,6 +167,15 @@ savepoint inside a transaction that is always rolled back, and Postgres makes
 DDL transactional, so it cannot leave anything behind even in the case where
 the server allows it.
 
+**For a Prometheus source**, the `@` modifier is refused in every spelling
+(`@ start()`, `@ end()`, a timestamp). It pins evaluation to a time, so it is
+PromQL's `now()`. `offset` is allowed because it is relative to the window the
+server chose. A range, a subquery's range and an offset are each bounded by
+`PROMQL_MAX_RANGE` (default `7d`), and a subquery's step must be at least a
+second. The expression carries no time at all: `buildPromqlPlan` sets `start`,
+`end` and `step` from the window the server resolved, and a panel's `minStep`
+can only raise the step.
+
 ## 8a. A row-filtered source returns only the viewer's rows
 
 The time window is not the only predicate the server owns. A source with a
@@ -163,6 +195,16 @@ for a source without one, so a call site cannot leave it out. A viewer without
 the claim is refused, never served unfiltered, and that includes a platform
 admin. Pollers are keyed by the claim values they run with, so tenants never
 share one. See [Row-level filters](/operations/row-level-filters/).
+
+**For a Prometheus source**, the row filter is a tenant label, `{ label, claim
+}`. `applyPromqlRowFilter` (`src/lib/promql/row-filter.ts`) splices
+`label="<the viewer's claim value>"` into every selector at the parser's
+offsets, including selectors inside subqueries and function arguments. A
+selector that already matches on that label is refused rather than overridden.
+The result is re-parsed and verified to have the same tree once the added
+matchers are set aside, with exactly one equality matcher on the label in every
+selector. A label-values variable with no `match` of its own draws its values
+from the allowlisted metrics only, with the same tenant matcher.
 
 ## 9. The catalog prompt is metadata only, and that metadata is untrusted
 

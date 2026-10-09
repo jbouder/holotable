@@ -268,6 +268,7 @@ describe("the scrape body", () => {
       "holotable_llm_tokens_total",
       "holotable_llm_requests_total",
       "holotable_sql_validation_rejections_total",
+      "holotable_promql_validation_rejections_total",
       "holotable_audit_write_failures_total",
     ]) {
       assert.ok(body.includes(`# TYPE ${name} `), `${name} is missing from the scrape`);

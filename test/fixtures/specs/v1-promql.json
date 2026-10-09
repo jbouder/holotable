@@ -1,0 +1,107 @@
+{
+  "specVersion": 1,
+  "title": "API traffic from Prometheus",
+  "timeRange": {
+    "from": "now-6h",
+    "to": "now"
+  },
+  "refreshIntervalMs": 30000,
+  "variables": [
+    {
+      "name": "instance",
+      "label": "Instance",
+      "type": "query",
+      "query": {
+        "sourceId": "prom-metrics",
+        "label": "instance",
+        "match": "up{job=\"api\"}"
+      },
+      "multi": true
+    }
+  ],
+  "panels": [
+    {
+      "id": "rate",
+      "title": "Request rate by route",
+      "viz": "line",
+      "format": "number",
+      "query": {
+        "sourceId": "prom-metrics",
+        "promql": "sum by (route) (rate(http_requests_total{job=\"api\", instance=~\":instance\"}[5m]))",
+        "minStep": "30s"
+      },
+      "layout": {
+        "x": 0,
+        "y": 0,
+        "w": 8,
+        "h": 4
+      }
+    },
+    {
+      "id": "up",
+      "title": "Instances up",
+      "viz": "stat",
+      "format": "number",
+      "query": {
+        "sourceId": "prom-metrics",
+        "promql": "sum(up{job=\"api\"})",
+        "instant": true
+      },
+      "layout": {
+        "x": 8,
+        "y": 0,
+        "w": 4,
+        "h": 2
+      }
+    },
+    {
+      "id": "p95",
+      "title": "p95 latency",
+      "viz": "area",
+      "format": "ms",
+      "query": {
+        "sourceId": "prom-metrics",
+        "promql": "histogram_quantile(0.95, sum by (le) (rate(http_request_duration_seconds_bucket[5m]))) * 1000"
+      },
+      "layout": {
+        "x": 8,
+        "y": 2,
+        "w": 4,
+        "h": 2
+      }
+    },
+    {
+      "id": "top-routes",
+      "title": "Busiest routes",
+      "viz": "table",
+      "query": {
+        "sourceId": "prom-metrics",
+        "promql": "topk(5, sum by (route) (rate(http_requests_total[1h])))",
+        "instant": true
+      },
+      "layout": {
+        "x": 0,
+        "y": 4,
+        "w": 6,
+        "h": 3
+      }
+    },
+    {
+      "id": "sql-beside",
+      "title": "Requests per minute (TimescaleDB)",
+      "viz": "line",
+      "format": "number",
+      "query": {
+        "sourceId": "ts-metrics",
+        "sql": "SELECT time_bucket('1 minute', ts) AS minute, count(*) AS requests FROM http_requests GROUP BY minute ORDER BY minute",
+        "timeField": "minute"
+      },
+      "layout": {
+        "x": 6,
+        "y": 4,
+        "w": 6,
+        "h": 3
+      }
+    }
+  ]
+}

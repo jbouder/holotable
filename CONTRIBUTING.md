@@ -165,12 +165,14 @@ A change to the IR is checked against `test/fixtures/specs/`, stored specs
 that are never edited; see the README there before adding one or changing a
 snapshot under `test/snapshots/`.
 
-`npm run test:fuzz` runs the property-based SQL guard suite on its own.
+`npm run test:fuzz` runs the property-based SQL and PromQL guard suites on
+their own.
 `npm test` includes it with a fixed seed and a small iteration count, so it is
 deterministic; CI also runs it longer with a fresh seed in a job that is not
 required to merge. If it fails, the output has the exact statement and a
 `FUZZ_SEED=… FUZZ_PATH=…` line that replays that one case. Add the statement to
-`test/fixtures/sql-fuzz-corpus.ts` with the verdict it should have, and a named
+`test/fixtures/sql-fuzz-corpus.ts` (or, for PromQL,
+`test/fixtures/promql-corpus.ts`) with the verdict it should have, and a named
 test explaining why.
 
 `npm run eval` grades generation quality against a fixed corpus of prompts

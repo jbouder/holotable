@@ -43,5 +43,10 @@
     "authoredAt": 1,
     "digest": "1c77890ac5a5311b78b00f93996b5f48924fa2d4760ff3dbbe1afecd60202627",
     "origin": "hand-written (#371): every panel link form — panel links (no set, literals only, carry false, newTab), datum links by column and by series, self links, a literal beside a datum pick"
+  },
+  "v1-promql.json": {
+    "authoredAt": 1,
+    "digest": "23ab6e197cc52b508d39bc198d76150c470277c8c9762dec49131e3eb1683c3e",
+    "origin": "hand-written (#384): PromQL panels, range and instant, a label-values variable, beside a SQL panel"
   }
 }

@@ -43,13 +43,41 @@ export const MANIFEST_FILE = "index.json";
 export const CATALOGS_FILE = "catalogs.json";
 
 /** What a fixture's SQL is validated against: a source minus its connection. */
-export const FixtureCatalog = z
+export const SqlFixtureCatalog = z
   .object({
     schema: z.string().min(1),
     tables: z.array(CatalogTable).min(1),
     rowFilter: RowFilter.optional(),
   })
   .strict();
+
+/**
+ * What a fixture's PromQL is validated against (#384): a Prometheus source's
+ * metric allowlist and its tenant label, minus the endpoint.
+ */
+export const PromqlFixtureCatalog = z
+  .object({
+    metrics: z
+      .array(
+        z
+          .object({
+            name: z.string().min(1),
+            labels: z.array(z.string().min(1)).optional(),
+          })
+          .strict(),
+      )
+      .min(1),
+    rowFilter: z
+      .object({
+        label: z.string().regex(/^[A-Za-z_][A-Za-z0-9_]*$/),
+        claim: z.string().min(1),
+      })
+      .strict()
+      .optional(),
+  })
+  .strict();
+
+export const FixtureCatalog = z.union([SqlFixtureCatalog, PromqlFixtureCatalog]);
 export type FixtureCatalog = z.infer<typeof FixtureCatalog>;
 
 export const FixtureEntry = z

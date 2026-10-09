@@ -248,6 +248,44 @@
     "params": ["api"],
     "variables": ["service"]
   },
+  "v1-promql.json#rate": {
+    "instant": false,
+    "expr": "sum by (route) (rate(http_requests_total{job=\"api\", instance=~\"instance-value\", tenant=\"fixture-tenant\"}[5m]))",
+    "start": "2026-01-01T00:00:00.000Z",
+    "end": "2026-01-01T01:00:00.000Z",
+    "stepSeconds": 30,
+    "timeoutMs": 20000
+  },
+  "v1-promql.json#up": {
+    "instant": true,
+    "expr": "sum(up{job=\"api\", tenant=\"fixture-tenant\"})",
+    "time": "2026-01-01T01:00:00.000Z",
+    "timeoutMs": 20000
+  },
+  "v1-promql.json#p95": {
+    "instant": false,
+    "expr": "histogram_quantile(0.95, sum by (le) (rate(http_request_duration_seconds_bucket{tenant=\"fixture-tenant\"}[5m]))) * 1000",
+    "start": "2026-01-01T00:00:00.000Z",
+    "end": "2026-01-01T01:00:00.000Z",
+    "stepSeconds": 5,
+    "timeoutMs": 20000
+  },
+  "v1-promql.json#top-routes": {
+    "instant": true,
+    "expr": "topk(5, sum by (route) (rate(http_requests_total{tenant=\"fixture-tenant\"}[1h])))",
+    "time": "2026-01-01T01:00:00.000Z",
+    "timeoutMs": 20000
+  },
+  "v1-promql.json#sql-beside": {
+    "sql": "SELECT * FROM (SELECT time_bucket('1 minute', ts) AS minute, count(*) AS requests FROM http_requests GROUP BY minute ORDER BY minute) AS _holo\nWHERE _holo.minute >= $1::timestamptz\n  AND _holo.minute < $2::timestamptz\nLIMIT 5000",
+    "params": ["2026-01-01T00:00:00.000Z", "2026-01-01T01:00:00.000Z"],
+    "timeField": "minute"
+  },
+  "v1-promql.json#variable:instance": {
+    "label": "instance",
+    "match": ["up{job=\"api\", tenant=\"fixture-tenant\"}"],
+    "timeoutMs": 20000
+  },
   "v1-seeded-fleet-status.json#cpu-now": {
     "sql": "SELECT * FROM (SELECT time_bucket('1 minute', ts) AS minute, host, avg(cpu_pct) AS cpu FROM system_metrics GROUP BY minute, host ORDER BY minute) AS _holo\nWHERE _holo.minute >= $1::timestamptz\n  AND _holo.minute < $2::timestamptz\nLIMIT 5000",
     "params": ["2026-01-01T00:00:00.000Z", "2026-01-01T01:00:00.000Z"],

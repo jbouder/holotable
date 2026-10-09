@@ -27,6 +27,9 @@ function num(name: string, fallback: number): number {
   return Number.isFinite(parsed) ? parsed : fallback;
 }
 
+/** A single-unit duration, as `PROMQL_MAX_RANGE` takes one: `7d`, `12h`. */
+const DURATION = /^(\d+)(ms|s|m|h|d|w)$/;
+
 function str(name: string, fallback: string): string {
   const raw = process.env[name];
   return raw === undefined || raw === "" ? fallback : raw;
@@ -120,6 +123,12 @@ export const config = {
    * the limit before it is fully buffered. Default 4 MiB.
    */
   maxResultBytes: num("MAX_RESULT_BYTES", 4 * 1024 * 1024),
+  /**
+   * The longest range, subquery range or offset a PromQL expression may ask
+   * for (#384), so one selector cannot ask the endpoint for a year. A
+   * duration such as `7d` or `12h`.
+   */
+  promqlMaxRange: str("PROMQL_MAX_RANGE", "7d"),
   /** Max points retained per series in the browser rolling window. */
   maxWindowPoints: num("MAX_WINDOW_POINTS", 720),
   /** Statement timeout (seconds) applied to every metrics query. */
@@ -540,6 +549,15 @@ const EnvSchema = z.object({
   DEFAULT_TIME_TO: blank(timeExpr),
   MAX_QUERY_ROWS: blank(positiveInt),
   MAX_RESULT_BYTES: blank(positiveInt),
+  PROMQL_MAX_RANGE: blank(
+    z
+      .string()
+      .regex(DURATION, "must be a duration such as 7d or 12h")
+      .refine(
+        (v) => !DURATION.test(v) || Number(DURATION.exec(v)?.[1]) > 0,
+        "must be longer than zero",
+      ),
+  ),
   MAX_WINDOW_POINTS: blank(positiveInt),
   QUERY_TIMEOUT_SECONDS: blank(positiveInt),
   MAX_POOL_PER_SOURCE: blank(positiveInt),
