@@ -101,6 +101,15 @@ Important files:
   the editor draws controls for. A panel's own `timeRange` and
   `refreshIntervalMs` (#114) are read through `panelTimeRange` and
   `panelRefreshMs`; the poller groups panels by cadence under one timer
+- `src/lib/sources/registry.ts` — the source kinds (#382, ADR 2), as the panel
+  registry is the panel kinds. `SourceConfig` is the union of every kind's
+  config on `kind`; a kind's browser-safe module is under
+  `src/lib/sources/kinds/` (config schema, `connection`, `catalog`, `listing`,
+  `language`) and its server half under `src/lib/sources/server/`
+  (`discover`, `refresh`, `test`, `validate`, `plan`, `execute`, the catalog
+  prompt). Never compare `source.kind` or import `src/lib/timescaledb/` from a
+  route: ask `sourceKind(record)` or `serverKind(record)` and use what comes
+  back. `test/source-kinds.test.ts` fails on either outside `src/lib/sources/`
 - `src/lib/sql/safety.ts` — the SQL guard every generated query passes through
 - `src/lib/sql/ast.ts` — the PostgreSQL parse-tree walk the guard is built on
 - `src/lib/sql/row-filter.ts` — row-level filters (#31): every real table a

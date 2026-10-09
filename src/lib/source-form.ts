@@ -233,9 +233,14 @@ function humanize(key: string, issue: { code: string; message: string }): string
   return issue.message;
 }
 
-/** The config a state describes, keyed in `SourceConfig`'s own order. */
+/**
+ * The config a state describes, keyed in `SourceConfig`'s own order. The form
+ * describes a TimescaleDB source, and says so: a saved config names its kind
+ * rather than leaving it to the schema's default for configs from before
+ * there was more than one.
+ */
 function configDraft(state: SourceFormState, port: unknown): Record<string, unknown> {
-  return { ...connectionDraft(state, port), tables: state.tables };
+  return { kind: "timescaledb", ...connectionDraft(state, port), tables: state.tables };
 }
 
 function connectionDraft(state: SourceFormState, port: unknown): Record<string, unknown> {

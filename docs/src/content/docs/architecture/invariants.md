@@ -79,7 +79,9 @@ non-deterministic functions, keywords and literals are banned. See
 
 The function denylist spans dialects on purpose. Entries in ClickHouse vocabulary cost
 nothing against a PostgreSQL target and mean a future driver inherits them, but
-the PostgreSQL entries are the ones doing work today. Two groups matter most:
+the PostgreSQL entries are the ones doing work today. A future driver is a
+registered source kind, with its own guard behind the same seam
+([ADR 2](/architecture/decisions/0002-source-kinds/)). Two groups matter most:
 
 - **Functions that take a query string and execute it** — `query_to_xml` and
   the rest of the `*_to_xml` family. The catalog allowlist never sees the

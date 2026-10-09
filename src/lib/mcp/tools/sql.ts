@@ -7,10 +7,10 @@ import { defineTool, type McpTool, READ_ONLY } from "@/lib/mcp/tool";
 import type { McpDeps } from "@/lib/mcp/tools/deps";
 import { liveSource } from "@/lib/mcp/tools/sources";
 import { rowFilterFor, rowFilterHttpError } from "@/lib/row-scope";
-import { buildExecutablePlan, validateSql } from "@/lib/sql/safety";
 import { VariableError } from "@/lib/sql/variables";
 import { resolveTimeRange } from "@/lib/time";
-import { QueryExecutionError } from "@/lib/timescaledb/client";
+import { QueryExecutionError } from "@/lib/sources/execution";
+import { serverKind } from "@/lib/sources/server/registry";
 import { VariableValuesBody } from "@/lib/variable-selection";
 
 /**
@@ -59,7 +59,7 @@ export function sqlTools(deps: McpDeps): McpTool[] {
           { workspaceId: source.workspaceId },
           { type: "source", id: source.id },
         );
-        const check = await validateSql(
+        const check = await serverKind(source).validate(
           args.sql,
           source.config,
           new Set(args.variables ?? []),
@@ -117,7 +117,7 @@ export function sqlTools(deps: McpDeps): McpTool[] {
           });
 
         const variables = args.variables ?? {};
-        const check = await validateSql(
+        const check = await serverKind(source).validate(
           args.sql,
           source.config,
           new Set(Object.keys(variables)),
@@ -130,7 +130,7 @@ export function sqlTools(deps: McpDeps): McpTool[] {
           args.timeRange ?? { from: config.defaultTimeFrom, to: config.defaultTimeTo },
         );
         try {
-          const plan = buildExecutablePlan({
+          const plan = serverKind(source).plan({
             sql: args.sql,
             timeField: args.timeField,
             from,

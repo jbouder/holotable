@@ -5,7 +5,7 @@ import { audit } from "@/lib/audit";
 import { SourceConnection } from "@/lib/registry";
 import { SECRET_REF_MESSAGE, SECRET_REF_PATTERN } from "@/lib/secret-refs";
 import { requireGrantedSecretRef } from "@/lib/secrets/http";
-import { discoverTables } from "@/lib/timescaledb/catalog";
+import { serverKind } from "@/lib/sources/server/registry";
 
 export const runtime = "nodejs";
 export const maxDuration = 30;
@@ -16,6 +16,11 @@ export const maxDuration = 30;
 // only introspect with an account the operator has given their workspace
 // (invariant 5).
 const Body = z.object({
+  /**
+   * The kind of the source being drafted. Optional for the bodies sent before
+   * there was more than one, which were all TimescaleDB.
+   */
+  kind: z.literal("timescaledb").default("timescaledb"),
   workspaceId: z.string().min(1).max(128),
   secretRef: z.string().regex(SECRET_REF_PATTERN, SECRET_REF_MESSAGE),
   connection: SourceConnection,
@@ -65,7 +70,7 @@ export const POST = route("sources.discover", async (req: Request) => {
     });
 
   try {
-    const tables = await discoverTables(
+    const tables = await serverKind(body.kind).discover(
       body.connection,
       body.secretRef,
       body.workspaceId,

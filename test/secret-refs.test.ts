@@ -248,6 +248,7 @@ function sourceIn(workspaceId: string, secretRef: string): SourceRecord {
     // A port nothing listens on: a check that let the ref through would fail
     // with a connection error instead, and the assertion would say so.
     config: {
+      kind: "timescaledb",
       host: "127.0.0.1",
       port: 1,
       database: "db",

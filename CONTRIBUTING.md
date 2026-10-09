@@ -270,7 +270,10 @@ The short version, five rules:
    AGENTS.md); the fixture library in `test/fixtures/specs/` fails until it
    does. Panel kinds are registered in `src/lib/panels/registry.ts`,
    not listed in `ir.ts`; the docs page "Streaming and rendering" says how to
-   add one.
+   add one. Source kinds are registered the same way, in
+   `src/lib/sources/registry.ts` with their server half in
+   `src/lib/sources/server/registry.ts`: never compare `source.kind` outside
+   `src/lib/sources/`, ask the kind instead (ADR 2 in the docs).
 2. **The model generates specs, never data.** The LLM may produce a
    specification and SQL. It must never produce metric values, and the client
    must never render data that did not come from server-side query execution.

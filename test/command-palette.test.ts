@@ -231,6 +231,7 @@ test("a search result carries a source's name and nothing else about it", () => 
     name: "metrics",
     kind: "timescaledb",
     config: {
+      kind: "timescaledb",
       host: "db.internal.example",
       port: 5432,
       database: "metrics",

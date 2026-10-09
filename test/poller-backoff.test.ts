@@ -19,7 +19,7 @@ import {
   type PollerEvent,
   retryPanel,
 } from "@/lib/poller/registry";
-import { QueryExecutionError } from "@/lib/timescaledb/client";
+import { QueryExecutionError } from "@/lib/sources/execution";
 
 /*
  * Poller backoff (#44): the policy as arithmetic, then the poller on a mocked

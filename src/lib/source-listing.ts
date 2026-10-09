@@ -1,4 +1,5 @@
 import type { SourceRecord } from "@/lib/registry";
+import { sourceKind } from "@/lib/sources/registry";
 
 /**
  * What a source looks like to someone who may use it but not manage it.
@@ -21,13 +22,7 @@ export interface SourceListing {
   tombstonedAt: string | null;
 }
 
+/** Projected by the source's kind, which names each field it lets through. */
 export function sourceListing(source: SourceRecord): SourceListing {
-  return {
-    id: source.id,
-    workspaceId: source.workspaceId,
-    name: source.name,
-    schema: source.config.schema,
-    tableCount: source.config.tables.length,
-    tombstonedAt: source.tombstonedAt,
-  };
+  return sourceKind(source).listing(source);
 }

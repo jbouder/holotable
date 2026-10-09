@@ -8,12 +8,12 @@ import {
 } from "ai";
 import { z } from "zod";
 import { type Model, modelSettings } from "@/lib/ai/provider";
-import { renderCatalog } from "@/lib/timescaledb/catalog";
 import { fenceUntrustedBlock, sanitizePromptField } from "@/lib/ai/untrusted";
 import { SQL_RULES } from "@/lib/ai/generate";
-import { validateSql, buildExecutablePlan, type ExecutablePlan } from "@/lib/sql/safety";
+import type { ExecutablePlan } from "@/lib/sql/safety";
 import { resolveTimeRange } from "@/lib/time";
-import { executePlan, QueryExecutionError } from "@/lib/timescaledb/client";
+import { QueryExecutionError } from "@/lib/sources/execution";
+import { serverKind } from "@/lib/sources/server/registry";
 import {
   Dashboard,
   declaredVariables,
@@ -183,14 +183,19 @@ export async function buildChatQueryPlan(input: {
   // one's default or a list's first value; a variable with no value here
   // makes a statement that needs it refused by name.
   const variables = input.variables ?? chatVariableValues(dashboard);
-  const check = await validateSql(args.sql, source.config, declaredVariables(dashboard));
+  const kind = serverKind(source);
+  const check = await kind.validate(
+    args.sql,
+    source.config,
+    declaredVariables(dashboard),
+  );
   if (!check.ok) return { ok: false, error: check.error ?? "invalid sql" };
 
   // The server is the sole authority on the window: the range the reader is
   // viewing, resolved here, never anything the model tried to express.
   try {
     const range = resolveTimeRange(dashboard.timeRange);
-    const plan = buildExecutablePlan({
+    const plan = kind.plan({
       sql: args.sql,
       timeField: args.timeField,
       from: range.from,
@@ -316,7 +321,10 @@ export function buildSystemPrompt(
   const panels = fenceUntrustedBlock("PANELS", renderPanels(dashboard));
 
   const catalogs = sources.length
-    ? fenceUntrustedBlock("CATALOG", sources.map((s) => renderCatalog(s)).join("\n\n"))
+    ? fenceUntrustedBlock(
+        "CATALOG",
+        sources.map((s) => serverKind(s).renderCatalog(s)).join("\n\n"),
+      )
     : "(no queryable sources are available to you on this dashboard)";
 
   return `You are a data assistant embedded in a live monitoring dashboard. You help the
@@ -443,7 +451,10 @@ export async function streamDashboardChat(input: {
             return { error: built.error };
           }
           try {
-            const result = await executePlan(built.source, built.plan);
+            const result = await serverKind(built.source).execute(
+              built.source,
+              built.plan,
+            );
             report("success");
             return {
               columns: result.columns,

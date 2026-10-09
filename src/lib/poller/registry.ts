@@ -1,13 +1,14 @@
 import { type Dashboard, hasQuery, panelRefreshMs, type QueryPanel } from "@/lib/ir";
 import { getSourceById } from "@/lib/db/repo";
 import type { SourceRecord } from "@/lib/registry";
-import { validateSql, buildExecutablePlan, type ExecutablePlan } from "@/lib/sql/safety";
+import type { ExecutablePlan } from "@/lib/sql/safety";
 import { RowFilterDenied, RowFilterError } from "@/lib/sql/row-filter";
 import { VariableError, type VariableValues } from "@/lib/sql/variables";
 import { valuesKey } from "@/lib/variable-selection";
 import { rowFilterInScope, type RowScope } from "@/lib/row-scope";
 import { resolveTimeRange, TimeRangeError } from "@/lib/time";
-import { executePlan, QueryExecutionError } from "@/lib/timescaledb/client";
+import { QueryExecutionError } from "@/lib/sources/execution";
+import { serverKind } from "@/lib/sources/server/registry";
 import { config } from "@/lib/config";
 import { type ErrorKind, OPAQUE_MESSAGE } from "@/lib/errors";
 import { log } from "@/lib/log";
@@ -192,7 +193,8 @@ export function makePanelExecutor(
       return [{ type: "tombstone", panelId: panel.id, sourceId: panel.query.sourceId }];
     }
 
-    const check = await validateSql(
+    const kind = serverKind(source);
+    const check = await kind.validate(
       panel.query.sql,
       source.config,
       new Set(Object.keys(variables)),
@@ -210,7 +212,7 @@ export function makePanelExecutor(
 
     let plan: ExecutablePlan;
     try {
-      plan = buildExecutablePlan({
+      plan = kind.plan({
         sql: panel.query.sql,
         timeField: panel.query.timeField,
         from: window.from,
@@ -243,7 +245,7 @@ export function makePanelExecutor(
       }
       throw err;
     }
-    const result = await executePlan(source, plan);
+    const result = await kind.execute(source, plan);
 
     // The whole result, always. Each subscriber's delta is cut from it by the
     // poller, against that subscriber's own cursor.

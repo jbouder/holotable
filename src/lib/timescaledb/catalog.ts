@@ -12,14 +12,15 @@ import {
   type SourceRecord,
 } from "@/lib/registry";
 import { resolveCredentials } from "@/lib/secrets/credentials";
+import { TimescaleDbConfig } from "@/lib/sources/kinds/timescaledb";
 
 // The clamp for each catalog field in a prompt is the registry schema's own
 // maximum, read from the schema so the two cannot drift apart.
 const MAX = {
   sourceId: 128,
   sourceName: 200,
-  database: SourceConfig.shape.database.maxLength ?? 128,
-  schema: SourceConfig.shape.schema.unwrap().maxLength ?? 128,
+  database: TimescaleDbConfig.shape.database.maxLength ?? 128,
+  schema: TimescaleDbConfig.shape.schema.unwrap().maxLength ?? 128,
   table: CatalogTable.shape.name.maxLength ?? 128,
   tableDescription: CatalogTable.shape.description.unwrap().maxLength ?? 500,
   timeField: CatalogTable.shape.timeField.unwrap().maxLength ?? 128,

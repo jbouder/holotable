@@ -3,10 +3,10 @@ import { requireIdentity, assertAuthorized, HttpError } from "@/lib/auth/authori
 import { readJson, json, route } from "@/lib/http";
 import { audit } from "@/lib/audit";
 import { getSourceById } from "@/lib/db/repo";
-import { validateSql, buildExecutablePlan } from "@/lib/sql/safety";
 import { resolveTimeRange } from "@/lib/time";
 import { rowFilterFor, rowFilterHttpError } from "@/lib/row-scope";
-import { executePlan, QueryExecutionError } from "@/lib/timescaledb/client";
+import { QueryExecutionError, type QueryResult } from "@/lib/sources/execution";
+import { serverKind } from "@/lib/sources/server/registry";
 import { TimeRange } from "@/lib/ir";
 import { VariableError } from "@/lib/sql/variables";
 import { VariableValuesBody } from "@/lib/variable-selection";
@@ -56,8 +56,9 @@ export const POST = route("query", async (req: Request) => {
         detail: { via: "preview", sql: body.sql, stage },
       });
 
+    const kind = serverKind(source);
     const variables = body.variables ?? {};
-    const check = await validateSql(
+    const check = await kind.validate(
       body.sql,
       source.config,
       new Set(Object.keys(variables)),
@@ -68,9 +69,9 @@ export const POST = route("query", async (req: Request) => {
     }
 
     const range = resolveTimeRange(body.timeRange);
-    let result: Awaited<ReturnType<typeof executePlan>>;
+    let result: QueryResult;
     try {
-      const plan = buildExecutablePlan({
+      const plan = kind.plan({
         sql: body.sql,
         timeField: body.timeField,
         from: range.from,
@@ -79,7 +80,7 @@ export const POST = route("query", async (req: Request) => {
         rowFilter: rowFilterFor(source, identity),
         variables,
       });
-      result = await executePlan(source, plan);
+      result = await kind.execute(source, plan);
     } catch (err) {
       record("failure", "execute");
       throw err;

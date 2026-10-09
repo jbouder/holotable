@@ -19,7 +19,7 @@ import type { McpDeps } from "@/lib/mcp/tools/deps";
 import { promptDashboards } from "@/lib/ai/prompt-dashboards";
 import { recordLlmRepair } from "@/lib/metrics";
 import { grantedRefs } from "@/lib/secret-refs";
-import { buildCatalogPrompt } from "@/lib/timescaledb/catalog";
+import { serverKind } from "@/lib/sources/server/registry";
 
 /**
  * The generation flows, as tools. Each is the route it mirrors —
@@ -191,7 +191,7 @@ export function generationTools(deps: McpDeps): McpTool[] {
             });
             return null;
           });
-        const catalog = sources.map((s) => buildCatalogPrompt(s)).join("\n\n");
+        const catalog = sources.map((s) => serverKind(s).catalogPrompt(s)).join("\n\n");
         // What a link may lead to (#375), as the route builds it: this
         // workspace's dashboards, for a caller who may view them.
         const dashboards = await promptDashboards({
@@ -273,7 +273,7 @@ export function generationTools(deps: McpDeps): McpTool[] {
           mode: "explore",
           sourceId: source.id,
           prompt: args.prompt,
-          catalog: buildCatalogPrompt(source),
+          catalog: serverKind(source).catalogPrompt(source),
           auditAttempt: (event, attempt, modelConfig) =>
             audit({
               actor: identity,

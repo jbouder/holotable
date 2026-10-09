@@ -74,6 +74,7 @@ async function type(
 
 function connected(): SourceConfig {
   return {
+    kind: "timescaledb",
     host: "timescaledb",
     port: 5432,
     database: "holotable",

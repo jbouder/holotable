@@ -23,7 +23,7 @@ import { sourceTools } from "@/lib/mcp/tools/sources";
 import { sqlTools } from "@/lib/mcp/tools/sql";
 import { invalidatePoller } from "@/lib/poller/registry";
 import { secretRefGrants } from "@/lib/secrets/credentials";
-import { executePlan } from "@/lib/timescaledb/client";
+import { serverKind } from "@/lib/sources/server/registry";
 import { workspacePromptFor } from "@/lib/workspace-prompt-service";
 
 export type { McpDeps } from "@/lib/mcp/tools/deps";
@@ -33,7 +33,7 @@ export function defaultMcpDeps(): McpDeps {
   return {
     getSource: getSourceById,
     listSources,
-    executePlan,
+    executePlan: (source, plan) => serverKind(source).execute(source, plan),
     listDashboards,
     getDashboard: getDashboardById,
     createDashboard,

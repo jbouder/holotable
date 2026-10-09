@@ -10,7 +10,7 @@ import {
   workspaceContextBlock,
 } from "@/lib/ai/prompt";
 import { withKnownLinkTargets } from "@/lib/ai/link-targets";
-import { buildCatalogPrompt } from "@/lib/timescaledb/catalog";
+import { serverKind } from "@/lib/sources/server/registry";
 import {
   type Dashboard,
   DashboardGenerationSchema,
@@ -194,12 +194,13 @@ function sourcesSection(sources: readonly SourceRecord[]): string {
 sourceId: ${source.id}
 
 Catalog (metadata only):
-${buildCatalogPrompt(source)}`;
+${serverKind(source).catalogPrompt(source)}`;
   }
   const ids = sources.map((s) => `sourceId: ${s.id}`).join("\n");
   const catalogs = sources
     .map(
-      (s) => `Catalog for sourceId "${s.id}" (metadata only):\n${buildCatalogPrompt(s)}`,
+      (s) =>
+        `Catalog for sourceId "${s.id}" (metadata only):\n${serverKind(s).catalogPrompt(s)}`,
     )
     .join("\n\n");
   return `The authorized data sources for this request (each panel uses exactly ONE):

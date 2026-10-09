@@ -215,6 +215,7 @@ function source(id: string, workspaceId = "ws"): SourceRecord {
     name: id,
     kind: "timescaledb",
     config: {
+      kind: "timescaledb",
       host: "localhost",
       port: 5432,
       database: "d",
