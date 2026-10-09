@@ -5,6 +5,11 @@ sidebar:
   order: 2
 ---
 
+**IR** stands for *intermediate representation*: the dashboard spec the model
+writes and everything else reads. It sits between the natural-language prompt
+and the rendered dashboard, the way a compiler's IR sits between source and
+machine code, and it is the one format every layer agrees on.
+
 A panel is one object in the shared Zod IR (`src/lib/ir.ts`). Its entire
 contract:
 
