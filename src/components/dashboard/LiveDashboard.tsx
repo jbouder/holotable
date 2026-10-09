@@ -13,6 +13,7 @@ import { AnnotationsControl, useAnnotations } from "@/components/dashboard/Annot
 import type { PollerEvent } from "@/lib/poller/registry";
 import { DashboardGrid } from "@/components/dashboard/DashboardGrid";
 import { PanelView, type PanelState } from "@/components/dashboard/PanelView";
+import { applySelfLink, type LinkTargets, menuLinks } from "@/lib/drilldown";
 import { ErrorDisplay } from "@/components/ui/error-display";
 import { type ApiError, presentError } from "@/lib/errors";
 import { ConnectionIndicator } from "@/components/dashboard/ConnectionIndicator";
@@ -86,6 +87,7 @@ export function LiveDashboard({
   initialSelection = {},
   annotationAccess,
   shareToken,
+  linkTargets = {},
 }: {
   dashboardId: string;
   spec: Dashboard;
@@ -121,6 +123,12 @@ export function LiveDashboard({
    * page offers no controls that would need a session.
    */
   shareToken?: string;
+  /**
+   * The panel links' targets this viewer may follow (#372), as the server
+   * resolved them. A link to anything else is shown disabled. Ignored on a
+   * share link, which shows no links at all.
+   */
+  linkTargets?: LinkTargets;
 }) {
   const shared = shareToken !== undefined;
   const [selection, setSelection] = React.useState<Selection>(initialSelection);
@@ -574,6 +582,13 @@ export function LiveDashboard({
             crosshairGroup={dashboardId}
             onSelectTimeRange={shared ? undefined : setTimeRange}
             embedded={shared}
+            // The other side of a share link has no session to follow one with.
+            links={
+              shared ? undefined : menuLinks(panel, linkTargets, { timeRange, selection })
+            }
+            onSelfLink={
+              shared ? undefined : (link) => setSelection((s) => applySelfLink(link, s))
+            }
             // A panel with its own window (#114) is sent it with its rows.
             window={panel.timeRange ? undefined : resolvedWindow}
             // Hidden is an empty list rather than none, so the merge clears

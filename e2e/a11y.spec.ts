@@ -1,6 +1,11 @@
 import { expect, test } from "@playwright/test";
 import { expectNoA11yViolations, type Theme, setAppearance } from "./support/a11y";
-import { DEMO_DASHBOARD, dashboardId, waitForPanels } from "./support/app";
+import {
+  createLinkedDashboards,
+  DEMO_DASHBOARD,
+  dashboardId,
+  waitForPanels,
+} from "./support/app";
 
 /*
  * Every main surface, in both themes (#91): contrast differs between them, so
@@ -84,6 +89,15 @@ for (const theme of THEMES) {
         .click();
       await page.getByRole("menuitem", { name: "Show generated SQL" }).click();
       await expect(page.getByRole("dialog")).toBeVisible();
+      await expectNoA11yViolations(page);
+    });
+
+    test("an open menu: a panel's links", async ({ page, request }) => {
+      const { source } = await createLinkedDashboards(request);
+      await page.goto(`/dashboards/${source}`);
+      await waitForPanels(page);
+      await page.getByRole("button", { name: "Actions for Requests by route" }).click();
+      await expect(page.getByRole("menuitem", { name: "Checkout detail" })).toBeVisible();
       await expectNoA11yViolations(page);
     });
 

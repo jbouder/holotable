@@ -1,8 +1,9 @@
 "use client";
 
 import * as React from "react";
-import { Clock, Info } from "lucide-react";
-import { hasQuery, type Panel, type TimeRange } from "@/lib/ir";
+import { Clock, Info, Link2 } from "lucide-react";
+import { hasQuery, type Panel, type PanelLink, type TimeRange } from "@/lib/ir";
+import { hasUsableLinks, type MenuLinkItem } from "@/lib/drilldown";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ErrorDisplay } from "@/components/ui/error-display";
 import type { EChartHandle } from "@/components/charts/EChart";
@@ -66,6 +67,8 @@ export function PanelView({
   window,
   annotations,
   embedded = false,
+  links,
+  onSelfLink,
 }: {
   panel: Panel;
   state?: PanelState;
@@ -96,6 +99,13 @@ export function PanelView({
   onSelectTimeRange?: (range: TimeRange) => void;
   /** Shown through a read-only share link (#65): nothing that needs a session or the SQL. */
   embedded?: boolean;
+  /**
+   * The panel's links as its menu offers them (#372). A surface that does not
+   * draw links (a share link, the editor, Explore) passes none.
+   */
+  links?: MenuLinkItem[];
+  /** Follow a self link: set this dashboard's variables in place. */
+  onSelfLink?: (link: PanelLink) => void;
 }) {
   const data = state?.data ?? EMPTY;
   // A panel that runs no query (text, #202) has nothing to load or go stale.
@@ -153,6 +163,12 @@ export function PanelView({
           <div className="flex shrink-0 items-center gap-1">
             <OverrideBadge panel={panel} />
             {showBadge && <StatusBadge status={status} updatedAt={state?.updatedAt} />}
+            {!embedded && links && hasUsableLinks(links) && (
+              <span className="inline-flex h-7 w-5 items-center justify-center text-muted">
+                <Link2 className="h-3.5 w-3.5" aria-hidden />
+                <span className="sr-only">Has links</span>
+              </span>
+            )}
             <PanelActions
               panelTitle={panel.title}
               dashboardTitle={dashboardTitle}
@@ -163,6 +179,8 @@ export function PanelView({
               onToggleExpanded={expansion.toggle}
               // A share link (#65) carries no SQL to show; a text panel has none.
               onShowSql={!embedded && queried ? () => setSqlOpen(true) : undefined}
+              links={embedded ? undefined : links}
+              onSelfLink={embedded ? undefined : onSelfLink}
               onAskAbout={
                 askAbout && !embedded
                   ? () => {

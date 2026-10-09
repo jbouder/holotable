@@ -2,6 +2,7 @@
 
 import type * as React from "react";
 import {
+  ArrowUpRight,
   Code,
   Download,
   Image as ImageIcon,
@@ -20,6 +21,8 @@ import {
   toCsv,
 } from "@/lib/panel-export";
 import { resolveColor } from "@/lib/color/oklch";
+import type { MenuLinkItem } from "@/lib/drilldown";
+import type { PanelLink } from "@/lib/ir";
 
 /**
  * The per-panel overflow menu: enlarge it, see the SQL behind it, ask the
@@ -41,6 +44,8 @@ export function PanelActions({
   onToggleExpanded,
   onShowSql,
   onAskAbout,
+  links = [],
+  onSelfLink,
 }: {
   panelTitle: string;
   dashboardTitle?: string;
@@ -58,6 +63,13 @@ export function PanelActions({
    * chat: an embed, the editor, Explore.
    */
   onAskAbout?: () => void;
+  /**
+   * Where the panel leads (#372): an href to a target the server named, a
+   * self link that sets variables in place, or a disabled item for a target
+   * the viewer cannot reach. None on a share link.
+   */
+  links?: MenuLinkItem[];
+  onSelfLink?: (link: PanelLink) => void;
 }) {
   const hasRows = data.columns.length > 0 && data.rows.length > 0;
 
@@ -106,6 +118,34 @@ export function PanelActions({
         <MenuItem onClick={onAskAbout}>
           <MessageSquare className="h-4 w-4" /> Ask about this panel
         </MenuItem>
+      )}
+      {links.map((item) =>
+        item.kind === "navigate" ? (
+          <MenuItem
+            key={item.title}
+            href={item.href}
+            target={item.newTab ? "_blank" : undefined}
+            title={`Open ${item.target}`}
+          >
+            <ArrowUpRight className="h-4 w-4" /> {item.title}
+          </MenuItem>
+        ) : item.kind === "self" ? (
+          <MenuItem
+            key={item.title}
+            onClick={onSelfLink ? () => onSelfLink(item.link) : undefined}
+            disabled={!onSelfLink}
+          >
+            <ArrowUpRight className="h-4 w-4" /> {item.title}
+          </MenuItem>
+        ) : (
+          <MenuItem key={item.title} disabled>
+            <ArrowUpRight className="h-4 w-4" />
+            <span>
+              {item.title}
+              <span className="block text-xs text-muted">Dashboard not available</span>
+            </span>
+          </MenuItem>
+        ),
       )}
       {exportable && <MenuSeparator />}
       {exportable && (

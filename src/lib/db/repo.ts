@@ -534,6 +534,26 @@ export async function getDashboardById(id: string): Promise<DashboardRecord | nu
   return { ...mapSummary(r), spec: upgradeSpec(r.spec) };
 }
 
+/**
+ * The titles of the dashboards among `ids` that exist, are not deleted and are
+ * in `workspaceId` (#372): the candidates a panel link may lead to. An id that
+ * is not a dashboard id at all is simply not found. Authorization is the
+ * caller's; this only narrows to the workspace.
+ */
+export async function getDashboardTitles(
+  workspaceId: string,
+  ids: string[],
+): Promise<Map<string, string>> {
+  const candidates = ids.filter((id) => UUID.test(id));
+  if (candidates.length === 0) return new Map();
+  const rows = await query<{ id: string; title: string }>(
+    `SELECT d.id, d.title FROM dashboards d
+     WHERE d.id = ANY($1::uuid[]) AND d.workspace_id = $2 AND d.deleted_at IS NULL`,
+    [candidates, workspaceId],
+  );
+  return new Map(rows.map((r) => [r.id, r.title]));
+}
+
 export async function createDashboard(input: {
   workspaceId: string;
   createdBy: string;

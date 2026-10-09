@@ -1,5 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
+import type { MenuLinkItem } from "@/lib/drilldown";
 import type { Panel } from "@/lib/ir";
 import { PanelView } from "@/components/dashboard/PanelView";
 import { mount } from "./support/dom";
@@ -63,4 +64,29 @@ test("a panel that is not expanded is a card in the grid, not an overlay", async
   assert.equal(card.getAttribute("aria-label"), panel().title);
   assert.equal(card.getAttribute("aria-modal"), null);
   h.unmount();
+});
+
+test("a panel that leads somewhere says so in its header, except through a share link (#372)", async () => {
+  const usable = [
+    {
+      kind: "navigate" as const,
+      title: "Host",
+      href: "/dashboards/x",
+      newTab: false,
+      target: "Host",
+    },
+  ];
+  const unavailable = [{ kind: "unavailable" as const, title: "Gone" }];
+  async function text(links: MenuLinkItem[], embedded = false): Promise<string> {
+    const h = await mount();
+    h.render(
+      <PanelView panel={panel()} state={STATE} links={links} embedded={embedded} />,
+    );
+    const out = h.container.textContent ?? "";
+    h.unmount();
+    return out;
+  }
+  assert.match(await text(usable), /Has links/);
+  assert.doesNotMatch(await text(unavailable), /Has links/);
+  assert.doesNotMatch(await text(usable, true), /Has links/);
 });

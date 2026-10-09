@@ -21,6 +21,7 @@ import { chatSuggestions } from "@/lib/chat-history";
 import { effectiveModel } from "@/lib/ai/model-resolution";
 import { rangeFromParams } from "@/lib/time-range";
 import { DEMO_IDLE_PAUSE_MS } from "@/lib/stream-idle";
+import { resolveLinkTargets } from "@/lib/drilldown-targets";
 
 export const dynamic = "force-dynamic";
 
@@ -59,6 +60,14 @@ export default async function DashboardViewPage({
     rowScopeFor(identity, variableSources),
   );
 
+  // Where the panels' links lead (#372): only the targets that exist, are in
+  // this workspace and the viewer may open. The browser draws nothing else.
+  const linkTargets = await resolveLinkTargets({
+    identity,
+    workspaceId: dashboard.workspaceId,
+    spec: dashboard.spec,
+  });
+
   const canEdit = can(identity, "dashboard:update", {
     workspaceId: dashboard.workspaceId,
   });
@@ -96,6 +105,7 @@ export default async function DashboardViewPage({
           variables={variables.choices}
           annotationAccess={{ workspaceId: dashboard.workspaceId, canEdit }}
           initialSelection={asSelection(variables.selection)}
+          linkTargets={linkTargets}
           // A saved dashboard with no panels is reachable — an import trimmed to
           // nothing, or every panel deleted in the editor — and used to render as
           // a header over blank space with a live badge above it.

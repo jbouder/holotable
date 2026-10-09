@@ -78,6 +78,7 @@ export default defineConfig({
             { label: "Editing a dashboard", slug: "concepts/editing-a-dashboard" },
             { label: "Dashboard variables", slug: "concepts/variables" },
             { label: "Annotations", slug: "concepts/annotations" },
+            { label: "Drilldown", slug: "concepts/drilldown" },
           ],
         },
         {
