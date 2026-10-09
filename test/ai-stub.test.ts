@@ -124,7 +124,22 @@ test("a source draft uses a granted ref and placeholders, never a plausible host
   });
   const draft = ModelSourceDraft.parse(await finalObject(result));
   assert.equal(draft.secretRef, "TS_METRICS");
+  assert.ok("host" in draft.config);
   assert.equal(draft.config.host, "<host>");
+});
+
+test("the stub drafts a Prometheus source when the description asks for one (#386)", async () => {
+  const result = streamObject({
+    model: stubModel(),
+    schema: ModelSourceDraft,
+    schemaName: "SourceDraft",
+    system: `'secretRef' MUST be one of: "PROM_TEST".`,
+    prompt: "Draft a data source for this description: our Prometheus",
+  });
+  const draft = ModelSourceDraft.parse(await finalObject(result));
+  assert.ok("url" in draft.config);
+  assert.equal(draft.config.kind, "prometheus");
+  assert.equal(draft.secretRef, "PROM_TEST");
 });
 
 test("chat answers with the recorded text", async () => {

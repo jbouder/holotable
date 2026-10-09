@@ -8,7 +8,10 @@ import {
   readOnlyTone,
   shortVersion,
   type SourceTestResult,
+  summarizeMetrics,
   summarizeTables,
+  writeSurfaceHeadline,
+  writeSurfaceTone,
 } from "@/lib/source-test";
 import { cn } from "@/lib/utils";
 
@@ -65,6 +68,13 @@ export function SourceTestReport({
       </header>
 
       {result.readOnly && <ReadOnlyVerdictRow result={result} />}
+      {result.writeSurface && (
+        <VerdictRow
+          tone={writeSurfaceTone(result.writeSurface.verdict)}
+          headline={writeSurfaceHeadline(result.writeSurface.verdict)}
+          detail={result.writeSurface.detail}
+        />
+      )}
 
       <dl className="grid grid-cols-1 gap-x-6 gap-y-1 text-xs text-muted sm:grid-cols-2">
         {result.latency && (
@@ -95,7 +105,39 @@ export function SourceTestReport({
           </Fact>
         )}
         {result.role && <Fact label="search_path">{result.role.searchPath}</Fact>}
+        {result.endpoint && (
+          <Fact label="Endpoint">
+            {result.endpoint.product}
+            {result.endpoint.version ? ` ${result.endpoint.version}` : ""}
+          </Fact>
+        )}
+        {result.auth && (
+          <Fact label="Auth">
+            {result.auth.mode}
+            {result.auth.accepted === true
+              ? " · accepted"
+              : result.auth.accepted === false
+                ? " · refused"
+                : ""}
+          </Fact>
+        )}
       </dl>
+
+      {result.metrics && result.metrics.length > 0 && (
+        <div className="mt-2">
+          <p className="text-xs text-muted">{summarizeMetrics(result.metrics)}</p>
+          <ul className="mt-1 space-y-0.5">
+            {result.metrics
+              .filter((m) => !m.reachable)
+              .map((m) => (
+                <li key={m.metric} className="text-xs text-danger">
+                  <span className="font-medium">{m.metric}</span>
+                  {m.error ? ` — ${m.error}` : ""}
+                </li>
+              ))}
+          </ul>
+        </div>
+      )}
 
       {result.tables && result.tables.length > 0 && (
         <div className="mt-2">
@@ -129,7 +171,25 @@ const TONE_STYLES = {
 function ReadOnlyVerdictRow({ result }: { result: SourceTestResult }) {
   const readOnly = result.readOnly;
   if (!readOnly) return null;
-  const tone = readOnlyTone(readOnly.verdict);
+  return (
+    <VerdictRow
+      tone={readOnlyTone(readOnly.verdict)}
+      headline={readOnlyHeadline(readOnly.verdict)}
+      detail={readOnly.detail}
+    />
+  );
+}
+
+/** The loudest line on the report: whether the source can write. */
+function VerdictRow({
+  tone,
+  headline,
+  detail,
+}: {
+  tone: keyof typeof TONE_STYLES;
+  headline: string;
+  detail: string;
+}) {
   const Icon = tone === "ok" ? ShieldCheck : ShieldAlert;
 
   return (
@@ -141,8 +201,8 @@ function ReadOnlyVerdictRow({ result }: { result: SourceTestResult }) {
     >
       <Icon className="mt-0.5 h-4 w-4 shrink-0" />
       <div>
-        <p className="font-medium">{readOnlyHeadline(readOnly.verdict)}</p>
-        <p className="mt-0.5 text-muted">{readOnly.detail}</p>
+        <p className="font-medium">{headline}</p>
+        <p className="mt-0.5 text-muted">{detail}</p>
       </div>
     </div>
   );

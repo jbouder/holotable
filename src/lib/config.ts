@@ -214,6 +214,11 @@ export const config = {
    * be public https.
    */
   sourceUrlAllowlist: str("SOURCE_URL_ALLOWLIST", ""),
+  /**
+   * How far back discovery, refresh and the connection test look for a
+   * metric's series and labels (#386). A duration such as `1h` or `6h`.
+   */
+  prometheusDiscoveryWindow: str("PROMETHEUS_DISCOVERY_WINDOW", "1h"),
   /** The smallest step a Prometheus range query is sent with (#385). */
   prometheusMinStepMs: num("PROMETHEUS_MIN_STEP_MS", 15_000),
   /** The most points per series a Prometheus range query asks for (#385). */
@@ -532,6 +537,15 @@ const EnvSchema = z.object({
       error:
         "must be a comma-separated list of host names, addresses and CIDR ranges, e.g. prometheus.monitoring.svc,10.0.0.0/8",
     }),
+  ),
+  PROMETHEUS_DISCOVERY_WINDOW: blank(
+    z
+      .string()
+      .regex(DURATION, "must be a duration such as 1h or 6h")
+      .refine(
+        (v) => !DURATION.test(v) || Number(DURATION.exec(v)?.[1]) > 0,
+        "must be longer than zero",
+      ),
   ),
   PROMETHEUS_MIN_STEP_MS: blank(positiveInt),
   PROMQL_MAX_POINTS: blank(positiveInt),

@@ -59,6 +59,28 @@ workspace yet; ask the operator to add one to `SOURCE_SECRET_REFS`.
 **This guards against:** a dashboard that carries a password. See
 [Source secret references](/operations/secret-references/).
 
+### Or a Prometheus endpoint
+
+Choose **Prometheus (PromQL)** under **Kind** to read an existing Prometheus,
+Thanos, Mimir or VictoriaMetrics instead. A source's kind is fixed once it is
+saved. The form asks for:
+
+- **URL**: the base of the HTTP API, such as `https://prometheus.example.com`.
+  It has to be public https unless the operator lists it in
+  `SOURCE_URL_ALLOWLIST`, which is where an in-cluster
+  `prometheus.monitoring.svc` goes.
+- **Authentication**: a bearer token (`<REF>_TOKEN`), a user name and password
+  (`<REF>_USERNAME`, `<REF>_PASSWORD`), or none, for an endpoint with no
+  authentication. A source with no authentication picks no reference.
+- **Metrics**: press **Discover metrics** and search the endpoint's metric
+  list, which can run to thousands. Tick the ones the source may read, up to
+  200. Picking one asks the endpoint for the labels its series carry. Only the
+  ticked metrics may appear in a PromQL panel; a selector naming anything else
+  is refused.
+- **Tenant label** (optional): a label every ticked metric has, matched against
+  a claim of the viewer's, so each viewer sees only their own series. See
+  [Row-level filters](/operations/row-level-filters/).
+
 **Success looks like:** a row in the source list.
 
 ## 2. Test and refresh the catalog
@@ -90,8 +112,20 @@ refresh has run, generating against the source is *refused* rather than
 attempted — an unverified catalog is a guess, and the failure would land on you
 as a broken chart instead of a sentence.
 
+For a **Prometheus** source, **Test** asks the endpoint for its readiness and a
+trivial query, names what answered (Prometheus, Thanos, VictoriaMetrics…),
+says whether the credential was accepted, and checks that every allowlisted
+metric has series in the last `PROMETHEUS_DISCOVERY_WINDOW` (an hour by
+default). In place of the read-only proof, it reads the endpoint's flags: an
+admin API or a write receiver that is switched on is reported as a finding,
+because the credential should not be able to reach it. The test reads those
+flags and never tries a write. **Refresh** re-reads each metric's type and
+labels, and reports a metric with no series as missing. **Catalog** lists the
+metrics with their type, help and labels; a metric is allowlisted whole, so
+there is nothing to hide.
+
 **Success looks like:** the Catalog column reads *Catalog fresh*, and the row's
-table count matches what you expect.
+table or metric count matches what you expect.
 
 ## 3. Generate your first dashboard
 

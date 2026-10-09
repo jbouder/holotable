@@ -92,6 +92,17 @@ reserves.
 `/api/sql/plan` shows the rewritten statement and labels the extra parameter
 `your "tenant" claim`, so an editor can see what will run.
 
+## On a Prometheus source
+
+A Prometheus source's row filter is a **tenant label**, `{ "label": "tenant",
+"claim": "tenant" }`, set in the source form or its JSON (#385, #386). Every
+selector a PromQL query holds, including those inside subqueries and function
+arguments, is narrowed to `tenant="<the viewer's value>"` before it is sent.
+A query that matches on the tenant label itself is refused rather than
+overridden. The label has to be one every allowlisted metric lists, which the
+save checks the way it checks a column on every table. A label-values variable
+lists only the values under the same matcher.
+
 ## Limits
 
 - **One value per viewer.** A viewer who belongs to several tenants needs a

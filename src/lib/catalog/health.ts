@@ -74,6 +74,19 @@ export interface CatalogHealth {
   refreshedAt: string | null;
   /** Whole days since that refresh; null if never (or if the value is junk). */
   ageDays: number | null;
+  /**
+   * What the allowlist holds, for the wording (#386): `metric` for a
+   * Prometheus source. Absent for SQL, whose entries are tables, so every
+   * health judged before there was a second kind reads as it did.
+   */
+  entries?: "metric";
+}
+
+/** The words a health message uses for a source's allowlist and where it lives. */
+function words(health: CatalogHealth): { entry: string; home: string; query: string } {
+  return health.entries === "metric"
+    ? { entry: "metric", home: "endpoint", query: "PromQL" }
+    : { entry: "table", home: "database", query: "SQL" };
 }
 
 const MS_PER_DAY = 86_400_000;
@@ -144,6 +157,7 @@ export function catalogHealth(
     blocked: state === "empty" || state === "never_refreshed",
     missingTables,
     liveTableCount: live,
+    ...("metrics" in source.config ? { entries: "metric" as const } : {}),
     refreshedAt,
     ageDays,
   };
@@ -159,7 +173,7 @@ export function catalogHealthLabel(health: CatalogHealth): string {
     case "never_refreshed":
       return "Never refreshed";
     case "drifted":
-      return `${plural(health.missingTables.length, "table")} missing`;
+      return `${plural(health.missingTables.length, words(health).entry)} missing`;
     case "stale":
       return "Catalog stale";
   }
@@ -177,19 +191,21 @@ export function describeCatalogHealth(
   health: CatalogHealth,
 ): string {
   const fix = `Refresh the catalog for source ${source.id}`;
+  const { entry, home, query } = words(health);
+  const parts = entry === "table" ? "tables and columns" : "metrics and labels";
   switch (health.state) {
     case "ok":
-      return `The catalog for "${source.name}" matched the database at the last refresh.`;
+      return `The catalog for "${source.name}" matched the ${home} at the last refresh.`;
     case "empty":
-      return `The catalog for "${source.name}" describes no table that exists in the database, so nothing can be queried through it. ${fix} and choose its tables again.`;
+      return `The catalog for "${source.name}" describes no ${entry} that exists in the ${home}, so nothing can be queried through it. ${fix} and choose its ${entry}s again.`;
     case "never_refreshed":
-      return `The catalog for "${source.name}" has never been checked against the database, so its tables and columns are unverified and generated SQL is likely to fail. ${fix} first.`;
+      return `The catalog for "${source.name}" has never been checked against the ${home}, so its ${parts} are unverified and generated ${query} is likely to fail. ${fix} first.`;
     case "drifted": {
       const n = health.missingTables.length;
-      return `${plural(n, "table")} in "${source.name}" ${n === 1 ? "no longer exists" : "no longer exist"} in the database (${health.missingTables.join(", ")}). ${fix} and adjust its tables.`;
+      return `${plural(n, entry)} in "${source.name}" ${n === 1 ? "no longer exists" : "no longer exist"} in the ${home} (${health.missingTables.join(", ")}). ${fix} and adjust its ${entry}s.`;
     }
     case "stale":
-      return `The catalog for "${source.name}" was last refreshed ${plural(health.ageDays ?? 0, "day")} ago and may no longer match the database. ${fix}.`;
+      return `The catalog for "${source.name}" was last refreshed ${plural(health.ageDays ?? 0, "day")} ago and may no longer match the ${home}. ${fix}.`;
   }
 }
 

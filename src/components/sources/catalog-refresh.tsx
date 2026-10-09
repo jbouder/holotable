@@ -11,6 +11,9 @@ import {
   previewCatalogRefresh,
   type RefreshPreview,
   summarizeCatalogDiff,
+  type AnyCatalogDiff,
+  isMetricDiff,
+  type MetricCatalogDiff,
 } from "@/lib/catalog/refresh";
 import type { ApiError } from "@/lib/errors";
 import { isExposed } from "@/lib/registry";
@@ -33,7 +36,7 @@ import { ErrorDisplay } from "@/components/ui/error-display";
  */
 
 export interface RefreshApplied {
-  diff: CatalogDiff;
+  diff: AnyCatalogDiff;
   catalogHealth: CatalogHealth;
 }
 
@@ -151,8 +154,84 @@ export function CatalogRefreshReview({
   );
 }
 
-/** The change set itself. Exported for the tests. */
-export function CatalogDiffView({ diff }: { diff: CatalogDiff }) {
+/** The change set itself, in the source kind's words. Exported for the tests. */
+export function CatalogDiffView({ diff }: { diff: AnyCatalogDiff }) {
+  return isMetricDiff(diff) ? (
+    <MetricDiffView diff={diff} />
+  ) : (
+    <TableDiffView diff={diff} />
+  );
+}
+
+/** A Prometheus refresh (#386): metrics missing or back, labels and types changed. */
+function MetricDiffView({ diff }: { diff: MetricCatalogDiff }) {
+  return (
+    <div className="space-y-3 text-sm">
+      <p className="text-foreground">{summarizeCatalogDiff(diff)}</p>
+      {diff.missingMetrics.length > 0 && (
+        <div
+          role="alert"
+          className="space-y-1 border border-danger/40 bg-danger/5 px-3 py-2 text-xs text-danger"
+        >
+          <p className="flex items-center gap-1.5 font-medium">
+            <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
+            No series in the discovery window: {diff.missingMetrics.join(", ")}
+          </p>
+          <p className="text-muted">
+            Renamed, no longer scraped, or not readable with this source&rsquo;s
+            credential. They stay in the allowlist with their last known labels, but are
+            left out of the model&rsquo;s catalog until a refresh finds them again.
+          </p>
+        </div>
+      )}
+      {diff.restoredMetrics.length > 0 && (
+        <p className="flex items-center gap-1.5 text-xs text-success">
+          <Check className="h-3.5 w-3.5 shrink-0" />
+          Found again: {diff.restoredMetrics.join(", ")}
+        </p>
+      )}
+      {diff.metrics.length > 0 && (
+        <ul className="divide-y divide-border border border-border">
+          {diff.metrics.map((change) => (
+            <li key={change.metric} className="space-y-1 px-3 py-2">
+              <p className="font-mono text-xs font-medium text-foreground">
+                {change.metric}
+              </p>
+              <ul className="space-y-0.5 font-mono text-xs">
+                {change.addedLabels.map((label) => (
+                  <li
+                    key={`+${label}`}
+                    className="flex items-center gap-1.5 text-success"
+                  >
+                    <Plus className="h-3 w-3 shrink-0" aria-label="added" />
+                    {label}
+                  </li>
+                ))}
+                {change.removedLabels.map((label) => (
+                  <li key={`-${label}`} className="flex items-center gap-1.5 text-danger">
+                    <Minus className="h-3 w-3 shrink-0" aria-label="removed" />
+                    {label}
+                  </li>
+                ))}
+                {change.type && (
+                  <li className="flex flex-wrap items-center gap-1.5 text-warning">
+                    <RefreshCw className="h-3 w-3 shrink-0" aria-label="type changed" />
+                    type
+                    <span className="text-muted">
+                      {change.type.from} → {change.type.to}
+                    </span>
+                  </li>
+                )}
+              </ul>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
+
+function TableDiffView({ diff }: { diff: CatalogDiff }) {
   const dropped = droppedHiddenColumns(diff);
   const added = diff.tables.some((t) => t.added.length > 0);
 

@@ -11,7 +11,14 @@ import {
   runPromqlPlan,
   sourceUrlAllowlist,
 } from "@/lib/prometheus/client";
+import {
+  prometheusRefreshDigest,
+  refreshPrometheusCatalog,
+  testPrometheus,
+} from "@/lib/prometheus/catalog";
 import { rowsFromPrometheus } from "@/lib/prometheus/rows";
+import { diffMetricCatalog } from "@/lib/catalog/refresh";
+import { prometheus } from "@/lib/sources/kinds/prometheus";
 import { durationMs } from "@/lib/promql/parse";
 import { buildLabelValuesPlan, buildPromqlPlan } from "@/lib/promql/plan";
 import {
@@ -221,31 +228,40 @@ const kind: ServerSourceKind = {
     return checkBaseUrl(cfg.url, sourceUrlAllowlist());
   },
 
-  async test(source) {
+  refresh(source) {
     const prom = promSource(source);
-    const startedAt = performance.now();
-    try {
-      await trackInFlight(() =>
-        reach(prom, () =>
-          prometheusRequest(
-            target(prom),
-            "query",
-            new URLSearchParams({ query: "vector(1)" }),
-            {
-              timeoutMs: config.queryTimeoutSeconds * 1000,
-            },
-          ),
-        ),
-      );
-      return {
-        ok: true,
-        message: `Connected in ${Math.round(performance.now() - startedAt)} ms.`,
-      };
-    } catch (err) {
-      // The author typed the URL and chose the reference, so the reason is
-      // theirs to act on, as a database connection failure is.
-      return { ok: false, message: err instanceof Error ? err.message : String(err) };
-    }
+    return reach(prom, () => refreshPrometheusCatalog(target(prom), prom.config));
+  },
+  refreshDiff(source, refresh) {
+    const prom = promSource(source);
+    if (refresh.config.kind !== "prometheus")
+      throw new Error("a Prometheus refresh holds its config");
+    return diffMetricCatalog(prom, {
+      config: refresh.config,
+      missingTables: refresh.missingTables,
+    });
+  },
+  refreshDigest(refresh) {
+    if (refresh.config.kind !== "prometheus")
+      throw new Error("a Prometheus refresh holds its config");
+    return prometheusRefreshDigest({
+      config: refresh.config,
+      missingTables: refresh.missingTables,
+    });
+  },
+  catalogView(source, catalogHealth, canManage) {
+    const prom = promSource(source);
+    return {
+      metrics: prometheus.catalog(prom.config).metrics,
+      missingMetrics: [...prom.catalogMissingTables],
+      catalogHealth,
+      canManage,
+    };
+  },
+
+  test(source) {
+    const prom = promSource(source);
+    return trackInFlight(() => testPrometheus(target(prom), prom.config));
   },
 
   renderCatalog(source) {

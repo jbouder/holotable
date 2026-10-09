@@ -784,6 +784,7 @@ test("SOURCE_URL_ALLOWLIST must parse, or the server does not boot (#385)", () =
         ...VALID_PRODUCTION,
         SOURCE_URL_ALLOWLIST: "prometheus.monitoring.svc, 10.0.0.0/8",
         PROMETHEUS_MIN_STEP_MS: "15000",
+        PROMETHEUS_DISCOVERY_WINDOW: "6h",
         PROMQL_MAX_POINTS: "1000",
         PROMETHEUS_MAX_SERIES: "100",
       },

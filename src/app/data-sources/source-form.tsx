@@ -61,7 +61,8 @@ export interface SourceFormInitial {
   config?: SqlSourceConfig;
 }
 
-const CHOOSE_SECRET_REF = "Choose the credential reference this source connects with.";
+export const CHOOSE_SECRET_REF =
+  "Choose the credential reference this source connects with.";
 
 /**
  * The ref the form stands on: the one chosen, or — when nothing is chosen and
@@ -69,7 +70,7 @@ const CHOOSE_SECRET_REF = "Choose the credential reference this source connects 
  * install needs no click. Derived rather than set from an effect, so a list
  * that arrives late cannot overwrite a choice.
  */
-function effectiveSecretRef(chosen: string, list: GrantedSecretRefsState): string {
+export function effectiveSecretRef(chosen: string, list: GrantedSecretRefsState): string {
   if (chosen) return chosen;
   return list.state === "ready" && list.refs.length === 1 ? list.refs[0].ref : "";
 }
@@ -498,14 +499,14 @@ export function SourceForm({
  * The attributes that point a screen reader at a field's error text. Spread
  * onto the control; {@link Field} renders the message under the matching id.
  */
-function fieldAria(id: string, error?: string) {
+export function fieldAria(id: string, error?: string) {
   return {
     "aria-invalid": error ? true : undefined,
     "aria-describedby": error ? `${id}-error` : undefined,
   };
 }
 
-function Field({
+export function Field({
   id,
   label,
   error,
@@ -623,6 +624,6 @@ function columnSummary(table: CatalogTable): string {
  * its own; anything else is checked against the `SourceDraft` field, as the
  * other fields are.
  */
-function secretRefErrors(secretRef: string): FieldErrors {
+export function secretRefErrors(secretRef: string): FieldErrors {
   return secretRef ? draftFieldErrors({ secretRef }) : { secretRef: CHOOSE_SECRET_REF };
 }

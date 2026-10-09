@@ -5,7 +5,12 @@ import { audit } from "@/lib/audit";
 import { SourceConnection } from "@/lib/registry";
 import { SECRET_REF_MESSAGE, SECRET_REF_PATTERN } from "@/lib/secret-refs";
 import { requireGrantedSecretRef } from "@/lib/secrets/http";
-import { sqlDiscovery } from "@/lib/sources/server/registry";
+import { prometheusDiscovery, sqlDiscovery } from "@/lib/sources/server/registry";
+import {
+  MAX_METRICS,
+  PrometheusMetric,
+  PrometheusUrl,
+} from "@/lib/sources/kinds/prometheus";
 
 export const runtime = "nodejs";
 export const maxDuration = 30;
@@ -15,7 +20,7 @@ export const maxDuration = 30;
 // env family itself, and only one granted to this workspace, so a caller can
 // only introspect with an account the operator has given their workspace
 // (invariant 5).
-const Body = z.object({
+const SqlBody = z.object({
   /**
    * The kind of the source being drafted. Optional for the bodies sent before
    * there was more than one, which were all TimescaleDB.
@@ -25,6 +30,35 @@ const Body = z.object({
   secretRef: z.string().regex(SECRET_REF_PATTERN, SECRET_REF_MESSAGE),
   connection: SourceConnection,
 });
+
+/**
+ * A Prometheus source being drafted (#386): its URL and auth, and the
+ * `secret_ref` exactly when the auth needs one. Without `labelsFor` the answer
+ * is the metric menu; with it, the label names of those metrics.
+ */
+const PrometheusBody = z
+  .object({
+    kind: z.literal("prometheus"),
+    workspaceId: z.string().min(1).max(128),
+    url: PrometheusUrl,
+    auth: z.enum(["none", "basic", "bearer"]),
+    secretRef: z.string().regex(SECRET_REF_PATTERN, SECRET_REF_MESSAGE).optional(),
+    labelsFor: z.array(PrometheusMetric.shape.name).max(MAX_METRICS).optional(),
+  })
+  .superRefine((b, ctx) => {
+    if ((b.auth === "none") !== (b.secretRef === undefined)) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["secretRef"],
+        message:
+          b.auth === "none"
+            ? 'a source with auth "none" names no secretRef'
+            : "secretRef is required: it names where the credentials come from",
+      });
+    }
+  });
+
+const Body = z.union([SqlBody, PrometheusBody]);
 
 /**
  * List the tables and columns a prospective source's read-only user can see,
@@ -51,7 +85,8 @@ export const POST = route("sources.discover", async (req: Request) => {
   const body = await readJson(req, Body);
 
   assertAuthorized(identity, "source:manage", { workspaceId: body.workspaceId });
-  requireGrantedSecretRef(body.secretRef, body.workspaceId);
+  if (body.secretRef !== undefined)
+    requireGrantedSecretRef(body.secretRef, body.workspaceId);
 
   // Discovery connects to a server the author named before any source
   // exists, so where it pointed is the part worth keeping (#30).
@@ -61,15 +96,33 @@ export const POST = route("sources.discover", async (req: Request) => {
       action: "source.discover",
       workspaceId: body.workspaceId,
       outcome,
-      detail: {
-        host: body.connection.host,
-        port: body.connection.port,
-        database: body.connection.database,
-        secretRef: body.secretRef,
-      },
+      detail:
+        "url" in body
+          ? { url: body.url, auth: body.auth, secretRef: body.secretRef }
+          : {
+              host: body.connection.host,
+              port: body.connection.port,
+              database: body.connection.database,
+              secretRef: body.secretRef,
+            },
     });
 
   try {
+    if ("url" in body) {
+      const discovery = prometheusDiscovery({
+        workspaceId: body.workspaceId,
+        url: body.url,
+        auth: body.auth,
+        secretRef: body.secretRef ?? null,
+      });
+      const refused = await discovery.checkUrl();
+      if (refused) throw new Error(refused);
+      const answer = body.labelsFor
+        ? { labels: await discovery.labels(body.labelsFor) }
+        : { metrics: await discovery.metrics() };
+      record("success");
+      return json({ ok: true, ...answer });
+    }
     const tables = await sqlDiscovery(body.connection, body.secretRef, body.workspaceId);
     record("success");
     return json({ ok: true, tables });

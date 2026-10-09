@@ -77,19 +77,19 @@ hand.
 
 | Route | Method | Min role | Notes |
 | --- | --- | --- | --- |
-| `/api/sources` | GET | viewer | List sources in a workspace, each with its catalog health. A source admin gets full records; anyone else gets a listing (id, name, schema, table count, status) with no connection details, `secret_ref` or catalog. `canManage` says which |
+| `/api/sources` | GET | viewer | List sources in a workspace, each with its catalog health. A source admin gets full records; anyone else gets a listing with no connection details, `secret_ref` or catalog: its `kind`, id, name and status, plus the schema and table count for TimescaleDB or the metric count for Prometheus, never its URL. `canManage` says which |
 | `/api/sources` | POST | source-admin | Create |
 | `/api/sources/generate` | POST | editor | Streams a validated `SourceDraft` — never credentials. Rate limited and budgeted. Takes `{ "repairOf": id }` for the one [repair](/operations/ai-provider/#structured-output-repair), as `/api/generate` does |
 | `/api/sources/[id]` | GET | viewer | The full record for a source admin, the listing for anyone else |
 | `/api/sources/[id]` | PUT/DELETE | source-admin | Delete tombstones when referenced |
-| `/api/sources/[id]/catalog` | GET | viewer | The catalog browser's view: every column with its `exposed` flag for a source admin, exposed columns only for anyone else, plus catalog health |
+| `/api/sources/[id]/catalog` | GET | viewer | The catalog browser's view: every column with its `exposed` flag for a source admin, exposed columns only for anyone else, plus catalog health. For a Prometheus source, the allowlisted metrics with their type, help and labels, the metrics the last refresh found no series for, and catalog health |
 | `/api/sources/[id]/catalog/impact` | GET | source-admin | `?table=&column=`: the current panels on this source that hiding the column would break, decided by a dry run of the guard. Ids and titles only, never SQL, scoped to the source's workspace |
-| `/api/sources/[id]/catalog` | PATCH | source-admin | Hide or expose one column, `{ table, column, exposed }`. Takes effect on the next generation and execution |
+| `/api/sources/[id]/catalog` | PATCH | source-admin | Hide or expose one column, `{ table, column, exposed }`. Takes effect on the next generation and execution. A Prometheus source is refused: a metric is allowlisted whole |
 | `/api/sources/[id]/impact` | GET | source-admin | Dashboards and panels currently referencing the source, scoped to its workspace |
-| `/api/sources/[id]/test` | POST | source-admin | Connectivity, latency, server and role identity, a **read-only proof**, and per-table reachability. All of it inside one rolled-back read-only transaction |
-| `/api/sources/discover` | POST | source-admin | The tables and columns a prospective source's read-only user can see, to pick an allowlist from. Nothing is persisted, and the `secret_ref` grant is checked like any connection |
+| `/api/sources/[id]/test` | POST | source-admin | Connectivity, latency, server and role identity, a **read-only proof**, and per-table reachability. All of it inside one rolled-back read-only transaction. For a Prometheus source: connect and query latency, what answered and its version, whether the credential was accepted, the **write surface** read from `/api/v1/status/flags`, and whether each allowlisted metric has series. Nothing is written |
+| `/api/sources/discover` | POST | source-admin | The tables and columns a prospective source's read-only user can see, to pick an allowlist from. For `kind: "prometheus"` (`url`, `auth`, `secretRef` unless `auth` is `none`): the endpoint's metric metadata, or with `labelsFor` the label names of those metrics. Nothing is persisted, the URL is checked against `SOURCE_URL_ALLOWLIST`, and the `secret_ref` grant is checked like any connection |
 | `/api/secret-refs` | GET | source-admin | `?workspaceId=`: the `secret_ref`s granted to that workspace, each with whether the server holds credentials. Names and booleans only, rate limited per caller. See [Source secret references](/operations/secret-references/) |
-| `/api/sources/[id]/refresh` | POST | source-admin | Re-introspect the catalog. With `{}` it is a preview: it writes nothing and answers with the diff and a `digest`. With `{ digest }` it introspects again and writes only if the result matches, recording freshness and any allowlisted table the database no longer has; otherwise 409 with the new diff and digest |
+| `/api/sources/[id]/refresh` | POST | source-admin | Re-introspect the catalog. With `{}` it is a preview: it writes nothing and answers with the diff and a `digest`. With `{ digest }` it introspects again and writes only if the result matches, recording freshness and any allowlisted table the database no longer has; otherwise 409 with the new diff and digest. For a Prometheus source the diff names metrics missing or found again, labels added or removed, and changed metric types |
 
 ## Search
 

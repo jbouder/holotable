@@ -3,6 +3,8 @@ import { assertAuthorized, can, HttpError, requireIdentity } from "@/lib/auth/au
 import { json, readJson, route } from "@/lib/http";
 import { audit } from "@/lib/audit";
 import { requireSqlSource } from "@/lib/sources/server/http";
+import { isSqlSource } from "@/lib/sources/registry";
+import { serverKind } from "@/lib/sources/server/registry";
 import { getSourceById, updateSource } from "@/lib/db/repo";
 import { catalogView, setColumnExposure } from "@/lib/catalog/browse";
 import { catalogHealth } from "@/lib/catalog/health";
@@ -31,9 +33,8 @@ export const GET = route(
     const scope = { workspaceId: source.workspaceId };
     assertAuthorized(identity, "source:use", scope, { type: "source", id });
     const canManage = can(identity, "source:manage", scope);
-    const sql = requireSqlSource(source, "Browsing the catalog");
     return json(
-      { view: catalogView(sql, catalogHealth(sql), canManage) },
+      { view: serverKind(source).catalogView(source, catalogHealth(source), canManage) },
       { headers: NO_STORE },
     );
   },
@@ -71,7 +72,16 @@ export const PATCH = route(
       { type: "source", id },
     );
     const { table, column, exposed } = await readJson(req, ExposureBody);
-    const sql = requireSqlSource(source, "Hiding a column");
+    if (!isSqlSource(source)) {
+      // A metric is allowlisted whole: there is no label to hide (#381).
+      throw new HttpError(
+        400,
+        "A Prometheus metric is allowlisted whole; there is no label to hide.",
+        {},
+        "validation",
+      );
+    }
+    const sql = source;
 
     const next = setColumnExposure(sql.config, table, column, exposed);
     if (!next) throw new HttpError(404, `column not in catalog: ${table}.${column}`);
