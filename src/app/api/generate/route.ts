@@ -29,6 +29,9 @@ import { Panel } from "@/lib/ir";
 import { StoredDashboard } from "@/lib/ir/upgrade";
 import { log } from "@/lib/log";
 import { workspacePromptFor } from "@/lib/workspace-prompt-service";
+import { promptDashboards } from "@/lib/ai/prompt-dashboards";
+import { linkableIds } from "@/lib/ai/prompt";
+import { LINK_TARGETS_HEADER, linkTargetsHeader } from "@/lib/ai/link-targets";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -48,12 +51,17 @@ const GenerateBody = z.discriminatedUnion("mode", [
     prompt: z.string().min(1).max(4000),
     // A tab opened before a deploy sends the spec it has; upgrade it (#58).
     current: StoredDashboard,
+    // The saved dashboard being refined, if it is one: marks it in the
+    // DASHBOARDS list (#375) so a link to it is written as a self link.
+    dashboardId: z.uuid().optional(),
   }),
   z.object({
     mode: z.literal("panel"),
     sourceId: z.string().min(1),
     prompt: z.string().min(1).max(4000),
     current: Panel,
+    // The dashboard the panel is on (#375); see dashboard-refine.
+    dashboardId: z.uuid().optional(),
   }),
   z.object({
     mode: z.literal("explore"),
@@ -138,6 +146,17 @@ export const POST = route("generate", async (req: Request) => {
     return null;
   });
 
+  // The dashboards a link may lead to (#375): this workspace's, for a caller
+  // who may view them. Explore writes no links and is told of none.
+  const dashboards =
+    body.mode === "explore"
+      ? undefined
+      : await promptDashboards({
+          identity,
+          workspaceId: source.workspaceId,
+          currentId: "dashboardId" in body ? body.dashboardId : undefined,
+        });
+
   // What the model is about to be shown, so the log can say which catalog was
   // in context without keeping the text. Built here rather than handed back by
   // the stream: it is a pure function of the same trusted source record.
@@ -196,6 +215,7 @@ export const POST = route("generate", async (req: Request) => {
   const result =
     body.mode === "dashboard"
       ? streamDashboard({
+          dashboards,
           source,
           additionalSources: additional,
           prompt: body.prompt,
@@ -206,6 +226,7 @@ export const POST = route("generate", async (req: Request) => {
         })
       : body.mode === "dashboard-refine"
         ? streamDashboardRefinement({
+            dashboards,
             source,
             additionalSources: additional,
             prompt: body.prompt,
@@ -225,6 +246,7 @@ export const POST = route("generate", async (req: Request) => {
               repair,
             })
           : streamPanel({
+              dashboards,
               source,
               prompt: body.prompt,
               current: body.current,
@@ -236,8 +258,16 @@ export const POST = route("generate", async (req: Request) => {
 
   // A provider that refused the request answers here, as an error that names
   // the setting to fix, rather than as an empty 200 (#337).
+  // The ids a link may name go to the browser too, which validates the stream
+  // with its own schema and holds it to the same list.
+  const headers: Record<string, string> = {
+    ...(generationId ? { [GENERATION_ID_HEADER]: generationId } : {}),
+    ...(dashboards
+      ? { [LINK_TARGETS_HEADER]: linkTargetsHeader(linkableIds(dashboards)) }
+      : {}),
+  };
   return textResponseOnceStarted(
     result,
-    generationId ? { [GENERATION_ID_HEADER]: generationId } : undefined,
+    Object.keys(headers).length > 0 ? headers : undefined,
   );
 });

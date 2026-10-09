@@ -2,7 +2,14 @@ import { type LanguageModelUsage, streamObject } from "ai";
 import type { z } from "zod";
 import { describeFailure, type Failure, repairPrompt } from "@/lib/ai/repair";
 import { type Model, modelSettings } from "@/lib/ai/provider";
-import { workspaceContextBlock } from "@/lib/ai/prompt";
+import {
+  dashboardsBlock,
+  linkableIds,
+  linksGuide,
+  type PromptDashboard,
+  workspaceContextBlock,
+} from "@/lib/ai/prompt";
+import { withKnownLinkTargets } from "@/lib/ai/link-targets";
 import { buildCatalogPrompt } from "@/lib/timescaledb/catalog";
 import {
   type Dashboard,
@@ -215,6 +222,12 @@ export function baseSystem(
   source: SourceRecord,
   workspacePrompt?: WorkspacePrompt | null,
   additionalSources: readonly SourceRecord[] = [],
+  /**
+   * The dashboards a link may lead to (#375), as the server listed them for
+   * this caller in this workspace. Absent: a request that writes no links
+   * (explore), and the link rules are left out. Empty: self links only.
+   */
+  dashboards?: readonly PromptDashboard[],
 ): string {
   const sources = [source, ...additionalSources];
   if (sources.length > MAX_GENERATION_SOURCES) {
@@ -224,11 +237,13 @@ export function baseSystem(
     workspacePrompt,
     sources.map((s) => s.id),
   );
+  const targets = dashboardsBlock(dashboards);
+  const hasTargets = linkableIds(dashboards ?? []).length > 0;
   return `You design monitoring dashboards as a strict JSON spec.
 You NEVER return data rows — only a viz specification (SQL + layout).
 
 ${sourcesSection(sources)}
-${workspace ? `\n${workspace}\n` : ""}
+${workspace ? `\n${workspace}\n` : ""}${targets ? `\n${targets}\n` : ""}
 ${sqlRules(sources.length)}
 
 ${DESCRIPTION_RULE}
@@ -244,7 +259,7 @@ Use 'format' (number|bytes|percent|ms) where meaningful.
 
 ${PRESENTATION_GUIDE}
 
-${VARIABLES_GUIDE}`;
+${VARIABLES_GUIDE}${dashboards === undefined ? "" : `\n\n${linksGuide(hasTargets)}`}`;
 }
 
 /**
@@ -261,13 +276,16 @@ export function dashboardRequest(input: {
   workspacePrompt?: WorkspacePrompt | null;
   /** Set when this run repairs a failed one (#21). */
   repair?: Failure;
+  /** The dashboards a link may lead to (#375). */
+  dashboards?: readonly PromptDashboard[];
 }) {
-  const { source, prompt, repair, workspacePrompt, additionalSources } = input;
+  const { source, prompt, repair, workspacePrompt, additionalSources, dashboards } =
+    input;
   return {
-    schema: DashboardGenerationSchema,
+    schema: linkedSchema(DashboardGenerationSchema, dashboards),
     schemaName: "Dashboard",
     schemaDescription: "A monitoring dashboard specification (viz spec, not data).",
-    system: baseSystem(source, workspacePrompt, additionalSources),
+    system: baseSystem(source, workspacePrompt, additionalSources, dashboards),
     prompt: withRepair(
       repair,
       `Create a dashboard for this request:\n"""${prompt}"""\n
@@ -276,7 +294,22 @@ Use refreshIntervalMs=${config.defaultRefreshIntervalMs} and timeRange {from:"${
   };
 }
 
+/**
+ * A generation schema held to the listed link targets (#375), when there is
+ * a list; the schema itself when there is none (explore, which writes none).
+ */
+function linkedSchema<S extends z.ZodType>(
+  schema: S,
+  dashboards: readonly PromptDashboard[] | undefined,
+): S {
+  return dashboards === undefined
+    ? schema
+    : withKnownLinkTargets(schema, linkableIds(dashboards));
+}
+
 export function streamDashboard(input: {
+  /** The dashboards a link may lead to (#375). */
+  dashboards?: readonly PromptDashboard[];
   additionalSources?: readonly SourceRecord[];
   source: SourceRecord;
   prompt: string;
@@ -437,15 +470,19 @@ export function streamPanel(input: {
   model: Model;
   /** Set when this run repairs a failed one (#21). */
   repair?: Failure;
+  /** The dashboards a link may lead to (#375). */
+  dashboards?: readonly PromptDashboard[];
 }) {
-  const { source, prompt, current, onFinish, repair, workspacePrompt } = input;
+  const { source, prompt, current, onFinish, repair, workspacePrompt, dashboards } =
+    input;
+  const schema = linkedSchema(GeneratedPanel, dashboards);
   return streamObject({
     ...modelSettings(input.model),
-    onFinish: finish(onFinish, GeneratedPanel),
-    schema: GeneratedPanel,
+    onFinish: finish(onFinish, schema),
+    schema,
     schemaName: "Panel",
     schemaDescription: "A single dashboard panel specification (viz spec, not data).",
-    system: baseSystem(source, workspacePrompt),
+    system: baseSystem(source, workspacePrompt, [], dashboards),
     prompt: withRepair(
       repair,
       `Here is the current panel spec:
@@ -477,6 +514,8 @@ export function streamDashboardRefinement(input: {
   model: Model;
   /** Set when this run repairs a failed one (#21). */
   repair?: Failure;
+  /** The dashboards a link may lead to (#375). */
+  dashboards?: readonly PromptDashboard[];
 }) {
   const {
     source,
@@ -486,14 +525,16 @@ export function streamDashboardRefinement(input: {
     repair,
     workspacePrompt,
     additionalSources,
+    dashboards,
   } = input;
+  const schema = linkedSchema(DashboardGenerationSchema, dashboards);
   return streamObject({
     ...modelSettings(input.model),
-    onFinish: finish(onFinish, DashboardGenerationSchema),
-    schema: DashboardGenerationSchema,
+    onFinish: finish(onFinish, schema),
+    schema,
     schemaName: "Dashboard",
     schemaDescription: "A monitoring dashboard specification (viz spec, not data).",
-    system: baseSystem(source, workspacePrompt, additionalSources),
+    system: baseSystem(source, workspacePrompt, additionalSources, dashboards),
     prompt: withRepair(
       repair,
       `Here is the current dashboard spec:

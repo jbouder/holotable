@@ -10,6 +10,7 @@ import type {
   getDashboardById,
   getSourceById,
   listDashboards,
+  listLinkableDashboards,
   listSources,
   saveDashboardVersion,
 } from "@/lib/db/repo";
@@ -38,6 +39,8 @@ export interface McpDeps {
   /** The caller's model in the workspace (#331): personal, workspace or environment. */
   requireModel: typeof requireModel;
   workspacePromptFor: typeof workspacePromptFor;
+  /** The dashboards a generated link may lead to (#375). */
+  listLinkableDashboards: typeof listLinkableDashboards;
   streamDashboard: typeof streamDashboard;
   streamExplorePanel: typeof streamExplorePanel;
   streamSourceDraft: typeof streamSourceDraft;

@@ -78,3 +78,49 @@ sense.
 Give a panel its own `timeRange` or `refreshIntervalMs` only when it must
 differ from the rest, such as a "last 24 hours" table refreshed every 5
 minutes on a 1-hour dashboard.
+
+## Links
+
+A panel's `links` say where it leads (see `ir.md` for the fields). Write one
+only when there is a natural next step:
+
+- **A breakdown to the dashboard about one of its items.** A panel grouped by
+  instance links to a dashboard that declares an `instance` variable, setting
+  it from the clicked row: `{ "column": "instance" }`. Clicking a row, bar or
+  slice then opens that dashboard with the instance picked.
+- **A self link to filter in place.** When this dashboard declares a variable
+  and a panel breaks the data down by it, a link with no `dashboard` that sets
+  the variable from the clicked series or column turns a click into a filter.
+
+What a link may target:
+
+- `dashboard` is the id of a dashboard in the same workspace, copied from
+  wherever you were given it. Never invent an id and never write a URL; when
+  you do not know the target's id, leave the link out and say so.
+- `set` names only variables the target declares. A name it does not declare
+  is ignored on arrival.
+- A `column` pick must be an output column of the panel's own SQL.
+
+Do not give every panel a link. One or two that answer "and then what?" are
+worth more than a menu on every card.
+
+```json
+{
+  "id": "by-instance",
+  "title": "CPU by instance",
+  "viz": "bar",
+  "query": {
+    "sourceId": "ts-metrics",
+    "sql": "SELECT instance, avg(cpu_pct) AS cpu FROM system_metrics GROUP BY instance ORDER BY cpu DESC"
+  },
+  "links": [
+    {
+      "title": "Instance detail",
+      "dashboard": "3f6c2a1e-8b4d-4c7a-9e21-5d0b7a6f4c13",
+      "set": { "instance": { "column": "instance" } }
+    },
+    { "title": "Filter to this instance", "set": { "instance": { "column": "instance" } } }
+  ],
+  "layout": { "x": 0, "y": 0, "w": 6, "h": 4 }
+}
+```

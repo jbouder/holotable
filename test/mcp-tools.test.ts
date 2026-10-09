@@ -208,6 +208,7 @@ function fakeDeps(
       model: {} as Model,
     }),
     workspacePromptFor: async () => null,
+    listLinkableDashboards: async () => [],
     streamDashboard: ((input: { onFinish?: OnGenerationFinish; repair?: Failure }) => {
       calls.starts.push({ repair: input.repair !== undefined });
       return stream(input.onFinish, next());
@@ -680,4 +681,30 @@ test("generate_source needs source-admin and drafts under the source-draft limit
   assert.equal((drafted.data.draft as { secretRef: string }).secretRef, "TS_METRICS");
   assert.deepEqual(calls.admitted, ["source-draft"]);
   assert.equal((calls.generations[0] as { mode: string }).mode, "source-draft");
+});
+
+test("generate_dashboard tells the model which dashboards a link may lead to (#375)", async () => {
+  const seen: { dashboards?: unknown }[] = [];
+  const asked: string[] = [];
+  const base = fakeDeps({}, [{ object: generated }]);
+  const deps: McpDeps = {
+    ...base.deps,
+    listLinkableDashboards: async (workspaceId) => {
+      asked.push(workspaceId);
+      return [{ id: DASH, title: "Host detail", variables: ["host"] }];
+    },
+    streamDashboard: ((input: Parameters<McpDeps["streamDashboard"]>[0]) => {
+      seen.push({ dashboards: input.dashboards });
+      return base.deps.streamDashboard(input);
+    }) as McpDeps["streamDashboard"],
+  };
+  const result = await call(mcpTools(deps), "generate_dashboard", {
+    sourceId: "src-app",
+    prompt: "fleet overview",
+  });
+  assert.ok(result.ok, result.text);
+  assert.deepEqual(asked, ["ws-1"]);
+  assert.deepEqual(seen, [
+    { dashboards: [{ id: DASH, title: "Host detail", variables: ["host"] }] },
+  ]);
 });

@@ -115,6 +115,29 @@ traced back to what the model was told. A customization that cannot be read
 when a generation starts is logged and skipped; the generation runs on the
 base prompt.
 
+## Other dashboards, for links
+
+A generation that writes a dashboard or a panel is also told which other
+dashboards a panel may [link](/concepts/drilldown/) to
+([#375](https://github.com/jbouder/holotable/issues/375)). The server lists
+them for the caller, from the workspace the sources belong to, and only when
+the caller may view that workspace. It lists the 30 most recently updated,
+each with its id, its title clamped to 64 characters and the variables it
+declares. In the editor, the dashboard being edited is marked, so a link back
+to it is written as a self link.
+
+The list goes into a fenced `DASHBOARDS` block after the catalog and the
+workspace context, introduced as data like they are. The line that closes it
+says the rules below win. Titles are people's text, so a title that reads like
+an instruction is only a name. Explore writes no links and gets no list.
+
+The rule the model is given is also enforced. A generated link whose
+`dashboard` is not in the list fails validation on the server and in the
+browser, which reads the same list from the response's `X-Link-Targets`
+header. The one [automatic repair](/operations/ai-provider/#structured-output-repair)
+then re-asks with the reason. A link target is always an id from the list
+the server built, never a URL.
+
 ## The catalog has to be true before any of that matters
 
 A catalog nobody has checked is a schema the model designs against and the

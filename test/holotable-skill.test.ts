@@ -3,7 +3,14 @@ import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { test } from "node:test";
 import { DashboardExportFile } from "@/lib/dashboard-export";
-import { declaredVariables, hasQuery, ValueFormat } from "@/lib/ir";
+import {
+  Dashboard,
+  declaredVariables,
+  hasQuery,
+  Panel,
+  SPEC_VERSION,
+  ValueFormat,
+} from "@/lib/ir";
 import { COLOR_TOKENS } from "@/lib/panels/colors";
 import { PANEL_KIND_NAMES, PANEL_KINDS } from "@/lib/panels/registry";
 import { CatalogTable, SourceConfig } from "@/lib/registry";
@@ -196,4 +203,23 @@ test("the skill carries no connection details, credentials or route calls", () =
       assert.doesNotMatch(text, pattern, `${file} matches ${pattern}`);
     }
   }
+});
+
+test("the guidance's link example is a valid panel, and its self link fits a dashboard declaring the variable (#375)", () => {
+  const text = read("references/guidance.md");
+  const section = text.slice(text.indexOf("## Links"));
+  const json = section.match(/```json\n([\s\S]*?)\n```/)?.[1];
+  assert.ok(json, "guidance.md has no JSON example under ## Links");
+  const panel = Panel.parse(JSON.parse(json));
+  assert.ok((panel.links ?? []).length >= 2);
+  // The self link sets a variable, so it holds on a dashboard that declares it.
+  const result = Dashboard.safeParse({
+    specVersion: SPEC_VERSION,
+    title: "Fleet",
+    timeRange: { from: "now-1h", to: "now" },
+    refreshIntervalMs: 15000,
+    variables: [{ name: "instance", type: "enum", values: ["a", "b"] }],
+    panels: [panel],
+  });
+  assert.ok(result.success, result.success ? "" : result.error.message);
 });
