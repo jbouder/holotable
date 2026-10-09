@@ -1,3 +1,5 @@
+import { buildPromqlPlan, buildLabelValuesPlan } from "@/lib/promql/plan";
+import { validatePromql, validatePromqlLabelValues } from "@/lib/promql/safety";
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { z } from "zod";
@@ -14,6 +16,8 @@ import {
   queryText,
   queryTimeField,
   SqlQuery,
+  isSqlQuery,
+  isPromqlQuery,
 } from "@/lib/ir";
 import { StoredDashboard } from "@/lib/ir/upgrade";
 import { PANEL_KIND_NAMES } from "@/lib/panels/registry";
@@ -65,9 +69,28 @@ const loaded: Loaded[] = parsed.flatMap(({ fixture, result }) =>
   result.success ? [{ file: fixture.file, raw: fixture.spec, spec: result.data }] : [],
 );
 
-function sourceConfig(catalogs: Catalogs, sourceId: string, file: string): SourceConfig {
+function catalogOf(catalogs: Catalogs, sourceId: string, file: string) {
   const catalog = catalogs[sourceId];
   assert.ok(catalog, `${file} reads source "${sourceId}", which catalogs.json lacks`);
+  return catalog;
+}
+
+/** A PromQL source's catalog (#384): its metric allowlist and tenant label. */
+function promqlCatalog(catalogs: Catalogs, sourceId: string, file: string) {
+  const catalog = catalogOf(catalogs, sourceId, file);
+  assert.ok(
+    "metrics" in catalog,
+    `${file} reads "${sourceId}" with PromQL, but it is a SQL catalog`,
+  );
+  return catalog;
+}
+
+function sourceConfig(catalogs: Catalogs, sourceId: string, file: string): SourceConfig {
+  const catalog = catalogOf(catalogs, sourceId, file);
+  assert.ok(
+    "tables" in catalog,
+    `${file} reads "${sourceId}" with SQL, but it is a PromQL catalog`,
+  );
   // A catalog is the allowlist alone; the connection half is a placeholder.
   return SourceConfig.parse({
     host: "fixture",
@@ -125,7 +148,9 @@ test("the current version has fixtures of its own", () => {
 test("no catalog carries a connection or a credential", () => {
   for (const [id, catalog] of Object.entries(library.catalogs)) {
     assert.deepEqual(
-      Object.keys(catalog).filter((k) => !["schema", "tables", "rowFilter"].includes(k)),
+      Object.keys(catalog).filter(
+        (k) => !["schema", "tables", "metrics", "rowFilter"].includes(k),
+      ),
       [],
       id,
     );
@@ -158,14 +183,29 @@ test("every panel's SQL passes the guard against its fixture catalog", async () 
   for (const { file, spec } of loaded) {
     const declared = declaredVariables(spec);
     for (const panel of spec.panels.filter(hasQuery)) {
-      const cfg = sourceConfig(library.catalogs, panel.query.sourceId, file);
-      const result = await validateSql(queryText(panel.query), cfg, declared);
+      const { sourceId } = panel.query;
+      const result = isSqlQuery(panel.query)
+        ? await validateSql(
+            panel.query.sql,
+            sourceConfig(library.catalogs, sourceId, file),
+            declared,
+          )
+        : validatePromql(
+            queryText(panel.query),
+            promqlCatalog(library.catalogs, sourceId, file),
+            declared,
+          );
       assert.ok(result.ok, `${file} panel ${panel.id}: ${result.error}`);
     }
     for (const v of spec.variables ?? []) {
       if (!v.query) continue;
-      const cfg = sourceConfig(library.catalogs, v.query.sourceId, file);
-      const result = await validateSql(queryText(v.query), cfg);
+      const { sourceId } = v.query;
+      const result = isSqlQuery(v.query)
+        ? await validateSql(v.query.sql, sourceConfig(library.catalogs, sourceId, file))
+        : validatePromqlLabelValues(
+            v.query,
+            promqlCatalog(library.catalogs, sourceId, file),
+          );
       assert.ok(result.ok, `${file} variable ${v.name}: ${result.error}`);
     }
   }
@@ -181,17 +221,46 @@ test("every panel's executable plan matches its snapshot", async () => {
     const declared = declaredVariables(spec);
     const variables = defaultValues(spec.variables);
     for (const panel of spec.panels.filter(hasQuery) as QueryPanel[]) {
-      const cfg = sourceConfig(library.catalogs, panel.query.sourceId, file);
+      const query = panel.query;
+      if (!isSqlQuery(query)) {
+        // PromQL (#384): the plan is the rewritten expression and the
+        // server's start, end and step. Only entries for PromQL fixtures.
+        const catalog = promqlCatalog(library.catalogs, query.sourceId, file);
+        plans[`${file}#${panel.id}`] = buildPromqlPlan({
+          promql: query.promql,
+          instant: query.instant,
+          minStep: query.minStep,
+          ...window,
+          rowFilter: catalog.rowFilter
+            ? { label: catalog.rowFilter.label, value: "fixture-tenant" }
+            : null,
+          variables,
+        });
+        continue;
+      }
+      const cfg = sourceConfig(library.catalogs, query.sourceId, file);
       // Loads the parser the plan builder's scanner needs.
-      await validateSql(queryText(panel.query), cfg, declared);
+      await validateSql(query.sql, cfg, declared);
       const plan = buildExecutablePlan({
-        sql: queryText(panel.query),
-        timeField: queryTimeField(panel.query),
+        sql: query.sql,
+        timeField: queryTimeField(query),
         ...window,
         rowFilter: bindRowFilter(cfg, () => "fixture-tenant"),
         variables,
       });
       plans[`${file}#${panel.id}`] = plan;
+    }
+    for (const v of spec.variables ?? []) {
+      if (!v.query || isSqlQuery(v.query)) continue;
+      const catalog = promqlCatalog(library.catalogs, v.query.sourceId, file);
+      plans[`${file}#variable:${v.name}`] = buildLabelValuesPlan({
+        label: v.query.label,
+        match: v.query.match,
+        catalog,
+        rowFilter: catalog.rowFilter
+          ? { label: catalog.rowFilter.label, value: "fixture-tenant" }
+          : null,
+      });
     }
   }
   matchJsonSnapshot(
@@ -244,6 +313,24 @@ test("the library covers every panel kind and the shapes a spec can take", () =>
   has(
     "a panel without a timeField",
     queries.some((p) => queryTimeField(p.query) === undefined),
+  );
+  has(
+    "a PromQL range query",
+    queries.some((p) => isPromqlQuery(p.query) && !p.query.instant),
+  );
+  has(
+    "a PromQL instant query",
+    queries.some((p) => isPromqlQuery(p.query) && p.query.instant === true),
+  );
+  has(
+    "a PromQL query with a minStep",
+    queries.some((p) => isPromqlQuery(p.query) && p.query.minStep !== undefined),
+  );
+  has(
+    "a label-values variable",
+    specs.some((s) =>
+      s.variables?.some((v) => v.query !== undefined && !isSqlQuery(v.query)),
+    ),
   );
   has(
     "a dashboard reading two sources",

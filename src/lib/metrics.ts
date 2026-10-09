@@ -61,6 +61,16 @@ export type SqlRejectionReason =
   | "column"
   | "variable";
 
+/** Why the PromQL guard refused an expression (#384). A fixed enum, safe as a label. */
+export type PromqlRejectionReason =
+  | "empty"
+  | "structure"
+  | "function"
+  | "time"
+  | "catalog"
+  | "bounds"
+  | "variable";
+
 /** What happened to a model request at the admission gate. */
 export type LlmRequestOutcome = "admitted" | "rate_limited" | "over_budget";
 
@@ -78,6 +88,7 @@ interface Instruments {
   llmRequests: Counter<"route" | "outcome">;
   llmRepairs: Counter<"route" | "outcome">;
   sqlRejections: Counter<"reason">;
+  promqlRejections: Counter<"reason">;
   auditWriteFailures: Counter<string>;
   /** One set of seen values per bounded label, keyed `metric/label`. */
   seenLabelValues: Map<string, Set<string>>;
@@ -144,6 +155,12 @@ function build(): Instruments {
     sqlRejections: new Counter({
       name: "holotable_sql_validation_rejections_total",
       help: "Statements refused by the SQL guard, by the kind of rule that refused them.",
+      labelNames: ["reason"],
+      registers: [registry],
+    }),
+    promqlRejections: new Counter({
+      name: "holotable_promql_validation_rejections_total",
+      help: "Expressions refused by the PromQL guard, by the kind of rule that refused them.",
       labelNames: ["reason"],
       registers: [registry],
     }),
@@ -270,6 +287,11 @@ export function recordLlmRepair(route: string, outcome: LlmRepairOutcome): void 
 /** Record one statement refused by the SQL guard. */
 export function recordSqlRejection(reason: SqlRejectionReason): void {
   instruments().sqlRejections.inc({ reason });
+}
+
+/** Record one expression refused by the PromQL guard (#384). */
+export function recordPromqlRejection(reason: PromqlRejectionReason): void {
+  instruments().promqlRejections.inc({ reason });
 }
 
 /**

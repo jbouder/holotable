@@ -73,12 +73,15 @@ process and Node.js collectors (`holotable_process_cpu_seconds_total`,
 | `holotable_llm_requests_total` | counter | `route`, `outcome` | Model requests at the admission gate. `outcome` is `admitted`, `rate_limited` or `over_budget` |
 | `holotable_llm_repairs_total` | counter | `route`, `outcome` | Structured-output repairs: one automatic re-ask after a generation failed its schema. `outcome` is `repaired` or `failed`. See [AI provider](/operations/ai-provider/#structured-output-repair) |
 | `holotable_sql_validation_rejections_total` | counter | `reason` | Statements refused by the SQL guard |
+| `holotable_promql_validation_rejections_total` | counter | `reason` | Expressions refused by the PromQL guard |
 | `holotable_audit_write_failures_total` | counter | — | Audit log rows lost because they could not be written. Anything above zero is a gap in `audit_log`; see [the audit log](/operations/audit-log/) |
 
 `reason` comes from a fixed enum, not the error message: `empty`, `structure`,
 `comment`, `keyword`, `function`, `time`, `catalog`, `column`, `variable`
-(`SqlRejectionReason` in `src/lib/metrics.ts`). The message
-names the offending table, column or function and is therefore
+(`SqlRejectionReason` in `src/lib/metrics.ts`); for PromQL, `empty`,
+`structure`, `function`, `time`, `catalog`, `bounds`, `variable`
+(`PromqlRejectionReason`). The message
+names the offending table, metric, column or function and is therefore
 attacker-influenced text; only the reason is safe as a label. A dry run is not
 counted: the check behind the "hide this column?" warning asks the guard about
 a catalog nobody has saved, through the uncounted `checkSql`.

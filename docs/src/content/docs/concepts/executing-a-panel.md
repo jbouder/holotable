@@ -87,6 +87,47 @@ from adversarial shapes and holds every accepted one to an independent walk of
 the parse tree; `npm run test:fuzz` runs it on its own.
 :::
 
+## The PromQL guard
+
+A panel against a Prometheus source carries PromQL instead of SQL
+([#384](https://github.com/jbouder/holotable/issues/384)), and `validatePromql`
+(`src/lib/promql/safety.ts`) is its trust boundary. It parses the expression
+with the Prometheus project's own grammar (`@prometheus-io/lezer-promql`,
+wrapped in `src/lib/promql/parse.ts`) and walks the tree:
+
+- **Exactly one expression, from allowlisted node types.** A tree with an
+  error node is rejected with its position. So are the `@` modifier, comments,
+  duration arithmetic, the experimental functions, aggregations and modifiers,
+  and anything else the walker has not been told about. A string literal the
+  tokenizer would let run unterminated is rejected too.
+- **Every selector names one allowlisted metric.** The name may be bare
+  (`http_requests_total{…}`), quoted (`{"http_requests_total"}`) or a
+  `__name__="…"` equality. It must be on the source's metric allowlist,
+  compared exactly. A selector with no name, a `__name__` pattern or negation,
+  a name given twice, and `info()` are rejected. Each would read series the
+  allowlist does not list.
+- **The server owns time.** `@` is rejected in every spelling. A range, a
+  subquery range and an `offset` are bounded by `PROMQL_MAX_RANGE` (default
+  `7d`). A subquery step is at least a second and evaluates at most 11,000
+  points.
+- **Bounds.** At most 8,000 characters, 32 selectors and 64 levels of nesting.
+- **Variables only as a matcher's whole value.** `{host=":host"}` is the one
+  place a `:name` may appear, and it must be declared. A multi-value variable
+  needs `=~` or `!~`.
+
+A label the catalog does not list for a metric is a **hint**, not a rejection.
+Prometheus answers an unknown label with an empty result rather than an error,
+so the author is told without being blocked.
+
+`buildPromqlPlan` (`src/lib/promql/plan.ts`) then writes the variable values in
+as escaped literals and splices the viewer's tenant matcher into every selector.
+Each rewrite is re-parsed and compared with the original tree. The plan carries
+the result with the `start`, `end` and `step` the server chose; the expression
+holds no time of its own. `test/promql-safety.test.ts` names every rule and its
+message. `test/promql-safety.fuzz.test.ts` generates adversarial expressions and
+holds every accepted one to an independent walk of the raw parse tree, and
+`npm run test:fuzz` runs it beside the SQL suite.
+
 ## Checking a query before saving
 
 The panel editor does not make an author discover a rejection at save time.

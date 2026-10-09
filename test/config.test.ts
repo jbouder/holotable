@@ -475,6 +475,7 @@ test("malformed values are errors regardless of environment", () => {
     OIDC_ACCOUNT_URL: "kc.example.com/realms/holotable/account",
     MAX_QUERY_ROWS: "lots",
     MAX_RESULT_BYTES: "0",
+    PROMQL_MAX_RANGE: "a week",
     QUERY_TIMEOUT_SECONDS: "-5",
     MAX_POOL_PER_SOURCE: "0",
     CATALOG_STALE_AFTER_DAYS: "-1",
@@ -493,6 +494,18 @@ test("malformed values are errors regardless of environment", () => {
   }
   // A malformed value is reported once, for its shape, not again as missing.
   assert.equal(e.filter((v) => v === "DATABASE_URL").length, 1);
+});
+
+test("PROMQL_MAX_RANGE takes a single-unit duration longer than zero (#384)", () => {
+  const problemsFor = (value: string) =>
+    validateConfig({ PROMQL_MAX_RANGE: value }, { production: false }).filter(
+      (p) => p.variable === "PROMQL_MAX_RANGE",
+    );
+  assert.deepEqual(problemsFor("7d"), []);
+  assert.deepEqual(problemsFor("12h"), []);
+  for (const bad of ["0d", "7", "1h30m", "-1d", "7 days"]) {
+    assert.equal(problemsFor(bad).length, 1, bad);
+  }
 });
 
 test("a catalog staleness threshold of zero is allowed and disables the check", () => {
