@@ -230,6 +230,24 @@
     "params": ["2026-01-01T00:00:00.000Z", "2026-01-01T01:00:00.000Z"],
     "timeField": "ts"
   },
+  "v1-links.json#requests-by-service": {
+    "sql": "SELECT * FROM (SELECT time_bucket('1 minute', ts) AS minute, service, count(*) AS requests FROM http_requests GROUP BY minute, service ORDER BY minute) AS _holo\nWHERE _holo.minute >= $1::timestamptz\n  AND _holo.minute < $2::timestamptz\nLIMIT 5000",
+    "params": ["2026-01-01T00:00:00.000Z", "2026-01-01T01:00:00.000Z"],
+    "timeField": "minute"
+  },
+  "v1-links.json#hosts": {
+    "sql": "SELECT * FROM (SELECT host, region, avg(cpu_pct) AS cpu FROM system_metrics GROUP BY host, region ORDER BY cpu DESC LIMIT 50) AS _holo LIMIT 5000",
+    "params": []
+  },
+  "v1-links.json#share": {
+    "sql": "SELECT * FROM (SELECT service, count(*) AS requests FROM http_requests GROUP BY service) AS _holo LIMIT 5000",
+    "params": []
+  },
+  "v1-links.json#error-count": {
+    "sql": "SELECT * FROM (SELECT count(*) FILTER (WHERE status >= 500) AS errors FROM http_requests WHERE service = $1) AS _holo LIMIT 5000",
+    "params": ["api"],
+    "variables": ["service"]
+  },
   "v1-seeded-fleet-status.json#cpu-now": {
     "sql": "SELECT * FROM (SELECT time_bucket('1 minute', ts) AS minute, host, avg(cpu_pct) AS cpu FROM system_metrics GROUP BY minute, host ORDER BY minute) AS _holo\nWHERE _holo.minute >= $1::timestamptz\n  AND _holo.minute < $2::timestamptz\nLIMIT 5000",
     "params": ["2026-01-01T00:00:00.000Z", "2026-01-01T01:00:00.000Z"],

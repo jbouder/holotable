@@ -44,6 +44,7 @@ is mapped to a real source in their workspace.
 | `format` | format | Optional; how numbers are written. |
 | `timeRange` | `{ from, to }` | Optional; this panel's own window instead of the dashboard's. Not on `text`. |
 | `refreshIntervalMs` | integer | Optional; this panel's own cadence, same bounds. Not on `text`. |
+| `links` | Link[] | Optional, 1–5. Where the panel leads; see Link below. Not on `text`. |
 | `layout` | `{ x, y, w, h }` | Required. Integers: `x` 0–12, `y` 0–1000, `w` 1–12, `h` 1–48. |
 
 Value formats: `number`, `bytes`, `percent`, `ms`
@@ -88,6 +89,34 @@ The server binds the value as a parameter; it never enters the SQL text.
 | `query` | `{ sourceId, sql }` | `query` only, required there: a guarded SELECT whose first column is the values. No time filter, and no `:variables` of its own. |
 | `multi` | boolean | Several values at once, bound as an array: write `col = ANY(:name)`. |
 | `default` | string or string[] | Optional. An array only when `multi`. For `enum`, each default must be one of `values`. By default the first value. |
+
+## Link
+
+Where a panel leads: another dashboard in the same workspace, or this one with
+a variable set ("click to filter"). A link carries the viewer's window and
+picks and sets variables on arrival. It never holds a URL or SQL, and the
+target checks every pick against its own variable, as for a hand-typed link.
+
+| Field | Type | Rules |
+|---|---|---|
+| `title` | string | 1–64 chars, unique among the panel's links. What the menu item or the click says. |
+| `dashboard` | string | Optional, 1–128. The target dashboard's opaque id, never a URL. Absent: this dashboard. |
+| `carry` | `{ timeRange?, variables? }` | Optional booleans, each `true` when absent. `false` lands on the target's own default. |
+| `set` | object | Optional, at most 10 entries, keyed by variable name. Each value is exactly one of `{ "value": "api" }` (a literal), `{ "column": "instance" }` (the clicked row's value in that result column) or `{ "series": true }` (the clicked series or slice name). |
+| `newTab` | boolean | Optional, default `false`. |
+
+- A link whose `set` reads a `column` or the `series` is followed by clicking a
+  point, slice, cell or row. Any other link is followed from the panel's menu.
+- A link with no `dashboard` must `set` at least one variable, and only
+  variables this dashboard declares.
+- A `column` must be an output column of the panel's query.
+
+```json
+"links": [
+  { "title": "Instance detail", "dashboard": "9b2c41d0", "set": { "instance": { "column": "instance" } } },
+  { "title": "Filter to this service", "set": { "service": { "series": true } } }
+]
+```
 
 ## Layout
 

@@ -1,0 +1,178 @@
+{
+  "specVersion": 1,
+  "title": "Fleet overview with drilldown",
+  "timeRange": {
+    "from": "now-1h",
+    "to": "now"
+  },
+  "refreshIntervalMs": 15000,
+  "variables": [
+    {
+      "name": "service",
+      "type": "enum",
+      "values": ["api", "web", "worker"],
+      "default": "api"
+    },
+    {
+      "name": "host",
+      "type": "query",
+      "query": {
+        "sourceId": "ts-system",
+        "sql": "SELECT DISTINCT host FROM system_metrics ORDER BY host"
+      }
+    }
+  ],
+  "panels": [
+    {
+      "id": "requests-by-service",
+      "title": "Requests by service",
+      "viz": "line",
+      "query": {
+        "sourceId": "ts-metrics",
+        "timeField": "minute",
+        "sql": "SELECT time_bucket('1 minute', ts) AS minute, service, count(*) AS requests FROM http_requests GROUP BY minute, service ORDER BY minute"
+      },
+      "links": [
+        {
+          "title": "Filter to this service",
+          "set": {
+            "service": {
+              "series": true
+            }
+          }
+        },
+        {
+          "title": "Service detail",
+          "dashboard": "service-detail-7f3a",
+          "set": {
+            "service": {
+              "series": true
+            },
+            "env": {
+              "value": "prod"
+            }
+          }
+        }
+      ],
+      "layout": {
+        "x": 0,
+        "y": 0,
+        "w": 12,
+        "h": 8
+      }
+    },
+    {
+      "id": "hosts",
+      "title": "Hosts by CPU",
+      "viz": "table",
+      "query": {
+        "sourceId": "ts-system",
+        "sql": "SELECT host, region, avg(cpu_pct) AS cpu FROM system_metrics GROUP BY host, region ORDER BY cpu DESC LIMIT 50"
+      },
+      "links": [
+        {
+          "title": "Host detail",
+          "dashboard": "host-detail-9b2c",
+          "carry": {
+            "timeRange": true,
+            "variables": true
+          },
+          "set": {
+            "host": {
+              "column": "host"
+            }
+          }
+        },
+        {
+          "title": "Region overview",
+          "dashboard": "region-overview-41d0",
+          "carry": {
+            "timeRange": false,
+            "variables": false
+          },
+          "set": {
+            "region": {
+              "column": "region"
+            }
+          },
+          "newTab": true
+        }
+      ],
+      "layout": {
+        "x": 0,
+        "y": 8,
+        "w": 6,
+        "h": 6
+      }
+    },
+    {
+      "id": "share",
+      "title": "Request share",
+      "viz": "pie",
+      "query": {
+        "sourceId": "ts-metrics",
+        "sql": "SELECT service, count(*) AS requests FROM http_requests GROUP BY service"
+      },
+      "links": [
+        {
+          "title": "Only this service",
+          "set": {
+            "service": {
+              "series": true
+            },
+            "host": {
+              "value": "web-01"
+            }
+          }
+        }
+      ],
+      "layout": {
+        "x": 6,
+        "y": 8,
+        "w": 6,
+        "h": 6
+      }
+    },
+    {
+      "id": "error-count",
+      "title": "Errors",
+      "viz": "stat",
+      "query": {
+        "sourceId": "ts-metrics",
+        "sql": "SELECT count(*) FILTER (WHERE status >= 500) AS errors FROM http_requests WHERE service = :service"
+      },
+      "links": [
+        {
+          "title": "Incident runbook dashboard",
+          "dashboard": "incidents-0c1e",
+          "newTab": true
+        },
+        {
+          "title": "Error detail, last day",
+          "dashboard": "errors-5d2b",
+          "carry": {
+            "timeRange": false
+          }
+        },
+        {
+          "title": "Errors on the web tier",
+          "dashboard": "errors-5d2b",
+          "carry": {
+            "variables": false
+          },
+          "set": {
+            "service": {
+              "value": "web"
+            }
+          }
+        }
+      ],
+      "layout": {
+        "x": 0,
+        "y": 14,
+        "w": 4,
+        "h": 4
+      }
+    }
+  ]
+}

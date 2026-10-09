@@ -73,7 +73,7 @@ export const DashboardGenerationSchema = z
     panels: z.array(GeneratedPanel).min(1).max(50),
   })
   .strict()
-  .superRefine(uniqueIds);
+  .superRefine(dashboardRules); // unique ids, self links set declared variables
 ```
 
 There are two differences. The first is `specVersion`: which shape a spec is in
@@ -87,7 +87,7 @@ in a refinement. JSON Schema cannot carry a refinement, so a model reading the
 schema it was bound to saw `query` as optional, and one model left it off every
 panel. `GeneratedPanel` says the same thing in its shape instead: a union on
 `viz`, in which a kind that runs a query requires `query` and a query-less kind
-has none. Explore's `ExplorePanel` offers only the first. Both shapes are
+has none. Explore's `ExplorePanel` offers only the first, without links. Both shapes are
 `Panel`s, held to the same refinement, so everything after generation is
 unchanged. Because generation is bound to the same fields the client renders, a spec that
 would not render is a spec the model could not have emitted. This is why
@@ -100,6 +100,42 @@ out in `ir.ts`: `VizType` is built from the panel registry
 (`src/lib/panels/registry.ts`), which also builds the prompt's list of kinds and
 is the key to the client's renderers. See
 [Panel kinds](/concepts/streaming-and-rendering/#panel-kinds).
+
+## Links
+
+A panel may declare `links`
+([#371](https://github.com/jbouder/holotable/issues/371)): where it leads when
+a viewer investigates further. A link targets another dashboard in the same
+workspace by its **id**, or, with no id, the dashboard it is on. It is never a
+URL, so there is nothing in a spec a model could point outside the app.
+
+```json
+"links": [
+  {
+    "title": "Host detail",
+    "dashboard": "9b2c41d0",
+    "carry": { "timeRange": true, "variables": true },
+    "set": { "host": { "column": "host" } }
+  }
+]
+```
+
+- `carry` says whether the viewer's window and variable picks go along. Each
+  is `true` when absent.
+- `set` makes picks on arrival, by variable name. A value is a literal
+  (`{ "value": "api" }`), the clicked row's value in a result column
+  (`{ "column": "host" }`), or the clicked series' name (`{ "series": true }`).
+- A panel takes at most 5 links, a link sets at most 10 variables, and a text
+  panel takes none.
+- A link to the same dashboard must set at least one variable, and only ones
+  the dashboard declares. A link to another dashboard is not checked against
+  that dashboard's variables: the target ignores a name it does not declare.
+
+A link carries time expressions and picks, never SQL. The target page
+resolves the window on the server and checks every pick against its own
+variable, exactly as it does for a hand-typed `var-*` URL. `isDatumLink` and
+`isSelfLink` in `src/lib/ir.ts` are the two derived facts every consumer
+reads, so none re-derives them.
 
 ## Time expressions
 

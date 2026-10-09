@@ -658,6 +658,89 @@
             "minimum": 1000,
             "maximum": 3600000
           },
+          "links": {
+            "minItems": 1,
+            "maxItems": 5,
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "title": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 64
+                },
+                "dashboard": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 128
+                },
+                "carry": {
+                  "type": "object",
+                  "properties": {
+                    "timeRange": {
+                      "type": "boolean"
+                    },
+                    "variables": {
+                      "type": "boolean"
+                    }
+                  },
+                  "additionalProperties": false
+                },
+                "set": {
+                  "type": "object",
+                  "propertyNames": {
+                    "type": "string",
+                    "pattern": "^[a-z][a-z0-9_]{0,31}$"
+                  },
+                  "additionalProperties": {
+                    "anyOf": [
+                      {
+                        "type": "object",
+                        "properties": {
+                          "value": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 256
+                          }
+                        },
+                        "required": ["value"],
+                        "additionalProperties": false
+                      },
+                      {
+                        "type": "object",
+                        "properties": {
+                          "column": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 128
+                          }
+                        },
+                        "required": ["column"],
+                        "additionalProperties": false
+                      },
+                      {
+                        "type": "object",
+                        "properties": {
+                          "series": {
+                            "type": "boolean",
+                            "const": true
+                          }
+                        },
+                        "required": ["series"],
+                        "additionalProperties": false
+                      }
+                    ]
+                  }
+                },
+                "newTab": {
+                  "type": "boolean"
+                }
+              },
+              "required": ["title"],
+              "additionalProperties": false
+            }
+          },
           "layout": {
             "type": "object",
             "properties": {
