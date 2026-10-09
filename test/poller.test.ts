@@ -13,7 +13,7 @@ import {
 } from "@/lib/poller/registry";
 import { OPAQUE_MESSAGE } from "@/lib/errors";
 import { TimeRangeError } from "@/lib/time";
-import { QueryExecutionError } from "@/lib/timescaledb/client";
+import { QueryExecutionError } from "@/lib/sources/execution";
 import { createLogger, setLogger } from "@/lib/log";
 import type { Dashboard, QueryPanel } from "@/lib/ir";
 import type { SourceRecord } from "@/lib/registry";
@@ -145,6 +145,7 @@ test("makePanelExecutor emits tombstone for a cross-workspace source (never exec
     name: "Attacker Source",
     kind: "timescaledb",
     config: {
+      kind: "timescaledb",
       host: "internal-host",
       port: 5432,
       database: "secret_db",
@@ -210,6 +211,7 @@ test("makePanelExecutor allows execution when source workspace matches dashboard
     name: "Same WS Source",
     kind: "timescaledb",
     config: {
+      kind: "timescaledb",
       host: "localhost",
       port: 5432,
       database: "holotable",
@@ -324,6 +326,7 @@ test("a rejected query is reported as the statement it is", async () => {
         name: "s",
         secretRef: "TS",
         tombstonedAt: null,
+        kind: "timescaledb",
         config: { host: "h", port: 5432, database: "d", schema: "public", tables: [] },
       }) as unknown as SourceRecord,
   );

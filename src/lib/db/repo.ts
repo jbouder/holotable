@@ -7,7 +7,8 @@ import {
   normalizeTags,
 } from "@/lib/dashboard-metadata";
 import { log } from "@/lib/log";
-import { SourceConfig, type SourceRecord } from "@/lib/registry";
+import type { SourceConfig, SourceRecord } from "@/lib/registry";
+import { parseStoredSource } from "@/lib/sources/registry";
 import { type Dashboard, parseDashboard } from "@/lib/ir";
 import { upgradeSpec } from "@/lib/ir/upgrade";
 import type { BudgetStore } from "@/lib/limits/budget";
@@ -49,8 +50,7 @@ function mapSource(row: SourceRow): SourceRecord {
     id: row.id,
     workspaceId: row.workspace_id,
     name: row.name,
-    kind: row.kind,
-    config: SourceConfig.parse(row.config),
+    ...parseStoredSource(row.kind, row.config),
     secretRef: row.secret_ref,
     catalogRefreshedAt: row.catalog_refreshed_at,
     catalogMissingTables: row.catalog_missing_tables ?? [],
@@ -84,7 +84,6 @@ export async function createSource(input: {
   id: string;
   workspaceId: string;
   name: string;
-  kind?: string;
   config: SourceConfig;
   secretRef: string;
   createdBy: string;
@@ -97,7 +96,9 @@ export async function createSource(input: {
       input.id,
       input.workspaceId,
       input.name,
-      input.kind ?? "timescaledb",
+      // The column and the config's discriminator are written from the one
+      // value, so they cannot disagree.
+      input.config.kind,
       JSON.stringify(input.config),
       input.secretRef,
       input.createdBy,

@@ -2,7 +2,7 @@ import { requireIdentity, assertAuthorized, HttpError } from "@/lib/auth/authori
 import { json, route } from "@/lib/http";
 import { audit } from "@/lib/audit";
 import { getSourceById } from "@/lib/db/repo";
-import { testSource } from "@/lib/timescaledb/client";
+import { serverKind } from "@/lib/sources/server/registry";
 
 export const runtime = "nodejs";
 
@@ -21,7 +21,7 @@ export const POST = route(
       { workspaceId: source.workspaceId },
       { type: "source", id },
     );
-    const result = await testSource(source);
+    const result = await serverKind(source).test(source);
     audit({
       actor: identity,
       action: "source.test",

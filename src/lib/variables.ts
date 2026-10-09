@@ -4,9 +4,10 @@ import { getSourceById } from "@/lib/db/repo";
 import { VARIABLE_VALUES_MAX, type Variable } from "@/lib/ir";
 import type { SourceRecord } from "@/lib/registry";
 import { type RowScope, rowFilterHttpError, rowFilterInScope } from "@/lib/row-scope";
-import { buildExecutablePlan, type ExecutablePlan, validateSql } from "@/lib/sql/safety";
+import type { ExecutablePlan } from "@/lib/sql/safety";
 import type { VariableValues } from "@/lib/sql/variables";
-import { executePlan } from "@/lib/timescaledb/client";
+import type { QueryResult } from "@/lib/sources/execution";
+import { serverKind } from "@/lib/sources/server/registry";
 import {
   resolveSelection,
   type Selection,
@@ -29,13 +30,13 @@ import {
 
 export interface VariableDeps {
   getSource: (id: string) => Promise<SourceRecord | null>;
-  execute: (
-    source: SourceRecord,
-    plan: ExecutablePlan,
-  ) => Promise<{ columns: string[]; rows: Record<string, unknown>[] }>;
+  execute: (source: SourceRecord, plan: ExecutablePlan) => Promise<QueryResult>;
 }
 
-const DEFAULT_DEPS: VariableDeps = { getSource: getSourceById, execute: executePlan };
+const DEFAULT_DEPS: VariableDeps = {
+  getSource: getSourceById,
+  execute: (source, plan) => serverKind(source).execute(source, plan),
+};
 
 /**
  * What a variable allows. A query variable's failure is the author's to fix,
@@ -56,12 +57,13 @@ export async function variableOptions(
       `variable :${variable.name} reads a source that is not available`,
     );
   }
-  const check = await validateSql(sql, source.config);
+  const kind = serverKind(source);
+  const check = await kind.validate(sql, source.config);
   if (!check.ok) {
     throw new VariableSelectionError(`variable :${variable.name}: ${check.error}`);
   }
   const now = new Date();
-  const plan = buildExecutablePlan({
+  const plan = kind.plan({
     sql,
     from: now,
     to: now,

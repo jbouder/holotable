@@ -8,7 +8,7 @@ import {
 import { buildExecutablePlan, validateSql } from "@/lib/sql/safety";
 import { bindRowFilter } from "@/lib/sql/row-filter";
 import { resolveTimeRange } from "@/lib/time";
-import { executePlan } from "@/lib/timescaledb/client";
+import { serverKind } from "@/lib/sources/server/registry";
 
 /**
  * End-to-end smoke test for the self-monitoring demo (#54).
@@ -77,7 +77,7 @@ async function runPanel(
   });
 
   try {
-    const result = await executePlan(source, plan);
+    const result = await serverKind(source).execute(source, plan);
     return { panel, rows: result.rows.length };
   } catch (err) {
     return { panel, rows: 0, error: err instanceof Error ? err.message : String(err) };

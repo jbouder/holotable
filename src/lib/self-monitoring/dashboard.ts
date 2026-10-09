@@ -113,7 +113,7 @@ export function selfMonitoringTables(): CatalogTable[] {
 
 /** The full source config, given wherever the collector's database lives. */
 export function selfMonitoringConfig(connection: SourceConnection): SourceConfig {
-  return { ...connection, tables: selfMonitoringTables() };
+  return { kind: "timescaledb", ...connection, tables: selfMonitoringTables() };
 }
 
 /**

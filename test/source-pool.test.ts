@@ -7,7 +7,8 @@ import { type SourceRecord, SourceConfig } from "@/lib/registry";
 import { secretRefEnvVars } from "@/lib/secret-refs";
 import { SecretRefError } from "@/lib/secrets/credentials";
 import type { ExecutablePlan } from "@/lib/sql/safety";
-import { executePlan, QueryExecutionError } from "@/lib/timescaledb/client";
+import { QueryExecutionError } from "@/lib/sources/execution";
+import { executePlan } from "@/lib/timescaledb/client";
 import {
   closeSourcePools,
   connectionFingerprint,

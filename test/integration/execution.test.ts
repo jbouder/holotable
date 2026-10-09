@@ -5,7 +5,8 @@ import type { QueryPanel } from "@/lib/ir";
 import { makePanelExecutor } from "@/lib/poller/registry";
 import type { SourceRecord } from "@/lib/registry";
 import { buildExecutablePlan, type ExecutablePlan, validateSql } from "@/lib/sql/safety";
-import { executePlan, QueryExecutionError } from "@/lib/timescaledb/client";
+import { QueryExecutionError } from "@/lib/sources/execution";
+import { executePlan } from "@/lib/timescaledb/client";
 import { closeSourcePools } from "@/lib/timescaledb/pool";
 import { grantRef, metricsSource, needsDb, unique } from "./support";
 

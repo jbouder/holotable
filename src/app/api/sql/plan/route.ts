@@ -6,11 +6,11 @@ import { config } from "@/lib/config";
 import { getSourceById } from "@/lib/db/repo";
 import { TimeRange } from "@/lib/ir";
 import { buildQueryPlanView } from "@/lib/query-plan";
-import { validateSql, buildExecutablePlan } from "@/lib/sql/safety";
+import type { ExecutablePlan } from "@/lib/sql/safety";
 import { VariableError } from "@/lib/sql/variables";
 import { VariableValuesBody } from "@/lib/variable-selection";
 import { resolveTimeRange } from "@/lib/time";
-import { sessionStatements } from "@/lib/timescaledb/client";
+import { serverKind } from "@/lib/sources/server/registry";
 
 export const runtime = "nodejs";
 
@@ -56,8 +56,9 @@ export const POST = route("sql.plan", async (req: Request) => {
     { type: "source", id: source.id },
   );
 
+  const kind = serverKind(source);
   const variables = body.variables ?? {};
-  const check = await validateSql(
+  const check = await kind.validate(
     body.sql,
     source.config,
     new Set(Object.keys(variables)),
@@ -65,9 +66,9 @@ export const POST = route("sql.plan", async (req: Request) => {
   if (!check.ok) throw new HttpError(400, check.error ?? "invalid sql", {}, "statement");
 
   const range = resolveTimeRange(body.timeRange);
-  let plan: ReturnType<typeof buildExecutablePlan>;
+  let plan: ExecutablePlan;
   try {
-    plan = buildExecutablePlan({
+    plan = kind.plan({
       sql: body.sql,
       timeField: body.timeField,
       from: range.from,
@@ -89,7 +90,7 @@ export const POST = route("sql.plan", async (req: Request) => {
       timeRange: body.timeRange,
       plan,
       rowFilterClaim: source.config.rowFilter?.claim,
-      session: sessionStatements(source.config.schema),
+      session: kind.session(source.config),
       limits: {
         maxRows: config.maxQueryRows,
         statementTimeoutMs: config.queryTimeoutSeconds * 1000,

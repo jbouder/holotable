@@ -48,6 +48,7 @@ const SYSTEM_METRICS: CatalogTable = {
 
 function config(tables: CatalogTable[]): SourceConfig {
   return {
+    kind: "timescaledb",
     host: "timescaledb",
     port: 5432,
     database: "holotable",

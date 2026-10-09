@@ -94,6 +94,10 @@ export default defineConfig({
               label: "ADR 1: Multi-source generation",
               slug: "architecture/decisions/0001-multi-source-generation",
             },
+            {
+              label: "ADR 2: Source kinds",
+              slug: "architecture/decisions/0002-source-kinds",
+            },
           ],
         },
         {

@@ -47,6 +47,7 @@ function source(id: string, extra: Partial<SourceRecord> = {}): SourceRecord {
     id,
     workspaceId: "ws",
     name: id,
+    kind: "timescaledb",
     config,
     secretRef: "TS",
     catalogRefreshedAt: new Date().toISOString(),

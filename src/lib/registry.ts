@@ -1,6 +1,8 @@
 import { z } from "zod";
-import { CLAIM_NAME } from "@/lib/auth/claims";
 import { SECRET_REF_MESSAGE, SECRET_REF_PATTERN } from "@/lib/secret-refs";
+import type { SourceCatalog } from "@/lib/sources/catalog";
+import { TimescaleDbConfig } from "@/lib/sources/kinds/timescaledb";
+import { SourceConfig, type SourceKindName, sourceKind } from "@/lib/sources/registry";
 
 /**
  * Source registry types.
@@ -13,96 +15,25 @@ import { SECRET_REF_MESSAGE, SECRET_REF_PATTERN } from "@/lib/secret-refs";
  * and lives apart because this module is also bundled for the browser.
  */
 
-/**
- * The allowlist caps, named because discovery has to honour them too: the menu
- * a source author picks from can never be allowed to exceed what a valid
- * `SourceConfig` could hold.
- */
-export const MAX_TABLES = 200;
-export const MAX_COLUMNS = 200;
-
-export const CatalogColumn = z
-  .object({
-    name: z.string().min(1).max(128),
-    type: z.string().min(1).max(64),
-    description: z.string().max(500).optional(),
-    /**
-     * Whether generated SQL may reference this column and the model may be
-     * told it exists. Absent means exposed, so every config stored before the
-     * flag existed reads exactly as it did. `false` keeps the column out of
-     * the prompt and the editor, and `validateSql` refuses any statement that
-     * names it, selects `*` over its table, or reads its table's whole row.
-     */
-    exposed: z.boolean().optional(),
-  })
-  .strict();
-export type CatalogColumn = z.infer<typeof CatalogColumn>;
-
-export const CatalogTable = z
-  .object({
-    name: z.string().min(1).max(128),
-    description: z.string().max(500).optional(),
-    /** Preferred time column for server-injected time filtering. */
-    timeField: z.string().min(1).max(128).optional(),
-    columns: z.array(CatalogColumn).min(1).max(MAX_COLUMNS),
-  })
-  .strict();
-export type CatalogTable = z.infer<typeof CatalogTable>;
-
-/**
- * How to reach the database, without the catalog.
- *
- * Split out of {@link SourceConfig} so table discovery can be asked for before
- * an allowlist exists: the discovery route needs exactly these fields and must
- * not be handed a `tables` array it would have no use for. `SourceConfig`
- * extends it, so the two can never drift in their constraints.
- */
-export const SourceConnection = z
-  .object({
-    host: z.string().min(1).max(255),
-    port: z.number().int().min(1).max(65535),
-    database: z.string().min(1).max(128),
-    schema: z.string().min(1).max(128).default("public"),
-    ssl: z.boolean().default(false),
-  })
-  .strict();
-export type SourceConnection = z.infer<typeof SourceConnection>;
-
-/**
- * A mandatory tenant predicate (#31): every table this source reads is
- * narrowed to the rows whose `column` equals the viewer's `claim`, before any
- * statement sees them. `column` is a bare identifier, checked exactly as a
- * `timeField` is, and must be a column of every table in the catalog.
- * `claim` is `sub` or a name listed in `ROW_FILTER_CLAIMS`; the value always
- * comes from the verified identity, never from a request or the model.
- */
-export const RowFilter = z
-  .object({
-    column: z
-      .string()
-      .regex(/^[A-Za-z_][A-Za-z0-9_]*$/, "must be a bare column name")
-      .max(63),
-    claim: z.string().regex(CLAIM_NAME, "must be a claim name"),
-  })
-  .strict();
-export type RowFilter = z.infer<typeof RowFilter>;
-
-export const SourceConfig = SourceConnection.extend({
-  /** The table allowlist. Only these tables may be referenced by any SQL. */
-  tables: z.array(CatalogTable).min(1).max(MAX_TABLES),
-  rowFilter: RowFilter.optional(),
-}).strict();
-export type SourceConfig = z.infer<typeof SourceConfig>;
+export {
+  CatalogColumn,
+  CatalogTable,
+  MAX_COLUMNS,
+  MAX_TABLES,
+  RowFilter,
+  type SourceCatalog,
+  allowedTables,
+  exposedColumns,
+  exposedTable,
+  isExposed,
+  unexposedColumns,
+} from "@/lib/sources/catalog";
+export { SourceConnection } from "@/lib/sources/kinds/timescaledb";
+export { SourceConfig, type SourceKindName } from "@/lib/sources/registry";
 
 /** The connection half of a stored config, for a reconnect or a rediscovery. */
-export function sourceConnection(cfg: SourceConfig): SourceConnection {
-  return {
-    host: cfg.host,
-    port: cfg.port,
-    database: cfg.database,
-    schema: cfg.schema,
-    ssl: cfg.ssl,
-  };
+export function sourceConnection(cfg: SourceConfig) {
+  return sourceKind(cfg).connection(cfg);
 }
 
 /**
@@ -133,31 +64,25 @@ export type SourceDraft = z.infer<typeof SourceDraft>;
  * shown the field, and a draft that somehow carries one fails to parse.
  */
 export const ModelSourceDraft = SourceDraft.extend({
-  config: SourceConfig.omit({ rowFilter: true }).strict(),
+  // TimescaleDB only until a Prometheus draft exists (#386). The model is not
+  // shown `kind` either: it has one answer here, which the default supplies.
+  config: TimescaleDbConfig.omit({ rowFilter: true, kind: true }).strict(),
 }).strict();
 
 /**
- * The part of a source that may be sent to a browser: the schema name and the
- * table allowlist with its columns, and nothing else.
- *
- * The editor needs the catalog to complete table and column names and to warn
- * about a table the guard will refuse. It does not need — and invariant 5 says
- * it must not receive — the host, port, database, TLS setting or `secret_ref`
- * that sit beside the catalog in {@link SourceConfig}. Projecting through
- * {@link sourceCatalog} rather than spreading the config is what keeps a field
- * added to `SourceConfig` later from reaching the client by default.
+ * What the editor may see of a source's catalog: projected by the source's
+ * kind, which names the fields (see `SourceCatalog`), never spread.
  */
-export type SourceCatalog = Pick<SourceConfig, "schema" | "tables">;
-
 export function sourceCatalog(cfg: SourceConfig): SourceCatalog {
-  return { schema: cfg.schema, tables: cfg.tables.map(exposedTable) };
+  return sourceKind(cfg).catalog(cfg);
 }
 
 export interface SourceRecord {
   id: string;
   workspaceId: string;
   name: string;
-  kind: string;
+  /** Checked against the registered kinds when the row is loaded. */
+  kind: SourceKindName;
   config: SourceConfig;
   secretRef: string;
   /**
@@ -177,58 +102,4 @@ export interface SourceRecord {
   createdAt: string;
   updatedAt: string;
   tombstonedAt: string | null;
-}
-
-/**
- * The set of allowed table names for a source, bare and schema-qualified,
- * exactly as the catalog spells them.
- *
- * Names are compared character for character, never case-folded. PostgreSQL
- * folds an *unquoted* identifier to lowercase and preserves the case of a
- * *quoted* one, so `"HTTP_REQUESTS"` is a different relation from
- * `http_requests`. The parser applies the same folding before the guard sees
- * a name, so an exact comparison here is exactly the server's resolution;
- * lowercasing on either side would collapse the two into one.
- */
-export function allowedTables(cfg: SourceCatalog): Set<string> {
-  const set = new Set<string>();
-  for (const t of cfg.tables) {
-    set.add(t.name);
-    set.add(`${cfg.schema}.${t.name}`);
-  }
-  return set;
-}
-
-/** A column is exposed unless its author said otherwise. */
-export function isExposed(column: CatalogColumn): boolean {
-  return column.exposed !== false;
-}
-
-/** The columns of a table that generated SQL may reference. */
-export function exposedColumns(table: CatalogTable): CatalogColumn[] {
-  return table.columns.filter(isExposed);
-}
-
-/** The names of a table's unexposed columns, exactly as the catalog spells them. */
-export function unexposedColumns(table: CatalogTable): Set<string> {
-  return new Set(table.columns.filter((c) => !isExposed(c)).map((c) => c.name));
-}
-
-/**
- * A table as it may be described — to the model, to the editor, or to a
- * catalog-derived suggestion: its exposed columns only, and no `timeField`
- * when that column is unexposed, since a query could not select it.
- *
- * The result is a view, not a valid `CatalogTable`: a table whose every
- * column is unexposed comes back with none. It must never be stored.
- */
-export function exposedTable(table: CatalogTable): CatalogTable {
-  const hidden = unexposedColumns(table);
-  if (hidden.size === 0) return table;
-  const { timeField, ...rest } = table;
-  return {
-    ...rest,
-    ...(timeField && !hidden.has(timeField) ? { timeField } : {}),
-    columns: exposedColumns(table),
-  };
 }

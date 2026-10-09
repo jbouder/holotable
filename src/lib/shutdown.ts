@@ -160,11 +160,11 @@ async function defaultStopPollers(): Promise<void> {
 }
 
 async function defaultClosePool(): Promise<void> {
-  const [{ closePool }, { closeSourcePools }] = await Promise.all([
+  const [{ closePool }, { closeAllSources }] = await Promise.all([
     import("@/lib/db/pg"),
-    import("@/lib/timescaledb/pool"),
+    import("@/lib/sources/server/registry"),
   ]);
-  await Promise.all([closePool(), closeSourcePools()]);
+  await Promise.all([closePool(), closeAllSources()]);
 }
 
 /**

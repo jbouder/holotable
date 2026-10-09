@@ -4,7 +4,7 @@ import type { Identity } from "@/lib/auth/claims";
 import { currentRequest, log } from "@/lib/log";
 import { VariableError } from "@/lib/sql/variables";
 import { TimeRangeError } from "@/lib/time";
-import { QueryExecutionError } from "@/lib/timescaledb/client";
+import { QueryExecutionError } from "@/lib/sources/execution";
 
 /**
  * What an MCP tool is, on the server side (#148).

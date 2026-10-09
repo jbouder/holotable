@@ -52,6 +52,7 @@ ever runs it.
 | IR contract | `src/lib/ir.ts` |
 | Generate route + auth | `src/app/api/generate/route.ts` |
 | LLM generation | `src/lib/ai/generate.ts`, `src/lib/ai/provider.ts` |
+| Source kinds | `src/lib/sources/registry.ts`, `src/lib/sources/server/registry.ts` ([ADR 2](/architecture/decisions/0002-source-kinds/)) |
 | Catalog (prompt metadata) | `src/lib/timescaledb/catalog.ts` |
 | Save + validate | `src/app/api/dashboards/route.ts`, `src/lib/dashboard-service.ts` |
 | SQL guard + time injection | `src/lib/sql/safety.ts` |

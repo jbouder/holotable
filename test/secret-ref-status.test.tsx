@@ -17,6 +17,7 @@ import { mount } from "./support/dom";
 
 function config(): SourceConfig {
   return {
+    kind: "timescaledb",
     host: "timescaledb",
     port: 5432,
     database: "holotable",

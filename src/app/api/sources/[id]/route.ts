@@ -4,9 +4,10 @@ import { readJson, json, route } from "@/lib/http";
 import { assertRowFilterSavable } from "@/lib/row-scope";
 import { audit } from "@/lib/audit";
 import { getSourceById, updateSource, deleteSource } from "@/lib/db/repo";
-import { dropSourcePool } from "@/lib/timescaledb/pool";
 import { SourceConfig } from "@/lib/registry";
 import { sourceListing } from "@/lib/source-listing";
+import { sameKind } from "@/lib/sources/registry";
+import { serverKind } from "@/lib/sources/server/registry";
 import { SECRET_REF_MESSAGE, SECRET_REF_PATTERN } from "@/lib/secret-refs";
 import { requireGrantedSecretRef } from "@/lib/secrets/http";
 
@@ -60,6 +61,14 @@ export const PUT = route(
     if (patch.secretRef !== undefined && patch.secretRef !== source.secretRef) {
       requireGrantedSecretRef(patch.secretRef, source.workspaceId);
     }
+    // A source's kind is what it is: an edit may change its config, never turn
+    // it into another kind under the same id, which every panel names.
+    if (patch.config && !sameKind(source, patch.config)) {
+      throw new HttpError(
+        400,
+        `a ${source.kind} source cannot become a ${patch.config.kind} one`,
+      );
+    }
     if (patch.config) assertRowFilterSavable(patch.config);
     const updated = await updateSource(source.workspaceId, id, patch);
     if (!updated) throw new HttpError(409, "source is tombstoned and cannot be edited");
@@ -92,7 +101,7 @@ export const DELETE = route(
     const outcome = await deleteSource(source.workspaceId, id);
     // Its connections would close at the idle timeout anyway; nothing will
     // check them out again, so close them now.
-    await dropSourcePool(id);
+    await serverKind(source).dispose(id);
     audit({
       actor: identity,
       action: "source.delete",

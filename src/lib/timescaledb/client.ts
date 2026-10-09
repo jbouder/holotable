@@ -9,6 +9,7 @@ import { observeQuery } from "@/lib/metrics";
 import { trackInFlight } from "@/lib/shutdown";
 import { isPlainIdentifier } from "@/lib/catalog/identifiers";
 import type { SourceTestResult, TestReadOnly, TestTable } from "@/lib/source-test";
+import { QueryExecutionError, type QueryResult } from "@/lib/sources/execution";
 
 /**
  * A connection of its own, outside the source's pool, for the connection test
@@ -31,24 +32,6 @@ function testClient(source: SourceRecord): Client {
     statement_timeout: config.queryTimeoutSeconds * 1000,
     application_name: "holotable",
   });
-}
-
-export interface QueryResult {
-  columns: string[];
-  rows: Record<string, unknown>[];
-}
-
-/**
- * A SQL statement failed at execution time (as opposed to a connection or
- * infrastructure failure). The message is safe to surface to an authorized
- * editor — it is the same information the live poller already forwards — and
- * routes translate it into a 400 so the user can correct the query and retry.
- */
-export class QueryExecutionError extends Error {
-  constructor(message: string) {
-    super(message);
-    this.name = "QueryExecutionError";
-  }
 }
 
 /**

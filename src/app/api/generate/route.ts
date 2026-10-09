@@ -23,7 +23,7 @@ import {
   takeFailure,
 } from "@/lib/ai/repair";
 import { recordLlmRepair } from "@/lib/metrics";
-import { buildCatalogPrompt } from "@/lib/timescaledb/catalog";
+import { serverKind } from "@/lib/sources/server/registry";
 import { enforceLlmLimits } from "@/lib/limits/llm";
 import { Panel } from "@/lib/ir";
 import { StoredDashboard } from "@/lib/ir/upgrade";
@@ -160,7 +160,7 @@ export const POST = route("generate", async (req: Request) => {
   // What the model is about to be shown, so the log can say which catalog was
   // in context without keeping the text. Built here rather than handed back by
   // the stream: it is a pure function of the same trusted source record.
-  const catalog = sources.map((s) => buildCatalogPrompt(s)).join("\n\n");
+  const catalog = sources.map((s) => serverKind(s).catalogPrompt(s)).join("\n\n");
   // Only a first attempt can be repaired, so only it gets an id.
   const generationId = repair ? null : randomUUID();
   const onFinish: OnGenerationFinish = (event) => {

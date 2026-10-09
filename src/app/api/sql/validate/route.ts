@@ -2,7 +2,7 @@ import { z } from "zod";
 import { requireIdentity, assertAuthorized, HttpError } from "@/lib/auth/authorize";
 import { readJson, json, route } from "@/lib/http";
 import { getSourceById } from "@/lib/db/repo";
-import { validateSql } from "@/lib/sql/safety";
+import { serverKind } from "@/lib/sources/server/registry";
 import { VariableName } from "@/lib/ir";
 
 export const runtime = "nodejs";
@@ -46,7 +46,11 @@ export const POST = route("sql.validate", async (req: Request) => {
     { type: "source", id: source.id },
   );
 
-  const check = await validateSql(body.sql, source.config, new Set(body.variables));
+  const check = await serverKind(source).validate(
+    body.sql,
+    source.config,
+    new Set(body.variables),
+  );
   return json(
     check.ok ? { ok: true } : { ok: false, error: check.error ?? "invalid sql" },
   );

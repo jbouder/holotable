@@ -381,7 +381,7 @@ test("the model cannot draft a row filter", () => {
   const draft = { id: "d", name: "d", secretRef: "TS_METRICS", config };
   assert.equal(SourceDraft.safeParse(draft).success, true);
   assert.equal(ModelSourceDraft.safeParse(draft).success, false);
-  const { rowFilter: _, ...plain } = config;
+  const { rowFilter: _, kind: _kind, ...plain } = config;
   assert.equal(ModelSourceDraft.safeParse({ ...draft, config: plain }).success, true);
 });
 

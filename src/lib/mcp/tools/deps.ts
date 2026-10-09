@@ -17,7 +17,7 @@ import type {
 import type { enforceLlmLimits } from "@/lib/limits/llm";
 import type { invalidatePoller } from "@/lib/poller/registry";
 import type { secretRefGrants } from "@/lib/secrets/credentials";
-import type { executePlan } from "@/lib/timescaledb/client";
+import type { ServerSourceKind } from "@/lib/sources/server/registry";
 import type { workspacePromptFor } from "@/lib/workspace-prompt-service";
 
 /**
@@ -29,7 +29,8 @@ import type { workspacePromptFor } from "@/lib/workspace-prompt-service";
 export interface McpDeps {
   getSource: typeof getSourceById;
   listSources: typeof listSources;
-  executePlan: typeof executePlan;
+  /** A plan run on its source, through the source's kind. */
+  executePlan: ServerSourceKind["execute"];
   listDashboards: typeof listDashboards;
   getDashboard: typeof getDashboardById;
   createDashboard: typeof createDashboard;
