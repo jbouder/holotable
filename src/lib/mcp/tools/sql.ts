@@ -59,9 +59,11 @@ export function sqlTools(deps: McpDeps): McpTool[] {
           { workspaceId: source.workspaceId },
           { type: "source", id: source.id },
         );
-        const check = await serverKind(source).validate(
-          args.sql,
-          source.config,
+        // SQL until the tools learn PromQL (#389); a Prometheus source
+        // refuses it by name.
+        const check = await serverKind(source).check(
+          source,
+          { sourceId: source.id, sql: args.sql },
           new Set(args.variables ?? []),
         );
         return check.ok ? { ok: true } : { ok: false, error: check.error ?? "rejected" };
@@ -117,9 +119,14 @@ export function sqlTools(deps: McpDeps): McpTool[] {
           });
 
         const variables = args.variables ?? {};
-        const check = await serverKind(source).validate(
-          args.sql,
-          source.config,
+        const query = {
+          sourceId: source.id,
+          sql: args.sql,
+          ...(args.timeField ? { timeField: args.timeField } : {}),
+        };
+        const check = await serverKind(source).check(
+          source,
+          query,
           new Set(Object.keys(variables)),
         );
         if (!check.ok) {
@@ -130,9 +137,7 @@ export function sqlTools(deps: McpDeps): McpTool[] {
           args.timeRange ?? { from: config.defaultTimeFrom, to: config.defaultTimeTo },
         );
         try {
-          const plan = serverKind(source).plan({
-            sql: args.sql,
-            timeField: args.timeField,
+          const plan = serverKind(source).plan(source, query, {
             from,
             to,
             rowFilter: rowFilterFor(source, identity),

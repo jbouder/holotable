@@ -12,7 +12,7 @@ import {
 import {
   allowedTables,
   type CatalogTable,
-  type SourceConfig,
+  type SqlSourceConfig,
   unexposedColumns,
 } from "@/lib/registry";
 import {
@@ -169,7 +169,7 @@ function timeFunctionError(fn: string): ValidationResult {
  */
 export async function validateSql(
   sql: string,
-  source: SourceConfig,
+  source: SqlSourceConfig,
   variables: ReadonlySet<string> = NO_VARIABLES,
 ): Promise<ValidationResult> {
   const result = await checkSql(sql, source, variables);
@@ -189,7 +189,7 @@ export async function validateSql(
  */
 export async function checkSql(
   sql: string,
-  source: SourceConfig,
+  source: SqlSourceConfig,
   variables: ReadonlySet<string> = NO_VARIABLES,
 ): Promise<ValidationResult> {
   const stripped = stripTerminators(sql);
@@ -295,7 +295,7 @@ export async function checkSql(
  */
 export function checkColumns(
   analysis: SelectAnalysis,
-  source: SourceConfig,
+  source: SqlSourceConfig,
 ): string | null {
   const catalogTable = (ref: TableRef): CatalogTable | undefined =>
     source.tables.find(

@@ -1,6 +1,6 @@
 import { z } from "zod";
 import type { SourceRecord } from "@/lib/registry";
-import type { SourceListing } from "@/lib/source-listing";
+import type { TimescaleDbListing } from "@/lib/source-listing";
 import {
   CatalogTable,
   MAX_TABLES,
@@ -74,14 +74,29 @@ export const timescaledb = {
     return { schema: cfg.schema, tables: cfg.tables.map(exposedTable) };
   },
 
-  listing(source: SourceRecord): SourceListing {
+  listing(source: SourceRecord): TimescaleDbListing {
+    const cfg = source.config;
+    if (cfg.kind !== "timescaledb")
+      throw new Error(`${source.id} is not a TimescaleDB source`);
     return {
       id: source.id,
       workspaceId: source.workspaceId,
       name: source.name,
-      schema: source.config.schema,
-      tableCount: source.config.tables.length,
+      kind: "timescaledb",
+      schema: cfg.schema,
+      tableCount: cfg.tables.length,
       tombstonedAt: source.tombstonedAt,
     };
   },
-} as const satisfies SourceKind<"timescaledb", typeof TimescaleDbConfig>;
+
+  rowFilter(cfg: TimescaleDbConfig) {
+    return cfg.rowFilter
+      ? { target: cfg.rowFilter.column, claim: cfg.rowFilter.claim }
+      : undefined;
+  },
+} as const satisfies SourceKind<
+  "timescaledb",
+  typeof TimescaleDbConfig,
+  SourceCatalog,
+  TimescaleDbListing
+>;

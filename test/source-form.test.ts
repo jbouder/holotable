@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { SourceConfig } from "@/lib/registry";
+import { type SqlSourceConfig, TimescaleDbConfig } from "@/lib/registry";
 import {
   applyDiscovery,
   configFromFormState,
@@ -30,7 +30,7 @@ import {
  * than becoming an allowlist by itself.
  */
 
-const config = SourceConfig.parse({
+const config = TimescaleDbConfig.parse({
   host: "timescaledb.internal",
   port: 5432,
   database: "holotable",

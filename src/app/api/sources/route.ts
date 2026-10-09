@@ -5,9 +5,10 @@ import { assertRowFilterSavable } from "@/lib/row-scope";
 import { audit } from "@/lib/audit";
 import { listSources, createSource } from "@/lib/db/repo";
 import { catalogHealth } from "@/lib/catalog/health";
-import { SourceDraft } from "@/lib/registry";
+import { checkSecretRef, SourceDraftFields } from "@/lib/registry";
 import { sourceListing } from "@/lib/source-listing";
 import { requireGrantedSecretRef } from "@/lib/secrets/http";
+import { serverKind } from "@/lib/sources/server/registry";
 
 export const runtime = "nodejs";
 
@@ -42,9 +43,9 @@ export const GET = route("sources.list", async (req: Request) => {
 
 // The create body IS a drafted source plus the target workspace, so the
 // natural-language draft schema and the create contract stay in lockstep.
-const CreateBody = SourceDraft.extend({
+const CreateBody = SourceDraftFields.extend({
   workspaceId: z.string().min(1).max(128),
-});
+}).superRefine(checkSecretRef);
 
 /** Create a source (source-admin on the target workspace). */
 export const POST = route("sources.create", async (req: Request) => {
@@ -52,15 +53,18 @@ export const POST = route("sources.create", async (req: Request) => {
   const body = await readJson(req, CreateBody);
 
   assertAuthorized(identity, "source:manage", { workspaceId: body.workspaceId });
-  requireGrantedSecretRef(body.secretRef, body.workspaceId);
+  if (body.secretRef !== undefined)
+    requireGrantedSecretRef(body.secretRef, body.workspaceId);
   assertRowFilterSavable(body.config);
+  const unreachable = await serverKind(body.config).checkConfig(body.config);
+  if (unreachable) throw new HttpError(400, unreachable, {}, "validation");
 
   const source = await createSource({
     id: body.id,
     workspaceId: body.workspaceId,
     name: body.name,
     config: body.config,
-    secretRef: body.secretRef,
+    secretRef: body.secretRef ?? null,
     createdBy: identity.sub,
   });
   audit({

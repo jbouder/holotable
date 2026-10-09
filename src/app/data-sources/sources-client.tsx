@@ -13,7 +13,7 @@ import {
   ExternalLink,
   ListTree,
 } from "lucide-react";
-import { SourceDraft, type SourceRecord } from "@/lib/registry";
+import { SourceDraft, type SourceRecord, type SqlSourceDraft } from "@/lib/registry";
 import { type SourceListing, sourceListing } from "@/lib/source-listing";
 import { summarizeCatalogDiff } from "@/lib/catalog/refresh";
 import { CatalogBrowserDialog } from "@/components/sources/catalog-browser";
@@ -42,6 +42,7 @@ import { useRepairingObject } from "@/components/use-repairing-object";
 import { FIRST_DASHBOARD_DOCS_URL } from "@/lib/onboarding";
 import { apiErrorFromThrown, readApiError } from "@/lib/errors";
 import { buildSourceDescriptionStarters } from "@/lib/prompts/starters";
+import { isSqlSource } from "@/lib/sources/registry";
 import { SourceForm } from "./source-form";
 import { type GrantedSecretRefsState, readinessIn } from "@/lib/secret-refs";
 import { Notice } from "@/components/notice";
@@ -212,7 +213,10 @@ export function SourcesClient({
     sources.length > 0 &&
     sources.every((source) => catalog[source.id]?.blocked === true);
 
-  const sourceBeingEdited = sources?.find((source) => source.id === editing)?.record;
+  // The form edits SQL sources; a Prometheus source has no form until #386.
+  const editedRecord = sources?.find((source) => source.id === editing)?.record;
+  const sourceBeingEdited =
+    editedRecord && isSqlSource(editedRecord) ? editedRecord : undefined;
   const sourceShowingImpact = sources?.find((source) => source.id === showingImpact);
   const sourceBeingDeleted = sources?.find((source) => source.id === confirmingDelete);
   const sourceBeingBrowsed = sources?.find((source) => source.id === browsing) ?? null;
@@ -340,12 +344,15 @@ export function SourcesClient({
                 </TableCell>
                 {source.record && (
                   <TableCell className="whitespace-nowrap">
-                    {source.record.config.host}:{source.record.config.port}/
-                    {source.record.config.database}
+                    {"host" in source.record.config
+                      ? `${source.record.config.host}:${source.record.config.port}/${source.record.config.database}`
+                      : source.record.config.url}
                   </TableCell>
                 )}
-                <TableCell>{source.schema}</TableCell>
-                <TableCell>{source.tableCount}</TableCell>
+                <TableCell>{"schema" in source ? source.schema : "—"}</TableCell>
+                <TableCell>
+                  {"tableCount" in source ? source.tableCount : source.metricCount}
+                </TableCell>
                 <TableCell>
                   <CatalogHealthBadge source={source} health={catalog[source.id]} />
                 </TableCell>
@@ -359,9 +366,11 @@ export function SourcesClient({
                 )}
                 {source.record && (
                   <TableCell>
-                    <SecretRefBadge
-                      readiness={readinessIn(secretRefs, source.record.secretRef)}
-                    />
+                    {source.record.secretRef !== null && (
+                      <SecretRefBadge
+                        readiness={readinessIn(secretRefs, source.record.secretRef)}
+                      />
+                    )}
                   </TableCell>
                 )}
                 <TableCell>
@@ -553,7 +562,7 @@ function CreateSourcePanel({
   onCreated: () => void;
   onCancel: () => void;
 }) {
-  const [seed, setSeed] = React.useState<SourceDraft>();
+  const [seed, setSeed] = React.useState<SqlSourceDraft>();
   // Bumped on each draft so the form remounts and re-seeds from the new values.
   const [seedSeq, setSeedSeq] = React.useState(0);
   // The configuration form stays hidden until the drafter returns a result;
@@ -620,21 +629,24 @@ function NaturalLanguageDrafter({
 }: {
   workspaceId: string;
   existing: SourceRecord[];
-  onDraft: (draft: SourceDraft) => void;
+  onDraft: (draft: SqlSourceDraft) => void;
 }) {
   const [description, setDescription] = React.useState("");
   // There is no catalog to read here — this is how a source comes to exist —
   // so the examples are drawn from the sources the workspace already has, and
   // fall back to the shape of a description when there are none.
   const presets = React.useMemo(
-    () => buildSourceDescriptionStarters(existing),
+    () => buildSourceDescriptionStarters(existing.filter(isSqlSource)),
     [existing],
   );
   const { object, submit, isLoading, error, stop, repairing } = useRepairingObject({
     api: "/api/sources/generate",
     schema: SourceDraft,
     onFinish({ object }) {
-      if (object) onDraft(object);
+      // The model drafts SQL sources only (#386 adds Prometheus).
+      if (object && "tables" in object.config && object.secretRef) {
+        onDraft({ ...object, config: object.config, secretRef: object.secretRef });
+      }
     },
   });
 

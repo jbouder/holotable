@@ -1,12 +1,12 @@
-import { cannotRun } from "@/lib/sources/registry";
 import "./lib/env";
 import { getDashboardById, getSourceById, listDashboards } from "@/lib/db/repo";
-import { hasQuery, type QueryPanel, isSqlQuery } from "@/lib/ir";
+import { hasQuery, type QueryPanel } from "@/lib/ir";
 import {
   SELF_DASHBOARD_TITLE,
   selfMonitoringSpec,
 } from "@/lib/self-monitoring/dashboard";
-import { bindRowFilter } from "@/lib/sql/row-filter";
+import { bindSourceRowFilter } from "@/lib/row-scope";
+import type { SourcePlan } from "@/lib/sources/server/types";
 import { resolveTimeRange } from "@/lib/time";
 import { serverKind } from "@/lib/sources/server/registry";
 
@@ -64,19 +64,22 @@ async function runPanel(
   }
 
   const query = panel.query;
-  if (!isSqlQuery(query)) return { panel, rows: 0, error: cannotRun(source, query) };
-  const check = await serverKind(source).validate(query.sql, source.config);
+  const kind = serverKind(source);
+  const check = await kind.check(source, query);
   if (!check.ok) return { panel, rows: 0, error: `guard refused: ${check.error}` };
 
   const resolved = resolveTimeRange({ from: range.from, to: range.to });
-  const plan = serverKind(source).plan({
-    sql: query.sql,
-    timeField: query.timeField,
-    from: resolved.from,
-    to: resolved.to,
-    // A script has no viewer, so a row-filtered source refuses here.
-    rowFilter: bindRowFilter(source.config, () => undefined),
-  });
+  let plan: SourcePlan;
+  try {
+    plan = kind.plan(source, query, {
+      from: resolved.from,
+      to: resolved.to,
+      // A script has no viewer, so a row-filtered source refuses here.
+      rowFilter: bindSourceRowFilter(source.config, () => undefined),
+    });
+  } catch (err) {
+    return { panel, rows: 0, error: err instanceof Error ? err.message : String(err) };
+  }
 
   try {
     const result = await serverKind(source).execute(source, plan);

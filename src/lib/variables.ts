@@ -1,11 +1,10 @@
-import { cannotRun } from "@/lib/sources/registry";
 import { toText } from "@/components/charts/options";
 import { HttpError } from "@/lib/auth/authorize";
 import { getSourceById } from "@/lib/db/repo";
 import { VARIABLE_VALUES_MAX, type Variable, isSqlQuery } from "@/lib/ir";
 import type { SourceRecord } from "@/lib/registry";
 import { type RowScope, rowFilterHttpError, rowFilterInScope } from "@/lib/row-scope";
-import type { ExecutablePlan } from "@/lib/sql/safety";
+import type { SourcePlan } from "@/lib/sources/server/types";
 import type { VariableValues } from "@/lib/sql/variables";
 import type { QueryResult } from "@/lib/sources/execution";
 import { serverKind } from "@/lib/sources/server/registry";
@@ -31,7 +30,7 @@ import {
 
 export interface VariableDeps {
   getSource: (id: string) => Promise<SourceRecord | null>;
-  execute: (source: SourceRecord, plan: ExecutablePlan) => Promise<QueryResult>;
+  execute: (source: SourceRecord, plan: SourcePlan) => Promise<QueryResult>;
 }
 
 const DEFAULT_DEPS: VariableDeps = {
@@ -58,24 +57,20 @@ export async function variableOptions(
       `variable :${variable.name} reads a source that is not available`,
     );
   }
-  if (!isSqlQuery(query)) {
-    throw new VariableSelectionError(
-      `variable :${variable.name}: ${cannotRun(source, query)}`,
-    );
-  }
-  const { sql } = query;
   const kind = serverKind(source);
-  const check = await kind.validate(sql, source.config);
+  const check = await kind.checkVariable(source, query);
   if (!check.ok) {
     throw new VariableSelectionError(`variable :${variable.name}: ${check.error}`);
   }
+  const rowFilter = rowFilterInScope(source, scope);
+  // A label-values variable (#383) asks its endpoint for the label's values.
+  if (!isSqlQuery(query)) return kind.labelValues(source, query, rowFilter);
   const now = new Date();
-  const plan = kind.plan({
-    sql,
-    from: now,
-    to: now,
-    rowFilter: rowFilterInScope(source, scope),
-  });
+  const plan = kind.plan(
+    source,
+    { sourceId: query.sourceId, sql: query.sql },
+    { from: now, to: now, rowFilter },
+  );
   const result = await deps.execute(source, plan);
   const column = result.columns[0];
   if (column === undefined) return [];

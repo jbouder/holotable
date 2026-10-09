@@ -42,19 +42,30 @@ export type PromqlPlan =
     };
 
 /**
- * The step for a window: enough points to draw it, never more than the
- * browser keeps (`MAX_WINDOW_POINTS`), never under a second, and raised to the
- * panel's `minStep` when it asks for a coarser one.
+ * The step for a window (#385): enough points to draw it and no more than
+ * `PROMQL_MAX_POINTS` per series, never under `PROMETHEUS_MIN_STEP_MS`, and
+ * raised to the panel's `minStep` when it asks for a coarser one. Whole
+ * seconds, so the window can be aligned to it.
  */
 export function stepSecondsFor(from: Date, to: Date, minStep?: string): number {
-  const spanSeconds = Math.max(1, (to.getTime() - from.getTime()) / 1_000);
-  const points = Math.max(1, config.maxWindowPoints);
-  let step = Math.max(1, Math.ceil(spanSeconds / points));
-  if (minStep) {
-    const floor = durationMs(minStep);
-    if (floor !== null) step = Math.max(step, Math.ceil(floor / 1_000));
-  }
-  return step;
+  const spanMs = Math.max(1, to.getTime() - from.getTime());
+  const floorMs = minStep ? (durationMs(minStep) ?? 0) : 0;
+  const stepMs = Math.max(
+    floorMs,
+    config.prometheusMinStepMs,
+    Math.ceil(spanMs / Math.max(1, config.promqlMaxPoints)),
+    1_000,
+  );
+  return Math.ceil(stepMs / 1_000);
+}
+
+/**
+ * The window aligned down to a multiple of the step, so two polls a few
+ * seconds apart ask for the same points and a chart's x values do not drift.
+ */
+export function alignToStep(at: Date, stepSeconds: number): Date {
+  const stepMs = stepSeconds * 1_000;
+  return new Date(Math.floor(at.getTime() / stepMs) * stepMs);
 }
 
 export function buildPromqlPlan(input: {
@@ -74,12 +85,15 @@ export function buildPromqlPlan(input: {
   if (input.rowFilter) expr = applyPromqlRowFilter(expr, input.rowFilter, limits);
   const timeoutMs = config.queryTimeoutSeconds * 1_000;
   if (input.instant) return { instant: true, expr, time: input.to, timeoutMs };
+  const stepSeconds = stepSecondsFor(input.from, input.to, input.minStep);
+  const start = alignToStep(input.from, stepSeconds);
+  const end = alignToStep(input.to, stepSeconds);
   return {
     instant: false,
     expr,
-    start: input.from,
-    end: input.to,
-    stepSeconds: stepSecondsFor(input.from, input.to, input.minStep),
+    start,
+    end: end < start ? start : end,
+    stepSeconds,
     timeoutMs,
   };
 }

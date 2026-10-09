@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { SourceConfig, sourceCatalog } from "@/lib/registry";
+import { type SqlSourceConfig, sqlCatalog, TimescaleDbConfig } from "@/lib/registry";
 import {
   selectOutputs,
   sqlHints,
@@ -16,7 +16,7 @@ import { CORPUS } from "./fixtures/sql-fuzz-corpus";
  * one the guard accepts. Everything else here is a named case for a rule.
  */
 
-const config = SourceConfig.parse({
+const config = TimescaleDbConfig.parse({
   host: "postgres",
   port: 5432,
   database: "holotable",
@@ -43,7 +43,7 @@ const config = SourceConfig.parse({
     },
   ],
 });
-const catalog = sourceCatalog(config);
+const catalog = sqlCatalog(config);
 
 const messages = (sql: string) => sqlHints(sql, catalog).map((h) => h.message);
 

@@ -6,7 +6,12 @@ import {
   type QueryLanguage,
   type VariableQuery,
 } from "@/lib/ir";
+import type { SourceRecord, SqlSourceRecord } from "@/lib/registry";
+import type { SourceListing } from "@/lib/source-listing";
+import type { SourceCatalog } from "@/lib/sources/catalog";
+import { type PrometheusCatalog, prometheus } from "@/lib/sources/kinds/prometheus";
 import { timescaledb } from "@/lib/sources/kinds/timescaledb";
+import type { RowFilterTarget } from "@/lib/sources/types";
 
 /**
  * The source kinds (#382): what a source may be, as `src/lib/panels/registry.ts`
@@ -21,7 +26,7 @@ import { timescaledb } from "@/lib/sources/kinds/timescaledb";
  * `src/lib/sources/`, and on an import of `src/lib/timescaledb/` that does not
  * go through the server half.
  */
-export const SOURCE_KINDS = { timescaledb } as const;
+export const SOURCE_KINDS = { timescaledb, prometheus } as const;
 
 export type SourceKindName = keyof typeof SOURCE_KINDS;
 
@@ -35,7 +40,10 @@ export const SOURCE_KIND_NAMES = Object.keys(SOURCE_KINDS) as SourceKindName[];
  * default its own: there can only be one reading of a config that does not
  * say what it is, and it is the one every such config was written as.
  */
-export const SourceConfig = z.discriminatedUnion("kind", [timescaledb.config]);
+export const SourceConfig = z.discriminatedUnion("kind", [
+  timescaledb.config,
+  prometheus.config,
+]);
 export type SourceConfig = z.infer<typeof SourceConfig>;
 
 export function isSourceKindName(value: unknown): value is SourceKindName {
@@ -79,9 +87,30 @@ export function parseStoredSource(
   return { kind, config: SourceConfig.parse({ ...raw, kind }) };
 }
 
+/** What the editor may see of any source's catalog. */
+export type EditorCatalog = SourceCatalog | PrometheusCatalog;
+
+/**
+ * A kind as code that holds any source sees it. Each kind's functions take
+ * its own config; a record's config is always its kind's (`parseStoredSource`
+ * refuses a row where they disagree), so dispatching on the record's kind
+ * hands each function the config it expects.
+ */
+export interface AnySourceKind {
+  kind: SourceKindName;
+  label: string;
+  language: (typeof SOURCE_KINDS)[SourceKindName]["language"];
+  connection(cfg: SourceConfig): unknown;
+  catalog(cfg: SourceConfig): EditorCatalog;
+  listing(source: SourceRecord): SourceListing;
+  rowFilter(cfg: SourceConfig): RowFilterTarget | undefined;
+}
+
 /** The kind of a source, a config, or a kind name. */
-export function sourceKind(of: SourceKindName | { kind: SourceKindName }) {
-  return SOURCE_KINDS[parseSourceKindName(typeof of === "string" ? of : of.kind)];
+export function sourceKind(of: SourceKindName | { kind: SourceKindName }): AnySourceKind {
+  return SOURCE_KINDS[
+    parseSourceKindName(typeof of === "string" ? of : of.kind)
+  ] as unknown as AnySourceKind;
 }
 
 /** Whether two sources, configs or bodies are of the one kind. */
@@ -127,4 +156,15 @@ export function cannotRun(
     wrongLanguage(source, query) ??
     `${isPromqlQuery(query) ? "PromQL" : "this"} query cannot run on this server yet`
   );
+}
+
+/**
+ * Whether a source runs SQL, narrowed to the record the SQL path reads. For
+ * the code that is SQL by nature (the catalog browser, the starters, the SQL
+ * editor's catalog); anything that runs a query asks `serverKind` instead.
+ */
+export function isSqlSource(
+  source: SourceRecord,
+): source is SourceRecord & SqlSourceRecord {
+  return source.config.kind === "timescaledb" && source.secretRef !== null;
 }

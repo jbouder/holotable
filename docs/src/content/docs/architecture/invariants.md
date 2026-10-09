@@ -49,6 +49,13 @@ No connection details, hosts, or credentials live in a panel. The registry owns
 the safe connection config, the catalog (the table and column allowlist), and a
 `secret_ref`.
 
+**For a Prometheus source** (#385), the URL and the auth mode live in the
+registry beside the metric allowlist, and never in a panel, a listing or the
+editor's catalog. `sourceListing()` and the kind's `catalog()` name their fields
+(the id, the name, the metric count; the metrics and their labels), and
+neither names those two. A share's `sharedSpec()` replaces the expression with
+`(not shared)`, as it does a SQL statement.
+
 ## 5. Credentials resolve from the environment
 
 Via `secret_ref`: `TS_METRICS` resolves `TS_METRICS_USERNAME` /
@@ -61,6 +68,18 @@ unset grants nothing. The grant is checked in `resolveCredentials`
 (`src/lib/secrets/credentials.ts`) on every connection, not only when a source
 is saved, so one workspace cannot use another's database role by naming its
 ref. See [Source secret references](/operations/secret-references/).
+
+**For a Prometheus source**, `auth: "bearer"` resolves `<REF>_TOKEN`
+(`resolveBearerToken`) and `auth: "basic"` resolves the user name and password,
+both under the same grant and on every request. `auth: "none"` is for an
+endpoint with no authentication, typically in the cluster. Such a source names
+no `secret_ref`, and what it may reach is the operator's
+`SOURCE_URL_ALLOWLIST`. That allowlist is not per workspace. Every workspace's
+source admins may point a no-auth source at an address it lists, so an endpoint
+that must stay one tenant's needs authentication and a granted `secret_ref`.
+Every request goes through the guarded fetch: https only unless allowlisted, no
+private address unless allowlisted, checked at DNS time on every connection,
+and no redirect followed.
 
 ## 6. Referenced sources are tombstoned, not hard-deleted
 
@@ -176,6 +195,12 @@ second. The expression carries no time at all: `buildPromqlPlan` sets `start`,
 `end` and `step` from the window the server resolved, and a panel's `minStep`
 can only raise the step.
 
+The Prometheus executor sends `start`, `end` and `step` from that plan, never
+from the panel. The step is at least `PROMETHEUS_MIN_STEP_MS` (15 s by
+default), coarse enough that a series has at most `PROMQL_MAX_POINTS` (1,000)
+points, and raised by `minStep`. The window is aligned to the step, so two polls
+a few seconds apart ask for the same points.
+
 ## 8a. A row-filtered source returns only the viewer's rows
 
 The time window is not the only predicate the server owns. A source with a
@@ -281,6 +306,13 @@ dashboard.
 over `MAX_RESULT_BYTES`. Routes
 translate it to a `400` with the real message so an editor can fix and retry;
 connection and socket failures stay a generic `500` and are never surfaced.
+
+**For a Prometheus source**, the author's errors are a `400` or `422` whose
+`errorType` is `bad_data` or `execution`, which keep Prometheus's message. So
+are a result over `MAX_RESULT_BYTES`, more series than `PROMETHEUS_MAX_SERIES`,
+and a native-histogram sample. A timeout, a `5xx`, a refused address, a TLS
+failure or a redirect is infrastructure. It is logged with the source id and
+reaches the browser only as the opaque error.
 
 The split is carried, not inferred. Every error body names a `kind`
 (`src/lib/errors.ts`), and the SSE path honors it too: a `panel-error` or

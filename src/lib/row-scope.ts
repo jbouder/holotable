@@ -2,13 +2,30 @@ import { HttpError } from "@/lib/auth/authorize";
 import { claimValue, type Identity, SUBJECT_CLAIM } from "@/lib/auth/claims";
 import { config } from "@/lib/config";
 import type { SourceConfig, SourceRecord } from "@/lib/registry";
+import { sourceKind } from "@/lib/sources/registry";
+import { serverKind } from "@/lib/sources/server/registry";
 import {
-  bindRowFilter,
   RowFilterDenied,
   RowFilterError,
   type RowFilterBinding,
-  rowFilterProblem,
 } from "@/lib/sql/row-filter";
+
+/**
+ * A source's row filter bound to a viewer's claim value (#31). What the value
+ * is matched against is the kind's to say: a column for SQL, a label for
+ * PromQL, carried as the binding's `column`. A viewer without the claim is
+ * refused, never served unfiltered.
+ */
+export function bindSourceRowFilter(
+  cfg: SourceConfig,
+  claimValueOf: (claim: string) => string | undefined,
+): RowFilterBinding | null {
+  const filter = sourceKind(cfg).rowFilter(cfg);
+  if (!filter) return null;
+  const value = claimValueOf(filter.claim);
+  if (value === undefined || value === "") throw new RowFilterDenied(filter.claim);
+  return { column: filter.target, value };
+}
 
 /**
  * Row-level filters (#31) at the edges: from a viewer to the value a source
@@ -32,7 +49,7 @@ export function rowFilterFor(
   identity: Identity,
 ): RowFilterBinding | null {
   try {
-    return bindRowFilter(source.config, (claim) => claimValue(identity, claim));
+    return bindSourceRowFilter(source.config, (claim) => claimValue(identity, claim));
   } catch (err) {
     throw rowFilterHttpError(err);
   }
@@ -58,7 +75,7 @@ export function rowFilterInScope(
   source: SourceRecord,
   scope: RowScope,
 ): RowFilterBinding | null {
-  return bindRowFilter(source.config, (claim) =>
+  return bindSourceRowFilter(source.config, (claim) =>
     Object.hasOwn(scope, claim) ? scope[claim] : undefined,
   );
 }
@@ -99,6 +116,6 @@ export function assertRowFilterSavable(cfg: SourceConfig): void {
       "validation",
     );
   }
-  const problem = rowFilterProblem(cfg);
+  const problem = serverKind(cfg).rowFilterProblem(cfg);
   if (problem) throw new HttpError(400, problem, {}, "validation");
 }

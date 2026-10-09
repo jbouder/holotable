@@ -1,11 +1,11 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { validateSql, buildExecutablePlan } from "@/lib/sql/safety";
-import { SourceConfig } from "@/lib/registry";
+import { type SqlSourceConfig, TimescaleDbConfig } from "@/lib/registry";
 import { resolveTimeRange, resolveTimeExpr, TimeRangeError } from "@/lib/time";
 import { renderMetrics, resetMetricsForTests } from "@/lib/metrics";
 
-const source = SourceConfig.parse({
+const source = TimescaleDbConfig.parse({
   host: "postgres",
   port: 5432,
   database: "holotable",
@@ -225,7 +225,7 @@ test("every rule reports the class of rule that refused the statement", async ()
 });
 
 test("an unexposed column is refused under its own reason", async () => {
-  const restricted = SourceConfig.parse({
+  const restricted = TimescaleDbConfig.parse({
     ...source,
     tables: [
       {

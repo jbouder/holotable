@@ -8,8 +8,10 @@ import { buildSourceDescriptionStarters, buildStarters } from "@/lib/prompts/sta
 import {
   exposedTable,
   SourceConfig,
-  type SourceRecord,
-  sourceCatalog,
+  type SqlSourceConfig,
+  type SqlSourceRecord,
+  sqlCatalog,
+  TimescaleDbConfig,
 } from "@/lib/registry";
 import { catalogCompletions } from "@/lib/sql/completion";
 import { validateSql } from "@/lib/sql/safety";
@@ -29,7 +31,7 @@ import { queryOf } from "./support/panels";
 
 const HIDDEN = ["secret_email", "secret_latency_ms", "secret_status", "secret_seen_at"];
 
-const config = SourceConfig.parse({
+const config = TimescaleDbConfig.parse({
   host: "postgres",
   port: 5432,
   database: "holotable",
@@ -53,7 +55,7 @@ const config = SourceConfig.parse({
   ],
 });
 
-const source: SourceRecord = {
+const source: SqlSourceRecord = {
   id: "src-requests",
   workspaceId: "ws-1",
   name: "Requests",
@@ -80,7 +82,8 @@ test("a stored config without the flag stays valid, and the flag must be a boole
     tables: [{ name: "t", columns: [{ name: "c", type: "text" }] }],
   });
   assert.equal(legacy.success, true);
-  assert.equal(legacy.data?.tables[0].columns[0].exposed, undefined);
+  assert.ok(legacy.data && "tables" in legacy.data);
+  assert.equal(legacy.data.tables[0].columns[0].exposed, undefined);
 
   const wrong = SourceConfig.safeParse({
     ...config,
@@ -101,7 +104,7 @@ test("an unexposed column does not appear in the catalog prompt", () => {
 });
 
 test("the projection a browser receives carries no unexposed column", () => {
-  const catalog = sourceCatalog(config);
+  const catalog = sqlCatalog(config);
   assertNoHidden(JSON.stringify(catalog), "the client catalog");
   assertNoHidden(JSON.stringify(catalogCompletions(catalog)), "editor completions");
   assert.equal(catalog.tables[0].timeField, undefined);
@@ -117,7 +120,7 @@ test("suggestions are built from exposed columns only, and the guard accepts eve
   assertNoHidden(buildStarters(source, "dashboard").join("\n"), "dashboard starters");
   assertNoHidden(buildSourceDescriptionStarters([source]).join("\n"), "source starters");
 
-  const starter = panelStarter(sourceCatalog(config));
+  const starter = panelStarter(sqlCatalog(config));
   assertNoHidden(starter.sql, "the new-panel starter");
   assert.equal((await validateSql(starter.sql, config)).ok, true, starter.sql);
 

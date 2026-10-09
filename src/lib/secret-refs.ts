@@ -46,8 +46,14 @@ export const SECRET_REF_MESSAGE = "secretRef must be an UPPER_SNAKE env family";
 export function secretRefEnvVars(secretRef: string): {
   username: string;
   password: string;
+  /** A bearer token, for a Prometheus source with `auth: "bearer"` (#385). */
+  token: string;
 } {
-  return { username: `${secretRef}_USERNAME`, password: `${secretRef}_PASSWORD` };
+  return {
+    username: `${secretRef}_USERNAME`,
+    password: `${secretRef}_PASSWORD`,
+    token: `${secretRef}_TOKEN`,
+  };
 }
 
 /* -------------------------------------------------------------------------- */

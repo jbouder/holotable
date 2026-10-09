@@ -2,7 +2,7 @@ import { createHash } from "node:crypto";
 import { Pool, type PoolConfig } from "pg";
 import { config } from "@/lib/config";
 import { log } from "@/lib/log";
-import type { SourceRecord } from "@/lib/registry";
+import type { SqlSourceRecord } from "@/lib/registry";
 import { resolveCredentials } from "@/lib/secrets/credentials";
 
 /**
@@ -68,7 +68,7 @@ function state(): State {
 export const POOL_IDLE_TIMEOUT_MS = 30_000;
 
 /** The options a source's pool is built with: connection settings and limits. */
-export function poolOptions(source: SourceRecord): PoolConfig {
+export function poolOptions(source: SqlSourceRecord): PoolConfig {
   // Re-authorized on every checkout: the ref must still be granted to the
   // workspace this source belongs to, whatever it was granted when saved.
   const credentials = resolveCredentials(source.secretRef, source.workspaceId);
@@ -109,7 +109,7 @@ function endPool(sourceId: string, pool: Pool): Promise<void> {
  * The pool for `source`, created on first use and replaced when its
  * connection settings change.
  */
-export function sourcePool(source: SourceRecord): Pool {
+export function sourcePool(source: SqlSourceRecord): Pool {
   const { pools, factory } = state();
   const options = poolOptions(source);
   const fingerprint = connectionFingerprint(options);

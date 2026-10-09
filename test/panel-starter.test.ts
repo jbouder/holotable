@@ -7,7 +7,7 @@ import {
   PLACEHOLDER_SQL,
   starterPanel,
 } from "@/lib/panel-starter";
-import type { CatalogTable, SourceConfig } from "@/lib/registry";
+import type { CatalogTable, SqlSourceConfig } from "@/lib/registry";
 import { validateSql } from "@/lib/sql/safety";
 import { queryOf } from "./support/panels";
 
@@ -52,7 +52,7 @@ const TENANTS: CatalogTable = {
   ],
 };
 
-function config(tables: CatalogTable[]): SourceConfig {
+function config(tables: CatalogTable[]): SqlSourceConfig {
   return {
     kind: "timescaledb",
     host: "timescaledb",

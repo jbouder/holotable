@@ -1,12 +1,11 @@
-import { z } from "zod";
 import { requireIdentity, assertAuthorized, HttpError } from "@/lib/auth/authorize";
 import { readJson, json, route } from "@/lib/http";
 import { rowFilterFor, rowFilterHttpError } from "@/lib/row-scope";
-import { config } from "@/lib/config";
 import { getSourceById } from "@/lib/db/repo";
 import { TimeRange } from "@/lib/ir";
-import { buildQueryPlanView } from "@/lib/query-plan";
-import type { ExecutablePlan } from "@/lib/sql/safety";
+import { panelQueryBody, panelQueryOf } from "@/lib/query-body";
+import { QueryExecutionError } from "@/lib/sources/execution";
+import type { SourcePlan } from "@/lib/sources/server/types";
 import { VariableError } from "@/lib/sql/variables";
 import { VariableValuesBody } from "@/lib/variable-selection";
 import { resolveTimeRange } from "@/lib/time";
@@ -14,10 +13,8 @@ import { serverKind } from "@/lib/sources/server/registry";
 
 export const runtime = "nodejs";
 
-const Body = z.object({
-  sourceId: z.string().min(1),
-  sql: z.string().min(1).max(8000),
-  timeField: z.string().min(1).max(128).optional(),
+/** A panel's query in either language (#385): the path keeps its name. */
+const Body = panelQueryBody({
   timeRange: TimeRange,
   /** The values the editor previews with (#67). */
   variables: VariableValuesBody.optional(),
@@ -57,20 +54,16 @@ export const POST = route("sql.plan", async (req: Request) => {
   );
 
   const kind = serverKind(source);
+  const query = panelQueryOf(body);
   const variables = body.variables ?? {};
-  const check = await kind.validate(
-    body.sql,
-    source.config,
-    new Set(Object.keys(variables)),
-  );
-  if (!check.ok) throw new HttpError(400, check.error ?? "invalid sql", {}, "statement");
+  const check = await kind.check(source, query, new Set(Object.keys(variables)));
+  if (!check.ok)
+    throw new HttpError(400, check.error ?? "invalid query", {}, "statement");
 
   const range = resolveTimeRange(body.timeRange);
-  let plan: ExecutablePlan;
+  let plan: SourcePlan;
   try {
-    plan = kind.plan({
-      sql: body.sql,
-      timeField: body.timeField,
+    plan = kind.plan(source, query, {
       from: range.from,
       to: range.to,
       // The plan shown is the one that would run for this caller (#31).
@@ -78,24 +71,10 @@ export const POST = route("sql.plan", async (req: Request) => {
       variables,
     });
   } catch (err) {
-    if (err instanceof VariableError)
+    if (err instanceof VariableError || err instanceof QueryExecutionError)
       throw new HttpError(400, err.message, {}, "statement");
     throw rowFilterHttpError(err);
   }
 
-  return json(
-    buildQueryPlanView({
-      sql: body.sql,
-      timeField: body.timeField,
-      timeRange: body.timeRange,
-      plan,
-      rowFilterClaim: source.config.rowFilter?.claim,
-      session: kind.session(source.config),
-      limits: {
-        maxRows: config.maxQueryRows,
-        statementTimeoutMs: config.queryTimeoutSeconds * 1000,
-        maxResultBytes: config.maxResultBytes,
-      },
-    }),
-  );
+  return json(kind.planView({ source, query, plan, timeRange: body.timeRange }));
 });

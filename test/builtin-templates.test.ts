@@ -3,7 +3,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import type { CatalogSubject } from "@/lib/catalog/health";
 import { buildBuiltinTemplates } from "@/lib/builtin-templates";
-import type { CatalogTable, SourceConfig } from "@/lib/registry";
+import type { CatalogTable, SqlSourceConfig } from "@/lib/registry";
 import { validateSql } from "@/lib/sql/safety";
 import { templatePanels } from "@/lib/templates";
 import { queryOf } from "./support/panels";
@@ -47,7 +47,7 @@ const SYSTEM_METRICS: CatalogTable = {
   ],
 };
 
-function config(tables: CatalogTable[]): SourceConfig {
+function config(tables: CatalogTable[]): SqlSourceConfig {
   return {
     kind: "timescaledb",
     host: "timescaledb",

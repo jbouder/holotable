@@ -119,6 +119,32 @@ export function resolveCredentials(
 }
 
 /**
+ * A bearer token for `secretRef` (#385): `<REF>_TOKEN`, from a file in
+ * `SOURCE_SECRETS_DIR` or the environment, under the same workspace grant as
+ * a user name and password. The token never leaves the server except in the
+ * `Authorization` header of a request to the source it belongs to.
+ */
+export function resolveBearerToken(
+  secretRef: string,
+  workspaceId: string,
+  env: Environment = process.env,
+): string {
+  assertSecretRefGranted(secretRef, workspaceId, env);
+  const name = secretRefEnvVars(secretRef).token;
+  const dir = env[SECRETS_DIR_VAR];
+  const token = (dir ? readCredentialFile(dir, name) : undefined) ?? env[name];
+  if (!token) {
+    const where = dir
+      ? ` as a file in ${SECRETS_DIR_VAR} or in the environment`
+      : " in the environment";
+    throw new SecretRefError(
+      `a token for secret_ref "${secretRef}" is not configured on the server; set ${name}${where}`,
+    );
+  }
+  return token;
+}
+
+/**
  * Whether `secretRef` resolves for `workspaceId` — a boolean, and only a
  * boolean. It is deliberately the *same* call an execution makes rather than
  * a second opinion about the environment, so what the UI reports and what a

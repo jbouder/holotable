@@ -1,5 +1,10 @@
 import { config } from "@/lib/config";
-import { type CatalogTable, exposedTable, type SourceRecord } from "@/lib/registry";
+import {
+  type CatalogTable,
+  exposedTable,
+  type SourceRecord,
+  type SqlSourceRecord,
+} from "@/lib/registry";
 
 /**
  * Whether a source's catalog can still be believed.
@@ -25,11 +30,32 @@ import { type CatalogTable, exposedTable, type SourceRecord } from "@/lib/regist
 
 export type CatalogHealthState = "ok" | "empty" | "never_refreshed" | "stale" | "drifted";
 
-/** What `catalogHealth` needs of a source: the catalog and the two facts. */
+/** What the SQL catalog helpers need of a source: the catalog and the two facts. */
 export type CatalogSubject = Pick<
+  SqlSourceRecord,
+  "id" | "name" | "config" | "catalogRefreshedAt" | "catalogMissingTables"
+>;
+
+/**
+ * What `catalogHealth` needs of a source of any kind (#385). Its allowlist
+ * entries are tables for SQL and metrics for PromQL; `catalogMissingTables`
+ * holds the entries the last refresh could not find, whichever they are.
+ */
+export type HealthSubject = Pick<
   SourceRecord,
   "id" | "name" | "config" | "catalogRefreshedAt" | "catalogMissingTables"
 >;
+
+/** How many allowlist entries are still true: a table with columns, or a metric. */
+function liveEntryCount(source: HealthSubject): number {
+  const missing = new Set(source.catalogMissingTables);
+  if ("tables" in source.config) {
+    return source.config.tables.filter(
+      (t) => !missing.has(t.name) && t.columns.length > 0,
+    ).length;
+  }
+  return source.config.metrics.filter((m) => !missing.has(m.name)).length;
+}
 
 export interface CatalogHealth {
   state: CatalogHealthState;
@@ -87,13 +113,13 @@ export function exposedCatalogTables(source: CatalogSubject): CatalogTable[] {
 
 /** The state of a source's catalog, and everything the wording below needs. */
 export function catalogHealth(
-  source: CatalogSubject,
+  source: HealthSubject,
   opts: CatalogHealthOptions = {},
 ): CatalogHealth {
   const staleAfterDays = opts.staleAfterDays ?? config.catalogStaleAfterDays;
   const now = (opts.now ?? new Date()).getTime();
 
-  const live = liveCatalogTables(source);
+  const live = liveEntryCount(source);
   const missingTables = [...source.catalogMissingTables];
 
   // An unparseable timestamp is treated as no timestamp: "never refreshed" is
@@ -103,7 +129,7 @@ export function catalogHealth(
   const ageDays = refreshedAt === null ? null : Math.floor((now - parsed) / MS_PER_DAY);
 
   const state: CatalogHealthState =
-    live.length === 0 || live.every((table) => table.columns.length === 0)
+    live === 0
       ? "empty"
       : refreshedAt === null
         ? "never_refreshed"
@@ -117,7 +143,7 @@ export function catalogHealth(
     state,
     blocked: state === "empty" || state === "never_refreshed",
     missingTables,
-    liveTableCount: live.length,
+    liveTableCount: live,
     refreshedAt,
     ageDays,
   };

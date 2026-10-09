@@ -28,6 +28,13 @@ import {
 export interface BaseUrlAllowlist {
   hosts: ReadonlySet<string>;
   cidrs: readonly Cidr[];
+  /**
+   * The environment variable it came from and what it guards, for the
+   * messages: the same rules hold a model base URL (#331) and a Prometheus
+   * source's URL (#385), each under its own allowlist.
+   */
+  variable: string;
+  noun: string;
 }
 
 const HOST_NAME =
@@ -53,7 +60,13 @@ export function invalidAllowlistEntries(raw: string): string[] {
  * Parse `AI_BASE_URL_ALLOWLIST`. An entry that does not parse is dropped, so
  * a typo cannot widen it; `validateConfig` refuses to boot on one anyway.
  */
-export function parseBaseUrlAllowlist(raw: string | undefined): BaseUrlAllowlist {
+export function parseBaseUrlAllowlist(
+  raw: string | undefined,
+  label: { variable: string; noun: string } = {
+    variable: "AI_BASE_URL_ALLOWLIST",
+    noun: "base URL",
+  },
+): BaseUrlAllowlist {
   const hosts = new Set<string>();
   const cidrs: Cidr[] = [];
   for (const entry of (raw ?? "").split(/[,\s]+/).filter(Boolean)) {
@@ -62,7 +75,7 @@ export function parseBaseUrlAllowlist(raw: string | undefined): BaseUrlAllowlist
     if ("host" in parsed) hosts.add(parsed.host);
     else cidrs.push(parsed.cidr);
   }
-  return { hosts, cidrs };
+  return { hosts, cidrs, ...label };
 }
 
 /**
@@ -146,25 +159,26 @@ export function baseUrlShapeProblem(
   raw: string,
   allowlist: BaseUrlAllowlist,
 ): string | null {
+  const { noun, variable } = allowlist;
   let url: URL;
   try {
     url = new URL(raw);
   } catch {
-    return "The base URL is not a valid URL.";
+    return `The ${noun} is not a valid URL.`;
   }
   if (url.username || url.password) {
-    return "The base URL must not carry a user name or password; put the key in the API key field.";
+    return `The ${noun} must not carry a user name or password; credentials are never part of a URL.`;
   }
   const host = hostOf(url);
   if (url.protocol === "http:") {
     if (!hostAllowlisted(host, allowlist)) {
-      return `The base URL must use https. Plain http is allowed only for a host in AI_BASE_URL_ALLOWLIST, and ${host} is not in it.`;
+      return `The ${noun} must use https. Plain http is allowed only for a host in ${variable}, and ${host} is not in it.`;
     }
   } else if (url.protocol !== "https:") {
-    return "The base URL must use https.";
+    return `The ${noun} must use https.`;
   }
   if (parseAddress(host) && !addressAllowed(host, host, allowlist)) {
-    return `The base URL points at ${host}, which is not a public address. Ask an operator to add it to AI_BASE_URL_ALLOWLIST if this server should reach it.`;
+    return `The ${noun} points at ${host}, which is not a public address. Ask an operator to add it to ${variable} if this server should reach it.`;
   }
   return null;
 }

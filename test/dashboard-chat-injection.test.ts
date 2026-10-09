@@ -1,9 +1,14 @@
 import { test } from "node:test";
+import { sqlPlanOf } from "./support/plans";
 import assert from "node:assert/strict";
 import { buildChatQueryPlan, buildSystemPrompt, resolveChatSources } from "@/lib/ai/chat";
 import { parseGroups } from "@/lib/auth/claims";
 import { parseDashboard } from "@/lib/ir";
-import { SourceConfig, type SourceRecord } from "@/lib/registry";
+import {
+  type SqlSourceConfig,
+  type SqlSourceRecord,
+  TimescaleDbConfig,
+} from "@/lib/registry";
 
 /**
  * Prompt-injection suite for dashboard chat.
@@ -21,13 +26,13 @@ function makeSource(
   id: string,
   workspaceId: string,
   table = "http_requests",
-): SourceRecord {
+): SqlSourceRecord {
   return {
     id,
     workspaceId,
     name: id,
     kind: "timescaledb",
-    config: SourceConfig.parse({
+    config: TimescaleDbConfig.parse({
       host: "postgres",
       port: 5432,
       database: "holotable",
@@ -100,10 +105,10 @@ function assertRejected(r: Awaited<ReturnType<typeof plan>>, why: RegExp) {
 function assertServerOwnedWindow(r: Awaited<ReturnType<typeof plan>>) {
   assert.equal(r.ok, true);
   if (!r.ok) return;
-  assert.deepEqual(r.plan.params, [FROM, TO]);
-  assert.match(r.plan.sql, /_holo\.\w+ >= \$1::timestamptz/);
-  assert.match(r.plan.sql, /_holo\.\w+ < \$2::timestamptz/);
-  assert.match(r.plan.sql, /\bLIMIT \d+$/);
+  assert.deepEqual(sqlPlanOf(r.plan).params, [FROM, TO]);
+  assert.match(sqlPlanOf(r.plan).sql, /_holo\.\w+ >= \$1::timestamptz/);
+  assert.match(sqlPlanOf(r.plan).sql, /_holo\.\w+ < \$2::timestamptz/);
+  assert.match(sqlPlanOf(r.plan).sql, /\bLIMIT \d+$/);
   assert.equal(r.source.id, "src-metrics");
 }
 
@@ -253,8 +258,8 @@ test("injection: a scalar query still gets the server's LIMIT", async () => {
   });
   assert.equal(r.ok, true);
   if (r.ok) {
-    assert.deepEqual(r.plan.params, []);
-    assert.match(r.plan.sql, /\bLIMIT \d+$/);
+    assert.deepEqual(sqlPlanOf(r.plan).params, []);
+    assert.match(sqlPlanOf(r.plan).sql, /\bLIMIT \d+$/);
   }
 });
 

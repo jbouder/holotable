@@ -3,15 +3,16 @@ import {
   type CatalogColumn,
   CatalogTable,
   MAX_TABLES,
-  SourceConfig,
+  type SqlSourceConfig,
   SourceConnection,
   SourceDraft,
+  TimescaleDbConfig,
 } from "@/lib/registry";
 
 /**
  * The structured source form, as data.
  *
- * Creating a source used to mean typing a `SourceConfig` into a textarea, so a
+ * Creating a source used to mean typing a `SqlSourceConfig` into a textarea, so a
  * misspelled key produced a Zod error against a blob of JSON. The form state
  * here is that same config with the connection fields held as *text* — the raw
  * characters a user has typed so far, which is not yet a config — and the
@@ -53,7 +54,7 @@ export function emptyFormState(): SourceFormState {
   };
 }
 
-export function formStateFromConfig(config: SourceConfig): SourceFormState {
+export function formStateFromConfig(config: SqlSourceConfig): SourceFormState {
   return {
     host: config.host,
     port: String(config.port),
@@ -68,7 +69,7 @@ export function formStateFromConfig(config: SourceConfig): SourceFormState {
 export type FieldErrors = Record<string, string>;
 
 export type FormResult =
-  | { ok: true; config: SourceConfig }
+  | { ok: true; config: SqlSourceConfig }
   | { ok: false; errors: FieldErrors };
 
 export type ConnectionResult =
@@ -127,7 +128,7 @@ function parsePort(text: string): number | undefined {
 /**
  * Build the config a state describes, or the per-field reasons it cannot.
  *
- * The constraints are `SourceConfig`'s own — this validates by parsing, never
+ * The constraints are `SqlSourceConfig`'s own — this validates by parsing, never
  * by restating a rule the schema already owns — and the issue paths it comes
  * back with are what attaches each message to a field.
  */
@@ -135,7 +136,7 @@ export function configFromFormState(state: SourceFormState): FormResult {
   const errors: FieldErrors = {};
   const port = claimPort(state, errors);
   claimPlaceholders(state, errors);
-  const parsed = SourceConfig.safeParse(configDraft(state, port));
+  const parsed = TimescaleDbConfig.safeParse(configDraft(state, port));
   if (parsed.success && Object.keys(errors).length === 0) {
     return { ok: true, config: parsed.data };
   }
@@ -234,7 +235,7 @@ function humanize(key: string, issue: { code: string; message: string }): string
 }
 
 /**
- * The config a state describes, keyed in `SourceConfig`'s own order. The form
+ * The config a state describes, keyed in `SqlSourceConfig`'s own order. The form
  * describes a TimescaleDB source, and says so: a saved config names its kind
  * rather than leaving it to the schema's default for configs from before
  * there was more than one.
@@ -275,7 +276,7 @@ export function formStateFromConfigText(text: string): ConfigTextResult {
   } catch {
     return { ok: false, error: "The connection config is not valid JSON." };
   }
-  const parsed = SourceConfig.safeParse(value);
+  const parsed = TimescaleDbConfig.safeParse(value);
   if (!parsed.success) {
     const issue = parsed.error.issues[0];
     const where = issue && issue.path.length > 0 ? `${fieldKey(issue.path)}: ` : "";

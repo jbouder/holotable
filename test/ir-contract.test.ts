@@ -21,7 +21,7 @@ import {
 } from "@/lib/ir";
 import { StoredDashboard } from "@/lib/ir/upgrade";
 import { PANEL_KIND_NAMES } from "@/lib/panels/registry";
-import { SourceConfig } from "@/lib/registry";
+import { type SqlSourceConfig, TimescaleDbConfig } from "@/lib/registry";
 import { bindRowFilter } from "@/lib/sql/row-filter";
 import { buildExecutablePlan, validateSql } from "@/lib/sql/safety";
 import type { VariableValues } from "@/lib/sql/variables";
@@ -85,14 +85,18 @@ function promqlCatalog(catalogs: Catalogs, sourceId: string, file: string) {
   return catalog;
 }
 
-function sourceConfig(catalogs: Catalogs, sourceId: string, file: string): SourceConfig {
+function sourceConfig(
+  catalogs: Catalogs,
+  sourceId: string,
+  file: string,
+): SqlSourceConfig {
   const catalog = catalogOf(catalogs, sourceId, file);
   assert.ok(
     "tables" in catalog,
     `${file} reads "${sourceId}" with SQL, but it is a PromQL catalog`,
   );
   // A catalog is the allowlist alone; the connection half is a placeholder.
-  return SourceConfig.parse({
+  return TimescaleDbConfig.parse({
     host: "fixture",
     port: 5432,
     database: "fixture",

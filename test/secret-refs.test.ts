@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
-import type { SourceRecord } from "@/lib/registry";
+import type { SqlSourceRecord } from "@/lib/registry";
 import {
   GrantedSecretRef,
   SECRET_REF_PATTERN,
@@ -65,6 +65,7 @@ test("the env family is one function, so the lookup and the advice agree", () =>
   assert.deepEqual(secretRefEnvVars("TS_METRICS"), {
     username: "TS_METRICS_USERNAME",
     password: "TS_METRICS_PASSWORD",
+    token: "TS_METRICS_TOKEN",
   });
 });
 
@@ -239,7 +240,7 @@ test("a SOURCE_SECRETS_DIR that is not a directory is reported, not fatal", () =
 
 /* --- Every place credentials are used ------------------------------------ */
 
-function sourceIn(workspaceId: string, secretRef: string): SourceRecord {
+function sourceIn(workspaceId: string, secretRef: string): SqlSourceRecord {
   return {
     id: "src",
     workspaceId,

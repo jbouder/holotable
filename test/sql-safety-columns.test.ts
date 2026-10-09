@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { SourceConfig } from "@/lib/registry";
+import { type SqlSourceConfig, TimescaleDbConfig } from "@/lib/registry";
 import { validateSql } from "@/lib/sql/safety";
 
 /**
@@ -11,7 +11,7 @@ import { validateSql } from "@/lib/sql/safety";
  * take down with it.
  */
 
-const source = SourceConfig.parse({
+const source = TimescaleDbConfig.parse({
   host: "postgres",
   port: 5432,
   database: "holotable",
@@ -197,7 +197,7 @@ test("the rule is name-based across the statement, and errs toward refusing", as
 });
 
 test("a source with no unexposed column is unaffected", async () => {
-  const open = SourceConfig.parse({
+  const open = TimescaleDbConfig.parse({
     ...source,
     tables: source.tables.map((t) => ({
       ...t,
@@ -217,7 +217,7 @@ test("a source with no unexposed column is unaffected", async () => {
 });
 
 test("an explicit exposed: true is the same as no flag at all", async () => {
-  const explicit = SourceConfig.parse({
+  const explicit = TimescaleDbConfig.parse({
     ...source,
     tables: [
       {

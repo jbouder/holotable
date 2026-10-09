@@ -1,5 +1,5 @@
 import { Client, type ClientBase, type PoolClient, Query } from "pg";
-import type { SourceRecord } from "@/lib/registry";
+import type { SqlSourceRecord } from "@/lib/registry";
 import { resolveCredentials } from "@/lib/secrets/credentials";
 import { config } from "@/lib/config";
 import type { ExecutablePlan } from "@/lib/sql/safety";
@@ -17,7 +17,7 @@ import { QueryExecutionError, type QueryResult } from "@/lib/sources/execution";
  * like, neither of which a reused pooled client could answer. Queries go
  * through {@link sourcePool}.
  */
-function testClient(source: SourceRecord): Client {
+function testClient(source: SqlSourceRecord): Client {
   // Re-authorized on every connection: the ref must still be granted to the
   // workspace this source belongs to, whatever it was granted when saved.
   const credentials = resolveCredentials(source.secretRef, source.workspaceId);
@@ -148,7 +148,7 @@ function collectResult(
  * label; the statement and the error message never become one.
  */
 export function executePlan(
-  source: SourceRecord,
+  source: SqlSourceRecord,
   plan: ExecutablePlan,
 ): Promise<QueryResult> {
   return trackInFlight(async () => {
@@ -173,7 +173,10 @@ export function executePlan(
   });
 }
 
-async function runPlan(source: SourceRecord, plan: ExecutablePlan): Promise<QueryResult> {
+async function runPlan(
+  source: SqlSourceRecord,
+  plan: ExecutablePlan,
+): Promise<QueryResult> {
   let client: PoolClient | undefined;
   let transactionStarted = false;
   // Whether the client may go back to the pool. Only a client known to be idle
@@ -236,7 +239,7 @@ async function runPlan(source: SourceRecord, plan: ExecutablePlan): Promise<Quer
  * would make every later check report the same "current transaction is
  * aborted" instead of its own answer.
  */
-export function testSource(source: SourceRecord): Promise<SourceTestResult> {
+export function testSource(source: SqlSourceRecord): Promise<SourceTestResult> {
   return trackInFlight(() => runSourceTest(source));
 }
 
@@ -276,7 +279,7 @@ async function inSavepoint<T>(
   }
 }
 
-async function runSourceTest(source: SourceRecord): Promise<SourceTestResult> {
+async function runSourceTest(source: SqlSourceRecord): Promise<SourceTestResult> {
   const client = testClient(source);
   let connected = false;
   try {
@@ -371,7 +374,10 @@ async function proveReadOnly(client: Client): Promise<TestReadOnly> {
  * applies: the cost is one unverified row in this report, and the alternative
  * is interpolating a name from a database the operator may not control.
  */
-async function checkTables(client: Client, source: SourceRecord): Promise<TestTable[]> {
+async function checkTables(
+  client: Client,
+  source: SqlSourceRecord,
+): Promise<TestTable[]> {
   const results: TestTable[] = [];
   for (const [index, table] of source.config.tables.entries()) {
     if (!isPlainIdentifier(table.name)) {

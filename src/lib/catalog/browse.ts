@@ -1,11 +1,12 @@
+import { timescaledb } from "@/lib/sources/kinds/timescaledb";
 import { z } from "zod";
 import type { CatalogHealth } from "@/lib/catalog/health";
 import { type ApiError, apiErrorFromThrown, readApiError } from "@/lib/errors";
 import {
   type CatalogColumn,
   type CatalogTable,
-  type SourceConfig,
-  type SourceRecord,
+  type SqlSourceConfig,
+  type SqlSourceRecord,
   sourceCatalog,
 } from "@/lib/registry";
 import { ImpactDashboard, impactCounts } from "@/lib/source-impact";
@@ -35,11 +36,11 @@ export interface CatalogView {
 
 /** Build the view for one caller. Server-side; `canManage` comes from `can()`. */
 export function catalogView(
-  source: Pick<SourceRecord, "config" | "catalogMissingTables">,
+  source: Pick<SqlSourceRecord, "config" | "catalogMissingTables">,
   catalogHealth: CatalogHealth,
   canManage: boolean,
 ): CatalogView {
-  const projected = canManage ? source.config : sourceCatalog(source.config);
+  const projected = canManage ? source.config : timescaledb.catalog(source.config);
   return {
     schema: projected.schema,
     tables: projected.tables,
@@ -101,11 +102,11 @@ export function searchCatalog(tables: CatalogTable[], query: string): CatalogMat
  * it had before the column was ever hidden.
  */
 export function setColumnExposure(
-  config: SourceConfig,
+  config: SqlSourceConfig,
   table: string,
   column: string,
   exposed: boolean,
-): SourceConfig | null {
+): SqlSourceConfig | null {
   const target = config.tables.find((t) => t.name === table);
   if (!target?.columns.some((c) => c.name === column)) return null;
   return {
