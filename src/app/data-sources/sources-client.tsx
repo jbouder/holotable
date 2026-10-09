@@ -44,6 +44,11 @@ import { apiErrorFromThrown, readApiError } from "@/lib/errors";
 import { buildSourceDescriptionStarters } from "@/lib/prompts/starters";
 import { isSqlSource } from "@/lib/sources/registry";
 import { SourceForm } from "./source-form";
+import {
+  PrometheusSourceForm,
+  type PrometheusSourceFormInitial,
+} from "./prometheus-source-form";
+import { Select } from "@/components/ui/select";
 import { type GrantedSecretRefsState, readinessIn } from "@/lib/secret-refs";
 import { Notice } from "@/components/notice";
 import { useReducedMotion } from "@/components/motion-preference";
@@ -213,10 +218,14 @@ export function SourcesClient({
     sources.length > 0 &&
     sources.every((source) => catalog[source.id]?.blocked === true);
 
-  // The form edits SQL sources; a Prometheus source has no form until #386.
+  // Each kind has its own form; a source's kind is fixed once it exists.
   const editedRecord = sources?.find((source) => source.id === editing)?.record;
   const sourceBeingEdited =
     editedRecord && isSqlSource(editedRecord) ? editedRecord : undefined;
+  const promBeingEdited =
+    editedRecord && "url" in editedRecord.config
+      ? { record: editedRecord, config: editedRecord.config }
+      : undefined;
   const sourceShowingImpact = sources?.find((source) => source.id === showingImpact);
   const sourceBeingDeleted = sources?.find((source) => source.id === confirmingDelete);
   const sourceBeingBrowsed = sources?.find((source) => source.id === browsing) ?? null;
@@ -538,6 +547,41 @@ export function SourcesClient({
           />
         </Dialog>
       )}
+
+      {promBeingEdited && (
+        <Dialog
+          open
+          onOpenChange={(open) => {
+            if (!open) setEditing(null);
+          }}
+          title={`Edit ${promBeingEdited.record.name}`}
+        >
+          <PrometheusSourceForm
+            mode="edit"
+            workspaceId={promBeingEdited.record.workspaceId}
+            secretRefs={secretRefs}
+            initial={{
+              name: promBeingEdited.record.name,
+              secretRef: promBeingEdited.record.secretRef,
+              config: promBeingEdited.config,
+            }}
+            submitLabel="Save changes"
+            onSubmit={async ({ name, secretRef, config }) => {
+              const res = await fetch(`/api/sources/${promBeingEdited.record.id}`, {
+                method: "PUT",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ name, secretRef, config }),
+              });
+              if (!res.ok) return readApiError(res);
+              setEditing(null);
+              setNotice(`${promBeingEdited.record.id}: updated`);
+              if (workspaceId) void load(workspaceId);
+              return null;
+            }}
+            onCancel={() => setEditing(null)}
+          />
+        </Dialog>
+      )}
     </div>
   );
 }
@@ -563,12 +607,15 @@ function CreateSourcePanel({
   onCancel: () => void;
 }) {
   const [seed, setSeed] = React.useState<SqlSourceDraft>();
+  const [promSeed, setPromSeed] = React.useState<PrometheusSourceFormInitial>();
+  // Whether the manual form creates a Prometheus source; a draft decides it too.
+  const [promChosen, setPromChosen] = React.useState(false);
   // Bumped on each draft so the form remounts and re-seeds from the new values.
   const [seedSeq, setSeedSeq] = React.useState(0);
   // The configuration form stays hidden until the drafter returns a result;
   // an explicit opt-in lets users skip the model and fill it in by hand.
   const [manual, setManual] = React.useState(false);
-  const showForm = seed !== undefined || manual;
+  const showForm = seed !== undefined || promSeed !== undefined || manual;
 
   return (
     <div className="space-y-4">
@@ -576,31 +623,78 @@ function CreateSourcePanel({
         workspaceId={workspaceId}
         existing={existing}
         onDraft={(draft) => {
-          setSeed(draft);
+          if ("sql" in draft) {
+            setSeed(draft.sql);
+            setPromChosen(false);
+          } else {
+            setPromSeed(draft.prometheus);
+            setPromChosen(true);
+          }
           setSeedSeq((n) => n + 1);
         }}
       />
       {showForm ? (
-        <div className="border-t border-border pt-4">
-          <SourceForm
-            key={seedSeq}
-            mode="create"
-            workspaceId={workspaceId}
-            secretRefs={secretRefs}
-            submitLabel="Create source"
-            initial={seed}
-            onSubmit={async ({ id, name, secretRef, config }) => {
-              const res = await fetch("/api/sources", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ workspaceId, id, name, secretRef, config }),
-              });
-              if (!res.ok) return readApiError(res);
-              onCreated();
-              return null;
-            }}
-            onCancel={onCancel}
-          />
+        <div className="space-y-4 border-t border-border pt-4">
+          <div className="max-w-xs">
+            <Label htmlFor="s-kind">Kind</Label>
+            <Select
+              id="s-kind"
+              className="w-full"
+              value={promChosen ? "promql" : "sql"}
+              onValueChange={(value) => setPromChosen(value === "promql")}
+              options={[
+                { value: "sql", label: "TimescaleDB (SQL)" },
+                { value: "promql", label: "Prometheus (PromQL)" },
+              ]}
+            />
+          </div>
+          {promChosen ? (
+            <PrometheusSourceForm
+              key={`p${seedSeq}`}
+              mode="create"
+              workspaceId={workspaceId}
+              secretRefs={secretRefs}
+              submitLabel="Create source"
+              initial={promSeed}
+              onSubmit={async ({ id, name, secretRef, config }) => {
+                const res = await fetch("/api/sources", {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({
+                    workspaceId,
+                    id,
+                    name,
+                    ...(secretRef ? { secretRef } : {}),
+                    config,
+                  }),
+                });
+                if (!res.ok) return readApiError(res);
+                onCreated();
+                return null;
+              }}
+              onCancel={onCancel}
+            />
+          ) : (
+            <SourceForm
+              key={seedSeq}
+              mode="create"
+              workspaceId={workspaceId}
+              secretRefs={secretRefs}
+              submitLabel="Create source"
+              initial={seed}
+              onSubmit={async ({ id, name, secretRef, config }) => {
+                const res = await fetch("/api/sources", {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({ workspaceId, id, name, secretRef, config }),
+                });
+                if (!res.ok) return readApiError(res);
+                onCreated();
+                return null;
+              }}
+              onCancel={onCancel}
+            />
+          )}
         </div>
       ) : (
         <div className="border-t border-border pt-4">
@@ -629,7 +723,9 @@ function NaturalLanguageDrafter({
 }: {
   workspaceId: string;
   existing: SourceRecord[];
-  onDraft: (draft: SqlSourceDraft) => void;
+  onDraft: (
+    draft: { sql: SqlSourceDraft } | { prometheus: PrometheusSourceFormInitial },
+  ) => void;
 }) {
   const [description, setDescription] = React.useState("");
   // There is no catalog to read here — this is how a source comes to exist —
@@ -644,8 +740,20 @@ function NaturalLanguageDrafter({
     schema: SourceDraft,
     onFinish({ object }) {
       // The model drafts SQL sources only (#386 adds Prometheus).
-      if (object && "tables" in object.config && object.secretRef) {
-        onDraft({ ...object, config: object.config, secretRef: object.secretRef });
+      if (!object) return;
+      if ("tables" in object.config && object.secretRef) {
+        onDraft({
+          sql: { ...object, config: object.config, secretRef: object.secretRef },
+        });
+      } else if ("url" in object.config) {
+        onDraft({
+          prometheus: {
+            id: object.id,
+            name: object.name,
+            secretRef: object.secretRef ?? null,
+            config: object.config,
+          },
+        });
       }
     },
   });

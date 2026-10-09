@@ -426,9 +426,11 @@ export function streamSourceDraft(input: {
     schema: ModelSourceDraft,
     schemaName: "SourceDraft",
     schemaDescription:
-      "A TimescaleDB/PostgreSQL data source registration: safe connection config plus a table catalog. Never contains credentials.",
-    system: `You draft TimescaleDB/PostgreSQL data-source registrations for a
-monitoring dashboard tool, from a plain-English description.
+      "A data source registration — TimescaleDB/PostgreSQL (connection plus a table catalog) or Prometheus (URL, auth mode plus a metric catalog). Never contains credentials.",
+    system: `You draft data-source registrations for a monitoring dashboard tool,
+from a plain-English description. A source is EITHER a TimescaleDB/PostgreSQL
+database OR a Prometheus-compatible HTTP endpoint (Prometheus, Thanos, Mimir,
+VictoriaMetrics); decide which from the description.
 
 You emit ONLY a JSON spec describing how to CONNECT and WHAT tables exist. You
 NEVER emit data rows.
@@ -452,7 +454,20 @@ Field rules:
   columns with a reasonable PostgreSQL 'type', and set 'timeField' to the time
   column when there is one (used for server-injected time filtering). If the
   user names no tables/columns, emit a single reasonable placeholder table so
-  the draft validates — the user will Refresh it against the live database.`,
+  the draft validates — the user will Refresh it against the live database.
+
+For a Prometheus endpoint, 'config' is instead:
+- 'config.kind': exactly "prometheus".
+- 'config.url': the endpoint's base URL, https unless the description says it
+  is an in-cluster http address. NEVER put credentials in it. When none is
+  given, emit exactly "https://prometheus.example.com".
+- 'config.auth': "bearer", "basic" or "none". Use "none" only for an endpoint
+  the description says needs no authentication; then OMIT 'secretRef'.
+- 'config.metrics': the metrics the user describes, each with 'name', 'type'
+  ("counter", "gauge", "histogram", "summary" or "unknown"), and the 'labels'
+  its series carry when the description names them. If none are named, emit
+  "up" (type "gauge", labels ["job", "instance"]) so the draft validates — the
+  user will discover the real ones.`,
     prompt: withRepair(
       repair,
       `Draft a data source for this description:\n"""${prompt}"""`,

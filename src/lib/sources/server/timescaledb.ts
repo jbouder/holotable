@@ -1,7 +1,14 @@
 import { config } from "@/lib/config";
 import { isSqlQuery } from "@/lib/ir";
 import { buildQueryPlanView } from "@/lib/query-plan";
-import type { SourceRecord, SqlSourceRecord } from "@/lib/registry";
+import { catalogView } from "@/lib/catalog/browse";
+import { diffCatalog } from "@/lib/catalog/refresh";
+import type {
+  SourceConfig,
+  SourceRecord,
+  SqlSourceConfig,
+  SqlSourceRecord,
+} from "@/lib/registry";
 import { QueryExecutionError } from "@/lib/sources/execution";
 import { wrongLanguage } from "@/lib/sources/registry";
 import type {
@@ -37,6 +44,12 @@ function sqlSource(source: SourceRecord): SqlSourceRecord {
     throw new Error(`${source.id} is not a TimescaleDB source`);
   }
   return source as SqlSourceRecord;
+}
+
+function sqlConfig(cfg: SourceConfig): SqlSourceConfig {
+  if (cfg.kind !== "timescaledb")
+    throw new Error("a TimescaleDB refresh holds a SQL config");
+  return cfg;
 }
 
 function sqlPlan(plan: SourcePlan) {
@@ -110,6 +123,19 @@ const kind: ServerSourceKind = {
   // A database host is the operator's grant (`SOURCE_SECRET_REFS`), not an
   // address check; nothing more to look at when it is saved.
   checkConfig: async () => null,
+  refresh: (source) => refreshCatalog(sqlSource(source)),
+  refreshDiff: (source, refresh) =>
+    diffCatalog(sqlSource(source), {
+      config: sqlConfig(refresh.config),
+      missingTables: refresh.missingTables,
+    }),
+  refreshDigest: (refresh) =>
+    refreshDigest({
+      config: sqlConfig(refresh.config),
+      missingTables: refresh.missingTables,
+    }),
+  catalogView: (source, health, canManage) =>
+    catalogView(sqlSource(source), health, canManage),
   test: (source) => testSource(sqlSource(source)),
   renderCatalog: (source) => renderCatalog(sqlSource(source)),
   catalogPrompt: (source) => buildCatalogPrompt(sqlSource(source)),

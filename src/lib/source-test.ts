@@ -60,6 +60,44 @@ export interface TestTable {
   error?: string;
 }
 
+/** What answered a Prometheus source's URL (#386). */
+export interface TestEndpoint {
+  /** What the build info says it is: Prometheus, Thanos, VictoriaMetrics, … */
+  product: string;
+  version: string | null;
+}
+
+/** The source's auth mode, and whether the endpoint took the credential. */
+export interface TestAuth {
+  mode: "none" | "basic" | "bearer";
+  /** Null when nothing was asked that could tell. */
+  accepted: boolean | null;
+}
+
+export type WriteSurfaceVerdict =
+  /** No admin API and no write receiver is switched on. The healthy answer. */
+  | "closed"
+  /** A flag that lets a request write or delete is on. */
+  | "open"
+  /** The endpoint does not publish its flags (Thanos, Mimir, …). */
+  | "unknown";
+
+/**
+ * A Prometheus source's analog of the read-only proof, read from its flags
+ * rather than probed: a test never writes.
+ */
+export interface TestWriteSurface {
+  verdict: WriteSurfaceVerdict;
+  detail: string;
+}
+
+export interface TestMetric {
+  metric: string;
+  reachable: boolean;
+  /** Why not: "no series in the last 1h", or the endpoint's error. */
+  error?: string;
+}
+
 export interface SourceTestResult {
   /** Did the connection and the basic read succeed. */
   ok: boolean;
@@ -70,6 +108,12 @@ export interface SourceTestResult {
   readOnly?: TestReadOnly;
   /** One entry per allowlisted table, in catalog order. */
   tables?: TestTable[];
+  /** A Prometheus source's endpoint, auth, write surface and metrics (#386). */
+  endpoint?: TestEndpoint;
+  auth?: TestAuth;
+  writeSurface?: TestWriteSurface;
+  /** One entry per allowlisted metric, in catalog order. */
+  metrics?: TestMetric[];
 }
 
 /**
@@ -146,5 +190,35 @@ export function summarizeTables(tables: TestTable[]): string {
 export function hasFinding(result: SourceTestResult): boolean {
   if (!result.ok) return true;
   if (result.readOnly && result.readOnly.verdict !== "refused") return true;
+  if (result.writeSurface && result.writeSurface.verdict !== "closed") return true;
+  if ((result.metrics ?? []).some((m) => !m.reachable)) return true;
   return (result.tables ?? []).some((t) => !t.reachable);
+}
+
+export function writeSurfaceTone(
+  verdict: WriteSurfaceVerdict,
+): "ok" | "warning" | "danger" {
+  return verdict === "closed" ? "ok" : verdict === "open" ? "danger" : "warning";
+}
+
+export function writeSurfaceHeadline(verdict: WriteSurfaceVerdict): string {
+  switch (verdict) {
+    case "closed":
+      return "No write surface — the admin API and write receivers are off";
+    case "open":
+      return "This endpoint accepts writes; the credential should not be able to reach them.";
+    default:
+      return "Write surface unknown — the endpoint does not publish its flags";
+  }
+}
+
+export function summarizeMetrics(metrics: TestMetric[]): string {
+  const reachable = metrics.filter((m) => m.reachable).length;
+  if (metrics.length === 0) return "No metrics are allowlisted";
+  if (reachable === metrics.length) {
+    return metrics.length === 1
+      ? "1 metric has series"
+      : `All ${metrics.length} metrics have series`;
+  }
+  return `${reachable} of ${metrics.length} metrics have series`;
 }

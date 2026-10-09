@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { SECRET_REF_MESSAGE, SECRET_REF_PATTERN } from "@/lib/secret-refs";
 import { TimescaleDbConfig, timescaledb } from "@/lib/sources/kinds/timescaledb";
+import { PrometheusConfig } from "@/lib/sources/kinds/prometheus";
 import type { SourceCatalog } from "@/lib/sources/catalog";
 import {
   type EditorCatalog,
@@ -109,11 +110,16 @@ export type SqlSourceDraft = Omit<SourceDraft, "config" | "secretRef"> & {
  * shown the field, and a draft that somehow carries one fails to parse.
  */
 export const ModelSourceDraft = SourceDraftFields.extend({
-  secretRef: z.string().regex(SECRET_REF_PATTERN, SECRET_REF_MESSAGE),
-  // TimescaleDB only until a Prometheus draft exists (#386). The model is not
-  // shown `kind` either: it has one answer here, which the default supplies.
-  config: TimescaleDbConfig.omit({ rowFilter: true, kind: true }).strict(),
+  /** Required for SQL and for an authenticated Prometheus endpoint (#386). */
+  secretRef: z.string().regex(SECRET_REF_PATTERN, SECRET_REF_MESSAGE).optional(),
+  // A SQL draft is not shown `kind`: its default supplies it. A Prometheus
+  // draft names it, which is what tells the two apart (#386).
+  config: z.union([
+    TimescaleDbConfig.omit({ rowFilter: true, kind: true }).strict(),
+    PrometheusConfig.omit({ rowFilter: true }).strict(),
+  ]),
 }).strict();
+export type ModelSourceDraft = z.infer<typeof ModelSourceDraft>;
 
 /**
  * What the editor may see of a source's catalog: projected by the source's

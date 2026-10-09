@@ -14,8 +14,12 @@ import {
   type ColumnImpact,
   describeHideImpact,
   fetchHideImpact,
+  type AnyCatalogView,
   type CatalogView,
   fetchCatalogView,
+  isMetricCatalogView,
+  type MetricCatalogView,
+  searchMetrics,
   searchCatalog,
   updateColumnExposure,
 } from "@/lib/catalog/browse";
@@ -81,7 +85,7 @@ export function CatalogBrowserDialog({
 type Load =
   | { state: "loading" }
   | { state: "failed"; error: ApiError }
-  | { state: "ready"; view: CatalogView };
+  | { state: "ready"; view: AnyCatalogView };
 
 export function CatalogBrowser({
   source,
@@ -133,7 +137,7 @@ export function CatalogBrowser({
     );
   }
 
-  const { view } = load;
+  const { view: loaded } = load;
 
   if (refreshing) {
     return (
@@ -191,6 +195,25 @@ export function CatalogBrowser({
     onChanged?.(result.view.catalogHealth);
   }
 
+  if (isMetricCatalogView(loaded)) {
+    return (
+      <div className="space-y-4">
+        <Freshness source={source} view={loaded} onRefresh={() => setRefreshing(true)} />
+        {notice && (
+          <p className="drop-in text-xs text-muted" role="status">
+            {notice}
+          </p>
+        )}
+        <MetricList view={loaded} query={query} onQuery={setQuery} />
+        {!loaded.canManage && (
+          <p className="text-xs text-muted">
+            Read-only. A source admin for this workspace can refresh the catalog.
+          </p>
+        )}
+      </div>
+    );
+  }
+  const view = loaded;
   const matches = searchCatalog(view.tables, query);
   const searching = query.trim() !== "";
   const missing = new Set(view.missingTables);
@@ -271,7 +294,7 @@ function Freshness({
   onRefresh,
 }: {
   source: Named;
-  view: CatalogView;
+  view: AnyCatalogView;
   onRefresh: () => void;
 }) {
   const health = view.catalogHealth;
@@ -289,7 +312,7 @@ function Freshness({
               "Never refreshed"
             )}
           </span>
-          <span className="text-muted">schema {view.schema}</span>
+          {"schema" in view && <span className="text-muted">schema {view.schema}</span>}
         </div>
         {health.state !== "ok" && (
           <p className="text-xs text-muted">{describeCatalogHealth(source, health)}</p>
@@ -301,6 +324,71 @@ function Freshness({
         </Button>
       )}
     </div>
+  );
+}
+
+/**
+ * A Prometheus source's allowlist (#386): each metric with its type, help and
+ * labels, searched as the table browser is. Nothing to toggle: a metric is
+ * allowlisted whole.
+ */
+function MetricList({
+  view,
+  query,
+  onQuery,
+}: {
+  view: MetricCatalogView;
+  query: string;
+  onQuery: (query: string) => void;
+}) {
+  const matches = searchMetrics(view.metrics, query);
+  const missing = new Set(view.missingMetrics);
+  return (
+    <>
+      <div className="relative">
+        <Search
+          className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted"
+          aria-hidden
+        />
+        <Input
+          type="search"
+          value={query}
+          onChange={(e) => onQuery(e.target.value)}
+          placeholder="Search metrics, types and labels"
+          aria-label="Search the catalog"
+          className="pl-9"
+        />
+      </div>
+      {matches.length === 0 ? (
+        <p className="py-6 text-center text-sm text-muted">
+          {query.trim()
+            ? `Nothing in the catalog matches “${query.trim()}”.`
+            : "No metrics."}
+        </p>
+      ) : (
+        <ul className="divide-y divide-border border border-border">
+          {matches.map((metric) => (
+            <li key={metric.name} className="space-y-1 px-3 py-2">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="font-mono text-xs font-medium text-foreground">
+                  {metric.name}
+                </span>
+                <Badge>{metric.type}</Badge>
+                {missing.has(metric.name) && (
+                  <span className="text-xs text-danger">
+                    no series at the last refresh
+                  </span>
+                )}
+              </div>
+              {metric.help && <p className="text-xs text-muted">{metric.help}</p>}
+              <p className="font-mono text-xs text-muted">
+                {metric.labels.length > 0 ? metric.labels.join(", ") : "no labels listed"}
+              </p>
+            </li>
+          ))}
+        </ul>
+      )}
+    </>
   );
 }
 

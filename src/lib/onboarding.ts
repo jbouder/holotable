@@ -119,7 +119,7 @@ export function onboardingState(facts: OnboardingFacts): OnboardingState {
       id: "connect",
       title: "Connect a data source",
       detail:
-        "Register the database Holotable reads. Its credentials live in the server environment under a secret reference, so they never reach a dashboard or the browser.",
+        "Register the TimescaleDB database or Prometheus endpoint Holotable reads. Its credentials live in the server environment under a secret reference, so they never reach a dashboard or the browser.",
       status: statusOf("connect", done, currentStepId),
       action: facts.canManageSources
         ? { label: "Add a data source", href: "/data-sources?new=1" }
@@ -186,7 +186,7 @@ export function noSourceGuidance(canManageSources: boolean): {
   return {
     title: "No data sources yet",
     body: canManageSources
-      ? "Holotable queries a registered source, never the model. Connect one, then Test it and Refresh its catalog — that is what the generator is allowed to read."
+      ? "Holotable queries a registered source, never the model: a TimescaleDB database or a Prometheus endpoint. Connect one, then Test it and Refresh its catalog — that is what the generator is allowed to read."
       : "Holotable queries a registered source, never the model. None are available in your workspaces yet, and connecting one needs the source-admin role.",
     action: canManageSources
       ? { label: "Add a data source", href: "/data-sources?new=1" }

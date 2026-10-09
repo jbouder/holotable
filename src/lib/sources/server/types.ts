@@ -1,3 +1,6 @@
+import type { AnyCatalogView } from "@/lib/catalog/browse";
+import type { CatalogHealth } from "@/lib/catalog/health";
+import type { AnyCatalogDiff } from "@/lib/catalog/refresh";
 import type { PanelQuery, TimeRange, VariableQuery } from "@/lib/ir";
 import type { PromqlPlan } from "@/lib/promql/plan";
 import type { AnyPlanView } from "@/lib/query-plan";
@@ -16,6 +19,12 @@ import type { VariableValues } from "@/lib/sql/variables";
  * own language first: a PromQL query against a SQL source, or the reverse,
  * is refused here like a table the source does not have.
  */
+
+/** A catalog refresh, whatever the kind: the config to store and what is missing. */
+export interface CatalogRefresh {
+  config: SourceConfig;
+  missingTables: string[];
+}
 
 /** A guard's verdict, in the shape `validateSql` has always returned. */
 export interface QueryCheck {
@@ -73,6 +82,21 @@ export interface ServerSourceKind {
     plan: SourcePlan;
     timeRange: TimeRange;
   }): AnyPlanView;
+  /**
+   * The catalog re-read from the source (#386): the config to store and the
+   * allowlisted entries it could not find. Never edits the allowlist.
+   */
+  refresh(source: SourceRecord): Promise<CatalogRefresh>;
+  /** What a refresh would change, in the kind's own words. */
+  refreshDiff(source: SourceRecord, refresh: CatalogRefresh): AnyCatalogDiff;
+  /** What the apply step must send back. */
+  refreshDigest(refresh: CatalogRefresh): string;
+  /** What the catalog browser shows this caller. */
+  catalogView(
+    source: SourceRecord,
+    health: CatalogHealth,
+    canManage: boolean,
+  ): AnyCatalogView;
   /** Connectivity and the catalog's tables or metrics. */
   test(source: SourceRecord): Promise<SourceTestResult>;
   /** The catalog as the chat model is shown it. */

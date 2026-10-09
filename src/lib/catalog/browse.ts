@@ -34,6 +34,25 @@ export interface CatalogView {
   canManage: boolean;
 }
 
+/**
+ * A Prometheus source's catalog (#386): its allowlisted metrics with their
+ * type, help and labels. The same for every caller — there is no label to
+ * hide — and never the URL or the auth mode.
+ */
+export interface MetricCatalogView {
+  metrics: { name: string; type: string; help?: string; labels: string[] }[];
+  /** Allowlisted metrics the last refresh found no series for. */
+  missingMetrics: string[];
+  catalogHealth: CatalogHealth;
+  canManage: boolean;
+}
+
+export type AnyCatalogView = CatalogView | MetricCatalogView;
+
+export function isMetricCatalogView(view: AnyCatalogView): view is MetricCatalogView {
+  return "metrics" in view;
+}
+
 /** Build the view for one caller. Server-side; `canManage` comes from `can()`. */
 export function catalogView(
   source: Pick<SqlSourceRecord, "config" | "catalogMissingTables">,
@@ -141,8 +160,31 @@ async function viewFrom(res: Response): Promise<CatalogViewResult> {
   return { ok: true, view: ((await res.json()) as { view: CatalogView }).view };
 }
 
-export async function fetchCatalogView(sourceId: string): Promise<CatalogViewResult> {
-  return viewFrom(await fetch(catalogUrl(sourceId), { cache: "no-store" }));
+export type AnyCatalogViewResult =
+  | { ok: true; view: AnyCatalogView }
+  | { ok: false; error: ApiError };
+
+/** A source's catalog as this caller may see it: tables for SQL, metrics for PromQL. */
+export async function fetchCatalogView(sourceId: string): Promise<AnyCatalogViewResult> {
+  const res = await fetch(catalogUrl(sourceId), { cache: "no-store" });
+  if (!res.ok) return { ok: false, error: await readApiError(res) };
+  return { ok: true, view: ((await res.json()) as { view: AnyCatalogView }).view };
+}
+
+/** The metrics whose name, type, help or a label contains the query. */
+export function searchMetrics(
+  metrics: MetricCatalogView["metrics"],
+  query: string,
+): MetricCatalogView["metrics"] {
+  const q = query.trim().toLowerCase();
+  if (q === "") return metrics;
+  return metrics.filter(
+    (m) =>
+      m.name.toLowerCase().includes(q) ||
+      m.type.toLowerCase().includes(q) ||
+      (m.help ?? "").toLowerCase().includes(q) ||
+      m.labels.some((l) => l.toLowerCase().includes(q)),
+  );
 }
 
 /** Hide or expose one column. The answer is the catalog as it now stands. */

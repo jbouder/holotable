@@ -120,6 +120,55 @@ test("dashboard chat answers in the panel", async ({ page, request }) => {
   await chat.getByRole("button", { name: "Clear chat" }).click();
 });
 
+test("a source admin registers a Prometheus source through the form (#386)", async ({
+  page,
+  request,
+}) => {
+  const id = `e2e-prom-${Date.now().toString(36)}`;
+  const name = `Prometheus ${id}`;
+  await page.goto("/data-sources");
+  await page.getByRole("button", { name: "Add source" }).first().click();
+  const dialog = page.getByRole("dialog", { name: "Add source" });
+  await dialog.getByRole("button", { name: "or enter configuration manually" }).click();
+  await dialog.getByRole("combobox", { name: "Kind" }).click();
+  await page.getByRole("option", { name: "Prometheus (PromQL)" }).click();
+  await dialog.getByLabel("Source id").fill(id);
+  await dialog.getByLabel("Name").fill(name);
+  // A public address literal: the save checks it against SOURCE_URL_ALLOWLIST
+  // without resolving anything, and nothing here contacts it.
+  await dialog.getByLabel("URL").fill("https://93.184.216.34");
+  await dialog.getByRole("combobox", { name: "Authentication" }).click();
+  await page.getByRole("option", { name: "None (in-cluster endpoint)" }).click();
+  // No endpoint to discover from here, so the allowlist goes in through the
+  // JSON view, which the form reads back.
+  await dialog.getByRole("button", { name: "Advanced (JSON)" }).click();
+  await dialog.getByLabel("Endpoint + catalog (JSON)").fill(
+    JSON.stringify({
+      kind: "prometheus",
+      url: "https://93.184.216.34",
+      auth: "none",
+      metrics: [{ name: "up", type: "gauge", labels: ["job", "instance"] }],
+    }),
+  );
+  await dialog.getByRole("button", { name: "Back to the form" }).click();
+  await expect(dialog.getByText("job, instance")).toBeVisible();
+  await dialog.getByRole("button", { name: "Create source" }).click();
+  await expect(dialog).toBeHidden();
+  const row = page.locator(`#source-${id}`);
+  await expect(row).toBeVisible();
+  await expect(row).toContainText("https://93.184.216.34");
+
+  // Its kind is fixed: editing opens the Prometheus form, as saved.
+  await page.getByRole("button", { name: `Edit ${name}` }).click();
+  const edit = page.getByRole("dialog", { name: `Edit ${name}` });
+  await expect(edit.getByLabel("URL")).toHaveValue("https://93.184.216.34");
+  await expect(edit.getByText("job, instance")).toBeVisible();
+  await edit.getByRole("button", { name: "Cancel" }).click();
+
+  const removed = await request.delete(`/api/sources/${id}`);
+  expect(removed.ok(), await removed.text()).toBe(true);
+});
+
 test("a deleted source tombstones the panels that used it", async ({ page, request }) => {
   const id = `e2e-gone-${Date.now().toString(36)}`;
   const name = `Doomed ${id}`;

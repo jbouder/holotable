@@ -34,6 +34,13 @@ export interface PrometheusTarget {
  */
 export class PrometheusUnavailableError extends Error {
   override name = "PrometheusUnavailableError";
+  constructor(
+    message: string,
+    /** The HTTP status, when the endpoint answered at all. */
+    readonly status?: number,
+  ) {
+    super(message);
+  }
 }
 
 let allowlistCache: { raw: string; allowlist: BaseUrlAllowlist } | null = null;
@@ -121,31 +128,49 @@ interface ApiEnvelope {
  */
 const AUTHOR_ERRORS = new Set(["bad_data", "execution"]);
 
+interface RequestOptions {
+  timeoutMs: number;
+  /**
+   * POST (the default) sends `form` as the body, which every
+   * Prometheus-compatible API accepts for `query`, `query_range`, `series`
+   * and `labels`, and which keeps an 8,000-character expression out of a URL.
+   * GET puts it in the query string, for the endpoints that only answer GET
+   * (`metadata`, `status/*`).
+   */
+  method?: "GET" | "POST";
+  fetchImpl?: typeof fetch;
+}
+
 /**
- * Ask the endpoint. `form` is sent as a POST body, which every
- * Prometheus-compatible API accepts for `query`, `query_range` and the label
- * endpoints, and which keeps an 8,000-character expression out of a URL.
+ * One exchange with the endpoint: the request through the guarded fetch with
+ * the source's credentials, and the body read under the byte cap. `path` is
+ * under `/api/v1/`, or, starting with `/`, under the source URL itself
+ * (`/-/ready`).
  */
-export async function prometheusRequest(
+async function exchange(
   target: PrometheusTarget,
   path: string,
   form: URLSearchParams,
-  opts: { timeoutMs: number; fetchImpl?: typeof fetch } = {
-    timeoutMs: config.queryTimeoutSeconds * 1000,
-  },
-): Promise<unknown> {
-  const url = apiUrl(target.config.url, path);
+  opts: RequestOptions,
+): Promise<{ status: number; ok: boolean; text: string }> {
+  let url = path.startsWith("/")
+    ? rawUrl(target.config.url, path)
+    : apiUrl(target.config.url, path);
+  const method = opts.method ?? "POST";
+  if (method === "GET" && [...form.keys()].length > 0) url = `${url}?${form.toString()}`;
   const fetcher = opts.fetchImpl ?? guardedFetch(target.config.url, sourceUrlAllowlist());
   let response: Response;
   try {
     response = await fetcher(url, {
-      method: "POST",
+      method,
       headers: {
         Accept: "application/json",
-        "Content-Type": "application/x-www-form-urlencoded",
+        ...(method === "POST"
+          ? { "Content-Type": "application/x-www-form-urlencoded" }
+          : {}),
         ...authorization(target),
       },
-      body: form.toString(),
+      ...(method === "POST" ? { body: form.toString() } : {}),
       signal: AbortSignal.timeout(opts.timeoutMs + 1_000),
     });
   } catch (err) {
@@ -160,14 +185,48 @@ export async function prometheusRequest(
             : String(err);
     throw new PrometheusUnavailableError(`source ${target.id}: ${reason}`);
   }
-
   const text = await readCapped(response, config.maxResultBytes);
+  return { status: response.status, ok: response.ok, text };
+}
+
+/** `<url><path>`, for an endpoint beside the API rather than in it. */
+function rawUrl(base: string, path: string): string {
+  const url = new URL(base);
+  url.pathname = `${url.pathname.replace(/\/+$/, "")}${path}`;
+  return url.href;
+}
+
+/**
+ * Ask a path the endpoint answers in plain text (`/-/ready`): its status,
+ * with nothing but whether it was a success kept.
+ */
+export async function prometheusPing(
+  target: PrometheusTarget,
+  path: string,
+  opts: RequestOptions,
+): Promise<{ status: number; ok: boolean }> {
+  const { status, ok } = await exchange(target, path, new URLSearchParams(), {
+    ...opts,
+    method: "GET",
+  });
+  return { status, ok };
+}
+
+/** Ask the endpoint's JSON API, and return the `data` of a success. */
+export async function prometheusRequest(
+  target: PrometheusTarget,
+  path: string,
+  form: URLSearchParams,
+  opts: RequestOptions = { timeoutMs: config.queryTimeoutSeconds * 1000 },
+): Promise<unknown> {
+  const response = await exchange(target, path, form, opts);
   let body: ApiEnvelope;
   try {
-    body = JSON.parse(text) as ApiEnvelope;
+    body = JSON.parse(response.text) as ApiEnvelope;
   } catch {
     throw new PrometheusUnavailableError(
       `source ${target.id}: ${path} answered ${response.status} with a body that is not JSON`,
+      response.status,
     );
   }
   if (response.ok && body.status === "success") return body.data;
@@ -180,6 +239,7 @@ export async function prometheusRequest(
   }
   throw new PrometheusUnavailableError(
     `source ${target.id}: ${path} answered ${response.status}${body.errorType ? ` (${body.errorType})` : ""}${body.error ? `: ${body.error}` : ""}`,
+    response.status,
   );
 }
 

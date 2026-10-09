@@ -11,6 +11,7 @@ import {
   listDashboardVersions,
   listSources,
   saveDashboardVersion,
+  sourceImpact,
   updateSource,
 } from "@/lib/db/repo";
 import { type Dashboard, SPEC_VERSION } from "@/lib/ir";
@@ -93,7 +94,27 @@ test(
     );
     const cleared = await updateSource(WORKSPACE, id, { config, secretRef: null });
     assert.equal(cleared?.secretRef, null);
-    assert.equal(await deleteSource(WORKSPACE, id), "deleted");
+
+    // A PromQL panel names its source as a SQL one does, so impact and
+    // tombstoning are the same for either kind (#386).
+    const promSpec = spec("Reads Prometheus");
+    await createDashboard({
+      workspaceId: WORKSPACE,
+      createdBy: "integration",
+      spec: {
+        ...promSpec,
+        panels: promSpec.panels.map((p) => ({
+          ...p,
+          viz: "stat" as const,
+          query: { sourceId: id, promql: "sum(up)", instant: true },
+        })),
+      } as Dashboard,
+    });
+    const impact = await sourceImpact(WORKSPACE, id);
+    assert.equal(impact.dashboards.length, 1);
+    assert.equal(impact.dashboards[0].title, "Reads Prometheus");
+    assert.equal(impact.dashboards[0].panels.length, 1);
+    assert.equal(await deleteSource(WORKSPACE, id), "tombstoned");
   },
 );
 

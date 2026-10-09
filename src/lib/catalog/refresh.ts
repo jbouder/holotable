@@ -53,6 +53,68 @@ export interface CatalogDiff {
 }
 
 /** The stored side of a diff: the catalog and the last refresh's missing list. */
+/** What changed about one allowlisted Prometheus metric (#386). */
+export interface MetricChange {
+  metric: string;
+  addedLabels: string[];
+  removedLabels: string[];
+  /** The metric's type as the endpoint now reports it, when that changed. */
+  type?: { from: string; to: string };
+}
+
+/**
+ * A Prometheus catalog refresh, in the kind's own words. Like a SQL refresh,
+ * it never edits the allowlist: a metric with no series is reported missing
+ * and keeps its last known labels.
+ */
+export interface MetricCatalogDiff {
+  missingMetrics: string[];
+  restoredMetrics: string[];
+  metrics: MetricChange[];
+}
+
+export type AnyCatalogDiff = CatalogDiff | MetricCatalogDiff;
+
+export function isMetricDiff(diff: AnyCatalogDiff): diff is MetricCatalogDiff {
+  return "metrics" in diff;
+}
+
+interface MetricCatalog {
+  metrics: { name: string; type: string; labels: string[] }[];
+}
+
+export function diffMetricCatalog(
+  stored: { config: MetricCatalog; catalogMissingTables: string[] },
+  next: { config: MetricCatalog; missingTables: string[] },
+): MetricCatalogDiff {
+  const missing = new Set(next.missingTables);
+  const before = new Map(stored.config.metrics.map((m) => [m.name, m]));
+  const metrics: MetricChange[] = [];
+  for (const metric of next.config.metrics) {
+    if (missing.has(metric.name)) continue;
+    const old = before.get(metric.name);
+    const oldLabels = new Set(old?.labels ?? []);
+    const nowLabels = new Set(metric.labels);
+    const addedLabels = metric.labels.filter((l) => !oldLabels.has(l));
+    const removedLabels = [...oldLabels].filter((l) => !nowLabels.has(l));
+    const type =
+      old && old.type !== metric.type ? { from: old.type, to: metric.type } : undefined;
+    if (addedLabels.length + removedLabels.length > 0 || type) {
+      metrics.push({
+        metric: metric.name,
+        addedLabels,
+        removedLabels,
+        ...(type ? { type } : {}),
+      });
+    }
+  }
+  return {
+    missingMetrics: [...next.missingTables],
+    restoredMetrics: stored.catalogMissingTables.filter((name) => !missing.has(name)),
+    metrics,
+  };
+}
+
 export type StoredCatalog = Pick<CatalogSubject, "config" | "catalogMissingTables">;
 
 /** The introspected side: what `refreshCatalog()` returned. */
@@ -104,7 +166,14 @@ export function diffCatalog(
 }
 
 /** True when applying would change nothing but the freshness timestamp. */
-export function isUnchanged(diff: CatalogDiff): boolean {
+export function isUnchanged(diff: AnyCatalogDiff): boolean {
+  if (isMetricDiff(diff)) {
+    return (
+      diff.missingMetrics.length === 0 &&
+      diff.restoredMetrics.length === 0 &&
+      diff.metrics.length === 0
+    );
+  }
   return (
     diff.missingTables.length === 0 &&
     diff.restoredTables.length === 0 &&
@@ -117,7 +186,8 @@ function plural(n: number, word: string): string {
 }
 
 /** One line for the whole change set: the review's heading and the notice after it. */
-export function summarizeCatalogDiff(diff: CatalogDiff): string {
+export function summarizeCatalogDiff(diff: AnyCatalogDiff): string {
+  if (isMetricDiff(diff)) return summarizeMetricDiff(diff);
   const count = (pick: (t: TableChange) => unknown[]) =>
     diff.tables.reduce((n, t) => n + pick(t).length, 0);
   const parts = [
@@ -147,7 +217,37 @@ export function summarizeCatalogDiff(diff: CatalogDiff): string {
 }
 
 /** Hidden columns the database has dropped: re-adding one would expose it. */
-export function droppedHiddenColumns(diff: CatalogDiff): string[] {
+function summarizeMetricDiff(diff: MetricCatalogDiff): string {
+  const count = (pick: (m: MetricChange) => number) =>
+    diff.metrics.reduce((n, m) => n + pick(m), 0);
+  const parts = [
+    diff.missingMetrics.length > 0 &&
+      `${plural(diff.missingMetrics.length, "metric")} missing`,
+    diff.restoredMetrics.length > 0 &&
+      `${plural(diff.restoredMetrics.length, "metric")} found again`,
+    count((m) => m.addedLabels.length) > 0 &&
+      `${plural(
+        count((m) => m.addedLabels.length),
+        "label",
+      )} added`,
+    count((m) => m.removedLabels.length) > 0 &&
+      `${plural(
+        count((m) => m.removedLabels.length),
+        "label",
+      )} removed`,
+    count((m) => (m.type ? 1 : 0)) > 0 &&
+      `${plural(
+        count((m) => (m.type ? 1 : 0)),
+        "metric type",
+      )} changed`,
+  ].filter((part): part is string => typeof part === "string");
+  return parts.length > 0
+    ? `${parts.join(", ")}.`
+    : "No changes since the last refresh. The catalog still matches the endpoint.";
+}
+
+export function droppedHiddenColumns(diff: AnyCatalogDiff): string[] {
+  if (isMetricDiff(diff)) return [];
   return diff.tables.flatMap((t) =>
     t.removed.filter((c) => !isExposed(c)).map((c) => `${t.table}.${c.name}`),
   );
@@ -156,7 +256,7 @@ export function droppedHiddenColumns(diff: CatalogDiff): string[] {
 // --- Fetch helpers ---------------------------------------------------------------
 
 export interface RefreshPreview {
-  diff: CatalogDiff;
+  diff: AnyCatalogDiff;
   /** What the apply step must send back. */
   digest: string;
 }
@@ -166,7 +266,7 @@ export type PreviewResult =
   | { ok: false; error: ApiError };
 
 export type ApplyResult =
-  | { ok: true; diff: CatalogDiff; catalogHealth: CatalogHealth }
+  | { ok: true; diff: AnyCatalogDiff; catalogHealth: CatalogHealth }
   /** The database changed between the preview and the apply. */
   | { ok: false; changed: RefreshPreview; error: ApiError }
   | { ok: false; changed?: undefined; error: ApiError };
@@ -205,6 +305,9 @@ export async function applyCatalogRefresh(
     return { ok: false, error };
   }
   if (!res.ok) return { ok: false, error: await readApiError(res) };
-  const body = (await res.json()) as { diff: CatalogDiff; catalogHealth: CatalogHealth };
+  const body = (await res.json()) as {
+    diff: AnyCatalogDiff;
+    catalogHealth: CatalogHealth;
+  };
   return { ok: true, diff: body.diff, catalogHealth: body.catalogHealth };
 }

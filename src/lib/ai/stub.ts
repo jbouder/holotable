@@ -90,6 +90,21 @@ export function recordedExplorePanel(sourceId: string) {
  * real prompt demands: the form refuses to save one, so a draft can never
  * point somewhere by accident.
  */
+/** The stub's Prometheus source draft (#386): a bearer endpoint with `up`. */
+export function recordedPrometheusDraft(secretRef: string) {
+  return {
+    id: "drafted-prometheus",
+    name: "Drafted Prometheus",
+    secretRef,
+    config: {
+      kind: "prometheus",
+      url: "https://prometheus.example.com",
+      auth: "bearer",
+      metrics: [{ name: "up", type: "gauge", labels: ["job", "instance"] }],
+    },
+  };
+}
+
 export function recordedSourceDraft(secretRef: string) {
   return {
     id: "drafted-metrics",
@@ -183,7 +198,12 @@ export function stubAnswer(options: CallOptions): string {
     }
     case "SourceDraft": {
       const granted = /MUST be one of: "([^"]+)"/.exec(system)?.[1] ?? "TS_METRICS";
-      return JSON.stringify(recordedSourceDraft(granted));
+      // A description that asks for Prometheus gets the Prometheus recording (#386).
+      return JSON.stringify(
+        /prometheus/i.test(user)
+          ? recordedPrometheusDraft(granted)
+          : recordedSourceDraft(granted),
+      );
     }
     default:
       return "{}";
