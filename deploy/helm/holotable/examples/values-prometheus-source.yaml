@@ -1,0 +1,71 @@
+# Prometheus sources (#390) — an in-cluster Prometheus as a data source.
+#
+# A Prometheus source's URL is chosen by a source admin in the app, and the
+# server makes requests to it. By default a source URL must be public https,
+# so an in-cluster endpoint needs SOURCE_URL_ALLOWLIST: the exact host names,
+# addresses or CIDR ranges it may reach, which also lets it use plain http.
+# Every workspace's source admins may use what is listed, so an endpoint that
+# must stay one tenant's should require auth and name a secret_ref instead.
+#
+# The credentials themselves still come from the Secret the chart loads
+# (`secrets.existingSecret`). A Prometheus source with bearer auth names a ref
+# whose value is `<REF>_TOKEN`; basic auth uses `<REF>_USERNAME` and
+# `<REF>_PASSWORD`, like a database source:
+#
+#   kubectl create secret generic holotable-env \
+#     --from-literal=SESSION_SECRET="$(openssl rand -base64 32)" \
+#     --from-literal=DATABASE_URL='postgresql://holotable:...@postgres:5432/holotable' \
+#     --from-literal=OIDC_CLIENT_SECRET='...' \
+#     --from-literal=PROM_OPS_TOKEN='...'
+#
+# With the network policy on, the app pod reaches nothing it is not given:
+# the egress rule below lets it reach Prometheus on 9090 in the `monitoring`
+# namespace, beside Postgres and Keycloak. The allowlist and the policy are
+# two locks on one door; keep them naming the same endpoint.
+#
+#   helm install holotable deploy/helm/holotable -f values-prometheus-source.yaml
+
+secrets:
+  existingSecret: holotable-env
+
+config:
+  OIDC_ISSUER: https://kc.example.com/realms/holotable
+  OIDC_CLIENT_ID: holotable
+  OIDC_JWKS_URL: https://kc.example.com/realms/holotable/protocol/openid-connect/certs
+  OIDC_REDIRECT_URI: https://holotable.example.com/api/auth/callback
+  OIDC_SCOPE: openid profile email groups
+  # The `ops` workspace may use the PROM_OPS ref (a bearer token).
+  SOURCE_SECRET_REFS: "PROM_OPS:ops"
+  # The in-cluster Prometheus a source admin may point a source at.
+  SOURCE_URL_ALLOWLIST: "prometheus-operated.monitoring.svc.cluster.local"
+  # Sizing: a range query is stepped to at most this many points per series,
+  # never finer than this step, and holds at most this many series.
+  PROMQL_MAX_POINTS: "1000"
+  PROMETHEUS_MIN_STEP_MS: "15000"
+  PROMETHEUS_MAX_SERIES: "100"
+  PROMQL_MAX_RANGE: "7d"
+
+networkPolicy:
+  enabled: true
+  ingressFrom:
+    - namespaceSelector:
+        matchLabels:
+          kubernetes.io/metadata.name: ingress-nginx
+  egressTo:
+    # Postgres and Keycloak, wherever they run in your cluster.
+    - to:
+        - ipBlock:
+            cidr: 10.0.0.0/8
+      ports:
+        - protocol: TCP
+          port: 5432
+        - protocol: TCP
+          port: 8080
+    # The Prometheus the allowlist names.
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: monitoring
+      ports:
+        - protocol: TCP
+          port: 9090

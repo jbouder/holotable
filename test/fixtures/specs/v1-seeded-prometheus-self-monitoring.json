@@ -1,0 +1,131 @@
+{
+  "specVersion": 1,
+  "title": "Holotable self-monitoring (Prometheus)",
+  "timeRange": {
+    "from": "now-1h",
+    "to": "now"
+  },
+  "refreshIntervalMs": 15000,
+  "panels": [
+    {
+      "id": "tick-p95",
+      "title": "Poller tick p95 (s)",
+      "description": "95th percentile wall time of a dashboard poller tick, from the histogram's buckets.",
+      "viz": "line",
+      "query": {
+        "sourceId": "prometheus-self",
+        "promql": "histogram_quantile(0.95, sum by (le) (rate(holotable_poller_tick_duration_seconds_bucket[5m])))"
+      },
+      "format": "number",
+      "layout": {
+        "x": 0,
+        "y": 0,
+        "w": 6,
+        "h": 3
+      }
+    },
+    {
+      "id": "query-latency",
+      "title": "Query latency by source (ms)",
+      "description": "Mean wall time of one guarded query, per source: the rate of the summed seconds over the rate of the count.",
+      "viz": "line",
+      "query": {
+        "sourceId": "prometheus-self",
+        "promql": "1000 * sum by (source) (rate(holotable_query_duration_seconds_sum[5m])) / sum by (source) (rate(holotable_query_duration_seconds_count[5m]))"
+      },
+      "format": "ms",
+      "layout": {
+        "x": 6,
+        "y": 0,
+        "w": 6,
+        "h": 3
+      }
+    },
+    {
+      "id": "resident-memory",
+      "title": "Resident memory",
+      "description": "The app process's resident set size, the one series that is live from boot.",
+      "viz": "area",
+      "query": {
+        "sourceId": "prometheus-self",
+        "promql": "max(holotable_process_resident_memory_bytes)"
+      },
+      "format": "bytes",
+      "layout": {
+        "x": 0,
+        "y": 3,
+        "w": 6,
+        "h": 3
+      }
+    },
+    {
+      "id": "sse-subscribers",
+      "title": "Live viewers",
+      "description": "Browsers attached to a dashboard's event stream, summed across dashboards.",
+      "viz": "line",
+      "query": {
+        "sourceId": "prometheus-self",
+        "promql": "sum(holotable_sse_subscribers)"
+      },
+      "format": "number",
+      "layout": {
+        "x": 6,
+        "y": 3,
+        "w": 3,
+        "h": 3
+      }
+    },
+    {
+      "id": "pollers-active",
+      "title": "Active pollers",
+      "viz": "stat",
+      "query": {
+        "sourceId": "prometheus-self",
+        "promql": "max(holotable_pollers_active)",
+        "instant": true
+      },
+      "format": "number",
+      "layout": {
+        "x": 9,
+        "y": 3,
+        "w": 3,
+        "h": 3
+      }
+    },
+    {
+      "id": "llm-tokens",
+      "title": "Model tokens per 5 minutes",
+      "description": "Tokens billed by direction. Empty until a generate or chat request runs.",
+      "viz": "bar",
+      "query": {
+        "sourceId": "prometheus-self",
+        "promql": "sum by (direction) (increase(holotable_llm_tokens_total[5m]))",
+        "minStep": "5m"
+      },
+      "format": "number",
+      "layout": {
+        "x": 0,
+        "y": 6,
+        "w": 6,
+        "h": 3
+      }
+    },
+    {
+      "id": "sql-rejections",
+      "title": "SQL guard rejections by reason, last hour",
+      "description": "Statements the SQL guard refused in the last hour, by reason.",
+      "viz": "table",
+      "query": {
+        "sourceId": "prometheus-self",
+        "promql": "sum by (reason) (increase(holotable_sql_validation_rejections_total[1h]))",
+        "instant": true
+      },
+      "layout": {
+        "x": 6,
+        "y": 6,
+        "w": 6,
+        "h": 3
+      }
+    }
+  ]
+}

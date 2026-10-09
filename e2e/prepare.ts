@@ -1,5 +1,5 @@
 import { execFileSync } from "node:child_process";
-import { DATABASE_URL, KC_PORT, PG_PORT } from "./env";
+import { APP_PORT, DATABASE_URL, KC_PORT, PG_PORT, PROM_PORT, SCRAPE_TOKEN } from "./env";
 
 /**
  * Bring the dependencies up and the schema current, before Playwright starts
@@ -15,6 +15,9 @@ const env = {
   ...process.env,
   E2E_PG_PORT: String(PG_PORT),
   E2E_KC_PORT: String(KC_PORT),
+  E2E_PROM_PORT: String(PROM_PORT),
+  E2E_PORT: String(APP_PORT),
+  E2E_SCRAPE_TOKEN: SCRAPE_TOKEN,
 };
 
 if (process.env.E2E_SKIP_COMPOSE !== "1") {

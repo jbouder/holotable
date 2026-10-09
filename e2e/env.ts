@@ -14,6 +14,12 @@ import { join } from "node:path";
 export const APP_PORT = Number(process.env.E2E_PORT || 3107);
 export const PG_PORT = Number(process.env.E2E_PG_PORT || 55433);
 export const KC_PORT = Number(process.env.E2E_KC_PORT || 18181);
+/** The stack's Prometheus (#390), which scrapes the app on the host. */
+export const PROM_PORT = Number(process.env.E2E_PROM_PORT || 19190);
+/** The bearer the stack's Prometheus scrapes `/api/metrics` with. Not a secret. */
+export const SCRAPE_TOKEN = "e2e-scrape-token-0123456789";
+/** Where the app and the seeder reach that Prometheus. */
+export const PROM_URL = `http://localhost:${PROM_PORT}`;
 
 export const BASE_URL = `http://localhost:${APP_PORT}`;
 export const ISSUER = `http://localhost:${KC_PORT}/realms/holotable`;
@@ -74,8 +80,11 @@ export const APP_ENV: Record<string, string> = {
   DEFAULT_REFRESH_INTERVAL_MS: "2000",
   MIN_REFRESH_INTERVAL_MS: "1000",
   LOG_LEVEL: "warn",
-  METRICS_TOKEN: "",
+  // The stack's Prometheus scrapes the app (#390), so the gate is open to it.
+  METRICS_TOKEN: SCRAPE_TOKEN,
   METRICS_ALLOWED_CIDRS: "",
+  // And a Prometheus source may reach it: loopback, so it has to be named.
+  SOURCE_URL_ALLOWLIST: "localhost",
 };
 
 /** The looping seeder (scripts/seed.ts): demo sources, dashboards and rows. */
@@ -88,4 +97,6 @@ export const SEED_ENV: Record<string, string> = {
   SEED_DEMO: "true",
   SEED_INTERVAL_MS: "1000",
   SEED_BACKFILL: "30m",
+  // The seeded `prometheus-self` source (#390) asks the stack's Prometheus.
+  PROMETHEUS_SELF_URL: PROM_URL,
 };

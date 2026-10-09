@@ -321,7 +321,7 @@ issue and make the case first, rather than arriving with it already written.
   function with a plain test.
 - **Draft PRs** are fine and encouraged for work you want early eyes on.
 
-Files under `src/lib/sql/`, `src/lib/auth/`, `src/lib/secrets/`,
+Files under `src/lib/sql/`, `src/lib/promql/`, `src/lib/auth/`, `src/lib/secrets/`,
 `src/lib/ir.ts`, `src/lib/ir/`, `src/lib/time.ts`, `src/lib/registry.ts`,
 `src/lib/metrics-access.ts`, `src/lib/row-scope.ts`, `src/lib/variables.ts`,
 `src/lib/variable-selection.ts`, `src/lib/ai/base-url.ts` and
@@ -365,6 +365,9 @@ request:
 | `src/lib/ir.ts`, `src/lib/ir/` (the IR, `SPEC_VERSION`, an upgrader) | `concepts/the-shared-ir.md`, invariant 3 in `architecture/invariants.md` |
 | `src/lib/panels/` (a panel kind or its options) | `reference/panel-options.md`, "Panel kinds" in `concepts/streaming-and-rendering.md`. The visualization list is generated |
 | `src/lib/sql/safety.ts`, `ast.ts`, `denylist.ts` (the guard) | `concepts/executing-a-panel.md`, invariants 7 and 8, the trust model in `SECURITY.md` |
+| `src/lib/promql/` (the PromQL guard, its rewrites, the plan) | `concepts/executing-a-panel.md` ("The PromQL guard"), `concepts/prometheus-sources.md`, invariants 7 and 8, the trust model in `SECURITY.md`, the skill's `references/promql-rules.md` |
+| `src/lib/sources/` (a source kind, its config or its server half) | `concepts/prometheus-sources.md`, `architecture/data-model.md` (`sources`), ADR 2 in `architecture/decisions/` |
+| `src/lib/prometheus/` (the client, discovery, the connection test) | `operations/prometheus.md`, `concepts/prometheus-sources.md` |
 | `src/lib/sql/row-filter.ts`, `src/lib/row-scope.ts` | `operations/row-level-filters.md`, invariant 8a |
 | `src/lib/sql/variables.ts`, `src/lib/variables.ts`, `variable-selection.ts` | `concepts/variables.md` |
 | `src/lib/drilldown.ts`, `drilldown-targets.ts`, `drilldown-datum.ts`, `panel.links` in `ir.ts` | `concepts/drilldown.md` |
@@ -382,10 +385,10 @@ request:
 | `keycloak/holotable-realm.json` | `operations/keycloak.md` (the local realm, its users, client settings) |
 | A color token in `src/app/globals.css` | The contrast table in `architecture/accessibility.md` (`test/contrast.test.ts` fails until it matches) |
 | `src/lib/ai/` (a provider, including `stub`) | `operations/ai-provider.md` |
-| `src/lib/ir.ts`, a panel kind, a color token, or a guard rule in `src/lib/sql/` | The skill's `.claude/skills/holotable/references/` and `examples/` (`test/holotable-skill.test.ts` holds its examples and lists to the code) |
+| `src/lib/ir.ts`, a panel kind, a color token, or a guard rule in `src/lib/sql/` or `src/lib/promql/` | The skill's `.claude/skills/holotable/references/` and `examples/` (`test/holotable-skill.test.ts` holds its examples and lists to the code) |
 | `docker-compose.yml`, `deploy/quickstart/` | `getting-started/quick-start.md`, the quick start in `README.md` |
 | `deploy/helm/holotable/` | `operations/kubernetes.md`, the chart's own `README.md` |
-| `scripts/seed.ts`, `scripts/self-metrics.ts` | `getting-started/demo-data.md` |
+| `scripts/seed.ts`, `scripts/self-metrics.ts`, `scripts/smoke.ts`, `src/lib/self-monitoring/` | `getting-started/demo-data.md` |
 | A `package.json` script | `getting-started/quick-start.md` (Scripts), `AGENTS.md` (Development workflow) |
 
 Paths in the table are under `docs/src/content/docs/` unless they say

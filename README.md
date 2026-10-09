@@ -5,7 +5,8 @@
 Natural-language monitoring dashboards. Describe what you want to see; a language
 model authors a **validated visualization spec** (SQL + chart config) — never the
 data itself — and Holotable executes the guarded SQL against TimescaleDB and
-streams the results live.
+streams the results live. Prometheus-compatible endpoints are sources too, with
+panels written in guarded PromQL.
 
 **Stack:** Next.js 16 (App Router) · TypeScript · Tailwind v4 · Base UI · ECharts ·
 TimescaleDB/PostgreSQL · Vercel AI SDK · Keycloak OIDC · Server-Sent Events. One

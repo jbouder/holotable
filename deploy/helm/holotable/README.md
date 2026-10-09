@@ -82,6 +82,12 @@ Three wirings, each a runnable values file in [`examples/`](examples):
 | Vault, through the Agent injector | `values-vault-agent.yaml` | Vault, no operator |
 | Secrets Store CSI driver | `values-secrets-store-csi.yaml` | AWS/Azure/GCP/Vault CSI |
 
+One more example is not a wiring but a source: `values-prometheus-source.yaml`
+lets source admins register an in-cluster Prometheus, with
+`SOURCE_URL_ALLOWLIST` naming it, a bearer-token `secret_ref`, and a network
+policy whose egress rule names the same endpoint. See
+[Prometheus sources](https://holotable-docs.vibeproject.workers.dev/operations/prometheus/).
+
 `secrets.create` exists as a fourth option and is off for a reason: it puts
 credentials in your values file, and therefore in `helm get values` and in
 whatever stores your release history. It is also rendered as a hook (see

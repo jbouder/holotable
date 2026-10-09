@@ -197,6 +197,9 @@ const kind: ServerSourceKind = {
           form,
           {
             timeoutMs: plan.timeoutMs,
+            // The label-values endpoint answers GET only: Prometheus says 405
+            // to a POST, which a fake that accepts both would never show.
+            method: "GET",
           },
         ),
       ),

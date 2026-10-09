@@ -294,3 +294,38 @@ test("the browser view lists metrics, types, help and labels, and nothing about 
   ]);
   assert.ok(!JSON.stringify(view).includes(fake.url));
 });
+
+test("a label-values variable asks with GET, which is all the endpoint answers (#390)", async () => {
+  fake.seen.length = 0;
+  // As Prometheus does: the label-values endpoint is GET-only.
+  fake.handle = (r) =>
+    r.path === "/api/v1/label/instance/values"
+      ? r.method === "GET"
+        ? success(["b:9100", "a:9100", "a:9100"])
+        : { status: 405, text: "Method Not Allowed" }
+      : { status: 404, json: { status: "error" } };
+  const source = {
+    id: "prom",
+    workspaceId: "ws",
+    name: "Prom",
+    kind: "prometheus",
+    config: cfg([{ name: "up", type: "gauge", labels: ["instance", "job"] }]),
+    secretRef: null,
+    catalogRefreshedAt: null,
+    catalogMissingTables: [],
+    createdBy: "u",
+    createdAt: "",
+    updatedAt: "",
+    tombstonedAt: null,
+  } as unknown as SourceRecord;
+  const values = await serverKind(source).labelValues(
+    source,
+    { sourceId: "prom", label: "instance" },
+    null,
+  );
+  assert.deepEqual(values, ["a:9100", "b:9100"]);
+  const [request] = fake.seen;
+  assert.equal(request.method, "GET");
+  // Without a match of its own, the values come from the allowlisted metrics.
+  assert.deepEqual(request.query.getAll("match[]"), ['{__name__=~"^(up)$"}']);
+});

@@ -7,6 +7,11 @@ import {
   selfMonitoringSpec,
 } from "@/lib/self-monitoring/dashboard";
 import {
+  PROMETHEUS_SELF_SOURCE_ID,
+  prometheusSelfConfig,
+  prometheusSelfMonitoringSpec,
+} from "@/lib/self-monitoring/prometheus";
+import {
   backfillChunks,
   backfillStart,
   type HttpRequestRow,
@@ -58,16 +63,30 @@ function demoConnection() {
  */
 async function upsertSource(
   pg: Client,
-  source: { id: string; name: string; config: unknown },
+  source: {
+    id: string;
+    name: string;
+    config: unknown;
+    /** `timescaledb` unless said; a Prometheus source says so (#390). */
+    kind?: string;
+    /** The demo databases' credential; `null` for an unauthenticated endpoint. */
+    secretRef?: string | null;
+  },
 ) {
   await pg.query(
     `INSERT INTO sources (id, workspace_id, name, kind, config, secret_ref, created_by, catalog_refreshed_at)
-     VALUES ($1, 'demo', $2, 'timescaledb', $3, 'TS_METRICS', 'seed', now())
+     VALUES ($1, 'demo', $2, $4, $3, $5, 'seed', now())
      ON CONFLICT (id) DO UPDATE
        SET name = EXCLUDED.name, kind = EXCLUDED.kind, config = EXCLUDED.config,
            secret_ref = EXCLUDED.secret_ref, tombstoned_at = NULL,
            catalog_refreshed_at = now(), catalog_missing_tables = '{}'`,
-    [source.id, source.name, JSON.stringify(source.config)],
+    [
+      source.id,
+      source.name,
+      JSON.stringify(source.config),
+      source.kind ?? "timescaledb",
+      source.secretRef === undefined ? "TS_METRICS" : source.secretRef,
+    ],
   );
 }
 
@@ -134,10 +153,29 @@ async function ensureDemo() {
       config: selfMonitoringConfig(demoConnection()),
     });
 
+    // The same instruments through the compose stack's Prometheus (#390),
+    // which scrapes /api/metrics itself. Unauthenticated on the compose
+    // network, so no secret_ref; the app reaches it only because
+    // SOURCE_URL_ALLOWLIST names its host. Only where there is a Prometheus
+    // to ask: compose and `.env.example` set PROMETHEUS_SELF_URL, and the
+    // quick-start image, which has none, does not.
+    const promUrl = process.env.PROMETHEUS_SELF_URL;
+    if (promUrl) {
+      const promConfig = prometheusSelfConfig(promUrl);
+      await upsertSource(pg, {
+        id: PROMETHEUS_SELF_SOURCE_ID,
+        name: "Holotable self-monitoring (Prometheus)",
+        kind: promConfig.kind,
+        config: promConfig,
+        secretRef: null,
+      });
+    }
+
     await ensureDashboard(pg, demoSpec());
     await ensureDashboard(pg, systemSpec());
     await ensureDashboard(pg, fleetSpec());
     await ensureDashboard(pg, selfMonitoringSpec());
+    if (promUrl) await ensureDashboard(pg, prometheusSelfMonitoringSpec());
   } finally {
     await pg.end();
   }

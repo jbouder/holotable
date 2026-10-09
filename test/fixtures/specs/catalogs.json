@@ -340,5 +340,61 @@
       "label": "tenant",
       "claim": "tenant"
     }
+  },
+  "prometheus-self": {
+    "metrics": [
+      {
+        "name": "up",
+        "labels": ["instance", "job"]
+      },
+      {
+        "name": "holotable_poller_tick_duration_seconds_bucket",
+        "labels": ["dashboard", "instance", "job", "le"]
+      },
+      {
+        "name": "holotable_poller_tick_duration_seconds_count",
+        "labels": ["dashboard", "instance", "job"]
+      },
+      {
+        "name": "holotable_poller_tick_duration_seconds_sum",
+        "labels": ["dashboard", "instance", "job"]
+      },
+      {
+        "name": "holotable_query_duration_seconds_bucket",
+        "labels": ["instance", "job", "le", "outcome", "source"]
+      },
+      {
+        "name": "holotable_query_duration_seconds_count",
+        "labels": ["instance", "job", "outcome", "source"]
+      },
+      {
+        "name": "holotable_query_duration_seconds_sum",
+        "labels": ["instance", "job", "outcome", "source"]
+      },
+      {
+        "name": "holotable_sse_subscribers",
+        "labels": ["dashboard", "instance", "job"]
+      },
+      {
+        "name": "holotable_pollers_active",
+        "labels": ["instance", "job"]
+      },
+      {
+        "name": "holotable_llm_tokens_total",
+        "labels": ["direction", "instance", "job", "model", "workspace"]
+      },
+      {
+        "name": "holotable_sql_validation_rejections_total",
+        "labels": ["instance", "job", "reason"]
+      },
+      {
+        "name": "holotable_promql_validation_rejections_total",
+        "labels": ["instance", "job", "reason"]
+      },
+      {
+        "name": "holotable_process_resident_memory_bytes",
+        "labels": ["instance", "job"]
+      }
+    ]
   }
 }

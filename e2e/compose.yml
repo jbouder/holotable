@@ -1,5 +1,5 @@
 # The end-to-end suite's dependencies (#88): TimescaleDB with the demo metrics
-# schema, and Keycloak with the dev realm. A project of its own, on ports of
+# schema, Keycloak with the dev realm, and Prometheus scraping the app (#390). A project of its own, on ports of
 # its own, so `npm run e2e` never writes into the database or the realm a
 # contributor develops against. The app is not in here: Playwright builds and
 # starts it on the host (e2e/playwright.config.ts), because the production
@@ -60,3 +60,41 @@ services:
       interval: 3s
       timeout: 3s
       retries: 60
+
+  # Scrapes the app on the host every two seconds, so a Prometheus source has
+  # live series within a test's patience (#390). Its own metrics too, which
+  # give `up` a second series.
+  prometheus:
+    image: prom/prometheus:v3.1.0
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --web.listen-address=:${E2E_PROM_PORT:-19190}
+      - --storage.tsdb.retention.time=1h
+    ports:
+      - "${E2E_PROM_PORT:-19190}:${E2E_PROM_PORT:-19190}"
+    configs:
+      - source: prometheus_config
+        target: /etc/prometheus/prometheus.yml
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:${E2E_PROM_PORT:-19190}/-/ready"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+
+configs:
+  prometheus_config:
+    content: |
+      global:
+        scrape_interval: 2s
+      scrape_configs:
+        - job_name: holotable
+          metrics_path: /api/metrics
+          authorization:
+            credentials: "${E2E_SCRAPE_TOKEN:-e2e-scrape-token-0123456789}"
+          static_configs:
+            - targets: ["host.docker.internal:${E2E_PORT:-3107}"]
+        - job_name: prometheus
+          static_configs:
+            - targets: ["127.0.0.1:${E2E_PROM_PORT:-19190}"]

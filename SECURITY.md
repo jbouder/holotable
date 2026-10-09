@@ -71,6 +71,14 @@ whole row, or through a column alias list or `NATURAL JOIN`. It is then
 wrapped by `buildExecutablePlan` as a subquery, so the validated text cannot
 escape the wrapper.
 
+Generated PromQL, for a Prometheus source, goes through `validatePromql`
+(`src/lib/promql/safety.ts`): parsed with the Prometheus project's own grammar,
+it must be one expression of allowlisted node types in which every selector
+names exactly one metric on the source's allowlist. The `@` modifier and
+comments are refused, and ranges and offsets are bounded. A variable value and
+the viewer's tenant matcher are written in only as escaped label-matcher
+literals, and each rewrite is re-parsed and compared with the original tree.
+
 **User prompts.** A prompt reaches the model, and the model's output is
 untrusted regardless of what the prompt asked for. Every guard above applies
 identically whether the SQL was suggested by a prompt or invented by the model.
@@ -87,6 +95,20 @@ and the catalog is fenced between markers that carry a random per-call token
 (`src/lib/ai/untrusted.ts`), so a name cannot break out of the data block; the
 stored panel specs in the dashboard chat prompt get the same treatment. The
 model's output is untrusted anyway, which is what ultimately contains this.
+
+**A Prometheus endpoint, and the URL that names it.** A source admin types a
+Prometheus source's URL, and the server then sends it queries, with the
+source's credential when it has one. The URL is held to the rules a model base
+URL is: `https` only, public addresses only (checked on every address the name
+resolves to and again on each connection), no credentials in it, and no
+redirects followed. The one exception is the operator's `SOURCE_URL_ALLOWLIST`,
+a list of hosts and ranges a source URL may reach although they are not public,
+which is the control for an in-cluster Prometheus. It is one list for every
+workspace, so an endpoint that must stay one tenant's should require auth
+behind a `secret_ref` only that workspace is granted. What the endpoint answers
+is untrusted too: metric names, help text and labels from discovery are
+catalog metadata (above), a result is capped in series, points and bytes, and a
+native histogram is refused rather than drawn.
 
 **Workspace prompt customization.** A source-admin can add a glossary, metric
 definitions and example panels to every generation in their workspace (#66).

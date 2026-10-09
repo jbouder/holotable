@@ -79,6 +79,7 @@ export default defineConfig({
             { label: "Dashboard variables", slug: "concepts/variables" },
             { label: "Annotations", slug: "concepts/annotations" },
             { label: "Drilldown", slug: "concepts/drilldown" },
+            { label: "Prometheus sources", slug: "concepts/prometheus-sources" },
           ],
         },
         {
@@ -107,6 +108,7 @@ export default defineConfig({
             { label: "Demo mode", slug: "operations/demo-mode" },
             { label: "Hosted demo on Cloudflare", slug: "operations/cloudflare-demo" },
             { label: "Source secret references", slug: "operations/secret-references" },
+            { label: "Prometheus sources", slug: "operations/prometheus" },
             { label: "Row-level filters", slug: "operations/row-level-filters" },
             { label: "Share links and embedding", slug: "operations/share-links" },
             { label: "Service-account API tokens", slug: "operations/api-tokens" },
