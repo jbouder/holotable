@@ -130,11 +130,18 @@ async function main(): Promise<void> {
       if (!res.rows[0])
         throw new Error(`the spec reads source "${id}", which does not exist`);
       const config = SourceConfig.parse(res.rows[0].config);
-      catalogs[args.renames.get(id) ?? id] = {
-        schema: config.schema,
-        tables: config.tables,
-        ...(config.rowFilter ? { rowFilter: config.rowFilter } : {}),
-      };
+      // A catalog is the allowlist alone: tables for SQL, metrics for PromQL.
+      catalogs[args.renames.get(id) ?? id] =
+        "tables" in config
+          ? {
+              schema: config.schema,
+              tables: config.tables,
+              ...(config.rowFilter ? { rowFilter: config.rowFilter } : {}),
+            }
+          : {
+              metrics: config.metrics.map((m) => ({ name: m.name, labels: m.labels })),
+              ...(config.rowFilter ? { rowFilter: config.rowFilter } : {}),
+            };
     }
 
     const path = addFixture({

@@ -327,7 +327,14 @@ test("a rejected query is reported as the statement it is", async () => {
         secretRef: "TS",
         tombstonedAt: null,
         kind: "timescaledb",
-        config: { host: "h", port: 5432, database: "d", schema: "public", tables: [] },
+        config: {
+          kind: "timescaledb",
+          host: "h",
+          port: 5432,
+          database: "d",
+          schema: "public",
+          tables: [],
+        },
       }) as unknown as SourceRecord,
   );
   const events = await executor(

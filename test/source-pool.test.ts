@@ -3,7 +3,11 @@ import { EventEmitter } from "node:events";
 import { test } from "node:test";
 import type { Pool, PoolConfig } from "pg";
 import { config as appConfig } from "@/lib/config";
-import { type SourceRecord, SourceConfig } from "@/lib/registry";
+import {
+  type SqlSourceRecord,
+  type SqlSourceConfig,
+  TimescaleDbConfig,
+} from "@/lib/registry";
 import { secretRefEnvVars } from "@/lib/secret-refs";
 import { SecretRefError } from "@/lib/secrets/credentials";
 import type { ExecutablePlan } from "@/lib/sql/safety";
@@ -36,13 +40,16 @@ function grant(password = "first") {
   process.env[vars.password] = password;
 }
 
-function source(overrides: Partial<SourceConfig> = {}, id = "src-pool"): SourceRecord {
+function source(
+  overrides: Partial<SqlSourceConfig> = {},
+  id = "src-pool",
+): SqlSourceRecord {
   return {
     id,
     workspaceId: WORKSPACE,
     name: "pool",
     kind: "timescaledb",
-    config: SourceConfig.parse({
+    config: TimescaleDbConfig.parse({
       host: "db",
       port: 5432,
       database: "metrics",

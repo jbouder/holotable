@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { ColumnImpact, describeHideImpact } from "@/lib/catalog/browse";
 import { hiddenColumnImpact, type PanelStatement } from "@/lib/catalog/hide-impact";
 import { renderMetrics, resetMetricsForTests } from "@/lib/metrics";
-import { SourceConfig } from "@/lib/registry";
+import { type SqlSourceConfig, TimescaleDbConfig } from "@/lib/registry";
 import { checkSql, validateSql } from "@/lib/sql/safety";
 
 /**
@@ -12,7 +12,7 @@ import { checkSql, validateSql } from "@/lib/sql/safety";
  * without their SQL.
  */
 
-const config = SourceConfig.parse({
+const config = TimescaleDbConfig.parse({
   host: "postgres",
   port: 5432,
   database: "holotable",
@@ -82,7 +82,7 @@ test("the panels the guard would start refusing, grouped by dashboard, in order"
 test("the verdict agrees with validateSql after the change, panel by panel", async () => {
   const dashboards = await hiddenColumnImpact(config, PANELS, "http_requests", "route");
   const flagged = new Set(dashboards?.flatMap((d) => d.panels.map((p) => p.id)));
-  const hidden = SourceConfig.parse({
+  const hidden = TimescaleDbConfig.parse({
     ...config,
     tables: [
       {

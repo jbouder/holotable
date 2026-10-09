@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import type { SourceConfig } from "@/lib/registry";
+import type { SqlSourceConfig } from "@/lib/registry";
 import type { GrantedSecretRefsState } from "@/lib/secret-refs";
 import { SourceForm, type SourceFormValues } from "@/app/data-sources/source-form";
 import { mount } from "./support/dom";
@@ -15,7 +15,7 @@ import { mount } from "./support/dom";
  * grants nothing says so instead of offering a ref that cannot resolve.
  */
 
-function config(): SourceConfig {
+function config(): SqlSourceConfig {
   return {
     kind: "timescaledb",
     host: "timescaledb",

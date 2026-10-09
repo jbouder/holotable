@@ -1,5 +1,5 @@
 import { setColumnExposure } from "@/lib/catalog/browse";
-import type { SourceConfig } from "@/lib/registry";
+import type { SqlSourceConfig } from "@/lib/registry";
 import type { ImpactDashboard } from "@/lib/source-impact";
 import { checkSql } from "@/lib/sql/safety";
 
@@ -33,7 +33,7 @@ export interface PanelStatement {
  * and titles only; the SQL stays here.
  */
 export async function hiddenColumnImpact(
-  config: SourceConfig,
+  config: SqlSourceConfig,
   panels: PanelStatement[],
   table: string,
   column: string,

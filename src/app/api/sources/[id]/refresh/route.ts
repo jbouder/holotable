@@ -6,7 +6,8 @@ import { audit } from "@/lib/audit";
 import { getSourceById, updateSource } from "@/lib/db/repo";
 import { catalogHealth } from "@/lib/catalog/health";
 import { diffCatalog } from "@/lib/catalog/refresh";
-import { serverKind } from "@/lib/sources/server/registry";
+import { requireSqlSource } from "@/lib/sources/server/http";
+import { sqlManagement } from "@/lib/sources/server/registry";
 
 export const runtime = "nodejs";
 export const maxDuration = 30;
@@ -51,10 +52,10 @@ export const POST = route(
     );
     const { digest: confirmed } = await readJson(req, Body);
 
-    const kind = serverKind(source);
-    const refresh = await kind.refresh(source);
-    const diff = diffCatalog(source, refresh);
-    const digest = kind.refreshDigest(refresh);
+    const sql = requireSqlSource(source, "Refreshing the catalog");
+    const refresh = await sqlManagement.refresh(sql);
+    const diff = diffCatalog(sql, refresh);
+    const digest = sqlManagement.refreshDigest(refresh);
 
     if (confirmed === undefined) {
       return json({ diff, digest }, { headers: { "cache-control": "no-store" } });

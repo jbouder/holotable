@@ -7,9 +7,9 @@ import {
   CatalogTable,
   MAX_COLUMNS,
   MAX_TABLES,
-  SourceConfig,
+  type SqlSourceConfig,
   type SourceConnection,
-  type SourceRecord,
+  type SqlSourceRecord,
 } from "@/lib/registry";
 import { resolveCredentials } from "@/lib/secrets/credentials";
 import { TimescaleDbConfig } from "@/lib/sources/kinds/timescaledb";
@@ -47,7 +47,7 @@ const MAX = {
  * Leaving it out of the prompt is the courtesy; `validateSql` refusing it is
  * the control.
  */
-export function renderCatalog(source: SourceRecord): string {
+export function renderCatalog(source: SqlSourceRecord): string {
   const f = sanitizePromptField;
   const lines: string[] = [];
   lines.push(
@@ -80,7 +80,7 @@ export function renderCatalog(source: SourceRecord): string {
  * standing instruction that the contents are data, then the sanitized catalog
  * between markers that carry a random per-call token.
  */
-export function buildCatalogPrompt(source: SourceRecord): string {
+export function buildCatalogPrompt(source: SqlSourceRecord): string {
   return fenceUntrustedBlock("CATALOG", renderCatalog(source));
 }
 
@@ -107,7 +107,7 @@ function catalogClient(
  * columns — the menu a source author picks an allowlist from.
  *
  * This is *not* an allowlist and never becomes one on its own: nothing here
- * reaches `SourceConfig` until the author selects a table and the create/update
+ * reaches `SqlSourceConfig` until the author selects a table and the create/update
  * route validates it. `information_schema` already scopes its rows to what the
  * connecting role has privileges on, and that role is the read-only one named
  * by `secret_ref`, so discovery can show no more than execution could read.
@@ -187,7 +187,7 @@ export function refreshedColumns(
 
 /** What a refresh found: the re-read catalog, and what it could not find. */
 export interface CatalogRefresh {
-  config: SourceConfig;
+  config: SqlSourceConfig;
   /**
    * Allowlisted tables `information_schema` returned no column for — dropped,
    * renamed, or no longer readable by the source's read-only role.
@@ -208,7 +208,7 @@ export interface CatalogRefresh {
  * which is what makes the source read `drifted` and what keeps those columns
  * out of the prompt (see {@link renderCatalog}).
  */
-export async function refreshCatalog(source: SourceRecord): Promise<CatalogRefresh> {
+export async function refreshCatalog(source: SqlSourceRecord): Promise<CatalogRefresh> {
   const client = catalogClient(source.config, source.secretRef, source.workspaceId);
 
   await client.connect();
@@ -234,7 +234,10 @@ export async function refreshCatalog(source: SourceRecord): Promise<CatalogRefre
             : existing.columns,
       });
     }
-    return { config: SourceConfig.parse({ ...source.config, tables }), missingTables };
+    return {
+      config: TimescaleDbConfig.parse({ ...source.config, tables }),
+      missingTables,
+    };
   } finally {
     await client.end();
   }

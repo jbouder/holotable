@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { sqlPlanOf } from "./support/plans";
 import { test } from "node:test";
 import type { LanguageModelUsage } from "ai";
 import type { GenerationFinish, OnGenerationFinish } from "@/lib/ai/generate";
@@ -11,7 +12,11 @@ import { type Dashboard, SPEC_VERSION } from "@/lib/ir";
 import { callTool, type McpTool } from "@/lib/mcp/tool";
 import { type McpDeps, MCP_INSTRUCTIONS, mcpTools } from "@/lib/mcp/tools";
 import { MAX_TOOL_ROWS } from "@/lib/mcp/tools/sql";
-import { SourceConfig, type SourceRecord } from "@/lib/registry";
+import {
+  type SqlSourceConfig,
+  type SqlSourceRecord,
+  TimescaleDbConfig,
+} from "@/lib/registry";
 import type { ExecutablePlan } from "@/lib/sql/safety";
 
 /**
@@ -24,14 +29,14 @@ import type { ExecutablePlan } from "@/lib/sql/safety";
 function makeSource(
   id: string,
   workspaceId = "ws-1",
-  overrides: Partial<SourceRecord> = {},
-): SourceRecord {
+  overrides: Partial<SqlSourceRecord> = {},
+): SqlSourceRecord {
   return {
     id,
     workspaceId,
     name: `Source ${id}`,
     kind: "timescaledb",
-    config: SourceConfig.parse({
+    config: TimescaleDbConfig.parse({
       host: "db.internal",
       port: 5432,
       database: "metrics",
@@ -174,7 +179,7 @@ function fakeDeps(
     listSources: async (workspaceId) =>
       sources.filter((s) => s.workspaceId === workspaceId && !s.tombstonedAt),
     executePlan: async (_source, plan) => {
-      calls.executed.push(plan);
+      calls.executed.push(sqlPlanOf(plan));
       return { columns: ["ts", "value"], rows };
     },
     listDashboards: async (workspaceId) =>
@@ -300,6 +305,7 @@ test("list_sources shows the caller's workspaces, and never a connection detail"
         id: "src-app",
         workspaceId: "ws-1",
         name: "Source src-app",
+        kind: "timescaledb",
         schema: "metrics",
         tableCount: 1,
         catalog: "ok",

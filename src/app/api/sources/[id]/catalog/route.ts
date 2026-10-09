@@ -2,6 +2,7 @@ import { z } from "zod";
 import { assertAuthorized, can, HttpError, requireIdentity } from "@/lib/auth/authorize";
 import { json, readJson, route } from "@/lib/http";
 import { audit } from "@/lib/audit";
+import { requireSqlSource } from "@/lib/sources/server/http";
 import { getSourceById, updateSource } from "@/lib/db/repo";
 import { catalogView, setColumnExposure } from "@/lib/catalog/browse";
 import { catalogHealth } from "@/lib/catalog/health";
@@ -30,8 +31,9 @@ export const GET = route(
     const scope = { workspaceId: source.workspaceId };
     assertAuthorized(identity, "source:use", scope, { type: "source", id });
     const canManage = can(identity, "source:manage", scope);
+    const sql = requireSqlSource(source, "Browsing the catalog");
     return json(
-      { view: catalogView(source, catalogHealth(source), canManage) },
+      { view: catalogView(sql, catalogHealth(sql), canManage) },
       { headers: NO_STORE },
     );
   },
@@ -69,8 +71,9 @@ export const PATCH = route(
       { type: "source", id },
     );
     const { table, column, exposed } = await readJson(req, ExposureBody);
+    const sql = requireSqlSource(source, "Hiding a column");
 
-    const next = setColumnExposure(source.config, table, column, exposed);
+    const next = setColumnExposure(sql.config, table, column, exposed);
     if (!next) throw new HttpError(404, `column not in catalog: ${table}.${column}`);
     const updated = await updateSource(source.workspaceId, id, {
       config: SourceConfig.parse(next),
@@ -84,8 +87,9 @@ export const PATCH = route(
       resource: { type: "source", id },
       detail: { fields: ["catalog"], table, column, exposed },
     });
+    const saved = requireSqlSource(updated, "Hiding a column");
     return json(
-      { view: catalogView(updated, catalogHealth(updated), true) },
+      { view: catalogView(saved, catalogHealth(saved), true) },
       { headers: NO_STORE },
     );
   },

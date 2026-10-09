@@ -7,7 +7,11 @@ import {
   describeCatalogHealth,
   liveCatalogTables,
 } from "@/lib/catalog/health";
-import { SourceConfig, type SourceRecord } from "@/lib/registry";
+import {
+  type SqlSourceConfig,
+  type SqlSourceRecord,
+  TimescaleDbConfig,
+} from "@/lib/registry";
 import { renderCatalog } from "@/lib/timescaledb/catalog";
 
 /**
@@ -19,13 +23,13 @@ import { renderCatalog } from "@/lib/timescaledb/catalog";
 
 const NOW = new Date("2026-09-22T12:00:00.000Z");
 
-function source(patch: Partial<SourceRecord> = {}): SourceRecord {
+function source(patch: Partial<SqlSourceRecord> = {}): SqlSourceRecord {
   return {
     id: "ts-metrics",
     workspaceId: "demo",
     name: "Metrics",
     kind: "timescaledb",
-    config: SourceConfig.parse({
+    config: TimescaleDbConfig.parse({
       host: "db.internal",
       port: 5432,
       database: "holotable",
@@ -47,7 +51,7 @@ function source(patch: Partial<SourceRecord> = {}): SourceRecord {
   };
 }
 
-const health = (s: SourceRecord, staleAfterDays = 30) =>
+const health = (s: SqlSourceRecord, staleAfterDays = 30) =>
   catalogHealth(s, { now: NOW, staleAfterDays });
 
 test("a freshly refreshed catalog is ok and does not block", () => {

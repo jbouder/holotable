@@ -92,6 +92,93 @@ export function buildQueryPlanView(input: {
   };
 }
 
+/**
+ * What a Prometheus endpoint would be asked for a PromQL panel (#385): the
+ * expression after the server's rewrites, and every parameter with what the
+ * server resolved it from. An explicit field list, like {@link QueryPlanView}:
+ * no URL, no auth mode, no header has a field to travel in.
+ */
+export interface PromqlPlanView {
+  /** The expression as the panel holds it. */
+  promql: string;
+  /** What the server sends: variables bound, the tenant matcher spliced in. */
+  executedPromql: string;
+  /** `query` (one instant) or `query_range`. */
+  endpoint: "query" | "query_range";
+  /** `start`, `end` and `step`, or `time`: the server's, never the panel's. */
+  params: { name: string; value: string; from: string }[];
+  /** The deadline the endpoint and the request are both given, in milliseconds. */
+  timeoutMs: number;
+  /** Bytes after which the server stops reading the answer. */
+  maxResultBytes: number;
+  /** The most series a result may hold. */
+  maxSeries: number;
+}
+
+/** Either language's plan view; the field that holds the statement says which. */
+export type AnyPlanView = QueryPlanView | PromqlPlanView;
+
+/** Assemble the PromQL view from the plan and the pieces it was built from. */
+export function buildPromqlPlanView(input: {
+  promql: string;
+  minStep?: string;
+  timeRange: TimeRange;
+  plan:
+    | {
+        instant: false;
+        expr: string;
+        start: Date;
+        end: Date;
+        stepSeconds: number;
+        timeoutMs: number;
+      }
+    | { instant: true; expr: string; time: Date; timeoutMs: number };
+  /** The claim the source's tenant label binds, when it has one (#31). */
+  rowFilterClaim?: string;
+  limits: { maxResultBytes: number; maxSeries: number };
+}): PromqlPlanView {
+  const { plan } = input;
+  const params = plan.instant
+    ? [{ name: "time", value: plan.time.toISOString(), from: input.timeRange.to }]
+    : [
+        {
+          name: "start",
+          value: plan.start.toISOString(),
+          from: `${input.timeRange.from}, aligned to the step`,
+        },
+        {
+          name: "end",
+          value: plan.end.toISOString(),
+          from: `${input.timeRange.to}, aligned to the step`,
+        },
+        {
+          name: "step",
+          value: `${plan.stepSeconds}s`,
+          from: input.minStep
+            ? `the window, at least the panel's minStep of ${input.minStep}`
+            : "the window",
+        },
+      ];
+  return {
+    promql: input.promql,
+    executedPromql: plan.expr,
+    endpoint: plan.instant ? "query" : "query_range",
+    params: input.rowFilterClaim
+      ? [
+          ...params,
+          {
+            name: "tenant",
+            value: "(your value)",
+            from: `your "${input.rowFilterClaim}" claim`,
+          },
+        ]
+      : params,
+    timeoutMs: plan.timeoutMs,
+    maxResultBytes: input.limits.maxResultBytes,
+    maxSeries: input.limits.maxSeries,
+  };
+}
+
 /** Parameters are instants; anything else is rendered rather than trusted. */
 function instant(value: unknown): string {
   if (value instanceof Date) return value.toISOString();

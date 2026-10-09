@@ -299,7 +299,8 @@ test("a multi-value pick needs a regex matcher, and every reference needs a valu
   );
   assert.throws(
     () => bindPromqlVariables('up{instance=":host"}', {}, LIMITS),
-    (err) => err instanceof Error && /variable :host is not declared/.test(err.message),
+    (err) =>
+      err instanceof VariableError && err.message === "no value for variable :host",
   );
   assert.throws(
     () => bindPromqlVariables('up{instance=~":hosts"}', { hosts: [] }, LIMITS),
@@ -377,8 +378,8 @@ test("the plan binds the variables, then the tenant, and takes its time from the
     plan.expr,
     'sum(rate(http_requests_total{host="web-1", tenant="acme"}[5m]))',
   );
-  assert.equal(plan.start, FROM);
-  assert.equal(plan.end, TO);
+  assert.equal(plan.start.getTime(), FROM.getTime());
+  assert.equal(plan.end.getTime(), TO.getTime());
   assert.equal(plan.stepSeconds, stepSecondsFor(FROM, TO));
   assert.ok(plan.timeoutMs > 0);
 });
@@ -400,13 +401,28 @@ test("an instant plan asks for one time, the end of the window", () => {
   });
 });
 
-test("the step covers the window in the points a browser keeps, raised by minStep", () => {
+test("the step covers the window in at most 1,000 points, never under 15s, raised by minStep", () => {
   const day = new Date(TO.getTime() - 86_400_000);
-  assert.equal(stepSecondsFor(day, TO), 120); // 86,400 s over the default 720 points
-  assert.equal(stepSecondsFor(FROM, TO), 5);
+  assert.equal(stepSecondsFor(day, TO), 87); // 86,400 s over 1,000 points, rounded up
+  assert.equal(stepSecondsFor(FROM, TO), 15); // an hour is under the 15 s floor
   assert.equal(stepSecondsFor(FROM, TO, "1m"), 60);
-  assert.equal(stepSecondsFor(FROM, TO, "1s"), 5);
-  assert.equal(stepSecondsFor(TO, TO), 1);
+  assert.equal(stepSecondsFor(FROM, TO, "1s"), 15);
+  assert.equal(stepSecondsFor(TO, TO), 15);
+});
+
+test("a range plan's window is aligned to its step", () => {
+  const plan = buildPromqlPlan({
+    promql: "up",
+    from: new Date("2026-10-09T11:00:07Z"),
+    to: new Date("2026-10-09T12:00:07Z"),
+    rowFilter: null,
+    limits: LIMITS,
+  });
+  assert.equal(plan.instant, false);
+  if (plan.instant) return;
+  assert.equal(plan.stepSeconds, 15);
+  assert.equal(plan.start.toISOString(), "2026-10-09T11:00:00.000Z");
+  assert.equal(plan.end.toISOString(), "2026-10-09T12:00:00.000Z");
 });
 
 test("the default limits are the configured ones", () => {

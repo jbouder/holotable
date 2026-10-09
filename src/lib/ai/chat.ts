@@ -10,7 +10,7 @@ import { z } from "zod";
 import { type Model, modelSettings } from "@/lib/ai/provider";
 import { fenceUntrustedBlock, sanitizePromptField } from "@/lib/ai/untrusted";
 import { SQL_RULES } from "@/lib/ai/generate";
-import type { ExecutablePlan } from "@/lib/sql/safety";
+import type { SourcePlan } from "@/lib/sources/server/types";
 import { resolveTimeRange } from "@/lib/time";
 import { QueryExecutionError } from "@/lib/sources/execution";
 import { serverKind } from "@/lib/sources/server/registry";
@@ -30,7 +30,8 @@ import { defaultValue, type Selection } from "@/lib/variable-selection";
 import type { SourceRecord } from "@/lib/registry";
 import { can } from "@/lib/auth/authorize";
 import { claimValue, type Identity } from "@/lib/auth/claims";
-import { bindRowFilter, RowFilterDenied } from "@/lib/sql/row-filter";
+import { bindSourceRowFilter } from "@/lib/row-scope";
+import { RowFilterDenied } from "@/lib/sql/row-filter";
 import { log } from "@/lib/log";
 
 /**
@@ -63,7 +64,7 @@ type ChatQueryArgs = {
 };
 
 export type ChatQueryPlan =
-  | { ok: true; source: SourceRecord; plan: ExecutablePlan }
+  | { ok: true; source: SourceRecord; plan: SourcePlan }
   | { ok: false; error: string };
 
 /**
@@ -187,23 +188,26 @@ export async function buildChatQueryPlan(input: {
   // makes a statement that needs it refused by name.
   const variables = input.variables ?? chatVariableValues(dashboard);
   const kind = serverKind(source);
-  const check = await kind.validate(
-    args.sql,
-    source.config,
-    declaredVariables(dashboard),
-  );
+  // The tool writes SQL (#387 teaches it PromQL); a PromQL source refuses it
+  // by name, as the guard refuses a table it does not have.
+  const query = {
+    sourceId: source.id,
+    sql: args.sql,
+    ...(args.timeField ? { timeField: args.timeField } : {}),
+  };
+  const check = await kind.check(source, query, declaredVariables(dashboard));
   if (!check.ok) return { ok: false, error: check.error ?? "invalid sql" };
 
   // The server is the sole authority on the window: the range the reader is
   // viewing, resolved here, never anything the model tried to express.
   try {
     const range = resolveTimeRange(dashboard.timeRange);
-    const plan = kind.plan({
-      sql: args.sql,
-      timeField: args.timeField,
+    const plan = kind.plan(source, query, {
       from: range.from,
       to: range.to,
-      rowFilter: bindRowFilter(source.config, (claim) => claimValue(identity, claim)),
+      rowFilter: bindSourceRowFilter(source.config, (claim) =>
+        claimValue(identity, claim),
+      ),
       variables,
     });
     return { ok: true, source, plan };

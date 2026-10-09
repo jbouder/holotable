@@ -205,6 +205,26 @@ export const config = {
   aiBaseUrlAllowlist: str("AI_BASE_URL_ALLOWLIST", ""),
 
   /**
+   * Hosts, addresses and CIDR ranges a Prometheus source's URL may reach
+   * although they are not public, and hosts it may reach over plain http
+   * (#385). An in-cluster Prometheus (`prometheus.monitoring.svc`) is the
+   * usual entry. Every workspace's source admins may point a source at an
+   * address listed here, so an endpoint that must stay one tenant's needs
+   * authentication and a granted secret_ref instead. Empty: a source URL must
+   * be public https.
+   */
+  sourceUrlAllowlist: str("SOURCE_URL_ALLOWLIST", ""),
+  /** The smallest step a Prometheus range query is sent with (#385). */
+  prometheusMinStepMs: num("PROMETHEUS_MIN_STEP_MS", 15_000),
+  /** The most points per series a Prometheus range query asks for (#385). */
+  promqlMaxPoints: num("PROMQL_MAX_POINTS", 1_000),
+  /**
+   * The most series one Prometheus result may hold before it is refused as
+   * the author's to narrow (#385). Each series becomes a column.
+   */
+  prometheusMaxSeries: num("PROMETHEUS_MAX_SERIES", 100),
+
+  /**
    * Model requests per minute allowed per user in a workspace, on every
    * LLM-backed route (generate, source draft, dashboard chat). A token bucket:
    * this is both the sustained rate and the burst size. `0` disables the
@@ -507,6 +527,15 @@ const EnvSchema = z.object({
         "must be a comma-separated list of host names, addresses and CIDR ranges, e.g. ollama.internal,10.0.0.0/8",
     }),
   ),
+  SOURCE_URL_ALLOWLIST: blank(
+    z.string().refine((v) => invalidAllowlistEntries(v).length === 0, {
+      error:
+        "must be a comma-separated list of host names, addresses and CIDR ranges, e.g. prometheus.monitoring.svc,10.0.0.0/8",
+    }),
+  ),
+  PROMETHEUS_MIN_STEP_MS: blank(positiveInt),
+  PROMQL_MAX_POINTS: blank(positiveInt),
+  PROMETHEUS_MAX_SERIES: blank(positiveInt),
   LLM_RATE_PER_MINUTE: blank(nonNegativeInt),
   LLM_DAILY_TOKEN_BUDGET: blank(nonNegativeInt),
 

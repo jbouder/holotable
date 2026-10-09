@@ -1,6 +1,11 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { allowedTables, SourceConfig, sourceCatalog } from "@/lib/registry";
+import {
+  allowedTables,
+  type SqlSourceConfig,
+  sqlCatalog,
+  TimescaleDbConfig,
+} from "@/lib/registry";
 import { catalogCompletions } from "@/lib/sql/completion";
 
 /**
@@ -9,7 +14,7 @@ import { catalogCompletions } from "@/lib/sql/completion";
  * nothing that describes how to reach the database.
  */
 
-const config = SourceConfig.parse({
+const config = TimescaleDbConfig.parse({
   host: "timescaledb.internal",
   port: 5432,
   database: "holotable",
@@ -29,7 +34,7 @@ const config = SourceConfig.parse({
 });
 
 test("the client projection carries the catalog and no connection detail", () => {
-  const catalog = sourceCatalog(config);
+  const catalog = sqlCatalog(config);
   assert.deepEqual(Object.keys(catalog).sort(), ["schema", "tables"]);
   const serialized = JSON.stringify(catalog);
   for (const secret of ["timescaledb.internal", "5432", "holotable", "ssl"]) {
@@ -42,7 +47,7 @@ test("the client projection carries the catalog and no connection detail", () =>
 });
 
 test("the projection allowlists exactly what the full config does", () => {
-  assert.deepEqual(allowedTables(sourceCatalog(config)), allowedTables(config));
+  assert.deepEqual(allowedTables(sqlCatalog(config)), allowedTables(config));
   assert.deepEqual([...allowedTables(config)].sort(), [
     "http_requests",
     "metrics.http_requests",
@@ -50,7 +55,7 @@ test("the projection allowlists exactly what the full config does", () => {
 });
 
 test("completions offer the allowlisted tables and their columns", () => {
-  const { schema, defaultSchema } = catalogCompletions(sourceCatalog(config));
+  const { schema, defaultSchema } = catalogCompletions(sqlCatalog(config));
   assert.equal(defaultSchema, "metrics");
   assert.deepEqual(Object.keys(schema.metrics), ["http_requests"]);
   const table = schema.metrics.http_requests;

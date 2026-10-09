@@ -1,4 +1,5 @@
 import { requireIdentity, assertAuthorized, HttpError } from "@/lib/auth/authorize";
+import { isSqlSource } from "@/lib/sources/registry";
 import { readJson, json, route } from "@/lib/http";
 import { audit } from "@/lib/audit";
 import {
@@ -55,7 +56,13 @@ export const GET = route("templates.list", async (req: Request) => {
     const source = await getSourceById(sourceId);
     // Scoped to the named workspace, so a source elsewhere reads exactly as
     // one that does not exist: naming it discloses nothing.
-    if (source && !source.tombstonedAt && source.workspaceId === workspaceId) {
+    // The built-ins are SQL against a source's tables (#385: none for PromQL yet).
+    if (
+      source &&
+      !source.tombstonedAt &&
+      source.workspaceId === workspaceId &&
+      isSqlSource(source)
+    ) {
       templates.push(...buildBuiltinTemplates(source, kind?.data));
     }
   }

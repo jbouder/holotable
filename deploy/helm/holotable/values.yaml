@@ -148,12 +148,17 @@ config: {}
 #  # nothing and the server refuses to boot in production. Workspace ids are
 #  # the `<id>` in `/workspaces/<id>/<role>` groups; "*" grants every workspace.
 #  SOURCE_SECRET_REFS: "TS_METRICS:ops; BILLING_RO:finance"
+#  # Private addresses and plain-http hosts a Prometheus source's URL may
+#  # reach, e.g. an in-cluster Prometheus. Every workspace may use what is
+#  # listed; an endpoint that must stay one tenant's needs auth and a ref.
+#  SOURCE_URL_ALLOWLIST: "prometheus.monitoring.svc"
 
 secrets:
   # -- Name of an existing Secret holding the credential environment:
   # SESSION_SECRET, DATABASE_URL, OIDC_CLIENT_SECRET, METRICS_TOKEN, the
   # OPENAI_API_KEY or AI_GATEWAY_API_KEY, and one
-  # `<SECRET_REF>_USERNAME`/`<SECRET_REF>_PASSWORD` pair per data source. Its
+  # `<SECRET_REF>_USERNAME`/`<SECRET_REF>_PASSWORD` pair per data source (or a
+  # `<SECRET_REF>_TOKEN`, for a Prometheus source with bearer auth). Its
   # keys are loaded with `envFrom`, so they are the variable names verbatim.
   existingSecret: ""
   # -- Let the chart create that Secret from `secrets.values`. Off by default:

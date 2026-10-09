@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { validateSql } from "@/lib/sql/safety";
-import { SourceConfig } from "@/lib/registry";
+import { type SqlSourceConfig, TimescaleDbConfig } from "@/lib/registry";
 
 /**
  * PostgreSQL-specific guard coverage.
@@ -18,7 +18,7 @@ import { SourceConfig } from "@/lib/registry";
  * flipped to `accepts(...)` when the parse-tree validator (#10) replaced it.
  */
 
-const source = SourceConfig.parse({
+const source = TimescaleDbConfig.parse({
   host: "postgres",
   port: 5432,
   database: "holotable",
@@ -146,7 +146,7 @@ test("rejects cross-database and large-object access", async () => {
 test("accepts the SQL the seeded demo dashboards actually run", async () => {
   // The guard is worthless if it rejects the product's own queries. These are
   // verbatim from scripts/seed.ts, against the source they are seeded for.
-  const demo = SourceConfig.parse({
+  const demo = TimescaleDbConfig.parse({
     host: "postgres",
     port: 5432,
     database: "holotable",

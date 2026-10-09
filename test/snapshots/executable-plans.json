@@ -267,7 +267,7 @@
     "expr": "histogram_quantile(0.95, sum by (le) (rate(http_request_duration_seconds_bucket{tenant=\"fixture-tenant\"}[5m]))) * 1000",
     "start": "2026-01-01T00:00:00.000Z",
     "end": "2026-01-01T01:00:00.000Z",
-    "stepSeconds": 5,
+    "stepSeconds": 15,
     "timeoutMs": 20000
   },
   "v1-promql.json#top-routes": {

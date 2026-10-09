@@ -8,7 +8,11 @@ import {
   GENERIC_SOURCE_DESCRIPTIONS,
   type StarterKind,
 } from "@/lib/prompts/starters";
-import { SourceConfig, type SourceRecord } from "@/lib/registry";
+import {
+  type SqlSourceConfig,
+  type SqlSourceRecord,
+  TimescaleDbConfig,
+} from "@/lib/registry";
 
 /**
  * Starter prompts used to be three hard-coded lists that described the seeded
@@ -22,13 +26,13 @@ import { SourceConfig, type SourceRecord } from "@/lib/registry";
  * shared import would let a change to one drift past this file unnoticed.
  */
 
-function source(patch: Partial<SourceRecord> = {}): SourceRecord {
+function source(patch: Partial<SqlSourceRecord> = {}): SqlSourceRecord {
   return {
     id: "ts-metrics",
     workspaceId: "demo",
     name: "Demo TimescaleDB metrics",
     kind: "timescaledb",
-    config: SourceConfig.parse({
+    config: TimescaleDbConfig.parse({
       host: "localhost",
       port: 5432,
       database: "holotable",
@@ -77,16 +81,19 @@ const SYSTEM_TABLE = {
   ],
 };
 
-function withTables(tables: unknown[], patch: Partial<SourceRecord> = {}): SourceRecord {
+function withTables(
+  tables: unknown[],
+  patch: Partial<SqlSourceRecord> = {},
+): SqlSourceRecord {
   const base = source();
   return source({
-    config: SourceConfig.parse({ ...base.config, tables }),
+    config: TimescaleDbConfig.parse({ ...base.config, tables }),
     ...patch,
   });
 }
 
 /** Every catalog name a source's starters are permitted to mention. */
-function catalogNames(s: SourceRecord): Set<string> {
+function catalogNames(s: SqlSourceRecord): Set<string> {
   const names = new Set<string>();
   for (const table of s.config.tables) {
     names.add(table.name);
@@ -242,7 +249,7 @@ test("a source with an unusable catalog contributes no description example", () 
   const odd = withTables([{ name: "fine", columns: [{ name: "a", type: "text" }] }]);
   assert.deepEqual(
     buildSourceDescriptionStarters([
-      source({ config: SourceConfig.parse({ ...odd.config, host: "bad host!" }) }),
+      source({ config: TimescaleDbConfig.parse({ ...odd.config, host: "bad host!" }) }),
     ]),
     GENERIC_SOURCE_DESCRIPTIONS,
   );

@@ -1,11 +1,16 @@
 import { before, test } from "node:test";
+import { sqlPlanOf } from "./support/plans";
 import assert from "node:assert/strict";
 import { loadModule } from "libpg-query";
 import { HttpError } from "@/lib/auth/authorize";
 import { resolveAndValidateDashboard } from "@/lib/dashboard-service";
 import { Dashboard, type Variable } from "@/lib/ir";
 import { getPoller, type PanelExecutor } from "@/lib/poller/registry";
-import { SourceConfig, type SourceRecord } from "@/lib/registry";
+import {
+  type SqlSourceConfig,
+  type SqlSourceRecord,
+  TimescaleDbConfig,
+} from "@/lib/registry";
 import type { ExecutablePlan } from "@/lib/sql/safety";
 import {
   resolveSelection,
@@ -23,7 +28,7 @@ before(async () => {
   await loadModule();
 });
 
-const config = SourceConfig.parse({
+const config = TimescaleDbConfig.parse({
   host: "db",
   port: 5432,
   database: "metrics",
@@ -42,7 +47,7 @@ const config = SourceConfig.parse({
   ],
 });
 
-function source(id: string, extra: Partial<SourceRecord> = {}): SourceRecord {
+function source(id: string, extra: Partial<SqlSourceRecord> = {}): SqlSourceRecord {
   return {
     id,
     workspaceId: "ws",
@@ -57,7 +62,7 @@ function source(id: string, extra: Partial<SourceRecord> = {}): SourceRecord {
     updatedAt: new Date().toISOString(),
     tombstonedAt: null,
     ...extra,
-  } as SourceRecord;
+  } as SqlSourceRecord;
 }
 
 const ENV: Variable = { name: "env", type: "enum", values: ["prod", "staging"] };
@@ -175,12 +180,12 @@ test("a pick must be one the variable allows; no pick is the default", async () 
   );
 });
 
-function deps(rows: Record<string, unknown>[], sources: Record<string, SourceRecord>) {
+function deps(rows: Record<string, unknown>[], sources: Record<string, SqlSourceRecord>) {
   const plans: ExecutablePlan[] = [];
   const d: VariableDeps = {
     getSource: async (id) => sources[id] ?? null,
     execute: async (_source, plan) => {
-      plans.push(plan);
+      plans.push(sqlPlanOf(plan));
       return { columns: ["host"], rows };
     },
   };
@@ -222,7 +227,7 @@ test("a query variable's values come from its guarded query, in its workspace on
 
 test("a row-filtered source offers only the viewer's values", async () => {
   const filtered = source("src", {
-    config: SourceConfig.parse({
+    config: TimescaleDbConfig.parse({
       ...config,
       rowFilter: { column: "tenant", claim: "tenant" },
     }),
@@ -247,7 +252,7 @@ test("a refused pick is a 400 the viewer can act on", async () => {
 });
 
 test("saving: references must be declared, and a variable's query is held to a panel's rules", async () => {
-  const sources: Record<string, SourceRecord> = {
+  const sources: Record<string, SqlSourceRecord> = {
     src: source("src"),
     far: source("far", { workspaceId: "other" }),
   };

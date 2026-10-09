@@ -21,7 +21,7 @@ import {
   rowValues,
   toRow,
 } from "@/lib/self-monitoring/exposition";
-import { SourceConfig } from "@/lib/registry";
+import { type SqlSourceConfig, TimescaleDbConfig } from "@/lib/registry";
 import { buildExecutablePlan, validateSql } from "@/lib/sql/safety";
 import { resolveTimeRange } from "@/lib/time";
 import { queryOf } from "./support/panels";
@@ -217,7 +217,7 @@ test("the catalog names every column the panels select on", () => {
 });
 
 test("every panel's SQL passes the guard against the committed catalog", async () => {
-  const source = SourceConfig.parse(selfMonitoringConfig(connection));
+  const source = TimescaleDbConfig.parse(selfMonitoringConfig(connection));
   for (const panel of selfMonitoringSpec().panels) {
     const result = await validateSql(queryOf(panel).sql, source);
     assert.equal(result.ok, true, `${panel.id}: ${result.ok ? "" : result.error}`);

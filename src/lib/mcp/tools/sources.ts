@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { isSqlSource } from "@/lib/sources/registry";
 import { assertAuthorized, authorizedWorkspaces, HttpError } from "@/lib/auth/authorize";
 import { catalogView } from "@/lib/catalog/browse";
 import { catalogHealth } from "@/lib/catalog/health";
@@ -28,8 +29,13 @@ const SourceSummary = z.object({
   id: z.string(),
   workspaceId: z.string(),
   name: z.string(),
-  schema: z.string(),
-  tableCount: z.int(),
+  /** `timescaledb` (SQL) or `prometheus` (PromQL, #385). */
+  kind: z.string(),
+  /** A SQL source's schema and allowlisted table count. */
+  schema: z.string().optional(),
+  tableCount: z.int().optional(),
+  /** A Prometheus source's allowlisted metric count. */
+  metricCount: z.int().optional(),
   /** `ok`, `empty`, `never_refreshed`, `stale` or `drifted`; only `ok` and `stale` generate. */
   catalog: z.string(),
 });
@@ -67,8 +73,10 @@ export function sourceTools(deps: McpDeps): McpTool[] {
               id: listing.id,
               workspaceId: listing.workspaceId,
               name: listing.name,
-              schema: listing.schema,
-              tableCount: listing.tableCount,
+              kind: listing.kind,
+              ...("schema" in listing
+                ? { schema: listing.schema, tableCount: listing.tableCount }
+                : { metricCount: listing.metricCount }),
               catalog: catalogHealth(source).state,
             });
           }
@@ -87,13 +95,20 @@ export function sourceTools(deps: McpDeps): McpTool[] {
       }),
       annotations: READ_ONLY,
       async run(args, { identity }) {
-        const source = await liveSource(deps, args.sourceId);
+        const live = await liveSource(deps, args.sourceId);
         assertAuthorized(
           identity,
           "source:use",
-          { workspaceId: source.workspaceId },
-          { type: "source", id: source.id },
+          { workspaceId: live.workspaceId },
+          { type: "source", id: live.id },
         );
+        if (!isSqlSource(live)) {
+          throw new HttpError(
+            400,
+            "describe_source covers SQL sources until the MCP tools learn PromQL",
+          );
+        }
+        const source = live;
         // Never the admin view: a hidden column stays hidden to an agent, and
         // the view carries no connection detail either way.
         const { canManage: _, ...view } = catalogView(

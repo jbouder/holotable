@@ -2,7 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { validateSql } from "@/lib/sql/safety";
 import { analyzeSelect } from "@/lib/sql/ast";
-import { SourceConfig } from "@/lib/registry";
+import { type SqlSourceConfig, TimescaleDbConfig } from "@/lib/registry";
 
 /**
  * What the parse-tree validator sees that a regex could not.
@@ -15,7 +15,7 @@ import { SourceConfig } from "@/lib/registry";
  * for anything the grammar does not recognise.
  */
 
-const source = SourceConfig.parse({
+const source = TimescaleDbConfig.parse({
   host: "postgres",
   port: 5432,
   database: "holotable",
@@ -205,7 +205,7 @@ test("a quoted identifier that differs from the catalog only by case is a differ
 });
 
 test("a mixed-case catalog table is reachable only by its exact quoted name", async () => {
-  const mixed = SourceConfig.parse({
+  const mixed = TimescaleDbConfig.parse({
     ...source,
     tables: [
       {

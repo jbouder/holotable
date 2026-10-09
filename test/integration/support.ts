@@ -1,6 +1,10 @@
 import { randomBytes } from "node:crypto";
 import { Client } from "pg";
-import { type SourceRecord, SourceConfig } from "@/lib/registry";
+import {
+  type SqlSourceRecord,
+  type SqlSourceConfig,
+  TimescaleDbConfig,
+} from "@/lib/registry";
 import { secretRefEnvVars } from "@/lib/secret-refs";
 
 /**
@@ -61,7 +65,7 @@ export function grantRef(
 }
 
 /** The connection half of a source on the integration database. */
-export function connection(): Pick<SourceConfig, "host" | "port" | "database"> {
+export function connection(): Pick<SqlSourceConfig, "host" | "port" | "database"> {
   const url = new URL(dbUrl as string);
   return {
     host: url.hostname,
@@ -88,13 +92,13 @@ export function metricsSource(input: {
   id: string;
   workspaceId: string;
   secretRef: string;
-}): SourceRecord {
+}): SqlSourceRecord {
   return {
     id: input.id,
     workspaceId: input.workspaceId,
     name: input.id,
     kind: "timescaledb",
-    config: SourceConfig.parse({
+    config: TimescaleDbConfig.parse({
       ...connection(),
       schema: "metrics",
       tables: [HTTP_REQUESTS],

@@ -76,6 +76,27 @@ keys are those names. The chart mounts it as a volume and sets
 `SOURCE_SECRETS_DIR`. The kubelet refreshes a mounted Secret in place within
 about a minute; see [Kubernetes](/operations/kubernetes/).
 
+### Prometheus sources
+
+A Prometheus source (#385) uses the same refs, grants and lookup, with its own
+credential for each auth mode:
+
+| `auth` | Reads | Sent as |
+| --- | --- | --- |
+| `bearer` | `<REF>_TOKEN` | `Authorization: Bearer <token>` |
+| `basic` | `<REF>_USERNAME`, `<REF>_PASSWORD` | `Authorization: Basic …` |
+| `none` | nothing | no `Authorization` header |
+
+A token file in `SOURCE_SECRETS_DIR` takes precedence over the environment, as a
+user name and password do. A source with `auth: "none"` names no `secret_ref`
+at all: one that names nothing would be a grant with nothing behind it. What a
+no-auth source may reach is `SOURCE_URL_ALLOWLIST`, which lists the private
+addresses and plain-`http` hosts a source URL may use, for example an
+in-cluster `prometheus.monitoring.svc`. That list is not per workspace, so an
+endpoint that must stay one tenant's needs authentication and a granted ref.
+The readiness check below still describes the user name and password pair; the
+Prometheus form gains its own in a later release.
+
 ## Readiness, before you press Test
 
 The source form's `secret_ref` field is a picker over the refs granted to the

@@ -1,15 +1,20 @@
 import { test } from "node:test";
+import { sqlPlanOf } from "./support/plans";
 import assert from "node:assert/strict";
 import { buildChatQueryPlan, buildSystemPrompt, resolveChatView } from "@/lib/ai/chat";
 import type { VariableValues } from "@/lib/sql/variables";
 import type { Selection } from "@/lib/variable-selection";
 import { parseGroups } from "@/lib/auth/claims";
-import { SourceConfig, type SourceRecord } from "@/lib/registry";
+import {
+  type SqlSourceConfig,
+  type SqlSourceRecord,
+  TimescaleDbConfig,
+} from "@/lib/registry";
 import type { Dashboard } from "@/lib/ir";
 
 const reader = parseGroups("reader", ["/workspaces/ws/viewer"]);
 
-const config = SourceConfig.parse({
+const config = TimescaleDbConfig.parse({
   host: "postgres",
   port: 5432,
   database: "holotable",
@@ -28,7 +33,7 @@ const config = SourceConfig.parse({
   ],
 });
 
-const source: SourceRecord = {
+const source: SqlSourceRecord = {
   id: "src-metrics",
   workspaceId: "ws-1",
   name: "Metrics",
@@ -97,10 +102,10 @@ test("builds a guarded plan with server-injected time range for time-series", as
   assert.equal(r.ok, true);
   if (r.ok) {
     // The server owns the window: exactly the two bound time params are injected.
-    assert.equal(r.plan.params.length, 2);
-    assert.match(r.plan.sql, /_holo/);
-    assert.match(r.plan.sql, /_holo\.minute >= \$1::timestamptz/);
-    assert.match(r.plan.sql, /LIMIT/);
+    assert.equal(sqlPlanOf(r.plan).params.length, 2);
+    assert.match(sqlPlanOf(r.plan).sql, /_holo/);
+    assert.match(sqlPlanOf(r.plan).sql, /_holo\.minute >= \$1::timestamptz/);
+    assert.match(sqlPlanOf(r.plan).sql, /LIMIT/);
     assert.equal(r.source.id, "src-metrics");
     void now;
   }
@@ -118,9 +123,9 @@ test("builds a plan with no time filter when timeField is omitted (scalar)", asy
   });
   assert.equal(r.ok, true);
   if (r.ok) {
-    assert.equal(r.plan.params.length, 0);
-    assert.doesNotMatch(r.plan.sql, /timestamptz/);
-    assert.match(r.plan.sql, /LIMIT/);
+    assert.equal(sqlPlanOf(r.plan).params.length, 0);
+    assert.doesNotMatch(sqlPlanOf(r.plan).sql, /timestamptz/);
+    assert.match(sqlPlanOf(r.plan).sql, /LIMIT/);
   }
 });
 
@@ -242,8 +247,8 @@ test("the reader's picks are bound as parameters, never written into the SQL", a
   });
   assert.equal(r.ok, true);
   if (r.ok) {
-    assert.ok(r.plan.params.includes("500"));
-    assert.doesNotMatch(r.plan.sql, /= ?.?500\b/);
+    assert.ok(sqlPlanOf(r.plan).params.includes("500"));
+    assert.doesNotMatch(sqlPlanOf(r.plan).sql, /= ?.?500\b/);
   }
 });
 

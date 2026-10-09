@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { assertAuthorized, HttpError, requireIdentity } from "@/lib/auth/authorize";
 import { json, route } from "@/lib/http";
+import { requireSqlSource } from "@/lib/sources/server/http";
 import { getSourceById, sourcePanelStatements } from "@/lib/db/repo";
 import type { ColumnImpact } from "@/lib/catalog/browse";
 import { hiddenColumnImpact } from "@/lib/catalog/hide-impact";
@@ -47,7 +48,8 @@ export const GET = route(
     const { table, column } = parsed.data;
 
     const panels = await sourcePanelStatements(source.workspaceId, id);
-    const dashboards = await hiddenColumnImpact(source.config, panels, table, column);
+    const sql = requireSqlSource(source, "Hiding a column");
+    const dashboards = await hiddenColumnImpact(sql.config, panels, table, column);
     if (!dashboards)
       throw new HttpError(404, `column not in catalog: ${table}.${column}`);
 

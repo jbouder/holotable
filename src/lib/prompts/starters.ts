@@ -3,7 +3,7 @@ import {
   type CatalogColumn,
   type CatalogTable,
   exposedColumns,
-  type SourceRecord,
+  type SqlSourceRecord,
 } from "@/lib/registry";
 import { isTimestampType } from "@/lib/source-form";
 
@@ -218,7 +218,7 @@ export function buildStarters(
  * the shape of a description without inventing a schema.
  */
 export function buildSourceDescriptionStarters(
-  sources: Pick<SourceRecord, "config">[],
+  sources: Pick<SqlSourceRecord, "config">[],
   opts: StarterOptions = {},
 ): string[] {
   const limit = opts.limit ?? 3;

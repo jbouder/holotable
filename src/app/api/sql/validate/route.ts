@@ -2,14 +2,14 @@ import { z } from "zod";
 import { requireIdentity, assertAuthorized, HttpError } from "@/lib/auth/authorize";
 import { readJson, json, route } from "@/lib/http";
 import { getSourceById } from "@/lib/db/repo";
+import { panelQueryBody, panelQueryOf } from "@/lib/query-body";
 import { serverKind } from "@/lib/sources/server/registry";
 import { VariableName } from "@/lib/ir";
 
 export const runtime = "nodejs";
 
-const Body = z.object({
-  sourceId: z.string().min(1),
-  sql: z.string().min(1).max(8000),
+/** A panel's query in either language (#385): the path keeps its name. */
+const Body = panelQueryBody({
   /** The variables the dashboard declares, which `:name` may reference (#67). */
   variables: z.array(VariableName).max(10).optional(),
 });
@@ -46,12 +46,12 @@ export const POST = route("sql.validate", async (req: Request) => {
     { type: "source", id: source.id },
   );
 
-  const check = await serverKind(source).validate(
-    body.sql,
-    source.config,
+  const check = await serverKind(source).check(
+    source,
+    panelQueryOf(body),
     new Set(body.variables),
   );
-  return json(
-    check.ok ? { ok: true } : { ok: false, error: check.error ?? "invalid sql" },
-  );
+  if (!check.ok) return json({ ok: false, error: check.error ?? "invalid query" });
+  // A PromQL label the catalog does not list is a hint, never a refusal.
+  return json(check.hints ? { ok: true, hints: check.hints } : { ok: true });
 });

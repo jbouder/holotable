@@ -13,13 +13,25 @@ import { sourceKind } from "@/lib/sources/registry";
  * deletions, so a field added to `SourceRecord` later does not reach a viewer
  * by default.
  */
-export interface SourceListing {
+export type SourceListing = TimescaleDbListing | PrometheusListing;
+
+interface ListingBase {
   id: string;
   workspaceId: string;
   name: string;
+  tombstonedAt: string | null;
+}
+
+export interface TimescaleDbListing extends ListingBase {
+  kind: "timescaledb";
   schema: string;
   tableCount: number;
-  tombstonedAt: string | null;
+}
+
+/** A Prometheus source (#385): never its URL or its auth mode. */
+export interface PrometheusListing extends ListingBase {
+  kind: "prometheus";
+  metricCount: number;
 }
 
 /** Projected by the source's kind, which names each field it lets through. */

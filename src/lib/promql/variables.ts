@@ -30,11 +30,9 @@ export function bindPromqlVariables(
   variables: VariableValues,
   limits: PromqlLimits,
 ): string {
-  const { root, selectors } = analyzePromql(
-    expr,
-    new Set(Object.keys(variables)),
-    limits,
-  );
+  // The expression was validated against the dashboard's declared variables
+  // before it got here; what is checked now is that each one has a value.
+  const { root, selectors } = analyzePromql(expr, "bound", limits);
   const replaced = new Map<object, string>();
   const splices: Splice[] = [];
   for (const selector of selectors) {

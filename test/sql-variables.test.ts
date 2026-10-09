@@ -1,7 +1,7 @@
 import { before, test } from "node:test";
 import assert from "node:assert/strict";
 import { loadModule } from "libpg-query";
-import { SourceConfig } from "@/lib/registry";
+import { type SqlSourceConfig, TimescaleDbConfig } from "@/lib/registry";
 import { analyzeSelectSync } from "@/lib/sql/ast";
 import { buildExecutablePlan, checkSql } from "@/lib/sql/safety";
 import { scanVariables, VariableError } from "@/lib/sql/variables";
@@ -16,7 +16,7 @@ before(async () => {
   await loadModule();
 });
 
-const source = SourceConfig.parse({
+const source = TimescaleDbConfig.parse({
   host: "db",
   port: 5432,
   database: "metrics",

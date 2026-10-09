@@ -174,6 +174,7 @@ test("a TimescaleDB listing is exactly its named fields", () => {
   const listing = sourceListing(record());
   assert.deepEqual(Object.keys(listing).sort(), [
     "id",
+    "kind",
     "name",
     "schema",
     "tableCount",

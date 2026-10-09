@@ -2,7 +2,12 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import fc from "fast-check";
 import { parse, scan } from "libpg-query";
-import { allowedTables, SourceConfig, sourceCatalog } from "@/lib/registry";
+import {
+  allowedTables,
+  type SqlSourceConfig,
+  sqlCatalog,
+  TimescaleDbConfig,
+} from "@/lib/registry";
 import { sqlHints } from "@/lib/sql/hints";
 import { RowFilterError } from "@/lib/sql/row-filter";
 import { buildExecutablePlan, validateSql } from "@/lib/sql/safety";
@@ -46,7 +51,7 @@ const RUNS = Number.parseInt(process.env.FUZZ_RUNS ?? "", 10) || 300;
 const SEED = Number.parseInt(process.env.FUZZ_SEED ?? "", 10) || 20260920;
 const PATH = process.env.FUZZ_PATH;
 
-const source = SourceConfig.parse({
+const source = TimescaleDbConfig.parse({
   host: "postgres",
   port: 5432,
   database: "holotable",
@@ -1055,7 +1060,7 @@ test("fuzz: a benign statement is always accepted", async () => {
 });
 
 test("fuzz: the editor's hints never fire on a benign statement", async () => {
-  const catalog = sourceCatalog(source);
+  const catalog = sqlCatalog(source);
   await run(
     fc.asyncProperty(benign, async ({ sql }) => {
       const hints = sqlHints(sql, catalog);
@@ -1441,7 +1446,7 @@ test("fuzz: a timeField that is not a bare identifier is refused before it reach
  * "no column reference names a hidden column, a `*`, or the table's row".
  */
 
-const columnSource = SourceConfig.parse({
+const columnSource = TimescaleDbConfig.parse({
   ...source,
   tables: [
     ...source.tables,

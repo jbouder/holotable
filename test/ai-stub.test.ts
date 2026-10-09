@@ -8,7 +8,11 @@ import {
   stubModel,
 } from "@/lib/ai/stub";
 import { DashboardGenerationSchema, ExplorePanel, Panel, queryText } from "@/lib/ir";
-import { ModelSourceDraft, SourceConfig } from "@/lib/registry";
+import {
+  ModelSourceDraft,
+  type SqlSourceConfig,
+  TimescaleDbConfig,
+} from "@/lib/registry";
 import { validateSql } from "@/lib/sql/safety";
 
 /*
@@ -31,7 +35,7 @@ async function finalObject<T>(result: {
 const SYSTEM = "You design monitoring dashboards.\nsourceId: e2e-metrics\n\nCatalog: ...";
 
 /** The demo schema the recorded SQL is written against (timescaledb/init). */
-const DEMO = SourceConfig.parse({
+const DEMO = TimescaleDbConfig.parse({
   host: "localhost",
   port: 5432,
   database: "holotable",

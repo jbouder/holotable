@@ -56,6 +56,47 @@ function spec(title: string, panels = 1): Dashboard {
   };
 }
 
+test(
+  "a Prometheus source with no auth stores no secret_ref, and one can be set and cleared (#385)",
+  needsDb,
+  async () => {
+    const config = SourceConfig.parse({
+      kind: "prometheus",
+      url: "https://prom.example.com",
+      auth: "none",
+      metrics: [{ name: "up", labels: ["job"] }],
+    });
+    const id = unique("src-prom");
+    const created = await createSource({
+      id,
+      workspaceId: WORKSPACE,
+      name: "Prometheus",
+      config,
+      secretRef: null,
+      createdBy: "integration",
+    });
+    assert.equal(created.kind, "prometheus");
+    assert.equal(created.secretRef, null);
+    assert.deepEqual(created.config, config);
+    assert.deepEqual(await getSourceById(id), created);
+
+    const bearer = SourceConfig.parse({ ...config, auth: "bearer" });
+    const withRef = await updateSource(WORKSPACE, id, {
+      config: bearer,
+      secretRef: "HT_IT_PROM",
+    });
+    assert.equal(withRef?.secretRef, "HT_IT_PROM");
+    // An unrelated edit leaves the reference alone; null clears it.
+    assert.equal(
+      (await updateSource(WORKSPACE, id, { name: "Renamed" }))?.secretRef,
+      "HT_IT_PROM",
+    );
+    const cleared = await updateSource(WORKSPACE, id, { config, secretRef: null });
+    assert.equal(cleared?.secretRef, null);
+    assert.equal(await deleteSource(WORKSPACE, id), "deleted");
+  },
+);
+
 test("a source round-trips, updates and tombstones", needsDb, async () => {
   const config = SourceConfig.parse({
     ...connection(),

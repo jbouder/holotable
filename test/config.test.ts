@@ -772,6 +772,40 @@ test("AI_BASE_URL_ALLOWLIST must parse, or the server does not boot (#331)", () 
   );
 });
 
+test("SOURCE_URL_ALLOWLIST must parse, or the server does not boot (#385)", () => {
+  const bad = validateConfig(
+    { ...VALID_PRODUCTION, SOURCE_URL_ALLOWLIST: "prometheus.monitoring.svc, http://x" },
+    { production: true },
+  );
+  assert.deepEqual(variables(errors(bad)), ["SOURCE_URL_ALLOWLIST"]);
+  assert.deepEqual(
+    validateConfig(
+      {
+        ...VALID_PRODUCTION,
+        SOURCE_URL_ALLOWLIST: "prometheus.monitoring.svc, 10.0.0.0/8",
+        PROMETHEUS_MIN_STEP_MS: "15000",
+        PROMQL_MAX_POINTS: "1000",
+        PROMETHEUS_MAX_SERIES: "100",
+      },
+      { production: true },
+    ),
+    [],
+  );
+  const zeros = validateConfig(
+    {
+      PROMETHEUS_MIN_STEP_MS: "0",
+      PROMQL_MAX_POINTS: "0",
+      PROMETHEUS_MAX_SERIES: "none",
+    },
+    { production: false },
+  );
+  assert.deepEqual(variables(errors(zeros)).sort(), [
+    "PROMETHEUS_MAX_SERIES",
+    "PROMETHEUS_MIN_STEP_MS",
+    "PROMQL_MAX_POINTS",
+  ]);
+});
+
 test("an unconfigured metrics endpoint is not a problem; it is the default", () => {
   // /api/metrics answers 404 until one of the two is set, so silence here is
   // correct — the endpoint is closed, not misconfigured.

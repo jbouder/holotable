@@ -1,6 +1,6 @@
 import { parseSync, scanSync } from "libpg-query";
 import { analyzeSelectSync, type RelationUse } from "@/lib/sql/ast";
-import type { RowFilter, SourceConfig } from "@/lib/registry";
+import type { RowFilter, SqlSourceConfig } from "@/lib/registry";
 
 /**
  * Row-level filters (#31): a mandatory tenant predicate on every table a
@@ -66,7 +66,7 @@ export class RowFilterDenied extends Error {
  * claim, so a caller cannot fall through to an unfiltered query by accident.
  */
 export function bindRowFilter(
-  config: Pick<SourceConfig, "rowFilter">,
+  config: Pick<SqlSourceConfig, "rowFilter">,
   claimValue: (claim: string) => string | undefined,
 ): RowFilterBinding | null {
   const filter: RowFilter | undefined = config.rowFilter;
@@ -81,7 +81,7 @@ export function bindRowFilter(
  * have the column: a table without it would fail every query that reads it,
  * and is better refused when the source is saved.
  */
-export function rowFilterProblem(config: SourceConfig): string | null {
+export function rowFilterProblem(config: SqlSourceConfig): string | null {
   const filter = config.rowFilter;
   if (!filter) return null;
   const without = config.tables

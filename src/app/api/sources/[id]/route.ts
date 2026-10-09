@@ -4,7 +4,7 @@ import { readJson, json, route } from "@/lib/http";
 import { assertRowFilterSavable } from "@/lib/row-scope";
 import { audit } from "@/lib/audit";
 import { getSourceById, updateSource, deleteSource } from "@/lib/db/repo";
-import { SourceConfig } from "@/lib/registry";
+import { checkSecretRef, SourceConfig, SourceDraftFields } from "@/lib/registry";
 import { sourceListing } from "@/lib/source-listing";
 import { sameKind } from "@/lib/sources/registry";
 import { serverKind } from "@/lib/sources/server/registry";
@@ -37,7 +37,12 @@ export const GET = route(
 const UpdateBody = z.object({
   name: z.string().min(1).max(200).optional(),
   config: SourceConfig.optional(),
-  secretRef: z.string().regex(SECRET_REF_PATTERN, SECRET_REF_MESSAGE).optional(),
+  /** A new reference, or `null` to clear it once a source needs none (#385). */
+  secretRef: z
+    .string()
+    .regex(SECRET_REF_PATTERN, SECRET_REF_MESSAGE)
+    .nullable()
+    .optional(),
 });
 
 export const PUT = route(
@@ -58,7 +63,11 @@ export const PUT = route(
     const patch = await readJson(req, UpdateBody);
     // Only a changed ref is checked here: an unrelated edit to a source whose
     // grant has since been withdrawn still saves, and still cannot connect.
-    if (patch.secretRef !== undefined && patch.secretRef !== source.secretRef) {
+    if (
+      patch.secretRef !== undefined &&
+      patch.secretRef !== null &&
+      patch.secretRef !== source.secretRef
+    ) {
       requireGrantedSecretRef(patch.secretRef, source.workspaceId);
     }
     // A source's kind is what it is: an edit may change its config, never turn
@@ -70,6 +79,28 @@ export const PUT = route(
       );
     }
     if (patch.config) assertRowFilterSavable(patch.config);
+    // The source as it would be saved needs a reference exactly when it needs
+    // credentials (#385).
+    const after = {
+      config: patch.config ?? source.config,
+      secretRef: patch.secretRef !== undefined ? patch.secretRef : source.secretRef,
+    };
+    const refProblem = SourceDraftFields.pick({ config: true })
+      .extend({ secretRef: z.string().nullable() })
+      .superRefine(checkSecretRef)
+      .safeParse(after);
+    if (!refProblem.success) {
+      throw new HttpError(
+        400,
+        refProblem.error.issues[0]?.message ?? "invalid secretRef",
+        {},
+        "validation",
+      );
+    }
+    if (patch.config) {
+      const unreachable = await serverKind(source).checkConfig(patch.config);
+      if (unreachable) throw new HttpError(400, unreachable, {}, "validation");
+    }
     const updated = await updateSource(source.workspaceId, id, patch);
     if (!updated) throw new HttpError(409, "source is tombstoned and cannot be edited");
     audit({

@@ -12,8 +12,10 @@ import { buildQueryPlanView } from "@/lib/query-plan";
 import {
   ModelSourceDraft,
   SourceConfig,
+  type SqlSourceConfig,
   SourceDraft,
-  type SourceRecord,
+  type SqlSourceRecord,
+  TimescaleDbConfig,
 } from "@/lib/registry";
 import { assertRowFilterSavable, rowFilterFor, rowScopeFor } from "@/lib/row-scope";
 import {
@@ -40,7 +42,7 @@ before(async () => {
   await loadModule();
 });
 
-const config = SourceConfig.parse({
+const config = TimescaleDbConfig.parse({
   host: "db",
   port: 5432,
   database: "metrics",
@@ -66,7 +68,7 @@ const config = SourceConfig.parse({
   ],
 });
 
-function source(cfg: SourceConfig = config): SourceRecord {
+function source(cfg: SqlSourceConfig = config): SqlSourceRecord {
   return {
     id: "src-tenants",
     workspaceId: "ops",
@@ -77,7 +79,7 @@ function source(cfg: SourceConfig = config): SourceRecord {
     createdBy: "admin",
     createdAt: "2026-10-04T00:00:00Z",
     tombstonedAt: null,
-  } as unknown as SourceRecord;
+  } as unknown as SqlSourceRecord;
 }
 
 const acme = {
@@ -249,7 +251,7 @@ test("the value is the viewer's claim, and a viewer without it is refused", () =
   assert.throws(() => bindRowFilter(config, () => ""), RowFilterDenied);
 
   // `sub` is always available, for rows that belong to one person.
-  const bySub = SourceConfig.parse({
+  const bySub = TimescaleDbConfig.parse({
     ...config,
     rowFilter: { column: "tenant_id", claim: "sub" },
   });
@@ -357,12 +359,12 @@ test("a panel whose source needs a claim the poller's scope lacks is refused, no
 
 test("a row filter is saved only when a session can carry its claim and every table has its column", () => {
   assert.doesNotThrow(() => assertRowFilterSavable(config));
-  const unconfigured = SourceConfig.parse({
+  const unconfigured = TimescaleDbConfig.parse({
     ...config,
     rowFilter: { column: "tenant_id", claim: "region" },
   });
   assert.throws(() => assertRowFilterSavable(unconfigured), /ROW_FILTER_CLAIMS/);
-  const missingColumn = SourceConfig.parse({
+  const missingColumn = TimescaleDbConfig.parse({
     ...config,
     tables: [...config.tables, { name: "o", columns: [{ name: "k", type: "integer" }] }],
   });
@@ -420,7 +422,7 @@ test("no statement reads another tenant's rows", {
   skip: dbUrl ? false : "run with npm run test:integration (needs Docker)",
 }, async () => {
   const schema = `rf_test_${process.pid}`;
-  const scoped = SourceConfig.parse({ ...config, schema });
+  const scoped = TimescaleDbConfig.parse({ ...config, schema });
   const client = new Client({ connectionString: dbUrl });
   await client.connect();
   try {

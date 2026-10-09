@@ -2,7 +2,12 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { catalogView, searchCatalog, setColumnExposure } from "@/lib/catalog/browse";
 import { catalogHealth } from "@/lib/catalog/health";
-import { SourceConfig, type SourceRecord } from "@/lib/registry";
+import {
+  SourceConfig,
+  type SqlSourceConfig,
+  type SqlSourceRecord,
+  TimescaleDbConfig,
+} from "@/lib/registry";
 import { sourceListing } from "@/lib/source-listing";
 import { validateSql } from "@/lib/sql/safety";
 import { buildCatalogPrompt } from "@/lib/timescaledb/catalog";
@@ -13,7 +18,7 @@ import { buildCatalogPrompt } from "@/lib/timescaledb/catalog";
  * edit has to reach — the prompt and the guard.
  */
 
-const config = SourceConfig.parse({
+const config = TimescaleDbConfig.parse({
   host: "timescaledb.internal",
   port: 5432,
   database: "holotable",
@@ -40,7 +45,7 @@ const config = SourceConfig.parse({
   ],
 });
 
-const source: SourceRecord = {
+const source: SqlSourceRecord = {
   id: "src-metrics",
   workspaceId: "ws-1",
   name: "Metrics",
@@ -82,6 +87,7 @@ test("the viewer's source listing names the source and nothing about reaching it
   const listing = sourceListing(source);
   assert.deepEqual(Object.keys(listing).sort(), [
     "id",
+    "kind",
     "name",
     "schema",
     "tableCount",
@@ -92,6 +98,7 @@ test("the viewer's source listing names the source and nothing about reaching it
   for (const leak of ["secret_client_ip", "holotable", ...CONNECTION]) {
     assert.equal(serialized.includes(leak), false, `the listing leaked ${leak}`);
   }
+  assert.ok("tableCount" in listing);
   assert.equal(listing.tableCount, 2);
 });
 
@@ -156,7 +163,7 @@ test("a toggle takes effect in the prompt and in the guard", async () => {
   assert.equal((await validateSql(sql, config)).ok, true);
   assert.match(buildCatalogPrompt(source), /^ {4}status smallint/m);
 
-  const hidden = SourceConfig.parse(
+  const hidden = TimescaleDbConfig.parse(
     setColumnExposure(config, "http_requests", "status", false),
   );
   const refused = await validateSql(sql, hidden);
@@ -164,7 +171,7 @@ test("a toggle takes effect in the prompt and in the guard", async () => {
   assert.equal(refused.reason, "column");
   assert.doesNotMatch(buildCatalogPrompt({ ...source, config: hidden }), /status/);
 
-  const back = SourceConfig.parse(
+  const back = TimescaleDbConfig.parse(
     setColumnExposure(hidden, "http_requests", "status", true),
   );
   assert.equal((await validateSql(sql, back)).ok, true);

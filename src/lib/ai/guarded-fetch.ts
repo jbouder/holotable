@@ -59,9 +59,9 @@ export type GuardedLookup = (
   callback: LookupCallback,
 ) => void;
 
-function refused(host: string, address: string): BaseUrlRefusedError {
+function refused(host: string, address: string, variable: string): BaseUrlRefusedError {
   return new BaseUrlRefusedError(
-    `${host} resolves to ${address}, which is not a public address. Ask an operator to add it to AI_BASE_URL_ALLOWLIST if this server should reach it.`,
+    `${host} resolves to ${address}, which is not a public address. Ask an operator to add it to ${variable} if this server should reach it.`,
   );
 }
 
@@ -83,7 +83,7 @@ export function guardedLookup(
         return callback(new BaseUrlRefusedError(`${host} did not resolve.`), []);
       }
       const bad = addresses.find((a) => !addressAllowed(host, a.address, allowlist));
-      if (bad) return callback(refused(host, bad.address), []);
+      if (bad) return callback(refused(host, bad.address, allowlist.variable), []);
       if (options.all) return callback(null, addresses);
       return callback(null, addresses[0].address, addresses[0].family);
     });
@@ -140,7 +140,7 @@ export function guardedFetch(baseUrl: string, allowlist: BaseUrlAllowlist): type
     );
     if (url.origin !== origin) {
       throw new BaseUrlRefusedError(
-        `The model client asked for ${url.origin}, not the configured ${origin}.`,
+        `A request asked for ${url.origin}, not the configured ${origin}.`,
       );
     }
     // The allowlist can change under a stored URL, and an address literal
@@ -154,7 +154,7 @@ export function guardedFetch(baseUrl: string, allowlist: BaseUrlAllowlist): type
     });
     if (response.status >= 300 && response.status < 400) {
       throw new BaseUrlRefusedError(
-        `The model endpoint answered with a redirect (${response.status}), which is not followed. Use the URL it redirects to as the base URL.`,
+        `The endpoint answered with a redirect (${response.status}), which is not followed. Use the URL it redirects to as the ${allowlist.noun}.`,
       );
     }
     return response as unknown as Response;

@@ -111,6 +111,15 @@ Important files:
   route: ask `sourceKind(record)` or `serverKind(record)` and use what comes
   back. `test/source-kinds.test.ts` fails on either outside `src/lib/sources/`
 - `src/lib/sql/safety.ts` — the SQL guard every generated query passes through
+- `src/lib/sources/server/types.ts` — `ServerSourceKind`, the one shape every
+  kind's server half has (#385): `check`, `plan`, `execute`, `planView`,
+  `labelValues`, `test`, `checkConfig`. The poller, `/api/query`, `/api/sql/*`,
+  variables, chat and the MCP tools call it and never ask which language they
+  hold; each kind refuses a query in the other language itself. SQL-only
+  management (discover, refresh, hide a column) is behind `requireSqlSource`
+  until #386. `src/lib/prometheus/` is the HTTP client (guarded fetch under
+  `SOURCE_URL_ALLOWLIST`, credentials per request, byte cap as the body
+  arrives) and the conversion of results to wide rows
 - `src/lib/promql/` — the PromQL guard (#384), the same guard for a
   Prometheus source: `parse.ts` (the real grammar, `@prometheus-io/lezer-promql`),
   `safety.ts` (`validatePromql`: allowlisted node types, the metric allowlist,

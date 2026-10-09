@@ -9,7 +9,11 @@ import {
 } from "@/lib/ai/prompt";
 import { findUntrustedBlocks } from "@/lib/ai/untrusted";
 import { type Panel, SPEC_VERSION } from "@/lib/ir";
-import { SourceConfig, type SourceRecord } from "@/lib/registry";
+import {
+  type SqlSourceConfig,
+  type SqlSourceRecord,
+  TimescaleDbConfig,
+} from "@/lib/registry";
 import { validateSql } from "@/lib/sql/safety";
 import {
   draftFromPrompt,
@@ -31,13 +35,13 @@ import {
  * model is shown, and that nothing in it can change the rules.
  */
 
-function makeSource(overrides: Partial<SourceRecord> = {}): SourceRecord {
+function makeSource(overrides: Partial<SqlSourceRecord> = {}): SqlSourceRecord {
   return {
     id: "src-metrics",
     workspaceId: "ws-1",
     name: "Metrics",
     kind: "timescaledb",
-    config: SourceConfig.parse({
+    config: TimescaleDbConfig.parse({
       host: "postgres",
       port: 5432,
       database: "holotable",
@@ -96,7 +100,7 @@ function prompt(overrides: Partial<WorkspacePrompt> = {}): WorkspacePrompt {
 }
 
 const getSource =
-  (...sources: SourceRecord[]) =>
+  (...sources: SqlSourceRecord[]) =>
   async (id: string) =>
     sources.find((s) => s.id === id) ?? null;
 
@@ -355,7 +359,7 @@ test("an example whose SQL no longer passes against the catalog is not shown", a
   assert.equal((await usableWorkspacePrompt(custom, source))?.examples.length, 1);
   // The table the example reads is no longer in the catalog.
   const changed = makeSource({
-    config: SourceConfig.parse({
+    config: TimescaleDbConfig.parse({
       ...source.config,
       tables: [{ ...source.config.tables[0], name: "http_requests_v2" }],
     }),

@@ -7,7 +7,7 @@ import {
   isUnchanged,
   summarizeCatalogDiff,
 } from "@/lib/catalog/refresh";
-import { SourceConfig } from "@/lib/registry";
+import { type SqlSourceConfig, TimescaleDbConfig } from "@/lib/registry";
 import { refreshDigest } from "@/lib/timescaledb/catalog";
 
 /**
@@ -15,7 +15,7 @@ import { refreshDigest } from "@/lib/timescaledb/catalog";
  * keeps the apply step to exactly what was reviewed.
  */
 
-const stored = SourceConfig.parse({
+const stored = TimescaleDbConfig.parse({
   host: "postgres",
   port: 5432,
   database: "holotable",
@@ -46,8 +46,8 @@ const stored = SourceConfig.parse({
   ],
 });
 
-function withTables(tables: SourceConfig["tables"]): SourceConfig {
-  return SourceConfig.parse({ ...stored, tables });
+function withTables(tables: SqlSourceConfig["tables"]): SqlSourceConfig {
+  return TimescaleDbConfig.parse({ ...stored, tables });
 }
 
 test("a refresh that finds the same catalog reports no changes", () => {
@@ -139,7 +139,7 @@ test("the digest is stable for the same result and changes with anything that wo
   const digest = refreshDigest(base);
   assert.match(digest, /^[0-9a-f]{64}$/);
   assert.equal(
-    refreshDigest({ config: SourceConfig.parse(stored), missingTables: [] }),
+    refreshDigest({ config: TimescaleDbConfig.parse(stored), missingTables: [] }),
     digest,
   );
 

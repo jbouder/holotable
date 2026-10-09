@@ -18,7 +18,7 @@ import {
 } from "@/lib/ir";
 import { COLOR_TOKENS } from "@/lib/panels/colors";
 import { PANEL_KIND_NAMES, PANEL_KINDS } from "@/lib/panels/registry";
-import { CatalogTable, SourceConfig } from "@/lib/registry";
+import { CatalogTable, type SqlSourceConfig, TimescaleDbConfig } from "@/lib/registry";
 import { checkSql } from "@/lib/sql/safety";
 
 /*
@@ -41,7 +41,7 @@ function read(path: string): string {
 }
 
 /** The example catalog, as the guard needs it. */
-function exampleSource(): { sourceId: string; config: SourceConfig } {
+function exampleSource(): { sourceId: string; config: SqlSourceConfig } {
   const catalog = readJson(join(EXAMPLES, "catalog.json")) as {
     sourceId: string;
     schema: string;
@@ -49,7 +49,7 @@ function exampleSource(): { sourceId: string; config: SourceConfig } {
   };
   // The skill has no connection details by design (no host, no credentials);
   // the guard's config type wants them, so the test supplies placeholders.
-  const config = SourceConfig.parse({
+  const config = TimescaleDbConfig.parse({
     host: "example.invalid",
     port: 5432,
     database: "example",

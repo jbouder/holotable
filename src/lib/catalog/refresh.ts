@@ -1,6 +1,6 @@
 import type { CatalogHealth, CatalogSubject } from "@/lib/catalog/health";
 import { type ApiError, apiErrorFrom, readApiError } from "@/lib/errors";
-import { type CatalogColumn, isExposed, type SourceConfig } from "@/lib/registry";
+import { type CatalogColumn, isExposed, type SqlSourceConfig } from "@/lib/registry";
 
 /**
  * What a catalog refresh would change, shown before it is written (#123).
@@ -57,7 +57,7 @@ export type StoredCatalog = Pick<CatalogSubject, "config" | "catalogMissingTable
 
 /** The introspected side: what `refreshCatalog()` returned. */
 export interface IntrospectedCatalog {
-  config: SourceConfig;
+  config: SqlSourceConfig;
   missingTables: string[];
 }
 

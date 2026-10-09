@@ -5,7 +5,7 @@ import { audit } from "@/lib/audit";
 import { SourceConnection } from "@/lib/registry";
 import { SECRET_REF_MESSAGE, SECRET_REF_PATTERN } from "@/lib/secret-refs";
 import { requireGrantedSecretRef } from "@/lib/secrets/http";
-import { serverKind } from "@/lib/sources/server/registry";
+import { sqlDiscovery } from "@/lib/sources/server/registry";
 
 export const runtime = "nodejs";
 export const maxDuration = 30;
@@ -70,11 +70,7 @@ export const POST = route("sources.discover", async (req: Request) => {
     });
 
   try {
-    const tables = await serverKind(body.kind).discover(
-      body.connection,
-      body.secretRef,
-      body.workspaceId,
-    );
+    const tables = await sqlDiscovery(body.connection, body.secretRef, body.workspaceId);
     record("success");
     return json({ ok: true, tables });
   } catch (err) {

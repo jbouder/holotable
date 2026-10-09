@@ -1,15 +1,13 @@
 import {
   type Dashboard,
   hasQuery,
-  isSqlQuery,
   panelRefreshMs,
   type QueryPanel,
   queryTimeField,
 } from "@/lib/ir";
-import { cannotRun } from "@/lib/sources/registry";
 import { getSourceById } from "@/lib/db/repo";
 import type { SourceRecord } from "@/lib/registry";
-import type { ExecutablePlan } from "@/lib/sql/safety";
+import type { SourcePlan } from "@/lib/sources/server/types";
 import { RowFilterDenied, RowFilterError } from "@/lib/sql/row-filter";
 import { VariableError, type VariableValues } from "@/lib/sql/variables";
 import { valuesKey } from "@/lib/variable-selection";
@@ -203,37 +201,23 @@ export function makePanelExecutor(
 
     const kind = serverKind(source);
     const query = panel.query;
-    if (!isSqlQuery(query)) {
-      return [
-        {
-          type: "panel-error",
-          panelId: panel.id,
-          error: cannotRun(source, query),
-          kind: "statement",
-        },
-      ];
-    }
-    const check = await kind.validate(
-      query.sql,
-      source.config,
-      new Set(Object.keys(variables)),
-    );
+    // The source's kind checks the query is in its own language, then holds
+    // it to that language's guard (#385).
+    const check = await kind.check(source, query, new Set(Object.keys(variables)));
     if (!check.ok) {
       return [
         {
           type: "panel-error",
           panelId: panel.id,
-          error: check.error ?? "invalid sql",
+          error: check.error ?? "invalid query",
           kind: "statement",
         },
       ];
     }
 
-    let plan: ExecutablePlan;
+    let plan: SourcePlan;
     try {
-      plan = kind.plan({
-        sql: query.sql,
-        timeField: query.timeField,
+      plan = kind.plan(source, query, {
         from: window.from,
         to: window.to,
         // Re-bound every tick from the source as it is now, so a filter
@@ -252,7 +236,11 @@ export function makePanelExecutor(
           },
         ];
       }
-      if (err instanceof RowFilterError || err instanceof VariableError) {
+      if (
+        err instanceof RowFilterError ||
+        err instanceof VariableError ||
+        err instanceof QueryExecutionError
+      ) {
         return [
           {
             type: "panel-error",

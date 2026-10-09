@@ -1,4 +1,3 @@
-import { z } from "zod";
 import { requireIdentity, assertAuthorized, HttpError } from "@/lib/auth/authorize";
 import { readJson, json, route } from "@/lib/http";
 import { audit } from "@/lib/audit";
@@ -7,30 +6,20 @@ import { resolveTimeRange } from "@/lib/time";
 import { rowFilterFor, rowFilterHttpError } from "@/lib/row-scope";
 import { QueryExecutionError, type QueryResult } from "@/lib/sources/execution";
 import { serverKind } from "@/lib/sources/server/registry";
-import { isSqlQuery, PromqlQuery, queryStatement, TimeRange } from "@/lib/ir";
-import { cannotRun } from "@/lib/sources/registry";
+import { queryStatement, TimeRange } from "@/lib/ir";
+import { panelQueryBody, panelQueryOf } from "@/lib/query-body";
 import { VariableError } from "@/lib/sql/variables";
 import { VariableValuesBody } from "@/lib/variable-selection";
 
 export const runtime = "nodejs";
 export const maxDuration = 30;
 
-const Common = {
+/** A panel's query, in either language (#385), plus the window and the picks. */
+const Body = panelQueryBody({
   timeRange: TimeRange,
   /** The dashboard's variables as the editor previews them (#67). */
   variables: VariableValuesBody.optional(),
-};
-
-/** A panel's query, in either language (#383), plus the window and the picks. */
-const Body = z.union([
-  z.object({
-    sourceId: z.string().min(1),
-    sql: z.string().min(1).max(8000),
-    timeField: z.string().min(1).max(128).optional(),
-    ...Common,
-  }),
-  PromqlQuery.extend(Common),
-]);
+});
 
 /**
  * Execute a single guarded query (used by preview during author/edit).
@@ -62,20 +51,13 @@ export const POST = route("query", async (req: Request) => {
         workspaceId: source.workspaceId,
         resource: { type: "source", id: source.id },
         outcome,
-        detail: { via: "preview", ...queryStatement(body), stage },
+        detail: { via: "preview", ...queryStatement(panelQueryOf(body)), stage },
       });
 
     const kind = serverKind(source);
+    const query = panelQueryOf(body);
     const variables = body.variables ?? {};
-    if (!isSqlQuery(body)) {
-      record("failure", "validate");
-      throw new HttpError(400, cannotRun(source, body), {}, "statement");
-    }
-    const check = await kind.validate(
-      body.sql,
-      source.config,
-      new Set(Object.keys(variables)),
-    );
+    const check = await kind.check(source, query, new Set(Object.keys(variables)));
     if (!check.ok) {
       record("failure", "validate");
       throw new HttpError(400, check.error ?? "invalid sql");
@@ -84,9 +66,7 @@ export const POST = route("query", async (req: Request) => {
     const range = resolveTimeRange(body.timeRange);
     let result: QueryResult;
     try {
-      const plan = kind.plan({
-        sql: body.sql,
-        timeField: body.timeField,
+      const plan = kind.plan(source, query, {
         from: range.from,
         to: range.to,
         // The caller's own rows, when the source filters them (#31).

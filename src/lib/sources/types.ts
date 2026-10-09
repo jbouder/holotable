@@ -21,7 +21,12 @@ export type { QueryLanguage };
  * its config into one, so a field added to a config later reaches a browser
  * only when someone names it here.
  */
-export interface SourceKind<Name extends string, Config extends z.ZodType> {
+export interface SourceKind<
+  Name extends string,
+  Config extends z.ZodType,
+  Catalog = SourceCatalog,
+  Listing extends SourceListing = SourceListing,
+> {
   /** The stored value of `sources.kind`. Never renamed. */
   kind: Name;
   /** How the kind is named to a person. */
@@ -32,7 +37,18 @@ export interface SourceKind<Name extends string, Config extends z.ZodType> {
   /** How to reach the source, without the catalog. */
   connection(cfg: z.infer<Config>): unknown;
   /** What the editor may see of the catalog: no connection detail, no hidden column. */
-  catalog(cfg: z.infer<Config>): SourceCatalog;
+  catalog(cfg: z.infer<Config>): Catalog;
   /** What someone who may use but not manage the source may see of it. */
-  listing(source: SourceRecord): SourceListing;
+  listing(source: SourceRecord): Listing;
+  /**
+   * The source's row filter (#31): the claim a viewer's rows are matched on,
+   * and what it is matched against — a column for SQL, a label for PromQL.
+   */
+  rowFilter(cfg: z.infer<Config>): RowFilterTarget | undefined;
+}
+
+export interface RowFilterTarget {
+  /** The column or label the claim's value is matched against. */
+  target: string;
+  claim: string;
 }

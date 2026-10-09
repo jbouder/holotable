@@ -1,4 +1,5 @@
 import { authorizedWorkspaces, can, getIdentity } from "@/lib/auth/authorize";
+import { isSqlSource } from "@/lib/sources/registry";
 import { accessibleWorkspaces, hasWorkspaceRole } from "@/lib/auth/claims";
 import { listSources } from "@/lib/db/repo";
 import { catalogHealth } from "@/lib/catalog/health";
@@ -28,7 +29,8 @@ export default async function NewDashboardPage() {
     // Derived here because the catalog stays on the server: the browser is
     // handed the suggestions, never the table and column list they were
     // built from.
-    starters: buildStarters(s, "dashboard"),
+    // SQL catalogs only, until generation learns PromQL (#387).
+    starters: isSqlSource(s) ? buildStarters(s, "dashboard") : [],
     canRefresh: can(identity, "source:manage", { workspaceId: s.workspaceId }),
   }));
 

@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { validateSql } from "@/lib/sql/safety";
-import { SourceConfig } from "@/lib/registry";
+import { type SqlSourceConfig, TimescaleDbConfig } from "@/lib/registry";
 
 /**
  * Writes smuggled through data-modifying CTEs, and the shapes around them.
@@ -14,7 +14,7 @@ import { SourceConfig } from "@/lib/registry";
  * construct it broke rather than failing one lumped assertion.
  */
 
-const source = SourceConfig.parse({
+const source = TimescaleDbConfig.parse({
   host: "postgres",
   port: 5432,
   database: "holotable",

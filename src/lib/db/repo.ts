@@ -36,7 +36,7 @@ type SourceRow = {
   name: string;
   kind: string;
   config: unknown;
-  secret_ref: string;
+  secret_ref: string | null;
   catalog_refreshed_at: string | null;
   catalog_missing_tables: string[] | null;
   created_by: string;
@@ -85,7 +85,8 @@ export async function createSource(input: {
   workspaceId: string;
   name: string;
   config: SourceConfig;
-  secretRef: string;
+  /** Null for a source that needs no credentials (#385). */
+  secretRef: string | null;
   createdBy: string;
 }): Promise<SourceRecord> {
   const rows = await query<SourceRow>(
@@ -113,7 +114,8 @@ export async function updateSource(
   patch: {
     name?: string;
     config?: SourceConfig;
-    secretRef?: string;
+    /** A new reference; `null` clears it, for a source that no longer needs one. */
+    secretRef?: string | null;
     /** Set together by the refresh route; a null column leaves both alone. */
     catalogRefreshedAt?: Date;
     catalogMissingTables?: string[];
@@ -123,7 +125,7 @@ export async function updateSource(
     `UPDATE sources
      SET name = COALESCE($3, name),
          config = COALESCE($4, config),
-         secret_ref = COALESCE($5, secret_ref),
+         secret_ref = CASE WHEN $8::boolean THEN NULL ELSE COALESCE($5, secret_ref) END,
          catalog_refreshed_at = COALESCE($6::timestamptz, catalog_refreshed_at),
          catalog_missing_tables = COALESCE($7::text[], catalog_missing_tables),
          updated_at = now()
@@ -137,6 +139,7 @@ export async function updateSource(
       patch.secretRef ?? null,
       patch.catalogRefreshedAt ?? null,
       patch.catalogMissingTables ?? null,
+      patch.secretRef === null,
     ],
   );
   return rows[0] ? mapSource(rows[0]) : null;

@@ -20,9 +20,9 @@ import {
 } from "@/lib/ir";
 import { PANEL_KINDS } from "@/lib/panels/registry";
 import {
-  type SourceConfig,
-  SourceConfig as SourceConfigSchema,
-  type SourceRecord,
+  type SqlSourceConfig,
+  TimescaleDbConfig as SourceConfigSchema,
+  type SqlSourceRecord as SourceRecord,
 } from "@/lib/registry";
 import { analyzeSelect } from "@/lib/sql/ast";
 import { selectOutputs, timeFieldWarning } from "@/lib/sql/hints";
@@ -156,7 +156,7 @@ export function loadCases(dir: string = EVALS_DIR): EvalCase[] {
 
 /** The case's catalog as a registered, refreshed source, the way a route sees one. */
 export function loadSource(catalog: string, dir: string = EVALS_DIR): SourceRecord {
-  const config: SourceConfig = SourceConfigSchema.parse(
+  const config: SqlSourceConfig = SourceConfigSchema.parse(
     JSON.parse(readFileSync(join(dir, "catalogs", `${catalog}.json`), "utf8")),
   );
   const at = "2026-01-01T00:00:00.000Z";

@@ -1,12 +1,11 @@
 import { serverKind } from "@/lib/sources/server/registry";
-import { cannotRun } from "@/lib/sources/registry";
 import { HttpError } from "@/lib/auth/authorize";
 import { getSourceById } from "@/lib/db/repo";
 import {
   pgWorkspacePromptStore,
   type WorkspacePromptStore,
 } from "@/lib/db/workspace-prompts";
-import { hasQuery, isSqlQuery } from "@/lib/ir";
+import { hasQuery } from "@/lib/ir";
 import type { SourceRecord } from "@/lib/registry";
 import type { WorkspacePrompt } from "@/lib/workspace-prompt";
 
@@ -42,9 +41,8 @@ export async function validateWorkspacePrompt(
         `${label}: source "${query.sourceId}" is not a data source in this workspace`,
       );
     }
-    if (!isSqlQuery(query))
-      throw new HttpError(400, `${label}: ${cannotRun(source, query)}`);
-    const check = await serverKind(source).validate(query.sql, source.config);
+    // Held to the source's own language and guard, as a panel is on save.
+    const check = await serverKind(source).check(source, query);
     if (!check.ok) throw new HttpError(400, `${label}: ${check.error}`);
   }
 }
@@ -67,8 +65,8 @@ export async function usableWorkspacePrompt(
     if (!hasQuery(example.panel)) continue;
     const query = example.panel.query;
     const source = list.find((s) => s.id === query.sourceId);
-    if (!source || !isSqlQuery(query)) continue;
-    const check = await serverKind(source).validate(query.sql, source.config);
+    if (!source) continue;
+    const check = await serverKind(source).check(source, query);
     if (check.ok) examples.push(example);
   }
   return { ...prompt, examples };
