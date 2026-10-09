@@ -12,6 +12,7 @@ import {
   referencedSourceIds,
 } from "@/lib/dashboard-export";
 import type { ApiError } from "@/lib/errors";
+import { linkTargetIds } from "@/lib/drilldown";
 import { Button, ButtonLabel } from "@/components/ui/button";
 import { Label } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
@@ -77,6 +78,9 @@ export function ImportDashboard({ targets }: { targets: ImportTarget[] }) {
   const referenced = file ? referencedSourceIds(file.spec) : [];
   const resolvedId = (id: string) => mapping[id] ?? id;
   const unresolved = referenced.filter((id) => !available.has(resolvedId(id)));
+  // Panel links name dashboards by id (#372), which a file written on another
+  // instance cannot resolve here. Not an error: such a link shows disabled.
+  const linkedDashboards = file ? linkTargetIds(file.spec) : [];
 
   async function runImport() {
     if (!file || !target) return;
@@ -216,6 +220,17 @@ export function ImportDashboard({ targets }: { targets: ImportTarget[] }) {
                 </p>
               )}
             </div>
+          )}
+
+          {linkedDashboards.length > 0 && (
+            <p className="text-xs text-muted">
+              Its panels link to{" "}
+              {linkedDashboards.length === 1
+                ? "one other dashboard"
+                : `${linkedDashboards.length} other dashboards`}{" "}
+              by id. A link whose dashboard is not in this workspace shows as unavailable
+              until it is pointed at one here.
+            </p>
           )}
 
           {error && <ErrorDisplay error={error} />}

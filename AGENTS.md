@@ -119,6 +119,12 @@ Important files:
   dashboard's workspace, under the viewer's row scope) and
   `src/lib/variable-selection.ts` (`var-*` URL picks, defaults, the allowlist
   check). Picks are part of the poller key
+- `src/lib/drilldown.ts` and `src/lib/drilldown-targets.ts` — drilldown
+  (#370): a panel's `links` name a target dashboard by opaque id, never a URL.
+  The page resolves targets on the server (same workspace, `can()` on every
+  load) and the browser builds hrefs only to those; an href carries time
+  expressions and `var-*` picks, which the target re-checks like a typed URL.
+  Share links and embeds show no links
 - `src/lib/annotations.ts`, `src/lib/annotation-service.ts` and
   `src/lib/db/annotations.ts` — annotations (#68): workspace-scoped events
   drawn on time-series panels. Reads take the workspace from the dashboard

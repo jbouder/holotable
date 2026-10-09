@@ -362,6 +362,7 @@ request:
 | `src/lib/sql/safety.ts`, `ast.ts`, `denylist.ts` (the guard) | `concepts/executing-a-panel.md`, invariants 7 and 8, the trust model in `SECURITY.md` |
 | `src/lib/sql/row-filter.ts`, `src/lib/row-scope.ts` | `operations/row-level-filters.md`, invariant 8a |
 | `src/lib/sql/variables.ts`, `src/lib/variables.ts`, `variable-selection.ts` | `concepts/variables.md` |
+| `src/lib/drilldown.ts`, `drilldown-targets.ts`, `panel.links` in `ir.ts` | `concepts/drilldown.md` |
 | `src/lib/auth/authorize.ts` (an action or rule in `can()`) | `architecture/authorization.md` (the action matrix), `SECURITY.md` |
 | `src/lib/auth/` sessions, renewal, revocation, share links, API tokens | `architecture/authorization.md`, `operations/share-links.md`, `operations/api-tokens.md`, `SECURITY.md` |
 | `src/lib/auth/mcp-token.ts`, `/api/mcp`, the realm's MCP client | `operations/keycloak.md` ("MCP clients"), `SECURITY.md` |

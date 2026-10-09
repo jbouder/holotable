@@ -74,6 +74,8 @@ export function MenuItem({
   onClick,
   href,
   download,
+  target,
+  title,
 }: {
   children: React.ReactNode;
   disabled?: boolean;
@@ -81,15 +83,25 @@ export function MenuItem({
   onClick?: () => void;
   href?: string;
   download?: boolean;
+  /** `_blank` opens a new tab, always with `rel="noopener noreferrer"`. */
+  target?: "_blank";
+  title?: string;
 }) {
   return (
     <BaseMenu.Item
       disabled={disabled}
       onClick={onClick}
+      title={title}
       render={
         href
           ? (props) => (
-              <a {...props} href={href} download={download}>
+              <a
+                {...props}
+                href={href}
+                download={download}
+                target={target}
+                rel={target ? "noopener noreferrer" : undefined}
+              >
                 {props.children}
               </a>
             )

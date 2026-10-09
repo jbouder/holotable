@@ -2,7 +2,12 @@ import { expect, test } from "@playwright/test";
 import { STUB_CHAT_REPLY } from "../src/lib/ai/stub";
 import { SPEC_VERSION } from "../src/lib/ir";
 import { PG_PORT, storageStatePath } from "./env";
-import { DEMO_DASHBOARD, dashboardId, waitForPanels } from "./support/app";
+import {
+  createLinkedDashboards,
+  DEMO_DASHBOARD,
+  dashboardId,
+  waitForPanels,
+} from "./support/app";
 
 /*
  * The flows around the core journey (#88): Explore, dashboard chat, a source
@@ -177,6 +182,45 @@ test("a deleted source tombstones the panels that used it", async ({ page, reque
   await expect(
     page.getByText("This panel's data source has been removed."),
   ).toBeVisible();
+});
+
+test("a panel link carries the window and picks to its target (#372)", async ({
+  page,
+  request,
+}) => {
+  const { source, target } = await createLinkedDashboards(request);
+  await page.goto(`/dashboards/${source}?from=now-6h&to=now`);
+  await waitForPanels(page);
+  const panel = page.locator('[data-panel-id="routes"]');
+  await expect(panel.getByText("Has links")).toBeAttached();
+  const openMenu = async () => {
+    await panel.getByRole("button", { name: "Actions for Requests by route" }).click();
+    return page.getByRole("menu");
+  };
+
+  // A target that does not exist is a disabled item, never an href.
+  let menu = await openMenu();
+  const retired = menu.getByRole("menuitem", { name: /Retired dashboard/ });
+  await expect(retired).toHaveAttribute("aria-disabled", "true");
+  await expect(
+    menu.locator('a[href*="00000000-0000-4000-8000-000000000000"]'),
+  ).toHaveCount(0);
+
+  // A self link sets the pick in place: same page, new URL.
+  await menu.getByRole("menuitem", { name: "Only search" }).click();
+  await expect(page).toHaveURL(
+    new RegExp(`/dashboards/${source}\\?.*var-route=%2Fsearch`),
+  );
+
+  // A link to the target carries the window, and its literal pick wins.
+  menu = await openMenu();
+  await menu.getByRole("menuitem", { name: "Checkout detail" }).click();
+  await page.waitForURL(new RegExp(`/dashboards/${target}\\?`));
+  const url = new URL(page.url());
+  expect(url.searchParams.get("from")).toBe("now-6h");
+  expect(url.searchParams.get("to")).toBe("now");
+  expect(url.searchParams.getAll("var-route")).toEqual(["/checkout"]);
+  await waitForPanels(page);
 });
 
 test.describe("as a viewer", () => {

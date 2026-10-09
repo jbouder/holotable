@@ -3,6 +3,7 @@ import { appendPanel } from "@/lib/explore-save";
 import { type ApiError, apiErrorFromThrown, readApiError } from "@/lib/errors";
 import { Dashboard, hasQuery, Panel, SPEC_VERSION, type TimeRange } from "@/lib/ir";
 import { migratePanel, migrateSpec } from "@/lib/ir/upgrade";
+import { withoutDashboardLinks } from "@/lib/drilldown";
 
 /**
  * Panel and dashboard templates.
@@ -219,16 +220,30 @@ export function appendTemplate(
  * author's judgement, not the grid's.
  */
 export function panelTemplateBody(panel: Panel): TemplateBody {
+  const { links: _, ...unlinked } = panel;
   return {
     kind: "panel",
     specVersion: SPEC_VERSION,
-    panel: Panel.parse({ ...panel, layout: { ...panel.layout, x: 0, y: 0 } }),
+    // No links at all (#372): a dashboard id means nothing where the template
+    // lands, and a self link sets variables a lone panel does not bring along.
+    panel: Panel.parse({ ...unlinked, layout: { ...panel.layout, x: 0, y: 0 } }),
   };
 }
 
-/** The template a dashboard would become: the spec, whole and unaltered. */
+/**
+ * The template a dashboard would become: the spec, whole, less its links to
+ * other dashboards (#372). A template is reused across workspaces and
+ * instances, where a dashboard id points at nothing or at the wrong thing;
+ * a self link only sets the template's own variables, so it stays.
+ */
 export function dashboardTemplateBody(spec: Dashboard): TemplateBody {
-  return { kind: "dashboard", dashboard: Dashboard.parse(spec) };
+  return {
+    kind: "dashboard",
+    dashboard: Dashboard.parse({
+      ...spec,
+      panels: spec.panels.map(withoutDashboardLinks),
+    }),
+  };
 }
 
 /**
