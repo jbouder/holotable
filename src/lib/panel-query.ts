@@ -156,12 +156,19 @@ export function runSubject(
     timeRange.from,
     timeRange.to,
     valuesKey(variables),
-    // What else changes a PromQL result: the step's floor (#383).
-    ...(isSqlQuery(query) ? [] : [query.minStep ?? null]),
+    // What else changes a PromQL result: the step's floor (#383) and whether
+    // it is evaluated at one instant (#388).
+    ...(isSqlQuery(query) ? [] : [query.minStep ?? null, query.instant ?? false]),
   ]);
 }
 
-export type SqlCheck = { ok: true } | { ok: false; error: ApiError };
+export type SqlCheck =
+  | {
+      ok: true;
+      /** What the guard noticed without refusing: a PromQL catalog or counter hint (#388). */
+      hints?: string[];
+    }
+  | { ok: false; error: ApiError };
 
 /**
  * Ask the server whether a statement would be accepted.
@@ -177,13 +184,36 @@ export async function validatePanelSql(input: {
   /** The variables the dashboard declares (#67). */
   variables?: readonly string[];
 }): Promise<SqlCheck> {
+  return validatePanelQuery({
+    query: { sourceId: input.sourceId, sql: input.sql },
+    variables: input.variables,
+  });
+}
+
+/**
+ * `validatePanelSql` for a query in either language (#388): the body is the
+ * query's own fields, named rather than spread, and a PromQL verdict carries
+ * the guard's hints.
+ */
+export async function validatePanelQuery(input: {
+  query: PanelQuery;
+  variables?: readonly string[];
+}): Promise<SqlCheck> {
+  const { query } = input;
+  const statement = isSqlQuery(query)
+    ? { sql: query.sql }
+    : {
+        promql: query.promql,
+        ...(query.instant !== undefined ? { instant: query.instant } : {}),
+        ...(query.minStep !== undefined ? { minStep: query.minStep } : {}),
+      };
   try {
     const res = await fetch("/api/sql/validate", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        sourceId: input.sourceId,
-        sql: input.sql,
+        sourceId: query.sourceId,
+        ...statement,
         ...(input.variables?.length ? { variables: input.variables } : {}),
       }),
     });
@@ -193,9 +223,18 @@ export async function validatePanelSql(input: {
       string,
       unknown
     >;
-    if (record.ok === true) return { ok: true };
+    if (record.ok === true) {
+      const hints = Array.isArray(record.hints)
+        ? record.hints.filter((h): h is string => typeof h === "string")
+        : [];
+      return hints.length > 0 ? { ok: true, hints } : { ok: true };
+    }
     const message =
-      typeof record.error === "string" && record.error ? record.error : "invalid sql";
+      typeof record.error === "string" && record.error
+        ? record.error
+        : isSqlQuery(query)
+          ? "invalid sql"
+          : "invalid query";
     return { ok: false, error: { error: message, kind: "statement" } };
   } catch (err) {
     return { ok: false, error: apiErrorFromThrown(err) };

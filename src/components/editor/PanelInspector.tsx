@@ -1,13 +1,16 @@
 "use client";
 
-import type * as React from "react";
+import * as React from "react";
 import { Copy, LayoutTemplate, MoreHorizontal, Trash2, X } from "lucide-react";
 import {
   type Dashboard,
   hasQuery,
   type Panel,
   panelTimeRange,
+  Duration,
+  type PromqlQuery,
   type QueryPanel,
+  queryLanguage,
   ValueFormat,
   VizType,
   isSqlQuery,
@@ -15,8 +18,13 @@ import {
 import { changePanelKind } from "@/lib/panel-kind-change";
 import { panelKind } from "@/lib/panels/registry";
 import { TEXT_CONTENT_MAX } from "@/lib/panels/kinds/text";
-import { panelStarter } from "@/lib/panel-starter";
-import type { SourceCatalog } from "@/lib/registry";
+import { starterQuery } from "@/lib/panel-starter";
+import { validatePanelQuery } from "@/lib/panel-query";
+import {
+  type EditorCatalog,
+  type SourceKindName,
+  sourceKind,
+} from "@/lib/sources/registry";
 import type { VariableValues } from "@/lib/sql/variables";
 import { MarkdownView } from "@/components/panels/text";
 import { Button } from "@/components/ui/button";
@@ -24,6 +32,8 @@ import { Input, Label, Textarea } from "@/components/ui/input";
 import { Menu, MenuItem, MenuSeparator } from "@/components/ui/menu";
 import { Select } from "@/components/ui/select";
 import { SqlEditor } from "@/components/sql/SqlEditor";
+import { PromqlEditor, type PromqlVerdict } from "@/components/promql/PromqlEditor";
+import { Checkbox } from "@/components/ui/checkbox";
 import { TimeFieldPicker } from "@/components/sql/TimeFieldPicker";
 import { PanelPreview, usePanelPreview } from "@/components/dashboard/PanelPreview";
 import {
@@ -37,8 +47,23 @@ export interface SourceOption {
   id: string;
   name: string;
   workspaceId: string;
-  /** Tables and columns, for completion and the editor's allowlist hint. */
-  catalog: SourceCatalog;
+  /** Which kind, so the editor knows the language its panels are written in (#388). */
+  kind: SourceKindName;
+  /**
+   * Tables and columns, or metrics and labels, for completion and the
+   * editor's allowlist hints. Never where the source lives.
+   */
+  catalog: EditorCatalog;
+}
+
+/** The SQL catalog, when the source has one, for the SQL editor's completion. */
+function sqlCatalog(catalog: EditorCatalog | null) {
+  return catalog && "tables" in catalog ? catalog : null;
+}
+
+/** The metric catalog, when the source has one, for the PromQL editor's. */
+function promqlCatalog(catalog: EditorCatalog | null) {
+  return catalog && "metrics" in catalog ? catalog : null;
 }
 
 /** How a spec change is recorded in the undo stack. */
@@ -121,10 +146,27 @@ export function PanelInspector({
     });
   }
   /** A query for a panel switched back from a kind that had none (#202). */
-  const starterQuery = () => {
+  const starterFor = (viz: VizType) => () => {
     const source = sources[0];
-    const starter = panelStarter(source?.catalog ?? null);
-    return { sourceId: source?.id ?? "", sql: starter.sql, timeField: starter.timeField };
+    return starterQuery(source?.id ?? "", source?.catalog ?? null, viz).query;
+  };
+  /**
+   * A new source for the panel. Of the same kind, the query is kept and only
+   * re-pointed; of the other kind, its language is wrong there, so the panel
+   * starts over from that source's starter for its kind rather than being
+   * saved with a query its source cannot run (#388). Undo brings it back.
+   */
+  const changeSource = (sourceId: string) => {
+    const next = sources.find((s) => s.id === sourceId);
+    onQueryChange(
+      (p) => {
+        if (next && sourceKind(next.kind).language !== queryLanguage(p.query)) {
+          return { ...p, query: starterQuery(next.id, next.catalog, p.viz).query };
+        }
+        return { ...p, query: { ...p.query, sourceId } };
+      },
+      { action: "change panel source" },
+    );
   };
   const onQueryChange = (fn: (p: QueryPanel) => Panel, intent: EditIntent) =>
     onChange((p) => (hasQuery(p) ? fn(p) : p), intent);
@@ -184,11 +226,7 @@ export function PanelInspector({
               <Select
                 id="p-source"
                 value={panel.query.sourceId}
-                onValueChange={(v) =>
-                  onQueryChange((p) => ({ ...p, query: { ...p.query, sourceId: v } }), {
-                    action: "change panel source",
-                  })
-                }
+                onValueChange={changeSource}
                 options={sourceOptions}
               />
             </div>
@@ -232,9 +270,12 @@ export function PanelInspector({
               id="p-viz"
               value={panel.viz}
               onValueChange={(v) =>
-                onChange((p) => changePanelKind(p, v as VizType, starterQuery), {
-                  action: "change visualization",
-                })
+                onChange(
+                  (p) => changePanelKind(p, v as VizType, starterFor(v as VizType)),
+                  {
+                    action: "change visualization",
+                  },
+                )
               }
               options={VIZ_OPTIONS}
             />
@@ -316,21 +357,15 @@ function QueryFields({
   const query = panel.query;
 
   if (!isSqlQuery(query)) {
-    // A PromQL panel (#383) loads and saves, but this editor writes SQL; it
-    // learns PromQL with the Prometheus editor (#388).
     return (
-      <div className="space-y-2">
-        <Label htmlFor="p-promql">PromQL</Label>
-        <pre
-          id="p-promql"
-          className="overflow-auto rounded-md border border-border bg-surface px-3 py-2 font-mono text-xs"
-        >
-          {query.promql}
-        </pre>
-        <p className="text-sm text-muted">
-          This editor cannot change a PromQL query yet.
-        </p>
-      </div>
+      <PromqlFields
+        panel={panel}
+        query={query}
+        catalog={promqlCatalog(catalog)}
+        variables={variables}
+        preview={preview}
+        onChange={onChange}
+      />
     );
   }
 
@@ -343,7 +378,7 @@ function QueryFields({
         <SqlEditor
           id="p-sql"
           value={query.sql}
-          catalog={catalog}
+          catalog={sqlCatalog(catalog)}
           onChange={(sql) =>
             onChange((p) => ({ ...p, query: { ...p.query, sql } }), {
               action: "edit SQL",
@@ -362,13 +397,133 @@ function QueryFields({
         id="p-tf"
         value={query.timeField}
         sql={query.sql}
-        catalog={catalog}
+        catalog={sqlCatalog(catalog)}
         onChange={(timeField) =>
           onChange((p) => ({ ...p, query: { ...p.query, timeField } }), {
             action: "change time field",
           })
         }
       />
+    </>
+  );
+}
+
+/**
+ * A PromQL panel's expression (#388): the editor with metric and label
+ * completion and the guard's verdict, then how it is evaluated. There is no
+ * time field: the server steps the window itself, and `instant` and
+ * `minStep` are the only say a panel has in it.
+ */
+function PromqlFields({
+  panel,
+  query,
+  catalog,
+  variables,
+  preview,
+  onChange,
+}: {
+  panel: QueryPanel;
+  query: PromqlQuery;
+  catalog: ReturnType<typeof promqlCatalog>;
+  variables: VariableValues;
+  preview: ReturnType<typeof usePanelPreview>;
+  onChange: (fn: (p: QueryPanel) => Panel, intent: EditIntent) => void;
+}) {
+  const setQuery = (patch: Partial<PromqlQuery>, intent: EditIntent) =>
+    onChange(
+      (p) => (isSqlQuery(p.query) ? p : { ...p, query: { ...p.query, ...patch } }),
+      intent,
+    );
+
+  // The verdict the editor underlines, from the same route Validate uses.
+  const sourceId = query.sourceId;
+  const declared = Object.keys(variables).join(",");
+  const check = React.useCallback(
+    async (promql: string): Promise<PromqlVerdict | null> => {
+      const verdict = await validatePanelQuery({
+        query: { sourceId, promql },
+        variables: declared ? declared.split(",") : [],
+      });
+      if (verdict.ok) return verdict;
+      // A transport failure is not the expression's fault: draw nothing.
+      return verdict.error.kind === "statement"
+        ? { ok: false, error: verdict.error.error }
+        : null;
+    },
+    [sourceId, declared],
+  );
+
+  // `minStep` is a duration; the draft holds what is typed until it is one.
+  const [stepDraft, setStepDraft] = React.useState(query.minStep ?? "");
+  const stepValid =
+    stepDraft.trim() === "" || Duration.safeParse(stepDraft.trim()).success;
+
+  return (
+    <>
+      <div className="space-y-2">
+        <Label htmlFor="p-promql">
+          PromQL (no range of its own: the server steps the window)
+        </Label>
+        <PromqlEditor
+          id="p-promql"
+          value={query.promql}
+          catalog={catalog}
+          check={check}
+          onChange={(promql) =>
+            setQuery({ promql }, { action: "edit PromQL", key: `${panel.id}:promql` })
+          }
+          onRun={() => {
+            if (preview.busy === null) preview.run();
+          }}
+          placeholder="sum(rate(http_requests_total[5m]))"
+        />
+        <PanelPreview panel={panel} preview={preview} />
+      </div>
+
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+        <div className="space-y-1">
+          <Checkbox
+            checked={query.instant === true}
+            label="Instant (one value per series, at the window's end)"
+            onCheckedChange={(instant) =>
+              setQuery(
+                { instant: instant ? true : undefined },
+                { action: "change instant query" },
+              )
+            }
+          />
+          <p className="text-xs text-muted">For a stat, a gauge, a table or a pie.</p>
+        </div>
+        <div>
+          <Label htmlFor="p-minstep">Min step</Label>
+          <Input
+            id="p-minstep"
+            placeholder="the server's"
+            value={stepDraft}
+            disabled={query.instant === true}
+            aria-invalid={!stepValid}
+            aria-describedby="p-minstep-help"
+            onChange={(e) => {
+              setStepDraft(e.target.value);
+              const next = e.target.value.trim();
+              if (next === "" || Duration.safeParse(next).success) {
+                setQuery(
+                  { minStep: next === "" ? undefined : next },
+                  { action: "change min step", key: `${panel.id}:minStep` },
+                );
+              }
+            }}
+          />
+          <p
+            id="p-minstep-help"
+            className={stepValid ? "mt-1 text-xs text-muted" : "mt-1 text-xs text-danger"}
+          >
+            {stepValid
+              ? "A floor on the step, such as 1m. The server only ever raises it."
+              : "Write a duration such as 30s, 1m or 1h."}
+          </p>
+        </div>
+      </div>
     </>
   );
 }

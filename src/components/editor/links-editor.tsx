@@ -100,8 +100,8 @@ export function LinksEditor({
       {links.length === 0 && !editing && (
         <p className="text-xs text-muted">
           A link leads from this panel to another dashboard in the workspace, or sets a
-          variable on this one. A link that reads a column or the series is followed by
-          clicking the data.
+          variable on this one. A link that reads a column, the series or a series label
+          is followed by clicking the data.
         </p>
       )}
       {links.length > 0 && (
@@ -251,6 +251,7 @@ const SOURCE_OPTIONS: { value: PickSource; label: string }[] = [
   { value: "value", label: "a value" },
   { value: "column", label: "a column of the clicked row" },
   { value: "series", label: "the clicked series" },
+  { value: "label", label: "a label of the clicked series (PromQL)" },
 ];
 
 function LinkFormFields({
@@ -376,6 +377,16 @@ function LinkFormFields({
                 placeholder="value"
                 value={row.text}
                 maxLength={256}
+                onChange={(e) => editRow(i, { text: e.target.value })}
+              />
+            )}
+            {row.source === "label" && (
+              <Input
+                aria-label={`Pick ${i + 1} label`}
+                placeholder="label, such as instance"
+                value={row.text}
+                maxLength={128}
+                spellCheck={false}
                 onChange={(e) => editRow(i, { text: e.target.value })}
               />
             )}

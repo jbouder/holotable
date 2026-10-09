@@ -67,3 +67,36 @@ test("a panel that runs no query has no details to show (#202)", () => {
   const text = { ...panel(), viz: "text", query: undefined } as Panel;
   assert.equal(panelDetails(text), null);
 });
+
+test("a PromQL panel exposes its expression, instant and minStep, and nothing else (#388)", () => {
+  const query: Record<string, unknown> = {
+    sourceId: "prom-1",
+    promql: "sum(rate(http_requests_total[5m]))",
+    instant: true,
+    minStep: "1m",
+    url: "http://prometheus:9090",
+    auth: "bearer",
+  };
+  const smuggled = { ...panel(), query } as unknown as Panel;
+  const details = panelDetails(smuggled);
+  assert.deepEqual(Object.keys(details ?? {}).sort(), [
+    "description",
+    "instant",
+    "minStep",
+    "promql",
+    "sourceId",
+    "timeField",
+  ]);
+  assert.ok(details && "promql" in details);
+  assert.equal(details.promql, "sum(rate(http_requests_total[5m]))");
+  assert.equal(details.instant, true);
+  assert.equal(details.minStep, "1m");
+  assert.doesNotMatch(JSON.stringify(details), /prometheus:9090|bearer/);
+});
+
+test("a range PromQL panel leaves instant and minStep out rather than inventing them", () => {
+  const details = panelDetails(panel({ query: { sourceId: "prom-1", promql: "up" } }));
+  assert.ok(details && "promql" in details);
+  assert.equal("instant" in details, false);
+  assert.equal("minStep" in details, false);
+});

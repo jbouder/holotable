@@ -110,3 +110,29 @@ test("one panel is summarized in the singular", () => {
     "1 of 1 panel still validates against this source",
   );
 });
+
+test("a PromQL panel is checked as PromQL, so a SQL source refuses it by language (#388)", async () => {
+  const bodies: Record<string, unknown>[] = [];
+  globalThis.fetch = (async (_input: string, init?: RequestInit) => {
+    const body = JSON.parse(String(init?.body));
+    bodies.push(body);
+    return new Response(
+      JSON.stringify({
+        ok: false,
+        error: 'source "live" answers SQL; this query is PromQL',
+      }),
+      { status: 200, headers: { "content-type": "application/json" } },
+    );
+  }) as typeof fetch;
+  const prom: QueryPanel = {
+    ...panel("p", "dead"),
+    query: { sourceId: "dead", promql: "sum(up)", instant: true },
+  };
+  const [check] = await checkRepoint([prom], "live");
+  assert.deepEqual(bodies, [{ sourceId: "live", promql: "sum(up)", instant: true }]);
+  assert.equal(check.check.ok, false);
+  assert.match(
+    check.check.ok ? "" : check.check.error.error,
+    /answers SQL; this query is PromQL/,
+  );
+});

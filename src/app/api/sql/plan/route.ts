@@ -76,5 +76,7 @@ export const POST = route("sql.plan", async (req: Request) => {
     throw rowFilterHttpError(err);
   }
 
-  return json(kind.planView({ source, query, plan, timeRange: body.timeRange }));
+  return json(
+    kind.planView({ source, query, plan, timeRange: body.timeRange, variables }),
+  );
 });

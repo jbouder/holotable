@@ -10,6 +10,23 @@ import { type PromqlLimits, analyzePromql, VARIABLE_REF } from "@/lib/promql/saf
 import { type VariableValues, VariableError } from "@/lib/sql/variables";
 
 /**
+ * The variables an expression references, in the order they appear, each
+ * once: what the plan dialog lists beside the values it bound (#388).
+ */
+export function promqlVariableNames(expr: string, limits: PromqlLimits): string[] {
+  const { selectors } = analyzePromql(expr, "bound", limits);
+  const names: string[] = [];
+  for (const selector of selectors) {
+    for (const matcher of selector.matchers) {
+      const value = plainString(text(expr, matcher.value));
+      const ref = value === null ? null : VARIABLE_REF.exec(value);
+      if (ref && !names.includes(ref[1])) names.push(ref[1]);
+    }
+  }
+  return names;
+}
+
+/**
  * Dashboard variables in PromQL (#67, #384).
  *
  * The guard allows a `:name` reference only as a label matcher's whole value,

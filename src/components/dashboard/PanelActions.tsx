@@ -112,7 +112,7 @@ export function PanelActions({
       </MenuItem>
       {onShowSql && (
         <MenuItem onClick={onShowSql}>
-          <Code className="h-4 w-4" /> Show generated SQL
+          <Code className="h-4 w-4" /> Show query
         </MenuItem>
       )}
       {onAskAbout && (

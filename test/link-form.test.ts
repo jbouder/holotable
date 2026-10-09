@@ -207,3 +207,22 @@ test("while a generation streams, links it has not produced are pending, not rem
   assert.equal(row?.pending, true);
   assert.equal(row?.changed, false);
 });
+
+test("a label pick round-trips and names the label it needs (#388)", () => {
+  const link: PanelLink = { title: "Host", set: { host: { label: "instance" } } };
+  const form = formFromLink(link);
+  assert.deepEqual(form.set, [{ name: "host", source: "label", text: "instance" }]);
+  assert.deepEqual(
+    linkFromForm(form, { otherTitles: [], ownVariables: new Set(["host"]) }).link,
+    link,
+  );
+  const empty = { ...form, set: [{ name: "host", source: "label" as const, text: "" }] };
+  assert.deepEqual(
+    linkFromForm(empty, { otherTitles: [], ownVariables: new Set(["host"]) }).problems,
+    ["Pick 1: name the label."],
+  );
+  assert.equal(
+    describeLink(link),
+    "to this dashboard; sets host from the clicked series' instance label",
+  );
+});

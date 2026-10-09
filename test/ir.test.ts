@@ -20,7 +20,7 @@ import {
   linkCarries,
   PANEL_LINKS_MAX,
   Panel,
-  type PanelLink,
+  PanelLink,
   parseDashboard,
   SPEC_VERSION,
   safeParseDashboard,
@@ -507,4 +507,22 @@ test("isDatumLink, isSelfLink and linkCarries", () => {
     timeRange: true,
     variables: false,
   });
+});
+
+test("a link may set a variable from a label of the clicked series, by a label name only (#388)", () => {
+  const ok = PanelLink.safeParse({ title: "Host", set: { host: { label: "instance" } } });
+  assert.ok(ok.success);
+  for (const label of ["", "1abc", 'in"stance', "a-b", "x".repeat(129)]) {
+    assert.equal(
+      PanelLink.safeParse({ title: "Host", set: { host: { label } } }).success,
+      false,
+      label,
+    );
+  }
+  // Exactly one source per pick.
+  assert.equal(
+    PanelLink.safeParse({ title: "H", set: { host: { label: "a", series: true } } })
+      .success,
+    false,
+  );
 });

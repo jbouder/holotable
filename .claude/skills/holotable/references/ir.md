@@ -122,10 +122,10 @@ target checks every pick against its own variable, as for a hand-typed link.
 | `title` | string | 1–64 chars, unique among the panel's links. What the menu item or the click says. |
 | `dashboard` | string | Optional, 1–128. The target dashboard's opaque id, never a URL. Absent: this dashboard. |
 | `carry` | `{ timeRange?, variables? }` | Optional booleans, each `true` when absent. `false` lands on the target's own default. |
-| `set` | object | Optional, at most 10 entries, keyed by variable name. Each value is exactly one of `{ "value": "api" }` (a literal), `{ "column": "instance" }` (the clicked row's value in that result column) or `{ "series": true }` (the clicked series or slice name). |
+| `set` | object | Optional, at most 10 entries, keyed by variable name. Each value is exactly one of `{ "value": "api" }` (a literal), `{ "column": "instance" }` (the clicked row's value in that result column), `{ "series": true }` (the clicked series or slice name) or `{ "label": "instance" }` (one label of the clicked PromQL series, whose name is `metric{instance="…", job="…"}`; a Prometheus label name). |
 | `newTab` | boolean | Optional, default `false`. |
 
-- A link whose `set` reads a `column` or the `series` is followed by clicking a
+- A link whose `set` reads a `column`, the `series` or a `label` is followed by clicking a
   point, slice, cell or row. Any other link is followed from the panel's menu.
 - A link with no `dashboard` must `set` at least one variable, and only
   variables this dashboard declares.

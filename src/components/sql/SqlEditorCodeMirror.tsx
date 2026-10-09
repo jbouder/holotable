@@ -10,16 +10,14 @@ import {
 } from "@codemirror/autocomplete";
 import { defaultKeymap, history, historyKeymap } from "@codemirror/commands";
 import { PostgreSQL, sql } from "@codemirror/lang-sql";
-import {
-  bracketMatching,
-  HighlightStyle,
-  indentOnInput,
-  syntaxHighlighting,
-} from "@codemirror/language";
+import { bracketMatching, indentOnInput, syntaxHighlighting } from "@codemirror/language";
 import { type Diagnostic, linter, lintKeymap } from "@codemirror/lint";
 import { Compartment, EditorState, type Extension } from "@codemirror/state";
 import { drawSelection, EditorView, keymap, placeholder } from "@codemirror/view";
-import { tags } from "@lezer/highlight";
+import {
+  editorHighlight as highlight,
+  editorTheme as theme,
+} from "@/components/sql/editor-theme";
 import type { SqlEditorProps } from "@/components/sql/SqlEditor";
 import { documentNonce } from "@/lib/csp-nonce";
 import type { SourceCatalog } from "@/lib/registry";
@@ -50,56 +48,6 @@ import { sqlHints } from "@/lib/sql/hints";
  * second theme to maintain. (ECharts needs the OKLCH values converted because
  * a canvas cannot read a CSS variable; the DOM can.)
  */
-
-const theme = EditorView.theme({
-  "&": {
-    fontSize: "0.8125rem",
-    color: "var(--foreground)",
-    backgroundColor: "var(--surface)",
-    border: "1px solid var(--border)",
-    borderRadius: "var(--radius)",
-  },
-  "&.cm-focused": { outline: "2px solid var(--primary)", outlineOffset: "-1px" },
-  ".cm-content": {
-    fontFamily: "var(--font-mono)",
-    padding: "0.5rem 0",
-    caretColor: "var(--foreground)",
-  },
-  ".cm-line": { padding: "0 0.75rem" },
-  ".cm-cursor, .cm-dropCursor": { borderLeftColor: "var(--foreground)" },
-  "&.cm-focused .cm-selectionBackground, .cm-selectionBackground, .cm-content ::selection":
-    { backgroundColor: "var(--surface-2)" },
-  ".cm-matchingBracket, &.cm-focused .cm-matchingBracket": {
-    backgroundColor: "var(--surface-2)",
-    outline: "1px solid var(--primary)",
-  },
-  ".cm-nonmatchingBracket, &.cm-focused .cm-nonmatchingBracket": {
-    color: "var(--danger)",
-  },
-  ".cm-placeholder": { color: "var(--muted)" },
-  ".cm-tooltip": {
-    backgroundColor: "var(--surface-2)",
-    border: "1px solid var(--border)",
-    borderRadius: "var(--radius)",
-    color: "var(--foreground)",
-  },
-  ".cm-tooltip.cm-tooltip-autocomplete > ul > li[aria-selected]": {
-    backgroundColor: "var(--surface)",
-    color: "var(--foreground)",
-  },
-  ".cm-completionDetail": { color: "var(--muted)", fontStyle: "normal" },
-  ".cm-diagnostic-error": { borderLeftColor: "var(--danger)" },
-});
-
-const highlight = HighlightStyle.define([
-  { tag: tags.keyword, color: "var(--primary)" },
-  { tag: [tags.string, tags.special(tags.string)], color: "var(--success)" },
-  { tag: [tags.number, tags.bool, tags.null], color: "var(--warning)" },
-  { tag: tags.comment, color: "var(--muted)", fontStyle: "italic" },
-  { tag: [tags.operator, tags.punctuation, tags.separator], color: "var(--muted)" },
-  { tag: tags.typeName, color: "var(--foreground)" },
-  { tag: tags.function(tags.variableName), color: "var(--foreground)" },
-]);
 
 /** Completion and the hint linter, both of which depend on the source. */
 function catalogExtensions(catalog: SourceCatalog | null): Extension {

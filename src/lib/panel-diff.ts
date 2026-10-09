@@ -94,7 +94,7 @@ export interface PanelDiff {
    * (#202), which `bodyLabel` names.
    */
   sql: SqlDiff;
-  bodyLabel: "SQL" | "Text";
+  bodyLabel: "SQL" | "PromQL" | "Text";
   /** Nothing the author would see would change. */
   identical: boolean;
 }
@@ -257,7 +257,9 @@ export function describeLink(link: PanelLink): string {
       ? `${name} = "${v.value}"`
       : "column" in v
         ? `${name} from column ${v.column}`
-        : `${name} from the clicked series`,
+        : "label" in v
+          ? `${name} from the clicked series' ${v.label} label`
+          : `${name} from the clicked series`,
   );
   const carry = linkCarries(link);
   return [
@@ -269,6 +271,45 @@ export function describeLink(link: PanelLink): string {
   ]
     .filter(Boolean)
     .join("; ");
+}
+
+/** How a PromQL query is evaluated, as the diff shows it: "range, min step 1m". */
+function formatEvaluation(query: PanelDraft["query"]): string {
+  if (query?.promql === undefined) return NONE;
+  if (query.instant) return "instant";
+  return query.minStep ? `range, min step ${query.minStep}` : "range";
+}
+
+/**
+ * `instant` and `minStep` as one option row (#388), shown only when either
+ * side is PromQL, so a SQL panel's diff is what it always was.
+ */
+function evaluationSpecs(
+  before: Panel,
+  after: PanelDraft,
+  streaming: boolean,
+): FieldSpec[] {
+  const beforeQuery = before.query as PanelDraft["query"];
+  if (beforeQuery?.promql === undefined && after.query?.promql === undefined) return [];
+  return [
+    {
+      key: "evaluation",
+      label: "Evaluated",
+      before: formatEvaluation(beforeQuery),
+      after:
+        streaming && after.query?.promql === undefined && after.query?.sql === undefined
+          ? undefined
+          : formatEvaluation(after.query ?? beforeQuery),
+    },
+  ];
+}
+
+/** What the body is written in: the after side's language, else the before side's. */
+function bodyLabelOf(before: Panel, after: PanelDraft): PanelDiff["bodyLabel"] {
+  if (before.query === undefined) return "Text";
+  if (after.query?.promql !== undefined) return "PromQL";
+  if (after.query?.sql !== undefined) return "SQL";
+  return (before.query as PanelDraft["query"])?.promql !== undefined ? "PromQL" : "SQL";
 }
 
 /**
@@ -372,6 +413,7 @@ export function diffPanels(
           ? undefined
           : (draftTimeField(after) ?? NONE),
     },
+    ...evaluationSpecs(before, after, streaming),
     ...linkSpecs(before, after, streaming),
     {
       key: "layout",
@@ -410,7 +452,7 @@ export function diffPanels(
     fields,
     changedFields,
     sql,
-    bodyLabel: before.query === undefined ? "Text" : "SQL",
+    bodyLabel: bodyLabelOf(before, after),
     identical: changedFields === 0 && !sql.changed,
   };
 }

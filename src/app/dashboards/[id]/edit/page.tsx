@@ -1,6 +1,5 @@
 import { notFound } from "next/navigation";
-import { timescaledb } from "@/lib/sources/kinds/timescaledb";
-import { isSqlSource } from "@/lib/sources/registry";
+import { isSqlSource, sourceKind } from "@/lib/sources/registry";
 import { getIdentity, can } from "@/lib/auth/authorize";
 import { effectiveModel } from "@/lib/ai/model-resolution";
 import { getDashboardById, listDashboardTags, listSources } from "@/lib/db/repo";
@@ -31,15 +30,18 @@ export default async function EditDashboardPage({
   // The editor completes table and column names from the catalog, so the
   // catalog crosses to the client — projected through `sourceCatalog`, which
   // leaves the host, port, database and `secret_ref` on this side of the wire.
-  // SQL sources only, until the editor learns PromQL (#388): a PromQL panel
-  // shows its query read-only, and its source is not offered for a new one.
+  // Every kind's (#388): a SQL source's tables and columns, a Prometheus
+  // source's metrics and labels, each through its kind's own projection, so
+  // no URL, host or credential crosses. A SQL source without its credential
+  // reference cannot run, and is not offered.
   const sources = (await listSources(dashboard.workspaceId))
-    .filter(isSqlSource)
+    .filter((s) => sourceKind(s.config).language !== "sql" || isSqlSource(s))
     .map((s) => ({
       id: s.id,
       name: s.name,
       workspaceId: s.workspaceId,
-      catalog: timescaledb.catalog(s.config),
+      kind: s.config.kind,
+      catalog: sourceKind(s.config).catalog(s.config),
     }));
 
   // Which model a panel edit here uses: the editor's own, the workspace's or

@@ -192,14 +192,22 @@ export const VariableText = z.string().min(1).max(256);
 /**
  * Where a link's pick for one variable comes from (#371): a literal, the
  * clicked row's value in a result column, or the clicked series' name (the
- * pivot value on a line, area or bar; the slice on a pie). Whatever it reads,
- * the target checks the value against its own variable on arrival, exactly as
- * it checks a hand-typed `var-*` pick.
+ * pivot value on a line, area or bar; the slice on a pie), or one label out of
+ * the clicked PromQL series' name (`metric{host="a"}` → `a`, #388). Whatever
+ * it reads, the target checks the value against its own variable on arrival,
+ * exactly as it checks a hand-typed `var-*` pick.
  */
 export const LinkValue = z.union([
   z.object({ value: VariableText }).strict(),
   z.object({ column: Column }).strict(),
   z.object({ series: z.literal(true) }).strict(),
+  z
+    .object({
+      label: z
+        .string()
+        .regex(/^[A-Za-z_][A-Za-z0-9_]{0,127}$/, "must be a Prometheus label name"),
+    })
+    .strict(),
 ]);
 export type LinkValue = z.infer<typeof LinkValue>;
 
@@ -246,8 +254,8 @@ export const PanelLink = z
 export type PanelLink = z.infer<typeof PanelLink>;
 
 /**
- * Whether a link reads the datum that was clicked: any pick from a `column`
- * or the `series`. It is followed by clicking a point, slice, cell or row; a
+ * Whether a link reads the datum that was clicked: any pick from a `column`,
+ * the `series` or one of its `label`s. It is followed by clicking a point, slice, cell or row; a
  * link with only literals (or no `set`) is a panel link, followed from the
  * panel's menu.
  */

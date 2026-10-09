@@ -13,7 +13,7 @@ export type PanelDetails = {
   sourceId: string;
   timeField?: string;
   description?: string;
-} & ({ sql: string } | { promql: string });
+} & ({ sql: string } | { promql: string; instant?: boolean; minStep?: string });
 
 /** How a panel is computed, or null for one that computes nothing (#202). */
 export function panelDetails(panel: Panel): PanelDetails | null {
@@ -21,7 +21,14 @@ export function panelDetails(panel: Panel): PanelDetails | null {
   // The statement under its language's name, each named rather than spread.
   const query = panel.query;
   return {
-    ...(isSqlQuery(query) ? { sql: query.sql } : { promql: query.promql }),
+    ...(isSqlQuery(query)
+      ? { sql: query.sql }
+      : {
+          promql: query.promql,
+          // How it is evaluated, which the expression alone does not say (#388).
+          ...(query.instant !== undefined ? { instant: query.instant } : {}),
+          ...(query.minStep !== undefined ? { minStep: query.minStep } : {}),
+        }),
     sourceId: query.sourceId,
     timeField: queryTimeField(query),
     description: panel.description,

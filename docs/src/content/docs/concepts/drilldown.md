@@ -56,8 +56,9 @@ header, and each link is an item in the panel's ⋯ menu:
 
 ## Clicking a datum
 
-A link whose `set` reads a `column` (`{ "column": "host" }`) or the series
-(`{ "series": true }`) is a **datum link**. It needs to know what was clicked,
+A link whose `set` reads a `column` (`{ "column": "host" }`), the series
+(`{ "series": true }`) or one label of the series (`{ "label": "instance" }`)
+is a **datum link**. It needs to know what was clicked,
 so it is not in the panel's menu. Instead the panel's data is clickable:
 
 - **A chart.** Click a point, bar, slice, cell, span or gauge. With one link,
@@ -78,6 +79,15 @@ the series: the column a line, area or bar point belongs to, a slice's label, a
 heatmap cell's y value, a timeline's lane or a gauge bar's label. A value the
 row does not have, or one longer than a pick may be, leaves that variable
 unset, and the target falls back to its default.
+
+On a PromQL panel (#388), an instant query's table or pie has a column per
+label, so a `column` pick reads a label by name. A range query's chart has one
+series per label set, named the way the Prometheus UI names a legend entry,
+`up{instance="web-01:9100", job="node"}`, and a `series` pick carries that whole
+name. A `label` pick reads one label out of it (`seriesLabel` in
+`src/lib/drilldown.ts`), so "click a host's line, land on the host dashboard"
+needs no parsing in the link: `{ "host": { "label": "instance" } }` sets `host`
+to `web-01:9100`. A series without that label leaves the pick unset.
 
 A **self datum link** filters in place: clicking a host's slice sets `host` on
 this dashboard, the picker and the URL follow, and the picker puts it back.

@@ -113,6 +113,10 @@ export interface PromqlPlanView {
   maxResultBytes: number;
   /** The most series a result may hold. */
   maxSeries: number;
+  /** The most points per series a range query is stepped to. */
+  maxPoints: number;
+  /** Each variable the expression references, and the value bound for it. */
+  variables: { name: string; value: string; from: string }[];
 }
 
 /** Either language's plan view; the field that holds the statement says which. */
@@ -135,9 +139,22 @@ export function buildPromqlPlanView(input: {
     | { instant: true; expr: string; time: Date; timeoutMs: number };
   /** The claim the source's tenant label binds, when it has one (#31). */
   rowFilterClaim?: string;
-  limits: { maxResultBytes: number; maxSeries: number };
+  /** The variables the expression references, with the values the plan bound. */
+  variables?: { name: string; value: string | readonly string[] }[];
+  limits: {
+    maxResultBytes: number;
+    maxSeries: number;
+    maxPoints: number;
+    /** `PROMETHEUS_MIN_STEP_MS`: the step is never finer. */
+    minStepMs: number;
+  };
 }): PromqlPlanView {
-  const { plan } = input;
+  const { plan, limits } = input;
+  const stepFrom = [
+    `the window ÷ ${limits.maxPoints.toLocaleString("en-US")} points`,
+    `floored at ${seconds(limits.minStepMs)}`,
+    ...(input.minStep ? [`and at the panel's minimum step of ${input.minStep}`] : []),
+  ].join(", ");
   const params = plan.instant
     ? [{ name: "time", value: plan.time.toISOString(), from: input.timeRange.to }]
     : [
@@ -154,9 +171,7 @@ export function buildPromqlPlanView(input: {
         {
           name: "step",
           value: `${plan.stepSeconds}s`,
-          from: input.minStep
-            ? `the window, at least the panel's minStep of ${input.minStep}`
-            : "the window",
+          from: stepFrom,
         },
       ];
   return {
@@ -174,9 +189,21 @@ export function buildPromqlPlanView(input: {
         ]
       : params,
     timeoutMs: plan.timeoutMs,
-    maxResultBytes: input.limits.maxResultBytes,
-    maxSeries: input.limits.maxSeries,
+    maxResultBytes: limits.maxResultBytes,
+    maxSeries: limits.maxSeries,
+    maxPoints: limits.maxPoints,
+    variables: (input.variables ?? []).map(({ name, value }) => ({
+      name,
+      value: instant(value),
+      from: `the :${name} selection`,
+    })),
   };
+}
+
+/** "15 s", "1.5 s", "2 min": a duration the dialog states, from milliseconds. */
+function seconds(ms: number): string {
+  if (ms >= 60_000 && ms % 60_000 === 0) return `${ms / 60_000} min`;
+  return `${Number((ms / 1000).toFixed(1))} s`;
 }
 
 /** Parameters are instants; anything else is rendered rather than trusted. */
@@ -188,7 +215,7 @@ function instant(value: unknown): string {
 }
 
 export type PlanOutcome =
-  | { ok: true; plan: QueryPlanView }
+  | { ok: true; plan: AnyPlanView }
   | { ok: false; error: ApiError };
 
 /**
@@ -202,38 +229,50 @@ export async function fetchQueryPlan(
   timeRange: TimeRange,
   init?: { signal?: AbortSignal; variables?: VariableValues },
 ): Promise<PlanOutcome> {
-  if (!isSqlQuery(query)) {
-    // The plan of a PromQL query is the Prometheus executor's to describe (#385).
-    return {
-      ok: false,
-      error: {
-        error: "The plan of a PromQL query cannot be shown yet.",
-        kind: "statement",
-      },
-    };
-  }
   try {
     const res = await fetch("/api/sql/plan", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         sourceId: query.sourceId,
-        sql: query.sql,
-        timeField: query.timeField,
+        // The query's own fields, named rather than spread (#388).
+        ...(isSqlQuery(query)
+          ? { sql: query.sql, timeField: query.timeField }
+          : {
+              promql: query.promql,
+              ...(query.instant !== undefined ? { instant: query.instant } : {}),
+              ...(query.minStep !== undefined ? { minStep: query.minStep } : {}),
+            }),
         timeRange,
         ...(init?.variables ? { variables: init.variables } : {}),
       }),
       signal: init?.signal,
     });
     if (!res.ok) return { ok: false, error: await readApiError(res) };
-    return { ok: true, plan: (await res.json()) as QueryPlanView };
+    return { ok: true, plan: (await res.json()) as AnyPlanView };
   } catch (err) {
     return { ok: false, error: apiErrorFromThrown(err) };
   }
 }
 
-/** "4,000 rows · 30 s · 4 MiB" — the limits line under a plan. */
-export function summarizeLimits(plan: QueryPlanView): string {
+/** Whether a plan view is PromQL's: the field that holds the statement says. */
+export function isPromqlPlanView(plan: AnyPlanView): plan is PromqlPlanView {
+  return "promql" in plan;
+}
+
+/**
+ * "4,000 rows · 30 s · 4.0 MiB" under a SQL plan; "1,000 points · 30 s ·
+ * 4.0 MiB · 100 series" under a PromQL one.
+ */
+export function summarizeLimits(plan: AnyPlanView): string {
+  if (isPromqlPlanView(plan)) {
+    return [
+      `${plan.maxPoints.toLocaleString("en-US")} points`,
+      `${Math.round(plan.timeoutMs / 1000)} s`,
+      `${(plan.maxResultBytes / (1024 * 1024)).toFixed(1)} MiB`,
+      `${plan.maxSeries.toLocaleString("en-US")} series`,
+    ].join(" · ");
+  }
   return [
     `${plan.maxRows.toLocaleString("en-US")} rows`,
     `${Math.round(plan.statementTimeoutMs / 1000)} s`,

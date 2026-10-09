@@ -13,7 +13,7 @@ import {
   checkSubject,
   runSubject,
   summarizeResult,
-  validatePanelSql,
+  validatePanelQuery,
 } from "@/lib/panel-query";
 import { fetchQueryPlan, type PlanOutcome } from "@/lib/query-plan";
 import { Button } from "@/components/ui/button";
@@ -81,17 +81,10 @@ export function usePanelPreview(
   const validate = React.useCallback(() => {
     const seq = ++generation.current;
     setBusy("validate");
-    const checked: Promise<SqlCheck> = isSqlQuery(query)
-      ? validatePanelSql({
-          sourceId: query.sourceId,
-          sql: query.sql,
-          variables: Object.keys(variables),
-        })
-      : // Checking PromQL is the Prometheus guard's (#384), not yet reachable.
-        Promise.resolve({
-          ok: false,
-          error: { error: "PromQL cannot be checked yet.", kind: "statement" },
-        });
+    const checked: Promise<SqlCheck> = validatePanelQuery({
+      query,
+      variables: Object.keys(variables),
+    });
     void checked.then((r) => {
       if (seq !== generation.current) return;
       setCheck({ key: checkKey, result: r });
@@ -201,8 +194,17 @@ export function PanelPreview({
           className="stagger-in flex items-center gap-2 text-xs text-success"
         >
           <CheckCircle2 className="h-3.5 w-3.5 shrink-0" />
-          This SQL passes the guard for the selected source.
+          {isSqlQuery(panel.query)
+            ? "This SQL passes the guard for the selected source."
+            : "This PromQL passes the guard for the selected source."}
         </p>
+      )}
+      {check?.ok && check.hints && check.hints.length > 0 && (
+        <ul className="space-y-1 text-xs text-muted" aria-label="Hints">
+          {check.hints.map((hint) => (
+            <li key={hint}>{hint}</li>
+          ))}
+        </ul>
       )}
       {check && !check.ok && (
         <ErrorDisplay

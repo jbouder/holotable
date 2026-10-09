@@ -81,6 +81,8 @@ export interface ServerSourceKind {
     query: PanelQuery;
     plan: SourcePlan;
     timeRange: TimeRange;
+    /** The values the plan bound, for the variables the query references (#388). */
+    variables?: VariableValues;
   }): AnyPlanView;
   /**
    * The catalog re-read from the source (#386): the config to store and the

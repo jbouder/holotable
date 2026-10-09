@@ -22,10 +22,12 @@ import { prometheus } from "@/lib/sources/kinds/prometheus";
 import { durationMs } from "@/lib/promql/parse";
 import { buildLabelValuesPlan, buildPromqlPlan } from "@/lib/promql/plan";
 import {
+  defaultLimits,
   PromqlRefusal,
   validatePromql,
   validatePromqlLabelValues,
 } from "@/lib/promql/safety";
+import { promqlVariableNames } from "@/lib/promql/variables";
 import { buildPromqlPlanView } from "@/lib/query-plan";
 import type { SourceRecord } from "@/lib/registry";
 import { trackInFlight } from "@/lib/shutdown";
@@ -205,7 +207,7 @@ const kind: ServerSourceKind = {
     return [...new Set(values)].sort().slice(0, VARIABLE_VALUES_MAX);
   },
 
-  planView({ source, query, plan, timeRange }) {
+  planView({ source, query, plan, timeRange, variables }) {
     const prom = promSource(source);
     if (!isPromqlQuery(query) || plan.language !== "promql") {
       throw new Error("a Prometheus plan view needs a PromQL query and plan");
@@ -216,9 +218,15 @@ const kind: ServerSourceKind = {
       timeRange,
       plan: plan.plan,
       rowFilterClaim: prom.config.rowFilter?.claim,
+      variables: promqlVariableNames(query.promql, defaultLimits()).flatMap((name) => {
+        const value = variables?.[name];
+        return value === undefined ? [] : [{ name, value }];
+      }),
       limits: {
         maxResultBytes: config.maxResultBytes,
         maxSeries: config.prometheusMaxSeries,
+        maxPoints: config.promqlMaxPoints,
+        minStepMs: config.prometheusMinStepMs,
       },
     });
   },
