@@ -95,7 +95,7 @@ const NOT_SECRET_KEY = /^secret_?refs?$/i;
  * digest: enough to prove two requests carried the same statement, not enough
  * to leak what it said or the credential someone inlined into it.
  */
-const DIGEST_KEY = /^(sql|statement|prompts?|messages?|catalog)$/i;
+const DIGEST_KEY = /^(sql|promql|statement|prompts?|messages?|catalog)$/i;
 
 /** Credential shapes that show up inside otherwise ordinary strings. */
 const STRING_SCRUBBERS: ReadonlyArray<[RegExp, string]> = [

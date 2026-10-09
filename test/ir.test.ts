@@ -25,6 +25,7 @@ import {
   SPEC_VERSION,
   safeParseDashboard,
   TimeExpr,
+  queryText,
 } from "@/lib/ir";
 import {
   migratePanel,
@@ -241,7 +242,10 @@ test("today's stored spec loads after a simulated two-step (v1 → v2 → v3) ch
     ],
   );
   // Nothing the upgraders did not touch moved.
-  assert.equal(v3.panels[0].query?.sql, (UNVERSIONED.panels as Panel[])[0].query?.sql);
+  assert.equal(
+    v3.panels[0].query ? queryText(v3.panels[0].query) : undefined,
+    ((UNVERSIONED.panels as Panel[])[0].query as { sql: string }).sql,
+  );
 });
 
 test("the chain starts from the version a spec was saved at", () => {

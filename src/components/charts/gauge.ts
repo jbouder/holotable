@@ -1,3 +1,4 @@
+import { panelTimeField } from "@/lib/ir";
 import type { EChartsOption } from "echarts";
 import {
   type ChartOptionBuilder,
@@ -62,7 +63,7 @@ function bound(
 /** The readings a gauge panel shows for these rows. Pure. */
 export function gaugeReadings(panel: Panel, data: PanelData): GaugeReading[] {
   const options = gaugeOptions(panel);
-  const timeField = panel.query?.timeField;
+  const timeField = panelTimeField(panel);
   const boundColumns = [options.min, options.max].filter(
     (b): b is string => typeof b === "string",
   );

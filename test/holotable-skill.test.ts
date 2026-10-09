@@ -10,6 +10,11 @@ import {
   Panel,
   SPEC_VERSION,
   ValueFormat,
+  queryText,
+  queryTimeField,
+  SqlQuery,
+  PromqlQuery,
+  LabelValuesQuery,
 } from "@/lib/ir";
 import { COLOR_TOKENS } from "@/lib/panels/colors";
 import { PANEL_KIND_NAMES, PANEL_KINDS } from "@/lib/panels/registry";
@@ -75,9 +80,9 @@ for (const file of DASHBOARD_FILES) {
 
     for (const panel of spec.panels.filter(hasQuery)) {
       assert.equal(panel.query.sourceId, sourceId, `${file} ${panel.id}: sourceId`);
-      const check = await checkSql(panel.query.sql, config, declared);
+      const check = await checkSql(queryText(panel.query), config, declared);
       assert.ok(check.ok, `${file} ${panel.id}: ${check.error}`);
-      const { timeField } = panel.query;
+      const timeField = queryTimeField(panel.query);
       if (timeField) {
         // The server filters on an OUTPUT column, so the time field has to be
         // one the SELECT list produces: an alias, or the bare column itself.
@@ -86,7 +91,7 @@ for (const file of DASHBOARD_FILES) {
           "i",
         );
         assert.match(
-          panel.query.sql,
+          queryText(panel.query),
           output,
           `${file} ${panel.id}: timeField ${timeField}`,
         );
@@ -95,7 +100,7 @@ for (const file of DASHBOARD_FILES) {
     for (const variable of spec.variables ?? []) {
       if (!variable.query) continue;
       // A variable's own query declares no variables and has no time filter.
-      const check = await checkSql(variable.query.sql, config);
+      const check = await checkSql(queryText(variable.query), config);
       assert.ok(check.ok, `${file} variable ${variable.name}: ${check.error}`);
     }
   });
@@ -183,6 +188,18 @@ function listed(label: string): string[] {
 test("the reference's value formats and color tokens are the IR's", () => {
   assert.deepEqual(listed("Value formats:"), [...ValueFormat.options]);
   assert.deepEqual(listed("Color tokens:"), Object.keys(COLOR_TOKENS));
+});
+
+test("the reference documents every field of both query languages (#383)", () => {
+  const reference = read("references/ir.md");
+  for (const schema of [SqlQuery, PromqlQuery, LabelValuesQuery]) {
+    for (const field of Object.keys(schema.shape)) {
+      assert.ok(
+        reference.includes(`\`${field}\``),
+        `references/ir.md does not name \`${field}\``,
+      );
+    }
+  }
 });
 
 test("the skill carries no connection details, credentials or route calls", () => {

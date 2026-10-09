@@ -7,21 +7,30 @@ import { resolveTimeRange } from "@/lib/time";
 import { rowFilterFor, rowFilterHttpError } from "@/lib/row-scope";
 import { QueryExecutionError, type QueryResult } from "@/lib/sources/execution";
 import { serverKind } from "@/lib/sources/server/registry";
-import { TimeRange } from "@/lib/ir";
+import { isSqlQuery, PromqlQuery, queryStatement, TimeRange } from "@/lib/ir";
+import { cannotRun } from "@/lib/sources/registry";
 import { VariableError } from "@/lib/sql/variables";
 import { VariableValuesBody } from "@/lib/variable-selection";
 
 export const runtime = "nodejs";
 export const maxDuration = 30;
 
-const Body = z.object({
-  sourceId: z.string().min(1),
-  sql: z.string().min(1).max(8000),
-  timeField: z.string().min(1).max(128).optional(),
+const Common = {
   timeRange: TimeRange,
   /** The dashboard's variables as the editor previews them (#67). */
   variables: VariableValuesBody.optional(),
-});
+};
+
+/** A panel's query, in either language (#383), plus the window and the picks. */
+const Body = z.union([
+  z.object({
+    sourceId: z.string().min(1),
+    sql: z.string().min(1).max(8000),
+    timeField: z.string().min(1).max(128).optional(),
+    ...Common,
+  }),
+  PromqlQuery.extend(Common),
+]);
 
 /**
  * Execute a single guarded query (used by preview during author/edit).
@@ -53,11 +62,15 @@ export const POST = route("query", async (req: Request) => {
         workspaceId: source.workspaceId,
         resource: { type: "source", id: source.id },
         outcome,
-        detail: { via: "preview", sql: body.sql, stage },
+        detail: { via: "preview", ...queryStatement(body), stage },
       });
 
     const kind = serverKind(source);
     const variables = body.variables ?? {};
+    if (!isSqlQuery(body)) {
+      record("failure", "validate");
+      throw new HttpError(400, cannotRun(source, body), {}, "statement");
+    }
     const check = await kind.validate(
       body.sql,
       source.config,

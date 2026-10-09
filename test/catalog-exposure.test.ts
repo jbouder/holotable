@@ -1,3 +1,4 @@
+import { queryText } from "@/lib/ir";
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { buildBuiltinTemplates } from "@/lib/builtin-templates";
@@ -126,7 +127,11 @@ test("suggestions are built from exposed columns only, and the guard accepts eve
   for (const template of templates) {
     for (const panel of templatePanels(template.body)) {
       const result = await validateSql(queryOf(panel).sql, config);
-      assert.equal(result.ok, true, `${panel.query?.sql} -> ${result.error}`);
+      assert.equal(
+        result.ok,
+        true,
+        `${panel.query ? queryText(panel.query) : undefined} -> ${result.error}`,
+      );
     }
   }
 });

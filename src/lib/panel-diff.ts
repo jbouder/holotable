@@ -1,4 +1,11 @@
-import { linkCarries, type Panel, PanelLink } from "@/lib/ir";
+import {
+  linkCarries,
+  type Panel,
+  PanelLink,
+  panelTimeField,
+  panelQueryText,
+  PROMQL_TIME_FIELD,
+} from "@/lib/ir";
 
 /**
  * Field- and line-level diff between the panel being edited and the one a
@@ -16,6 +23,17 @@ import { linkCarries, type Panel, PanelLink } from "@/lib/ir";
  * `pending` rather than reported as changes.
  */
 
+/**
+ * A draft's time field, read as `queryTimeField` reads a finished query: the
+ * declared one for SQL, `time` for a PromQL range query, none for an instant
+ * one. A draft may not have said which language it is yet.
+ */
+function draftTimeField(draft: PanelDraft): string | undefined {
+  const query = draft.query;
+  if (query?.promql !== undefined) return query.instant ? undefined : PROMQL_TIME_FIELD;
+  return query?.timeField;
+}
+
 /** A panel as the model has produced it so far. */
 export interface PanelDraft {
   id?: string;
@@ -23,7 +41,14 @@ export interface PanelDraft {
   description?: string;
   viz?: Panel["viz"];
   format?: Panel["format"];
-  query?: { sourceId?: string; sql?: string; timeField?: string };
+  query?: {
+    sourceId?: string;
+    sql?: string;
+    timeField?: string;
+    promql?: string;
+    instant?: boolean;
+    minStep?: string;
+  };
   options?: Record<string, unknown>;
   timeRange?: { from?: string; to?: string };
   refreshIntervalMs?: number;
@@ -341,11 +366,11 @@ export function diffPanels(
     {
       key: "timeField",
       label: "Time field",
-      before: before.query?.timeField ?? NONE,
+      before: panelTimeField(before) ?? NONE,
       after:
-        streaming && after.query?.timeField === undefined
+        streaming && draftTimeField(after) === undefined
           ? undefined
-          : (after.query?.timeField ?? NONE),
+          : (draftTimeField(after) ?? NONE),
     },
     ...linkSpecs(before, after, streaming),
     {
@@ -375,8 +400,9 @@ export function diffPanels(
     };
   });
 
-  const beforeBody = before.query?.sql ?? textContent(before.options) ?? "";
-  const afterBody = after.query?.sql ?? textContent(after.options) ?? beforeBody;
+  const beforeBody = panelQueryText(before) ?? textContent(before.options) ?? "";
+  const afterBody =
+    after.query?.sql ?? after.query?.promql ?? textContent(after.options) ?? beforeBody;
   const sql = diffSqlLines(beforeBody, afterBody);
   const changedFields = fields.filter((f) => f.changed).length;
 

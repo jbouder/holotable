@@ -1,4 +1,4 @@
-import { type Panel, TimeRange } from "@/lib/ir";
+import { type Panel, TimeRange, panelTimeField } from "@/lib/ir";
 import { panelKind } from "@/lib/panels/registry";
 import { resolveTimeRange } from "@/lib/time";
 import {
@@ -332,7 +332,7 @@ export function rangeSearch(range: TimeRange, dashboardDefault: TimeRange): stri
 export function supportsTimeBrush(panel: Panel): boolean {
   return (
     panelKind(panel.viz).timeBrush &&
-    panel.query?.timeField !== undefined &&
+    panelTimeField(panel) !== undefined &&
     // A panel with its own window (#114) does not show the dashboard's, so a
     // stretch of it is not a dashboard window to select.
     panel.timeRange === undefined

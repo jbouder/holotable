@@ -17,7 +17,7 @@ import {
 } from "@/lib/auth/share";
 import { resolveShare } from "@/lib/auth/share-access";
 import { makeShareStore, type ShareRecord, type ShareStore } from "@/lib/db/shares";
-import { Dashboard } from "@/lib/ir";
+import { Dashboard, queryTimeField } from "@/lib/ir";
 import { redactString } from "@/lib/log";
 import { contentSecurityPolicy, EMBED_REQUEST_HEADER } from "@/lib/security-headers";
 import { ShareRequest, sharedSpec } from "@/lib/share-view";
@@ -307,7 +307,10 @@ test("a share link's page is sent no SQL, no source ids and no variables", () =>
   assert.equal(text.includes("private_table"), false);
   assert.equal(text.includes("secret-source"), false);
   assert.equal("variables" in shared, false);
-  assert.equal(shared.panels[0].query?.timeField, "ts");
+  assert.equal(
+    shared.panels[0].query ? queryTimeField(shared.panels[0].query) : undefined,
+    "ts",
+  );
   assert.deepEqual(shared.timeRange, { from: "now-24h", to: "now" });
 });
 

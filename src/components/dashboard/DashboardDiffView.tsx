@@ -1,5 +1,6 @@
 "use client";
 
+import { panelQueryText } from "@/lib/ir";
 import { Minus, Plus, PenLine } from "lucide-react";
 import type { DashboardDiff, PanelChange } from "@/lib/dashboard-versions";
 import type { Panel } from "@/lib/ir";
@@ -28,7 +29,7 @@ function summary(diff: DashboardDiff): string {
 /** The panel's body as diff lines: its SQL, or a text panel's Markdown (#202). */
 function wholeSql(panel: Panel, kind: "add" | "remove") {
   const content = typeof panel.options?.content === "string" ? panel.options.content : "";
-  return (panel.query?.sql ?? content)
+  return (panelQueryText(panel) ?? content)
     .replace(/\n+$/, "")
     .split(/\r?\n/)
     .map((text) => ({ kind, text }));

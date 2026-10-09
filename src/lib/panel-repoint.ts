@@ -1,4 +1,4 @@
-import { hasQuery, type Panel, type QueryPanel } from "@/lib/ir";
+import { hasQuery, type Panel, type QueryPanel, isSqlQuery } from "@/lib/ir";
 import { type SqlCheck, validatePanelSql } from "@/lib/panel-query";
 
 /**
@@ -95,7 +95,12 @@ export async function checkRepoint(
     panels.map(async (panel) => ({
       panelId: panel.id,
       title: panel.title,
-      check: await validatePanelSql({ sourceId, sql: panel.query.sql, variables }),
+      check: isSqlQuery(panel.query)
+        ? await validatePanelSql({ sourceId, sql: panel.query.sql, variables })
+        : ({
+            ok: false,
+            error: { error: "PromQL panels cannot be re-pointed yet", kind: "statement" },
+          } as const),
     })),
   );
 }

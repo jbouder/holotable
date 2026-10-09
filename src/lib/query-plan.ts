@@ -1,3 +1,4 @@
+import { isSqlQuery } from "@/lib/ir";
 import { type ApiError, apiErrorFromThrown, readApiError } from "@/lib/errors";
 import type { PanelQuery, TimeRange } from "@/lib/ir";
 import type { VariableValues } from "@/lib/sql/variables";
@@ -114,6 +115,16 @@ export async function fetchQueryPlan(
   timeRange: TimeRange,
   init?: { signal?: AbortSignal; variables?: VariableValues },
 ): Promise<PlanOutcome> {
+  if (!isSqlQuery(query)) {
+    // The plan of a PromQL query is the Prometheus executor's to describe (#385).
+    return {
+      ok: false,
+      error: {
+        error: "The plan of a PromQL query cannot be shown yet.",
+        kind: "statement",
+      },
+    };
+  }
   try {
     const res = await fetch("/api/sql/plan", {
       method: "POST",

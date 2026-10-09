@@ -1,3 +1,4 @@
+import { isSqlQuery, queryText, queryTimeField } from "@/lib/ir";
 import { type ApiError, apiErrorFromThrown, readApiError } from "@/lib/errors";
 import type { PanelQuery, TimeRange } from "@/lib/ir";
 import type { VariableValues } from "@/lib/sql/variables";
@@ -28,13 +29,25 @@ export const EMPTY_ROWS: QueryRows = { columns: [], rows: [] };
  * A panel carries a title, a layout and a viz that the executor has no use
  * for, and a spread of `panel.query` would ship whatever is added to it next.
  */
-export interface QueryRequest {
-  sourceId: string;
-  sql: string;
-  timeField?: string;
+export type QueryRequest = (
+  | { sourceId: string; sql: string; timeField?: string }
+  | { sourceId: string; promql: string; instant?: boolean; minStep?: string }
+) & {
   timeRange: TimeRange;
   /** The dashboard's variables, as the preview binds them (#67). */
   variables?: VariableValues;
+};
+
+/** The query's own fields, named one by one rather than spread. */
+function queryFields(query: PanelQuery) {
+  return isSqlQuery(query)
+    ? { sourceId: query.sourceId, sql: query.sql, timeField: query.timeField }
+    : {
+        sourceId: query.sourceId,
+        promql: query.promql,
+        instant: query.instant,
+        minStep: query.minStep,
+      };
 }
 
 export function queryRequest(
@@ -43,9 +56,7 @@ export function queryRequest(
   variables?: VariableValues,
 ): QueryRequest {
   return {
-    sourceId: query.sourceId,
-    sql: query.sql,
-    timeField: query.timeField,
+    ...queryFields(query),
     timeRange,
     ...(variables && Object.keys(variables).length > 0 ? { variables } : {}),
   };
@@ -126,7 +137,11 @@ export function readWindow(value: unknown): QueryRows["window"] {
  * arranged to collide with another.
  */
 export function checkSubject(query: PanelQuery, variables: VariableValues = {}): string {
-  return JSON.stringify([query.sourceId, query.sql, Object.keys(variables).sort()]);
+  return JSON.stringify([
+    query.sourceId,
+    queryText(query),
+    Object.keys(variables).sort(),
+  ]);
 }
 
 export function runSubject(
@@ -136,11 +151,13 @@ export function runSubject(
 ): string {
   return JSON.stringify([
     query.sourceId,
-    query.sql,
-    query.timeField ?? null,
+    queryText(query),
+    queryTimeField(query) ?? null,
     timeRange.from,
     timeRange.to,
     valuesKey(variables),
+    // What else changes a PromQL result: the step's floor (#383).
+    ...(isSqlQuery(query) ? [] : [query.minStep ?? null]),
   ]);
 }
 

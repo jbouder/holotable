@@ -1,5 +1,11 @@
 import type { UIMessage } from "ai";
-import { type Dashboard, hasQuery, type Panel } from "@/lib/ir";
+import {
+  type Dashboard,
+  hasQuery,
+  type Panel,
+  queryText,
+  queryTimeField,
+} from "@/lib/ir";
 import { type Selection, selectionFromParams } from "@/lib/variable-selection";
 
 /* -------------------------------------------------------------------------- */
@@ -175,7 +181,7 @@ export function matchingPanels(
       (p) =>
         p.query !== undefined &&
         p.query.sourceId === sourceId &&
-        normalizeSql(p.query.sql) === needle,
+        normalizeSql(queryText(p.query)) === needle,
     )
     .map((p) => p.title);
 }
@@ -242,7 +248,7 @@ export function chatSuggestions(dashboard: Dashboard): string[] {
   const suggestions = ["Summarize what this dashboard is showing right now."];
 
   const timeSeries = nameable.find(
-    (p) => p.query.timeField && (p.viz === "line" || p.viz === "area"),
+    (p) => queryTimeField(p.query) && (p.viz === "line" || p.viz === "area"),
   );
   if (timeSeries) {
     suggestions.push(`Has "${name(timeSeries)}" changed over this window?`);
@@ -275,7 +281,7 @@ export function panelChatSuggestions(
   const name = title.length > 0 && title.length <= 60 ? `"${title}"` : "this panel";
   if (!panel.query) return [`What does ${name} say?`];
   const suggestions = [`Explain what ${name} shows and how it is calculated.`];
-  if (panel.query.timeField && (panel.viz === "line" || panel.viz === "area")) {
+  if (queryTimeField(panel.query) && (panel.viz === "line" || panel.viz === "area")) {
     suggestions.push(`Has ${name} changed over this window?`);
     suggestions.push(`When was ${name} at its highest?`);
   } else if (panel.viz === "stat" || panel.viz === "gauge") {

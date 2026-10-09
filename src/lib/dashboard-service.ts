@@ -1,7 +1,8 @@
+import { serverKind } from "@/lib/sources/server/registry";
+import { cannotRun } from "@/lib/sources/registry";
 import { HttpError } from "@/lib/auth/authorize";
 import { getSourceById } from "@/lib/db/repo";
-import { validateSql } from "@/lib/sql/safety";
-import { type Dashboard, declaredVariables, hasQuery } from "@/lib/ir";
+import { type Dashboard, declaredVariables, hasQuery, isSqlQuery } from "@/lib/ir";
 import type { SourceRecord } from "@/lib/registry";
 
 /**
@@ -56,7 +57,16 @@ export async function resolveAndValidateDashboard(
       );
     }
 
-    const check = await validateSql(panel.query.sql, source.config, declared);
+    // A query in a language its source does not answer is refused like a
+    // table the source does not have.
+    if (!isSqlQuery(panel.query)) {
+      throw new HttpError(400, `panel "${panel.id}": ${cannotRun(source, panel.query)}`);
+    }
+    const check = await serverKind(source).validate(
+      panel.query.sql,
+      source.config,
+      declared,
+    );
     if (!check.ok) {
       throw new HttpError(400, `panel "${panel.id}": ${check.error}`);
     }
@@ -78,7 +88,13 @@ export async function resolveAndValidateDashboard(
         `variable "${variable.name}" reads a source outside the dashboard's workspace`,
       );
     }
-    const check = await validateSql(variable.query.sql, source.config);
+    if (!isSqlQuery(variable.query)) {
+      throw new HttpError(
+        400,
+        `variable "${variable.name}": ${cannotRun(source, variable.query)}`,
+      );
+    }
+    const check = await serverKind(source).validate(variable.query.sql, source.config);
     if (!check.ok) {
       throw new HttpError(400, `variable "${variable.name}": ${check.error}`);
     }

@@ -13,6 +13,10 @@ import {
   hasQuery,
   type Panel,
   SPEC_VERSION,
+  isSqlQuery,
+  queryTimeField,
+  type QueryPanel,
+  type SqlQuery,
 } from "@/lib/ir";
 import { PANEL_KINDS } from "@/lib/panels/registry";
 import {
@@ -327,6 +331,9 @@ function schemaFailure(error: unknown, schema: z.ZodType): string {
 type GradedOutput = { panels: Panel[] } | Panel;
 
 /** Checks 2–4 on output that already parsed. Returns the failures, if any. */
+/** A panel whose query is SQL: what the corpus grades. */
+type SqlPanel = QueryPanel & { query: SqlQuery };
+
 export async function grade(
   c: EvalCase,
   source: SourceRecord,
@@ -334,7 +341,14 @@ export async function grade(
 ): Promise<string[]> {
   const failures: string[] = [];
   const panels = "panels" in output ? output.panels : [output];
-  const queried = panels.filter(hasQuery);
+  // The corpus grades SQL generation; a PromQL panel fails it by name until
+  // the evals learn PromQL (#387).
+  const queried = panels
+    .filter(hasQuery)
+    .filter((p): p is SqlPanel => isSqlQuery(p.query));
+  for (const panel of panels.filter(hasQuery)) {
+    if (!isSqlQuery(panel.query)) failures.push(`panel "${panel.id}" is PromQL`);
+  }
 
   // 2. The guard, as a save would run it.
   if ("panels" in output) {
@@ -397,7 +411,7 @@ export async function grade(
   }
   if (expect.timeField) {
     for (const panel of queried) {
-      const has = panel.query.timeField !== undefined;
+      const has = queryTimeField(panel.query) !== undefined;
       if (expect.timeField === "required" && !has) {
         failures.push(`panel "${panel.id}" has no timeField`);
       } else if (expect.timeField === "absent" && has) {

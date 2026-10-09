@@ -19,8 +19,11 @@ import {
   declaredVariables,
   hasQuery,
   Panel,
-  PanelQuery,
   type TimeRange,
+  SqlQuery,
+  PromqlQuery,
+  isSqlQuery,
+  queryTimeField,
 } from "@/lib/ir";
 import type { VariableValues } from "@/lib/sql/variables";
 import { defaultValue, type Selection } from "@/lib/variable-selection";
@@ -270,9 +273,10 @@ const PANEL_MAX = {
   id: Panel.shape.id.maxLength ?? 64,
   title: Panel.shape.title.maxLength ?? 200,
   description: Panel.shape.description.unwrap().maxLength ?? 500,
-  sourceId: PanelQuery.shape.sourceId.maxLength ?? 128,
-  sql: PanelQuery.shape.sql.maxLength ?? 8_000,
-  timeField: PanelQuery.shape.timeField.unwrap().maxLength ?? 128,
+  sourceId: SqlQuery.shape.sourceId.maxLength ?? 128,
+  sql: SqlQuery.shape.sql.maxLength ?? 8_000,
+  promql: PromqlQuery.shape.promql.maxLength ?? 8_000,
+  timeField: SqlQuery.shape.timeField.unwrap().maxLength ?? 128,
   /** A text panel's Markdown is context, not the point: a short excerpt. */
   content: 500,
   dashboardTitle: Dashboard.shape.title.maxLength ?? 200,
@@ -303,10 +307,13 @@ export function renderPanels(dashboard: Dashboard): string {
       ];
       if (p.description)
         lines.push(`    intent: ${f(p.description, PANEL_MAX.description)}`);
-      if (p.query.timeField) {
-        lines.push(`    timeField: ${f(p.query.timeField, PANEL_MAX.timeField)}`);
-      }
-      lines.push(`    sql: ${f(p.query.sql, PANEL_MAX.sql)}`);
+      const timeField = queryTimeField(p.query);
+      if (timeField) lines.push(`    timeField: ${f(timeField, PANEL_MAX.timeField)}`);
+      lines.push(
+        isSqlQuery(p.query)
+          ? `    sql: ${f(p.query.sql, PANEL_MAX.sql)}`
+          : `    promql: ${f(p.query.promql, PANEL_MAX.promql)}`,
+      );
       return lines.join("\n");
     })
     .join("\n");

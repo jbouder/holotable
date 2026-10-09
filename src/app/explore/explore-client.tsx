@@ -27,6 +27,8 @@ import {
   panelTimeRange,
   type QueryPanel,
   type TimeRange,
+  queryText,
+  queryTimeField,
 } from "@/lib/ir";
 import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
@@ -1028,14 +1030,14 @@ function ResultView({
             className="absolute top-1 right-1"
             onClick={() => {
               void navigator.clipboard
-                ?.writeText(panel.query.sql)
+                ?.writeText(queryText(panel.query))
                 .then(() => setCopied(true));
             }}
           >
             <Copy className="h-3.5 w-3.5" /> {copied ? "Copied" : "Copy"}
           </Button>
           <pre className="overflow-auto px-4 py-3 pr-24 text-xs text-muted">
-            {panel.query.sql}
+            {queryText(panel.query)}
           </pre>
         </div>
       </details>
@@ -1292,7 +1294,7 @@ function ResultTable({
                   <td key={c} className="px-3 py-1.5 tabular-nums">
                     {formatCell(
                       r[c],
-                      c === panel.query.timeField ? undefined : panel.format,
+                      c === queryTimeField(panel.query) ? undefined : panel.format,
                     )}
                   </td>
                 ))}

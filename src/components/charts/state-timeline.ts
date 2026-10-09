@@ -1,3 +1,4 @@
+import { panelTimeField } from "@/lib/ir";
 import type { CustomSeriesRenderItem, EChartsOption } from "echarts";
 import { graphic } from "echarts";
 import {
@@ -100,7 +101,7 @@ export function stateTimelineKeys(
   data: PanelData,
 ): { timeField?: string; stateKey?: string; entityKey?: string } {
   const options = stateTimelineOptions(panel);
-  const timeField = panel.query?.timeField ?? data.columns[0];
+  const timeField = panelTimeField(panel) ?? data.columns[0];
   const text = data.columns.filter((c) => c !== timeField);
   const stateKey =
     (options.state && data.columns.includes(options.state) ? options.state : undefined) ??

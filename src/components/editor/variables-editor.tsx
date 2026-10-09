@@ -8,7 +8,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Input, Label, Textarea } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { type ApiError, apiErrorFromThrown, readApiError } from "@/lib/errors";
-import { Variable } from "@/lib/ir";
+import { Variable, isSqlQuery } from "@/lib/ir";
 import { describeIssue } from "@/lib/panel-options";
 import type { VariableValues } from "@/lib/sql/variables";
 import { defaultValue } from "@/lib/variable-selection";
@@ -27,6 +27,12 @@ interface VariableDraft {
   values: string;
   sourceId: string;
   sql: string;
+  /**
+   * A label-values query (#383), kept as it was: this editor writes SQL
+   * variables only until it learns PromQL (#388), and must not turn one it
+   * cannot show into an empty SQL one on save.
+   */
+  labelQuery?: { label: string; match?: string };
   multi: boolean;
   /** Comma-separated for a multi-value variable. */
   default: string;
@@ -39,7 +45,10 @@ function toDraft(v: Variable): VariableDraft {
     type: v.type,
     values: (v.values ?? []).join("\n"),
     sourceId: v.query?.sourceId ?? "",
-    sql: v.query?.sql ?? "",
+    sql: v.query && isSqlQuery(v.query) ? v.query.sql : "",
+    ...(v.query && "label" in v.query
+      ? { labelQuery: { label: v.query.label, match: v.query.match } }
+      : {}),
     multi: v.multi === true,
     default: v.default === undefined ? "" : [v.default].flat().join(", "),
   };
@@ -64,7 +73,12 @@ function fromDraft(d: VariableDraft): Record<string, unknown> {
             .map((s) => s.trim())
             .filter(Boolean),
         }
-      : { query: { sourceId: d.sourceId, sql: d.sql.trim() } }),
+      : {
+          query:
+            d.labelQuery && d.sql.trim() === ""
+              ? { sourceId: d.sourceId, ...d.labelQuery }
+              : { sourceId: d.sourceId, sql: d.sql.trim() },
+        }),
     ...(d.multi ? { multi: true } : {}),
     ...((Array.isArray(defaults) ? defaults.length > 0 : defaults !== "")
       ? { default: defaults }

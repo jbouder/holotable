@@ -1,5 +1,6 @@
 "use client";
 
+import { isSqlQuery } from "@/lib/ir";
 import * as React from "react";
 import type { VariableValues } from "@/lib/sql/variables";
 import { CheckCircle2, FileCode2, Loader2, Play, ShieldCheck } from "lucide-react";
@@ -80,11 +81,18 @@ export function usePanelPreview(
   const validate = React.useCallback(() => {
     const seq = ++generation.current;
     setBusy("validate");
-    void validatePanelSql({
-      sourceId: query.sourceId,
-      sql: query.sql,
-      variables: Object.keys(variables),
-    }).then((r) => {
+    const checked: Promise<SqlCheck> = isSqlQuery(query)
+      ? validatePanelSql({
+          sourceId: query.sourceId,
+          sql: query.sql,
+          variables: Object.keys(variables),
+        })
+      : // Checking PromQL is the Prometheus guard's (#384), not yet reachable.
+        Promise.resolve({
+          ok: false,
+          error: { error: "PromQL cannot be checked yet.", kind: "statement" },
+        });
+    void checked.then((r) => {
       if (seq !== generation.current) return;
       setCheck({ key: checkKey, result: r });
       setBusy(null);

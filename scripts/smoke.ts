@@ -1,11 +1,11 @@
+import { cannotRun } from "@/lib/sources/registry";
 import "./lib/env";
 import { getDashboardById, getSourceById, listDashboards } from "@/lib/db/repo";
-import { hasQuery, type QueryPanel } from "@/lib/ir";
+import { hasQuery, type QueryPanel, isSqlQuery } from "@/lib/ir";
 import {
   SELF_DASHBOARD_TITLE,
   selfMonitoringSpec,
 } from "@/lib/self-monitoring/dashboard";
-import { buildExecutablePlan, validateSql } from "@/lib/sql/safety";
 import { bindRowFilter } from "@/lib/sql/row-filter";
 import { resolveTimeRange } from "@/lib/time";
 import { serverKind } from "@/lib/sources/server/registry";
@@ -63,13 +63,15 @@ async function runPanel(
     return { panel, rows: 0, error: `unknown or removed source ${panel.query.sourceId}` };
   }
 
-  const check = await validateSql(panel.query.sql, source.config);
+  const query = panel.query;
+  if (!isSqlQuery(query)) return { panel, rows: 0, error: cannotRun(source, query) };
+  const check = await serverKind(source).validate(query.sql, source.config);
   if (!check.ok) return { panel, rows: 0, error: `guard refused: ${check.error}` };
 
   const resolved = resolveTimeRange({ from: range.from, to: range.to });
-  const plan = buildExecutablePlan({
-    sql: panel.query.sql,
-    timeField: panel.query.timeField,
+  const plan = serverKind(source).plan({
+    sql: query.sql,
+    timeField: query.timeField,
     from: resolved.from,
     to: resolved.to,
     // A script has no viewer, so a row-filtered source refuses here.

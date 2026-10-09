@@ -8,10 +8,12 @@ import {
   hasQuery,
   isDatumLink,
   isSelfLink,
-  PanelQuery,
   type QueryPanel,
   SPEC_VERSION,
   type Variable,
+  queryText,
+  queryTimeField,
+  SqlQuery,
 } from "@/lib/ir";
 import { StoredDashboard } from "@/lib/ir/upgrade";
 import { PANEL_KIND_NAMES } from "@/lib/panels/registry";
@@ -157,13 +159,13 @@ test("every panel's SQL passes the guard against its fixture catalog", async () 
     const declared = declaredVariables(spec);
     for (const panel of spec.panels.filter(hasQuery)) {
       const cfg = sourceConfig(library.catalogs, panel.query.sourceId, file);
-      const result = await validateSql(panel.query.sql, cfg, declared);
+      const result = await validateSql(queryText(panel.query), cfg, declared);
       assert.ok(result.ok, `${file} panel ${panel.id}: ${result.error}`);
     }
     for (const v of spec.variables ?? []) {
       if (!v.query) continue;
       const cfg = sourceConfig(library.catalogs, v.query.sourceId, file);
-      const result = await validateSql(v.query.sql, cfg);
+      const result = await validateSql(queryText(v.query), cfg);
       assert.ok(result.ok, `${file} variable ${v.name}: ${result.error}`);
     }
   }
@@ -181,10 +183,10 @@ test("every panel's executable plan matches its snapshot", async () => {
     for (const panel of spec.panels.filter(hasQuery) as QueryPanel[]) {
       const cfg = sourceConfig(library.catalogs, panel.query.sourceId, file);
       // Loads the parser the plan builder's scanner needs.
-      await validateSql(panel.query.sql, cfg, declared);
+      await validateSql(queryText(panel.query), cfg, declared);
       const plan = buildExecutablePlan({
-        sql: panel.query.sql,
-        timeField: panel.query.timeField,
+        sql: queryText(panel.query),
+        timeField: queryTimeField(panel.query),
         ...window,
         rowFilter: bindRowFilter(cfg, () => "fixture-tenant"),
         variables,
@@ -237,11 +239,11 @@ test("the library covers every panel kind and the shapes a spec can take", () =>
   const has = (what: string, ok: boolean) => assert.ok(ok, `no fixture has ${what}`);
   has(
     "a panel with a timeField",
-    queries.some((p) => p.query.timeField !== undefined),
+    queries.some((p) => queryTimeField(p.query) !== undefined),
   );
   has(
     "a panel without a timeField",
-    queries.some((p) => p.query.timeField === undefined),
+    queries.some((p) => queryTimeField(p.query) === undefined),
   );
   has(
     "a dashboard reading two sources",
@@ -326,7 +328,7 @@ test("the library covers every panel kind and the shapes a spec can take", () =>
   const panelsMax = bounds(schema, "panels").maxItems;
   const variablesMax = bounds(schema, "variables").maxItems;
   const titleMax = bounds(schema, "title").maxLength;
-  const sqlMax = bounds(z.toJSONSchema(PanelQuery), "sql").maxLength;
+  const sqlMax = bounds(z.toJSONSchema(SqlQuery), "sql").maxLength;
   for (const limit of [panelsMax, variablesMax, titleMax, sqlMax]) {
     assert.equal(
       typeof limit,
@@ -348,6 +350,6 @@ test("the library covers every panel kind and the shapes a spec can take", () =>
   );
   has(
     `the longest SQL (${sqlMax})`,
-    queries.some((p) => p.query.sql.length === sqlMax),
+    queries.some((p) => queryText(p.query).length === sqlMax),
   );
 });

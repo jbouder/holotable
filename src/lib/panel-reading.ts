@@ -1,3 +1,4 @@
+import { panelTimeField } from "@/lib/ir";
 import { asInstant, type PanelData, toNumber, toText } from "@/components/charts/options";
 import { formatValue } from "@/lib/format";
 import type { Panel } from "@/lib/ir";
@@ -41,7 +42,7 @@ export function statReading(panel: Panel, data: PanelData): StatReading {
   const valueKey =
     named ??
     data.columns.find(
-      (c) => c !== panel.query?.timeField && typeof last?.[c] === "number",
+      (c) => c !== panelTimeField(panel) && typeof last?.[c] === "number",
     ) ??
     data.columns[data.columns.length - 1];
   const value = last?.[valueKey];
@@ -151,7 +152,7 @@ export function chartTable(
   display: TimeDisplay = LOCAL_TIME_DISPLAY,
 ): ChartTable {
   const rows = data.rows.slice(-CHART_TABLE_ROWS_MAX);
-  const timeField = panel.query?.timeField;
+  const timeField = panelTimeField(panel);
   const cell = (column: string, value: unknown): string => {
     const instant = column === timeField ? asInstant(value) : null;
     if (instant) return formatDateTime(instant, display, { seconds: true });

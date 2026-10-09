@@ -1,7 +1,8 @@
+import { cannotRun } from "@/lib/sources/registry";
 import { toText } from "@/components/charts/options";
 import { HttpError } from "@/lib/auth/authorize";
 import { getSourceById } from "@/lib/db/repo";
-import { VARIABLE_VALUES_MAX, type Variable } from "@/lib/ir";
+import { VARIABLE_VALUES_MAX, type Variable, isSqlQuery } from "@/lib/ir";
 import type { SourceRecord } from "@/lib/registry";
 import { type RowScope, rowFilterHttpError, rowFilterInScope } from "@/lib/row-scope";
 import type { ExecutablePlan } from "@/lib/sql/safety";
@@ -50,13 +51,19 @@ export async function variableOptions(
   deps: VariableDeps = DEFAULT_DEPS,
 ): Promise<string[]> {
   if (variable.type === "enum" || !variable.query) return [...(variable.values ?? [])];
-  const { sourceId, sql } = variable.query;
-  const source = await deps.getSource(sourceId);
+  const query = variable.query;
+  const source = await deps.getSource(query.sourceId);
   if (!source || source.tombstonedAt || source.workspaceId !== workspaceId) {
     throw new VariableSelectionError(
       `variable :${variable.name} reads a source that is not available`,
     );
   }
+  if (!isSqlQuery(query)) {
+    throw new VariableSelectionError(
+      `variable :${variable.name}: ${cannotRun(source, query)}`,
+    );
+  }
+  const { sql } = query;
   const kind = serverKind(source);
   const check = await kind.validate(sql, source.config);
   if (!check.ok) {

@@ -7,7 +7,7 @@ import {
   STUB_PANEL_EDIT_SUFFIX,
   stubModel,
 } from "@/lib/ai/stub";
-import { DashboardGenerationSchema, ExplorePanel, Panel } from "@/lib/ir";
+import { DashboardGenerationSchema, ExplorePanel, Panel, queryText } from "@/lib/ir";
 import { ModelSourceDraft, SourceConfig } from "@/lib/registry";
 import { validateSql } from "@/lib/sql/safety";
 
@@ -70,7 +70,7 @@ test("a dashboard request streams the recorded spec, bound to the prompt's sourc
 
 test("every recorded statement passes the SQL guard against the demo schema", async () => {
   for (const panel of recordedDashboard("e2e-metrics").panels) {
-    const r = await validateSql(panel.query.sql, DEMO);
+    const r = await validateSql(queryText(panel.query), DEMO);
     assert.equal(r.ok, true, `${panel.id}: ${r.error}`);
   }
 });
@@ -87,7 +87,10 @@ test("a panel edit returns the current panel, same id, with the recorded change"
   const panel = Panel.parse(await finalObject(result));
   assert.equal(panel.id, current.id);
   assert.equal(panel.title, `${current.title}${STUB_PANEL_EDIT_SUFFIX}`);
-  assert.equal(panel.query?.sql, current.query?.sql);
+  assert.equal(
+    panel.query ? queryText(panel.query) : undefined,
+    current.query ? queryText(current.query) : undefined,
+  );
 });
 
 test("an explore question gets the recorded single panel", async () => {
@@ -100,7 +103,10 @@ test("an explore question gets the recorded single panel", async () => {
   });
   const panel = ExplorePanel.parse(await finalObject(result));
   assert.equal(panel.id, "explore");
-  const r = await validateSql(panel.query?.sql ?? "", DEMO);
+  const r = await validateSql(
+    (panel.query ? queryText(panel.query) : undefined) ?? "",
+    DEMO,
+  );
   assert.equal(r.ok, true, r.error);
 });
 

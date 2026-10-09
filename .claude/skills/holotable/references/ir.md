@@ -62,11 +62,31 @@ value or a CSS color.
 
 ## Query
 
+A query is SQL or PromQL, decided by which of `sql` and `promql` it carries;
+never both. Which one a panel may use is its source's: a TimescaleDB source
+answers SQL, a Prometheus source PromQL, and a query in the other language is
+refused like a table the source does not have.
+
+SQL:
+
 | Field | Type | Rules |
 |---|---|---|
 | `sourceId` | string | 1–128 chars. An opaque id of a registered source. It is never a host, URL or connection string. |
 | `sql` | string | 1–8000 chars. One guarded SELECT; see `sql-rules.md`. |
 | `timeField` | string | Optional, 1–128 chars, a bare identifier. The OUTPUT column the server filters the time window on. Set it for every time series; omit it when the result has no time column. |
+
+PromQL:
+
+| Field | Type | Rules |
+|---|---|---|
+| `sourceId` | string | 1–128 chars, as for SQL. |
+| `promql` | string | 1–8000 chars. One PromQL expression. It carries no time: the server picks `start`, `end` and `step`. |
+| `instant` | boolean | Optional. One sample per series at the end of the window instead of a range: for `stat`, `gauge`, `pie` and `table`. |
+| `minStep` | duration | Optional: a whole number followed by `ms`, `s`, `m`, `h` or `d` (`15s`, `1m`). Only raises the step the server picks. |
+
+A PromQL query has no `timeField`. A range query's rows always carry their time
+in a column called `time`, which is what a time series draws; an instant query
+has none, so a kind that needs time (`state-timeline`) needs a range query.
 
 ## Time expressions
 
@@ -86,7 +106,7 @@ The server binds the value as a parameter; it never enters the SQL text.
 | `label` | string | Optional, 1–64; what the picker is labeled. |
 | `type` | `"enum"` or `"query"` | |
 | `values` | string[] | `enum` only, required there: 1–200 unique strings, each 1–256 chars. |
-| `query` | `{ sourceId, sql }` | `query` only, required there: a guarded SELECT whose first column is the values. No time filter, and no `:variables` of its own. |
+| `query` | `{ sourceId, sql }` or `{ sourceId, label, match? }` | `query` only, required there. SQL: a guarded SELECT whose first column is the values. Prometheus: the values of the label `label` (a label name), optionally narrowed by `match`, a series selector such as `up{job="api"}`. No time filter, and no `:variables` of its own. |
 | `multi` | boolean | Several values at once, bound as an array: write `col = ANY(:name)`. |
 | `default` | string or string[] | Optional. An array only when `multi`. For `enum`, each default must be one of `values`. By default the first value. |
 

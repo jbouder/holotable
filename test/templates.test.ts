@@ -1,3 +1,4 @@
+import { queryText } from "@/lib/ir";
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import type { Dashboard, Panel } from "@/lib/ir";
@@ -191,8 +192,8 @@ test("the validation spec is a parseable dashboard for either kind", () => {
     const spec = templateValidationSpec(body);
     assert.ok(spec.panels.length > 0);
     assert.deepEqual(
-      spec.panels.map((p) => p.query?.sql),
-      templatePanels(body).map((p) => p.query?.sql),
+      spec.panels.map((p) => (p.query ? queryText(p.query) : undefined)),
+      templatePanels(body).map((p) => (p.query ? queryText(p.query) : undefined)),
       "every statement the server will guard is in the spec it guards",
     );
   }

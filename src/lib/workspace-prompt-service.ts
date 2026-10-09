@@ -1,12 +1,13 @@
+import { serverKind } from "@/lib/sources/server/registry";
+import { cannotRun } from "@/lib/sources/registry";
 import { HttpError } from "@/lib/auth/authorize";
 import { getSourceById } from "@/lib/db/repo";
 import {
   pgWorkspacePromptStore,
   type WorkspacePromptStore,
 } from "@/lib/db/workspace-prompts";
-import { hasQuery } from "@/lib/ir";
+import { hasQuery, isSqlQuery } from "@/lib/ir";
 import type { SourceRecord } from "@/lib/registry";
-import { validateSql } from "@/lib/sql/safety";
 import type { WorkspacePrompt } from "@/lib/workspace-prompt";
 
 /**
@@ -33,15 +34,17 @@ export async function validateWorkspacePrompt(
     if (!hasQuery(example.panel)) {
       throw new HttpError(400, `${label}: an example panel must run a query`);
     }
-    const { sourceId, sql } = example.panel.query;
-    const source = await getSource(sourceId);
+    const query = example.panel.query;
+    const source = await getSource(query.sourceId);
     if (!source || source.tombstonedAt || source.workspaceId !== workspaceId) {
       throw new HttpError(
         400,
-        `${label}: source "${sourceId}" is not a data source in this workspace`,
+        `${label}: source "${query.sourceId}" is not a data source in this workspace`,
       );
     }
-    const check = await validateSql(sql, source.config);
+    if (!isSqlQuery(query))
+      throw new HttpError(400, `${label}: ${cannotRun(source, query)}`);
+    const check = await serverKind(source).validate(query.sql, source.config);
     if (!check.ok) throw new HttpError(400, `${label}: ${check.error}`);
   }
 }
@@ -62,9 +65,10 @@ export async function usableWorkspacePrompt(
   const examples: WorkspacePrompt["examples"] = [];
   for (const example of prompt.examples) {
     if (!hasQuery(example.panel)) continue;
-    const source = list.find((s) => s.id === example.panel.query?.sourceId);
-    if (!source) continue;
-    const check = await validateSql(example.panel.query.sql, source.config);
+    const query = example.panel.query;
+    const source = list.find((s) => s.id === query.sourceId);
+    if (!source || !isSqlQuery(query)) continue;
+    const check = await serverKind(source).validate(query.sql, source.config);
     if (check.ok) examples.push(example);
   }
   return { ...prompt, examples };

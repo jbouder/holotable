@@ -1,3 +1,4 @@
+import { panelTimeField } from "@/lib/ir";
 import type { EChartsOption } from "echarts";
 import type { Panel } from "@/lib/ir";
 import { chartPalette } from "@/lib/color/oklch";
@@ -88,7 +89,7 @@ export function isNumeric(rows: Record<string, unknown>[], key: string): boolean
 }
 
 function xKey(panel: Panel, data: PanelData): string {
-  return panel.query?.timeField ?? data.columns[0] ?? "x";
+  return panelTimeField(panel) ?? data.columns[0] ?? "x";
 }
 
 function seriesKeys(panel: Panel, data: PanelData): string[] {
@@ -236,7 +237,7 @@ function buildSeries(type: "line" | "bar", area: boolean): ChartOptionBuilder {
     const keys = seriesKeys(panel, data);
     const xValues = data.rows.map((r) => r[x]);
     const categories =
-      panel.query?.timeField === x
+      panelTimeField(panel) === x
         ? timeAxisLabels(xValues, display)
         : xValues.map(toText);
     const o = readOptions(SeriesOptions, panel.options);
@@ -277,7 +278,7 @@ function buildSeries(type: "line" | "bar", area: boolean): ChartOptionBuilder {
         areaStyle: area ? {} : undefined,
         ...(o.stacked ? { stack: "total" } : {}),
         // The marks ride on the first series; one per chart is enough.
-        ...(i === 0 && annotations && panel.query?.timeField === x
+        ...(i === 0 && annotations && panelTimeField(panel) === x
           ? annotationMarks(annotations, xValues, display)
           : {}),
         data: data.rows.map((r) => toNumber(r[k])),
@@ -464,7 +465,7 @@ function buildHeatmap(
 ): EChartsOption {
   const [xk, yk, vk] = data.columns;
   const xs = [...new Set(data.rows.map((r) => toText(r[xk])))];
-  const xLabels = panel.query?.timeField === xk ? timeAxisLabels(xs, display) : xs;
+  const xLabels = panelTimeField(panel) === xk ? timeAxisLabels(xs, display) : xs;
   const ys = [...new Set(data.rows.map((r) => toText(r[yk])))];
   const values = data.rows.map((r) => [
     xs.indexOf(toText(r[xk])),
