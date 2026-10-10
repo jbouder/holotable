@@ -23,13 +23,10 @@ import {
   systemMetricRows,
 } from "./lib/seed-data";
 import {
-  customVisualsSpec,
   demoSpec,
-  fleetGridSpec,
   fleetSpec,
   hostDetailSpec,
-  logsSpec,
-  systemSpec,
+  RETIRED_DEMO_DASHBOARDS,
 } from "./lib/demo-dashboards";
 
 /**
@@ -208,11 +205,8 @@ async function ensureDemo() {
     await ensureDashboard(pg, demoSpec());
     // Link targets first: a link names its target by id (#371).
     const targets = { hostDetail: await ensureDashboard(pg, hostDetailSpec()) };
-    await ensureDashboard(pg, systemSpec(targets));
     await ensureDashboard(pg, fleetSpec(targets));
-    await ensureDashboard(pg, fleetGridSpec(targets));
-    await ensureDashboard(pg, logsSpec());
-    await ensureDashboard(pg, customVisualsSpec());
+    for (const title of RETIRED_DEMO_DASHBOARDS) await retireDashboard(pg, title);
     await ensureDashboard(pg, selfMonitoringSpec());
     if (promUrl) await ensureDashboard(pg, prometheusSelfMonitoringSpec());
   } finally {
@@ -230,6 +224,24 @@ async function ensureDemo() {
  * install seeded before a demo change, such as the drilldown links, picks it
  * up on its next start. Once a person saves one, it is theirs and left alone.
  */
+/**
+ * Soft-delete a demo dashboard an earlier seed wrote and this one no longer
+ * does, but only while the seeder still owns it: its current version is the
+ * seed's. One a person has saved is theirs, and is left where it is.
+ */
+async function retireDashboard(pg: Client, title: string): Promise<void> {
+  const { rows } = await pg.query<{ id: string }>(
+    `UPDATE dashboards d SET deleted_at = now()
+       FROM dashboard_versions v
+      WHERE v.id = d.current_version_id
+        AND v.created_by = 'seed'
+        AND d.workspace_id = 'demo' AND d.title = $1 AND d.deleted_at IS NULL
+      RETURNING d.id`,
+    [title],
+  );
+  for (const { id } of rows) console.log(`retired demo dashboard ${id} (${title})`);
+}
+
 async function ensureDashboard(pg: Client, input: unknown): Promise<string> {
   const spec: Dashboard = parseDashboard(input);
   const json = JSON.stringify(spec);

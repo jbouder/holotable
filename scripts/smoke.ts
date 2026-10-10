@@ -15,12 +15,12 @@ import { bindSourceRowFilter } from "@/lib/row-scope";
 import type { SourcePlan } from "@/lib/sources/server/types";
 import { resolveTimeRange } from "@/lib/time";
 import { serverKind } from "@/lib/sources/server/registry";
-import { customVisualsSpec } from "./lib/demo-dashboards";
+import { demoSpec } from "./lib/demo-dashboards";
 
 /**
  * End-to-end smoke test for the self-monitoring demo (#54), its PromQL twin
  * (#390), which asks the compose stack's Prometheus the same questions, and
- * the custom-visuals demo (#405), whose panels must also compile.
+ * the service health demo, whose custom visual (#405) must also compile.
  *
  * Brings no stack up of its own — `docker compose` does that — and instead
  * asserts that what compose produced actually works:
@@ -74,8 +74,8 @@ const TARGETS: Target[] = [
     feeds: "Prometheus needs a scrape or two",
   },
   {
-    title: "Demo custom visuals",
-    committed: () => parseDashboard(customVisualsSpec()),
+    title: "Demo service health",
+    committed: () => parseDashboard(demoSpec()),
     feeds: "the seeder writes demo rows every few seconds",
   },
 ];
