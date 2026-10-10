@@ -52,6 +52,10 @@ export const AUDIT_ACTIONS = [
   "dashboard.stream",
   "dashboard.generate",
   "dashboard.chat",
+  "chat.create",
+  "chat.update",
+  "chat.delete",
+  "chat.turn",
   "query.execute",
   "source.create",
   "source.update",
@@ -88,7 +92,8 @@ export type AuditResourceType =
   | "source"
   | "template"
   | "workspace"
-  | "annotation";
+  | "annotation"
+  | "conversation";
 
 /** What an event acted on. */
 export interface AuditResource {

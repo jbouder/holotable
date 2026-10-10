@@ -27,7 +27,9 @@ configure.
 | `dashboard.stream` | A viewer opens or resumes a dashboard's live stream | dashboard |
 | `dashboard.generate` | A generation finishes, or fails (`modelConfig`: which [level](/admin/ai-provider/#models-configured-in-the-app) answered) | source |
 | `dashboard.chat` | A chat turn starts (`modelConfig`, and the `timeRange`, `variables` and `panelId` it runs with) | dashboard |
-| `query.execute` | A statement run from preview or Explore (`via: "preview"`), by a chat (`via: "chat"`) or by an MCP client's `run_query` (`via: "mcp"`) | source |
+| `chat.create`, `chat.update`, `chat.delete` | A [conversation](/reference/api-routes/#chat) is started (`sourceIds`, `timeRange`), renamed or changed (`renamed`, `sourceIds`, `timeRange`: what changed, never the title), or deleted (`deleted`: a count; `all` when every one went) | conversation, or — for delete-all |
+| `chat.turn` | A Chat turn starts (`modelConfig`, `timeRange`, `sourceIds`) | conversation |
+| `query.execute` | A statement run from preview or Explore (`via: "preview"`), by a chat (`via: "chat"`, with `conversationId` and `panelId` for Chat) or by an MCP client's `run_query` (`via: "mcp"`) | source |
 | `source.create`, `source.update`, `source.delete` | Source changes, including hiding a column (`fields: ["catalog"]`) | source |
 | `source.test`, `source.refresh`, `source.discover`, `source.draft` | Connection test, applied catalog refresh, table discovery, drafted source | source, or — before one exists |
 | `template.create`, `template.delete` | Workspace templates | template |

@@ -35,7 +35,9 @@ export type GenerationMode =
   | "dashboard-refine"
   | "panel"
   | "explore"
-  | "source-draft";
+  | "source-draft"
+  /** A `showPanel` spec written in a Chat turn (#416). */
+  | "chat";
 
 /**
  * Credential shapes worth removing from a typed prompt but NOT from a log
