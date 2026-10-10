@@ -3,6 +3,7 @@ import { STUB_CHAT_REPLY } from "../src/lib/ai/stub";
 import { SPEC_VERSION } from "../src/lib/ir";
 import { PG_PORT, storageStatePath } from "./env";
 import {
+  askChat,
   clickChart,
   createDrilldownDashboards,
   createLinkedDashboards,
@@ -35,6 +36,26 @@ test("explore answers a question with a guarded query", async ({ page }) => {
   await dialog.getByRole("button", { name: "Start over" }).click();
   await expect(table).toHaveCount(0);
   await expect(page.getByRole("complementary", { name: "This session" })).toHaveCount(0);
+});
+
+test("chat answers with an inline panel that survives a reload", async ({ page }) => {
+  await askChat(page);
+  // The recorded panel's SQL ran on the server: real rows, real services.
+  const table = page.getByRole("region", { name: "Requests by service, table" });
+  await expect(table.getByRole("cell", { name: "api", exact: true })).toBeVisible();
+  await expect(page.getByText(STUB_CHAT_REPLY)).toBeVisible();
+  // The conversation has a URL, and the panel's rows were not stored: after a
+  // reload they come back from the run route.
+  await expect(page).toHaveURL(/\/chat\/[0-9a-f-]{36}$/);
+  await page.reload();
+  await expect(table.getByRole("cell", { name: "api", exact: true })).toBeVisible();
+  await expect(page.getByText(STUB_CHAT_REPLY)).toBeVisible();
+  // Re-run, and Show as switches the view without a model call.
+  await page.getByRole("button", { name: "Re-run" }).click();
+  await expect(table.getByRole("cell", { name: "api", exact: true })).toBeVisible();
+  await page.getByRole("button", { name: /^Show as:/ }).click();
+  await page.getByRole("menuitemradio", { name: "Bar" }).click();
+  await expect(page.getByRole("region", { name: "Requests by service" })).toBeVisible();
 });
 
 test("new dashboard: Start over asks, then clears every version", async ({ page }) => {

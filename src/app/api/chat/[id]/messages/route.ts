@@ -1,4 +1,4 @@
-import { APICallError, type UIMessage } from "ai";
+import { APICallError, createIdGenerator, type UIMessage } from "ai";
 import { ModelTimeoutError } from "@/lib/ai/invoke";
 import { providerHttpError } from "@/lib/ai/provider-error";
 import { buildDataChatPrompt, streamDataChat } from "@/lib/ai/data-chat";
@@ -28,6 +28,9 @@ import { workspacePromptFor } from "@/lib/workspace-prompt-service";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
+
+/** The answer's id, made here: it is the stored row's key. */
+const messageId = createIdGenerator({ prefix: "msg", size: 16 });
 
 /**
  * One turn of a conversation (#416). The browser sends only the new question;
@@ -150,6 +153,7 @@ export const POST = route(
 
     return result.toUIMessageStreamResponse({
       originalMessages: messages,
+      generateMessageId: messageId,
       // A provider failure names the setting to fix (#337); anything else
       // keeps the SDK default's reticence.
       onError: (error) =>

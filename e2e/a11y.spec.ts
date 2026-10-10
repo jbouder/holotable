@@ -1,6 +1,7 @@
 import { expect, test } from "@playwright/test";
 import { expectNoA11yViolations, type Theme, setAppearance } from "./support/a11y";
 import {
+  askChat,
   clickChart,
   createDrilldownDashboards,
   createLinkedDashboards,
@@ -98,6 +99,20 @@ for (const theme of THEMES) {
       await page.getByRole("button", { name: "Pin", exact: true }).click();
       await page.getByRole("button", { name: "Column filters" }).click();
       await expect(page.getByRole("textbox", { name: /^Filter / }).first()).toBeVisible();
+      await expectNoA11yViolations(page);
+    });
+
+    test("chat, empty", async ({ page }) => {
+      await page.goto("/chat");
+      await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
+      await expectNoA11yViolations(page);
+    });
+
+    test("chat with an answer and an inline panel", async ({ page }) => {
+      await askChat(page);
+      const table = page.getByRole("region", { name: "Requests by service, table" });
+      await expect(table.getByRole("cell", { name: "api", exact: true })).toBeVisible();
+      await page.getByText("Show query").click();
       await expectNoA11yViolations(page);
     });
 
