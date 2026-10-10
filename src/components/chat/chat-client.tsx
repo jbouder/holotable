@@ -51,6 +51,9 @@ import { cn } from "@/lib/utils";
 import { type AddTo, ChatPanelCard, type ShowPanelPart } from "./chat-panel-card";
 import { ChatSidePanel } from "./chat-side-panel";
 
+/** The tallest the question box grows before it scrolls, in pixels. */
+const COMPOSER_MAX_HEIGHT = 240;
+
 /** The most sources one conversation may use, as the server holds it. */
 const MAX_SOURCES = 3;
 
@@ -196,6 +199,16 @@ export function ChatClient({
   const busy = status === "submitted" || status === "streaming";
 
   React.useEffect(() => setPanelOpen(readChatPanelOpen(browserStorage())), []);
+
+  // The box grows with the question, up to its cap, and shrinks back after a
+  // send. Measured, not animated: a height transition is not ours to run.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: re-measure when the text changes
+  React.useLayoutEffect(() => {
+    const el = inputRef.current;
+    if (!el) return;
+    el.style.height = "auto";
+    el.style.height = `${Math.min(el.scrollHeight, COMPOSER_MAX_HEIGHT)}px`;
+  }, [text]);
 
   // Focus lands in the composer, where the next thing to do is.
   React.useEffect(() => inputRef.current?.focus(), []);
@@ -493,61 +506,26 @@ export function ChatClient({
             )}
             <form
               aria-label="Ask"
-              className="flex flex-wrap items-end gap-2 sm:flex-nowrap"
               onSubmit={(e) => {
                 e.preventDefault();
                 void ask(text);
               }}
             >
-              <Menu
-                label={`Sources: ${chosen.map((s) => s.name).join(", ") || "none"}`}
-                className={cn(COMPOSER_CHIP_CLASS, "max-sm:aspect-square max-sm:px-0")}
-                panelClassName="max-w-sm"
-                trigger={
-                  primary ? (
-                    <span className="flex min-w-0 items-center gap-1.5 max-sm:[&>*:not(svg)]:sr-only">
-                      <SourceChipLabel
-                        name={primary.name}
-                        workspaceId={primary.workspaceId}
-                        extra={chosen.length - 1}
-                      />
-                    </span>
-                  ) : (
-                    <>
-                      <Database className="h-3.5 w-3.5 text-muted" aria-hidden />
-                      <span className="max-sm:sr-only">Pick a source</span>
-                    </>
-                  )
-                }
-              >
-                {sources.map((s) => {
-                  // A conversation stays in its workspace; another one is a new conversation.
-                  const otherWorkspace =
-                    conversationId !== null && s.workspaceId !== workspaceId;
-                  const full = !selected.includes(s.id) && selected.length >= MAX_SOURCES;
-                  return (
-                    <MenuCheckboxItem
-                      key={s.id}
-                      checked={selected.includes(s.id)}
-                      disabled={
-                        otherWorkspace || (full && s.workspaceId === workspaceId) || busy
-                      }
-                      onCheckedChange={(on) => void toggleSource(s.id, on)}
-                    >
-                      <span className="truncate">{s.name}</span>
-                      <span className="text-xs text-muted">{s.workspaceId}</span>
-                    </MenuCheckboxItem>
-                  );
-                })}
-              </Menu>
               <label htmlFor="chat-message" className="sr-only">
                 Message
               </label>
-              <div className="relative min-w-0 flex-1 basis-0">
+              {/*
+                One box, as tall as two lines and growing with what is typed:
+                the question on top, the sources and Send in a row along its
+                bottom edge, inside the same border, so nothing overhangs it at
+                any width or pointer size.
+              */}
+              <div className="relative">
                 <Textarea
+                  style={{ maxHeight: COMPOSER_MAX_HEIGHT }}
                   id="chat-message"
                   ref={inputRef}
-                  rows={1}
+                  rows={2}
                   value={text}
                   disabled={aiUnavailable !== null || readOnly}
                   placeholder={
@@ -555,7 +533,7 @@ export function ChatClient({
                       ? `e.g. ${starters[0]}`
                       : "Ask a question about these sources"
                   }
-                  className="max-h-48 min-h-10 resize-none pr-12"
+                  className="block min-h-28 resize-none pb-14"
                   onChange={(e) => setText(e.target.value)}
                   onKeyDown={(e) => {
                     // Enter sends, Shift+Enter breaks the line, as the dashboard chat.
@@ -566,35 +544,88 @@ export function ChatClient({
                     if (e.key === "Escape" && busy) void stop();
                   }}
                 />
-                {busy ? (
-                  <Button
-                    type="button"
-                    size="icon"
-                    variant="secondary"
-                    onClick={() => void stop()}
-                    aria-label="Stop"
-                    title="Stop"
-                    className="absolute right-1 bottom-1 h-8 w-8"
-                  >
-                    <Square className="h-4 w-4" />
-                  </Button>
-                ) : (
-                  <Button
-                    type="submit"
-                    size="icon"
-                    disabled={
-                      !text.trim() ||
-                      aiUnavailable !== null ||
-                      readOnly ||
-                      selected.length === 0
-                    }
-                    aria-label="Send"
-                    title="Send"
-                    className="absolute right-1 bottom-1 h-8 w-8"
-                  >
-                    <SendHorizontal className="h-4 w-4" />
-                  </Button>
-                )}
+                <div className="pointer-events-none absolute inset-x-2 bottom-2 flex items-center justify-between gap-2">
+                  <div className="pointer-events-auto min-w-0">
+                    <Menu
+                      label={`Sources: ${chosen.map((s) => s.name).join(", ") || "none"}`}
+                      className={cn(
+                        COMPOSER_CHIP_CLASS,
+                        "h-8 max-w-[min(20rem,60vw)] px-2.5",
+                      )}
+                      panelClassName="max-w-sm"
+                      trigger={
+                        primary ? (
+                          <span className="flex min-w-0 items-center gap-1.5">
+                            <SourceChipLabel
+                              name={primary.name}
+                              workspaceId={primary.workspaceId}
+                              extra={chosen.length - 1}
+                            />
+                          </span>
+                        ) : (
+                          <>
+                            <Database className="h-3.5 w-3.5 text-muted" aria-hidden />
+                            <span>Pick a source</span>
+                          </>
+                        )
+                      }
+                    >
+                      {sources.map((s) => {
+                        // A conversation stays in its workspace; another one is a new conversation.
+                        const otherWorkspace =
+                          conversationId !== null && s.workspaceId !== workspaceId;
+                        const full =
+                          !selected.includes(s.id) && selected.length >= MAX_SOURCES;
+                        return (
+                          <MenuCheckboxItem
+                            key={s.id}
+                            checked={selected.includes(s.id)}
+                            disabled={
+                              otherWorkspace ||
+                              (full && s.workspaceId === workspaceId) ||
+                              busy
+                            }
+                            onCheckedChange={(on) => void toggleSource(s.id, on)}
+                          >
+                            <span className="truncate">{s.name}</span>
+                            <span className="text-xs text-muted">{s.workspaceId}</span>
+                          </MenuCheckboxItem>
+                        );
+                      })}
+                    </Menu>
+                  </div>
+                  <div className="pointer-events-auto shrink-0">
+                    {busy ? (
+                      <Button
+                        type="button"
+                        size="icon"
+                        variant="secondary"
+                        onClick={() => void stop()}
+                        aria-label="Stop"
+                        title="Stop"
+                        className="h-8 w-8"
+                      >
+                        <Square className="h-4 w-4" />
+                      </Button>
+                    ) : (
+                      <Button
+                        type="submit"
+                        size="icon"
+                        disabled={
+                          !text.trim() ||
+                          aiUnavailable !== null ||
+                          readOnly ||
+                          selected.length === 0
+                        }
+                        aria-label="Send"
+                        title="Send"
+                        className="h-8 w-8"
+                      >
+                        <SendHorizontal className="h-4 w-4" />
+                      </Button>
+                    )}
+                  </div>
+                </div>
               </div>
             </form>
           </div>
