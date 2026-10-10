@@ -140,6 +140,26 @@ row; default as many as fit). At most 200 tiles are drawn.
 
 With PromQL: an instant query, one tile per series, `max by (instance) (up)` with `entity: "instance"` and thresholds `[{0, danger}, {1, success}]`.
 
+### `histogram`
+
+How a value is distributed (latency, payload size, queue depth), where a
+percentile line hides the shape. Return a bucket column, its lower bound
+(`floor(duration_ms / 50) * 50 AS bucket`), and a count. Add a coarse time
+bucket as `query.timeField` (`time_bucket('5 minutes', ts) AS period`) so the
+window applies: the counts are summed per bucket across the rows, and a fine
+time bucket times many value buckets runs into the row cap. Numeric buckets
+are ordered by value; text buckets keep the result's order.
+
+Options: number (how the bucket bounds are written; the counts are plain
+numbers), thresholds (each bar takes the color of its bucket's lower bound:
+an SLO drawn as color), `bucket` and `count` (the columns; default the first
+column other than the time field, and the first numeric column after it),
+`cumulative` (`true` when each bucket is an upper bound with a cumulative
+count; each bar is then the difference from the bound below, `+Inf` last),
+`log` (`true` for a logarithmic count axis, for a long tail).
+
+With PromQL: an instant query over a classic histogram's buckets, `sum by (le) (increase(http_request_duration_seconds_bucket[1h]))`, with `cumulative: true` and `bucket: "le"`.
+
 ### `text`
 
 Prose for the reader: a heading, what the dashboard is for, a runbook link.

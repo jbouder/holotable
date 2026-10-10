@@ -193,6 +193,28 @@
           "instant": true
         },
         "layout": { "x": 4, "y": 13, "w": 8, "h": 4 }
+      },
+      {
+        "id": "latency-histogram",
+        "title": "Request latency, last hour",
+        "description": "Requests per latency bucket over the last hour, from the histogram's cumulative buckets.",
+        "viz": "histogram",
+        "options": {
+          "cumulative": true,
+          "bucket": "le",
+          "unit": "s",
+          "thresholds": [
+            { "value": 0, "color": "success" },
+            { "value": 0.5, "color": "warning" },
+            { "value": 1, "color": "danger" }
+          ]
+        },
+        "query": {
+          "sourceId": "prom-fleet",
+          "promql": "sum by (le) (increase(http_request_duration_seconds_bucket{job=\"api\"}[1h]))",
+          "instant": true
+        },
+        "layout": { "x": 0, "y": 17, "w": 12, "h": 4 }
       }
     ]
   }

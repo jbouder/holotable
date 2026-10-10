@@ -23,8 +23,8 @@ They resolve through the same OKLCH values as the theme (invariant 13).
 
 ### Numbers
 
-Taken by `line`, `area`, `bar`, `stat`, `pie`, `donut`, `gauge` and
-`status-grid`, and by each
+Taken by `line`, `area`, `bar`, `stat`, `pie`, `donut`, `gauge`,
+`status-grid` and `histogram`, and by each
 entry of a table's `columns`.
 
 | Option | Type | Default | Meaning |
@@ -39,8 +39,8 @@ them; without, the axis and tooltip show values as they always have.
 
 ### Thresholds
 
-Taken by `line`, `area`, `bar`, `stat`, `gauge` and `status-grid`:
-`[{ value, color }]`,
+Taken by `line`, `area`, `bar`, `stat`, `gauge`, `status-grid` and
+`histogram`: `[{ value, color }]`,
 strictly ascending, at most 10. A value takes the color of the last step at or
 below it.
 
@@ -214,6 +214,56 @@ One tile per entity, colored by threshold or by state
   }
 }
 ```
+
+## `histogram`
+
+A value distribution, one bar per bucket
+([#404](https://github.com/jbouder/holotable/issues/404)).
+
+| Option | Type | Default | Meaning |
+| --- | --- | --- | --- |
+| `bucket` | column name | `le` when `cumulative` and present, else the first column other than the time field | The bucket: its lower bound, or a label. |
+| `count` | column name | first numeric column other than the bucket | Summed per bucket across the rows. |
+| `cumulative` | boolean | `false` | Each bucket is an upper bound with a cumulative count, as a Prometheus classic histogram's `le` is. Each bar is the difference from the bound below it, and `+Inf` is last. |
+| `log` | boolean | `false` | A logarithmic count axis, for a long tail. An empty bucket is left off it. |
+| `thresholds` | `[{ value, color }]`, ascending, at most 10 | none | Each bar takes the color of its bucket's lower bound: an SLO, drawn as color. Below the first step, or with none, it is `info`. |
+| `decimals`, `unit`, `compact` | see [Numbers](#numbers) | none | How the bucket bounds are written, with `panel.format`. The counts are plain numbers. |
+
+- Rows are summed per bucket, so a query that also groups by a time bucket
+  (to take the panel's window through `query.timeField`) draws the
+  distribution across the whole window. Keep that time bucket coarse
+  (`time_bucket('5 minutes', ts)`): time buckets times value buckets is the
+  row count, and the server caps it.
+- Numeric buckets are ordered by value. Text buckets keep the result's order.
+- With `cumulative`, a bar's label is its range (`0.1 s–0.5 s`), the first is
+  `≤ 0.05 s` and the last is `> 0.5 s`. A count that falls between two bounds
+  is a counter reset inside the window, and is drawn as zero.
+- At most 200 bars are drawn.
+- A click on a bar carries its bucket and summed count to a
+  [datum link](/guide/drilldown/).
+
+```json
+{
+  "viz": "histogram",
+  "format": "ms",
+  "query": {
+    "sourceId": "ts-metrics",
+    "timeField": "period",
+    "sql": "SELECT time_bucket('5 minutes', ts) AS period, floor(duration_ms / 50) * 50 AS bucket, count(*) AS requests FROM http_requests GROUP BY period, bucket ORDER BY period, bucket"
+  },
+  "options": {
+    "decimals": 0,
+    "thresholds": [
+      { "value": 0, "color": "success" },
+      { "value": 300, "color": "warning" },
+      { "value": 1000, "color": "danger" }
+    ]
+  }
+}
+```
+
+With PromQL, an instant query over a classic histogram's buckets reads in
+`cumulative` mode: `sum by (le) (increase(http_request_duration_seconds_bucket[1h]))`.
 
 ## `text`
 

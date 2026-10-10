@@ -71,6 +71,7 @@
               "gauge",
               "state-timeline",
               "status-grid",
+              "histogram",
               "text"
             ]
           },
@@ -701,6 +702,68 @@
                     "type": "integer",
                     "minimum": 1,
                     "maximum": 12
+                  },
+                  "thresholds": {
+                    "maxItems": 10,
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "value": {
+                          "type": "number"
+                        },
+                        "color": {
+                          "type": "string",
+                          "enum": [
+                            "success",
+                            "warning",
+                            "danger",
+                            "info",
+                            "neutral",
+                            "orange",
+                            "purple",
+                            "teal"
+                          ]
+                        }
+                      },
+                      "required": ["value", "color"],
+                      "additionalProperties": false
+                    }
+                  },
+                  "decimals": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 6
+                  },
+                  "unit": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 16
+                  },
+                  "compact": {
+                    "type": "boolean"
+                  }
+                },
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "bucket": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 128
+                  },
+                  "count": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 128
+                  },
+                  "cumulative": {
+                    "type": "boolean"
+                  },
+                  "log": {
+                    "type": "boolean"
                   },
                   "thresholds": {
                     "maxItems": 10,

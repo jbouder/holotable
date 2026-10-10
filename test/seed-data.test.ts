@@ -9,6 +9,7 @@ import {
   HTTP_ROWS_PER_BATCH,
   httpRequestRows,
   parseBackfill,
+  requestLatency,
   systemMetricRows,
 } from "../scripts/lib/seed-data";
 
@@ -169,4 +170,21 @@ test("the hosts differ, so the demo's thresholds and states have something to sh
   assert.ok(mean("host-03", "cpu_pct") > 70);
   assert.ok(mean("host-04", "disk_pct") > 85);
   assert.ok(mean("host-01", "disk_pct") < 60);
+});
+
+test("latency has a body, a slow route and a tail, so a histogram has a shape", () => {
+  const random = seeded(11);
+  const sample = (route: string, status = 200) =>
+    Array.from({ length: 2000 }, () => requestLatency(route, status, random)).sort(
+      (a, b) => a - b,
+    );
+  const fast = sample("/login");
+  const search = sample("/search");
+  const median = (xs: number[]) => xs[Math.floor(xs.length / 2)] ?? 0;
+  assert.ok(median(fast) < 100, `median ${median(fast)}`);
+  assert.ok(median(search) > median(fast) + 100);
+  // About one in fifty is a tail past 600 ms.
+  const tail = fast.filter((ms) => ms > 600).length / fast.length;
+  assert.ok(tail > 0.005 && tail < 0.05, `tail ${tail}`);
+  assert.ok(median(sample("/login", 500)) > median(fast) + 250);
 });

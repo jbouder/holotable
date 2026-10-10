@@ -9,6 +9,7 @@ import {
   scatterChart,
 } from "@/components/charts/options";
 import { gaugeChart, gaugeShape } from "@/components/charts/gauge";
+import { histogramChart, histogramShape } from "@/components/charts/histogram";
 import {
   stateTimelineChart,
   stateTimelineShape,
@@ -45,6 +46,7 @@ export const PANEL_RENDERERS = {
     shape: stateTimelineShape,
   },
   "status-grid": { type: "html", Body: StatusGridView },
+  histogram: { type: "chart", option: histogramChart, shape: histogramShape },
   text: { type: "html", Body: TextView },
 } as const satisfies Record<VizType, PanelRenderer>;
 

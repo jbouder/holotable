@@ -1,5 +1,6 @@
 import { panelTimeField } from "@/lib/ir";
 import { gaugeOptions, gaugeReadings } from "@/components/charts/gauge";
+import { histogramBars } from "@/components/charts/histogram";
 import {
   asInstant,
   type ChartContext,
@@ -146,6 +147,12 @@ const tileDatum: DatumMapper = (panel, data, click) => {
   return tile ? { row: tile.row, series: tile.label } : null;
 };
 
+/** A bar is a bucket: its row is the bucket and its summed count. */
+const barDatum: DatumMapper = (panel, data, click) => {
+  const bar = at(histogramBars(panel, data).bars, click.dataIndex);
+  return bar ? { row: bar.row, series: bar.label } : null;
+};
+
 export const DATUM_MAPPERS = {
   line: byRowIndex,
   area: byRowIndex,
@@ -159,6 +166,7 @@ export const DATUM_MAPPERS = {
   gauge: gaugeDatum,
   "state-timeline": spanDatum,
   "status-grid": tileDatum,
+  histogram: barDatum,
   // A text panel has no rows and takes no links.
   text: () => null,
 } as const satisfies Record<VizType, DatumMapper>;

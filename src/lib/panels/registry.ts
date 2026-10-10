@@ -1,5 +1,6 @@
 import { gauge } from "@/lib/panels/kinds/gauge";
 import { heatmap } from "@/lib/panels/kinds/heatmap";
+import { histogram } from "@/lib/panels/kinds/histogram";
 import { donut, pie } from "@/lib/panels/kinds/pie";
 import { scatter } from "@/lib/panels/kinds/scatter";
 import { area, bar, line } from "@/lib/panels/kinds/series";
@@ -38,6 +39,7 @@ export const PANEL_KINDS = [
   gauge,
   stateTimeline,
   statusGrid,
+  histogram,
   text,
 ] as const satisfies readonly PanelKind[];
 
