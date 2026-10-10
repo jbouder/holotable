@@ -270,6 +270,15 @@ Important files:
   is opened. The base URL is untrusted: `ai/base-url.ts` holds the rules and
   `ai/guarded-fetch.ts` applies them at DNS time on every connection. Both
   levels are off in demo mode
+- `src/lib/ai/data-chat.ts` and `src/lib/chat/` — the Chat engine (#416):
+  one `streamText` turn over a conversation's sources with two guarded tools,
+  `runQuery` and `showPanel`. `showPanel` takes an IR panel spec (`ChatPanel`,
+  no id, layout or window: the server assigns them), runs it once under the
+  conversation's window and the viewer's row filter, and streams the rows to
+  the browser; `toModelOutput` gives the model only the columns, the row count
+  and a few sample rows. A stored message never holds result rows
+  (`persistableMessage` in `src/lib/chat/persist.ts`). The dashboard chat
+  (`src/lib/ai/chat.ts`) is a caller with `draw: false`
 - `src/lib/ai/repair.ts` and `src/components/use-repairing-object.ts` — the
   one automatic repair of output that failed its schema (#21). The browser
   sends only `{ repairOf: id }`; the request, the rejected output and the

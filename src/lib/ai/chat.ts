@@ -1,19 +1,17 @@
-import {
-  streamText,
-  tool,
-  convertToModelMessages,
-  stepCountIs,
-  type LanguageModelUsage,
-  type UIMessage,
-} from "ai";
-import { z } from "zod";
-import { type Model, modelSettings } from "@/lib/ai/provider";
+import type { LanguageModelUsage, UIMessage } from "ai";
+import type { Model } from "@/lib/ai/provider";
 import { fenceUntrustedBlock, sanitizePromptField } from "@/lib/ai/untrusted";
 import { PROMQL_RULES, SQL_RULES } from "@/lib/ai/generate";
+import {
+  type ChatQueryArgs,
+  type ChatQueryOutcome,
+  type ChatQueryPlan,
+  type ChatScope,
+  chatQueryOf,
+  planChatQuery,
+  streamDataChat,
+} from "@/lib/ai/data-chat";
 import { sourceKind } from "@/lib/sources/registry";
-import type { SourcePlan } from "@/lib/sources/server/types";
-import { resolveTimeRange } from "@/lib/time";
-import { QueryExecutionError } from "@/lib/sources/execution";
 import { serverKind } from "@/lib/sources/server/registry";
 import {
   Dashboard,
@@ -30,10 +28,7 @@ import type { VariableValues } from "@/lib/sql/variables";
 import { defaultValue, type Selection } from "@/lib/variable-selection";
 import type { SourceRecord } from "@/lib/registry";
 import { can } from "@/lib/auth/authorize";
-import { claimValue, type Identity } from "@/lib/auth/claims";
-import { bindSourceRowFilter } from "@/lib/row-scope";
-import { RowFilterDenied } from "@/lib/sql/row-filter";
-import { log } from "@/lib/log";
+import type { Identity } from "@/lib/auth/claims";
 
 /**
  * Dashboard chat.
@@ -51,29 +46,6 @@ import { log } from "@/lib/log";
  *     re-resolved server-side — no connection details or credentials are exposed;
  *   - the chat cannot mutate the dashboard.
  */
-
-/** Cap on rows handed back to the model, to bound context/token cost. */
-export const MAX_TOOL_ROWS = 200;
-
-/** How many model<->tool steps a single turn may take. */
-const MAX_STEPS = 6;
-
-/**
- * What the model asks `runQuery` to run: SQL for a SQL source, PromQL for a
- * Prometheus one (#387). The tool offers `promql` only on a dashboard that
- * has a Prometheus source.
- */
-type ChatQueryArgs = {
-  sourceId: string;
-  sql?: string;
-  timeField?: string;
-  promql?: string;
-  instant?: boolean;
-};
-
-export type ChatQueryPlan =
-  | { ok: true; source: SourceRecord; plan: SourcePlan }
-  | { ok: false; error: string };
 
 /**
  * Resolve the sources a chat turn may query: exactly the ones this dashboard's
@@ -178,64 +150,32 @@ export async function buildChatQueryPlan(input: {
   /** The reader's checked picks (#366); the dashboard's defaults when absent. */
   variables?: VariableValues;
 }): Promise<ChatQueryPlan> {
-  const { dashboard, sources, args, identity } = input;
+  const named = chatQueryOf(input.args);
+  if (!named.ok) return named;
+  return planChatQuery(dashboardScope(input), named.query);
+}
 
-  const source = sources.find((s) => s.id === args.sourceId);
-  if (!source) {
-    return {
-      ok: false,
-      error: `source "${args.sourceId}" is not available on this dashboard. Use one of: ${sources
-        .map((s) => s.id)
-        .join(", ")}.`,
-    };
-  }
-
-  // A panel's statement may reference the dashboard's variables (#67). The
-  // model's query runs with the reader's checked picks (#366), or else each
-  // one's default or a list's first value; a variable with no value here
-  // makes a statement that needs it refused by name.
-  const variables = input.variables ?? chatVariableValues(dashboard);
-  const kind = serverKind(source);
-  // Exactly one statement, in either language; the source's kind refuses the
-  // other one by name, as the guard refuses a table it does not have.
-  if ((args.sql === undefined) === (args.promql === undefined)) {
-    return { ok: false, error: "give exactly one of sql or promql" };
-  }
-  const query =
-    args.promql !== undefined
-      ? {
-          sourceId: source.id,
-          promql: args.promql,
-          ...(args.instant ? { instant: true } : {}),
-        }
-      : {
-          sourceId: source.id,
-          sql: args.sql ?? "",
-          ...(args.timeField ? { timeField: args.timeField } : {}),
-        };
-  const check = await kind.check(source, query, declaredVariables(dashboard));
-  if (!check.ok) return { ok: false, error: check.error ?? "invalid sql" };
-
-  // The server is the sole authority on the window: the range the reader is
-  // viewing, resolved here, never anything the model tried to express.
-  try {
-    const range = resolveTimeRange(dashboard.timeRange);
-    const plan = kind.plan(source, query, {
-      from: range.from,
-      to: range.to,
-      rowFilter: bindSourceRowFilter(source.config, (claim) =>
-        claimValue(identity, claim),
-      ),
-      variables,
-    });
-    return { ok: true, source, plan };
-  } catch (err) {
-    // Named for the model without the claim: it can do nothing about it.
-    if (err instanceof RowFilterDenied) {
-      return { ok: false, error: "the reader has no access to this source's rows" };
-    }
-    return { ok: false, error: err instanceof Error ? err.message : "invalid query" };
-  }
+/**
+ * What a dashboard's chat runs against: the dashboard's window, its declared
+ * variables, and the reader's checked picks (#366) or else each one's
+ * default or a list's first value; a variable with no value here makes a
+ * statement that needs it refused by name.
+ */
+function dashboardScope(input: {
+  dashboard: Dashboard;
+  sources: SourceRecord[];
+  identity: Identity;
+  variables?: VariableValues;
+}): ChatScope {
+  const { dashboard } = input;
+  return {
+    sources: input.sources,
+    timeRange: dashboard.timeRange,
+    identity: input.identity,
+    declaredVariables: declaredVariables(dashboard),
+    variables: input.variables ?? chatVariableValues(dashboard),
+    where: "on this dashboard",
+  };
 }
 
 /** How long one variable value may be in the prompt: the IR's own cap. */
@@ -403,66 +343,6 @@ Queryable source catalogs (metadata only — never the underlying data):
 ${catalogs}`;
 }
 
-const SQL_TOOL_INPUT = z.object({
-  sourceId: z
-    .string()
-    .describe("One of the dashboard's source ids (see the panel list)."),
-  sql: z
-    .string()
-    .max(8000)
-    .describe("A single SELECT/WITH statement following the SQL rules."),
-  timeField: z
-    .string()
-    .max(128)
-    .optional()
-    .describe(
-      "Output alias of the time column, when the result is time-series. Omit for scalars/breakdowns.",
-    ),
-});
-
-/** The tool's input on a dashboard with a Prometheus source (#387). */
-const PROMQL_TOOL_INPUT = z.object({
-  sourceId: z
-    .string()
-    .describe("One of the dashboard's source ids (see the panel list)."),
-  sql: z
-    .string()
-    .max(8000)
-    .optional()
-    .describe(
-      "For a SQL source: a single SELECT/WITH statement following the SQL rules.",
-    ),
-  timeField: z
-    .string()
-    .max(128)
-    .optional()
-    .describe(
-      "For SQL: the output alias of the time column, when the result is time-series.",
-    ),
-  promql: z
-    .string()
-    .max(8000)
-    .optional()
-    .describe(
-      "For a Prometheus source: one PromQL expression following the PromQL rules.",
-    ),
-  instant: z
-    .boolean()
-    .optional()
-    .describe("For PromQL: true for one value per series at the end of the window."),
-});
-
-/** One statement the model asked to run, as the audit log records it. */
-export interface ChatQueryOutcome {
-  sourceId: string;
-  /** The statement, under its language's name. */
-  sql?: string;
-  promql?: string;
-  outcome: "success" | "failure";
-  /** Where a failure happened: refused by the guard, or failed on the source. */
-  stage?: string;
-}
-
 /**
  * Run one chat turn. Returns the streaming result; the route serializes it with
  * `.toUIMessageStreamResponse()`.
@@ -492,77 +372,18 @@ export async function streamDashboardChat(input: {
    */
   abortSignal?: AbortSignal;
 }) {
-  const { dashboard, sources, identity, view, messages, onUsage, onQuery, abortSignal } =
-    input;
-  const modelMessages = await convertToModelMessages(messages);
-
-  // The tool learns PromQL only on a dashboard with a Prometheus source, so
-  // a SQL dashboard's chat is asked exactly what it always was (#387).
-  const promql = sources.some((s) => sourceKind(s).language === "promql");
-  return streamText({
-    ...modelSettings(input.model),
+  const { dashboard, sources, identity, view } = input;
+  // The dashboard chat answers in words: it draws nothing until its widget
+  // renders panels (#416, phase 6).
+  return streamDataChat({
     system: buildSystemPrompt(dashboard, sources, view),
-    messages: modelMessages,
-    stopWhen: stepCountIs(MAX_STEPS),
-    abortSignal,
-    onFinish: ({ usage }) => onUsage?.(usage),
-    tools: {
-      runQuery: tool({
-        description: promql
-          ? "Run one read-only query against one of this dashboard's data sources to fetch fresh data: 'sql' (a SELECT) for a SQL source, 'promql' for a Prometheus one. The server injects the dashboard's time range automatically; do not add a time filter. Returns columns and rows."
-          : "Run a read-only SQL SELECT against one of this dashboard's data sources to fetch fresh data. The server injects the dashboard's time range automatically; do not add a time filter. Returns columns and rows.",
-        // The SQL schema's input is a case of the PromQL one's, so the tool is
-        // typed by the wider; a SQL dashboard is still shown only the SQL one.
-        inputSchema: (promql
-          ? PROMQL_TOOL_INPUT
-          : SQL_TOOL_INPUT) as typeof PROMQL_TOOL_INPUT,
-        execute: async (args) => {
-          const built = await buildChatQueryPlan({
-            dashboard,
-            sources,
-            args,
-            identity,
-            variables: view?.variables,
-          });
-          const report = (outcome: ChatQueryOutcome["outcome"], stage?: string) =>
-            onQuery?.({
-              sourceId: args.sourceId,
-              ...("promql" in args && args.promql !== undefined
-                ? { promql: args.promql }
-                : { sql: args.sql }),
-              outcome,
-              stage,
-            });
-          if (!built.ok) {
-            report("failure", "validate");
-            return { error: built.error };
-          }
-          try {
-            const result = await serverKind(built.source).execute(
-              built.source,
-              built.plan,
-            );
-            report("success");
-            return {
-              columns: result.columns,
-              rows: result.rows.slice(0, MAX_TOOL_ROWS),
-              rowCount: result.rows.length,
-              truncated: result.rows.length > MAX_TOOL_ROWS,
-              // What the rows were narrowed to, so the citation can say (#366).
-              timeRange: dashboard.timeRange,
-              variables: view?.variables ?? {},
-            };
-          } catch (err) {
-            report("failure", "execute");
-            // Statement-level errors are the query's fault and safe to surface so
-            // the model can correct itself; anything else is infra — log it and
-            // return a generic message rather than leaking internals.
-            if (err instanceof QueryExecutionError) return { error: err.message };
-            log.error("chat.run_query_failed", { sourceId: built.source.id, err });
-            return { error: "query execution failed" };
-          }
-        },
-      }),
-    },
+    scope: dashboardScope({ dashboard, sources, identity, variables: view?.variables }),
+    noun: "this dashboard's",
+    draw: false,
+    model: input.model,
+    messages: input.messages,
+    onUsage: input.onUsage,
+    onQuery: input.onQuery,
+    abortSignal: input.abortSignal,
   });
 }

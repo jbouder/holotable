@@ -86,7 +86,18 @@ export async function describeFailure(
   schema: z.ZodType,
 ): Promise<Failure | null> {
   if (!NoObjectGeneratedError.isInstance(error) || !error.text?.trim()) return null;
-  const text = error.text;
+  return describeOutput(error.text, schema);
+}
+
+/**
+ * Why `text`, a model's output, does not satisfy `schema`; null when it does.
+ * The half of {@link describeFailure} that needs no error: a tool call whose
+ * input failed its schema (#416) carries the text itself.
+ */
+export async function describeOutput(
+  text: string,
+  schema: z.ZodType,
+): Promise<Failure | null> {
   let value: unknown;
   try {
     value = JSON.parse(text);

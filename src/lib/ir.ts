@@ -308,7 +308,10 @@ export const PanelOptions = z.union(
  * What a panel's kind asks of the rest of it: a query or none (a text panel,
  * #202), a time field (a state timeline, #201), and options that are its own.
  */
-function fitsItsKind(panel: z.infer<typeof PanelFields>, ctx: z.RefinementCtx): void {
+function fitsItsKind(
+  panel: Omit<z.infer<typeof PanelFields>, "id" | "layout">,
+  ctx: z.RefinementCtx,
+): void {
   const kind = findPanelKind(panel.viz);
   if (!kind) return;
   if (kind.query === "none" && panel.query !== undefined) {
@@ -488,6 +491,32 @@ export const GeneratedPanelAnyLanguage: z.ZodType<Panel> = z
 export const ExplorePanelAnyLanguage = GeneratedAnyQueryPanel.omit({
   links: true,
 }).superRefine(fitsItsKind);
+
+/**
+ * What Chat's `showPanel` tool asks the model for (#416): an
+ * {@link ExplorePanel} without the `id` and `layout`, which the server
+ * assigns, and without a window or cadence of its own: the conversation owns
+ * both. The result is read as an `ExplorePanelAnyLanguage` once the id and
+ * layout are added, so nothing downstream sees this shape.
+ */
+export const ChatPanel = GeneratedQueryPanel.omit({
+  links: true,
+  id: true,
+  layout: true,
+  timeRange: true,
+  refreshIntervalMs: true,
+}).superRefine(fitsItsKind);
+export type ChatPanel = z.infer<typeof ChatPanel>;
+
+/** {@link ChatPanel} in either query language. */
+export const ChatPanelAnyLanguage = GeneratedAnyQueryPanel.omit({
+  links: true,
+  id: true,
+  layout: true,
+  timeRange: true,
+  refreshIntervalMs: true,
+}).superRefine(fitsItsKind);
+export type ChatPanelAnyLanguage = z.infer<typeof ChatPanelAnyLanguage>;
 
 /** A panel that runs a query: every kind but the query-less ones. */
 export type QueryPanel = Panel & { query: PanelQuery };
