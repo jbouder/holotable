@@ -72,6 +72,7 @@
               "state-timeline",
               "status-grid",
               "histogram",
+              "logs",
               "text"
             ]
           },
@@ -803,6 +804,61 @@
                     "maxLength": 16
                   },
                   "compact": {
+                    "type": "boolean"
+                  }
+                },
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "message": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 128
+                  },
+                  "level": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 128
+                  },
+                  "levels": {
+                    "maxItems": 20,
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "state": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 64
+                        },
+                        "color": {
+                          "type": "string",
+                          "enum": [
+                            "success",
+                            "warning",
+                            "danger",
+                            "info",
+                            "neutral",
+                            "orange",
+                            "purple",
+                            "teal"
+                          ]
+                        }
+                      },
+                      "required": ["state", "color"],
+                      "additionalProperties": false
+                    }
+                  },
+                  "wrap": {
+                    "type": "boolean"
+                  },
+                  "order": {
+                    "type": "string",
+                    "enum": ["newest", "oldest"]
+                  },
+                  "showTime": {
                     "type": "boolean"
                   }
                 },

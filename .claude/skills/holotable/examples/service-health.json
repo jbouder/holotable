@@ -210,6 +210,19 @@
           ]
         },
         "layout": { "x": 0, "y": 21, "w": 12, "h": 3 }
+      },
+      {
+        "id": "recent-errors",
+        "title": "Recent errors and warnings",
+        "description": "The newest lines at warn or above; expand one for its request id.",
+        "viz": "logs",
+        "options": { "message": "message", "level": "level" },
+        "query": {
+          "sourceId": "ts-metrics",
+          "sql": "SELECT ts, level, message, service, request_id FROM app_logs WHERE level IN ('error', 'warn') ORDER BY ts DESC LIMIT 200",
+          "timeField": "ts"
+        },
+        "layout": { "x": 0, "y": 24, "w": 12, "h": 5 }
       }
     ]
   }

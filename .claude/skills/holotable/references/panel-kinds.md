@@ -160,6 +160,23 @@ count; each bar is then the difference from the bound below, `+Inf` last),
 
 With PromQL: an instant query over a classic histogram's buckets, `sum by (le) (increase(http_request_duration_seconds_bucket[1h]))`, with `cumulative: true` and `bucket: "le"`.
 
+### `logs`
+
+Raw events to read: log lines, audit entries, recent errors. Return the raw
+time column (no bucketing) as `query.timeField`, a message column and,
+optionally, a level column, `ORDER BY ts DESC LIMIT 200`. Lines are shown
+newest first; every other column is shown when a line is expanded.
+Requires `query.timeField`. At most 500 lines are drawn. Filter by level in the SQL,
+with a variable for a picker (`WHERE level = ANY(:level)`).
+
+Options: `message` (default the longest text column), `level` (the level
+column; default one named `level` or `severity`), `levels` (up to 20 `{ state, color }` pairs; without one, `error` and
+`fatal` are `danger`, `warn` is `warning`, `info` is `info`, `debug` is
+`neutral`), `wrap` (default `true`), `order` (`"newest"`, the default, or
+`"oldest"`), `showTime` (default `true`).
+
+With PromQL: not for a Prometheus source; a PromQL result has no lines. Use `table` for an instant query's series.
+
 ### `text`
 
 Prose for the reader: a heading, what the dashboard is for, a runbook link.

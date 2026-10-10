@@ -396,5 +396,42 @@
         "labels": ["instance", "job"]
       }
     ]
+  },
+  "ts-logs": {
+    "schema": "metrics",
+    "tables": [
+      {
+        "name": "app_logs",
+        "description": "gateway log lines, one per event",
+        "timeField": "ts",
+        "columns": [
+          {
+            "name": "ts",
+            "type": "timestamp with time zone"
+          },
+          {
+            "name": "host",
+            "type": "text"
+          },
+          {
+            "name": "level",
+            "type": "text",
+            "description": "error, warn, info or debug"
+          },
+          {
+            "name": "route",
+            "type": "text"
+          },
+          {
+            "name": "message",
+            "type": "text"
+          },
+          {
+            "name": "request_id",
+            "type": "text"
+          }
+        ]
+      }
+    ]
   }
 }

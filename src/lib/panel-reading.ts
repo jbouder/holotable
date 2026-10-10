@@ -9,6 +9,7 @@ import {
 import { formatValue } from "@/lib/format";
 import type { Panel } from "@/lib/ir";
 import { type ColorToken, defaultStateToken } from "@/lib/panels/colors";
+import { LogsOptions } from "@/lib/panels/kinds/logs";
 import { StatusGridOptions } from "@/lib/panels/kinds/status-grid";
 import {
   numberDisplay,
@@ -158,6 +159,116 @@ export function statusGrid(panel: Panel, data: PanelData): StatusGrid {
     tiles: tiles.slice(0, STATUS_GRID_MAX),
     overflow: Math.max(0, tiles.length - STATUS_GRID_MAX),
   };
+}
+
+/** The most lines a logs panel draws. */
+export const LOG_LINES_MAX = 500;
+
+/** A level's color when the panel did not assign one. */
+const LEVEL_COLORS: Record<string, ColorToken> = {
+  fatal: "danger",
+  panic: "danger",
+  critical: "danger",
+  crit: "danger",
+  error: "danger",
+  err: "danger",
+  warn: "warning",
+  warning: "warning",
+  notice: "info",
+  info: "info",
+  debug: "neutral",
+  trace: "neutral",
+};
+
+export interface LogLine {
+  /** Stable across polls while the line is in the window, for React and expansion. */
+  key: string;
+  time: string;
+  level?: string;
+  color?: ColorToken;
+  message: string;
+  /** The row's other columns, as name and text, shown when the line is expanded. */
+  details: [string, string][];
+  row: Record<string, unknown>;
+}
+
+export interface LogView {
+  lines: LogLine[];
+  /** Lines past {@link LOG_LINES_MAX}, not drawn. */
+  overflow: number;
+}
+
+/**
+ * A logs panel's lines: newest first unless asked otherwise, each with its
+ * time on the viewer's clock, its level's color, and its other columns.
+ */
+export function logLines(
+  panel: Panel,
+  data: PanelData,
+  display: TimeDisplay = LOCAL_TIME_DISPLAY,
+): LogView {
+  const o = readOptions(LogsOptions, panel.options);
+  const timeKey = panelTimeField(panel);
+  const named = (c: string | undefined) =>
+    c && data.columns.includes(c) ? c : undefined;
+  const levelKey =
+    named(o.level) ??
+    data.columns.find((c) => ["level", "severity", "lvl"].includes(c.toLowerCase()));
+  const candidates = data.columns.filter(
+    (c) => c !== timeKey && c !== levelKey && !isNumeric(data.rows, c),
+  );
+  const length = (c: string) =>
+    data.rows.reduce((sum, r) => sum + toText(r[c]).length, 0);
+  const messageKey =
+    named(o.message) ??
+    candidates.reduce<string | undefined>(
+      (best, c) => (best === undefined || length(c) > length(best) ? c : best),
+      undefined,
+    );
+  const detailKeys = data.columns.filter(
+    (c) => c !== timeKey && c !== levelKey && c !== messageKey,
+  );
+  const colors = new Map((o.levels ?? []).map((l) => [l.state, l.color]));
+
+  const at = (r: Record<string, unknown>) =>
+    timeKey === undefined ? Number.NaN : (asInstant(r[timeKey])?.getTime() ?? Number.NaN);
+  const rows = data.rows
+    .map((row, index) => ({ row, index, t: at(row) }))
+    .sort((a, b) => {
+      // Newest first by default; a row without a time keeps its place at the end.
+      const x = Number.isFinite(a.t);
+      const y = Number.isFinite(b.t);
+      if (x && y && a.t !== b.t) return o.order === "oldest" ? a.t - b.t : b.t - a.t;
+      if (x !== y) return x ? -1 : 1;
+      return a.index - b.index;
+    });
+
+  const seen = new Map<string, number>();
+  const lines = rows.slice(0, LOG_LINES_MAX).map(({ row, t }): LogLine => {
+    const message = messageKey === undefined ? "" : toText(row[messageKey]);
+    const level = levelKey === undefined ? undefined : toText(row[levelKey]);
+    const base = `${Number.isFinite(t) ? t : ""}\u0000${level ?? ""}\u0000${message}`;
+    const n = seen.get(base) ?? 0;
+    seen.set(base, n + 1);
+    return {
+      key: n === 0 ? base : `${base}\u0000${n}`,
+      time: Number.isFinite(t)
+        ? formatDateTime(new Date(t), display, { seconds: true })
+        : "",
+      level: level || undefined,
+      color: level
+        ? (colors.get(level) ??
+          LEVEL_COLORS[level.toLowerCase()] ??
+          defaultStateToken(level))
+        : undefined,
+      message,
+      details: detailKeys
+        .filter((c) => row[c] !== null && row[c] !== undefined && row[c] !== "")
+        .map((c) => [c, toText(row[c])]),
+      row,
+    };
+  });
+  return { lines, overflow: Math.max(0, rows.length - LOG_LINES_MAX) };
 }
 
 /** The most rows a table shows, as before options. */

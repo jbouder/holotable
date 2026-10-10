@@ -70,6 +70,30 @@ SELECT add_retention_policy(
     if_not_exists => TRUE
 );
 
+-- Gateway log lines (#404), the logs panel's demo. The seeder creates the
+-- same table on a volume that predates it.
+CREATE TABLE IF NOT EXISTS metrics.app_logs
+(
+    ts         TIMESTAMPTZ NOT NULL DEFAULT now(),
+    host       TEXT NOT NULL,
+    level      TEXT NOT NULL,
+    route      TEXT NOT NULL,
+    message    TEXT NOT NULL,
+    request_id TEXT NOT NULL
+);
+
+SELECT create_hypertable(
+    'metrics.app_logs',
+    by_range('ts'),
+    if_not_exists => TRUE
+);
+
+SELECT add_retention_policy(
+    'metrics.app_logs',
+    drop_after => INTERVAL '7 days',
+    if_not_exists => TRUE
+);
+
 -- Third demo source: Holotable's own Prometheus instruments (#54).
 --
 -- `scripts/self-metrics.ts` scrapes GET /api/metrics and lands one row per

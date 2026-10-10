@@ -267,6 +267,7 @@ export const PRESENTATION_GUIDE = `Optional per-panel settings; omit each unless
 - 'options' on pie/donut: decimals, unit, compact, legend.
 - 'options' on status-grid: entity (the label column), value, thresholds, or state with states [{state, color}], sort ("label"|"value"|"none"), decimals, unit, compact.
 - 'options' on histogram: bucket, count (the columns), cumulative (true for Prometheus "le" buckets), log (true for a long tail), thresholds (colors bars from a bucket bound, e.g. an SLO), decimals, unit, compact (for the bucket labels).
+- 'options' on logs: message, level (the columns), levels [{state, color}], wrap, order ("newest"|"oldest"), showTime.
 - 'options' on table: columns [{name, label, hidden, format, decimals, unit, align}] (listed first, in order), sort {column, order: "asc"|"desc"}.
 - Colors are tokens only: success, warning, danger, info, neutral, orange, purple, teal.
 - 'timeRange' and 'refreshIntervalMs' on a panel override the dashboard's, for a panel that needs a different window or cadence than the rest (e.g. a "today so far" stat over {from:"now-24h", to:"now"} refreshed every 300000ms). Never on a text panel.`;

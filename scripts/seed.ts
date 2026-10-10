@@ -12,6 +12,8 @@ import {
   prometheusSelfMonitoringSpec,
 } from "@/lib/self-monitoring/prometheus";
 import {
+  type AppLogRow,
+  appLogRows,
   backfillChunks,
   backfillStart,
   type HttpRequestRow,
@@ -25,6 +27,7 @@ import {
   fleetGridSpec,
   fleetSpec,
   hostDetailSpec,
+  logsSpec,
   systemSpec,
 } from "./lib/demo-dashboards";
 
@@ -151,6 +154,29 @@ async function ensureDemo() {
       },
     });
 
+    await upsertSource(pg, {
+      id: "ts-logs",
+      name: "Demo TimescaleDB logs",
+      config: {
+        ...demoConnection(),
+        tables: [
+          {
+            name: "app_logs",
+            description: "gateway log lines, one per event",
+            timeField: "ts",
+            columns: [
+              { name: "ts", type: "timestamp with time zone" },
+              { name: "host", type: "text" },
+              { name: "level", type: "text", description: "error, warn, info or debug" },
+              { name: "route", type: "text" },
+              { name: "message", type: "text" },
+              { name: "request_id", type: "text" },
+            ],
+          },
+        ],
+      },
+    });
+
     // Holotable's own instruments, landed by scripts/self-metrics.ts. Seeded
     // whether or not the collector is running: an empty table is a dashboard
     // with empty panels, while a missing source is a broken one.
@@ -184,6 +210,7 @@ async function ensureDemo() {
     await ensureDashboard(pg, systemSpec(targets));
     await ensureDashboard(pg, fleetSpec(targets));
     await ensureDashboard(pg, fleetGridSpec(targets));
+    await ensureDashboard(pg, logsSpec());
     await ensureDashboard(pg, selfMonitoringSpec());
     if (promUrl) await ensureDashboard(pg, prometheusSelfMonitoringSpec());
   } finally {
@@ -306,6 +333,9 @@ const insertHttpRows = (client: Client, rows: readonly HttpRequestRow[]) =>
   insertRows(client, "metrics.http_requests", HTTP_COLUMNS, rows);
 const insertSystemRows = (client: Client, rows: readonly SystemMetricRow[]) =>
   insertRows(client, "metrics.system_metrics", SYSTEM_COLUMNS, rows);
+const LOG_COLUMNS = ["ts", "host", "level", "route", "message", "request_id"] as const;
+const insertLogRows = (client: Client, rows: readonly AppLogRow[]) =>
+  insertRows(client, "metrics.app_logs", LOG_COLUMNS, rows);
 
 /** The newest row's time in a demo table, or null when it is empty. */
 async function newestRow(client: Client, table: string): Promise<number | null> {
@@ -343,6 +373,11 @@ async function backfill(client: Client, windowMs: number, intervalMs: number) {
     insertSystemRows,
     { windowMs, intervalMs, now },
   );
+  await backfillTable(client, "metrics.app_logs", appLogRows, insertLogRows, {
+    windowMs,
+    intervalMs,
+    now,
+  });
   if (httpFrom === null) return;
   try {
     await client.query(
@@ -404,6 +439,18 @@ async function ensureMetricsTables(client: Client) {
   await client.query(
     `SELECT create_hypertable('metrics.system_metrics', by_range('ts'), if_not_exists => TRUE)`,
   );
+  await client.query(`
+    CREATE TABLE IF NOT EXISTS metrics.app_logs (
+      ts         TIMESTAMPTZ NOT NULL DEFAULT now(),
+      host       TEXT NOT NULL,
+      level      TEXT NOT NULL,
+      route      TEXT NOT NULL,
+      message    TEXT NOT NULL,
+      request_id TEXT NOT NULL
+    )`);
+  await client.query(
+    `SELECT create_hypertable('metrics.app_logs', by_range('ts'), if_not_exists => TRUE)`,
+  );
 }
 
 async function main() {
@@ -436,6 +483,7 @@ async function main() {
       const now = Date.now();
       await insertHttpRows(client, httpRequestRows(now));
       await insertSystemRows(client, systemMetricRows(now));
+      await insertLogRows(client, appLogRows(now));
       process.stdout.write(".");
     } catch (err) {
       console.warn("\ninsert failed:", err instanceof Error ? err.message : err);

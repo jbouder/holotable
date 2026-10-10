@@ -63,5 +63,10 @@
     "authoredAt": 1,
     "digest": "c5a90a96323a910148d1196d24110dfa597be0524b05263127ed8e0d6bb0a491",
     "origin": "hand-written (#404): histograms from SQL buckets over a coarse time bucket, and from a Prometheus classic histogram's cumulative le buckets"
+  },
+  "v1-logs.json": {
+    "authoredAt": 1,
+    "digest": "7973c87fed19e4c7364fd973cf116043e1e8bb19176586cef24d8851bc42b0da",
+    "origin": "hand-written (#404): the seeded \"Demo gateway logs\", a logs panel filtered by a multi enum variable under an errors-per-minute bar"
   }
 }

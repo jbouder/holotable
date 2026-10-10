@@ -93,8 +93,8 @@ The result's shape is what the panel kinds read:
 - **An instant query** answers one row per series, one column per label, then
   `value`.
 
-`heatmap`, `scatter` and `state-timeline` read row shapes a PromQL result does
-not have, and the model is told not to use them for a Prometheus source.
+`heatmap`, `scatter`, `state-timeline` and `logs` read row shapes a PromQL
+result does not have, and the model is told not to use them for a Prometheus source.
 
 ## The guard
 

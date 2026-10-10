@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import {
   BACKFILL_CHUNK_ROWS,
   backfillBatchTimes,
+  appLogRows,
   backfillChunks,
   backfillStart,
   HOSTS,
@@ -187,4 +188,18 @@ test("latency has a body, a slow route and a tail, so a histogram has a shape", 
   const tail = fast.filter((ms) => ms > 600).length / fast.length;
   assert.ok(tail > 0.005 && tail < 0.05, `tail ${tail}`);
   assert.ok(median(sample("/login", 500)) > median(fast) + 250);
+});
+
+test("log lines cover every level, each with a route and a request id", () => {
+  const random = seeded(13);
+  const lines = Array.from({ length: 400 }, (_, i) => appLogRows(NOW + i, random)).flat();
+  const levels = new Set(lines.map((l) => l.level));
+  assert.deepEqual([...levels].sort(), ["debug", "error", "info", "warn"]);
+  for (const line of lines) {
+    assert.match(line.request_id, /^[0-9a-f]{12}$/);
+    assert.ok(line.message.includes(line.route), line.message);
+    assert.ok(line.ts.getTime() <= NOW + 400);
+  }
+  const errors = lines.filter((l) => l.level === "error").length / lines.length;
+  assert.ok(errors > 0.01 && errors < 0.1, `errors ${errors}`);
 });

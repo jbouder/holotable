@@ -15,7 +15,7 @@ import {
 } from "@/components/charts/state-timeline";
 import type { Datum } from "@/lib/drilldown";
 import type { Panel, VizType } from "@/lib/ir";
-import { statusGrid, tableView } from "@/lib/panel-reading";
+import { logLines, statusGrid, tableView } from "@/lib/panel-reading";
 
 /**
  * From a click to the row it was drawn from (#373): one mapping per
@@ -153,6 +153,12 @@ const barDatum: DatumMapper = (panel, data, click) => {
   return bar ? { row: bar.row, series: bar.label } : null;
 };
 
+/** A log line is its row, in the order the panel shows; its series is its level. */
+const lineDatum: DatumMapper = (panel, data, click) => {
+  const line = at(logLines(panel, data).lines, click.dataIndex);
+  return line ? { row: line.row, series: line.level } : null;
+};
+
 export const DATUM_MAPPERS = {
   line: byRowIndex,
   area: byRowIndex,
@@ -167,6 +173,7 @@ export const DATUM_MAPPERS = {
   "state-timeline": spanDatum,
   "status-grid": tileDatum,
   histogram: barDatum,
+  logs: lineDatum,
   // A text panel has no rows and takes no links.
   text: () => null,
 } as const satisfies Record<VizType, DatumMapper>;

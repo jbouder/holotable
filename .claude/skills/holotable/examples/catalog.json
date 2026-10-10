@@ -51,6 +51,18 @@
         { "name": "service", "type": "text" },
         { "name": "state", "type": "text" }
       ]
+    },
+    {
+      "name": "app_logs",
+      "description": "One row per log line the services write.",
+      "timeField": "ts",
+      "columns": [
+        { "name": "ts", "type": "timestamp with time zone" },
+        { "name": "service", "type": "text" },
+        { "name": "level", "type": "text" },
+        { "name": "message", "type": "text" },
+        { "name": "request_id", "type": "text" }
+      ]
     }
   ]
 }
