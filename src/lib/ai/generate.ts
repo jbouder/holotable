@@ -9,6 +9,7 @@ import {
   type PromptDashboard,
   workspaceContextBlock,
 } from "@/lib/ai/prompt";
+import { withCompiledCustomVisuals } from "@/lib/ai/custom-visuals";
 import { withKnownLinkTargets } from "@/lib/ai/link-targets";
 import { withSourceLanguages } from "@/lib/ai/source-languages";
 import { sourceKind } from "@/lib/sources/registry";
@@ -78,9 +79,14 @@ function withRepair(repair: Failure | undefined, prompt: string): string {
  */
 export type OnGenerationFinish = (event: GenerationFinish) => void;
 
-/** Adapt `streamObject`'s finish event to {@link GenerationFinish}. */
+/**
+ * Adapt `streamObject`'s finish event to {@link GenerationFinish}. Async,
+ * because a failure is worked out against a schema that may compile a custom
+ * visual (#405); the SDK awaits it before the stream closes, so a repair
+ * request still finds the failure remembered.
+ */
 function finish(onFinish: OnGenerationFinish | undefined, schema: z.ZodType) {
-  return (event: {
+  return async (event: {
     object: unknown;
     usage: LanguageModelUsage;
     error: unknown;
@@ -91,7 +97,8 @@ function finish(onFinish: OnGenerationFinish | undefined, schema: z.ZodType) {
       usage: event.usage,
       error: event.error,
       modelId: event.response.modelId ?? "",
-      failure: event.object === undefined ? describeFailure(event.error, schema) : null,
+      failure:
+        event.object === undefined ? await describeFailure(event.error, schema) : null,
     });
 }
 
@@ -269,6 +276,7 @@ export const PRESENTATION_GUIDE = `Optional per-panel settings; omit each unless
 - 'options' on histogram: bucket, count (the columns), cumulative (true for Prometheus "le" buckets), log (true for a long tail), thresholds (colors bars from a bucket bound, e.g. an SLO), decimals, unit, compact (for the bucket labels).
 - 'options' on logs: message, level (the columns), levels [{state, color}], wrap, order ("newest"|"oldest"), showTime.
 - 'options' on treemap: path (columns, top level first), value, variant ("treemap"|"sunburst"), decimals, unit, compact.
+- 'options' on vega: spec, a Vega-Lite spec with "data": {"name": "rows"}, encoding the query's columns; colors only as token names or palette-0..palette-5; no url, href, image, datasets, values, config or scheme. Use it only when no other kind draws the view.
 - 'options' on table: columns [{name, label, hidden, format, decimals, unit, align}] (listed first, in order), sort {column, order: "asc"|"desc"}.
 - Colors are tokens only: success, warning, danger, info, neutral, orange, purple, teal.
 - 'timeRange' and 'refreshIntervalMs' on a panel override the dashboard's, for a panel that needs a different window or cadence than the rest (e.g. a "today so far" stat over {from:"now-24h", to:"now"} refreshed every 300000ms). Never on a text panel.`;
@@ -393,7 +401,7 @@ export function dashboardRequest(input: {
     input;
   const schemas = schemasFor([source, ...(additionalSources ?? [])]);
   return {
-    schema: linkedSchema(schemas.dashboard, dashboards),
+    schema: withCompiledCustomVisuals(linkedSchema(schemas.dashboard, dashboards)),
     schemaName: "Dashboard",
     schemaDescription: "A monitoring dashboard specification (viz spec, not data).",
     system: baseSystem(source, workspacePrompt, additionalSources, dashboards),
@@ -609,7 +617,9 @@ export function streamPanel(input: {
 }) {
   const { source, prompt, current, onFinish, repair, workspacePrompt, dashboards } =
     input;
-  const schema = linkedSchema(schemasFor([source]).panel, dashboards);
+  const schema = withCompiledCustomVisuals(
+    linkedSchema(schemasFor([source]).panel, dashboards),
+  );
   return streamObject({
     ...modelSettings(input.model),
     onFinish: finish(onFinish, schema),

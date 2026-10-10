@@ -81,7 +81,10 @@ function store(): Map<string, Entry> {
  * `schema`. Null when the failure was not about the output's shape (a
  * provider error, a timeout, an empty answer): there is nothing to repair.
  */
-export function describeFailure(error: unknown, schema: z.ZodType): Failure | null {
+export async function describeFailure(
+  error: unknown,
+  schema: z.ZodType,
+): Promise<Failure | null> {
   if (!NoObjectGeneratedError.isInstance(error) || !error.text?.trim()) return null;
   const text = error.text;
   let value: unknown;
@@ -91,7 +94,8 @@ export function describeFailure(error: unknown, schema: z.ZodType): Failure | nu
     const reason = parseError instanceof Error ? parseError.message : "malformed JSON";
     return { text, issues: [`The output is not valid JSON: ${reason}`] };
   }
-  const result = schema.safeParse(value);
+  // Async: a generation schema may compile a custom visual (#405).
+  const result = await schema.safeParseAsync(value);
   if (result.success) return null;
   return {
     text,

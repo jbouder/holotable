@@ -104,6 +104,25 @@ chart is. The kind says so with `image: true` and leaves `canvas` (which means
 resolves the spec's color names, sets its size from the panel for a single
 view, compiles it and builds the view, then merges each poll's rows into it.
 
+## Generation
+
+The model is offered the kind like any other, through its hint, which says to
+use it only when no registered kind fits and lists the walk's rules. A
+generated spec is held to the walk by the IR, as a saved one is. It must also
+compile: the generation schema (never the IR) carries an async refinement that
+compiles each custom visual in the output
+(`src/lib/ai/custom-visuals.ts`). A spec that fails either check fails the
+output, and the one automatic repair round re-asks with the issue, so a
+compile failure comes back with the compiler's own message. The refinement
+returns nothing for an output with no custom visual, so every other generation
+is validated exactly as before. The MCP server's generate tools share the
+same path.
+
+Whether the model reaches for the kind only when it should is the eval
+corpus's to show: every existing case lists the kinds it accepts
+(`plausibleViz`), so a live re-record that answers a familiar request with a
+custom visual fails it.
+
 ## Phases
 
 1. The spike and this record: the pinned dependencies, the CSP-safe runtime,
@@ -112,7 +131,7 @@ view, compiles it and builds the view, then merges each poll's rows into it.
    compile without a renderer for every kind: the `vega` kind, the walk, the
    compile at save, and the view with its theme, size, screen-reader table and
    PNG export.
-3. Generation, chat, repair and the MCP tools, with evals that show the kind
-   is chosen only when no registered kind fits.
+3. Generation and repair, which the MCP tools share. Chat answers over a
+   dashboard and never writes a spec, so it has nothing to do here.
 4. The editor's spec field with compiler messages, and a "Demo custom
    visuals" dashboard on the demo site, scanned by axe.

@@ -311,7 +311,7 @@ export async function runCase(
   }
   const failures =
     object === undefined
-      ? [schemaFailure(error, request.schema)]
+      ? [await schemaFailure(error, request.schema)]
       : await grade(c, source, object as GradedOutput);
   return {
     name: c.name,
@@ -324,8 +324,8 @@ export async function runCase(
   };
 }
 
-function schemaFailure(error: unknown, schema: z.ZodType): string {
-  const failure = describeFailure(error, schema);
+async function schemaFailure(error: unknown, schema: z.ZodType): Promise<string> {
+  const failure = await describeFailure(error, schema);
   if (failure) return `does not match the schema: ${failure.issues.join("; ")}`;
   return `no output: ${error instanceof Error ? error.message : String(error)}`;
 }
