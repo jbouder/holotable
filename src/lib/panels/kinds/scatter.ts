@@ -9,6 +9,6 @@ export const scatter = definePanelKind({
     "not for a Prometheus source: its rows are a time and one column per series.",
   canvas: true,
   timeBrush: false,
-  skeleton: "chart",
+  skeleton: "scatter",
   query: "required",
 });

@@ -35,7 +35,7 @@ export const treemap = definePanelKind({
     'an instant query aggregated by the levels, \'sum by (job, instance) (…)\', with options.path ["job", "instance"] and options.value "value".',
   canvas: true,
   timeBrush: false,
-  skeleton: "chart",
+  skeleton: "blocks",
   query: "required",
   options: TreemapOptions,
   optionGroups: ["number"],

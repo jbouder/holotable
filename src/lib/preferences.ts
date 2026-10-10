@@ -34,6 +34,11 @@ import {
  * anyway. Drafts, recents and dismissed hints are per browser for the reasons
  * their own modules give.
  *
+ * Chart patterns (`chartPatterns`) sync too, though they look like an
+ * appearance setting: they are an accessibility need of the person (telling
+ * series apart without color), and they apply when a chart draws, after
+ * hydration, so nothing has to land before first paint.
+ *
  * Whether to keep those recents at all does sync (`remember*`): "do not keep
  * what I asked" is a choice about the person, and a second laptop quietly
  * starting to record again would break it. The lists themselves still never
@@ -92,6 +97,7 @@ export const PREFERENCE_FIELDS = {
     error: `must be one of ${EXPLORE_START_VIEWS.join(", ")}`,
   }),
   exploreKeepSession: z.boolean({ error: "must be true or false" }),
+  chartPatterns: z.boolean({ error: "must be true or false" }),
 } as const;
 
 export interface Preferences {
@@ -111,6 +117,11 @@ export interface Preferences {
   exploreStartView: ExploreStartView;
   /** Keep Explore's session in the tab across a reload. */
   exploreKeepSession: boolean;
+  /**
+   * Fill chart bars, slices and areas with patterns as well as colors, so
+   * series can be told apart without color (WCAG 1.4.1). Off by default.
+   */
+  chartPatterns: boolean;
 }
 
 export type PreferenceKey = keyof Preferences;
@@ -128,6 +139,7 @@ export const DEFAULT_PREFERENCES: Preferences = {
   exploreRefreshMs: 0,
   exploreStartView: "model",
   exploreKeepSession: false,
+  chartPatterns: false,
 };
 
 const KEYS = Object.keys(PREFERENCE_FIELDS) as PreferenceKey[];

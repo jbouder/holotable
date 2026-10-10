@@ -53,7 +53,7 @@ export const logs = definePanelKind({
     "not for a Prometheus source: a PromQL result has no lines to read. Use 'table' for an instant query's series.",
   canvas: false,
   timeBrush: false,
-  skeleton: "text",
+  skeleton: "lines",
   query: "required",
   requiresTimeField: true,
   options: LogsOptions,

@@ -13,6 +13,7 @@ import { historyOf, KEEP_ALL_HISTORY, timeDisplayOf } from "@/lib/preferences";
 import { requestPreferences } from "@/lib/preferences-server";
 import { LOCAL_TIME_DISPLAY } from "@/lib/time-display";
 import { HistoryPreferencesProvider } from "@/components/history-preferences";
+import { ChartPatternsProvider } from "@/components/chart-patterns";
 import { TimeDisplayProvider } from "@/components/time-display";
 import { EMBED_REQUEST_HEADER, NONCE_REQUEST_HEADER } from "@/lib/security-headers";
 import { BOOTSTRAP_SCRIPT } from "@/lib/bootstrap";
@@ -70,6 +71,8 @@ export default async function RootLayout({
   const timeDisplay = prefs ? timeDisplayOf(prefs) : LOCAL_TIME_DISPLAY;
   // Which recents this browser may keep (signed out, nothing records anyway).
   const history = prefs ? historyOf(prefs) : KEEP_ALL_HISTORY;
+  // Patterns in charts: the person's choice, off when signed out (#77).
+  const chartPatterns = prefs?.chartPatterns ?? false;
   return (
     <html
       lang="en"
@@ -100,35 +103,39 @@ export default async function RootLayout({
       <body className="min-h-full flex flex-col">
         {embed ? (
           <TimeDisplayProvider value={timeDisplay}>
-            <main className="flex-1 p-3 sm:p-4">{children}</main>
+            <ChartPatternsProvider value={chartPatterns}>
+              <main className="flex-1 p-3 sm:p-4">{children}</main>
+            </ChartPatternsProvider>
           </TimeDisplayProvider>
         ) : (
           <HistoryPreferencesProvider value={history}>
             <TimeDisplayProvider value={timeDisplay}>
-              {/*
+              <ChartPatternsProvider value={chartPatterns}>
+                {/*
                 The first stop for a keyboard (#77): past the navigation, straight
                 to the page. Visible only while it has focus. `main` takes focus
                 from it (tabIndex -1) so the next Tab continues from there.
               */}
-              <a
-                href="#main"
-                className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-3 focus:z-50 focus:bg-surface focus:px-3 focus:py-2 focus:text-sm focus:outline-2 focus:outline-primary"
-              >
-                Skip to content
-              </a>
-              <NavBar account={account} />
-              {config.authMode === "demo" && <DemoBanner />}
-              {sessionExpiresAt !== null && (
-                <SessionKeepalive expiresAt={sessionExpiresAt} />
-              )}
-              <main
-                id="main"
-                tabIndex={-1}
-                className="flex flex-1 flex-col px-4 py-6 outline-none sm:px-6"
-              >
-                {children}
-              </main>
-              {signedIn && <CommandPalette />}
+                <a
+                  href="#main"
+                  className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-3 focus:z-50 focus:bg-surface focus:px-3 focus:py-2 focus:text-sm focus:outline-2 focus:outline-primary"
+                >
+                  Skip to content
+                </a>
+                <NavBar account={account} />
+                {config.authMode === "demo" && <DemoBanner />}
+                {sessionExpiresAt !== null && (
+                  <SessionKeepalive expiresAt={sessionExpiresAt} />
+                )}
+                <main
+                  id="main"
+                  tabIndex={-1}
+                  className="flex flex-1 flex-col px-4 py-6 outline-none sm:px-6"
+                >
+                  {children}
+                </main>
+                {signedIn && <CommandPalette />}
+              </ChartPatternsProvider>
             </TimeDisplayProvider>
           </HistoryPreferencesProvider>
         )}

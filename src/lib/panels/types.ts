@@ -18,11 +18,17 @@ import type { OptionGroup } from "@/lib/panels/presentation";
 /** The silhouette a kind's body shows while its first rows are on their way. */
 export type PanelSkeletonShape =
   | "chart"
+  | "line"
+  | "scatter"
+  | "cells"
+  | "lanes"
+  | "blocks"
+  | "grid"
   | "radial"
+  | "ring"
   | "stat"
   | "table"
-  | "lanes"
-  | "grid"
+  | "lines"
   | "text";
 
 export interface PanelKind<K extends string = string> {

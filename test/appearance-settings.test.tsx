@@ -26,11 +26,11 @@ function radios(root: ParentNode, name: string): HTMLInputElement[] {
 
 test("each group is a fieldset named by its legend, every radio labelled", async () => {
   const ui = await mount();
-  ui.render(<AppearanceSettings />);
+  ui.render(<AppearanceSettings chartPatterns={false} />);
   const legends = [...ui.container.querySelectorAll("fieldset > legend")].map(
     (l) => l.textContent,
   );
-  assert.deepEqual(legends, ["Theme", "Motion"]);
+  assert.deepEqual(legends, ["Theme", "Motion", "Patterns in charts"]);
   for (const name of ["theme", "motion"]) {
     const group = radios(ui.container, name);
     assert.equal(group.length, 3);
@@ -47,7 +47,7 @@ test("each group is a fieldset named by its legend, every radio labelled", async
 test("choosing applies to <html> at once and is remembered", async () => {
   window.localStorage.clear();
   const ui = await mount();
-  ui.render(<AppearanceSettings />);
+  ui.render(<AppearanceSettings chartPatterns={false} />);
   const html = document.documentElement;
 
   ui.click(radios(ui.container, "theme").find((r) => r.value === "light") as Element);
@@ -63,4 +63,41 @@ test("choosing applies to <html> at once and is remembered", async () => {
   ui.click(radios(ui.container, "motion").find((r) => r.value === "system") as Element);
   assert.equal(html.dataset.motion, "reduce");
   ui.unmount();
+});
+
+test("patterns in charts is off by default, and saving it applies it to the page", async () => {
+  const calls: { url: string; body: unknown }[] = [];
+  const realFetch = globalThis.fetch;
+  globalThis.fetch = (async (url: string, init?: RequestInit) => {
+    calls.push({ url, body: JSON.parse(String(init?.body)) });
+    return new Response("{}", { status: 200 });
+  }) as typeof fetch;
+  const { ChartPatternsProvider, useChartPatterns } = await import(
+    "@/components/chart-patterns"
+  );
+  let seen: boolean | undefined;
+  function Probe() {
+    seen = useChartPatterns();
+    return null;
+  }
+  const ui = await mount();
+  ui.render(
+    <ChartPatternsProvider value={false}>
+      <AppearanceSettings chartPatterns={false} />
+      <Probe />
+    </ChartPatternsProvider>,
+  );
+  const group = radios(ui.container, "chart-patterns");
+  assert.equal(group.length, 2);
+  assert.equal(group.find((r) => r.checked)?.value, "false");
+  assert.equal(seen, false);
+
+  ui.click(group.find((r) => r.value === "true") as Element);
+  await new Promise((r) => setTimeout(r, 0));
+  assert.deepEqual(calls, [
+    { url: "/api/me/preferences", body: { chartPatterns: true } },
+  ]);
+  assert.equal(seen, true);
+  ui.unmount();
+  globalThis.fetch = realFetch;
 });

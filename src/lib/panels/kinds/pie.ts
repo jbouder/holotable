@@ -25,7 +25,7 @@ export const donut = definePanelKind({
   promptHint: "the same as 'pie', drawn as a ring.",
   canvas: true,
   timeBrush: false,
-  skeleton: "radial",
+  skeleton: "ring",
   query: "required",
   options: PieOptions,
   optionGroups: ["number", "legend"],

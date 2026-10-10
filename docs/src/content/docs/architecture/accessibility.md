@@ -44,8 +44,10 @@ A canvas has nothing for a screen reader to read, so every chart panel
   value;
 - a visually hidden table of the rows the chart draws, newest 50, with times on
   the reader's clock and values in the panel's format;
-- ECharts' `aria` decals, so bar, pie and area series are told apart by pattern
-  as well as by color.
+- ECharts' `aria` decals, so bar, pie and area series can be told apart by
+  pattern as well as by color. They are a preference, **Patterns in charts**
+  under Settings → Appearance, off by default and saved to the account; a
+  chart picks up a change without being rebuilt.
 
 Each panel is a named region, so a screen reader's landmark list doubles as
 the dashboard's table of contents.

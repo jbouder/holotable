@@ -3,6 +3,7 @@
 import * as React from "react";
 import * as echarts from "echarts";
 import type { EChartsOption } from "echarts";
+import { useChartPatterns } from "@/components/chart-patterns";
 import { useReducedMotion } from "@/components/motion-preference";
 
 /**
@@ -59,10 +60,13 @@ export interface BrushSelection {
 /**
  * Accessibility for every chart (#77), set once at init and kept by every
  * merged update. ECharts writes `aria.label.description` onto the container
- * as its accessible name; the decal patterns tell bar, pie and area series
- * apart without relying on color alone (WCAG 1.4.1).
+ * as its accessible name. The decal patterns, which tell bar, pie and area
+ * series apart without relying on color alone (WCAG 1.4.1), are the person's
+ * `chartPatterns` preference: off unless they turn them on.
  */
-export const CHART_ARIA = { enabled: true, decal: { show: true } } as const;
+export function chartAria(patterns: boolean) {
+  return { enabled: true, decal: { show: patterns } } as const;
+}
 
 const BRUSH_OPTION = {
   xAxisIndex: 0,
@@ -136,6 +140,11 @@ export function EChart({
   reduceMotionRef.current = reduceMotion;
   const descriptionRef = React.useRef(description);
   descriptionRef.current = description;
+  // The patterns preference, read like reduced motion: at init through a ref,
+  // and merged in when it changes, which never recreates the chart.
+  const patterns = useChartPatterns();
+  const patternsRef = React.useRef(patterns);
+  patternsRef.current = patterns;
 
   React.useEffect(() => {
     if (!containerRef.current) return;
@@ -145,7 +154,10 @@ export function EChart({
     chartRef.current = chart;
     chart.setOption({
       animation: !reduceMotionRef.current,
-      aria: { ...CHART_ARIA, label: { description: descriptionRef.current } },
+      aria: {
+        ...chartAria(patternsRef.current),
+        label: { description: descriptionRef.current },
+      },
     });
 
     const observer = new ResizeObserver(() => chart.resize());
@@ -169,6 +181,10 @@ export function EChart({
   React.useEffect(() => {
     chartRef.current?.setOption({ animation: !reduceMotion }, { notMerge: false });
   }, [reduceMotion]);
+
+  React.useEffect(() => {
+    chartRef.current?.setOption({ aria: chartAria(patterns) }, { notMerge: false });
+  }, [patterns]);
 
   // A merged option, like the motion setting: a new title never rebuilds it.
   React.useEffect(() => {
