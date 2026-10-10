@@ -23,6 +23,13 @@ import { withCompiledCustomVisuals } from "@/lib/ai/custom-visuals";
 import { withSourceLanguages } from "@/lib/ai/source-languages";
 import { describeOutput, repairPrompt } from "@/lib/ai/repair";
 import { workspaceContextBlock } from "@/lib/ai/prompt";
+import {
+  type ChatView,
+  PANEL_MAX,
+  renderPanels,
+  variablesBlock,
+} from "@/lib/ai/dashboard-context";
+import { sanitizePromptField } from "@/lib/ai/untrusted";
 import type { WorkspacePrompt } from "@/lib/workspace-prompt";
 import { sourceKind } from "@/lib/sources/registry";
 import type { SourcePlan } from "@/lib/sources/server/types";
@@ -34,6 +41,7 @@ import {
   ChatPanelAnyLanguage,
   type PanelQuery,
   queryStatement,
+  type Dashboard,
   type TimeRange,
 } from "@/lib/ir";
 import type { VariableValues } from "@/lib/sql/variables";
@@ -457,6 +465,11 @@ export function buildDataChatPrompt(input: {
   sources: SourceRecord[];
   timeRange: TimeRange;
   workspacePrompt?: WorkspacePrompt | null;
+  /**
+   * The dashboard this conversation continues the chat of (#416, phase 6):
+   * its panels and variables go in the prompt, fenced like the catalog.
+   */
+  dashboard?: { spec: Dashboard; view?: ChatView };
 }): string {
   const { sources, timeRange } = input;
   const ids = sources.map((s) => `sourceId: ${s.id}`).join("\n");
@@ -471,6 +484,13 @@ export function buildDataChatPrompt(input: {
     sources.map((s) => s.id),
   );
   const languages = sourceLanguages(sources);
+  const board = input.dashboard;
+  const dashboardBlock = board
+    ? `
+This conversation continues the chat on the dashboard "${sanitizePromptField(board.spec.title, PANEL_MAX.dashboardTitle)}". Its panels:
+${fenceUntrustedBlock("PANELS", renderPanels(board.spec))}${variablesBlock(board.spec, board.view)}
+`
+    : "";
 
   return `You are a data assistant. You answer questions about the data in the sources
 below, in words, and you may draw a panel when a picture answers better than a
@@ -484,7 +504,7 @@ ${ids || "(none)"}
 
 Queryable source catalogs (metadata only — never the underlying data):
 ${catalogs}
-${workspace ? `\n${workspace}\n` : ""}
+${dashboardBlock}${workspace ? `\n${workspace}\n` : ""}
 How to answer:
 - For a single figure or a small breakdown, call "runQuery" and answer from the
   returned rows, in words or a small pipe table.

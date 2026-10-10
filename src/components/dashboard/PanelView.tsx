@@ -12,7 +12,7 @@ import type { EChartHandle } from "@/components/charts/EChart";
 import { AccessibleChart } from "@/components/charts/AccessibleChart";
 import { PanelSqlDialog } from "@/components/dashboard/PanelSqlDialog";
 import { PanelActions } from "@/components/dashboard/PanelActions";
-import { useAskAboutPanel } from "@/components/dashboard/chat-bridge";
+import { useAskAboutPanel, useAskInChat } from "@/components/dashboard/chat-bridge";
 import { LoadingLabel, PanelSkeleton } from "@/components/dashboard/PanelSkeleton";
 import { Popover } from "@/components/ui/popover";
 import type { ChartContext, PanelData } from "@/components/charts/options";
@@ -123,6 +123,7 @@ export function PanelView({
   const chart = React.useRef<EChartHandle | null>(null);
   const expansion = useExpanded();
   const askAbout = useAskAboutPanel();
+  const askInChat = useAskInChat();
   const [sqlOpen, setSqlOpen] = React.useState(false);
 
   // While paused, suppress the transient "live"/"loading" badges — they no
@@ -190,6 +191,7 @@ export function PanelView({
               onShowSql={!embedded && queried ? () => setSqlOpen(true) : undefined}
               links={embedded ? undefined : links}
               onPick={embedded ? undefined : onPick}
+              onAskInChat={askInChat && !embedded ? () => askInChat(panel.id) : undefined}
               onAskAbout={
                 askAbout && !embedded
                   ? () => {

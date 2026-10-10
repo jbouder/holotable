@@ -3,15 +3,16 @@ import { ModelTimeoutError } from "@/lib/ai/invoke";
 import { providerHttpError } from "@/lib/ai/provider-error";
 import { APICallError, type UIMessage } from "ai";
 import { requireIdentity, assertAuthorized, HttpError } from "@/lib/auth/authorize";
+import type { Identity } from "@/lib/auth/claims";
 import { json, readJson, route } from "@/lib/http";
 import { audit } from "@/lib/audit";
-import {
-  appendChatMessages,
-  clearChatMessages,
-  getDashboardById,
-  getSourceById,
-  listChatMessages,
-} from "@/lib/db/repo";
+import { getDashboardById, getSourceById } from "@/lib/db/repo";
+import { pgConversationStore } from "@/lib/db/conversations";
+import { persistableMessage, readStoredChatMessage } from "@/lib/chat/persist";
+import { conversationTitle } from "@/lib/chat/conversations";
+import { requestPreferences } from "@/lib/preferences-server";
+import { workspacePromptFor } from "@/lib/workspace-prompt-service";
+import { randomUUID } from "node:crypto";
 import { resolveChatSources, resolveChatView, streamDashboardChat } from "@/lib/ai/chat";
 import {
   Panel,
@@ -25,7 +26,7 @@ import { rowScopeFor } from "@/lib/row-scope";
 import { checkedSelection, variableSourceIds } from "@/lib/variables";
 import { requireModel } from "@/lib/ai/model-resolution";
 import { enforceLlmLimits } from "@/lib/limits/llm";
-import { messagesToPersist, parseStoredMessages } from "@/lib/chat-history";
+import { messagesToPersist } from "@/lib/chat-history";
 import { config } from "@/lib/config";
 import { log } from "@/lib/log";
 
@@ -56,6 +57,21 @@ const retention = () => ({
   limit: config.chatHistoryMaxMessages,
   retentionDays: config.chatHistoryRetentionDays,
 });
+
+/**
+ * This caller's conversation on this dashboard (#416, phase 6): the Chat
+ * conversation with this `dashboard_id` and this subject, or none. Someone
+ * who keeps no conversations has none, and the chat behaves as it did before
+ * history was kept.
+ */
+async function storedConversation(identity: Identity, dashboardId: string) {
+  if (!(await requestPreferences(identity)).rememberChats) return null;
+  return pgConversationStore.findForDashboard(
+    identity.sub,
+    dashboardId,
+    config.chatHistoryRetentionDays,
+  );
+}
 
 /**
  * The dashboard a caller may chat with, or a throw.
@@ -92,8 +108,18 @@ export const GET = route(
   "dashboards.chat.history",
   async (_req: Request, ctx: RouteParams) => {
     const { identity, id } = await authorizedDashboard(ctx);
-    const rows = await listChatMessages(id, identity.sub, retention());
-    return json({ messages: parseStoredMessages(rows) });
+    const conversation = await storedConversation(identity, id);
+    if (!conversation) return json({ messages: [], conversationId: null });
+    const rows = await pgConversationStore.messages(
+      conversation.id,
+      identity.sub,
+      retention(),
+    );
+    return json({
+      messages: rows.map(readStoredChatMessage).filter((m) => m !== null),
+      // So the widget can open the same conversation in Chat.
+      conversationId: conversation.id,
+    });
   },
 );
 
@@ -102,8 +128,14 @@ export const DELETE = route(
   "dashboards.chat.clear",
   async (_req: Request, ctx: RouteParams) => {
     const { identity, id } = await authorizedDashboard(ctx);
-    const deleted = await clearChatMessages(id, identity.sub);
-    return json({ deleted });
+    const conversation = await pgConversationStore.findForDashboard(identity.sub, id, 0);
+    if (!conversation) return json({ deleted: 0 });
+    const rows = await pgConversationStore.messages(conversation.id, identity.sub, {
+      limit: config.chatHistoryMaxMessages,
+      retentionDays: 0,
+    });
+    await pgConversationStore.remove(conversation.id, identity.sub);
+    return json({ deleted: rows.length });
   },
 );
 
@@ -170,8 +202,21 @@ export const POST = route("dashboards.chat", async (req: Request, ctx: RoutePara
   const incoming = body.messages as UIMessage[];
   // What is already on disk, so `onEnd` — which hands back the whole
   // conversation — only writes the tail this turn produced.
-  const stored = await listChatMessages(id, identity.sub, retention());
+  const kept = await storedConversation(identity, id);
+  const stored = kept
+    ? await pgConversationStore.messages(kept.id, identity.sub, retention())
+    : [];
   const storedIds = stored.map((m) => m.id);
+  const keep = (await requestPreferences(identity)).rememberChats;
+  // The workspace's own context (#66), as every other prompt has it.
+  // Advisory: unreadable, the turn runs on the base prompt.
+  const workspacePrompt = await workspacePromptFor(sources).catch((error: unknown) => {
+    log.warn("workspace_prompt.load_failed", {
+      workspaceId: dashboard.workspaceId,
+      error,
+    });
+    return null;
+  });
 
   audit({
     actor: identity,
@@ -192,6 +237,7 @@ export const POST = route("dashboards.chat", async (req: Request, ctx: RoutePara
     sources,
     identity,
     view,
+    workspacePrompt,
     model: resolved.model,
     messages: incoming,
     onUsage: usage.record,
@@ -224,16 +270,29 @@ export const POST = route("dashboards.chat", async (req: Request, ctx: RoutePara
         ? providerHttpError(error).message
         : "Something went wrong while answering. Try again.",
     onEnd: async ({ messages }) => {
+      if (!keep) return;
       try {
-        await appendChatMessages({
-          dashboardId: id,
+        const conversation =
+          kept ??
+          (await pgConversationStore.forDashboard({
+            id: randomUUID(),
+            userSub: identity.sub,
+            workspaceId: dashboard.workspaceId,
+            dashboardId: id,
+            timeRange: viewed.timeRange,
+            variables: view.variables,
+            max: config.chatConversationsMax,
+            retentionDays: config.chatHistoryRetentionDays,
+          }));
+        const question = incoming.findLast((m) => m.role === "user");
+        await pgConversationStore.append({
+          conversationId: conversation.id,
           userSub: identity.sub,
-          messages: messagesToPersist(messages, storedIds).map((m) => ({
-            id: m.id,
-            role: m.role,
-            content: m,
-          })),
-          ...retention(),
+          messages: messagesToPersist(messages, storedIds)
+            .map(persistableMessage)
+            .map((m) => ({ id: m.id, role: m.role, content: m })),
+          title: question ? conversationTitle(question) : undefined,
+          retention: retention(),
         });
       } catch (err) {
         // The answer already reached the browser. Failing to remember it is

@@ -6,6 +6,7 @@ import { DefaultChatTransport } from "ai";
 import type { UIMessage } from "ai";
 import {
   Database,
+  ExternalLink,
   Maximize2,
   MessageSquare,
   Minimize2,
@@ -26,7 +27,8 @@ import { WorkingStatus } from "@/components/composing";
 import { CopyButton } from "@/components/settings/copy-button";
 import { MarkdownView } from "@/components/panels/text";
 import { useChatRequest } from "@/components/dashboard/chat-bridge";
-import { apiErrorFromThrown } from "@/lib/errors";
+import { type ApiError, apiErrorFromThrown } from "@/lib/errors";
+import { chatHref, dashboardConversation } from "@/lib/chat/client";
 import {
   type ChatCitation,
   chatViewFromSearch,
@@ -127,6 +129,24 @@ export function DashboardChat({
   );
 
   const busy = status === "submitted" || status === "streaming";
+  const [openingInChat, setOpeningInChat] = React.useState(false);
+  const [openError, setOpenError] = React.useState<ApiError | null>(null);
+
+  /**
+   * Continue on the Chat page (#416): this dashboard's conversation, made on
+   * first use, with the panels in context and the range on screen.
+   */
+  async function openInChat() {
+    setOpeningInChat(true);
+    setOpenError(null);
+    const made = await dashboardConversation(
+      dashboardId,
+      chatViewFromSearch(window.location.search).timeRange,
+    );
+    setOpeningInChat(false);
+    if (made.ok) window.location.assign(chatHref(made.value));
+    else setOpenError(made.error);
+  }
   const listRef = React.useRef<HTMLDivElement>(null);
   const aboutPanel = panels.find((p) => p.id === about);
 
@@ -291,6 +311,16 @@ export function DashboardChat({
           </div>
         </div>
         <div className="flex items-center gap-1">
+          <Button
+            variant="ghost"
+            size="icon"
+            aria-label="Open in Chat"
+            title="Open in Chat: continue this conversation on its own page"
+            disabled={busy || openingInChat}
+            onClick={() => void openInChat()}
+          >
+            <ExternalLink className="h-4 w-4" />
+          </Button>
           {messages.length > 0 && (
             <Button
               variant="ghost"
@@ -363,6 +393,14 @@ export function DashboardChat({
             error={apiErrorFromThrown(error)}
             className="mt-3"
             onRetry={() => regenerate()}
+          />
+        )}
+        {openError && (
+          <ErrorDisplay
+            error={openError}
+            className="mt-3"
+            onRetry={() => void openInChat()}
+            retryLabel="Try again"
           />
         )}
       </div>

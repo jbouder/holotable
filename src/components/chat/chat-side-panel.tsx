@@ -41,6 +41,7 @@ export function ChatSidePanel({
   workspaceId,
   conversationId,
   busy,
+  sourcesNote,
   onToggleSource,
   timeRange,
   onTimeRange,
@@ -53,6 +54,8 @@ export function ChatSidePanel({
   workspaceId?: string;
   conversationId: string | null;
   busy: boolean;
+  /** Why the sources cannot be changed here, when they cannot. */
+  sourcesNote?: string;
   onToggleSource: (id: string, on: boolean) => void;
   timeRange: string;
   onTimeRange: (from: string) => void;
@@ -69,6 +72,7 @@ export function ChatSidePanel({
         workspaceId={workspaceId}
         locked={conversationId !== null}
         busy={busy}
+        note={sourcesNote}
         onToggle={onToggleSource}
       />
       <HistorySection
@@ -92,6 +96,7 @@ function SourcesSection({
   workspaceId,
   locked,
   busy,
+  note,
   onToggle,
 }: {
   sources: ChatSourceOption[];
@@ -99,6 +104,7 @@ function SourcesSection({
   workspaceId?: string;
   locked: boolean;
   busy: boolean;
+  note?: string;
   onToggle: (id: string, on: boolean) => void;
 }) {
   const byWorkspace = new Map<string, ChatSourceOption[]>();
@@ -138,6 +144,7 @@ function SourcesSection({
           })}
         </fieldset>
       ))}
+      {note && <p className="text-xs text-muted">{note}</p>}
       {locked && byWorkspace.size > 1 && (
         <p className="text-xs text-muted">
           A conversation stays in one workspace. Start a new one for another.

@@ -8,6 +8,7 @@ import {
   Image as ImageIcon,
   Maximize2,
   MessageSquare,
+  MessagesSquare,
   Minimize2,
   MoreHorizontal,
 } from "lucide-react";
@@ -44,6 +45,7 @@ export function PanelActions({
   onToggleExpanded,
   onShowSql,
   onAskAbout,
+  onAskInChat,
   links = [],
   onPick,
 }: {
@@ -63,6 +65,8 @@ export function PanelActions({
    * chat: an embed, the editor, Chat.
    */
   onAskAbout?: () => void;
+  /** Continue on the Chat page about this panel (#416). Offered where the chat is. */
+  onAskInChat?: () => void;
   /**
    * Where the panel leads (#372): an href to a target the server named, a
    * self link that sets variables in place, or a disabled item for a target
@@ -118,6 +122,11 @@ export function PanelActions({
       {onAskAbout && (
         <MenuItem onClick={onAskAbout}>
           <MessageSquare className="h-4 w-4" /> Ask about this panel
+        </MenuItem>
+      )}
+      {onAskInChat && (
+        <MenuItem onClick={onAskInChat}>
+          <MessagesSquare className="h-4 w-4" /> Ask in Chat
         </MenuItem>
       )}
       {links.map((item) =>

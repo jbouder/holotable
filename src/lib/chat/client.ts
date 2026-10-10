@@ -116,3 +116,32 @@ export function savePreferences(patch: PreferencesPatch): Promise<ChatCall<Prefe
     (body) => parsePreferences(body),
   );
 }
+
+/**
+ * This person's Chat conversation on a dashboard (#416, phase 6), made on
+ * first use; its id. The range is the one the reader is looking at, as an IR
+ * expression the server resolves.
+ */
+export function dashboardConversation(
+  dashboardId: string,
+  timeRange?: TimeRange,
+): Promise<ChatCall<string>> {
+  return call(
+    "/api/chat",
+    {
+      method: "POST",
+      body: JSON.stringify({ dashboardId, ...(timeRange ? { timeRange } : {}) }),
+    },
+    (body) => {
+      const id = (body as { conversation?: { id?: unknown } }).conversation?.id;
+      if (typeof id !== "string") throw new Error("no conversation id in the response");
+      return id;
+    },
+  );
+}
+
+/** Where a dashboard's conversation opens in Chat, about a panel or not. */
+export function chatHref(conversationId: string, aboutPanelId?: string): string {
+  const about = aboutPanelId ? `?about=${encodeURIComponent(aboutPanelId)}` : "";
+  return `/chat/${encodeURIComponent(conversationId)}${about}`;
+}
