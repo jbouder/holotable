@@ -1,21 +1,24 @@
 import { DatumLinksBody } from "@/components/dashboard/DatumLinks";
 import type { PanelBodyProps } from "@/components/panels/types";
 import { datumOf } from "@/lib/drilldown-datum";
-import { tokenHex } from "@/lib/panels/colors";
+import { tokenHex, tokenTextColor } from "@/lib/panels/colors";
 import { statReading } from "@/lib/panel-reading";
 
 /**
  * One formatted number: the named value column, or the last row's first
  * numeric column that is not the time field. Thresholds color it, and a
- * sparkline of the column can sit behind it (#115).
+ * sparkline of the column can sit behind it (#115). The number takes the
+ * theme's status token so it reads in both themes; the sparkline, a graphic,
+ * keeps the chart color.
  */
 export function StatView({ panel, data }: PanelBodyProps) {
   const reading = statReading(panel, data);
   const color = reading.color ? tokenHex(reading.color) : undefined;
+  const text = reading.color ? tokenTextColor(reading.color) : undefined;
   // The whole number is the datum (#373): with a datum link, the body is one control.
   return (
     <DatumLinksBody datum={datumOf(panel, data, {})} label={panel.title}>
-      <StatBody reading={reading} color={color} />
+      <StatBody reading={reading} color={color} text={text} />
     </DatumLinksBody>
   );
 }
@@ -23,9 +26,13 @@ export function StatView({ panel, data }: PanelBodyProps) {
 function StatBody({
   reading,
   color,
+  text,
 }: {
   reading: ReturnType<typeof statReading>;
+  /** The sparkline's color: the chart color. */
   color?: string;
+  /** The number's color: the theme's status token, or none. */
+  text?: string;
 }) {
   return (
     <div className="relative flex h-full items-center justify-center">
@@ -33,7 +40,7 @@ function StatBody({
       {/* Shrinks with the viewport: a 4xl number is most of a phone panel. */}
       <span
         className="relative text-3xl font-semibold tabular-nums sm:text-4xl"
-        style={color ? { color } : undefined}
+        style={text ? { color: text } : undefined}
       >
         {reading.text}
       </span>
@@ -43,7 +50,7 @@ function StatBody({
 
 /**
  * The value's history, faint, across the bottom of the panel. Drawn in the
- * number's own color, so a threshold that turns one turns both.
+ * threshold's chart color, so a threshold that turns the number turns it too.
  */
 function Sparkline({ values, color }: { values: number[]; color?: string }) {
   const min = Math.min(...values);

@@ -82,3 +82,24 @@ const SEMANTIC_STATES: Record<string, ColorToken> = {
 export function defaultStateToken(state: string): ColorToken {
   return SEMANTIC_STATES[state.toLowerCase()] ?? fallbackToken(state);
 }
+
+/**
+ * A spec color as text on a surface, in the page's theme: the theme's own
+ * status token where there is one, which `CONTRAST_PAIRS` holds to AA on
+ * every surface in both themes. A `tokenHex` color is one value for both
+ * themes and paints charts well, but `warning` as text on the light theme's
+ * white is about 2:1. The palette-only colors (orange, purple, teal) have no
+ * theme token, so they give no text color: the text stays the foreground,
+ * and the color is shown some other way (a stat's sparkline).
+ */
+const TEXT_TOKENS: Partial<Record<ColorToken, string>> = {
+  success: "var(--success)",
+  warning: "var(--warning)",
+  danger: "var(--danger)",
+  info: "var(--primary)",
+  neutral: "var(--muted)",
+};
+
+export function tokenTextColor(token: ColorToken): string | undefined {
+  return TEXT_TOKENS[token];
+}

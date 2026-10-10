@@ -130,11 +130,11 @@ The walk's issues show under it as you type, because they are schema issues,
 and the kind's `check` runs after them, so a spec that does not compile shows
 the compiler's message there too, before a save would be refused with it.
 
-The seeder writes **Demo custom visuals**: a latency band with the SLO as a
-rule, CPU per host as small multiples by region (averaged by the spec itself),
-and every five-minute CPU reading as a tick per host. The smoke test checks it
-on the built images, and that each spec compiles, and the end-to-end suite
-scans it with axe in both themes.
+The demo dashboards each carry one: **Demo service health** a latency band
+with the SLO as a rule, and **Demo fleet** every five-minute CPU reading as a
+tick per host. The smoke test checks the service health dashboard on the
+built images, including that its spec compiles, and the end-to-end suite
+scans the fleet dashboard with axe in both themes.
 
 ## Phases
 
@@ -148,5 +148,5 @@ All four have shipped.
    PNG export.
 3. Generation and repair, which the MCP tools share. Chat answers over a
    dashboard and never writes a spec, so it has nothing to do here.
-4. The editor's compile messages, and the "Demo custom visuals" dashboard on
-   the demo site, smoke-tested and scanned by axe.
+4. The editor's compile messages, and custom visuals on the demo site,
+   smoke-tested and scanned by axe.

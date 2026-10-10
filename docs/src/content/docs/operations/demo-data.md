@@ -19,27 +19,49 @@ the compose stack's own Prometheus, which scrapes the app.
 
 | Source id | Table | Demo dashboard |
 | --- | --- | --- |
-| `ts-metrics` | `metrics.http_requests` — per-request events | **Demo service health** (RPS, p95 latency, 5xx, requests by route, latency histograms for all requests and for 5xx, and a sunburst of requests by route and status) |
-| `ts-system` | `metrics.system_metrics` — per-host infra metrics | **Demo infrastructure** (CPU/memory by host, disk %, CPU by region, network in as a region-then-host treemap), **Demo fleet status** (a text header, CPU and disk gauges, a host load state timeline), **Demo fleet grid** (a status-grid tile per host for CPU, disk and load state) and **Demo host detail** (one host, picked with a `host` variable) |
-| `ts-logs` | `metrics.app_logs` — gateway log lines | **Demo gateway logs** (errors per minute over the log itself, filtered by a `level` picker) |
-| `ts-metrics`, `ts-system` | the two tables above | **Demo custom visuals**: three [custom visuals](/architecture/custom-visuals/), a latency band against the SLO, CPU per host as small multiples by region, and every five-minute CPU reading as a tick |
+| `ts-metrics` | `metrics.http_requests` — per-request events | **Demo service health** |
+| `ts-system` | `metrics.system_metrics` — per-host infra metrics | **Demo fleet** and **Demo host detail** |
+| `ts-logs` | `metrics.app_logs` — gateway log lines | The logs on **Demo service health** and **Demo host detail** |
 | `holotable-self` | `metrics.holotable_self` — the app's own instruments | **Holotable self-monitoring**, below |
 | `prometheus-self` | Prometheus at `PROMETHEUS_SELF_URL` — the same instruments, scraped | **Holotable self-monitoring (Prometheus)**, below |
 
-The demo dashboards show [drilldown](/guide/drilldown/) too. On **Demo fleet
-status**, a click on a host's CPU bar or on one of its load-state lanes opens
-**Demo host detail** for that host, and so does a click on any tile of **Demo
-fleet grid**. The CPU chart on **Demo infrastructure**
-has an *Open host detail* item in its panel menu. On **Demo host detail**, a
-click on a row of the host table switches the page to that host in place.
-A link names its target by dashboard id, so the seeder writes **Demo host
-detail** before the dashboards that link to it.
+Three demo dashboards each answer one question, and between them use every
+panel kind:
+
+- **Demo service health**: is the API serving well? The 5xx error rate, p95
+  latency and the share of requests over the 300 ms SLO as stats with
+  sparklines, availability as a gauge, requests per minute by outcome, a
+  sunburst of requests by route and status, the latency band against the SLO
+  (a [custom visual](/architecture/custom-visuals/)) beside the latency
+  histogram, the slowest routes, server errors by route, requests by service,
+  and the gateway's recent errors and warnings.
+- **Demo fleet**: which hosts need attention, and why? Status grids of CPU and
+  disk now, CPU by host over time, memory as gauge bars, a CPU heatmap by host
+  and minute, the load-state timeline, network in as a region-then-host
+  treemap, CPU against memory as a scatter, every five-minute CPU reading as a
+  tick plot (a custom visual), and a table of hosts.
+- **Demo host detail**: one host, picked with a `host` variable: its CPU,
+  memory, disk and network, its own log lines and their levels, and the other
+  hosts.
+
+They show [drilldown](/guide/drilldown/) too. On **Demo fleet**, a click on a
+host anywhere (a tile, a line, a bar, a lane or a row of the hosts table)
+opens **Demo host detail** for that host, and the heatmap has an *Open host
+detail* item in its panel menu. On **Demo host detail**, a click on a row of
+the host table switches the page to that host in place. A link names its
+target by dashboard id, so the seeder writes **Demo host detail** before the
+dashboard that links to it.
 
 A demo dashboard the seeder wrote and nobody has saved since is brought up to
 the current demo spec on the next start, as a new version noted *Updated by
 the demo seeder*. That is how an install seeded before the drilldown links
 gets them. Once a person saves one of these dashboards, the seeder leaves it
 alone.
+
+Earlier seeds wrote more demo dashboards (*Demo infrastructure*, *Demo fleet
+status*, *Demo fleet grid*, *Demo gateway logs* and *Demo custom visuals*),
+now folded into the three above. The seeder deletes each of them it still
+owns on its next start; one a person has saved stays.
 
 Each source is stamped with a `catalog_refreshed_at` as it is written. A source
 that has never been introspected is refused by the [catalog freshness

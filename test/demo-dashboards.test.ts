@@ -11,15 +11,13 @@ import {
 import type { CatalogTable, SqlSourceConfig } from "@/lib/registry";
 import { validateSql } from "@/lib/sql/safety";
 import { compileVegaLite } from "@/lib/vega/compile";
+import { PANEL_KIND_NAMES } from "@/lib/panels/registry";
 import {
   type DemoLinkTargets,
   demoSpec,
-  customVisualsSpec,
-  fleetGridSpec,
-  logsSpec,
   fleetSpec,
   hostDetailSpec,
-  systemSpec,
+  RETIRED_DEMO_DASHBOARDS,
 } from "../scripts/lib/demo-dashboards";
 import { queryOf } from "./support/panels";
 
@@ -95,11 +93,7 @@ const TARGETS: DemoLinkTargets = { hostDetail: "00000000-0000-4000-8000-00000000
 
 const SPECS: Record<string, Dashboard> = {
   demo: parseDashboard(demoSpec()),
-  system: parseDashboard(systemSpec(TARGETS)),
   fleet: parseDashboard(fleetSpec(TARGETS)),
-  fleetGrid: parseDashboard(fleetGridSpec(TARGETS)),
-  logs: parseDashboard(logsSpec()),
-  customVisuals: parseDashboard(customVisualsSpec()),
   hostDetail: parseDashboard(hostDetailSpec()),
 };
 
@@ -125,10 +119,8 @@ for (const [name, spec] of Object.entries(SPECS)) {
 
 test("the demo links lead to the host detail dashboard and set only its host", () => {
   const hostVariables = declaredVariables(SPECS.hostDetail);
-  const links = [SPECS.system, SPECS.fleet, SPECS.fleetGrid].flatMap((spec) =>
-    spec.panels.flatMap((panel) => panel.links ?? []),
-  );
-  assert.ok(links.length >= 3, "the fleet and infrastructure dashboards link out");
+  const links = (SPECS.fleet?.panels ?? []).flatMap((panel) => panel.links ?? []);
+  assert.ok(links.length >= 3, "the fleet dashboard links out");
   for (const link of links) {
     assert.equal(link.dashboard, TARGETS.hostDetail);
     for (const name of Object.keys(link.set ?? {})) {
@@ -150,9 +142,27 @@ test("every custom visual on a demo dashboard compiles (#405)", async () => {
   const visuals = Object.values(SPECS).flatMap((spec) =>
     spec.panels.filter((panel) => panel.viz === "vega"),
   );
-  assert.ok(visuals.length >= 3, "the demo shows custom visuals");
+  assert.ok(visuals.length >= 2, "the demo shows custom visuals");
   for (const panel of visuals) {
     const result = await compileVegaLite((panel.options as { spec: unknown }).spec);
     assert.ok(result.ok, `${panel.id}: ${result.ok ? "" : result.error}`);
+  }
+});
+
+test("between them, the demo dashboards show every panel kind", () => {
+  const used = new Set(
+    Object.values(SPECS).flatMap((spec) => spec.panels.map((p) => p.viz)),
+  );
+  assert.deepEqual(
+    PANEL_KIND_NAMES.filter((kind) => !used.has(kind)),
+    [],
+    "add a panel of each missing kind to a demo dashboard",
+  );
+});
+
+test("the seeded dashboards and the retired ones never share a title", () => {
+  const titles = Object.values(SPECS).map((spec) => spec.title);
+  for (const retired of RETIRED_DEMO_DASHBOARDS) {
+    assert.ok(!titles.includes(retired), retired);
   }
 });
