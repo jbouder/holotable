@@ -21,7 +21,7 @@ export function aiConfigProblem(env: Environment = process.env): string | null {
 }
 
 /**
- * What the generate, Explore, panel-edit and chat surfaces show in place of a
+ * What the generate, panel-edit and chat surfaces show in place of a
  * request that would fail (#251). Names the variables to set; demo mode makes
  * a missing model a warning rather than a boot failure, so this is what a
  * visitor to a demo without a key sees.

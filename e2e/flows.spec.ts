@@ -13,29 +13,32 @@ import {
 } from "./support/app";
 
 /*
- * The flows around the core journey (#88): Explore, dashboard chat, a source
+ * The flows around the core journey (#88): Chat, dashboard chat, a source
  * removed out from under a dashboard, and a viewer kept out of the editor.
  */
 
-test("explore answers a question with a guarded query", async ({ page }) => {
+test("/explore lands on Chat", async ({ page }) => {
   await page.goto("/explore");
-  // The source is a chip in the prompt bar, like /dashboards/new (#362).
-  await page.getByRole("button", { name: /^Data source:/ }).click();
-  await page.getByRole("menuitemradio", { name: /Demo TimescaleDB metrics/ }).click();
-  await page.keyboard.press("Escape");
-  await page.locator("#prompt").fill("Which service is busiest?");
-  await page.getByRole("button", { name: "Explore" }).click();
-  // The recorded panel's SQL ran on the server: real rows, real services.
+  await expect(page).toHaveURL(/\/chat$/);
+  await expect(page.getByRole("heading", { level: 1, name: "Chat" })).toBeVisible();
+});
+
+test("a chat panel is added to a new dashboard as the ordinary save", async ({
+  page,
+}) => {
+  await askChat(page);
   const table = page.getByRole("region", { name: "Requests by service, table" });
   await expect(table.getByRole("cell", { name: "api", exact: true })).toBeVisible();
-
-  // Start over asks, then clears the visit's answers.
-  await page.locator("#main").getByRole("button", { name: "Start over" }).click();
-  const dialog = page.getByRole("dialog", { name: "Start over?" });
-  await expect(dialog).toContainText("The 1 answer from this visit is cleared");
-  await dialog.getByRole("button", { name: "Start over" }).click();
-  await expect(table).toHaveCount(0);
-  await expect(page.getByRole("complementary", { name: "This session" })).toHaveCount(0);
+  await page.getByRole("button", { name: "Add to dashboard" }).click();
+  const dialog = page.getByRole("dialog", { name: "Add to dashboard" });
+  await dialog.getByRole("combobox", { name: "Dashboard" }).click();
+  await page.getByRole("option", { name: "New dashboard…" }).click();
+  await dialog.getByRole("textbox", { name: "New dashboard title" }).fill("From chat");
+  await dialog.getByRole("button", { name: "Create dashboard" }).click();
+  // A new dashboard opens in the editor with the panel selected.
+  await expect(page).toHaveURL(
+    /\/dashboards\/[0-9a-f-]{36}\/edit\?panel=requests-by-service$/,
+  );
 });
 
 test("chat answers with an inline panel that survives a reload", async ({ page }) => {

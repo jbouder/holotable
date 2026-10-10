@@ -1,7 +1,7 @@
-import type { TableSort } from "@/lib/explore-view";
+import type { TableSort } from "@/lib/chat/view";
 
 /**
- * Filtering, sorting and exporting an Explore result table.
+ * Filtering, sorting and exporting a result table (a Chat panel's, #416).
  *
  * Browser-safe and pure, over the rows the guarded query already returned:
  * nothing here reaches the database, so a filter narrows what is shown, never
@@ -106,5 +106,5 @@ export function csvFilename(title: string): string {
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-+|-+$/g, "")
     .slice(0, 60);
-  return `${slug || "explore-result"}.csv`;
+  return `${slug || "chat-result"}.csv`;
 }

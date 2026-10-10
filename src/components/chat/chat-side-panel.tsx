@@ -23,7 +23,7 @@ import {
   groupConversations,
 } from "@/lib/chat/history";
 import type { ChatSourceOption } from "@/lib/chat/page-data";
-import { EXPLORE_REFRESH_CHOICES, EXPLORE_TIME_RANGES } from "@/lib/explore-defaults";
+import { CHAT_REFRESH_CHOICES, CHAT_TIME_RANGES } from "@/lib/chat/defaults";
 import { animateOut } from "@/lib/motion";
 import type { ChatPreferences } from "@/lib/preferences";
 import { cn } from "@/lib/utils";
@@ -413,11 +413,11 @@ function RenameField({
   );
 }
 
-const RANGE_OPTIONS = EXPLORE_TIME_RANGES.map((r) => ({
+const RANGE_OPTIONS = CHAT_TIME_RANGES.map((r) => ({
   value: r.value,
   label: r.label,
 }));
-const REFRESH_OPTIONS = EXPLORE_REFRESH_CHOICES.map((c) => ({
+const REFRESH_OPTIONS = CHAT_REFRESH_CHOICES.map((c) => ({
   value: String(c.value),
   label: c.label,
 }));

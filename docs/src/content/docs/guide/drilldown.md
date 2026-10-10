@@ -117,7 +117,7 @@ is ignored.
 
 - **A share link or embed** shows no links. The other side has no session to
   open a dashboard with.
-- **Explore** panels have none: an explored panel is on no dashboard.
+- **Chat** panels have none: a panel in an answer is on no dashboard. Add it to one and give it links in the editor.
 - **Templates.** Saving a dashboard as a template keeps its self links and drops
   links to other dashboards, whose ids mean nothing where the template is used.
   A panel template keeps no links.

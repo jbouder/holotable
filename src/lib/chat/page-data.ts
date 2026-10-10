@@ -3,12 +3,9 @@ import { effectiveModels } from "@/lib/ai/model-resolution";
 import { authorizedWorkspaces, can } from "@/lib/auth/authorize";
 import { accessibleWorkspaces, type Identity } from "@/lib/auth/claims";
 import { type CatalogHealth, catalogHealth } from "@/lib/catalog/health";
+import { config } from "@/lib/config";
 import { listSources } from "@/lib/db/repo";
-import {
-  type ChatPreferences,
-  chatPreferencesOf,
-  exploreDefaultsOf,
-} from "@/lib/preferences";
+import { type ChatPreferences, chatPreferencesOf } from "@/lib/preferences";
 import { requestPreferences } from "@/lib/preferences-server";
 import { buildStarters } from "@/lib/prompts/starters";
 import { isSqlSource, sourceKind } from "@/lib/sources/registry";
@@ -38,6 +35,14 @@ export interface ChatPageData {
   defaultFrom: string;
   /** Live refresh, open queries, and whether conversations are kept. */
   chatPrefs: ChatPreferences;
+  /**
+   * The workspaces where this person may add a panel to a dashboard: edit
+   * one, or create one. Elsewhere a panel offers Copy spec alone; the save
+   * route decides either way.
+   */
+  addableWorkspaces: string[];
+  /** A dashboard made from a panel starts with this refresh interval. */
+  defaultRefreshIntervalMs: number;
 }
 
 /**
@@ -65,7 +70,13 @@ export async function chatPageData(identity: Identity): Promise<ChatPageData> {
     sources,
     models: await effectiveModels(identity, workspaces),
     canManageSources: authorizedWorkspaces(identity, "source:manage").length > 0,
-    defaultFrom: exploreDefaultsOf(prefs).timeRange,
+    defaultFrom: prefs.chatTimeRange,
     chatPrefs: chatPreferencesOf(prefs),
+    addableWorkspaces: workspaces.filter(
+      (w) =>
+        can(identity, "dashboard:update", { workspaceId: w }) ||
+        can(identity, "dashboard:create", { workspaceId: w }),
+    ),
+    defaultRefreshIntervalMs: config.defaultRefreshIntervalMs,
   };
 }

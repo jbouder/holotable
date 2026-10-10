@@ -40,7 +40,7 @@ export const PROMPT_MAX_LENGTH = 4_000;
  * list that mixes them is a list nobody reads. Each scope is still per
  * workspace, because a prompt names that workspace's tables.
  */
-export type PromptScope = "dashboard" | "panel" | "explore";
+export type PromptScope = "dashboard" | "panel" | "chat";
 
 export interface RememberedPrompt {
   prompt: string;

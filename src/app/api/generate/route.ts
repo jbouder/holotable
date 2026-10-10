@@ -147,7 +147,7 @@ export const POST = route("generate", async (req: Request) => {
   });
 
   // The dashboards a link may lead to (#375): this workspace's, for a caller
-  // who may view them. Explore writes no links and is told of none.
+  // who may view them. An explore-mode panel writes no links and is told of none.
   const dashboards =
     body.mode === "explore"
       ? undefined

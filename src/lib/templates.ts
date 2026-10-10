@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { appendPanel } from "@/lib/explore-save";
+import { appendPanel } from "@/lib/panel-placement";
 import { type ApiError, apiErrorFromThrown, readApiError } from "@/lib/errors";
 import { Dashboard, hasQuery, Panel, SPEC_VERSION, type TimeRange } from "@/lib/ir";
 import { migratePanel, migrateSpec } from "@/lib/ir/upgrade";

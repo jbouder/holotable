@@ -150,7 +150,7 @@ In `npm test` those tests skip themselves.
 
 `npm run e2e` runs the Playwright suite in `e2e/`: the core journey (register
 a source, generate, save, watch rows arrive over SSE, pause, resume, edit,
-save a version), Explore, chat, a tombstoned source, a viewer kept out of the
+save a version), Chat, dashboard chat, a tombstoned source, a viewer kept out of the
 editor, and axe accessibility scans of every main surface in both themes. It
 brings up `e2e/compose.yml` (TimescaleDB and Keycloak on ports 55433 and 18181,
 away from your dev stack), builds the app and starts it on 3107, and signs in
@@ -380,6 +380,7 @@ request:
 | `src/lib/editor/`, `src/lib/panel-starter.ts`, `src/lib/preview-runs.ts` | "What the editor holds before a save" in `concepts/executing-a-panel.md` |
 | `src/components/dashboard/LiveDashboard.tsx`, `src/lib/connection.ts`, the time picker, a panel's menu | `guide/viewing-a-dashboard.md`, the viewer sections of `concepts/streaming-and-rendering.md` |
 | `src/lib/ai/chat.ts`, `src/app/api/dashboards/[id]/chat/` | `guide/dashboard-chat.md`, "Dashboard chat" in `concepts/generating-a-panel.md` |
+| `src/lib/ai/data-chat.ts`, `src/lib/chat/`, `src/app/api/chat/`, `src/components/chat/` | `guide/chat.md`, "Chat" in `concepts/generating-a-panel.md`, the Chat rows in `reference/api-routes.md` and `operations/audit-log.md`, `architecture/data-model.md` |
 | `src/components/command-palette.tsx`, `src/lib/command-palette.ts`, `/api/search` | `guide/viewing-a-dashboard.md`, "Search and the command palette" in `architecture/authorization.md` |
 | `src/lib/config.ts` (a variable) | The configuration reference is generated; a startup rule goes in `operations/startup-validation.md`, and the variable in `.env.example` |
 | A route under `src/app/api/` | `reference/api-routes.md` (`test/docs-drift.test.ts` fails until it has a row) |

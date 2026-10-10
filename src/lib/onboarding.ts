@@ -170,7 +170,7 @@ function statusOf(
 
 /**
  * The empty state for a surface that needs a data source and has none —
- * Explore and the new-dashboard page.
+ * Chat and the new-dashboard page.
  *
  * Here rather than in each component so that the wording, and in particular
  * who the reader is told to ask, is decided in the one place that already

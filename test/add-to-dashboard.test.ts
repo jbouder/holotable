@@ -2,15 +2,17 @@ import { test, afterEach } from "node:test";
 import assert from "node:assert/strict";
 import type { Dashboard, Panel } from "@/lib/ir";
 import {
-  appendPanel,
-  bottomOf,
   listEditableDashboards,
   newDashboardSpec,
-  panelIdFromTitle,
   saveToExistingDashboard,
   saveToNewDashboard,
+} from "@/lib/chat/add-to-dashboard";
+import {
+  appendPanel,
+  bottomOf,
+  panelIdFromTitle,
   uniquePanelId,
-} from "@/lib/explore-save";
+} from "@/lib/panel-placement";
 
 function panel(overrides: Partial<Panel> = {}): Panel {
   return {

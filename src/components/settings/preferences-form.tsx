@@ -13,12 +13,11 @@ import {
   type PreferencesPatch,
 } from "@/lib/preferences";
 import {
-  EXPLORE_REFRESH_CHOICES,
-  EXPLORE_TIME_RANGES,
-  type ExploreRefreshMs,
-  type ExploreStartView,
-  type ExploreTimeRange,
-} from "@/lib/explore-defaults";
+  CHAT_REFRESH_CHOICES,
+  CHAT_TIME_RANGES,
+  type ChatRefreshMs,
+  type ChatTimeRange,
+} from "@/lib/chat/defaults";
 import { LOCAL_STORES } from "@/lib/local-data";
 import { browserStorage } from "@/lib/browser-storage";
 import { formatDateTime, runtimeTimeZone } from "@/lib/time-display";
@@ -35,12 +34,12 @@ const CLOCK_OPTIONS: SelectOption[] = [
   { value: "24h", label: "24-hour" },
 ];
 
-const TIME_RANGE_OPTIONS: SelectOption[] = EXPLORE_TIME_RANGES.map((r) => ({
+const TIME_RANGE_OPTIONS: SelectOption[] = CHAT_TIME_RANGES.map((r) => ({
   value: r.value,
   label: r.label,
 }));
 
-const REFRESH_OPTIONS: SelectOption[] = EXPLORE_REFRESH_CHOICES.map((c) => ({
+const REFRESH_OPTIONS: SelectOption[] = CHAT_REFRESH_CHOICES.map((c) => ({
   value: String(c.value),
   label: c.label,
 }));
@@ -171,7 +170,7 @@ export function PreferencesForm({
 
   const startOptions: SelectOption[] = [
     { value: "dashboards", label: "Dashboards list" },
-    { value: "explore", label: "Explore" },
+    { value: "chat", label: "Chat" },
     ...dashboards.map((d) => ({
       value: `dashboard:${d.id}`,
       label: `${d.title} (${d.workspaceId})`,
@@ -301,52 +300,18 @@ export function PreferencesForm({
 
       <Card>
         <CardHeader>
-          <CardTitle>Explore</CardTitle>
-        </CardHeader>
-        <CardContent className="grid grid-cols-1 gap-4 sm:grid-cols-[12rem_1fr] sm:items-center">
-          <Label className="mb-0" htmlFor="pref-explore-range">
-            Time range
-          </Label>
-          <Select
-            id="pref-explore-range"
-            value={prefs.exploreTimeRange}
-            options={TIME_RANGE_OPTIONS}
-            onValueChange={(v) => void save({ exploreTimeRange: v as ExploreTimeRange })}
-          />
-          <Label className="mb-0" htmlFor="pref-explore-refresh">
-            Auto-refresh
-          </Label>
-          <Select
-            id="pref-explore-refresh"
-            value={String(prefs.exploreRefreshMs)}
-            options={REFRESH_OPTIONS}
-            onValueChange={(v) =>
-              void save({ exploreRefreshMs: Number(v) as ExploreRefreshMs })
-            }
-          />
-          <Label className="mb-0" htmlFor="pref-explore-view">
-            Answers start as
-          </Label>
-          <Select
-            id="pref-explore-view"
-            value={prefs.exploreStartView}
-            options={START_VIEW_OPTIONS}
-            onValueChange={(v) => void save({ exploreStartView: v as ExploreStartView })}
-          />
-          <span className="text-sm">Session</span>
-          <Checkbox
-            checked={prefs.exploreKeepSession}
-            onCheckedChange={(checked) => void save({ exploreKeepSession: checked })}
-            label="Keep this tab's answers when the page reloads"
-          />
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
           <CardTitle>Chat</CardTitle>
         </CardHeader>
         <CardContent className="grid grid-cols-1 gap-4 sm:grid-cols-[12rem_1fr] sm:items-center">
+          <Label className="mb-0" htmlFor="pref-chat-range">
+            Time range
+          </Label>
+          <Select
+            id="pref-chat-range"
+            value={prefs.chatTimeRange}
+            options={TIME_RANGE_OPTIONS}
+            onValueChange={(v) => void save({ chatTimeRange: v as ChatTimeRange })}
+          />
           <Label className="mb-0" htmlFor="pref-chat-refresh">
             Live refresh
           </Label>
@@ -355,7 +320,7 @@ export function PreferencesForm({
             value={String(prefs.chatRefreshMs)}
             options={REFRESH_OPTIONS}
             onValueChange={(v) =>
-              void save({ chatRefreshMs: Number(v) as ExploreRefreshMs })
+              void save({ chatRefreshMs: Number(v) as ChatRefreshMs })
             }
           />
           <span className="text-sm">Queries</span>

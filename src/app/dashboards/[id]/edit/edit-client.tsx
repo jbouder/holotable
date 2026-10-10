@@ -163,7 +163,7 @@ export function EditDashboardClient({
   const dirty = isDirty(spec, savedSpec);
 
   // Nothing selected shows the dashboard's own settings; `?panel=` (how
-  // Explore hands off a saved result) opens on that panel instead.
+  // Chat hands off an added panel) opens on that panel instead.
   const [selectedId, setSelectedId] = React.useState<string | null>(
     initialSpec.panels.find((p) => p.id === initialPanelId)?.id ?? null,
   );

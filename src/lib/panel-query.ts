@@ -8,7 +8,7 @@ import { valuesKey } from "@/lib/variable-selection";
  * The client half of running one guarded query.
  *
  * Three surfaces run a panel's SQL before it is live — the editor's Run
- * preview, the create/edit preview grid, and Explore — and all three must send
+ * preview and the create/edit preview grid — and both must send
  * the same thing: an opaque `sourceId`, the statement, the declared `timeField`
  * and a *relative* time range the server resolves. Writing that request once
  * keeps invariants 4 and 5 in a single place instead of in three fetch calls

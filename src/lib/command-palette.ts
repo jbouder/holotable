@@ -65,11 +65,11 @@ export const STATIC_COMMANDS: Command[] = [
     action: { type: "navigate", href: "/dashboards" },
   },
   {
-    id: "page:explore",
+    id: "page:chat",
     kind: "page",
-    title: "Explore",
-    keywords: "query ad hoc sql",
-    action: { type: "navigate", href: "/explore" },
+    title: "Chat",
+    keywords: "ask question query explore ad hoc",
+    action: { type: "navigate", href: "/chat" },
   },
   {
     id: "page:data-sources",

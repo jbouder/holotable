@@ -14,7 +14,7 @@ The request body is a discriminated union over four modes:
 | `dashboard` | a full `Dashboard` (1–50 panels) | new-dashboard flow |
 | `dashboard-refine` | a full `Dashboard` from a current spec + follow-up | refinement before the first save |
 | `panel` | one updated `Panel` from a current panel + NL edit | per-panel "edit with AI" |
-| `explore` | one `Panel` answering an ad-hoc question | the Explore tool |
+| `explore` | one `Panel` answering an ad-hoc question | the MCP `generate_panel` tool |
 
 ## Before any model call
 
@@ -137,7 +137,7 @@ to it is written as a self link.
 The list goes into a fenced `DASHBOARDS` block after the catalog and the
 workspace context, introduced as data like they are. The line that closes it
 says the rules below win. Titles are people's text, so a title that reads like
-an instruction is only a name. Explore writes no links and gets no list.
+an instruction is only a name. An explore panel writes no links and gets no list.
 
 The rule the model is given is also enforced. A generated link whose
 `dashboard` is not in the list fails validation on the server and in the
@@ -226,7 +226,7 @@ against a Prometheus source fails it, and the one
 write `query.promql` instead. The [PromQL guard](/concepts/executing-a-panel/#the-promql-guard)
 is still the enforcement, on save and on every run.
 
-Explore and the dashboard chat work the same way. On a dashboard with a
+Chat and the dashboard chat work the same way. On a dashboard with a
 Prometheus source, the chat's `runQuery` tool takes `promql` (and `instant`)
 beside `sql`, and the source's kind refuses the other language by name.
 
@@ -278,7 +278,7 @@ picking another source there asks to start over rather than being refused.
 The page is laid out around that loop: a single-line prompt bar runs across
 the top, with the source chip at its start, and the preview fills the page
 under it. Before there is one, a placeholder takes that space; while a version
-is written, one line says what is being composed (the same line Explore shows),
+is written, one line says what is being composed (the same line Chat shows),
 and a refinement keeps the current preview on screen, dimmed, until the next
 version lands. Before the first prompt, a few starters sit
 under the bar, and **Start from a template…** and recent prompts sit on the
@@ -307,7 +307,7 @@ call*, because none was made.
 offers them back (on `/dashboards/new`, beside the page title on a fresh
 screen); choosing one fills
 the box rather than submitting, so re-use and edit are the same gesture. The create box, the panel
-editor's NL edit and Explore keep separate lists — "make it a bar chart" is a
+editor's NL edit and Chat keep separate lists — "make it a bar chart" is a
 panel edit and is nonsense as a dashboard description.
 
 The list lives in `localStorage` (`src/lib/prompt-history.ts`) and is never sent
@@ -317,52 +317,49 @@ stores a redacted prompt, a hash of the catalog that was in context and the spec
 that came back, and is readable only by a workspace source-admin — see
 [Data model](/architecture/data-model/).
 
-## Looking at an Explore answer
+## Chat
 
-Explore's prompt bar is the one `/dashboards/new` has: the source chip and one
-line to ask in. The **time range** (5 minutes to 30 days) and **auto-refresh**
-(off, 30s, 1m, 5m) sit in the page header, and both apply to the answers on
-screen: a new range re-runs
-them, and a refresh re-runs them quietly, keeping the rows on screen until the
-new ones land and skipping a hidden tab. Each run is the ordinary guarded
-`POST /api/query`; the server resolves the window, as it does everywhere.
+[Chat](/guide/chat/) is a conversation over a few sources in one workspace
+(`src/lib/ai/data-chat.ts`, the routes under `/api/chat`). A turn is
+`streamText` with two tools, both running on the server and both reaching a
+source only through its kind's `check`, `plan` and `execute` under the
+caller's row filter:
 
-Once an answer is back, nothing on it asks the model again:
+- **`runQuery`** fetches rows for the model to answer from, in words or a
+  small table, exactly as the dashboard chat does.
+- **`showPanel`** draws. The model writes a `ChatPanel`: an explore panel
+  without the `id`, `layout` and window, which the server assigns. The server
+  reads it through the IR, runs it once over the conversation's window, and
+  streams the rows to the browser. Through `toModelOutput` the model is told
+  only the columns, the row count and five sample rows, so it can narrate only
+  what came back, at a bounded cost per panel. A spec that fails its schema is
+  repaired once per turn; a statement the guard refuses is the tool's error,
+  which the model may correct.
 
-- **Show as** redraws the same rows as a line, area, bar, table or stat (line
-  and area only when the query has a time field), and a chart takes **Legend**,
-  **Stack** and **Log scale**. Every switch is checked against the IR's `Panel`
-  schema first (`src/lib/explore-view.ts`), so a toggle that would make an
-  invalid spec, such as a log axis over a fixed minimum of zero, is disabled
-  rather than drawn.
-- The **table** filters rows by text, anywhere or per column, sorts on a header
-  click, hides columns, and downloads the matching rows as CSV
-  (`src/lib/result-table.ts`). The CSV is built in the browser from rows already
-  returned, and a cell a spreadsheet would run as a formula is prefixed with `'`.
-  Filtering narrows what is shown, never what was read.
-- **This session** lists every question asked on the visit, newest first, up to
-  20 (`src/lib/explore-session.ts`). One click brings an answer back; **Pin**
-  holds one beside the current answer to compare them, and **Start over**
-  asks, then clears the list. A reload starts over too, unless **Keep this
-  tab's answers** is on in Preferences: then the questions come back and their
-  queries run again.
+Every drawn spec, accepted or refused, is a generation in the log with
+`mode: "chat"`, and every statement is audited as `query.execute` with
+`via: "chat"`.
 
-## Keeping an Explore answer
+A kept conversation stores each message with every panel's rows stripped
+(`persistableMessage` in `src/lib/chat/persist.ts`): the spec and the sample,
+never the result. Reopening it runs each panel again through
+`POST /api/chat/[id]/panels/[panelId]/run`, which takes a window and reads the
+spec from the store, so the browser never sends a statement to run. The page
+sends only the new question; the history the model sees is the stored one.
 
-An explore panel is a spec like any other, so Explore can pin it to a dashboard
-instead of discarding it. **Save as panel** saves it as it is shown, with the
-view, chart toggles, hidden columns and sort applied, and offers the dashboards in the
-*source's* workspace that the caller may update (`GET
-/api/dashboards?workspaceId=…&editable=true`), plus a new dashboard.
+In the browser a panel is drawn by the dashboard's own `PanelView`, so every
+panel kind can be an answer. **Show as** redraws the same rows as another kind
+without a model call, each candidate checked against the IR's `Panel` first
+(`src/lib/chat/view.ts`).
 
-The placement is pure arithmetic over the spec (`src/lib/explore-save.ts`): the
-fixed `explore` id becomes a slug of the panel title, disambiguated against the
-ids already in that dashboard, and the panel lands at the bottom of the grid.
-The save itself is the ordinary `PUT /api/dashboards/[id]` (which appends a new
-immutable version) or `POST /api/dashboards`, so the workspace is still derived
-from the trusted source records and every statement is re-validated on the way
-in. A dashboard created this way opens in the editor with `?panel=<id>`
-selected.
+**Add to dashboard** saves the panel as shown, with the view applied. The
+placement is arithmetic over the spec (`src/lib/panel-placement.ts`): the id
+becomes a slug of the title, made unique within the dashboard, and the panel
+lands at the bottom of the grid. The save is the ordinary
+`PUT /api/dashboards/[id]` or `POST /api/dashboards`
+(`src/lib/chat/add-to-dashboard.ts`), so the workspace is derived from the
+trusted source records and every statement is checked again. A new dashboard
+opens in the editor with `?panel=<id>` selected.
 
 ## Drafting a data source
 

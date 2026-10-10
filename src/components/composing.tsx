@@ -5,7 +5,7 @@ import { cn } from "@/lib/utils";
 /**
  * While the model writes a spec: one line, the compass pulsing, and the title
  * as soon as the stream has one. The same on every generation surface, so
- * waiting for a dashboard and waiting for an Explore answer look alike.
+ * waiting for a dashboard and waiting for an answer look alike.
  */
 export function ComposingStatus({
   what,
@@ -29,7 +29,7 @@ export function ComposingStatus({
 
 /**
  * The pulsing compass and a short line of what the model is doing. The one
- * waiting state every model surface shows: Explore, a new dashboard, and the
+ * waiting state every model surface shows: Chat, a new dashboard, and the
  * dashboard chat's "Thinking…" and "Querying data…" (#366).
  */
 export function WorkingStatus({

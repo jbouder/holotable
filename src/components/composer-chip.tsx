@@ -2,7 +2,7 @@ import { Database, Lock } from "lucide-react";
 
 /**
  * The menu triggers that sit in a prompt bar beside the input (#362): the
- * source chip, and on Explore the time range and auto-refresh. One height and
+ * source chip, and on Chat the sources a conversation uses. One height and
  * one border, so the bar reads as a single row.
  */
 export const COMPOSER_CHIP_CLASS =
