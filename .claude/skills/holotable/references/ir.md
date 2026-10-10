@@ -81,7 +81,7 @@ PromQL:
 |---|---|---|
 | `sourceId` | string | 1–128 chars, as for SQL. |
 | `promql` | string | 1–8000 chars. One PromQL expression. It carries no time: the server picks `start`, `end` and `step`. |
-| `instant` | boolean | Optional. One sample per series at the end of the window instead of a range: for `stat`, `gauge`, `pie` and `table`. |
+| `instant` | boolean | Optional. One sample per series at the end of the window instead of a range: for `stat`, `gauge`, `pie`, `table` and `status-grid`. |
 | `minStep` | duration | Optional: a whole number followed by `ms`, `s`, `m`, `h` or `d` (`15s`, `1m`). Only raises the step the server picks. |
 
 A PromQL query has no `timeField`. A range query's rows always carry their time

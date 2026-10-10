@@ -20,13 +20,14 @@ the compose stack's own Prometheus, which scrapes the app.
 | Source id | Table | Demo dashboard |
 | --- | --- | --- |
 | `ts-metrics` | `metrics.http_requests` — per-request events | **Demo service health** (RPS, p95 latency, 5xx, requests by route) |
-| `ts-system` | `metrics.system_metrics` — per-host infra metrics | **Demo infrastructure** (CPU/memory by host, disk %, CPU by region), **Demo fleet status** (a text header, CPU and disk gauges, a host load state timeline) and **Demo host detail** (one host, picked with a `host` variable) |
+| `ts-system` | `metrics.system_metrics` — per-host infra metrics | **Demo infrastructure** (CPU/memory by host, disk %, CPU by region), **Demo fleet status** (a text header, CPU and disk gauges, a host load state timeline), **Demo fleet grid** (a status-grid tile per host for CPU, disk and load state) and **Demo host detail** (one host, picked with a `host` variable) |
 | `holotable-self` | `metrics.holotable_self` — the app's own instruments | **Holotable self-monitoring**, below |
 | `prometheus-self` | Prometheus at `PROMETHEUS_SELF_URL` — the same instruments, scraped | **Holotable self-monitoring (Prometheus)**, below |
 
 The demo dashboards show [drilldown](/guide/drilldown/) too. On **Demo fleet
 status**, a click on a host's CPU bar or on one of its load-state lanes opens
-**Demo host detail** for that host. The CPU chart on **Demo infrastructure**
+**Demo host detail** for that host, and so does a click on any tile of **Demo
+fleet grid**. The CPU chart on **Demo infrastructure**
 has an *Open host detail* item in its panel menu. On **Demo host detail**, a
 click on a row of the host table switches the page to that host in place.
 A link names its target by dashboard id, so the seeder writes **Demo host

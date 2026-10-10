@@ -101,6 +101,14 @@ read as text on `surface-2` is too light to carry white at AA.
 | text-success on bg-success/15 (badges, alerts) | 5.64:1 | 5.07:1 |
 | text-success on bg-success/20 (badges, alerts) | 5.12:1 | 4.69:1 |
 | text-primary on bg-primary/10 | 4.85:1 | 4.92:1 |
+| text-foreground on a success status tile | 9.91:1 | 12.91:1 |
+| text-foreground on a warning status tile | 9.33:1 | 13.49:1 |
+| text-foreground on a danger status tile | 11.26:1 | 11.83:1 |
+| text-foreground on a info status tile | 10.67:1 | 12.29:1 |
+| text-foreground on a neutral status tile | 9.74:1 | 13.17:1 |
+| text-foreground on a orange status tile | 10.20:1 | 12.84:1 |
+| text-foreground on a purple status tile | 11.06:1 | 12.04:1 |
+| text-foreground on a teal status tile | 9.60:1 | 13.04:1 |
 | primary button | 6.06:1 | 5.37:1 |
 | danger button | 7.25:1 | 6.70:1 |
 

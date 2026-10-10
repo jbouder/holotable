@@ -172,7 +172,7 @@ test("the BOM is the download's job, not the text's", () => {
 test("a PNG is offered exactly where there is a chart to export", () => {
   // Exhaustive over the IR's own enum, so adding a viz forces a decision here
   // rather than silently inheriting one.
-  const nonChart = new Set<VizType>(["stat", "table", "text"]);
+  const nonChart = new Set<VizType>(["stat", "table", "status-grid", "text"]);
   for (const viz of VizType.options) {
     assert.equal(supportsImageExport(viz), !nonChart.has(viz), viz);
   }

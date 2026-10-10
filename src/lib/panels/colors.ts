@@ -47,3 +47,38 @@ export function fallbackToken(label: string): ColorToken {
   for (let i = 0; i < label.length; i++) hash = (hash * 31 + label.charCodeAt(i)) | 0;
   return FALLBACK[Math.abs(hash) % FALLBACK.length];
 }
+
+/**
+ * What a state is colored when nobody said: the obvious ones read as what
+ * they mean, and anything else gets a stable color of its own. Shared by the
+ * state timeline and the status grid, so a state is one color on both.
+ */
+const SEMANTIC_STATES: Record<string, ColorToken> = {
+  up: "success",
+  ok: "success",
+  healthy: "success",
+  running: "success",
+  success: "success",
+  succeeded: "success",
+  passing: "success",
+  resolved: "success",
+  down: "danger",
+  error: "danger",
+  failed: "danger",
+  failure: "danger",
+  failing: "danger",
+  critical: "danger",
+  firing: "danger",
+  warn: "warning",
+  warning: "warning",
+  degraded: "warning",
+  pending: "warning",
+  unknown: "neutral",
+  idle: "neutral",
+  stopped: "neutral",
+};
+
+/** A state's color when the panel did not assign it one. */
+export function defaultStateToken(state: string): ColorToken {
+  return SEMANTIC_STATES[state.toLowerCase()] ?? fallbackToken(state);
+}

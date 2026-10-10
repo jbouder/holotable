@@ -14,6 +14,7 @@ dashboard readable during an incident.
 | What share of the whole? (status classes, regions) | `pie` / `donut` | Label + value, a handful of categories. More than ~8 slices: use `bar`. |
 | How close to a limit? (CPU %, disk, quota) | `gauge` | One value, `min`/`max` set; `variant: "bar"` for one bar per host. |
 | What state was it in, and when? (up/down, deploys) | `state-timeline` | Raw time, entity, state, ordered by time. |
+| Which of these is unhealthy? (hosts, services, targets) | `status-grid` | One row per entity, a label + a value (or a state); thresholds color it. |
 | Where is the load concentrated over time? | `heatmap` | Time bucket, a dimension, a count. |
 | Do two measures move together? (size vs latency) | `scatter` | Two numeric columns, optionally a label. |
 | I need the exact numbers | `table` | Rows; set `columns` labels and formats. |
@@ -54,8 +55,8 @@ For a Prometheus source (see `references/promql-rules.md`):
 - **Latency**: `histogram_quantile(0.95, sum by (le) (rate(…_bucket[5m])))`,
   keeping `le` in the `by`. Multiply a `…_seconds` histogram by 1000 for
   `"format": "ms"`.
-- **`instant`**: set it for a stat, a gauge, a table, a pie or donut, and a
-  bar compared across a label; they draw one value per series. Leave it out
+- **`instant`**: set it for a stat, a gauge, a table, a pie or donut, a
+  status grid, and a bar compared across a label; they draw one value per series. Leave it out
   for anything over time.
 - **Not for PromQL**: `heatmap`, `scatter` and `state-timeline` read row shapes
   a PromQL result does not have.

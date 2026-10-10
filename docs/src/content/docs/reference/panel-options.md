@@ -23,7 +23,8 @@ They resolve through the same OKLCH values as the theme (invariant 13).
 
 ### Numbers
 
-Taken by `line`, `area`, `bar`, `stat`, `pie`, `donut` and `gauge`, and by each
+Taken by `line`, `area`, `bar`, `stat`, `pie`, `donut`, `gauge` and
+`status-grid`, and by each
 entry of a table's `columns`.
 
 | Option | Type | Default | Meaning |
@@ -38,7 +39,8 @@ them; without, the axis and tooltip show values as they always have.
 
 ### Thresholds
 
-Taken by `line`, `area`, `bar`, `stat` and `gauge`: `[{ value, color }]`,
+Taken by `line`, `area`, `bar`, `stat`, `gauge` and `status-grid`:
+`[{ value, color }]`,
 strictly ascending, at most 10. A value takes the color of the last step at or
 below it.
 
@@ -168,6 +170,50 @@ are built in the browser from those rows; the model still writes only SQL.
   `success`; `down`, `error` and `failed` are `danger`; `warn` and `degraded`
   are `warning`. Any other state gets a fallback color worked out from its
   name, so the same state is always the same color.
+
+## `status-grid`
+
+One tile per entity, colored by threshold or by state
+([#404](https://github.com/jbouder/holotable/issues/404)).
+
+| Option | Type | Default | Meaning |
+| --- | --- | --- | --- |
+| `entity` | column name | first text column other than the state | One tile per value. |
+| `value` | column name | first numeric column | The number on the tile. |
+| `state` | column name | none | A discrete state. When set, it colors the tile and is written on it, instead of the value's threshold. |
+| `states` | `[{ state, color }]`, at most 50 | none | A color per state. |
+| `sort` | `"label"` \| `"value"` \| `"none"` | `"label"` | By label (numbers in a label sort as numbers: `web-2` before `web-10`), largest value first, or the result's order. |
+| `columns` | integer, 1 to 12 | as many as fit | Tiles per row. |
+| `thresholds` | `[{ value, color }]`, ascending, at most 10 | none | A value takes the color of the last step at or below it. Below the first step, or with none, the tile is neutral. |
+| `decimals`, `unit`, `compact` | see [Numbers](#numbers) | none | How the value is written. |
+
+- Each entity's latest row is its tile, so a time series per host (bucketed,
+  with `query.timeField`) reads as now, as a gauge's bars do. One row per
+  entity works as well.
+- A state with no color in `states` takes the state timeline's: `ok` is
+  `success`, `down` is `danger`, and so on.
+- The tile's text is always the foreground color over a tint of its color, so
+  every tile meets WCAG AA in both themes; the value and state are written on
+  it, so color is never the only signal.
+- At most 200 tiles are drawn; the panel says how many more there are.
+- With a [datum link](/guide/drilldown/), each tile is a link carrying its
+  row, and its label is the series.
+
+```json
+{
+  "viz": "status-grid",
+  "format": "percent",
+  "options": {
+    "entity": "host",
+    "value": "cpu",
+    "thresholds": [
+      { "value": 0, "color": "success" },
+      { "value": 70, "color": "warning" },
+      { "value": 85, "color": "danger" }
+    ]
+  }
+}
+```
 
 ## `text`
 

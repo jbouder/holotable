@@ -13,6 +13,7 @@ import { validateSql } from "@/lib/sql/safety";
 import {
   type DemoLinkTargets,
   demoSpec,
+  fleetGridSpec,
   fleetSpec,
   hostDetailSpec,
   systemSpec,
@@ -78,6 +79,7 @@ const SPECS: Record<string, Dashboard> = {
   demo: parseDashboard(demoSpec()),
   system: parseDashboard(systemSpec(TARGETS)),
   fleet: parseDashboard(fleetSpec(TARGETS)),
+  fleetGrid: parseDashboard(fleetGridSpec(TARGETS)),
   hostDetail: parseDashboard(hostDetailSpec()),
 };
 
@@ -103,7 +105,7 @@ for (const [name, spec] of Object.entries(SPECS)) {
 
 test("the demo links lead to the host detail dashboard and set only its host", () => {
   const hostVariables = declaredVariables(SPECS.hostDetail);
-  const links = [SPECS.system, SPECS.fleet].flatMap((spec) =>
+  const links = [SPECS.system, SPECS.fleet, SPECS.fleetGrid].flatMap((spec) =>
     spec.panels.flatMap((panel) => panel.links ?? []),
   );
   assert.ok(links.length >= 3, "the fleet and infrastructure dashboards link out");

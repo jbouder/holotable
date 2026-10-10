@@ -11,7 +11,7 @@ import {
   toText,
 } from "@/components/charts/options";
 import type { Panel } from "@/lib/ir";
-import { type ColorToken, fallbackToken, tokenHex } from "@/lib/panels/colors";
+import { type ColorToken, defaultStateToken, tokenHex } from "@/lib/panels/colors";
 import { StateTimelineOptions } from "@/lib/panels/kinds/state-timeline";
 import { formatDateTime, type TimeDisplay } from "@/lib/time-display";
 
@@ -57,38 +57,9 @@ export function stateTimelineOptions(panel: Panel): StateTimelineOptions {
   return parsed.success ? parsed.data : {};
 }
 
-/**
- * What a state is colored when nobody said: the obvious ones read as what
- * they mean, and anything else gets a stable color of its own.
- */
-const SEMANTIC: Record<string, ColorToken> = {
-  up: "success",
-  ok: "success",
-  healthy: "success",
-  running: "success",
-  success: "success",
-  succeeded: "success",
-  passing: "success",
-  resolved: "success",
-  down: "danger",
-  error: "danger",
-  failed: "danger",
-  failure: "danger",
-  failing: "danger",
-  critical: "danger",
-  firing: "danger",
-  warn: "warning",
-  warning: "warning",
-  degraded: "warning",
-  pending: "warning",
-  unknown: "neutral",
-  idle: "neutral",
-  stopped: "neutral",
-};
-
 export function stateColor(state: string, panel: Panel): ColorToken {
   const mapped = stateTimelineOptions(panel).states?.find((s) => s.state === state);
-  return mapped?.color ?? SEMANTIC[state.toLowerCase()] ?? fallbackToken(state);
+  return mapped?.color ?? defaultStateToken(state);
 }
 
 /**

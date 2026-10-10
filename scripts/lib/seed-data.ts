@@ -75,6 +75,23 @@ export function httpRequestRows(
   });
 }
 
+/**
+ * Each host's CPU and disk range, `[low, high]` percent (#404). Distinct on
+ * purpose, so the demo's thresholds and states have something to show: one
+ * quiet host, one that is busy and now and then hot, one whose disk is
+ * filling. Indexed like {@link HOSTS}.
+ */
+const HOST_PROFILES = [
+  { cpu: [20, 50], disk: [40, 55] },
+  { cpu: [45, 75], disk: [60, 72] },
+  { cpu: [72, 98], disk: [70, 80] },
+  { cpu: [30, 60], disk: [86, 94] },
+] as const satisfies readonly { cpu: [number, number]; disk: [number, number] }[];
+
+function within([low, high]: readonly [number, number], random: Random): number {
+  return Math.min(100, Math.max(1, low + random() * (high - low)));
+}
+
 /** One reading per host at `at`, so every host stays present in each window. */
 export function systemMetricRows(
   at: number,
@@ -85,9 +102,9 @@ export function systemMetricRows(
     ts: new Date(Math.max(floor, at - Math.floor(random() * SPREAD_MS))),
     host,
     region: REGIONS[index % REGIONS.length],
-    cpu_pct: Math.min(100, Math.max(1, 30 + random() * 50)),
+    cpu_pct: within(HOST_PROFILES[index % HOST_PROFILES.length].cpu, random),
     mem_pct: Math.min(100, Math.max(1, 40 + random() * 40)),
-    disk_pct: Math.min(100, Math.max(1, 50 + random() * 30)),
+    disk_pct: within(HOST_PROFILES[index % HOST_PROFILES.length].disk, random),
     net_in_bytes: Math.floor(10_000 + random() * 5_000_000),
     net_out_bytes: Math.floor(10_000 + random() * 5_000_000),
   }));

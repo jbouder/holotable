@@ -156,6 +156,25 @@
         "layout": { "x": 8, "y": 9, "w": 4, "h": 4 }
       },
       {
+        "id": "targets-up",
+        "title": "Targets up",
+        "description": "One tile per instance: green while its last scrape succeeded, red when it did not.",
+        "viz": "status-grid",
+        "options": {
+          "entity": "instance",
+          "thresholds": [
+            { "value": 0, "color": "danger" },
+            { "value": 1, "color": "success" }
+          ]
+        },
+        "query": {
+          "sourceId": "prom-fleet",
+          "promql": "max by (instance) (up)",
+          "instant": true
+        },
+        "layout": { "x": 0, "y": 13, "w": 4, "h": 4 }
+      },
+      {
         "id": "targets",
         "title": "Scrape targets",
         "description": "Every target, and whether its last scrape succeeded (1) or not (0).",
@@ -173,7 +192,7 @@
           "promql": "up",
           "instant": true
         },
-        "layout": { "x": 0, "y": 13, "w": 12, "h": 4 }
+        "layout": { "x": 4, "y": 13, "w": 8, "h": 4 }
       }
     ]
   }
