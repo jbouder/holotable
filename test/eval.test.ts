@@ -182,3 +182,61 @@ test("a case is asked with the provider options every app call carries", async (
   await runCase(c, source, capturing);
   assert.deepEqual(seen, PROVIDER_OPTIONS);
 });
+
+/* --- Chat turns (#416) ------------------------------------------------------ */
+
+function chatCase(expect: Record<string, unknown>) {
+  return {
+    name: "chat-x",
+    mode: "chat" as const,
+    catalog: "demo",
+    prompt: "Requests by service?",
+    expect,
+  };
+}
+
+const drawPanel = (sql: string) => ({
+  text: "",
+  toolCalls: [
+    {
+      toolName: "showPanel",
+      input: JSON.stringify({
+        title: "Requests by service",
+        viz: "table",
+        query: { sourceId: source.id, sql },
+      }),
+    },
+  ],
+});
+
+test("a chat case replays its steps through the engine and grades the drawn panel", async () => {
+  const steps = [
+    drawPanel("SELECT service, count(*) AS requests FROM http_requests GROUP BY service"),
+    { text: "api is the busiest.", toolCalls: [] },
+  ];
+  const result = await runCase(
+    chatCase({
+      tables: ["http_requests"],
+      minPanels: 1,
+      maxPanels: 1,
+      timeField: "absent",
+    }),
+    source,
+    replayModel({ model: "m", recordedAt: "", requestDigest: "", text: "", steps }),
+  );
+  assert.deepEqual(result.failures, []);
+  assert.equal(result.text, "api is the busiest.");
+  assert.equal(result.steps?.length, 2);
+});
+
+test("a chat panel the guard refuses, or the wrong count, fails the case", async () => {
+  const steps = [drawPanel("SELECT * FROM payroll"), { text: "Sorry.", toolCalls: [] }];
+  const result = await runCase(
+    chatCase({ minPanels: 1, runQuery: "required" }),
+    source,
+    replayModel({ model: "m", recordedAt: "", requestDigest: "", text: "", steps }),
+  );
+  assert.ok(result.failures.some((f) => /a panel was refused/.test(f)));
+  assert.ok(result.failures.some((f) => /drew 0 panels; expected at least 1/.test(f)));
+  assert.ok(result.failures.some((f) => /never fetched rows with runQuery/.test(f)));
+});

@@ -1,0 +1,13 @@
+{
+  "name": "chat-requests-over-time",
+  "mode": "chat",
+  "catalog": "demo",
+  "prompt": "Chart requests per minute over time.",
+  "expect": {
+    "tables": ["http_requests"],
+    "plausibleViz": ["line", "area", "bar"],
+    "timeField": "required",
+    "minPanels": 1,
+    "maxPanels": 1
+  }
+}

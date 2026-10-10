@@ -27,6 +27,7 @@ import { SourceConfig as SourceConfigSchema, type SourceRecord } from "@/lib/reg
 import { serverKind } from "@/lib/sources/server/registry";
 import { analyzeSelect } from "@/lib/sql/ast";
 import { selectOutputs, timeFieldWarning } from "@/lib/sql/hints";
+import { ChatStep, chatReplayModel, chatRequest, runChatTurn } from "./eval-chat";
 
 /*
  * The LLM eval harness (#24): a fixed corpus of prompts, each run through the
@@ -55,8 +56,11 @@ export const EvalCase = z
   .object({
     /** Also the file name, `evals/corpus/<name>.json`. */
     name: z.string().regex(/^[a-z0-9-]+$/),
-    /** Which generation the case runs: a whole dashboard, or one explore panel. */
-    mode: z.enum(["dashboard", "explore"]),
+    /**
+     * Which generation the case runs: a whole dashboard, one explore panel, or
+     * one Chat turn (#416), graded on the panels it drew.
+     */
+    mode: z.enum(["dashboard", "explore", "chat"]),
     /** A catalog in `evals/catalogs/<catalog>.json`: a `SourceConfig`. */
     catalog: z.string().regex(/^[a-z0-9-]+$/),
     prompt: z.string().min(1).max(4000),
@@ -88,8 +92,10 @@ export const EvalCase = z
         metrics: z.array(z.string()).min(1).optional(),
         /** Every query panel sets `query.timeField` (`required`) or none does (`absent`). */
         timeField: z.enum(["required", "absent"]).optional(),
-        minPanels: z.number().int().positive().optional(),
-        maxPanels: z.number().int().positive().optional(),
+        minPanels: z.number().int().nonnegative().optional(),
+        maxPanels: z.number().int().nonnegative().optional(),
+        /** A chat turn (#416) fetched rows in words (`required`), or never did (`absent`). */
+        runQuery: z.enum(["required", "absent"]).optional(),
         /**
          * Some panel links to `dashboard`, setting `variable` from one of
          * `columns` of the clicked row (#375).
@@ -121,6 +127,8 @@ export const Recording = z
      */
     requestDigest: z.string(),
     text: z.string(),
+    /** A chat turn's steps (#416), which replay plays back in order. */
+    steps: z.array(ChatStep).optional(),
   })
   .strict();
 export type Recording = z.infer<typeof Recording>;
@@ -140,6 +148,8 @@ export interface CaseResult {
   completed: boolean;
   model: string;
   requestDigest: string;
+  /** A chat turn's steps, for recording. */
+  steps?: ChatStep[];
 }
 
 export function loadCases(dir: string = EVALS_DIR): EvalCase[] {
@@ -216,6 +226,7 @@ export function requestDigest(request: {
  * plays back. It reports the recorded model's id.
  */
 export function replayModel(recording: Recording): LanguageModel {
+  if (recording.steps) return chatReplayModel(recording.model, recording.steps);
   type V4 = Extract<LanguageModel, { specificationVersion: "v4" }>;
   type Part =
     Awaited<ReturnType<V4["doStream"]>>["stream"] extends ReadableStream<infer P>
@@ -270,6 +281,7 @@ export async function runCase(
   source: SourceRecord,
   model: LanguageModel,
 ): Promise<CaseResult> {
+  if (c.mode === "chat") return runChatCase(c, source, model);
   const request = caseRequest(c, source);
   const digest = requestDigest(request);
   let modelId = "";
@@ -324,6 +336,63 @@ export async function runCase(
   };
 }
 
+/**
+ * One Chat case: the turn through the real engine, graded on what the server
+ * drew and whether it fetched rows in words. A refused panel is a failure,
+ * as it would be a failed answer.
+ */
+async function runChatCase(
+  c: EvalCase,
+  source: SourceRecord,
+  model: LanguageModel,
+): Promise<CaseResult> {
+  const request = chatRequest(source, c.prompt);
+  const turn = await runChatTurn(source, c.prompt, model);
+  const failures: string[] = [];
+  if (!turn.completed) {
+    failures.push(
+      `no output: ${turn.error instanceof Error ? turn.error.message : String(turn.error)}`,
+    );
+  }
+  for (const r of turn.refused) failures.push(`a panel was refused: ${r.error}`);
+  // The per-panel checks, then the turn's own: the count and the words.
+  const { minPanels, maxPanels, runQuery, tables, metrics, requiredViz, ...perPanel } =
+    c.expect;
+  for (const panel of turn.drawn) {
+    failures.push(...(await grade({ ...c, expect: perPanel }, source, panel)));
+  }
+  failures.push(
+    ...(await grade(
+      { ...c, expect: { tables, metrics, requiredViz } },
+      source,
+      { panels: turn.drawn } as GradedOutput,
+      { skipSave: true },
+    )),
+  );
+  const n = turn.drawn.length;
+  if (minPanels !== undefined && n < minPanels) {
+    failures.push(`drew ${n} panels; expected at least ${minPanels}`);
+  }
+  if (maxPanels !== undefined && n > maxPanels) {
+    failures.push(`drew ${n} panels; expected at most ${maxPanels}`);
+  }
+  if (runQuery === "required" && turn.runQueries === 0) {
+    failures.push("never fetched rows with runQuery");
+  } else if (runQuery === "absent" && turn.runQueries > 0) {
+    failures.push(`fetched rows with runQuery ${turn.runQueries} time(s)`);
+  }
+  return {
+    name: c.name,
+    ok: failures.length === 0,
+    failures,
+    text: turn.text,
+    steps: turn.steps,
+    model: turn.modelId,
+    completed: turn.completed,
+    requestDigest: requestDigest(request),
+  };
+}
+
 async function schemaFailure(error: unknown, schema: z.ZodType): Promise<string> {
   const failure = await describeFailure(error, schema);
   if (failure) return `does not match the schema: ${failure.issues.join("; ")}`;
@@ -374,6 +443,8 @@ export async function grade(
   c: EvalCase,
   source: SourceRecord,
   output: GradedOutput,
+  /** For a chat turn's panels, which were each checked already and are on no dashboard. */
+  opts: { skipSave?: boolean } = {},
 ): Promise<string[]> {
   const failures: string[] = [];
   const panels = "panels" in output ? output.panels : [output];
@@ -383,7 +454,9 @@ export async function grade(
 
   // 2. The guard, as a save would run it: the source's kind checks each
   // panel's language first, so SQL against a Prometheus source fails here.
-  if ("panels" in output) {
+  if (opts.skipSave) {
+    // Each panel was held to the guard on its own.
+  } else if ("panels" in output) {
     try {
       const spec = Dashboard.parse({ ...output, specVersion: SPEC_VERSION });
       await resolveAndValidateDashboard(spec, async (id) =>

@@ -136,31 +136,12 @@ Deleting a template is a hard delete. Instantiating one copies its spec into an
 ordinary dashboard, so unlike a source there is never a reference left pointing
 back at the row.
 
-### `chat_messages`
+### `chat_messages` (dropped)
 
-**Superseded** (#416): migration 020 copied every row into `conversations` and `conversation_messages`, the dashboard chat now reads and writes those, and a later migration drops this table. Until then it is read by nothing.
-
-One dashboard-chat message: the SDK's own `id`, `dashboard_id`, `user_sub`,
-`role`, and the whole message as `jsonb` in `content`. The primary key is
-`(dashboard_id, user_sub, id)` — the id is unique per *conversation*, and the
-conversation is that pair, which is also the only way rows are ever read. A
-re-sent turn therefore updates the row it belongs to instead of appending a
-duplicate.
-
-Per person, not per dashboard: a chat is a reader working something out, not a
-shared annotation (see `annotations` below). `ON DELETE CASCADE` for the same
-reason as a favorite.
-
-`content` is deliberately opaque rather than a column per part kind — the
-message shape is the AI SDK's, it evolves, and a second opinion about it would
-drift. Nothing executes a row: the model's SQL reaches the database only
-through the guarded `runQuery` tool, which re-validates whatever it is handed,
-so replaying a stored turn cannot run anything. It is read back as untrusted
-all the same, and a row that no longer parses is dropped.
-
-Bounded by `CHAT_HISTORY_MAX_MESSAGES` and `CHAT_HISTORY_RETENTION_DAYS`, swept
-in the same transaction as each write — the only way a row is added is the only
-way rows are removed, so there is no scheduled job to forget to run.
+The dashboard chat's history before #416. Migration 020 copied every row into
+`conversations` and `conversation_messages`; migration 021 dropped the table.
+Its rollback recreates it from the conversations that continue a dashboard's
+chat.
 
 ### `conversations`
 

@@ -305,14 +305,21 @@ The source is re-resolved and re-authorized on **every** execution, including
 each poller tick. `can()` in `src/lib/auth/authorize.ts` is the only decision
 point and the only place the platform-admin bypass applies.
 
-## 15. Dashboard chat is read-only
+## 15. Chat is read-only
 
-`/api/dashboards/[id]/chat` authorizes `dashboard:view` and exposes the model a
-single `runQuery` tool, scoped to sources the dashboard already references and
-the caller may use. It takes `sql` or `promql`, whichever the source answers,
-and runs the same validate → plan → execute pipeline, injects
-the dashboard's own time range, caps rows and steps, and cannot mutate the
-dashboard.
+Both chats, [Chat](/guide/chat/) and the one beside a dashboard, can query and
+draw, and change nothing. The engine (`src/lib/ai/data-chat.ts`) exposes the
+model two tools, `runQuery` and `showPanel`, scoped to the sources the caller
+resolved and may use (`source:use`, re-checked on every turn and every panel
+run; a dashboard's chat adds `dashboard:view` and the dashboard's own
+sources). Each takes `sql` or `promql`, whichever the source answers, and runs
+the same check → plan → execute pipeline under the server's window and the
+caller's row filter, with rows and steps capped. `showPanel` hands the browser
+the rows and the model only a sample. Neither tool writes anything: a panel
+reaches a dashboard only through **Add to dashboard**, which is the ordinary,
+versioned dashboard save with its own authorization and re-validation. The
+browser never sends a statement to run; a panel runs again from its stored
+spec.
 
 ## 16. Statement errors are actionable; infrastructure errors are opaque
 

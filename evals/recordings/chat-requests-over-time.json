@@ -1,0 +1,21 @@
+{
+  "model": "kimi-k3",
+  "recordedAt": "2026-10-10T15:34:10.259Z",
+  "requestDigest": "e4f70da2e0a2d6eb61ade70570ddde0871280e3dd9119fc383bb33ea51efcb15",
+  "text": "The panel is drawn, but the query returned **zero rows** — there are no HTTP requests recorded in `metrics.http_requests` within the last 24 hours. The chart will appear empty.",
+  "steps": [
+    {
+      "text": "",
+      "toolCalls": [
+        {
+          "toolName": "showPanel",
+          "input": "{\"title\":\"Requests per minute\",\"description\":\"Count of HTTP requests grouped into one-minute buckets over the last 24 hours.\",\"viz\":\"line\",\"query\":{\"sourceId\":\"eval-demo\",\"sql\":\"SELECT time_bucket('1 minute', ts) AS minute, count(*) AS requests FROM http_requests GROUP BY minute ORDER BY minute\",\"timeField\":\"minute\"},\"options\":{\"legend\":\"none\",\"yAxis\":{\"label\":\"requests/min\"}}}"
+        }
+      ]
+    },
+    {
+      "text": "The panel is drawn, but the query returned **zero rows** — there are no HTTP requests recorded in `metrics.http_requests` within the last 24 hours. The chart will appear empty.",
+      "toolCalls": []
+    }
+  ]
+}

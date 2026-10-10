@@ -146,6 +146,7 @@ function record(r: CaseResult): void {
         recordedAt: new Date().toISOString(),
         requestDigest: r.requestDigest,
         text: r.text,
+        ...(r.steps ? { steps: r.steps } : {}),
       },
       null,
       2,
