@@ -160,9 +160,37 @@ Bounded by `CHAT_HISTORY_MAX_MESSAGES` and `CHAT_HISTORY_RETENTION_DAYS`, swept
 in the same transaction as each write — the only way a row is added is the only
 way rows are removed, so there is no scheduled job to forget to run.
 
+### `conversations`
+
+One person's Chat conversation (#416): `id`, `user_sub`, `workspace_id`,
+`source_ids`, `dashboard_id` (set when it continues a dashboard's chat; `ON
+DELETE SET NULL`), `title`, `time_range` (an IR `TimeRange`), `variables` and
+the two timestamps. Personal like `user_preferences`: every statement filters
+on `user_sub` from the session, and no route reads another person's.
+
+Nothing in a row is authorization. `source_ids` are re-resolved and
+re-authorized on every turn and every panel run; `workspace_id` is derived from
+the source records when the conversation is made, never from a request.
+
+Bounded per person by `CHAT_CONVERSATIONS_MAX` (the least recently used go
+first) and by `CHAT_HISTORY_RETENTION_DAYS` (one with nothing newer is gone),
+swept when a conversation is created and applied on read.
+
+### `conversation_messages`
+
+One message of a conversation, as `chat_messages` holds one: the SDK's own
+`id`, `role` and the whole message in `content`, keyed on `(conversation_id,
+id)` and cascading with the conversation. A drawn panel's result rows are
+**never** stored: `persistableMessage` reduces each `showPanel` output to the
+panel id, columns, row count and five sample rows, and the page runs the panel
+again from its stored spec. Read back as untrusted; a panel whose spec no
+longer parses comes back as an error part. Bounded per conversation by
+`CHAT_HISTORY_MAX_MESSAGES` and `CHAT_HISTORY_RETENTION_DAYS`, swept with each
+write.
+
 ### `generation_log`
 
-One row per model generation: `mode`, `source_id`, `prompt_redacted`,
+One row per model generation, or per panel a Chat turn draws (`mode = 'chat'`): `mode`, `source_id`, `prompt_redacted`,
 `catalog_hash`, `spec`, `model`, `attempts`, `input_tokens`, `output_tokens`,
 `error`. It answers the question a wrong dashboard raises — what was asked, and
 what came back — and it is the corpus the eval harness

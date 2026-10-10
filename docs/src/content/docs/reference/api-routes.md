@@ -73,6 +73,23 @@ hand.
 | `/api/generation-log` | GET | source-admin | The redacted prompt/spec pairs every generation leaves behind. Workspaces come from the caller's claims, so `?workspaceId=` narrows and can never widen; a viewer or editor reads an empty list rather than a 403. `?limit=` is clamped |
 | `/api/audit` | GET | source-admin | The append-only [audit log](/operations/audit-log/), newest first. Filters: `workspaceId`, `from`/`to` (ISO or `now-24h`), `action`, `outcome`; paged with `limit` and `before` (the previous page's `next`). Workspaces come from the caller's claims as above; a platform admin reads any workspace, and every row with no filter. An unusable filter is a 400 |
 
+## Chat
+
+A conversation is the caller's own: every route is keyed on the session's
+subject, and someone else's conversation is a `404`, for a platform admin too.
+A share link reaches none of them.
+
+| Route | Method | Min role | Notes |
+| --- | --- | --- | --- |
+| `/api/chat` | GET | signed in | The caller's conversations, most recently used first, 50 a page; `?after=` is the previous page's `next`. Conversations past `CHAT_HISTORY_RETENTION_DAYS` are not listed |
+| `/api/chat` | POST | viewer | Start a conversation: `{ sourceIds, timeRange }`. Each source needs `source:use`; all must be in one workspace, which is the conversation's, and at most three. Past `CHAT_CONVERSATIONS_MAX` the caller's least recently used conversation is deleted |
+| `/api/chat` | DELETE | signed in | Delete every one of the caller's conversations, at once |
+| `/api/chat/[id]` | GET | owner | The conversation and its messages. A drawn panel's rows are never stored, so the page runs each panel again; `unavailableSourceIds` names the sources the caller can no longer use |
+| `/api/chat/[id]` | PATCH | owner | Rename it (`title`), or change its `sourceIds` (re-authorized, same workspace) or `timeRange` |
+| `/api/chat/[id]` | DELETE | owner | Delete it and its messages |
+| `/api/chat/[id]/messages` | POST | owner, viewer on its sources | One turn: `{ message }`, the new question only; the history is the stored conversation. Streams the answer, with `runQuery` and `showPanel`. Rate limited and budgeted per workspace; the turn is stored with each panel's rows stripped. Refused with a `403` when none of the conversation's sources is usable any more |
+| `/api/chat/[id]/panels/[panelId]/run` | POST | owner, viewer on its source | Run a drawn panel again. The body is `{ timeRange? }` and nothing else: the statement is the stored panel's, checked against its source's catalog as it is now, under the caller's row scope |
+
 ## Sources
 
 | Route | Method | Min role | Notes |

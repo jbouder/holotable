@@ -414,6 +414,23 @@ test("ROW_FILTER_CLAIMS names claims, and never one the session token uses itsel
   assert.deepEqual(variables(errors(renamed)), ["ROW_FILTER_CLAIMS"]);
 });
 
+test("the conversation cap is a positive count", () => {
+  for (const value of ["1", "200", ""]) {
+    const ok = validateConfig(
+      { ...VALID_PRODUCTION, CHAT_CONVERSATIONS_MAX: value },
+      { production: true },
+    );
+    assert.deepEqual(errors(ok), [], formatConfigProblems(ok));
+  }
+  for (const value of ["0", "-1", "lots"]) {
+    const bad = validateConfig(
+      { ...VALID_PRODUCTION, CHAT_CONVERSATIONS_MAX: value },
+      { production: true },
+    );
+    assert.deepEqual(variables(errors(bad)), ["CHAT_CONVERSATIONS_MAX"]);
+  }
+});
+
 test("chat history limits are bounded, and zero days means keep forever", () => {
   for (const value of ["1", "500", ""]) {
     const ok = validateConfig(

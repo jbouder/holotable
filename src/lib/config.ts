@@ -255,6 +255,12 @@ export const config = {
    * age check and leaves only the message cap. Documented default: 30 days.
    */
   chatHistoryRetentionDays: num("CHAT_HISTORY_RETENTION_DAYS", 30),
+  /**
+   * How many Chat conversations (#416) one person keeps. Past it, the one
+   * least recently used goes when a new one is started; the two limits above
+   * apply within each. Documented default: 200 conversations.
+   */
+  chatConversationsMax: num("CHAT_CONVERSATIONS_MAX", 200),
 
   /**
    * How long a `generation_log` row -- the redacted prompt, the spec the model
@@ -607,6 +613,7 @@ const EnvSchema = z.object({
   CATALOG_STALE_AFTER_DAYS: blank(nonNegativeInt),
   CHAT_HISTORY_MAX_MESSAGES: blank(positiveInt),
   CHAT_HISTORY_RETENTION_DAYS: blank(nonNegativeInt),
+  CHAT_CONVERSATIONS_MAX: blank(positiveInt),
   GENERATION_LOG_RETENTION_DAYS: blank(nonNegativeInt),
   SHUTDOWN_GRACE_MS: blank(positiveInt),
   SSE_REAUTH_INTERVAL_MS: blank(positiveInt),
