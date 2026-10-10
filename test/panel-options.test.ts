@@ -320,3 +320,36 @@ test("the model is told every shared option and every color token", () => {
     assert.ok(PRESENTATION_GUIDE.includes(token), token);
   }
 });
+
+test("a stat's number takes the theme's status token, so it reads in both themes", async () => {
+  const { tokenTextColor } = await import("@/lib/panels/colors");
+  // The semantic three, and info and neutral, have a theme token held to AA
+  // by CONTRAST_PAIRS; a palette-only color gives none and the text stays
+  // the foreground.
+  assert.equal(tokenTextColor("warning"), "var(--warning)");
+  assert.equal(tokenTextColor("danger"), "var(--danger)");
+  assert.equal(tokenTextColor("success"), "var(--success)");
+  assert.equal(tokenTextColor("info"), "var(--primary)");
+  assert.equal(tokenTextColor("neutral"), "var(--muted)");
+  assert.equal(tokenTextColor("orange"), undefined);
+  const { renderToStaticMarkup } = await import("react-dom/server");
+  const { createElement } = await import("react");
+  const { StatView } = await import("@/components/panels/stat");
+  const stat = Panel.parse({
+    id: "s",
+    title: "Error rate",
+    viz: "stat",
+    query: { sourceId: "s", sql: "SELECT 1" },
+    options: {
+      thresholds: [
+        { value: 0, color: "success" },
+        { value: 1, color: "warning" },
+      ],
+    },
+    layout: { x: 0, y: 0, w: 3, h: 2 },
+  });
+  const html = renderToStaticMarkup(
+    createElement(StatView, { panel: stat, data: { columns: ["v"], rows: [{ v: 3 }] } }),
+  );
+  assert.match(html, /color:var\(--warning\)/);
+});
