@@ -41,6 +41,19 @@ for (const theme of THEMES) {
       await expectNoA11yViolations(page);
     });
 
+    test("custom visuals (#405)", async ({ page, request }) => {
+      await page.goto(`/dashboards/${await dashboardId(request, "Demo custom visuals")}`);
+      await waitForPanels(page);
+      // Drawn: each view is named by its panel, not by Vega's own label.
+      await expect(
+        page.getByRole("img", {
+          name: /^Latency band, p5 to p95, against the SLO, vega chart/,
+        }),
+      ).toBeVisible();
+      await expect(page.locator("[data-echarts-canvas] canvas")).toHaveCount(3);
+      await expectNoA11yViolations(page);
+    });
+
     test("dashboard editor", async ({ page, request }) => {
       await page.goto(`/dashboards/${await dashboardId(request, DEMO_DASHBOARD)}/edit`);
       await expect(page.getByRole("heading", { level: 1 })).toBeVisible();

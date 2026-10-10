@@ -419,7 +419,8 @@ jobs:
       # The assertion: both seeded self-monitoring dashboards answer with
       # rows, the SQL one from what the collector scraped out of the running
       # app and the PromQL one from what Prometheus scraped (#390), through
-      # the same guard and executor POST /api/query uses.
+      # the same guard and executor POST /api/query uses; and the custom
+      # visuals demo answers too, with every spec compiling (#405).
       - name: Smoke
         run: docker compose --profile smoke run --rm smoke
 

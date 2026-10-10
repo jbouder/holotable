@@ -1,6 +1,7 @@
 import "./lib/env";
 import { getDashboardById, getSourceById, listDashboards } from "@/lib/db/repo";
-import { hasQuery, type QueryPanel } from "@/lib/ir";
+import { hasQuery, parseDashboard, type QueryPanel } from "@/lib/ir";
+import { panelKind } from "@/lib/panels/registry";
 import type { Dashboard } from "@/lib/ir";
 import {
   SELF_DASHBOARD_TITLE,
@@ -14,10 +15,12 @@ import { bindSourceRowFilter } from "@/lib/row-scope";
 import type { SourcePlan } from "@/lib/sources/server/types";
 import { resolveTimeRange } from "@/lib/time";
 import { serverKind } from "@/lib/sources/server/registry";
+import { customVisualsSpec } from "./lib/demo-dashboards";
 
 /**
- * End-to-end smoke test for the self-monitoring demo (#54), and its PromQL
- * twin (#390), which asks the compose stack's Prometheus the same questions.
+ * End-to-end smoke test for the self-monitoring demo (#54), its PromQL twin
+ * (#390), which asks the compose stack's Prometheus the same questions, and
+ * the custom-visuals demo (#405), whose panels must also compile.
  *
  * Brings no stack up of its own — `docker compose` does that — and instead
  * asserts that what compose produced actually works:
@@ -69,6 +72,11 @@ const TARGETS: Target[] = [
     title: PROMETHEUS_SELF_DASHBOARD_TITLE,
     committed: prometheusSelfMonitoringSpec,
     feeds: "Prometheus needs a scrape or two",
+  },
+  {
+    title: "Demo custom visuals",
+    committed: () => parseDashboard(customVisualsSpec()),
+    feeds: "the seeder writes demo rows every few seconds",
   },
 ];
 
@@ -163,6 +171,14 @@ async function smokeOne(target: Target, deadline: number): Promise<boolean> {
   assertCommittedSpec(target, dashboard.spec);
 
   let failed = false;
+  // A kind's own check, as a save runs it: a custom visual must compile.
+  for (const panel of dashboard.spec.panels) {
+    const problem = await panelKind(panel.viz).check?.(panel.options);
+    if (problem) {
+      failed = true;
+      console.error(`  ✗ ${panel.id.padEnd(18)} ${problem}`);
+    }
+  }
   for (const { panel, rows, error } of outcomes) {
     if (error) {
       failed = true;

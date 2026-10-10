@@ -83,11 +83,12 @@ export interface PanelKind<K extends string = string> {
    */
   readonly optionGroups?: readonly OptionGroup[];
   /**
-   * A check of a panel's options beyond their schema, run on the server
-   * wherever a dashboard is accepted (`resolveAndValidateDashboard`): an
-   * error message, or undefined when the options pass. A custom visual's
-   * spec is compiled here (#405). It may import server-only code
-   * dynamically; the IR never calls it.
+   * A check of a panel's options beyond their schema: an error message, or
+   * undefined when the options pass. The server runs it wherever a dashboard
+   * is accepted (`resolveAndValidateDashboard`), and the editor runs it as the
+   * options are typed, so it must work in both: a custom visual's spec is
+   * compiled here (#405), importing the compiler dynamically. The IR never
+   * calls it.
    */
   readonly check?: (options: unknown) => Promise<string | undefined>;
   /**

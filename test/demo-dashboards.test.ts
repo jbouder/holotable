@@ -10,9 +10,11 @@ import {
 } from "@/lib/ir";
 import type { CatalogTable, SqlSourceConfig } from "@/lib/registry";
 import { validateSql } from "@/lib/sql/safety";
+import { compileVegaLite } from "@/lib/vega/compile";
 import {
   type DemoLinkTargets,
   demoSpec,
+  customVisualsSpec,
   fleetGridSpec,
   logsSpec,
   fleetSpec,
@@ -97,6 +99,7 @@ const SPECS: Record<string, Dashboard> = {
   fleet: parseDashboard(fleetSpec(TARGETS)),
   fleetGrid: parseDashboard(fleetGridSpec(TARGETS)),
   logs: parseDashboard(logsSpec()),
+  customVisuals: parseDashboard(customVisualsSpec()),
   hostDetail: parseDashboard(hostDetailSpec()),
 };
 
@@ -141,4 +144,15 @@ test("the host detail dashboard filters itself from its host table", () => {
   const hosts = SPECS.hostDetail.panels.find((panel) => panel.id === "hosts");
   const self = hosts?.links?.find(isSelfLink);
   assert.deepEqual(self?.set, { host: { column: "host" } });
+});
+
+test("every custom visual on a demo dashboard compiles (#405)", async () => {
+  const visuals = Object.values(SPECS).flatMap((spec) =>
+    spec.panels.filter((panel) => panel.viz === "vega"),
+  );
+  assert.ok(visuals.length >= 3, "the demo shows custom visuals");
+  for (const panel of visuals) {
+    const result = await compileVegaLite((panel.options as { spec: unknown }).spec);
+    assert.ok(result.ok, `${panel.id}: ${result.ok ? "" : result.error}`);
+  }
 });

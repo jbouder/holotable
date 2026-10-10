@@ -487,6 +487,152 @@ export function logsSpec() {
 }
 
 /**
+ * Custom visuals (#405): three views no registered kind draws, each a
+ * Vega-Lite spec over the panel's own rows, in token colors. A band of
+ * latency percentiles with the SLO as a rule; CPU per host as small
+ * multiples by region, averaged by the spec itself; and every five-minute
+ * CPU reading as a tick, per host, against the 85% line.
+ */
+export function customVisualsSpec() {
+  return {
+    specVersion: SPEC_VERSION,
+    title: "Demo custom visuals",
+    timeRange: { from: "now-1h", to: "now" },
+    refreshIntervalMs: 15000,
+    panels: [
+      {
+        id: "about",
+        title: "About this dashboard",
+        viz: "text",
+        options: {
+          content: [
+            "## Custom visuals",
+            "",
+            "Each chart below is a **Vega-Lite spec** over its panel's query rows: a view no built-in panel kind draws. Edit a panel to read or change its spec.",
+            "",
+            "A spec reads only its panel's rows, names colors as tokens (`danger`, `palette-0`), and is compiled by the server before it is saved.",
+          ].join("\n"),
+        },
+        layout: { x: 0, y: 0, w: 12, h: 2 },
+      },
+      {
+        id: "latency-band",
+        title: "Latency band, p5 to p95, against the SLO",
+        viz: "vega",
+        query: {
+          sourceId: "ts-metrics",
+          timeField: "minute",
+          sql: "SELECT time_bucket('1 minute', ts) AS minute, percentile_cont(0.05) WITHIN GROUP (ORDER BY duration_ms) AS p5, percentile_cont(0.5) WITHIN GROUP (ORDER BY duration_ms) AS p50, percentile_cont(0.95) WITHIN GROUP (ORDER BY duration_ms) AS p95 FROM http_requests GROUP BY minute ORDER BY minute",
+        },
+        options: {
+          spec: {
+            data: { name: "rows" },
+            // `x` is per layer: the rule, given one, would draw once per row.
+            layer: [
+              {
+                mark: "area",
+                encoding: {
+                  x: { field: "minute", type: "temporal", title: null },
+                  y: { field: "p5", type: "quantitative", title: "ms" },
+                  y2: { field: "p95" },
+                  color: { value: "palette-0" },
+                  opacity: { value: 0.25 },
+                },
+              },
+              {
+                mark: { type: "line", tooltip: true },
+                encoding: {
+                  x: { field: "minute", type: "temporal", title: null },
+                  y: { field: "p50", type: "quantitative" },
+                  color: { value: "palette-0" },
+                },
+              },
+              {
+                mark: { type: "rule", strokeDash: [4, 4] },
+                encoding: { y: { datum: 300 }, color: { value: "danger" } },
+              },
+            ],
+          },
+        },
+        layout: { x: 0, y: 2, w: 12, h: 4 },
+      },
+      {
+        id: "cpu-by-region",
+        title: "Average CPU per host, by region",
+        viz: "vega",
+        query: {
+          sourceId: "ts-system",
+          timeField: "period",
+          sql: "SELECT time_bucket('5 minutes', ts) AS period, region, host, avg(cpu_pct) AS cpu FROM system_metrics GROUP BY period, region, host ORDER BY period",
+        },
+        options: {
+          spec: {
+            data: { name: "rows" },
+            facet: { field: "region", type: "nominal", title: null },
+            spec: {
+              width: 120,
+              height: 160,
+              mark: { type: "bar", tooltip: true },
+              encoding: {
+                x: { field: "host", type: "nominal", title: null },
+                y: {
+                  field: "cpu",
+                  type: "quantitative",
+                  aggregate: "mean",
+                  title: "CPU %",
+                },
+                color: {
+                  field: "host",
+                  type: "nominal",
+                  legend: null,
+                  scale: { range: ["palette-0", "palette-1", "palette-2", "palette-4"] },
+                },
+              },
+            },
+          },
+        },
+        layout: { x: 0, y: 6, w: 6, h: 4 },
+      },
+      {
+        id: "cpu-ticks",
+        title: "Every 5-minute CPU reading, per host",
+        viz: "vega",
+        query: {
+          sourceId: "ts-system",
+          timeField: "period",
+          sql: "SELECT time_bucket('5 minutes', ts) AS period, host, avg(cpu_pct) AS cpu FROM system_metrics GROUP BY period, host ORDER BY period",
+        },
+        options: {
+          spec: {
+            data: { name: "rows" },
+            layer: [
+              {
+                mark: { type: "tick", opacity: 0.7, tooltip: true },
+                encoding: {
+                  x: {
+                    field: "cpu",
+                    type: "quantitative",
+                    title: "CPU %",
+                    scale: { domain: [0, 100] },
+                  },
+                  y: { field: "host", type: "nominal", title: null },
+                  color: { value: "info" },
+                },
+              },
+              {
+                mark: "rule",
+                encoding: { x: { datum: 85 }, color: { value: "danger" } },
+              },
+            ],
+          },
+        },
+        layout: { x: 6, y: 6, w: 6, h: 4 },
+      },
+    ],
+  };
+}
+
+/**
  * One host up close, the target of the fleet's and the infrastructure
  * dashboard's links. Its `host` picker is what a link sets on arrival, and its
  * host table filters the page in place with a self link (#373).
