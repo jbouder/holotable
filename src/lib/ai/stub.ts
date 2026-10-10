@@ -280,6 +280,30 @@ export function stubAnswer(options: CallOptions): string {
   }
 }
 
+/**
+ * The recorded Chat turn (#416): offered `showPanel`, and not yet answering
+ * its result, the stub draws the recorded Explore panel (without the id and
+ * layout the server assigns), against whichever source the prompt lists
+ * first; with the result in hand it answers {@link STUB_CHAT_REPLY}.
+ */
+export function stubToolCall(
+  options: CallOptions,
+): { toolName: string; input: string } | null {
+  const offered = options.tools?.some(
+    (t) => t.type === "function" && t.name === "showPanel",
+  );
+  if (!offered || options.prompt.at(-1)?.role === "tool") return null;
+  const { system } = textOf(options);
+  const sourceId = /^sourceId: (\S+)$/m.exec(system)?.[1] ?? "unknown-source";
+  const promql = system.includes(`(id: ${sourceId}, kind: prometheus)`);
+  const {
+    id: _id,
+    layout: _layout,
+    ...panel
+  } = promql ? recordedPromqlExplorePanel(sourceId) : recordedExplorePanel(sourceId);
+  return { toolName: "showPanel", input: JSON.stringify(panel) };
+}
+
 /** Split into a handful of deltas, so partial rendering is exercised. */
 function chunks(text: string, count = 4): string[] {
   const size = Math.max(1, Math.ceil(text.length / count));
@@ -293,6 +317,7 @@ const USAGE = {
   outputTokens: { total: 0, text: 0, reasoning: 0 },
 };
 const FINISH = { unified: "stop", raw: "stop" } as const;
+const TOOL_CALLS = { unified: "tool-calls", raw: "tool_calls" } as const;
 
 export function stubModel(): StubModel {
   return {
@@ -301,6 +326,15 @@ export function stubModel(): StubModel {
     modelId: "stub",
     supportedUrls: {},
     async doGenerate(options): Promise<GenerateResult> {
+      const call = stubToolCall(options);
+      if (call) {
+        return {
+          content: [{ type: "tool-call", toolCallId: "stub-call", ...call }],
+          finishReason: TOOL_CALLS,
+          usage: USAGE,
+          warnings: [],
+        };
+      }
       return {
         content: [{ type: "text", text: stubAnswer(options) }],
         finishReason: FINISH,
@@ -309,16 +343,34 @@ export function stubModel(): StubModel {
       };
     },
     async doStream(options) {
-      const parts: StreamPart[] = [
-        { type: "stream-start", warnings: [] },
-        { type: "response-metadata", id: "stub", modelId: "stub", timestamp: new Date() },
-        { type: "text-start", id: "t" },
-        ...chunks(stubAnswer(options)).map(
-          (delta): StreamPart => ({ type: "text-delta", id: "t", delta }),
-        ),
-        { type: "text-end", id: "t" },
-        { type: "finish", finishReason: FINISH, usage: USAGE },
-      ];
+      const call = stubToolCall(options);
+      const parts: StreamPart[] = call
+        ? [
+            { type: "stream-start", warnings: [] },
+            {
+              type: "response-metadata",
+              id: "stub",
+              modelId: "stub",
+              timestamp: new Date(),
+            },
+            { type: "tool-call", toolCallId: "stub-call", ...call },
+            { type: "finish", finishReason: TOOL_CALLS, usage: USAGE },
+          ]
+        : [
+            { type: "stream-start", warnings: [] },
+            {
+              type: "response-metadata",
+              id: "stub",
+              modelId: "stub",
+              timestamp: new Date(),
+            },
+            { type: "text-start", id: "t" },
+            ...chunks(stubAnswer(options)).map(
+              (delta): StreamPart => ({ type: "text-delta", id: "t", delta }),
+            ),
+            { type: "text-end", id: "t" },
+            { type: "finish", finishReason: FINISH, usage: USAGE },
+          ];
       return {
         stream: new ReadableStream<StreamPart>({
           start(controller) {
