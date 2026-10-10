@@ -26,7 +26,7 @@ bookmark one or send it to someone.
 | Section | Address | What it holds |
 | --- | --- | --- |
 | Account | `/settings/account` | Your name, email and user id, the workspaces you can reach with your role in each, and what every role allows |
-| Appearance | `/settings/appearance` | Theme, and whether the interface and charts animate |
+| Appearance | `/settings/appearance` | Theme, whether the interface and charts animate, and patterns in charts |
 | Preferences | `/settings/preferences` | Time zone, 12 or 24 hour clock, the page you land on after signing in, and how the dashboard list opens |
 | Local data | `/settings/local-data` | What this browser remembers, with a way to clear each part |
 | Keyboard shortcuts | `/settings/shortcuts` | Every key binding, grouped by where it works |
@@ -54,6 +54,12 @@ reduced-motion setting. *Reduce* stops transitions, entrances and slides, the
 theme crossfade, loading shimmer and chart animation whatever the system says:
 every change is a cut. *Allow* keeps them on, even when the system asks for
 less. Charts update in place either way.
+
+**Patterns in charts** fills bars, pie slices, areas and other filled shapes
+with a pattern as well as a color, so series can be told apart without
+relying on color. It is off by default. Unlike theme and motion, which are
+kept in the browser, it is saved to your account and follows you to any
+device. A custom visual (a Vega-Lite panel) draws in colors only.
 
 ### Preferences
 

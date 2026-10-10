@@ -40,7 +40,7 @@ export const gauge = definePanelKind({
     "an instant query ('instant': true) for a value with natural bounds, against options.min and options.max; options.variant \"bar\" draws one bar per series.",
   canvas: true,
   timeBrush: false,
-  skeleton: "radial",
+  skeleton: "ring",
   query: "required",
   options: GaugeOptions,
   optionGroups: ["number", "thresholds"],

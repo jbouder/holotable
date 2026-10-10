@@ -3,6 +3,7 @@
 import type { View } from "vega";
 import type { Config } from "vega-lite";
 import * as React from "react";
+import { PanelSkeleton } from "@/components/dashboard/PanelSkeleton";
 import type { PanelViewProps } from "@/components/panels/types";
 import { useTimeDisplay } from "@/components/time-display";
 import { ErrorDisplay } from "@/components/ui/error-display";
@@ -91,6 +92,9 @@ export function VegaView({ panel, data, handle }: PanelViewProps) {
   const rows = React.useRef(data.rows);
   rows.current = data.rows;
   const [error, setError] = React.useState<string | null>(null);
+  // Until the view has drawn (Vega's chunk loads with the first custom
+  // visual), the panel keeps the same skeleton every other kind shows.
+  const [drawn, setDrawn] = React.useState(false);
   const display = useTimeDisplay();
   // The theme lives on <html data-theme>; a change rebuilds the view in it.
   const [theme, setTheme] = React.useState<string | null>(null);
@@ -137,6 +141,7 @@ export function VegaView({ panel, data, handle }: PanelViewProps) {
         }
         view.current = built;
         setError(null);
+        setDrawn(true);
         if (fits) {
           resize = new ResizeObserver(() => {
             if (!built || el.clientWidth === 0) return;
@@ -199,7 +204,7 @@ export function VegaView({ panel, data, handle }: PanelViewProps) {
   }
   const table = chartTable(panel, data, display);
   return (
-    <>
+    <div className="relative h-full w-full">
       {/*
         Named here, outside the element Vega draws into: Vega writes its own
         role and "Vega visualization" label onto that one, which is hidden
@@ -207,6 +212,11 @@ export function VegaView({ panel, data, handle }: PanelViewProps) {
         `data-echarts-canvas` is what the axe scans exclude: the canvas has
         nothing to read, and the table beside it is scanned instead.
       */}
+      {!drawn && (
+        <div className="absolute inset-0">
+          <PanelSkeleton viz={panel.viz} />
+        </div>
+      )}
       <div
         role="img"
         aria-label={chartDescription(panel, data.rows.length)}
@@ -250,6 +260,6 @@ export function VegaView({ panel, data, handle }: PanelViewProps) {
           </tbody>
         </table>
       )}
-    </>
+    </div>
   );
 }

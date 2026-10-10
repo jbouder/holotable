@@ -1,6 +1,7 @@
 "use client";
 
-import type * as React from "react";
+import * as React from "react";
+import { useSetChartPatterns } from "@/components/chart-patterns";
 import { THEME_OPTIONS, useThemePreference } from "@/components/theme-toggle";
 import { useMotionPreference } from "@/components/motion-preference";
 import type { Motion } from "@/lib/motion";
@@ -92,8 +93,71 @@ function Choice({
   );
 }
 
-/** The `/settings/appearance` controls (#212). Both apply at once and are per browser. */
-export function AppearanceSettings() {
+/**
+ * Patterns in charts (#77): a synced preference, saved to the account on
+ * change and then set for this page, so its charts follow at once.
+ */
+function ChartPatternsSetting({ initial }: { initial: boolean }) {
+  const apply = useSetChartPatterns();
+  const [on, setOn] = React.useState(initial);
+  const [error, setError] = React.useState<string | null>(null);
+
+  async function save(value: boolean) {
+    const previous = on;
+    setOn(value);
+    setError(null);
+    try {
+      const res = await fetch("/api/me/preferences", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ chartPatterns: value }),
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      apply(value);
+    } catch {
+      setOn(previous);
+      setError("Could not save that setting. Nothing was changed.");
+    }
+  }
+
+  return (
+    <fieldset>
+      <legend className="text-sm font-semibold">Patterns in charts</legend>
+      <p className="mt-1 text-sm text-muted">
+        Fill bars, slices and areas with patterns as well as colors, so series can be told
+        apart without color.
+      </p>
+      <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
+        {[
+          { value: false, label: "Off", hint: "Solid colors." },
+          { value: true, label: "On", hint: "Each series also gets a pattern." },
+        ].map((option) => (
+          <Choice
+            key={option.label}
+            name="chart-patterns"
+            value={String(option.value)}
+            checked={on === option.value}
+            onChange={() => void save(option.value)}
+          >
+            <span className="font-medium">{option.label}</span>
+            <span className="text-xs text-muted">{option.hint}</span>
+          </Choice>
+        ))}
+      </div>
+      {error && (
+        <p role="alert" className="mt-2 text-sm text-danger">
+          {error}
+        </p>
+      )}
+    </fieldset>
+  );
+}
+
+/**
+ * The `/settings/appearance` controls (#212). Theme and motion apply at once
+ * and are per browser; patterns in charts is saved to the account.
+ */
+export function AppearanceSettings({ chartPatterns }: { chartPatterns: boolean }) {
   const [theme, setTheme] = useThemePreference();
   const [motion, setMotion] = useMotionPreference();
 
@@ -144,7 +208,13 @@ export function AppearanceSettings() {
       </fieldset>
 
       <p className="text-xs text-muted">
-        These settings are kept in this browser and apply before the page draws.
+        Theme and motion are kept in this browser and apply before the page draws.
+      </p>
+
+      <ChartPatternsSetting initial={chartPatterns} />
+
+      <p className="text-xs text-muted">
+        Patterns in charts is saved to your account, so it follows you to any device.
       </p>
     </>
   );
