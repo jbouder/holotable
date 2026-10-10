@@ -183,6 +183,20 @@ const CASES: Record<VizType, Case> = {
     click: { dataIndex: 1 },
     expect: { row: { ts: T(1), level: "warn", message: "slow" }, series: "warn" },
   },
+  treemap: {
+    panel: panel("treemap", { options: { path: ["region", "host"] } }),
+    data: {
+      columns: ["region", "host", "disk"],
+      rows: [
+        { region: "eu", host: "a", disk: 10 },
+        { region: "eu", host: "b", disk: 5 },
+        { region: "us", host: "c", disk: 7 },
+      ],
+    },
+    // A parent node: its path so far and the sum of its children.
+    click: { id: "eu" },
+    expect: { row: { region: "eu", disk: 15 }, series: "eu" },
+  },
   "status-grid": {
     panel: panel("status-grid", { options: { sort: "value" } }),
     data: BY_HOST,
@@ -366,6 +380,12 @@ test("an ECharts click is read defensively", () => {
     clientY: 0,
   });
   assert.equal(datumClick(null), null);
+  // A data item's own id is carried when it is a string.
+  assert.equal(
+    datumClick({ data: { id: "eu\u001fdb-1", value: 3 } })?.id,
+    "eu\u001fdb-1",
+  );
+  assert.equal(datumClick({ data: { id: 7 } })?.id, undefined);
 });
 
 test("a click during a brush, or the release that ends one, is not a datum click", () => {

@@ -68,5 +68,10 @@
     "authoredAt": 1,
     "digest": "7973c87fed19e4c7364fd973cf116043e1e8bb19176586cef24d8851bc42b0da",
     "origin": "hand-written (#404): the seeded \"Demo gateway logs\", a logs panel filtered by a multi enum variable under an errors-per-minute bar"
+  },
+  "v1-treemap.json": {
+    "authoredAt": 1,
+    "digest": "203825f2e76d6c7675b7ec6c0b3614e4550508712fb08c37c477e180afdd1e41",
+    "origin": "hand-written (#404): a SQL treemap over a coarse time bucket, and a PromQL sunburst from an instant query"
   }
 }

@@ -120,6 +120,26 @@ export function demoSpec() {
         options: { bucket: "bucket", count: "requests", decimals: 0 },
         layout: { x: 8, y: 5, w: 4, h: 4 },
       },
+      {
+        id: "route-status",
+        title: "Requests by route and status",
+        description:
+          "Each route, then its status codes: the failures are a thin outer slice.",
+        viz: "treemap",
+        query: {
+          sourceId: "ts-metrics",
+          timeField: "period",
+          sql: "SELECT time_bucket('5 minutes', ts) AS period, route, status, count(*) AS requests FROM http_requests GROUP BY period, route, status ORDER BY period",
+        },
+        format: "number",
+        options: {
+          variant: "sunburst",
+          path: ["route", "status"],
+          value: "requests",
+          compact: true,
+        },
+        layout: { x: 0, y: 9, w: 6, h: 5 },
+      },
     ],
   };
 }
@@ -178,6 +198,20 @@ export function systemSpec(targets: DemoLinkTargets) {
           sql: "SELECT region, round(avg(cpu_pct)::numeric, 1) AS avg_cpu FROM system_metrics GROUP BY region ORDER BY avg_cpu DESC",
         },
         layout: { x: 3, y: 3, w: 9, h: 2 },
+      },
+      {
+        id: "network-share",
+        title: "Network in by region and host",
+        description: "Bytes received over the window: each region, then its hosts.",
+        viz: "treemap",
+        query: {
+          sourceId: "ts-system",
+          timeField: "period",
+          sql: "SELECT time_bucket('5 minutes', ts) AS period, region, host, sum(net_in_bytes) AS bytes FROM system_metrics GROUP BY period, region, host ORDER BY period",
+        },
+        format: "bytes",
+        options: { path: ["region", "host"], value: "bytes" },
+        layout: { x: 0, y: 5, w: 12, h: 4 },
       },
     ],
   };

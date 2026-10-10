@@ -10,6 +10,7 @@ import { stateTimeline } from "@/lib/panels/kinds/state-timeline";
 import { statusGrid } from "@/lib/panels/kinds/status-grid";
 import { table } from "@/lib/panels/kinds/table";
 import { text } from "@/lib/panels/kinds/text";
+import { treemap } from "@/lib/panels/kinds/treemap";
 import type { PanelKind } from "@/lib/panels/types";
 
 /**
@@ -42,6 +43,7 @@ export const PANEL_KINDS = [
   statusGrid,
   histogram,
   logs,
+  treemap,
   text,
 ] as const satisfies readonly PanelKind[];
 

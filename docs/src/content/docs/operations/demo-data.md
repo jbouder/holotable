@@ -19,8 +19,8 @@ the compose stack's own Prometheus, which scrapes the app.
 
 | Source id | Table | Demo dashboard |
 | --- | --- | --- |
-| `ts-metrics` | `metrics.http_requests` — per-request events | **Demo service health** (RPS, p95 latency, 5xx, requests by route, and latency histograms for all requests and for 5xx) |
-| `ts-system` | `metrics.system_metrics` — per-host infra metrics | **Demo infrastructure** (CPU/memory by host, disk %, CPU by region), **Demo fleet status** (a text header, CPU and disk gauges, a host load state timeline), **Demo fleet grid** (a status-grid tile per host for CPU, disk and load state) and **Demo host detail** (one host, picked with a `host` variable) |
+| `ts-metrics` | `metrics.http_requests` — per-request events | **Demo service health** (RPS, p95 latency, 5xx, requests by route, latency histograms for all requests and for 5xx, and a sunburst of requests by route and status) |
+| `ts-system` | `metrics.system_metrics` — per-host infra metrics | **Demo infrastructure** (CPU/memory by host, disk %, CPU by region, network in as a region-then-host treemap), **Demo fleet status** (a text header, CPU and disk gauges, a host load state timeline), **Demo fleet grid** (a status-grid tile per host for CPU, disk and load state) and **Demo host detail** (one host, picked with a `host` variable) |
 | `ts-logs` | `metrics.app_logs` — gateway log lines | **Demo gateway logs** (errors per minute over the log itself, filtered by a `level` picker) |
 | `holotable-self` | `metrics.holotable_self` — the app's own instruments | **Holotable self-monitoring**, below |
 | `prometheus-self` | Prometheus at `PROMETHEUS_SELF_URL` — the same instruments, scraped | **Holotable self-monitoring (Prometheus)**, below |

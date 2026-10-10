@@ -62,6 +62,7 @@ test("every chart kind is covered", () => {
       "gauge",
       "state-timeline",
       "histogram",
+      "treemap",
     ],
   );
 });
