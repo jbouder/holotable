@@ -183,7 +183,7 @@ that one dashboard and nothing else, ahead of every other rule. Only the
 dashboard's stream and the `/embed/` page accept it. The page is sent no SQL or
 source ids, may be framed only by the origins the token names, and the link is
 revocable at once. See
-[Share links](docs/src/content/docs/operations/share-links.md).
+[Share links](docs/src/content/docs/integrations/share-links.md).
 
 **Service-account API tokens.** A pipeline or script calls the API with
 `Authorization: Bearer ht_…` (#288). A source-admin mints the token in one
@@ -197,7 +197,7 @@ a fall back to the cookie. Tokens cannot open a dashboard stream or manage
 tokens. A browser page on another origin cannot use one for a mutation,
 because the origin check refuses it before authentication. Requests made with
 a token are audited as `token:<id>`. See
-[API tokens](docs/src/content/docs/operations/api-tokens.md).
+[API tokens](docs/src/content/docs/integrations/api-tokens.md).
 
 **MCP clients.** An MCP client (#149) reaches `/api/mcp`, and only that
 route, with an access token the realm minted for a second, public realm
@@ -220,8 +220,8 @@ runs SQL through the same guard, plan and read-only executor with the same
 limits, and records the same audit event; none returns a connection detail,
 a credential or an unguarded row, and the model's answers are specs the IR
 validated, never data. See
-[Keycloak setup](docs/src/content/docs/operations/keycloak.md) and the
-[MCP server](docs/src/content/docs/operations/mcp.md).
+[Keycloak setup](docs/src/content/docs/admin/keycloak.md) and the
+[MCP server](docs/src/content/docs/integrations/mcp.md).
 
 **Cookies and cross-origin requests.** The session cookie is `httpOnly` and
 `SameSite=Lax`. When it is `Secure`, its name is `__Host-` prefixed, so the
@@ -260,7 +260,7 @@ to the output, which a statement can relabel as any tenant. The value is a
 bound parameter from the verified identity. The rewrite re-parses its own output
 and refuses anything it cannot prove is fully narrowed, and a viewer without
 the claim is refused, platform admins included. See
-[Row-level filters](docs/src/content/docs/operations/row-level-filters.md).
+[Row-level filters](docs/src/content/docs/admin/row-level-filters.md).
 
 **The audit log.** Sign-ins, sign-outs, every change to a dashboard, source,
 template or workspace limit, every statement a person runs, and every request

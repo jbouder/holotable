@@ -11,7 +11,7 @@ same three steps the app walks you through on a fresh install, in the same
 order, so you can follow either one.
 
 Before you begin you need the app running and signed in, an `AI_PROVIDER` and
-`AI_MODEL` configured (see [AI provider](/operations/ai-provider/)), and a
+`AI_MODEL` configured (see [AI provider](/admin/ai-provider/)), and a
 **read-only** PostgreSQL or TimescaleDB role that can reach the tables you want
 to watch. You also need the `source-admin` role in a workspace for steps 1 and
 2, and `editor` for step 3; see the
@@ -57,7 +57,7 @@ variables to set. If the picker is empty, no reference is granted to this
 workspace yet; ask the operator to add one to `SOURCE_SECRET_REFS`.
 
 **This guards against:** a dashboard that carries a password. See
-[Source secret references](/operations/secret-references/).
+[Source secret references](/admin/secret-references/).
 
 ### Or a Prometheus endpoint
 
@@ -79,7 +79,7 @@ saved. The form asks for:
   is refused.
 - **Tenant label** (optional): a label every ticked metric has, matched against
   a claim of the viewer's, so each viewer sees only their own series. See
-  [Row-level filters](/operations/row-level-filters/).
+  [Row-level filters](/admin/row-level-filters/).
 
 **Success looks like:** a row in the source list.
 
@@ -169,13 +169,13 @@ saved version you now have to clean up.
 
 **"Generation is unavailable" or a 500 on send.** No AI provider is configured.
 `AI_PROVIDER` and `AI_MODEL` must be set, with the matching key. See
-[AI provider](/operations/ai-provider/).
+[AI provider](/admin/ai-provider/).
 
 **`credentials for secret_ref "X" are not configured on the server`.** The
 source names a secret reference the server has no values for. Set `X_USERNAME`
 and `X_PASSWORD` as files in `SOURCE_SECRETS_DIR`, or in the server's
 environment and restart it. See
-[Source secret references](/operations/secret-references/).
+[Source secret references](/admin/secret-references/).
 
 **`secret_ref "X" is not granted to workspace "w"`.** The reference exists, but
 not for this workspace. An operator adds the workspace to that reference's
@@ -189,7 +189,7 @@ skipped. Press Refresh on the source. See
 source's allowlist. Refreshing does not add it — the allowlist is the boundary,
 and widening it is an edit to the source. Edit the source, add the table, then
 Refresh. See
-[Source secret references](/operations/secret-references/).
+[Source secret references](/admin/secret-references/).
 
 **A query was rejected before it ran.** The SQL guard refused it: it allows one
 read-only `SELECT`, over allowlisted relations, with no comments, no
@@ -202,6 +202,6 @@ you allowlisted. Edit the source to drop it, or restore it in the database.
 
 ## Next
 
-- [Demo data](/getting-started/demo-data/) — a seeded workspace to compare against.
+- [Demo data](/operations/demo-data/) — a seeded workspace to compare against.
 - [How it works](/concepts/how-it-works/) — the path from prompt to live chart.
 - [Invariants](/architecture/invariants/) — the guarantees behind every step above.

@@ -45,9 +45,9 @@ Everything is explained once, on the docs site
 - [How it works](https://holotable-docs.vibeproject.workers.dev/concepts/how-it-works/) — a panel from prompt to live chart.
 - [Invariants](https://holotable-docs.vibeproject.workers.dev/architecture/invariants/) — the guarantees the design rests on.
 - [Configuration](https://holotable-docs.vibeproject.workers.dev/reference/configuration/) — every environment variable, generated from `src/lib/config.ts`.
-- [Keycloak setup](https://holotable-docs.vibeproject.workers.dev/operations/keycloak/) — the OIDC client and group mapper.
+- [Keycloak setup](https://holotable-docs.vibeproject.workers.dev/admin/keycloak/) — the OIDC client and group mapper.
 - [API routes](https://holotable-docs.vibeproject.workers.dev/reference/api-routes/) and [Deploying on Kubernetes](https://holotable-docs.vibeproject.workers.dev/operations/kubernetes/).
-- [Writing specs with Claude Code](https://holotable-docs.vibeproject.workers.dev/getting-started/writing-specs-with-claude-code/) — the `/holotable` skill in `.claude/skills/holotable/` writes, reviews and fixes dashboard specs from your terminal.
+- [Writing specs with Claude Code](https://holotable-docs.vibeproject.workers.dev/integrations/writing-specs-with-claude-code/) — the `/holotable` skill in `.claude/skills/holotable/` writes, reviews and fixes dashboard specs from your terminal.
 
 ## Contributing, security, license
 

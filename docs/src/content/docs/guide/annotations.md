@@ -34,7 +34,7 @@ them: a dashed line for a point in time, a band for a range.
   The open dashboard reads again every minute and whenever the window changes.
 
 A pipeline posts deploy markers with an editor
-[API token](/operations/api-tokens/) (#288); the write route authorizes it
+[API token](/integrations/api-tokens/) (#288); the write route authorizes it
 through `can()` like anyone else.
 
 ## On a dashboard

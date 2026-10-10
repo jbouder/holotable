@@ -3,7 +3,7 @@ title: Prometheus sources
 description: A Prometheus-compatible endpoint as a data source. Its catalog is metrics, its panels are PromQL, and the server still owns the window.
 ---
 
-A source has a **kind** ([ADR 2](/architecture/decisions/0002-source-kinds/)).
+A source has a **kind** ([Source kinds](/architecture/data-model/#source-kinds)).
 A TimescaleDB/PostgreSQL source answers SQL. A **Prometheus** source answers
 PromQL: Prometheus itself, or anything that speaks its HTTP query API, such as
 Thanos, Mimir or VictoriaMetrics. Everything the app guarantees about a SQL
@@ -31,10 +31,10 @@ A Prometheus source's config is its endpoint and its catalog:
 - **`url`** is where the server sends queries. A source admin chooses it, so it
   is held to the same rules as a model base URL: public `https` unless the
   operator's `SOURCE_URL_ALLOWLIST` names the host, no credentials in it, and
-  no redirects followed. See [Prometheus operations](/operations/prometheus/).
+  no redirects followed. See [Prometheus operations](/admin/prometheus/).
 - **`auth`** is `none`, `bearer` or `basic`. The credential is never in the
   config. A source with `bearer` or `basic` names a
-  [`secret_ref`](/operations/secret-references/#prometheus-sources), and the
+  [`secret_ref`](/admin/secret-references/#prometheus-sources), and the
   server resolves `<REF>_TOKEN` or `<REF>_USERNAME`/`<REF>_PASSWORD` when it
   connects. `none` is for an in-cluster endpoint and names no ref.
 - **`metrics`** is the allowlist, the PromQL counterpart of a SQL source's
@@ -43,7 +43,7 @@ A Prometheus source's config is its endpoint and its catalog:
   `…_count` and `…_sum`. An expression may select only listed metrics.
 - **`rowFilter`** is optional. It names a tenant label every listed metric
   carries, and the identity claim whose value the viewer's queries are
-  narrowed to. See [row-level filters](/operations/row-level-filters/#on-a-prometheus-source).
+  narrowed to. See [row-level filters](/admin/row-level-filters/#on-a-prometheus-source).
 
 The **Data sources** page registers one through the same dialog as a database,
 with **Prometheus (PromQL)** as the kind. **Discover metrics** reads the
@@ -147,14 +147,14 @@ a label matcher's value.
   the original with only those literals changed. A variable anywhere else is
   refused. A Prometheus source's variable is usually **label values**:
   `{ "sourceId": "prom-prod", "label": "instance", "match": "up{job=\"node\"}" }`.
-  See [Dashboard variables](/concepts/variables/).
+  See [Dashboard variables](/guide/variables/).
 - **The row filter** adds `tenant="<the viewer's claim>"` to every selector,
   including those inside functions and subqueries, before the query runs. The
   viewer's queries cannot read another tenant's series, however they are
   written.
 
 A drilldown can read one label of a clicked series with `{ "label": "instance" }`:
-see [Drilldown](/concepts/drilldown/#clicking-a-datum).
+see [Drilldown](/guide/drilldown/#clicking-a-datum).
 
 ## What is refused, and why
 

@@ -66,7 +66,7 @@ natural-language edit and the dashboard chat show a notice naming the variables
 to set, instead of sending a request that can only fail. With
 `AUTH_MODE=oidc` a missing model is still an error in production.
 
-The [models configured in the app](/operations/ai-provider/#models-configured-in-the-app)
+The [models configured in the app](/admin/ai-provider/#models-configured-in-the-app)
 are off in demo mode: the environment's model is the only one. The Workspace
 model and Personal model settings are not listed, their routes refuse, and a
 row left in the database from an earlier non-demo run is ignored, so a
@@ -78,7 +78,7 @@ address of their choosing.
 Demo mode is fine for working on dashboards, panels and charts. It is not a way
 to develop or test authentication. Anything that touches the session, the
 claims or authorization runs against a realm; see
-[Keycloak setup](/operations/keycloak/).
+[Keycloak setup](/admin/keycloak/).
 
 ---
 

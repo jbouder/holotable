@@ -25,7 +25,7 @@ configure.
 | `dashboard.update` | Save, rename or metadata edit (`fields`), restore (`restoredFrom`) | dashboard |
 | `dashboard.delete` | Delete | dashboard |
 | `dashboard.stream` | A viewer opens or resumes a dashboard's live stream | dashboard |
-| `dashboard.generate` | A generation finishes, or fails (`modelConfig`: which [level](/operations/ai-provider/#models-configured-in-the-app) answered) | source |
+| `dashboard.generate` | A generation finishes, or fails (`modelConfig`: which [level](/admin/ai-provider/#models-configured-in-the-app) answered) | source |
 | `dashboard.chat` | A chat turn starts (`modelConfig`, and the `timeRange`, `variables` and `panelId` it runs with) | dashboard |
 | `query.execute` | A statement run from preview or Explore (`via: "preview"`), by a chat (`via: "chat"`) or by an MCP client's `run_query` (`via: "mcp"`) | source |
 | `source.create`, `source.update`, `source.delete` | Source changes, including hiding a column (`fields: ["catalog"]`) | source |
@@ -33,7 +33,7 @@ configure.
 | `template.create`, `template.delete` | Workspace templates | template |
 | `workspace.limits.update` | A platform admin changes a workspace's LLM limits (`before`, `after`) | workspace |
 | `workspace.prompt.update` | A source-admin saves a workspace's prompt customization (`glossaryChars`, `metricDefinitions`, `examples`: sizes, not the text) | workspace |
-| `workspace.model.update` | A source-admin saves a workspace's [model](/operations/ai-provider/#models-configured-in-the-app) (`provider`, `baseUrlHost`, `model`, `keyChanged`, `allowPersonalKeys`, or `cleared`; never the key) | workspace |
+| `workspace.model.update` | A source-admin saves a workspace's [model](/admin/ai-provider/#models-configured-in-the-app) (`provider`, `baseUrlHost`, `model`, `keyChanged`, `allowPersonalKeys`, or `cleared`; never the key) | workspace |
 | `workspace.model.test` | A source-admin tests a workspace model configuration (`baseUrlHost`, `model`); `failure` when the model did not answer | workspace |
 | `user.model.update` | Someone saves their personal model (`provider`, `baseUrlHost`, `model`, `keyChanged`; never the key) | none |
 | `user.model.delete` | Someone removes their personal model | none |

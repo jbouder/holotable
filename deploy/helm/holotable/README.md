@@ -33,7 +33,7 @@ helm install holotable deploy/helm/holotable \
    cluster. The migration Job creates the schema on first install.
 
 3. **A Keycloak realm.** OIDC is the only way to sign in; there is no local
-   login. See [Keycloak setup](https://holotable-docs.vibeproject.workers.dev/operations/keycloak/).
+   login. See [Keycloak setup](https://holotable-docs.vibeproject.workers.dev/admin/keycloak/).
 
 4. **A Secret** holding the credential environment. The chart never generates
    one for you — see below.
@@ -72,7 +72,7 @@ can:
 
 A source whose ref is granted but has no credentials saves fine and fails on
 **Test**. See
-[Source secret references](https://holotable-docs.vibeproject.workers.dev/operations/secret-references/).
+[Source secret references](https://holotable-docs.vibeproject.workers.dev/admin/secret-references/).
 
 Three wirings, each a runnable values file in [`examples/`](examples):
 
@@ -86,7 +86,7 @@ One more example is not a wiring but a source: `values-prometheus-source.yaml`
 lets source admins register an in-cluster Prometheus, with
 `SOURCE_URL_ALLOWLIST` naming it, a bearer-token `secret_ref`, and a network
 policy whose egress rule names the same endpoint. See
-[Prometheus sources](https://holotable-docs.vibeproject.workers.dev/operations/prometheus/).
+[Prometheus sources](https://holotable-docs.vibeproject.workers.dev/admin/prometheus/).
 
 `secrets.create` exists as a fourth option and is off for a reason: it puts
 credentials in your values file, and therefore in `helm get values` and in

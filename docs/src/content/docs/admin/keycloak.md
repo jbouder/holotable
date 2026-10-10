@@ -186,7 +186,7 @@ it), that it is an access token (`typ: Bearer`, no `nonce`: an id_token is
 refused), and that its realm session (`sid`) has not been revoked. A token
 that fails any of these is a `401` with `error="invalid_token"`, which tells
 the client to sign in again. A service-account token
-([`ht_…`](/operations/api-tokens/)) is accepted on `/api/mcp` too, by its
+([`ht_…`](/integrations/api-tokens/)) is accepted on `/api/mcp` too, by its
 prefix, and resolves exactly as it does elsewhere.
 
 A realm token is a credential for `/api/mcp` and nothing else. No other route
@@ -194,7 +194,7 @@ reads one: `getIdentity()` knows only the session cookie and `ht_` tokens,
 and a token minted for the MCP client put in the session cookie is refused
 by `azp` even though the realm's keys verify it. The MCP route in turn reads
 no cookie, so a browser page cannot reach it with a session. What the tools do
-is on the [MCP server](/operations/mcp/) page. An authenticated `GET /api/mcp`
+is on the [MCP server](/integrations/mcp/) page. An authenticated `GET /api/mcp`
 answers with the caller's own identity, the way `/api/me` does, so a
 configuration can be checked end to end:
 

@@ -1,5 +1,5 @@
 ---
-title: Prometheus sources
+title: Prometheus endpoints
 description: Running Holotable against Prometheus, Thanos, Mimir or VictoriaMetrics — the URL allowlist, auth and secret references, compatibility, and sizing.
 ---
 
@@ -46,7 +46,7 @@ has both.
 
 The ref is granted to workspaces by `SOURCE_SECRET_REFS` and read from
 `SOURCE_SECRETS_DIR` files or the environment, exactly as a database source's
-is. See [Source secret references](/operations/secret-references/#prometheus-sources).
+is. See [Source secret references](/admin/secret-references/#prometheus-sources).
 The credential is never stored, never sent to the browser, and redacted from
 every log line.
 

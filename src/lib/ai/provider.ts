@@ -26,7 +26,7 @@ import { config } from "@/lib/config";
  *                                     the end-to-end suite, see ./stub.ts.
  *
  * OPEN DECISION: which concrete provider/model to run is deliberately left to
- * deployment (see docs/src/content/docs/operations/ai-provider.md). `AI_MODEL`
+ * deployment (see docs/src/content/docs/admin/ai-provider.md). `AI_MODEL`
  * selects it; there is no baked-in default model.
  *
  * Every model is wrapped with the deadline and retry from ./invoke.ts (#22).

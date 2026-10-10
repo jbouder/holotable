@@ -71,7 +71,7 @@ process and Node.js collectors (`holotable_process_cpu_seconds_total`,
 | `holotable_pollers_active` | gauge | — | Pollers running on this instance |
 | `holotable_llm_tokens_total` | counter | `workspace`, `model`, `direction` | Tokens billed to a workspace. `direction` is `input` or `output` |
 | `holotable_llm_requests_total` | counter | `route`, `outcome` | Model requests at the admission gate. `outcome` is `admitted`, `rate_limited` or `over_budget` |
-| `holotable_llm_repairs_total` | counter | `route`, `outcome` | Structured-output repairs: one automatic re-ask after a generation failed its schema. `outcome` is `repaired` or `failed`. See [AI provider](/operations/ai-provider/#structured-output-repair) |
+| `holotable_llm_repairs_total` | counter | `route`, `outcome` | Structured-output repairs: one automatic re-ask after a generation failed its schema. `outcome` is `repaired` or `failed`. See [AI provider](/admin/ai-provider/#structured-output-repair) |
 | `holotable_sql_validation_rejections_total` | counter | `reason` | Statements refused by the SQL guard |
 | `holotable_promql_validation_rejections_total` | counter | `reason` | Expressions refused by the PromQL guard |
 | `holotable_audit_write_failures_total` | counter | — | Audit log rows lost because they could not be written. Anything above zero is a gap in `audit_log`; see [the audit log](/operations/audit-log/) |
@@ -135,7 +135,7 @@ so the shipped **Holotable self-monitoring** dashboard is guarded SQL over the
 metrics above. Its twin, **Holotable self-monitoring (Prometheus)**, asks the
 compose Prometheus the same questions in PromQL through the `prometheus-self`
 [Prometheus source](/concepts/prometheus-sources/). See
-[Demo data](/getting-started/demo-data/) for the collector, both dashboards,
+[Demo data](/operations/demo-data/) for the collector, both dashboards,
 and the end-to-end smoke test built on them.
 
 A Kubernetes deployment scrapes the same endpoint; put the token in a Secret

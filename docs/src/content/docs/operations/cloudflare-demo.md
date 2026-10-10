@@ -58,7 +58,7 @@ The provider's credit limit is the only cap that holds if everything else
 fails; set one.
 
 The demo can never register a data source: demo mode refuses to start with
-groups above editor. See [Demo mode](/operations/demo-mode/).
+groups above editor. See [Demo mode](/admin/demo-mode/).
 
 ## Cost
 
@@ -87,7 +87,7 @@ Repository secrets:
 | `CLOUDFLARE_ACCOUNT_ID` | yes | The account the demo deploys to. |
 | `DEMO_SESSION_SECRET` | yes | 32+ random characters (`openssl rand -hex 32`). Keeps visitors' sessions valid across a wake. |
 | `DEMO_AI_MODEL`, `DEMO_OPENAI_API_KEY` | no | Turn on generation, Explore and chat. Without them the demo runs with those off. |
-| `DEMO_OPENAI_BASE_URL`, `DEMO_OPENAI_API` | no | The provider endpoint and API style, as in [AI provider](/operations/ai-provider/). |
+| `DEMO_OPENAI_BASE_URL`, `DEMO_OPENAI_API` | no | The provider endpoint and API style, as in [AI provider](/admin/ai-provider/). |
 
 Until the three required secrets exist, the workflow skips the deploy with a
 warning instead of failing. A manual run (`workflow_dispatch`) deploys the

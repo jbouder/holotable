@@ -117,7 +117,7 @@ transform the body.
 
 Embedding a page in another site's `<iframe>` is blocked by
 `frame-ancestors 'none'` and `X-Frame-Options: DENY`. The one exception is a
-[share link](/operations/share-links/)'s embed page under `/embed/`
+[share link](/integrations/share-links/)'s embed page under `/embed/`
 ([#65](https://github.com/jbouder/holotable/issues/65)). There the proxy sets
 `frame-ancestors` to exactly the origins the link's signed token names, or
 `'none'` when it names none. `next.config.ts` leaves `X-Frame-Options` off that

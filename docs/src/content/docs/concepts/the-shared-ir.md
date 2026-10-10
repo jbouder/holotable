@@ -41,8 +41,8 @@ Panel = {
 
 A `Dashboard` wraps its `specVersion`, a title, a `timeRange`, a
 `refreshIntervalMs`, 1–50 panels, up to 10 optional `variables`
-([Dashboard variables](/concepts/variables/)) and an optional `annotations`
-setting ([Annotations](/concepts/annotations/)), with a refinement rejecting
+([Dashboard variables](/guide/variables/)) and an optional `annotations`
+setting ([Annotations](/guide/annotations/)), with a refinement rejecting
 duplicate panel ids and variable names. A panel may carry a
 `timeRange` and a `refreshIntervalMs` of its own
 ([#114](https://github.com/jbouder/holotable/issues/114)): a "today so far"
@@ -77,7 +77,7 @@ PromQL existed parses exactly as it did, with no `specVersion` bump, and a query
 carrying both is refused.
 
 Which language a panel may use is not the panel's choice. It is a property of
-its source's kind ([ADR 2](/architecture/decisions/0002-source-kinds/)): a
+its source's kind ([Source kinds](/architecture/data-model/#source-kinds)): a
 TimescaleDB source answers SQL, a Prometheus source answers PromQL, and a query
 in the other language is refused on save and at execution like a table the
 source does not have.

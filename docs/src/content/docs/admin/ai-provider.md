@@ -48,7 +48,7 @@ Which level answered is recorded on every generation log row
 (`modelConfig`) and on the `dashboard.generate`, `source.draft` and
 `dashboard.chat` audit rows, never the key. Rate limits and the
 per-workspace budget apply whichever level is used. Both levels are off in
-[demo mode](/operations/demo-mode/): the settings sections are not listed and
+[demo mode](/admin/demo-mode/): the settings sections are not listed and
 the routes refuse.
 
 ### The API key
@@ -213,7 +213,7 @@ suite sets both.
 
 - Every model-backed route is rate limited per user and budgeted per
   workspace per day ([#18](https://github.com/jbouder/holotable/issues/18));
-  see [LLM rate limits and budgets](/operations/llm-limits/).
+  see [LLM rate limits and budgets](/admin/llm-limits/).
 - Every model request has a deadline and a bounded retry
   ([#22](https://github.com/jbouder/holotable/issues/22)); see
   [Timeouts and retries](#timeouts-and-retries) below. There is no fallback

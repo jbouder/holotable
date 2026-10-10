@@ -39,7 +39,7 @@ import type { WorkspacePrompt } from "@/lib/workspace-prompt";
  * The model only ever emits a validated spec conforming to the shared Zod IR —
  * never data. The prompt contains catalog METADATA for the selected,
  * already-authorized source, or for a dashboard up to three of one workspace
- * (#104, ADR 1). The model must not write time filters;
+ * (#104). The model must not write time filters;
  * the server injects the dashboard time range at execution.
  */
 

@@ -48,7 +48,7 @@ The same through the API, editor role:
   own. A `from`/`to` or `var-*` parameter sent with it is ignored, and every
   variable runs at its default.
 - **Row-filtered sources refuse.** A link holds no claims, so a panel on a
-  [row-filtered source](/operations/row-level-filters/) shows "no access" rather
+  [row-filtered source](/admin/row-level-filters/) shows "no access" rather
   than anyone's rows.
 
 ## Embedding

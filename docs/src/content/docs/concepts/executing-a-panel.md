@@ -244,9 +244,9 @@ LIMIT <maxQueryRows>          -- default 5000
   supplies a time value; it only named the column.
 - A source with a row filter adds one more bound parameter, the viewer's
   claim value, spliced in where each table is read rather than on this wrapper
-  ([Row-level filters](/operations/row-level-filters/)). Dashboard variables
+  ([Row-level filters](/admin/row-level-filters/)). Dashboard variables
   bind after it, one `$n` per declared name
-  ([Dashboard variables](/concepts/variables/)). Without a `timeField` the
+  ([Dashboard variables](/guide/variables/)). Without a `timeField` the
   wrapper has no `WHERE`, and the numbering starts at `$1`.
 - `timeField` is re-checked against a strict identifier regex before
   interpolation — it is an identifier, so it cannot be a bound parameter.
