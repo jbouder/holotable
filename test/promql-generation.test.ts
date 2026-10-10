@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { NoObjectGeneratedError } from "ai";
-import type { z } from "zod";
+import { z } from "zod";
 import { buildChatQueryPlan, buildSystemPrompt } from "@/lib/ai/chat";
 import {
   baseSystem,
@@ -45,10 +45,11 @@ test("a SQL generation's prompt is what it was before PromQL existed", () => {
   const system = baseSystem(sql);
   assert.ok(!system.includes("PromQL"));
   assert.match(system, /only a viz specification \(SQL \+ layout\)/);
-  // And it is bound to the SQL schema, not the union.
-  assert.equal(
-    dashboardRequest({ source: sql, prompt: "x" }).schema,
-    DashboardGenerationSchema,
+  // And it is bound to the SQL schema, not the union: the model is shown the
+  // same JSON Schema (the custom-visual compile is a refinement on top, #405).
+  assert.deepEqual(
+    z.toJSONSchema(dashboardRequest({ source: sql, prompt: "x" }).schema as z.ZodType),
+    z.toJSONSchema(DashboardGenerationSchema),
   );
 });
 
@@ -83,7 +84,7 @@ test("a mixed generation gets both rule sets and the rule that a panel's languag
   );
 });
 
-test("the schema holds each panel to its source's language, so the repair says what to write", () => {
+test("the schema holds each panel to its source's language, so the repair says what to write", async () => {
   const request = dashboardRequest({
     source: prom,
     additionalSources: [sql],
@@ -130,7 +131,7 @@ test("the schema holds each panel to its source's language, so the repair says w
     },
     finishReason: "stop",
   });
-  const failure = describeFailure(error, request.schema as z.ZodType);
+  const failure = await describeFailure(error, request.schema as z.ZodType);
   assert.ok(failure);
   assert.match(failure.issues.join("\n"), /which answers PromQL; write "query.promql"/);
 });

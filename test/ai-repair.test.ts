@@ -12,6 +12,7 @@ import {
 } from "@/lib/ai/repair";
 import { recordedDashboard } from "@/lib/ai/stub";
 import { findUntrustedBlocks } from "@/lib/ai/untrusted";
+import { withCompiledCustomVisuals } from "@/lib/ai/custom-visuals";
 import { DashboardGenerationSchema } from "@/lib/ir";
 
 /*
@@ -62,12 +63,16 @@ function scriptedModel(answers: string[]) {
 }
 
 /** Run one generation the way generate.ts does; resolves with its finish. */
-async function generate(model: V4, prompt: string) {
+async function generate(
+  model: V4,
+  prompt: string,
+  schema: typeof DashboardGenerationSchema = DashboardGenerationSchema,
+) {
   let finished: { object: unknown; error: unknown } | undefined;
   const result = streamObject({
     model,
     maxRetries: 0,
-    schema: DashboardGenerationSchema,
+    schema,
     prompt,
     onFinish: (event) => {
       finished = { object: event.object, error: event.error };
@@ -107,7 +112,7 @@ test("a schema failure gets exactly one re-ask carrying the issues, then succeed
 
   const first = await generate(model, "request rate by route");
   assert.equal(first.object, undefined);
-  const failure = describeFailure(first.error, DashboardGenerationSchema);
+  const failure = await describeFailure(first.error, DashboardGenerationSchema);
   assert.ok(failure, "the failure should be repairable");
   assert.ok(
     failure.issues.some((i) => i.startsWith("panels.0.viz")),
@@ -140,7 +145,7 @@ test("a successful first attempt makes no extra call and leaves nothing to repai
 
 test("describeFailure: malformed JSON, a schema failure, and failures that are not repairable", async () => {
   const { model } = scriptedModel(['{"title": "half']);
-  const malformed = describeFailure(
+  const malformed = await describeFailure(
     (await generate(model, "x")).error,
     DashboardGenerationSchema,
   );
@@ -148,26 +153,29 @@ test("describeFailure: malformed JSON, a schema failure, and failures that are n
   assert.match(malformed.issues[0], /not valid JSON/);
 
   // A provider failure, a timeout, an empty answer: nothing to show the model.
-  assert.equal(describeFailure(new Error("HTTP 500"), DashboardGenerationSchema), null);
   assert.equal(
-    describeFailure(noObject({ text: "  " }), DashboardGenerationSchema),
+    await describeFailure(new Error("HTTP 500"), DashboardGenerationSchema),
+    null,
+  );
+  assert.equal(
+    await describeFailure(noObject({ text: "  " }), DashboardGenerationSchema),
     null,
   );
   // Output that does validate is not a failure.
   assert.equal(
-    describeFailure(noObject({ text: VALID }), DashboardGenerationSchema),
+    await describeFailure(noObject({ text: VALID }), DashboardGenerationSchema),
     null,
   );
 });
 
-test("describeFailure caps how many issues it lists", () => {
+test("describeFailure caps how many issues it lists", async () => {
   const spec = JSON.parse(VALID);
   spec.panels = Array.from({ length: 40 }, (_, i) => ({
     ...spec.panels[0],
     id: `p${i}`,
     viz: "x",
   }));
-  const failure = describeFailure(
+  const failure = await describeFailure(
     noObject({ text: JSON.stringify(spec) }),
     DashboardGenerationSchema,
   );
@@ -231,4 +239,43 @@ test("the rejected output and the issues are fenced as data and cannot close the
   assert.equal(rejected.body.split("\n").length, 1);
   assert.match(rejected.body, /DROP TABLE users/);
   assert.equal(issues.body.split("\n").length, 1);
+});
+
+/** The recorded dashboard with its first panel drawn as a custom visual (#405). */
+function withCustomVisual(spec: unknown): string {
+  const dashboard = JSON.parse(VALID) as { panels: Record<string, unknown>[] };
+  const first = dashboard.panels[0] ?? {};
+  dashboard.panels[0] = { ...first, viz: "vega", options: { spec } };
+  return JSON.stringify(dashboard);
+}
+
+test("a custom visual that does not compile gets the one repair, with the compiler's message", async () => {
+  clearPendingRepairs();
+  const schema = withCompiledCustomVisuals(DashboardGenerationSchema);
+  // Passes the IR's walk (data, marks, colors), fails Vega-Lite's compiler.
+  const broken = withCustomVisual({ data: { name: "rows" }, layer: "line" });
+  const fixed = withCustomVisual({
+    data: { name: "rows" },
+    layer: [{ mark: "line", encoding: {} }],
+  });
+  assert.equal(DashboardGenerationSchema.safeParse(JSON.parse(broken)).success, true);
+  const { model, prompts } = scriptedModel([broken, fixed]);
+
+  const first = await generate(model, "latency band", schema);
+  assert.equal(first.object, undefined);
+  const failure = await describeFailure(first.error, schema);
+  assert.ok(failure);
+  assert.match(
+    failure.issues.join("\n"),
+    /^panels\.0\.options\.spec: the Vega-Lite spec does not compile: /m,
+  );
+
+  const second = await generate(model, repairPrompt("latency band", failure), schema);
+  assert.ok(second.object, "the repaired custom visual should compile");
+  assert.match(prompts[1] ?? "", /does not compile/);
+});
+
+test("an output with no custom visual is still parsed synchronously", () => {
+  const schema = withCompiledCustomVisuals(DashboardGenerationSchema);
+  assert.equal(schema.safeParse(JSON.parse(VALID)).success, true);
 });
