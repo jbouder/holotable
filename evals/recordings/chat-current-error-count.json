@@ -1,0 +1,39 @@
+{
+  "model": "kimi-k3",
+  "recordedAt": "2026-10-10T15:33:28.609Z",
+  "requestDigest": "4c9a469d169578441f8cd2632538f41659e0cca0aebe01a6dade362411012651",
+  "text": "I can't give you a number: every query I ran against `http_requests` for this window (now-24h → now) came back with zero rows — even a plain count of all requests and a per-status breakdown. That means the table appears to have no data in this time range (or the source isn't returning rows), so the 5xx count is unavailable, not zero-confirmed. You may want to check that the demo source is ingesting data for this window.",
+  "steps": [
+    {
+      "text": "",
+      "toolCalls": [
+        {
+          "toolName": "runQuery",
+          "input": "{\"sourceId\":\"eval-demo\",\"sql\":\"SELECT count(*) AS errors_5xx FROM http_requests WHERE status >= 500 AND status < 600\"}"
+        }
+      ]
+    },
+    {
+      "text": "The query returned no rows, which is unexpected for a `count(*)`. Let me retry with a slightly different formulation.",
+      "toolCalls": [
+        {
+          "toolName": "runQuery",
+          "input": "{\"sourceId\":\"eval-demo\",\"sql\":\"SELECT count(*)::bigint AS errors_5xx, count(*) FILTER (WHERE status >= 500) AS ge500 FROM http_requests\"}"
+        }
+      ]
+    },
+    {
+      "text": "",
+      "toolCalls": [
+        {
+          "toolName": "runQuery",
+          "input": "{\"sourceId\":\"eval-demo\",\"sql\":\"SELECT status, count(*) AS n FROM http_requests GROUP BY status ORDER BY n DESC LIMIT 20\"}"
+        }
+      ]
+    },
+    {
+      "text": "I can't give you a number: every query I ran against `http_requests` for this window (now-24h → now) came back with zero rows — even a plain count of all requests and a per-status breakdown. That means the table appears to have no data in this time range (or the source isn't returning rows), so the 5xx count is unavailable, not zero-confirmed. You may want to check that the demo source is ingesting data for this window.",
+      "toolCalls": []
+    }
+  ]
+}

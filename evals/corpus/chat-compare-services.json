@@ -1,0 +1,13 @@
+{
+  "name": "chat-compare-services",
+  "mode": "chat",
+  "catalog": "demo",
+  "prompt": "Compare the request volume of the api and checkout services over time.",
+  "expect": {
+    "tables": ["http_requests"],
+    "plausibleViz": ["line", "area", "bar"],
+    "timeField": "required",
+    "minPanels": 1,
+    "maxPanels": 1
+  }
+}

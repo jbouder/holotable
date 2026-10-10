@@ -10,7 +10,7 @@ import { conversationScope, conversationTitle } from "@/lib/chat/conversations";
 import type { Dashboard, TimeRange } from "@/lib/ir";
 import { enforceLlmLimits } from "@/lib/limits/llm";
 import { log } from "@/lib/log";
-import { recordLlmRepair } from "@/lib/metrics";
+import { recordChatPanel, recordLlmRepair } from "@/lib/metrics";
 import type { SourceRecord } from "@/lib/registry";
 import type { VariableValues } from "@/lib/sql/variables";
 import { serverKind } from "@/lib/sources/server/registry";
@@ -101,6 +101,7 @@ export async function chatTurnResponse(input: {
     onRepair: ({ usage: used, repaired }) => {
       usage.record(used);
       recordLlmRepair("chat", repaired ? "repaired" : "failed");
+      if (repaired) recordChatPanel("repaired");
     },
     // Each statement is the caller's execution, on their authority (#30).
     onQuery: (q) =>
@@ -120,7 +121,8 @@ export async function chatTurnResponse(input: {
       }),
     // Every drawn spec, accepted or refused, is a generation a source-admin can
     // read back, as for a dashboard generation.
-    onPanel: (p) =>
+    onPanel: (p) => {
+      recordChatPanel(p.outcome);
       recordGeneration({
         workspaceId,
         createdBy: identity.sub,
@@ -132,7 +134,8 @@ export async function chatTurnResponse(input: {
         model: resolved.modelId,
         modelConfig: resolved.source,
         error: p.error,
-      }),
+      });
+    },
   });
 
   return result.toUIMessageStreamResponse({

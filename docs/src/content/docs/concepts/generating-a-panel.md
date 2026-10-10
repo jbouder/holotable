@@ -412,17 +412,19 @@ to, which the citation shows.
 
 These make it usable rather than a demo (#82, #366):
 
-- **History persists.** A turn is stored in `chat_messages`, keyed by
-  `(dashboard_id, user_sub, id)` — the SDK's own message id, so re-sending a
-  turn updates the row rather than appending a duplicate. A conversation is one
-  reader working something out, so it is scoped per person: two people on the
-  same dashboard have separate histories and cannot see each other's. It is
-  bounded by `CHAT_HISTORY_MAX_MESSAGES` and `CHAT_HISTORY_RETENTION_DAYS`,
-  enforced on write *and* on read, so lowering either takes effect at once
-  rather than whenever someone next sends a message. The sweep runs in the same
-  transaction as the write, which is what keeps the table bounded without a
-  scheduled job. Clearing the chat is a `DELETE` on the same route, and forgets
-  only the caller's own conversation.
+- **History persists.** A dashboard's chat is the reader's own
+  [Chat](#chat) conversation with that dashboard (#416): at most one per person
+  per dashboard, stored in `conversation_messages` keyed by the SDK's own
+  message id, so re-sending a turn updates the row rather than appending a
+  duplicate. A conversation is one reader working something out, so it is
+  scoped per person: two people on the same dashboard have separate histories
+  and cannot see each other's. It is bounded by `CHAT_HISTORY_MAX_MESSAGES` and
+  `CHAT_HISTORY_RETENTION_DAYS`, enforced on write *and* on read, so lowering
+  either takes effect at once. The sweep runs in the same transaction as the
+  write, so the table stays bounded without a scheduled job. Clearing the chat
+  is a `DELETE` on the same route and deletes only the caller's own
+  conversation. **Open in Chat** continues it on the Chat page, with the
+  dashboard's panels in context.
 
   Stored rows are read back as untrusted: `content` is opaque JSONB holding a
   shape the SDK owns and evolves, so `parseStoredMessage` shape-checks each one

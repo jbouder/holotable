@@ -1,0 +1,10 @@
+{
+  "name": "chat-current-error-count",
+  "mode": "chat",
+  "catalog": "demo",
+  "prompt": "How many requests returned a 5xx status in this window? Just the number.",
+  "expect": {
+    "maxPanels": 0,
+    "runQuery": "required"
+  }
+}

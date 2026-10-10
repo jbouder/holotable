@@ -16,6 +16,7 @@ import {
   resetMetricsForTests,
   setActivePollers,
   setSseSubscribers,
+  recordChatPanel,
 } from "@/lib/metrics";
 
 /**
@@ -257,6 +258,7 @@ describe("the scrape body", () => {
     });
     recordLlmRequest("generate", "admitted");
     recordSqlRejection("catalog");
+    recordChatPanel("accepted");
 
     const body = await renderMetrics();
     for (const name of [
@@ -270,6 +272,7 @@ describe("the scrape body", () => {
       "holotable_sql_validation_rejections_total",
       "holotable_promql_validation_rejections_total",
       "holotable_audit_write_failures_total",
+      "holotable_chat_panels_total",
     ]) {
       assert.ok(body.includes(`# TYPE ${name} `), `${name} is missing from the scrape`);
     }

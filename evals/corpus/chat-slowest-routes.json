@@ -1,0 +1,13 @@
+{
+  "name": "chat-slowest-routes",
+  "mode": "chat",
+  "catalog": "demo",
+  "prompt": "Show me a table of the 10 slowest routes by p95 latency.",
+  "expect": {
+    "tables": ["http_requests"],
+    "plausibleViz": ["table", "bar"],
+    "timeField": "absent",
+    "minPanels": 1,
+    "maxPanels": 1
+  }
+}

@@ -87,6 +87,7 @@ interface Instruments {
   llmTokens: Counter<"workspace" | "model" | "direction">;
   llmRequests: Counter<"route" | "outcome">;
   llmRepairs: Counter<"route" | "outcome">;
+  chatPanels: Counter<"outcome">;
   sqlRejections: Counter<"reason">;
   promqlRejections: Counter<"reason">;
   auditWriteFailures: Counter<string>;
@@ -150,6 +151,12 @@ function build(): Instruments {
       name: "holotable_llm_repairs_total",
       help: "Structured-output repairs (#21): one re-ask after a generation failed its schema, by route and whether the repaired output validated.",
       labelNames: ["route", "outcome"],
+      registers: [registry],
+    }),
+    chatPanels: new Counter({
+      name: "holotable_chat_panels_total",
+      help: "Panels a Chat turn asked to draw (#416), by outcome: accepted, refused (by the IR, the guard or the source), or repaired (its spec failed the schema and the one re-ask fixed it).",
+      labelNames: ["outcome"],
       registers: [registry],
     }),
     sqlRejections: new Counter({
@@ -282,6 +289,13 @@ export type LlmRepairOutcome = "repaired" | "failed";
 /** Record one structured-output repair attempt and how it ended (#21). */
 export function recordLlmRepair(route: string, outcome: LlmRepairOutcome): void {
   instruments().llmRepairs.inc({ route, outcome });
+}
+
+export type ChatPanelOutcome = "accepted" | "refused" | "repaired";
+
+/** Record one panel a Chat turn asked to draw (#416). */
+export function recordChatPanel(outcome: ChatPanelOutcome): void {
+  instruments().chatPanels.inc({ outcome });
 }
 
 /** Record one statement refused by the SQL guard. */

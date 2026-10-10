@@ -303,6 +303,13 @@ generate route makes, and grades each answer
    required, which tables or metrics must be read, whether panels are time
    series, and how many panels there are.
 
+A `chat` case (#416) asks one [Chat](/guide/chat/) question instead. Its
+recording is the turn's steps, each one's text and tool calls, and replay plays
+them back through the real engine, so the guard and the IR decide again what
+would have been drawn. It is graded on the panels the server drew (checks 2–4
+on each, and a refused panel is a failure), on how many it drew, and on
+whether the turn fetched rows in words through `runQuery`.
+
 The prompt is per kind (#387). A case against `evals/catalogs/prometheus-demo.json`,
 a Prometheus catalog of Holotable's own metrics, runs the PromQL prompt and is
 graded by the PromQL guard; a case against a TimescaleDB catalog runs the SQL

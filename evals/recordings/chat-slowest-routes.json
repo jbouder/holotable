@@ -1,0 +1,30 @@
+{
+  "model": "kimi-k3",
+  "recordedAt": "2026-10-10T15:34:31.056Z",
+  "requestDigest": "9decc307dfd66ef0384f0bc3c85c25e4335f9fef95933097c277ce95cc91b226",
+  "text": "There's nothing to show: `http_requests` has **no rows at all** in the last 24 hours (the conversation's time range), so no route latencies can be computed. The table above is empty.\n\nIf traffic exists outside this window, the query would need a wider time range — but that's fixed by the server, and I can't extend it. It may simply be that the demo source hasn't ingested requests recently; the `system_metrics` table may still have host data if you want to check something else.",
+  "steps": [
+    {
+      "text": "",
+      "toolCalls": [
+        {
+          "toolName": "showPanel",
+          "input": "{\"title\":\"10 slowest routes by p95 latency\",\"description\":\"Computes the 95th-percentile request duration in milliseconds per route from http_requests, ranked slowest first.\",\"viz\":\"table\",\"query\":{\"sourceId\":\"eval-demo\",\"sql\":\"SELECT route, percentile_cont(0.95) WITHIN GROUP (ORDER BY duration_ms) AS p95_ms, count(*) AS requests FROM http_requests GROUP BY route ORDER BY p95_ms DESC LIMIT 10\"},\"options\":{\"columns\":[{\"name\":\"route\",\"label\":\"Route\"},{\"name\":\"p95_ms\",\"label\":\"p95 latency\",\"format\":\"ms\",\"decimals\":1,\"align\":\"right\"},{\"name\":\"requests\",\"label\":\"Requests\",\"align\":\"right\"}],\"sort\":{\"column\":\"p95_ms\",\"order\":\"desc\"}}}"
+        }
+      ]
+    },
+    {
+      "text": "The panel returned no rows, so let me check whether there's any request data in the last 24 hours.",
+      "toolCalls": [
+        {
+          "toolName": "runQuery",
+          "input": "{\"sourceId\":\"eval-demo\",\"sql\":\"SELECT count(*) AS rows, count(DISTINCT route) AS routes FROM http_requests\"}"
+        }
+      ]
+    },
+    {
+      "text": "There's nothing to show: `http_requests` has **no rows at all** in the last 24 hours (the conversation's time range), so no route latencies can be computed. The table above is empty.\n\nIf traffic exists outside this window, the query would need a wider time range — but that's fixed by the server, and I can't extend it. It may simply be that the demo source hasn't ingested requests recently; the `system_metrics` table may still have host data if you want to check something else.",
+      "toolCalls": []
+    }
+  ]
+}

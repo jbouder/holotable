@@ -1,0 +1,12 @@
+{
+  "name": "chat-promql-query-rate",
+  "mode": "chat",
+  "catalog": "prometheus-demo",
+  "prompt": "Plot the rate of executed queries per source over time.",
+  "expect": {
+    "metrics": ["holotable_query_duration_seconds_count"],
+    "plausibleViz": ["line", "area", "bar"],
+    "minPanels": 1,
+    "maxPanels": 1
+  }
+}
