@@ -94,7 +94,10 @@ test("patterns in charts is off by default, and saving it applies it to the page
 
   ui.click(group.find((r) => r.value === "true") as Element);
   // The save is a fetch, then a state update, then a render: wait for it.
-  for (let i = 0; i < 100 && seen !== true; i++) {
+  // Read through a function: after the assertion above, TypeScript narrows
+  // `seen` to false, though the render below changes it.
+  const current = () => seen;
+  for (let i = 0; i < 100 && current() !== true; i++) {
     await new Promise((r) => setTimeout(r, 10));
   }
   assert.deepEqual(calls, [
