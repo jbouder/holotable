@@ -240,8 +240,8 @@ export function SourcesClient({
         title="Data sources"
         description={
           canManage
-            ? "Manage the connections that dashboards and Chat query against. Sources are scoped to a workspace and referenced by stable IDs."
-            : "The sources dashboards and Chat query against in this workspace. Browse a catalog to see the tables and columns you can query."
+            ? "Manage the connections that dashboards and Explore query against. Sources are scoped to a workspace and referenced by stable IDs."
+            : "The sources dashboards and Explore query against in this workspace. Browse a catalog to see the tables and columns you can query."
         }
         actions={
           canManage &&

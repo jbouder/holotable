@@ -314,8 +314,8 @@ export function DashboardChat({
           <Button
             variant="ghost"
             size="icon"
-            aria-label="Open in Chat"
-            title="Open in Chat: continue this conversation on its own page"
+            aria-label="Open in Explore"
+            title="Open in Explore: continue this conversation on its own page"
             disabled={busy || openingInChat}
             onClick={() => void openInChat()}
           >

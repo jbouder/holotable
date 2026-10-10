@@ -307,7 +307,7 @@ point and the only place the platform-admin bypass applies.
 
 ## 15. Chat is read-only
 
-Both chats, [Chat](/guide/chat/) and the one beside a dashboard, can query and
+Both chats, [Explore](/guide/explore/) and the one beside a dashboard, can query and
 draw, and change nothing. The engine (`src/lib/ai/data-chat.ts`) exposes the
 model two tools, `runQuery` and `showPanel`, scoped to the sources the caller
 resolved and may use (`source:use`, re-checked on every turn and every panel

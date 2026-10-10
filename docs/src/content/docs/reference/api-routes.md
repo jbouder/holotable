@@ -38,8 +38,8 @@ names one that exists.
 | `/api/dashboards/[id]/shares/[shareId]` | DELETE | editor | Revoke a share link at once; its open streams close |
 | `/api/dashboards/[id]/annotations` | GET | viewer | The [annotations](/guide/annotations/) the dashboard shows for `from`/`to` (its own range by default), from the dashboard's own workspace only, honoring its `annotations` setting |
 | `/api/dashboards/[id]/panels/[panelId]/retry` | POST | viewer | Runs a panel the poller is backing off from now instead of at its `retryAt`, on every poller showing the dashboard. Refused (`started: 0`) for a panel that is not backing off or within `MIN_REFRESH_INTERVAL_MS` of its last attempt. The result arrives on the stream |
-| `/api/dashboards/[id]/chat` | POST | viewer | Read-only chat with a guarded `runQuery` tool. Rate limited and budgeted. The turn is kept in the **caller's own** [Chat conversation](/guide/chat/#beside-a-dashboard) for this dashboard (made on the first turn; nothing kept when they keep no conversations), and the request's abort signal cancels the model call |
-| `/api/dashboards/[id]/chat` | GET | viewer | The caller's own conversation on this dashboard, bounded by `CHAT_HISTORY_MAX_MESSAGES` / `CHAT_HISTORY_RETENTION_DAYS`, and its `conversationId` for Open in Chat. The subject comes from the session, never from the request |
+| `/api/dashboards/[id]/chat` | POST | viewer | Read-only chat with a guarded `runQuery` tool. Rate limited and budgeted. The turn is kept in the **caller's own** [Explore conversation](/guide/explore/#beside-a-dashboard) for this dashboard (made on the first turn; nothing kept when they keep no conversations), and the request's abort signal cancels the model call |
+| `/api/dashboards/[id]/chat` | GET | viewer | The caller's own conversation on this dashboard, bounded by `CHAT_HISTORY_MAX_MESSAGES` / `CHAT_HISTORY_RETENTION_DAYS`, and its `conversationId` for Open in Explore. The subject comes from the session, never from the request |
 | `/api/dashboards/[id]/chat` | DELETE | viewer | Delete the caller's own conversation on this dashboard. Nobody else's |
 
 ## Templates
@@ -73,7 +73,7 @@ hand.
 | `/api/generation-log` | GET | source-admin | The redacted prompt/spec pairs every generation leaves behind. Workspaces come from the caller's claims, so `?workspaceId=` narrows and can never widen; a viewer or editor reads an empty list rather than a 403. `?limit=` is clamped |
 | `/api/audit` | GET | source-admin | The append-only [audit log](/operations/audit-log/), newest first. Filters: `workspaceId`, `from`/`to` (ISO or `now-24h`), `action`, `outcome`; paged with `limit` and `before` (the previous page's `next`). Workspaces come from the caller's claims as above; a platform admin reads any workspace, and every row with no filter. An unusable filter is a 400 |
 
-## Chat
+## Chat (Explore)
 
 A conversation is the caller's own: every route is keyed on the session's
 subject, and someone else's conversation is a `404`, for a platform admin too.
@@ -82,7 +82,7 @@ A share link reaches none of them.
 | Route | Method | Min role | Notes |
 | --- | --- | --- | --- |
 | `/api/chat` | GET | signed in | The caller's conversations, most recently used first, 50 a page; `?after=` is the previous page's `next`. Conversations past `CHAT_HISTORY_RETENTION_DAYS` are not listed |
-| `/api/chat` | POST | viewer | Start a conversation: `{ sourceIds, timeRange }`, or `{ dashboardId, timeRange? }` for the caller's one conversation on a dashboard they may view (made on first use, over the dashboard's sources; Open in Chat and Ask in Chat). Each source needs `source:use`; all must be in one workspace, which is the conversation's, and at most three. Past `CHAT_CONVERSATIONS_MAX` the caller's least recently used conversation is deleted. A `409` when the caller turned **Keep my conversations** off |
+| `/api/chat` | POST | viewer | Start a conversation: `{ sourceIds, timeRange }`, or `{ dashboardId, timeRange? }` for the caller's one conversation on a dashboard they may view (made on first use, over the dashboard's sources; Open in Explore and Ask in Explore). Each source needs `source:use`; all must be in one workspace, which is the conversation's, and at most three. Past `CHAT_CONVERSATIONS_MAX` the caller's least recently used conversation is deleted. A `409` when the caller turned **Keep my conversations** off |
 | `/api/chat` | DELETE | signed in | Delete every one of the caller's conversations, at once |
 | `/api/chat/[id]` | GET | owner | The conversation and its messages. A drawn panel's rows are never stored, so the page runs each panel again; `unavailableSourceIds` names the sources the caller can no longer use |
 | `/api/chat/[id]` | PATCH | owner | Rename it (`title`), or change its `sourceIds` (re-authorized, same workspace) or `timeRange` |
@@ -120,7 +120,7 @@ A share link reaches none of them.
 | Route | Method | Min role | Notes |
 | --- | --- | --- | --- |
 | `/api/me` | GET | signed in | The caller's own subject, display name, email, platform-admin flag and workspace roles, all from the session. No parameters, so it can only describe the identity that asked. The name and email are display-only and never reach `can()` |
-| `/api/me/preferences` | GET / PATCH | signed in | The caller's own preferences: time zone, clock, start page and dashboard list defaults. PATCH merges a partial object; an unknown key or an invalid value is a 400 naming the field, and a start dashboard must be one the caller can view. Turning `rememberChats` off deletes every one of the caller's Chat conversations. No subject parameter, so nobody reads or writes another person's row |
+| `/api/me/preferences` | GET / PATCH | signed in | The caller's own preferences: time zone, clock, start page and dashboard list defaults. PATCH merges a partial object; an unknown key or an invalid value is a 400 naming the field, and a start dashboard must be one the caller can view. Turning `rememberChats` off deletes every one of the caller's Explore conversations. No subject parameter, so nobody reads or writes another person's row |
 | `/api/me/model` | GET, PUT, DELETE | signed in | The caller's own [model](/admin/ai-provider/#models-configured-in-the-app) (#331): `{ config }`, with `settings` (provider, base URL, model, API) and the key's state (`set` with its last four characters, `none`, or `unreadable`), never the key. PUT takes `{ settings, apiKey? }`: a missing `apiKey` keeps the stored key, for the same origin only, and `""` clears it; the base URL is held to the [base URL guard](/admin/ai-provider/#the-base-url-guard). Always the session's own row; refused for a service-account token and in demo mode. Audited as `user.model.update` and `user.model.delete` |
 | `/api/me/model/test` | POST | editor | `{ config, workspaceId }`: one minimal model call with that configuration, admitted by `workspaceId`'s rate limit and budget, which must allow personal keys. Answers `{ ok, model, latencyMs }` or `{ ok: false, message }`. Audited as `user.model.test` |
 

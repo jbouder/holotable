@@ -53,13 +53,13 @@ export const CHAT_OPEN_SHORTCUT = {
 } as const satisfies Shortcut;
 
 /**
- * Shows or hides Chat's side panel (#416). A bare key, so it never fires
+ * Shows or hides Explore's side panel (#416, #431). A bare key, so it never fires
  * while someone is typing a question.
  */
 export const CHAT_PANEL_SHORTCUT = {
   id: "chat-panel",
   key: "[",
-  group: "Chat",
+  group: "Explore",
   description: "Show or hide the side panel",
 } as const satisfies Shortcut;
 
@@ -209,8 +209,8 @@ export const SHORTCUT_SECTIONS: readonly ShortcutSection[] = [
   },
   {
     id: "chat",
-    title: "Chat",
-    description: "On the Chat page.",
+    title: "Explore",
+    description: "On the Explore page.",
     shortcuts: [CHAT_PANEL_SHORTCUT],
   },
   {

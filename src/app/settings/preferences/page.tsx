@@ -18,7 +18,7 @@ const PICKER_LIMIT = 200;
 
 /**
  * Where you start, how times are shown (#214, #215), which recents are kept
- * and how Chat behaves. Saved to the account,
+ * and how Explore behaves. Saved to the account,
  * so both follow the person to any device they sign in on.
  */
 export default async function PreferencesSettings() {

@@ -118,7 +118,7 @@ test("every action can() decides is described on the account page", () => {
 test("role descriptions come from can(), and each role allows what the one below does", () => {
   assert.deepEqual(roleCapabilities("viewer"), [
     "View dashboards",
-    "Query data sources from dashboards and Chat",
+    "Query data sources from dashboards and Explore",
     "Delete dashboards you created",
   ]);
   assert.ok(

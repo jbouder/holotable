@@ -4,22 +4,22 @@ import * as React from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Collapsible } from "@base-ui/react/collapsible";
-import {
-  LayoutDashboard,
-  Database,
-  Menu as MenuIcon,
-  MessageSquare,
-  X,
-} from "lucide-react";
-import { Button, ButtonLabel, ButtonLink } from "@/components/ui/button";
+import { LayoutDashboard, Database, Menu as MenuIcon, Compass, X } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { NavSlot } from "@/components/nav-slot";
 import { ProfileMenu, type ProfileMenuAccount } from "@/components/profile-menu";
 
 const LINKS = [
   { href: "/dashboards", label: "Dashboards", Icon: LayoutDashboard },
+  { href: "/explore", label: "Explore", Icon: Compass },
   { href: "/data-sources", label: "Data sources", Icon: Database },
 ] as const;
+
+/** A link is current on its page and on every page under it (`/explore/<id>`). */
+function isCurrent(pathname: string, href: string): boolean {
+  return pathname === href || pathname.startsWith(`${href}/`);
+}
 
 /**
  * The top bar. Three links inline on a wide screen; behind a disclosure below
@@ -33,10 +33,10 @@ const LINKS = [
  * `--collapsible-panel-height` so the height can transition, and keeps it
  * mounted until the closing transition ends.
  *
- * Chat (#416) is not one of the links: it is the primary action, a filled
- * button on the right beside the account menu, in the bar at every width
- * (its label folds to the icon on a phone). The account menu (#210) stays
- * in the bar at every width too, and carries Sign out, Settings and the theme. `account` is null for a signed-out visitor,
+ * Explore (#416, #431), where people ask questions of their data, is one of
+ * the links: a dashboard has its own chat, and a second chat button in the
+ * bar beside it read as two of the same thing. The account menu (#210) stays
+ * in the bar at every width, and carries Sign out, Settings and the theme. `account` is null for a signed-out visitor,
  * who gets no menu: every item in it needs a session.
  */
 export function NavBar({ account }: { account: ProfileMenuAccount | null }) {
@@ -77,7 +77,7 @@ export function NavBar({ account }: { account: ProfileMenuAccount | null }) {
               <Link
                 key={href}
                 href={href}
-                aria-current={pathname === href ? "page" : undefined}
+                aria-current={isCurrent(pathname, href) ? "page" : undefined}
                 className="tap-target flex items-center gap-1.5 text-sm text-muted hover:text-foreground aria-[current=page]:text-foreground"
               >
                 <Icon className="h-4 w-4" /> {label}
@@ -87,19 +87,6 @@ export function NavBar({ account }: { account: ProfileMenuAccount | null }) {
         </nav>
         <div className="flex shrink-0 items-center gap-2">
           <NavSlot />
-          {account && (
-            <ButtonLink
-              href="/chat"
-              size="sm"
-              collapse
-              title="Chat with your data"
-              aria-current={pathname.startsWith("/chat") ? "page" : undefined}
-              className="gap-1.5"
-            >
-              <MessageSquare className="h-4 w-4" aria-hidden />
-              <ButtonLabel>Chat</ButtonLabel>
-            </ButtonLink>
-          )}
           {account && <ProfileMenu account={account} />}
           <Collapsible.Trigger
             render={<Button variant="ghost" size="icon" />}
@@ -135,7 +122,7 @@ export function NavBar({ account }: { account: ProfileMenuAccount | null }) {
             <Link
               key={href}
               href={href}
-              aria-current={pathname === href ? "page" : undefined}
+              aria-current={isCurrent(pathname, href) ? "page" : undefined}
               className="tap-target flex items-center gap-2 px-3 py-3 text-sm text-muted hover:bg-surface-2 hover:text-foreground aria-[current=page]:text-foreground"
             >
               <Icon className="h-4 w-4" /> {label}

@@ -147,7 +147,7 @@ test("a start dashboard must be one the caller can view", async () => {
 test("the start page resolves, and a vanished or unreadable dashboard falls back with a notice", async () => {
   const base = { ...DEFAULT_PREFERENCES };
   assert.equal(await startHref(viewer, base), "/dashboards");
-  assert.equal(await startHref(viewer, { ...base, startPage: "chat" }), "/chat");
+  assert.equal(await startHref(viewer, { ...base, startPage: "chat" }), "/explore");
   const start = { ...base, startPage: `dashboard:${DASH}` as const };
   assert.equal(
     await startHref(viewer, start, lookup({ [DASH]: "w" })),

@@ -20,13 +20,13 @@ export const dynamic = "force-dynamic";
  * the page runs again through the run route.
  *
  * A conversation that continues a dashboard's chat names the dashboard and the
- * picks it was opened with; `?about=<panel id>` (from "Ask in Chat") starts
+ * picks it was opened with; `?about=<panel id>` (from "Ask in Explore") starts
  * the next question about that panel.
  */
 export default async function ConversationPage({
   params,
   searchParams,
-}: PageProps<"/chat/[id]">) {
+}: PageProps<"/explore/[id]">) {
   const identity = await getIdentity();
   if (!identity) return <SignIn />;
   const { id } = await params;

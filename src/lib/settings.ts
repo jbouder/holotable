@@ -77,7 +77,7 @@ export const SETTINGS_SECTIONS: readonly SettingsSection[] = [
     id: "preferences",
     label: "Preferences",
     description:
-      "Where you start, how times are shown, what history is kept, and how Chat behaves.",
+      "Where you start, how times are shown, what history is kept, and how Explore behaves.",
     href: "/settings/preferences",
   },
   {

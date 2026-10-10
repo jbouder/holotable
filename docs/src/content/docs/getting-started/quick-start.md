@@ -172,7 +172,7 @@ npm run smoke          # check the self-monitoring dashboard answers with scrape
 | `/dashboards/[id]/edit` | Panel CRUD/layout, single-panel NL edits, version save | editor |
 | `/dashboards/[id]/versions` | Version history, diff, preview and restore | viewer (restore: editor) |
 | `/embed/dashboards/[id]` | A [share link](/integrations/share-links/)'s read-only view, framable by the origins the link names | the link's token |
-| `/chat` | Ask questions of your data in a conversation, with inline panels; `/explore` redirects here | viewer |
+| `/explore` | Ask questions of your data in a conversation, with inline panels; `/chat` redirects here | viewer |
 | `/settings` | Account, appearance, preferences, local data, shortcuts; workspace AI limits and API tokens for admins. Reached from the account menu | signed in |
 | `/data-sources` | Source CRUD / test / reviewed refresh, a catalog browser with per-column exposure, a structured form with table discovery, plus a natural-language drafter. Viewers get the list and the catalog browser read-only, without connection details or hidden columns | source-admin (read-only: viewer) |
 

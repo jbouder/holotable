@@ -16,9 +16,13 @@ const nextConfig: NextConfig = {
   // src/proxy.ts. `next build` runs with NODE_ENV=production, so a production
   // build carries HSTS and `next dev` does not; this only adds headers, so the
   // SSE stream under /api/dashboards/[id]/stream is not buffered or altered.
-  // Explore became Chat (#416); old links and bookmarks land there.
+  // Chat (#416) is called Explore and lives at /explore (#431); a /chat
+  // link or bookmark from the weeks between lands on the same conversation.
   async redirects() {
-    return [{ source: "/explore", destination: "/chat", permanent: true }];
+    return [
+      { source: "/chat", destination: "/explore", permanent: true },
+      { source: "/chat/:id", destination: "/explore/:id", permanent: true },
+    ];
   },
   async headers() {
     return [

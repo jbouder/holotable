@@ -126,7 +126,7 @@ export function PanelActions({
       )}
       {onAskInChat && (
         <MenuItem onClick={onAskInChat}>
-          <MessagesSquare className="h-4 w-4" /> Ask in Chat
+          <MessagesSquare className="h-4 w-4" /> Ask in Explore
         </MenuItem>
       )}
       {links.map((item) =>

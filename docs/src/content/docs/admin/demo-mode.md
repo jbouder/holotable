@@ -61,7 +61,7 @@ warning.
 
 In demo mode `AI_MODEL` and the provider key are optional. A missing one is a
 startup warning, not an error. The seeded dashboards, the live viewer and the
-SQL editor need no model. The new-dashboard page, Chat, the panel editor's
+SQL editor need no model. The new-dashboard page, Explore, the panel editor's
 natural-language edit and the dashboard chat show a notice naming the variables
 to set, instead of sending a request that can only fail. With
 `AUTH_MODE=oidc` a missing model is still an error in production.

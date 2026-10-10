@@ -83,7 +83,7 @@ test("the first Tab offers a skip link that lands on the page", async ({ page })
   await expect(page.locator("main#main")).toBeFocused();
 });
 
-for (const path of ["/dashboards", "/data-sources", "/chat"]) {
+for (const path of ["/dashboards", "/data-sources", "/explore"]) {
   test(`every Tab stop on ${path} shows where focus is`, async ({ page }) => {
     await page.goto(path);
     await expect(page.getByRole("heading", { level: 1 })).toBeVisible();

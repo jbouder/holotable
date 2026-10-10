@@ -70,7 +70,7 @@ title shows the one-sentence description of what the panel computes.
 - **Show query** opens the panel's statement — SQL or PromQL — with its source
   and time field, or for PromQL how it is evaluated. It is not offered on a
   text panel or through a share link.
-- **Ask about this panel** opens the [dashboard chat](/guide/chat/#beside-a-dashboard)
+- **Ask about this panel** opens the [dashboard chat](/guide/explore/#beside-a-dashboard)
   with the panel attached to your question.
 - The panel's **links**, if the editor gave it any, lead to another dashboard
   carrying your window and picks; see [Drilldown](/guide/drilldown/).
@@ -101,4 +101,4 @@ workspaces you belong to.
 
 The chat beside every dashboard answers questions about what is on screen,
 with the same window and picks you are viewing. It is read-only and has its
-own page: [Dashboard chat](/guide/chat/#beside-a-dashboard).
+own page: [Dashboard chat](/guide/explore/#beside-a-dashboard).

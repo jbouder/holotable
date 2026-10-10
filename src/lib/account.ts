@@ -53,7 +53,7 @@ export function accountSummary(identity: Identity): AccountSummary {
  */
 export const CAPABILITIES: readonly { action: Action; own?: boolean; label: string }[] = [
   { action: "dashboard:view", label: "View dashboards" },
-  { action: "source:use", label: "Query data sources from dashboards and Chat" },
+  { action: "source:use", label: "Query data sources from dashboards and Explore" },
   { action: "dashboard:create", label: "Create dashboards" },
   { action: "dashboard:update", label: "Edit dashboards" },
   { action: "dashboard:generate", label: "Generate dashboards and panels with AI" },

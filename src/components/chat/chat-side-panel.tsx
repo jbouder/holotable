@@ -218,7 +218,7 @@ function HistorySection({
       return;
     }
     setEntries((e) => e.filter((c) => c.id !== id));
-    if (id === currentId) window.location.assign("/chat");
+    if (id === currentId) window.location.assign("/explore");
   }
 
   async function removeAll() {
@@ -229,7 +229,7 @@ function HistorySection({
     }
     setEntries([]);
     setNext(null);
-    if (currentId) window.location.assign("/chat");
+    if (currentId) window.location.assign("/explore");
   }
 
   async function rename(id: string, title: string) {
@@ -300,7 +300,7 @@ function HistorySection({
                       ) : (
                         <>
                           <Link
-                            href={`/chat/${c.id}`}
+                            href={`/explore/${c.id}`}
                             aria-current={c.id === currentId ? "page" : undefined}
                             className="min-w-0 flex-1 truncate px-2 py-1.5 text-sm text-foreground hover:bg-surface-2"
                           >

@@ -47,7 +47,7 @@ it.
 | The viewer's claim | Result |
 | --- | --- |
 | A single string or number | Only rows whose `column` equals it |
-| Missing, a list, an object, empty, or over 256 characters | Refused: a 403 from preview, an error on a Chat query, and an authorization error on each of the source's panels on a dashboard. The source is never queried unfiltered |
+| Missing, a list, an object, empty, or over 256 characters | Refused: a 403 from preview, an error on an Explore query, and an authorization error on each of the source's panels on a dashboard. The source is never queried unfiltered |
 
 The rule holds for platform admins too. Their bypass covers actions, not rows,
 so an admin without the claim is refused like anyone else.

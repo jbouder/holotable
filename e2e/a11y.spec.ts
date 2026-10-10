@@ -78,13 +78,13 @@ for (const theme of THEMES) {
       await expectNoA11yViolations(page);
     });
 
-    test("chat, empty", async ({ page }) => {
-      await page.goto("/chat");
+    test("explore, empty", async ({ page }) => {
+      await page.goto("/explore");
       await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
       await expectNoA11yViolations(page);
     });
 
-    test("chat with an answer and an inline panel", async ({ page }) => {
+    test("explore with an answer and an inline panel", async ({ page }) => {
       await askChat(page);
       const table = page.getByRole("region", { name: "Requests by service, table" });
       await expect(table.getByRole("cell", { name: "api", exact: true })).toBeVisible();
@@ -92,7 +92,7 @@ for (const theme of THEMES) {
       await expectNoA11yViolations(page);
     });
 
-    test("chat with the history filter in use", async ({ page }) => {
+    test("explore with the history filter in use", async ({ page }) => {
       await askChat(page);
       await expect(
         page.getByRole("region", { name: "Requests by service, table" }),
@@ -101,9 +101,9 @@ for (const theme of THEMES) {
       await expectNoA11yViolations(page);
     });
 
-    test("chat at phone width with the side panel open", async ({ page }) => {
+    test("explore at phone width with the side panel open", async ({ page }) => {
       await page.setViewportSize({ width: 390, height: 844 });
-      await page.goto("/chat");
+      await page.goto("/explore");
       await page.getByRole("button", { name: /source.* · / }).click();
       await expect(page.getByRole("dialog", { name: "Conversation" })).toBeVisible();
       await expectNoA11yViolations(page);
