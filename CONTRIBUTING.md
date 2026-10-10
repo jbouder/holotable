@@ -363,6 +363,7 @@ request:
 | When you change | Update |
 | --- | --- |
 | `src/lib/ir.ts`, `src/lib/ir/` (the IR, `SPEC_VERSION`, an upgrader) | `concepts/the-shared-ir.md`, invariant 3 in `architecture/invariants.md` |
+| `src/components/charts/vega-runtime.ts`, `src/lib/vega/` (custom visuals) | `architecture/custom-visuals.md` |
 | `src/lib/panels/` (a panel kind or its options) | `reference/panel-options.md`, "Panel kinds" in `concepts/streaming-and-rendering.md`. The visualization list is generated |
 | `src/lib/sql/safety.ts`, `ast.ts`, `denylist.ts` (the guard) | `concepts/executing-a-panel.md`, invariants 7 and 8, the trust model in `SECURITY.md` |
 | `src/lib/promql/` (the PromQL guard, its rewrites, the plan) | `concepts/executing-a-panel.md` ("The PromQL guard"), `concepts/prometheus-sources.md`, invariants 7 and 8, the trust model in `SECURITY.md`, the skill's `references/promql-rules.md` |

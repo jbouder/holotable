@@ -110,6 +110,14 @@ Important files:
   prompt). Never compare `source.kind` or import `src/lib/timescaledb/` from a
   route: ask `sourceKind(record)` or `serverKind(record)` and use what comes
   back. `test/source-kinds.test.ts` fails on either outside `src/lib/sources/`
+- `src/components/charts/vega-runtime.ts` and `src/lib/vega/compile.ts` — custom
+  visuals (#405): a Vega-Lite spec drawn over the panel's rows. The runtime
+  parses with `ast: true` and evaluates with `vega-interpreter`, because Vega's
+  default expression compiler uses `new Function` and the CSP has no
+  `'unsafe-eval'`; its loader refuses every URL. Both import Vega dynamically
+  (Vega's Node canvas module awaits at its top level), and they are the only
+  modules that name it; `test/vega-runtime.test.ts` holds that list.
+  `docs/src/content/docs/architecture/custom-visuals.md` is the decision
 - `src/lib/sql/safety.ts` — the SQL guard every generated query passes through
 - `src/lib/sources/server/types.ts` — `ServerSourceKind`, the one shape every
   kind's server half has (#385): `check`, `plan`, `execute`, `planView`,
