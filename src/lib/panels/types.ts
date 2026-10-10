@@ -16,7 +16,14 @@ import type { z } from "zod";
 import type { OptionGroup } from "@/lib/panels/presentation";
 
 /** The silhouette a kind's body shows while its first rows are on their way. */
-export type PanelSkeletonShape = "chart" | "radial" | "stat" | "table" | "lanes" | "text";
+export type PanelSkeletonShape =
+  | "chart"
+  | "radial"
+  | "stat"
+  | "table"
+  | "lanes"
+  | "grid"
+  | "text";
 
 export interface PanelKind<K extends string = string> {
   /** The value of `panel.viz`. Stored in every saved spec, so never renamed. */

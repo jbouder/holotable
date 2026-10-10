@@ -258,6 +258,111 @@ export function fleetSpec(targets: DemoLinkTargets) {
 }
 
 /**
+ * The fleet as tiles (#404): every host's CPU, fullest disk and load state
+ * now, one status grid each, and every tile a way into that host's detail.
+ * Its own dashboard, like "Demo fleet status", so an install seeded before
+ * the kind existed gets it on its next seed.
+ */
+export function fleetGridSpec(targets: DemoLinkTargets) {
+  const openHost = [
+    {
+      title: "Open host detail",
+      dashboard: targets.hostDetail,
+      set: { host: { series: true } },
+    },
+  ];
+  return {
+    specVersion: SPEC_VERSION,
+    title: "Demo fleet grid",
+    timeRange: { from: "now-15m", to: "now" },
+    refreshIntervalMs: 15000,
+    panels: [
+      {
+        id: "about",
+        title: "About this dashboard",
+        viz: "text",
+        options: {
+          content: [
+            "## Fleet grid",
+            "",
+            "One tile per demo host, showing its latest minute. CPU and disk are colored by thresholds, load by state.",
+            "",
+            "Click a tile to open that host's detail.",
+          ].join("\n"),
+        },
+        layout: { x: 0, y: 0, w: 12, h: 2 },
+      },
+      {
+        id: "cpu",
+        title: "CPU now",
+        viz: "status-grid",
+        query: {
+          sourceId: "ts-system",
+          timeField: "minute",
+          sql: "SELECT time_bucket('1 minute', ts) AS minute, host, avg(cpu_pct) AS cpu FROM system_metrics GROUP BY minute, host ORDER BY minute",
+        },
+        options: {
+          entity: "host",
+          value: "cpu",
+          thresholds: [
+            { value: 0, color: "success" },
+            { value: 70, color: "warning" },
+            { value: 85, color: "danger" },
+          ],
+        },
+        format: "percent",
+        links: openHost,
+        layout: { x: 0, y: 2, w: 6, h: 2 },
+      },
+      {
+        id: "disk",
+        title: "Disk used",
+        viz: "status-grid",
+        query: {
+          sourceId: "ts-system",
+          timeField: "minute",
+          sql: "SELECT time_bucket('1 minute', ts) AS minute, host, max(disk_pct) AS disk FROM system_metrics GROUP BY minute, host ORDER BY minute",
+        },
+        options: {
+          entity: "host",
+          value: "disk",
+          sort: "value",
+          thresholds: [
+            { value: 0, color: "success" },
+            { value: 80, color: "warning" },
+            { value: 90, color: "danger" },
+          ],
+        },
+        format: "percent",
+        links: openHost,
+        layout: { x: 6, y: 2, w: 6, h: 2 },
+      },
+      {
+        id: "load",
+        title: "Load state",
+        viz: "status-grid",
+        query: {
+          sourceId: "ts-system",
+          timeField: "minute",
+          sql: "SELECT time_bucket('1 minute', ts) AS minute, host, CASE WHEN avg(cpu_pct) >= 85 THEN 'hot' WHEN avg(cpu_pct) >= 70 THEN 'busy' ELSE 'ok' END AS state FROM system_metrics GROUP BY minute, host ORDER BY minute",
+        },
+        options: {
+          entity: "host",
+          state: "state",
+          states: [
+            { state: "ok", color: "success" },
+            { state: "busy", color: "warning" },
+            { state: "hot", color: "danger" },
+          ],
+        },
+        links: openHost,
+        layout: { x: 0, y: 4, w: 12, h: 2 },
+      },
+    ],
+  };
+}
+
+/**
  * One host up close, the target of the fleet's and the infrastructure
  * dashboard's links. Its `host` picker is what a link sets on arrival, and its
  * host table filters the page in place with a self link (#373).

@@ -33,6 +33,8 @@ function SkeletonShape({ shape }: { shape: PanelSkeletonShape }) {
       return <ChartSkeleton />;
     case "lanes":
       return <LanesSkeleton />;
+    case "grid":
+      return <GridSkeleton />;
     case "text":
       return <TextSkeleton />;
   }
@@ -63,6 +65,21 @@ function LanesSkeleton() {
             ))}
           </div>
         </div>
+      ))}
+    </div>
+  );
+}
+
+/** A fixed count of tiles, wrapping as the status grid's do. */
+function GridSkeleton() {
+  return (
+    <div
+      className="grid gap-1.5"
+      style={{ gridTemplateColumns: "repeat(auto-fill, minmax(7rem, 1fr))" }}
+    >
+      {Array.from({ length: 8 }, (_, i) => (
+        // biome-ignore lint/suspicious/noArrayIndexKey: static decorative shapes
+        <Skeleton key={i} className="h-14" />
       ))}
     </div>
   );

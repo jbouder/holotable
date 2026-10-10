@@ -155,6 +155,13 @@ const CASES: Record<VizType, Case> = {
     click: { dataIndex: 1 },
     expect: { row: { ts: T(1), host: "a", state: "hot" }, series: "a" },
   },
+  "status-grid": {
+    panel: panel("status-grid", { options: { sort: "value" } }),
+    data: BY_HOST,
+    // Tiles are sorted by value: index 0 is web-02, but the name wins.
+    click: { dataIndex: 0, name: "web-01" },
+    expect: { row: { host: "web-01", cpu: 40 }, series: "web-01" },
+  },
   text: {
     panel: {
       id: "t",

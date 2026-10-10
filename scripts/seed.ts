@@ -20,7 +20,13 @@ import {
   type SystemMetricRow,
   systemMetricRows,
 } from "./lib/seed-data";
-import { demoSpec, fleetSpec, hostDetailSpec, systemSpec } from "./lib/demo-dashboards";
+import {
+  demoSpec,
+  fleetGridSpec,
+  fleetSpec,
+  hostDetailSpec,
+  systemSpec,
+} from "./lib/demo-dashboards";
 
 /**
  * Looping seeder.
@@ -177,6 +183,7 @@ async function ensureDemo() {
     const targets = { hostDetail: await ensureDashboard(pg, hostDetailSpec()) };
     await ensureDashboard(pg, systemSpec(targets));
     await ensureDashboard(pg, fleetSpec(targets));
+    await ensureDashboard(pg, fleetGridSpec(targets));
     await ensureDashboard(pg, selfMonitoringSpec());
     if (promUrl) await ensureDashboard(pg, prometheusSelfMonitoringSpec());
   } finally {

@@ -1,8 +1,15 @@
 import { panelTimeField } from "@/lib/ir";
-import { asInstant, type PanelData, toNumber, toText } from "@/components/charts/options";
+import {
+  asInstant,
+  isNumeric,
+  type PanelData,
+  toNumber,
+  toText,
+} from "@/components/charts/options";
 import { formatValue } from "@/lib/format";
 import type { Panel } from "@/lib/ir";
-import type { ColorToken } from "@/lib/panels/colors";
+import { type ColorToken, defaultStateToken } from "@/lib/panels/colors";
+import { StatusGridOptions } from "@/lib/panels/kinds/status-grid";
 import {
   numberDisplay,
   readOptions,
@@ -55,6 +62,101 @@ export function statReading(panel: Panel, data: PanelData): StatReading {
     spark: o.sparkline
       ? data.rows.map((r) => toNumber(r[valueKey])).filter(Number.isFinite)
       : [],
+  };
+}
+
+/** The most tiles a status grid draws; the rest are counted, not drawn. */
+export const STATUS_GRID_MAX = 200;
+
+export interface StatusTile {
+  label: string;
+  /** The value, formatted per the panel; empty without a value column. */
+  text: string;
+  /** The state written on the tile, when the panel names a state column. */
+  state?: string;
+  /** Undefined below every threshold step: the tile is drawn neutral. */
+  color?: ColorToken;
+  /** For sorting by value; NaN without one. */
+  value: number;
+  /** The row the tile was drawn from: its entity's latest. */
+  row: Record<string, unknown>;
+}
+
+export interface StatusGrid {
+  tiles: StatusTile[];
+  /** Entities past {@link STATUS_GRID_MAX}, not drawn. */
+  overflow: number;
+}
+
+/**
+ * A status grid's tiles: the latest row per entity, so a time series of many
+ * hosts reads as now, the way a gauge's bars do. Colored by the state column
+ * when there is one, by the same rule as a state timeline's lanes, else by
+ * the value's threshold step.
+ */
+export function statusGrid(panel: Panel, data: PanelData): StatusGrid {
+  const o = readOptions(StatusGridOptions, panel.options);
+  const timeField = panelTimeField(panel);
+  const named = (c: string | undefined) =>
+    c && data.columns.includes(c) ? c : undefined;
+  const stateKey = named(o.state);
+  const valueKey =
+    named(o.value) ??
+    data.columns.find(
+      (c) => c !== timeField && c !== stateKey && isNumeric(data.rows, c),
+    );
+  const labelKey =
+    named(o.entity) ??
+    data.columns.find(
+      (c) =>
+        c !== timeField && c !== valueKey && c !== stateKey && !isNumeric(data.rows, c),
+    );
+
+  const latest = new Map<string, Record<string, unknown>>();
+  for (const row of data.rows) {
+    const label =
+      labelKey === undefined ? (valueKey ?? panel.title) : toText(row[labelKey]);
+    // Delete first, so a map in insertion order is also the entities' order of
+    // last appearance, which `sort: "none"` keeps.
+    latest.delete(label);
+    latest.set(label, row);
+  }
+
+  const colors = new Map((o.states ?? []).map((s) => [s.state, s.color]));
+  const display = numberDisplay(o);
+  const tiles = [...latest].map(([label, row]): StatusTile => {
+    const raw = valueKey === undefined ? undefined : row[valueKey];
+    const value = toNumber(raw);
+    const present = raw !== null && raw !== undefined && raw !== "";
+    const state = stateKey === undefined ? undefined : toText(row[stateKey]);
+    return {
+      label,
+      text: present ? formatValue(raw, panel.format, display) : "",
+      state,
+      color:
+        state !== undefined
+          ? (colors.get(state) ?? defaultStateToken(state))
+          : Number.isFinite(value)
+            ? thresholdColor(o.thresholds, value)
+            : undefined,
+      value,
+      row,
+    };
+  });
+
+  if (o.sort === "value") {
+    // Largest first; a tile without a number last.
+    tiles.sort((a, b) => {
+      const x = Number.isFinite(a.value);
+      const y = Number.isFinite(b.value);
+      return x && y ? b.value - a.value : x === y ? 0 : x ? -1 : 1;
+    });
+  } else if (o.sort !== "none") {
+    tiles.sort((a, b) => a.label.localeCompare(b.label, undefined, { numeric: true }));
+  }
+  return {
+    tiles: tiles.slice(0, STATUS_GRID_MAX),
+    overflow: Math.max(0, tiles.length - STATUS_GRID_MAX),
   };
 }
 

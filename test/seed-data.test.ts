@@ -150,3 +150,23 @@ test("the live generators keep their shape", () => {
     }
   }
 });
+
+test("the hosts differ, so the demo's thresholds and states have something to show", () => {
+  // Over many readings, each host's CPU and disk stay in its own range: a
+  // quiet host, a busy one past the 70% warning step, and a disk past 85%.
+  const random = seeded(7);
+  const readings = Array.from({ length: 500 }, (_, i) =>
+    systemMetricRows(NOW + i, random),
+  );
+  const mean = (host: string, key: "cpu_pct" | "disk_pct") => {
+    const values = readings
+      .flat()
+      .filter((r) => r.host === host)
+      .map((r) => r[key]);
+    return values.reduce((a, b) => a + b, 0) / values.length;
+  };
+  assert.ok(mean("host-01", "cpu_pct") < 50);
+  assert.ok(mean("host-03", "cpu_pct") > 70);
+  assert.ok(mean("host-04", "disk_pct") > 85);
+  assert.ok(mean("host-01", "disk_pct") < 60);
+});

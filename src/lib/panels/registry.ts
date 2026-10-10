@@ -5,6 +5,7 @@ import { scatter } from "@/lib/panels/kinds/scatter";
 import { area, bar, line } from "@/lib/panels/kinds/series";
 import { stat } from "@/lib/panels/kinds/stat";
 import { stateTimeline } from "@/lib/panels/kinds/state-timeline";
+import { statusGrid } from "@/lib/panels/kinds/status-grid";
 import { table } from "@/lib/panels/kinds/table";
 import { text } from "@/lib/panels/kinds/text";
 import type { PanelKind } from "@/lib/panels/types";
@@ -36,6 +37,7 @@ export const PANEL_KINDS = [
   donut,
   gauge,
   stateTimeline,
+  statusGrid,
   text,
 ] as const satisfies readonly PanelKind[];
 

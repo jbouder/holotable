@@ -56,7 +56,12 @@ test("every kind there was before the registry is still registered, in the same 
     "pie",
     "donut",
   ]);
-  assert.deepEqual(VizType.options.slice(9), ["gauge", "state-timeline", "text"]);
+  assert.deepEqual(VizType.options.slice(9), [
+    "gauge",
+    "state-timeline",
+    "status-grid",
+    "text",
+  ]);
   assert.deepEqual(VizType.options, PANEL_KIND_NAMES);
 });
 

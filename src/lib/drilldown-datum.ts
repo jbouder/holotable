@@ -14,7 +14,7 @@ import {
 } from "@/components/charts/state-timeline";
 import type { Datum } from "@/lib/drilldown";
 import type { Panel, VizType } from "@/lib/ir";
-import { tableView } from "@/lib/panel-reading";
+import { statusGrid, tableView } from "@/lib/panel-reading";
 
 /**
  * From a click to the row it was drawn from (#373): one mapping per
@@ -139,6 +139,13 @@ const tableDatum: DatumMapper = (panel, data, click) => {
   return row ? { row } : null;
 };
 
+/** A tile is its entity's latest row; its series is the tile's label. */
+const tileDatum: DatumMapper = (panel, data, click) => {
+  const { tiles } = statusGrid(panel, data);
+  const tile = tiles.find((t) => t.label === click.name) ?? at(tiles, click.dataIndex);
+  return tile ? { row: tile.row, series: tile.label } : null;
+};
+
 export const DATUM_MAPPERS = {
   line: byRowIndex,
   area: byRowIndex,
@@ -151,6 +158,7 @@ export const DATUM_MAPPERS = {
   donut: sliceDatum,
   gauge: gaugeDatum,
   "state-timeline": spanDatum,
+  "status-grid": tileDatum,
   // A text panel has no rows and takes no links.
   text: () => null,
 } as const satisfies Record<VizType, DatumMapper>;

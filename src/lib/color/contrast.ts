@@ -1,4 +1,5 @@
 import { resolveOklchToken } from "@/lib/color/oklch";
+import { COLOR_TOKENS, type ColorToken, tokenHex } from "@/lib/panels/colors";
 
 /**
  * WCAG contrast for the design tokens (#77).
@@ -73,8 +74,12 @@ export interface ContrastPair {
   text: string;
   /** The background token, opaque. */
   on: string;
-  /** A tint of `tint` at this opacity over `on`, as `bg-<tint>/<n>` draws it. */
-  tint?: { token: string; alpha: number };
+  /**
+   * A tint of `tint` at this opacity over `on`, as `bg-<tint>/<n>` draws it.
+   * With `spec`, the token is a spec color (`ColorToken`), which is one color
+   * in both themes, rather than a CSS variable.
+   */
+  tint?: { token: string; alpha: number; spec?: true };
   /** Where it is used, so a failure says what to look at. */
   where: string;
 }
@@ -85,6 +90,12 @@ export interface ContrastPair {
  */
 const SURFACES = ["background", "surface", "surface-2"] as const;
 const STATUS = ["danger", "warning", "success"] as const;
+
+/**
+ * How much of its color a status-grid tile mixes into `surface-2` (#404). All
+ * of a tile's text is `foreground`: `muted` falls below AA under some tints.
+ */
+export const STATUS_TILE_TINT = 0.2;
 
 /**
  * The pairings in use. Text tokens on every surface; each status color on its
@@ -110,6 +121,12 @@ export const CONTRAST_PAIRS: readonly ContrastPair[] = [
     tint: { token: "primary", alpha: 0.1 },
     where: "text-primary on bg-primary/10",
   },
+  ...(Object.keys(COLOR_TOKENS) as ColorToken[]).map((color) => ({
+    text: "foreground",
+    on: "surface-2",
+    tint: { token: color, alpha: STATUS_TILE_TINT, spec: true as const },
+    where: `text-foreground on a ${color} status tile`,
+  })),
   { text: "primary-foreground", on: "primary", where: "primary button" },
   { text: "primary-foreground", on: "danger", where: "danger button" },
 ];
@@ -148,7 +165,14 @@ export function measureContrast(css: string): MeasuredPair[] {
     };
     return CONTRAST_PAIRS.map((pair) => {
       const base = token(pair.on);
-      const bg = pair.tint ? over(token(pair.tint.token), pair.tint.alpha, base) : base;
+      const tint = pair.tint;
+      const bg = tint
+        ? over(
+            tint.spec ? hexToRgb(tokenHex(tint.token as ColorToken)) : token(tint.token),
+            tint.alpha,
+            base,
+          )
+        : base;
       return { ...pair, theme, ratio: contrastRatio(token(pair.text), bg) };
     });
   });

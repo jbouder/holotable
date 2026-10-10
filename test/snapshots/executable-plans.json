@@ -425,6 +425,21 @@
     "sql": "SELECT * FROM (SELECT route, count(*) AS requests FROM http_requests GROUP BY route ORDER BY requests DESC) AS _holo LIMIT 5000",
     "params": []
   },
+  "v1-status-grid.json#cpu": {
+    "sql": "SELECT * FROM (SELECT time_bucket('1 minute', ts) AS minute, host, avg(cpu_pct) AS cpu FROM system_metrics GROUP BY minute, host ORDER BY minute) AS _holo\nWHERE _holo.minute >= $1::timestamptz\n  AND _holo.minute < $2::timestamptz\nLIMIT 5000",
+    "params": ["2026-01-01T00:00:00.000Z", "2026-01-01T01:00:00.000Z"],
+    "timeField": "minute"
+  },
+  "v1-status-grid.json#disk": {
+    "sql": "SELECT * FROM (SELECT time_bucket('1 minute', ts) AS minute, host, max(disk_pct) AS disk FROM system_metrics GROUP BY minute, host ORDER BY minute) AS _holo\nWHERE _holo.minute >= $1::timestamptz\n  AND _holo.minute < $2::timestamptz\nLIMIT 5000",
+    "params": ["2026-01-01T00:00:00.000Z", "2026-01-01T01:00:00.000Z"],
+    "timeField": "minute"
+  },
+  "v1-status-grid.json#load": {
+    "sql": "SELECT * FROM (SELECT time_bucket('1 minute', ts) AS minute, host, CASE WHEN avg(cpu_pct) >= 85 THEN 'hot' WHEN avg(cpu_pct) >= 70 THEN 'busy' ELSE 'ok' END AS state FROM system_metrics GROUP BY minute, host ORDER BY minute) AS _holo\nWHERE _holo.minute >= $1::timestamptz\n  AND _holo.minute < $2::timestamptz\nLIMIT 5000",
+    "params": ["2026-01-01T00:00:00.000Z", "2026-01-01T01:00:00.000Z"],
+    "timeField": "minute"
+  },
   "v1-unversioned.json#rps": {
     "sql": "SELECT * FROM (SELECT time_bucket('1 minute', ts) AS minute, count(*) AS requests FROM http_requests GROUP BY minute ORDER BY minute) AS _holo\nWHERE _holo.minute >= $1::timestamptz\n  AND _holo.minute < $2::timestamptz\nLIMIT 5000",
     "params": ["2026-01-01T00:00:00.000Z", "2026-01-01T01:00:00.000Z"],

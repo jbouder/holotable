@@ -53,5 +53,10 @@
     "authoredAt": 1,
     "digest": "45b522022bb669f425179bdc855c1ecba9c80e1d9906b7549e806b10eed4f805",
     "origin": "committed (#390): dashboard \"Holotable self-monitoring (Prometheus)\", the PromQL self-monitoring demo the seeder stores"
+  },
+  "v1-status-grid.json": {
+    "authoredAt": 1,
+    "digest": "bf48ea0a8edd53c626b0cc65e5ce5bf3b585acc2a365876c46bd5ca83994ed87",
+    "origin": "hand-written (#404): the seeded \"Demo fleet grid\", status grids by threshold and by state, with datum links"
   }
 }

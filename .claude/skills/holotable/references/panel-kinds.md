@@ -122,6 +122,24 @@ default, or `"history"`: fixed cells, each showing the state at its middle).
 
 With PromQL: not for a Prometheus source; it needs an entity column and a state column per row. Draw the state value as a `line` instead.
 
+### `status-grid`
+
+Which of many things is healthy, at a glance: one tile per entity (a host, a
+service, a pod) showing its latest value, colored by `thresholds` or by a
+discrete state. Return one row per entity, or a series per entity: the latest
+row of each is shown. Use `gauge` with `variant: "bar"` instead to rank values
+against a limit.
+
+Options: number, thresholds, `entity` (the tile's label; default the first
+text column other than the state), `value` (default the first numeric
+column), `state` (a state column; when set it colors the tile through
+`states` and is written on it, instead of the value's threshold), `states`
+(up to 50 `{ state, color }` pairs, each state once), `sort` (`"label"`, the
+default, `"value"`, largest first, or `"none"`), `columns` (1–12 tiles per
+row; default as many as fit). At most 200 tiles are drawn.
+
+With PromQL: an instant query, one tile per series, `max by (instance) (up)` with `entity: "instance"` and thresholds `[{0, danger}, {1, success}]`.
+
 ### `text`
 
 Prose for the reader: a heading, what the dashboard is for, a runbook link.
