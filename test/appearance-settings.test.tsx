@@ -93,7 +93,10 @@ test("patterns in charts is off by default, and saving it applies it to the page
   assert.equal(seen, false);
 
   ui.click(group.find((r) => r.value === "true") as Element);
-  await new Promise((r) => setTimeout(r, 0));
+  // The save is a fetch, then a state update, then a render: wait for it.
+  for (let i = 0; i < 100 && seen !== true; i++) {
+    await new Promise((r) => setTimeout(r, 10));
+  }
   assert.deepEqual(calls, [
     { url: "/api/me/preferences", body: { chartPatterns: true } },
   ]);
