@@ -95,6 +95,37 @@
           ]
         },
         "layout": { "x": 4, "y": 4, "w": 8, "h": 4 }
+      },
+      {
+        "id": "cpu-spread",
+        "title": "CPU spread per host",
+        "description": "Every 5-minute average as a tick, one row per host, against the 85% line: where each host usually sits, and how far it strays.",
+        "viz": "vega",
+        "options": {
+          "spec": {
+            "data": { "name": "rows" },
+            "layer": [
+              {
+                "mark": { "type": "tick", "opacity": 0.6 },
+                "encoding": {
+                  "x": { "field": "cpu", "type": "quantitative", "title": "CPU %" },
+                  "y": { "field": "host", "type": "nominal", "title": null },
+                  "color": { "value": "info" }
+                }
+              },
+              {
+                "mark": "rule",
+                "encoding": { "x": { "datum": 85 }, "color": { "value": "danger" } }
+              }
+            ]
+          }
+        },
+        "query": {
+          "sourceId": "ts-metrics",
+          "sql": "SELECT time_bucket('5 minutes', ts) AS period, host, avg(cpu_pct) AS cpu FROM host_metrics WHERE region = :region AND host = ANY(:host) GROUP BY period, host ORDER BY period",
+          "timeField": "period"
+        },
+        "layout": { "x": 0, "y": 8, "w": 12, "h": 4 }
       }
     ]
   }

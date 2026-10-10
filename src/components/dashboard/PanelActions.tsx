@@ -86,11 +86,11 @@ export function PanelActions({
     URL.revokeObjectURL(href);
   }
 
-  function exportPng() {
+  async function exportPng() {
     // The canvas is transparent, so the theme's own surface colour is painted
     // behind it — an exported chart should look like the one on screen, not
     // like a dark-theme chart pasted onto white.
-    const url = chart?.current?.toPng(surfaceColor());
+    const url = await chart?.current?.toPng(surfaceColor());
     if (url) download(url, name("png"));
   }
 
@@ -156,7 +156,7 @@ export function PanelActions({
         </MenuItem>
       )}
       {exportable && chart && (
-        <MenuItem onClick={exportPng} disabled={!hasRows}>
+        <MenuItem onClick={() => void exportPng()} disabled={!hasRows}>
           <ImageIcon className="h-4 w-4" /> Export PNG
         </MenuItem>
       )}

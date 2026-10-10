@@ -1,0 +1,132 @@
+{
+  "specVersion": 1,
+  "title": "Custom visuals",
+  "timeRange": {
+    "from": "now-1h",
+    "to": "now"
+  },
+  "refreshIntervalMs": 30000,
+  "panels": [
+    {
+      "id": "cpu-band",
+      "title": "CPU band across hosts",
+      "viz": "vega",
+      "query": {
+        "sourceId": "ts-system",
+        "timeField": "minute",
+        "sql": "SELECT time_bucket('1 minute', ts) AS minute, min(cpu_pct) AS low, avg(cpu_pct) AS mean, max(cpu_pct) AS high FROM system_metrics GROUP BY minute ORDER BY minute"
+      },
+      "options": {
+        "spec": {
+          "data": {
+            "name": "rows"
+          },
+          "layer": [
+            {
+              "mark": "area",
+              "encoding": {
+                "x": {
+                  "field": "minute",
+                  "type": "temporal"
+                },
+                "y": {
+                  "field": "low",
+                  "type": "quantitative"
+                },
+                "y2": {
+                  "field": "high"
+                },
+                "color": {
+                  "value": "palette-0"
+                },
+                "opacity": {
+                  "value": 0.25
+                }
+              }
+            },
+            {
+              "mark": "line",
+              "encoding": {
+                "x": {
+                  "field": "minute",
+                  "type": "temporal"
+                },
+                "y": {
+                  "field": "mean",
+                  "type": "quantitative",
+                  "title": "CPU %"
+                },
+                "color": {
+                  "value": "palette-0"
+                }
+              }
+            },
+            {
+              "mark": "rule",
+              "encoding": {
+                "y": {
+                  "datum": 85
+                },
+                "color": {
+                  "value": "danger"
+                }
+              }
+            }
+          ]
+        }
+      },
+      "layout": {
+        "x": 0,
+        "y": 0,
+        "w": 8,
+        "h": 4
+      }
+    },
+    {
+      "id": "cpu-by-region",
+      "title": "CPU by host, per region",
+      "viz": "vega",
+      "query": {
+        "sourceId": "ts-system",
+        "sql": "SELECT region, host, avg(cpu_pct) AS cpu FROM system_metrics GROUP BY region, host"
+      },
+      "options": {
+        "spec": {
+          "data": {
+            "name": "rows"
+          },
+          "facet": {
+            "field": "region",
+            "type": "nominal"
+          },
+          "spec": {
+            "mark": "bar",
+            "encoding": {
+              "x": {
+                "field": "host",
+                "type": "nominal"
+              },
+              "y": {
+                "field": "cpu",
+                "type": "quantitative"
+              },
+              "color": {
+                "field": "host",
+                "type": "nominal",
+                "scale": {
+                  "range": ["info", "teal", "purple", "orange"]
+                }
+              }
+            }
+          }
+        }
+      },
+      "layout": {
+        "x": 8,
+        "y": 0,
+        "w": 4,
+        "h": 4
+      }
+    }
+  ]
+}

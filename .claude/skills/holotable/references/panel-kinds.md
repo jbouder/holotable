@@ -195,6 +195,30 @@ drawn, and at most 500 leaves are, the largest.
 
 With PromQL: an instant query aggregated by the levels, `sum by (job, instance) (rate(http_requests_total[5m]))`, with `path: ["job", "instance"]` and `value: "value"`.
 
+### `vega`
+
+A custom visual: a view no other kind draws (a band with a rule, small
+multiples, a dot or tick plot, a slope chart), as a Vega-Lite spec in
+`options.spec` over the panel's own query rows. Reach for it last: a
+registered kind is themed, linked and generated better.
+
+The spec's `data` is exactly `{ "name": "rows" }`, at the top and anywhere
+else one appears, and it encodes the query's columns by name. Refused
+anywhere in it: `url`, `href`, an `image` mark, `datasets`, inline `values`,
+`config`, `usermeta`, a `scheme`, a parameter bound to an `element`, and a
+`projection`. Every color is a token name (`success`, `warning`, `danger`,
+`info`, `neutral`, `orange`, `purple`, `teal`), a chart color by index
+(`palette-0` to `palette-5`) or `transparent`, never a literal. Marks are
+`arc`, `area`, `bar`, `boxplot`, `circle`, `errorband`, `errorbar`, `line`,
+`point`, `rect`, `rule`, `square`, `text`, `tick` and `trail`; field types
+are `quantitative`, `temporal`, `ordinal` and `nominal`. The spec is at most
+32 KB, and it must compile: the server refuses one that does not, with the
+compiler's message.
+
+Options: `spec` (required).
+
+With PromQL: as with SQL, over the result's rows: an instant query's one row per series (its labels and `value`), or a range query's `time` and one column per series.
+
 ### `text`
 
 Prose for the reader: a heading, what the dashboard is for, a runbook link.

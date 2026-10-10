@@ -191,6 +191,8 @@ export const DATUM_MAPPERS = {
   histogram: barDatum,
   logs: lineDatum,
   treemap: nodeDatum,
+  // A custom visual's marks are the spec's own, not rows the kind can name (#405).
+  vega: () => null,
   // A text panel has no rows and takes no links.
   text: () => null,
 } as const satisfies Record<VizType, DatumMapper>;

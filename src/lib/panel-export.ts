@@ -22,7 +22,8 @@ import { panelKind } from "@/lib/panels/registry";
  * than a PNG that would have to be faked.
  */
 export function supportsImageExport(viz: VizType): boolean {
-  return panelKind(viz).canvas;
+  const kind = panelKind(viz);
+  return kind.canvas || kind.image === true;
 }
 
 /**

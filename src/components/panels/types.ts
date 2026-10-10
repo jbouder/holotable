@@ -1,15 +1,18 @@
 import type * as React from "react";
+import type { EChartHandle } from "@/components/charts/EChart";
 import type { ChartOptionBuilder, PanelData } from "@/components/charts/options";
 import type { Panel } from "@/lib/ir";
 
 /**
  * How a panel kind is drawn: the browser half of the panel registry (#61).
  *
- * A kind is either a chart, whose option builder `PanelView` hands to the one
- * long-lived `EChart` (merged on every update, never recreated: invariant 11),
- * or an HTML body. The kind's `canvas` flag in `src/lib/panels/` says the same
- * thing to the code that cannot import React, and a test holds the two to
- * each other.
+ * A kind is a chart, whose option builder `PanelView` hands to the one
+ * long-lived `EChart` (merged on every update, never recreated: invariant 11);
+ * an HTML body; or a view, a body that draws its own image (a custom visual,
+ * #405) and is handed the same export handle a chart is. The kind's `canvas`
+ * flag in `src/lib/panels/` says "an ECharts chart" to the code that cannot
+ * import React, its `image` flag says "a view", and a test holds them to the
+ * renderers.
  */
 export type PanelRenderer =
   | {
@@ -23,9 +26,15 @@ export type PanelRenderer =
        */
       shape?: (panel: Panel) => string;
     }
-  | { type: "html"; Body: React.ComponentType<PanelBodyProps> };
+  | { type: "html"; Body: React.ComponentType<PanelBodyProps> }
+  | { type: "view"; Body: React.ComponentType<PanelViewProps> };
 
 export interface PanelBodyProps {
   panel: Panel;
   data: PanelData;
+}
+
+export interface PanelViewProps extends PanelBodyProps {
+  /** What the PNG export calls: the view's own image of itself. */
+  handle?: React.Ref<EChartHandle>;
 }

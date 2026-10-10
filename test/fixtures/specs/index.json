@@ -73,5 +73,10 @@
     "authoredAt": 1,
     "digest": "203825f2e76d6c7675b7ec6c0b3614e4550508712fb08c37c477e180afdd1e41",
     "origin": "hand-written (#404): a SQL treemap over a coarse time bucket, and a PromQL sunburst from an instant query"
+  },
+  "v1-vega.json": {
+    "authoredAt": 1,
+    "digest": "0624abece2a27c9c22617dc884877ca12b37b2771ca4a16acda3acfc04d0acdb",
+    "origin": "hand-written (#405): custom visuals, a layered band with a rule and a faceted bar, in token colors over the panel's rows"
   }
 }

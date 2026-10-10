@@ -44,6 +44,11 @@ export interface PanelKind<K extends string = string> {
    */
   readonly canvas: boolean;
   /**
+   * Draws its own image rather than an ECharts chart (a custom visual, #405):
+   * it can be exported as a PNG, but explore does not plot it.
+   */
+  readonly image?: boolean;
+  /**
    * The x-axis is the panel's time field laid out left to right, so dragging
    * across the chart names a stretch of time (#75).
    */
@@ -77,6 +82,14 @@ export interface PanelKind<K extends string = string> {
    * the editor shows them. A field in none of them is edited as JSON.
    */
   readonly optionGroups?: readonly OptionGroup[];
+  /**
+   * A check of a panel's options beyond their schema, run on the server
+   * wherever a dashboard is accepted (`resolveAndValidateDashboard`): an
+   * error message, or undefined when the options pass. A custom visual's
+   * spec is compiled here (#405). It may import server-only code
+   * dynamically; the IR never calls it.
+   */
+  readonly check?: (options: unknown) => Promise<string | undefined>;
   /**
    * The options a panel switched to this kind starts with, when `{}` would not
    * do (a text panel needs content). Given the panel's title.

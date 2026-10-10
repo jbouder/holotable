@@ -12,6 +12,7 @@ import { table } from "@/lib/panels/kinds/table";
 import { text } from "@/lib/panels/kinds/text";
 import { treemap } from "@/lib/panels/kinds/treemap";
 import type { PanelKind } from "@/lib/panels/types";
+import { vega } from "@/lib/panels/kinds/vega";
 
 /**
  * The panel registry (#61): every kind a panel can be, in one list.
@@ -44,6 +45,7 @@ export const PANEL_KINDS = [
   histogram,
   logs,
   treemap,
+  vega,
   text,
 ] as const satisfies readonly PanelKind[];
 
