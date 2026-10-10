@@ -223,6 +223,19 @@
           "timeField": "ts"
         },
         "layout": { "x": 0, "y": 24, "w": 12, "h": 5 }
+      },
+      {
+        "id": "route-status",
+        "title": "Requests by service and route",
+        "description": "Each service, then its routes, sized by requests in the window.",
+        "viz": "treemap",
+        "options": { "path": ["service", "route"], "value": "requests", "compact": true },
+        "query": {
+          "sourceId": "ts-metrics",
+          "sql": "SELECT time_bucket('5 minutes', ts) AS period, service, route, count(*) AS requests FROM http_requests GROUP BY period, service, route ORDER BY period",
+          "timeField": "period"
+        },
+        "layout": { "x": 0, "y": 29, "w": 12, "h": 4 }
       }
     ]
   }

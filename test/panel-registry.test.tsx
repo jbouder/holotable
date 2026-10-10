@@ -62,6 +62,7 @@ test("every kind there was before the registry is still registered, in the same 
     "status-grid",
     "histogram",
     "logs",
+    "treemap",
     "text",
   ]);
   assert.deepEqual(VizType.options, PANEL_KIND_NAMES);

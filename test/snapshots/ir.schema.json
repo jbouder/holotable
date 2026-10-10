@@ -73,6 +73,7 @@
               "status-grid",
               "histogram",
               "logs",
+              "treemap",
               "text"
             ]
           },
@@ -859,6 +860,44 @@
                     "enum": ["newest", "oldest"]
                   },
                   "showTime": {
+                    "type": "boolean"
+                  }
+                },
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "path": {
+                    "minItems": 1,
+                    "maxItems": 5,
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 128
+                    }
+                  },
+                  "value": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 128
+                  },
+                  "variant": {
+                    "type": "string",
+                    "enum": ["treemap", "sunburst"]
+                  },
+                  "decimals": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 6
+                  },
+                  "unit": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 16
+                  },
+                  "compact": {
                     "type": "boolean"
                   }
                 },

@@ -102,17 +102,22 @@ export function httpRequestRows(
 }
 
 /**
- * Each host's CPU and disk range, `[low, high]` percent (#404). Distinct on
- * purpose, so the demo's thresholds and states have something to show: one
- * quiet host, one that is busy and now and then hot, one whose disk is
- * filling. Indexed like {@link HOSTS}.
+ * Each host's CPU and disk range, `[low, high]` percent, and its share of
+ * traffic (#404). Distinct on purpose, so the demo's thresholds, states and
+ * shares have something to show: one quiet host, one that is busy and now
+ * and then hot, one whose disk is filling. Indexed like {@link HOSTS}.
  */
 const HOST_PROFILES = [
-  { cpu: [20, 50], disk: [40, 55] },
-  { cpu: [45, 75], disk: [60, 72] },
-  { cpu: [72, 98], disk: [70, 80] },
-  { cpu: [30, 60], disk: [86, 94] },
-] as const satisfies readonly { cpu: [number, number]; disk: [number, number] }[];
+  { cpu: [20, 50], disk: [40, 55], traffic: 0.6 },
+  { cpu: [45, 75], disk: [60, 72], traffic: 1.4 },
+  { cpu: [72, 98], disk: [70, 80], traffic: 2.5 },
+  { cpu: [30, 60], disk: [86, 94], traffic: 1 },
+] as const satisfies readonly {
+  cpu: [number, number];
+  disk: [number, number];
+  /** Scales the host's network bytes, so the hosts carry different loads. */
+  traffic: number;
+}[];
 
 function within([low, high]: readonly [number, number], random: Random): number {
   return Math.min(100, Math.max(1, low + random() * (high - low)));
@@ -131,8 +136,14 @@ export function systemMetricRows(
     cpu_pct: within(HOST_PROFILES[index % HOST_PROFILES.length].cpu, random),
     mem_pct: Math.min(100, Math.max(1, 40 + random() * 40)),
     disk_pct: within(HOST_PROFILES[index % HOST_PROFILES.length].disk, random),
-    net_in_bytes: Math.floor(10_000 + random() * 5_000_000),
-    net_out_bytes: Math.floor(10_000 + random() * 5_000_000),
+    net_in_bytes: Math.floor(
+      (10_000 + random() * 5_000_000) *
+        HOST_PROFILES[index % HOST_PROFILES.length].traffic,
+    ),
+    net_out_bytes: Math.floor(
+      (10_000 + random() * 5_000_000) *
+        HOST_PROFILES[index % HOST_PROFILES.length].traffic,
+    ),
   }));
 }
 

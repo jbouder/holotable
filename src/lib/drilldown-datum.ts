@@ -1,6 +1,7 @@
 import { panelTimeField } from "@/lib/ir";
 import { gaugeOptions, gaugeReadings } from "@/components/charts/gauge";
 import { histogramBars } from "@/components/charts/histogram";
+import { treemapNodes, treemapTree } from "@/components/charts/treemap";
 import {
   asInstant,
   type ChartContext,
@@ -32,6 +33,8 @@ export interface DatumClick {
   seriesName?: string;
   dataIndex?: number;
   name?: string;
+  /** The data item's `id`, where the kind sets one. */
+  id?: string;
 }
 
 type DatumMapper = (
@@ -159,6 +162,19 @@ const lineDatum: DatumMapper = (panel, data, click) => {
   return line ? { row: line.row, series: line.level } : null;
 };
 
+/**
+ * A node is its path: the row is its column values from the top level down,
+ * with its summed value, and the series is its own label.
+ */
+const nodeDatum: DatumMapper = (panel, data, click) => {
+  const tree = treemapTree(panel, data);
+  const node = treemapNodes(tree).find((n) => n.id === click.id);
+  if (!node) return null;
+  const row: Record<string, unknown> = { ...node.path };
+  if (tree.valueKey) row[tree.valueKey] = node.value;
+  return { row, series: node.name };
+};
+
 export const DATUM_MAPPERS = {
   line: byRowIndex,
   area: byRowIndex,
@@ -174,6 +190,7 @@ export const DATUM_MAPPERS = {
   "status-grid": tileDatum,
   histogram: barDatum,
   logs: lineDatum,
+  treemap: nodeDatum,
   // A text panel has no rows and takes no links.
   text: () => null,
 } as const satisfies Record<VizType, DatumMapper>;

@@ -24,7 +24,7 @@ They resolve through the same OKLCH values as the theme (invariant 13).
 ### Numbers
 
 Taken by `line`, `area`, `bar`, `stat`, `pie`, `donut`, `gauge`,
-`status-grid` and `histogram`, and by each
+`status-grid`, `histogram` and `treemap`, and by each
 entry of a table's `columns`.
 
 | Option | Type | Default | Meaning |
@@ -296,6 +296,43 @@ Log lines, newest first
   the line they were reading where it was.
 - To filter by level, put it in the SQL with a
   [variable](/guide/variables/): `WHERE level = ANY(:level)`.
+
+## `treemap`
+
+What a whole is made of, level by level
+([#404](https://github.com/jbouder/holotable/issues/404)).
+
+| Option | Type | Default | Meaning |
+| --- | --- | --- | --- |
+| `path` | 1 to 5 column names | every text column other than the time field | The levels, top first. |
+| `value` | column name | first numeric column | The size of each leaf. |
+| `variant` | `"treemap"` \| `"sunburst"` | `"treemap"` | Nested rectangles, or rings from the center out. |
+| `decimals`, `unit`, `compact` | see [Numbers](#numbers) | none | How a value is written in labels and tooltips, with `panel.format`. |
+
+- Each row is a leaf at the end of its path. Rows with the same path are
+  summed, and a parent is the sum of its children, so a query returns
+  counts and totals rather than averages. A coarse time bucket as
+  `query.timeField` (`time_bucket('5 minutes', ts)`) applies the window and
+  sums correctly.
+- A zero, negative or missing value is not drawn. At most 500 leaves are, the
+  largest.
+- Every node takes its top-level branch's chart color. Its label is black or
+  white, whichever meets WCAG AA on that color.
+- A click on a node follows a [datum link](/guide/drilldown/), carrying the
+  node's path columns and its summed value; it never zooms.
+
+```json
+{
+  "viz": "treemap",
+  "format": "bytes",
+  "query": {
+    "sourceId": "ts-system",
+    "timeField": "period",
+    "sql": "SELECT time_bucket('5 minutes', ts) AS period, region, host, sum(net_in_bytes) AS bytes FROM system_metrics GROUP BY period, region, host ORDER BY period"
+  },
+  "options": { "path": ["region", "host"], "value": "bytes" }
+}
+```
 
 ## `text`
 

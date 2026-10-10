@@ -16,6 +16,7 @@ dashboard readable during an incident.
 | What state was it in, and when? (up/down, deploys) | `state-timeline` | Raw time, entity, state, ordered by time. |
 | What does it look like, not just its p95? (latency, sizes) | `histogram` | A bucket (lower bound) + a count, with a coarse time bucket; `cumulative` for a Prometheus `le`. |
 | What did it say? (errors, audit entries, recent events) | `logs` | Raw time + message (+ level), newest first, `LIMIT 200`. |
+| What is the whole made of, level by level? (disk, cost, traffic) | `treemap` | Path columns + a summable value; `variant: "sunburst"` for rings. |
 | Which of these is unhealthy? (hosts, services, targets) | `status-grid` | One row per entity, a label + a value (or a state); thresholds color it. |
 | Where is the load concentrated over time? | `heatmap` | Time bucket, a dimension, a count. |
 | Do two measures move together? (size vs latency) | `scatter` | Two numeric columns, optionally a label. |
@@ -58,8 +59,8 @@ For a Prometheus source (see `references/promql-rules.md`):
   keeping `le` in the `by`. Multiply a `…_seconds` histogram by 1000 for
   `"format": "ms"`.
 - **`instant`**: set it for a stat, a gauge, a table, a pie or donut, a
-  status grid, a histogram, and a bar compared across a label; they draw one
-  value per series. Leave it out for anything over time.
+  status grid, a histogram, a treemap, and a bar compared across a label; they
+  draw one value per series. Leave it out for anything over time.
 - **Not for PromQL**: `heatmap`, `scatter`, `state-timeline` and `logs` read
   row shapes a PromQL result does not have.
 

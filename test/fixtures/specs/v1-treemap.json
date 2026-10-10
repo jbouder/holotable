@@ -1,0 +1,55 @@
+{
+  "specVersion": 1,
+  "title": "Where the traffic goes",
+  "timeRange": {
+    "from": "now-1h",
+    "to": "now"
+  },
+  "refreshIntervalMs": 30000,
+  "panels": [
+    {
+      "id": "network",
+      "title": "Network in by region and host",
+      "viz": "treemap",
+      "format": "bytes",
+      "query": {
+        "sourceId": "ts-system",
+        "timeField": "period",
+        "sql": "SELECT time_bucket('5 minutes', ts) AS period, region, host, sum(net_in_bytes) AS bytes FROM system_metrics GROUP BY period, region, host ORDER BY period"
+      },
+      "options": {
+        "path": ["region", "host"],
+        "value": "bytes"
+      },
+      "layout": {
+        "x": 0,
+        "y": 0,
+        "w": 6,
+        "h": 4
+      }
+    },
+    {
+      "id": "routes",
+      "title": "Request rate by route and code",
+      "viz": "treemap",
+      "query": {
+        "sourceId": "prom-metrics",
+        "promql": "sum by (route, code) (rate(http_requests_total[5m]))",
+        "instant": true
+      },
+      "options": {
+        "variant": "sunburst",
+        "path": ["route", "code"],
+        "value": "value",
+        "unit": "/s",
+        "decimals": 1
+      },
+      "layout": {
+        "x": 6,
+        "y": 0,
+        "w": 6,
+        "h": 4
+      }
+    }
+  ]
+}

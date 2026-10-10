@@ -177,6 +177,24 @@ column; default one named `level` or `severity`), `levels` (up to 20 `{ state, c
 
 With PromQL: not for a Prometheus source; a PromQL result has no lines. Use `table` for an instant query's series.
 
+### `treemap`
+
+What a whole is made of, level by level: disk by region then host, requests
+by service then route, cost by team then service. Return one row per leaf:
+its path columns and one numeric value. Rows with the same path are summed,
+and a parent is the sum of its children, so return counts and totals, not
+averages; a coarse time bucket as `query.timeField`
+(`time_bucket('5 minutes', ts) AS period`) applies the window and sums
+correctly. Use `pie` for one level with a handful of parts.
+
+Options: number (how values are written), `path` (1–5 columns, top level
+first; default every text column other than the time field), `value` (default
+the first numeric column), `variant` (`"treemap"`, the default, or
+`"sunburst"`: rings from the center out). A zero or negative value is not
+drawn, and at most 500 leaves are, the largest.
+
+With PromQL: an instant query aggregated by the levels, `sum by (job, instance) (rate(http_requests_total[5m]))`, with `path: ["job", "instance"]` and `value: "value"`.
+
 ### `text`
 
 Prose for the reader: a heading, what the dashboard is for, a runbook link.

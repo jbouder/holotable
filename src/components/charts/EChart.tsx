@@ -43,6 +43,8 @@ export interface DatumClickEvent {
   seriesName?: string;
   dataIndex?: number;
   name?: string;
+  /** The data item's own `id`, where a kind gives one (a treemap node's path). */
+  id?: string;
   clientX: number;
   clientY: number;
 }
@@ -355,8 +357,13 @@ export function datumClick(params: unknown): DatumClickEvent | null {
     seriesName?: unknown;
     dataIndex?: unknown;
     name?: unknown;
+    data?: unknown;
     event?: { event?: { clientX?: unknown; clientY?: unknown } };
   };
+  const id =
+    typeof p.data === "object" && p.data !== null
+      ? (p.data as { id?: unknown }).id
+      : undefined;
   const native = p.event?.event;
   const clientX = typeof native?.clientX === "number" ? native.clientX : 0;
   const clientY = typeof native?.clientY === "number" ? native.clientY : 0;
@@ -364,6 +371,7 @@ export function datumClick(params: unknown): DatumClickEvent | null {
     seriesName: typeof p.seriesName === "string" ? p.seriesName : undefined,
     dataIndex: typeof p.dataIndex === "number" ? p.dataIndex : undefined,
     name: typeof p.name === "string" ? p.name : undefined,
+    ...(typeof id === "string" ? { id } : {}),
     clientX,
     clientY,
   };

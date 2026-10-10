@@ -10,6 +10,7 @@ import {
 } from "@/components/charts/options";
 import { gaugeChart, gaugeShape } from "@/components/charts/gauge";
 import { histogramChart, histogramShape } from "@/components/charts/histogram";
+import { treemapChart, treemapShape } from "@/components/charts/treemap";
 import {
   stateTimelineChart,
   stateTimelineShape,
@@ -49,6 +50,7 @@ export const PANEL_RENDERERS = {
   "status-grid": { type: "html", Body: StatusGridView },
   histogram: { type: "chart", option: histogramChart, shape: histogramShape },
   logs: { type: "html", Body: LogsView },
+  treemap: { type: "chart", option: treemapChart, shape: treemapShape },
   text: { type: "html", Body: TextView },
 } as const satisfies Record<VizType, PanelRenderer>;
 
