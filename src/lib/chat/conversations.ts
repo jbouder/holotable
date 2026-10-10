@@ -77,6 +77,23 @@ export const TurnBody = z.object({
 });
 export type TurnBody = z.infer<typeof TurnBody>;
 
+/**
+ * The history an unkept conversation's page sends with each turn (#416): at
+ * most the kept bound of messages, each a user or assistant message with an
+ * array of parts. The parts are the AI SDK's and evolve, so they are checked
+ * by the SDK when the history is converted for the model, as the dashboard
+ * chat's are; none of them is ever executed.
+ */
+export const UnkeptHistory = z
+  .array(
+    z.object({
+      id: z.string().min(1).max(128),
+      role: z.enum(["user", "assistant"]),
+      parts: z.array(z.unknown()).max(50),
+    }),
+  )
+  .max(100);
+
 export function conversationRetention(): ConversationRetention {
   return {
     limit: config.chatHistoryMaxMessages,

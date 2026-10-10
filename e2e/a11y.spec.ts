@@ -116,6 +116,23 @@ for (const theme of THEMES) {
       await expectNoA11yViolations(page);
     });
 
+    test("chat with the history filter in use", async ({ page }) => {
+      await askChat(page);
+      await expect(
+        page.getByRole("region", { name: "Requests by service, table" }),
+      ).toBeVisible();
+      await page.getByRole("textbox", { name: "Filter conversations" }).fill("busiest");
+      await expectNoA11yViolations(page);
+    });
+
+    test("chat at phone width with the side panel open", async ({ page }) => {
+      await page.setViewportSize({ width: 390, height: 844 });
+      await page.goto("/chat");
+      await page.getByRole("button", { name: /source.* · / }).click();
+      await expect(page.getByRole("dialog", { name: "Conversation" })).toBeVisible();
+      await expectNoA11yViolations(page);
+    });
+
     test("data sources", async ({ page }) => {
       await page.goto("/data-sources");
       await expect(page.getByRole("heading", { level: 1 })).toBeVisible();

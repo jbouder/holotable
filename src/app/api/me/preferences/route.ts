@@ -1,6 +1,8 @@
 import { z } from "zod";
 import { requireIdentity } from "@/lib/auth/authorize";
 import { json, readJson, route } from "@/lib/http";
+import { audit } from "@/lib/audit";
+import { pgConversationStore } from "@/lib/db/conversations";
 import { loadPreferences, savePreferences } from "@/lib/preferences-server";
 
 export const runtime = "nodejs";
@@ -19,5 +21,23 @@ export const GET = route("me.preferences.get", async () => {
 export const PATCH = route("me.preferences.patch", async (req: Request) => {
   const identity = await requireIdentity();
   const body = await readJson(req, z.unknown(), { maxBytes: 4_096 });
-  return json(await savePreferences(identity, body));
+  const saved = await savePreferences(identity, body);
+  // Not keeping conversations (#416) means not keeping the ones already
+  // kept: the store is emptied here, on the server, whatever the page did.
+  const turnedOff =
+    typeof body === "object" &&
+    body !== null &&
+    (body as Record<string, unknown>).rememberChats === false;
+  if (turnedOff && !saved.rememberChats) {
+    const deleted = await pgConversationStore.removeAll(identity.sub);
+    if (deleted > 0) {
+      audit({
+        actor: identity,
+        action: "chat.delete",
+        workspaceId: null,
+        detail: { deleted, all: true, rememberChats: false },
+      });
+    }
+  }
+  return json(saved);
 });

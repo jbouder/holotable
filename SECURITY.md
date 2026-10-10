@@ -96,6 +96,15 @@ and the catalog is fenced between markers that carry a random per-call token
 stored panel specs in the dashboard chat prompt get the same treatment. The
 model's output is untrusted anyway, which is what ultimately contains this.
 
+**Chat conversations.** Chat keeps a person's conversations on the server:
+what they asked, the answers, and the panel specs drawn in them. Each one is
+readable only by the person who had it, with no route for anyone else to read
+it, a platform admin included. A stored message never holds a result row,
+only a panel's spec and a five-row sample of what it returned. Nothing stored
+is authorization: the sources are re-checked on every turn and every re-run,
+and a stored spec passes the guard again, against the catalog as it is then.
+**Keep my conversations** off stores none and deletes what was kept.
+
 **A Prometheus endpoint, and the URL that names it.** A source admin types a
 Prometheus source's URL, and the server then sends it queries, with the
 source's credential when it has one. The URL is held to the rules a model base

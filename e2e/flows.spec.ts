@@ -58,6 +58,76 @@ test("chat answers with an inline panel that survives a reload", async ({ page }
   await expect(page.getByRole("region", { name: "Requests by service" })).toBeVisible();
 });
 
+test("chat history: a conversation is listed, renamed and deleted", async ({ page }) => {
+  await askChat(page, "Which service is busiest right now?");
+  await expect(page.getByText(STUB_CHAT_REPLY)).toBeVisible();
+  const history = page.getByRole("navigation", { name: "History" });
+  const entry = history.getByRole("link", {
+    name: "Which service is busiest right now?",
+  });
+  await expect(entry).toHaveAttribute("aria-current", "page");
+
+  await history
+    .getByRole("button", { name: "Rename Which service is busiest right now?" })
+    .click();
+  await history
+    .getByRole("textbox", { name: "Conversation title" })
+    .fill("Busiest service");
+  await history.getByRole("button", { name: "Save title" }).click();
+  await expect(history.getByRole("link", { name: "Busiest service" })).toBeVisible();
+
+  // Deleting the open conversation leaves for a new one.
+  await history.getByRole("button", { name: "Delete Busiest service" }).click();
+  await expect(page).toHaveURL(/\/chat$/);
+  await expect(
+    page
+      .getByRole("navigation", { name: "History" })
+      .getByRole("link", { name: "Busiest service" }),
+  ).toHaveCount(0);
+});
+
+test("chat with Keep my conversations off: answered, stored nowhere", async ({
+  page,
+  request,
+}) => {
+  await askChat(page, "Kept question");
+  await expect(page.getByText(STUB_CHAT_REPLY)).toBeVisible();
+  try {
+    // Turning it off asks, then deletes what was kept and starts again.
+    await page.getByRole("checkbox", { name: "Keep my conversations" }).click();
+    const confirm = page.getByRole("dialog", { name: "Stop keeping conversations?" });
+    await confirm.getByRole("button", { name: "Stop and delete" }).click();
+    await expect(page).toHaveURL(/\/chat$/);
+    const list = await (await request.get("/api/chat")).json();
+    expect(list.conversations).toEqual([]);
+
+    // A question is still answered, with its panel, through the unkept turn.
+    await askChat(page, "Unkept question");
+    const table = page.getByRole("region", { name: "Requests by service, table" });
+    await expect(table.getByRole("cell", { name: "api", exact: true })).toBeVisible();
+    await expect(page).toHaveURL(/\/chat$/);
+    expect((await (await request.get("/api/chat")).json()).conversations).toEqual([]);
+  } finally {
+    await request.patch("/api/me/preferences", { data: { rememberChats: true } });
+  }
+});
+
+test("chat at phone width: the side panel is a sheet, and nothing scrolls sideways", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto("/chat");
+  const overflow = await page.evaluate(
+    () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
+  );
+  expect(overflow).toBeLessThanOrEqual(0);
+  await page.getByRole("button", { name: /source.* · / }).click();
+  const sheet = page.getByRole("dialog", { name: "Conversation" });
+  await expect(sheet.getByRole("heading", { name: "Sources" })).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(sheet).toHaveCount(0);
+});
+
 test("new dashboard: Start over asks, then clears every version", async ({ page }) => {
   await page.goto("/dashboards/new");
   await page.getByLabel("Describe the dashboard").fill("Checkout service health");

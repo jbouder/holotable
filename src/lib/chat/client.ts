@@ -1,6 +1,12 @@
 import { type ApiError, apiErrorFromThrown, readApiError } from "@/lib/errors";
 import type { TimeRange } from "@/lib/ir";
+import { readConversationPage } from "@/lib/chat/history";
 import { type QueryRows, readWindow } from "@/lib/panel-query";
+import {
+  parsePreferences,
+  type Preferences,
+  type PreferencesPatch,
+} from "@/lib/preferences";
 
 /**
  * The browser's half of `/api/chat` (#416). Each call names a conversation
@@ -81,4 +87,32 @@ export function readRows(body: unknown): QueryRows {
     rows: Array.isArray(record.rows) ? (record.rows as Record<string, unknown>[]) : [],
     ...(window && { window }),
   };
+}
+
+/** A page of this person's conversations, most recently used first. */
+export function listConversations(after?: string | null) {
+  const query = after ? `?after=${encodeURIComponent(after)}` : "";
+  return call(`/api/chat${query}`, { method: "GET" }, readConversationPage);
+}
+
+/** Delete one conversation. */
+export function deleteConversation(id: string): Promise<ChatCall<null>> {
+  return call(`/api/chat/${encodeURIComponent(id)}`, { method: "DELETE" }, () => null);
+}
+
+/** Delete every one of this person's conversations. */
+export function deleteAllConversations(): Promise<ChatCall<number>> {
+  return call("/api/chat", { method: "DELETE" }, (body) => {
+    const n = (body as { deleted?: unknown }).deleted;
+    return typeof n === "number" ? n : 0;
+  });
+}
+
+/** Save some of this person's preferences; the server's merged result. */
+export function savePreferences(patch: PreferencesPatch): Promise<ChatCall<Preferences>> {
+  return call(
+    "/api/me/preferences",
+    { method: "PATCH", body: JSON.stringify(patch) },
+    (body) => parsePreferences(body),
+  );
 }

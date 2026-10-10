@@ -42,7 +42,9 @@ import {
  * Whether to keep those recents at all does sync (`remember*`): "do not keep
  * what I asked" is a choice about the person, and a second laptop quietly
  * starting to record again would break it. The lists themselves still never
- * leave the browser. Explore's defaults (`explore*`) sync like the rest.
+ * leave the browser. Explore's defaults (`explore*`) and Chat's (`chat*`) sync
+ * like the rest. `rememberChats` is the one `remember*` that governs a
+ * server-side store: Chat conversations (#416), which it deletes when off.
  *
  * Preferences are personal: keyed by `sub` alone, never by workspace, and no
  * route reads or writes a subject other than the caller's own.
@@ -98,6 +100,11 @@ export const PREFERENCE_FIELDS = {
   }),
   exploreKeepSession: z.boolean({ error: "must be true or false" }),
   chartPatterns: z.boolean({ error: "must be true or false" }),
+  chatRefreshMs: z.custom<ExploreRefreshMs>(isExploreRefreshMs, {
+    message: "must be 0, 30000, 60000 or 300000",
+  }),
+  chatShowQueries: z.boolean({ error: "must be true or false" }),
+  rememberChats: z.boolean({ error: "must be true or false" }),
 } as const;
 
 export interface Preferences {
@@ -122,6 +129,16 @@ export interface Preferences {
    * series can be told apart without color (WCAG 1.4.1). Off by default.
    */
   chartPatterns: boolean;
+  /** How often Chat re-runs the panels on screen (#416); 0 is off. */
+  chatRefreshMs: ExploreRefreshMs;
+  /** Open every Chat panel's and citation's query by default. */
+  chatShowQueries: boolean;
+  /**
+   * Keep Chat conversations on the server (#416). Off, a conversation lives
+   * in the page and is gone on reload, and turning it off deletes every
+   * stored one.
+   */
+  rememberChats: boolean;
 }
 
 export type PreferenceKey = keyof Preferences;
@@ -140,6 +157,9 @@ export const DEFAULT_PREFERENCES: Preferences = {
   exploreStartView: "model",
   exploreKeepSession: false,
   chartPatterns: false,
+  chatRefreshMs: 0,
+  chatShowQueries: false,
+  rememberChats: true,
 };
 
 const KEYS = Object.keys(PREFERENCE_FIELDS) as PreferenceKey[];
@@ -243,5 +263,20 @@ export function exploreDefaultsOf(prefs: Preferences): ExploreDefaults {
     refreshMs: prefs.exploreRefreshMs,
     startView: prefs.exploreStartView,
     keepSession: prefs.exploreKeepSession,
+  };
+}
+
+/** What Chat opens with and how it behaves, from the preferences (#416). */
+export interface ChatPreferences {
+  refreshMs: ExploreRefreshMs;
+  showQueries: boolean;
+  remember: boolean;
+}
+
+export function chatPreferencesOf(prefs: Preferences): ChatPreferences {
+  return {
+    refreshMs: prefs.chatRefreshMs,
+    showQueries: prefs.chatShowQueries,
+    remember: prefs.rememberChats,
   };
 }

@@ -27,7 +27,7 @@ bookmark one or send it to someone.
 | --- | --- | --- |
 | Account | `/settings/account` | Your name, email and user id, the workspaces you can reach with your role in each, and what every role allows |
 | Appearance | `/settings/appearance` | Theme, whether the interface and charts animate, and patterns in charts |
-| Preferences | `/settings/preferences` | Time zone, 12 or 24 hour clock, the page you land on after signing in, and how the dashboard list opens |
+| Preferences | `/settings/preferences` | Time zone, 12 or 24 hour clock, the page you land on after signing in, how the dashboard list opens, and Chat's live refresh, open queries and whether your conversations are kept |
 | Local data | `/settings/local-data` | What this browser remembers, with a way to clear each part |
 | Keyboard shortcuts | `/settings/shortcuts` | Every key binding, grouped by where it works |
 | Workspaces | `/settings/workspaces` | AI usage and limits. Listed only if you are a source-admin somewhere or a platform admin |
@@ -151,10 +151,12 @@ once. See [Service-account API tokens](/integrations/api-tokens/).
 
 | Setting | Stored | Why |
 | --- | --- | --- |
-| Time zone, clock, start page, dashboard list defaults, Explore defaults, which recents to keep | Server, per user | They are choices about you, and should survive a new laptop or a cleared browser |
+| Time zone, clock, start page, dashboard list defaults, Explore and Chat defaults, which recents to keep | Server, per user | They are choices about you, and should survive a new laptop or a cleared browser |
 | Theme, motion | This browser | They must apply before the page first draws, which cannot wait for the server. A device-specific choice is often what people want anyway |
 | Drafts, recents, dismissed hints | This browser | They describe what you did on this device |
 | A kept Explore session | This tab | It is one sitting's work; it ends with the tab |
+| Chat conversations | Server, per user, readable only by you | So a question can be continued on another device. Never a result row: panels run again when opened. Bounded by `CHAT_CONVERSATIONS_MAX` and the chat history limits; **Keep my conversations** off stores none and deletes what was kept |
+| Whether Chat's side panel is closed | This browser | A layout choice for this screen |
 
 Preferences are stored per user, never per workspace, and nobody else's can be
 read or changed through the API, including by a platform admin.
