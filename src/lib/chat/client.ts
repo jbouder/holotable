@@ -140,8 +140,8 @@ export function dashboardConversation(
   );
 }
 
-/** Where a dashboard's conversation opens in Chat, about a panel or not. */
+/** Where a dashboard's conversation opens in Explore, about a panel or not. */
 export function chatHref(conversationId: string, aboutPanelId?: string): string {
   const about = aboutPanelId ? `?about=${encodeURIComponent(aboutPanelId)}` : "";
-  return `/chat/${encodeURIComponent(conversationId)}${about}`;
+  return `/explore/${encodeURIComponent(conversationId)}${about}`;
 }

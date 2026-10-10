@@ -96,7 +96,7 @@ and the catalog is fenced between markers that carry a random per-call token
 stored panel specs in the dashboard chat prompt get the same treatment. The
 model's output is untrusted anyway, which is what ultimately contains this.
 
-**Chat conversations.** Chat keeps a person's conversations on the server:
+**Explore conversations.** Explore keeps a person's conversations on the server:
 what they asked, the answers, and the panel specs drawn in them. Each one is
 readable only by the person who had it, with no route for anyone else to read
 it, a platform admin included. A stored message never holds a result row,

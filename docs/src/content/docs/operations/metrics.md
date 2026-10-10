@@ -71,7 +71,7 @@ process and Node.js collectors (`holotable_process_cpu_seconds_total`,
 | `holotable_pollers_active` | gauge | — | Pollers running on this instance |
 | `holotable_llm_tokens_total` | counter | `workspace`, `model`, `direction` | Tokens billed to a workspace. `direction` is `input` or `output` |
 | `holotable_llm_requests_total` | counter | `route`, `outcome` | Model requests at the admission gate. `outcome` is `admitted`, `rate_limited` or `over_budget` |
-| `holotable_chat_panels_total` | counter | `outcome` | Panels a [Chat](/guide/chat/) turn asked to draw: `accepted`, `refused` (by the IR, the guard or the source) or `repaired` (the spec failed its schema and the one re-ask fixed it; the repaired spec is then counted again as accepted or refused) |
+| `holotable_chat_panels_total` | counter | `outcome` | Panels an [Explore](/guide/explore/) turn asked to draw: `accepted`, `refused` (by the IR, the guard or the source) or `repaired` (the spec failed its schema and the one re-ask fixed it; the repaired spec is then counted again as accepted or refused) |
 | `holotable_llm_repairs_total` | counter | `route`, `outcome` | Structured-output repairs: one automatic re-ask after a generation failed its schema. `outcome` is `repaired` or `failed`. See [AI provider](/admin/ai-provider/#structured-output-repair) |
 | `holotable_sql_validation_rejections_total` | counter | `reason` | Statements refused by the SQL guard |
 | `holotable_promql_validation_rejections_total` | counter | `reason` | Expressions refused by the PromQL guard |

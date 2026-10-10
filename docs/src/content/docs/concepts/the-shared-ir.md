@@ -121,7 +121,7 @@ in a refinement. JSON Schema cannot carry a refinement, so a model reading the
 schema it was bound to saw `query` as optional, and one model left it off every
 panel. `GeneratedPanel` says the same thing in its shape instead: a union on
 `viz`, in which a kind that runs a query requires `query` and a query-less kind
-has none. `ExplorePanel` (the MCP `generate_panel` tool) and Chat's `ChatPanel` offer only the first, without links. Both shapes are
+has none. `ExplorePanel` (the MCP `generate_panel` tool) and Explore's `ChatPanel` offer only the first, without links. Both shapes are
 `Panel`s, held to the same refinement, so everything after generation is
 unchanged. Because generation is bound to the same fields the client renders, a spec that
 would not render is a spec the model could not have emitted. This is why

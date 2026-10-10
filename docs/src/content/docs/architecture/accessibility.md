@@ -29,7 +29,7 @@ keep them from regressing (#77, #91).
   being typed into.
 - **Focus is always visible.** Every interactive primitive draws
   `focus-visible:outline-2 outline-primary`. A scroll container that can
-  overflow (a table panel, a Chat answer's table) is itself focusable, so it can be
+  overflow (a table panel, an Explore answer's table) is itself focusable, so it can be
   scrolled from the keyboard.
 - **Links are links.** Something that navigates is one `<a>` styled as a
   button (`ButtonLink`), never a `<button>` inside a link: that was two tab

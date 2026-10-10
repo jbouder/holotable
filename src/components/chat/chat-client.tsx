@@ -70,7 +70,7 @@ export interface InitialConversation {
    * dashboard's and cannot be changed here.
    */
   dashboard?: { id: string; title: string; picks: VariableValues };
-  /** The question box's starting text ("Ask in Chat" about a panel). */
+  /** The question box's starting text ("Ask in Explore" about a panel). */
   draft?: string;
 }
 
@@ -88,7 +88,7 @@ function useWide(): boolean {
 }
 
 /**
- * Chat (#416): a conversation with your data. The answer streams as prose,
+ * Explore (#416, #431): a conversation with your data. The answer streams as prose,
  * with inline panels the server drew through the guard. Beside it, the side
  * panel: the sources, this person's past conversations, and the settings.
  *
@@ -249,7 +249,7 @@ export function ChatClient({
       setConversationId(made.value);
       setHistoryKey((k) => k + 1);
       // The conversation has a URL now; no navigation, no reload.
-      window.history.replaceState(null, "", `/chat/${made.value}`);
+      window.history.replaceState(null, "", `/explore/${made.value}`);
     }
     setText("");
     prompts.remember(trimmed);
@@ -296,7 +296,7 @@ export function ChatClient({
       return;
     }
     // The server deleted every kept conversation: start again, unkept.
-    if (patch.remember === false) window.location.assign("/chat");
+    if (patch.remember === false) window.location.assign("/explore");
   }
 
   const panel = (
@@ -322,7 +322,7 @@ export function ChatClient({
 
   const header = (
     <PageHeader
-      title={initial?.conversation.title || "Chat"}
+      title={initial?.conversation.title || "Explore"}
       badge={effective?.model && <Badge title="Model">{effective.model}</Badge>}
       description="Ask about your data in plain English. Answers come back in words, with charts and tables the server ran for you."
       actions={
@@ -353,7 +353,7 @@ export function ChatClient({
           />
           {(conversationId || messages.length > 0) && (
             <ButtonLink
-              href="/chat"
+              href="/explore"
               variant="secondary"
               size="sm"
               className="h-8 gap-1.5"

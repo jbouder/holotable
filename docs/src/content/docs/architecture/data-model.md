@@ -145,7 +145,7 @@ chat.
 
 ### `conversations`
 
-One person's Chat conversation (#416): `id`, `user_sub`, `workspace_id`,
+One person's Explore conversation (#416, the Chat engine): `id`, `user_sub`, `workspace_id`,
 `source_ids`, `dashboard_id` (set when it continues a dashboard's chat; `ON
 DELETE SET NULL`), `title`, `time_range` (an IR `TimeRange`), `variables` and
 the two timestamps. Personal like `user_preferences`: every statement filters
@@ -175,7 +175,7 @@ write.
 
 ### `generation_log`
 
-One row per model generation, or per panel a Chat turn draws (`mode = 'chat'`): `mode`, `source_id`, `prompt_redacted`,
+One row per model generation, or per panel an Explore turn draws (`mode = 'chat'`): `mode`, `source_id`, `prompt_redacted`,
 `catalog_hash`, `spec`, `model`, `attempts`, `input_tokens`, `output_tokens`,
 `error`. It answers the question a wrong dashboard raises — what was asked, and
 what came back — and it is the corpus the eval harness

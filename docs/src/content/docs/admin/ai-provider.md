@@ -19,7 +19,7 @@ place of the environment's for their generations; see
 ## Models configured in the app
 
 ([#331](https://github.com/jbouder/holotable/issues/331)) Every generation
-(dashboard, refine, panel edit, source draft, Chat and dashboard chat)
+(dashboard, refine, panel edit, source draft, Explore and dashboard chat)
 resolves its model per request, and the first level that is configured wins:
 
 1. **Personal**: the caller's own model, under Settings → Personal model,
@@ -224,7 +224,7 @@ suite sets both.
 
 ## Timeouts and retries
 
-Every request to the provider, from every surface (generate, Chat, panel
+Every request to the provider, from every surface (generate, Explore, panel
 edit, source draft, dashboard chat), goes through the same model middleware
 (`src/lib/ai/invoke.ts`):
 
@@ -303,7 +303,7 @@ generate route makes, and grades each answer
    required, which tables or metrics must be read, whether panels are time
    series, and how many panels there are.
 
-A `chat` case (#416) asks one [Chat](/guide/chat/) question instead. Its
+A `chat` case (#416) asks one [Explore](/guide/explore/) question instead. Its
 recording is the turn's steps, each one's text and tool calls, and replay plays
 them back through the real engine, so the guard and the IR decide again what
 would have been drawn. It is graded on the panels the server drew (checks 2–4

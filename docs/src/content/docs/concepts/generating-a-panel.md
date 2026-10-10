@@ -226,7 +226,7 @@ against a Prometheus source fails it, and the one
 write `query.promql` instead. The [PromQL guard](/concepts/executing-a-panel/#the-promql-guard)
 is still the enforcement, on save and on every run.
 
-Chat and the dashboard chat work the same way. On a dashboard with a
+Explore and the dashboard chat work the same way. On a dashboard with a
 Prometheus source, the chat's `runQuery` tool takes `promql` (and `instant`)
 beside `sql`, and the source's kind refuses the other language by name.
 
@@ -278,7 +278,7 @@ picking another source there asks to start over rather than being refused.
 The page is laid out around that loop: a single-line prompt bar runs across
 the top, with the source chip at its start, and the preview fills the page
 under it. Before there is one, a placeholder takes that space; while a version
-is written, one line says what is being composed (the same line Chat shows),
+is written, one line says what is being composed (the same line Explore shows),
 and a refinement keeps the current preview on screen, dimmed, until the next
 version lands. Before the first prompt, a few starters sit
 under the bar, and **Start from a template…** and recent prompts sit on the
@@ -307,7 +307,7 @@ call*, because none was made.
 offers them back (on `/dashboards/new`, beside the page title on a fresh
 screen); choosing one fills
 the box rather than submitting, so re-use and edit are the same gesture. The create box, the panel
-editor's NL edit and Chat keep separate lists — "make it a bar chart" is a
+editor's NL edit and Explore keep separate lists — "make it a bar chart" is a
 panel edit and is nonsense as a dashboard description.
 
 The list lives in `localStorage` (`src/lib/prompt-history.ts`) and is never sent
@@ -317,9 +317,9 @@ stores a redacted prompt, a hash of the catalog that was in context and the spec
 that came back, and is readable only by a workspace source-admin — see
 [Data model](/architecture/data-model/).
 
-## Chat
+## Explore
 
-[Chat](/guide/chat/) is a conversation over a few sources in one workspace
+[Explore](/guide/explore/) is a conversation over a few sources in one workspace
 (`src/lib/ai/data-chat.ts`, the routes under `/api/chat`). A turn is
 `streamText` with two tools, both running on the server and both reaching a
 source only through its kind's `check`, `plan` and `execute` under the
@@ -372,7 +372,7 @@ source of truth for real columns.
 
 ## Dashboard chat
 
-The chat beside a dashboard ([Dashboard chat](/guide/chat/#beside-a-dashboard)) is a
+The chat beside a dashboard ([Dashboard chat](/guide/explore/#beside-a-dashboard)) is a
 **read-only** assistant scoped to one dashboard (`src/lib/ai/chat.ts`,
 `src/app/api/dashboards/[id]/chat/route.ts`). It reasons over the panel specs
 first and may escalate to fetching fresh data through a guarded `runQuery`
@@ -413,7 +413,7 @@ to, which the citation shows.
 These make it usable rather than a demo (#82, #366):
 
 - **History persists.** A dashboard's chat is the reader's own
-  [Chat](#chat) conversation with that dashboard (#416): at most one per person
+  [Explore](#explore) conversation with that dashboard (#416): at most one per person
   per dashboard, stored in `conversation_messages` keyed by the SDK's own
   message id, so re-sending a turn updates the row rather than appending a
   duplicate. A conversation is one reader working something out, so it is
@@ -423,7 +423,7 @@ These make it usable rather than a demo (#82, #366):
   either takes effect at once. The sweep runs in the same transaction as the
   write, so the table stays bounded without a scheduled job. Clearing the chat
   is a `DELETE` on the same route and deletes only the caller's own
-  conversation. **Open in Chat** continues it on the Chat page, with the
+  conversation. **Open in Explore** continues it on the Explore page, with the
   dashboard's panels in context.
 
   Stored rows are read back as untrusted: `content` is opaque JSONB holding a

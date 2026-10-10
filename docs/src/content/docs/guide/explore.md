@@ -1,15 +1,15 @@
 ---
-title: Chat
+title: Explore
 description: Ask questions of your data in a conversation, get answers with inline charts and tables the server ran, and add any of them to a dashboard.
 ---
 
-Chat is where you ask questions of your data without building a dashboard
+Explore is where you ask questions of your data without building a dashboard
 first. Ask in plain English; the answer comes back in words, and when a
 picture answers better it comes with a **panel**: a chart, a table, a stat or
 any other panel kind, drawn from rows the server just queried. Follow up and
-the next answer builds on the last one. Open it from the **Chat** button on
-the right of the header, or the command palette. The old `/explore` address
-lands here.
+the next answer builds on the last one. Open it from **Explore** in
+the main navigation, or the command palette. A `/chat` link from before it was
+named Explore lands here.
 
 ## Asking
 
@@ -20,7 +20,7 @@ line). **Stop**, or **Esc** in the box, cancels an answer that is still being
 written. An empty conversation offers a few questions built from the first
 source's catalog.
 
-The answer is read-only. Chat can query the sources you picked and draw panels
+The answer is read-only. Explore can query the sources you picked and draw panels
 from them; it cannot change a source or a dashboard. Everything it runs goes
 through the same guard a dashboard panel does, over the conversation's time
 range, and only over the rows you are allowed to see.
@@ -69,7 +69,7 @@ conversations**. The filter searches the titles that are loaded.
 A conversation you keep is stored on the server, readable only by you; nobody
 else can open it, a platform admin included. It holds your questions, the
 answers and each panel's spec, **never its rows**: opening a conversation runs
-its panels again. A conversation has its own address (`/chat/<id>`), so it can
+its panels again. A conversation has its own address (`/explore/<id>`), so it can
 be bookmarked or opened in a new tab.
 
 Conversations are kept for `CHAT_HISTORY_RETENTION_DAYS` (30 by default) after
@@ -92,11 +92,11 @@ answers from the panel definitions first and from fresh data when it needs it.
 It is **read-only**: it cannot change the dashboard, and the only thing it can
 run is the same kind of guarded query a panel runs, against the same sources.
 
-The widget's **Open in Chat** button continues the same conversation on this
+The widget's **Open in Explore** button continues the same conversation on this
 page: the dashboard's panels stay in context, its sources are the
 conversation's, and the picks it was opened with show as read-only chips
 beside a **From** link back to the dashboard (change them there). A panel's
-menu has **Ask in Chat** as well as **Ask about this panel**: it opens that
+menu has **Ask in Explore** as well as **Ask about this panel**: it opens that
 conversation here with the question started about the panel. A dashboard's
 conversation is listed in History like any other, and **Clear chat** in the
 widget deletes it.

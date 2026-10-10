@@ -100,7 +100,7 @@ message.
 The renderer is a third type beside `chart` and `html`: a `view`, a component
 that draws its own image and is handed the same PNG export handle an ECharts
 chart is. The kind says so with `image: true` and leaves `canvas` (which means
-"an ECharts chart") false, so Chat's Show as never offers a custom visual. The view
+"an ECharts chart") false, so Explore's Show as never offers a custom visual. The view
 resolves the spec's color names, sets its size from the panel for a single
 view, compiles it and builds the view, then merges each poll's rows into it.
 
@@ -146,7 +146,7 @@ All four have shipped.
    compile without a renderer for every kind: the `vega` kind, the walk, the
    compile at save, and the view with its theme, size, screen-reader table and
    PNG export.
-3. Generation and repair, which the MCP tools share. Chat answers over a
+3. Generation and repair, which the MCP tools share. Explore answers over a
    dashboard and never writes a spec, so it has nothing to do here.
 4. The editor's compile messages, and custom visuals on the demo site,
    smoke-tested and scanned by axe.

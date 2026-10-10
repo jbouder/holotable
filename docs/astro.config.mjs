@@ -26,7 +26,9 @@ export default defineConfig({
     "/concepts/drilldown/": "/guide/drilldown/",
     "/getting-started/settings/": "/guide/settings/",
     // The dashboard chat guide was folded into Chat (#416).
-    "/guide/dashboard-chat/": "/guide/chat/#beside-a-dashboard",
+    "/guide/dashboard-chat/": "/guide/explore/#beside-a-dashboard",
+    // Chat was renamed Explore (#431).
+    "/guide/chat/": "/guide/explore/",
     "/operations/share-links/": "/integrations/share-links/",
     "/operations/api-tokens/": "/integrations/api-tokens/",
     "/operations/mcp/": "/integrations/mcp/",
@@ -95,7 +97,7 @@ export default defineConfig({
           items: [
             { label: "Viewing a dashboard", slug: "guide/viewing-a-dashboard" },
             { label: "Editing a dashboard", slug: "guide/editing-a-dashboard" },
-            { label: "Chat", slug: "guide/chat" },
+            { label: "Explore", slug: "guide/explore" },
             { label: "Dashboard variables", slug: "guide/variables" },
             { label: "Annotations", slug: "guide/annotations" },
             { label: "Drilldown", slug: "guide/drilldown" },

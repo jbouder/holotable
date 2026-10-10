@@ -117,7 +117,7 @@ export const GET = route(
     );
     return json({
       messages: rows.map(readStoredChatMessage).filter((m) => m !== null),
-      // So the widget can open the same conversation in Chat.
+      // So the widget can open the same conversation in Explore.
       conversationId: conversation.id,
     });
   },

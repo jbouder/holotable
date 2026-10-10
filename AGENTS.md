@@ -279,8 +279,8 @@ Important files:
   and a few sample rows. A stored message never holds result rows
   (`persistableMessage` in `src/lib/chat/persist.ts`). The dashboard chat
   (`src/lib/ai/chat.ts`) is a caller with `draw: false`
-- `src/app/chat/` and `src/components/chat/` — the Chat page (#416), which
-  replaced Explore (`/explore` redirects to it). The page never sends a
+- `src/app/explore/` and `src/components/chat/` — the Explore page (#416,
+  #431), built on the Chat engine above; `/chat` redirects to it. The page never sends a
   statement: a kept conversation's turn sends only the new question
   (`/api/chat/[id]/messages`), a panel runs again through
   `/api/chat/[id]/panels/[panelId]/run` from its stored spec, and an unkept

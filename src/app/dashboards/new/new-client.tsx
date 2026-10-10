@@ -539,7 +539,7 @@ export function NewDashboardClient({
         which holds the composing status while that version is written. After
         it, the version's live preview with the versions and Save above it; a
         refinement being written keeps it on screen, dimmed and inert, under
-        the same status line Chat shows.
+        the same status line Explore shows.
       */}
       <section
         aria-label="Dashboard preview"

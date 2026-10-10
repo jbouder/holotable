@@ -170,7 +170,7 @@ export function PreferencesForm({
 
   const startOptions: SelectOption[] = [
     { value: "dashboards", label: "Dashboards list" },
-    { value: "chat", label: "Chat" },
+    { value: "chat", label: "Explore" },
     ...dashboards.map((d) => ({
       value: `dashboard:${d.id}`,
       label: `${d.title} (${d.workspaceId})`,
@@ -300,7 +300,7 @@ export function PreferencesForm({
 
       <Card>
         <CardHeader>
-          <CardTitle>Chat</CardTitle>
+          <CardTitle>Explore</CardTitle>
         </CardHeader>
         <CardContent className="grid grid-cols-1 gap-4 sm:grid-cols-[12rem_1fr] sm:items-center">
           <Label className="mb-0" htmlFor="pref-chat-range">

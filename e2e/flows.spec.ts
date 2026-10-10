@@ -17,10 +17,18 @@ import {
  * removed out from under a dashboard, and a viewer kept out of the editor.
  */
 
-test("/explore lands on Chat", async ({ page }) => {
+test("Explore is in the main nav, and an old /chat link lands there", async ({
+  page,
+}) => {
+  await page.goto("/dashboards");
+  await page
+    .getByRole("navigation", { name: "Main" })
+    .getByRole("link", { name: "Explore" })
+    .click();
+  await expect(page).toHaveURL(/\/explore$/);
+  await expect(page.getByRole("heading", { level: 1, name: "Explore" })).toBeVisible();
   await page.goto("/explore");
-  await expect(page).toHaveURL(/\/chat$/);
-  await expect(page.getByRole("heading", { level: 1, name: "Chat" })).toBeVisible();
+  await expect(page).toHaveURL(/\/explore$/);
 });
 
 test("a chat panel is added to a new dashboard as the ordinary save", async ({
@@ -49,7 +57,7 @@ test("chat answers with an inline panel that survives a reload", async ({ page }
   await expect(page.getByText(STUB_CHAT_REPLY)).toBeVisible();
   // The conversation has a URL, and the panel's rows were not stored: after a
   // reload they come back from the run route.
-  await expect(page).toHaveURL(/\/chat\/[0-9a-f-]{36}$/);
+  await expect(page).toHaveURL(/\/explore\/[0-9a-f-]{36}$/);
   await page.reload();
   await expect(table.getByRole("cell", { name: "api", exact: true })).toBeVisible();
   await expect(page.getByText(STUB_CHAT_REPLY)).toBeVisible();
@@ -81,7 +89,7 @@ test("chat history: a conversation is listed, renamed and deleted", async ({ pag
 
   // Deleting the open conversation leaves for a new one.
   await history.getByRole("button", { name: "Delete Busiest service" }).click();
-  await expect(page).toHaveURL(/\/chat$/);
+  await expect(page).toHaveURL(/\/explore$/);
   await expect(
     page
       .getByRole("navigation", { name: "History" })
@@ -100,7 +108,7 @@ test("chat with Keep my conversations off: answered, stored nowhere", async ({
     await page.getByRole("checkbox", { name: "Keep my conversations" }).click();
     const confirm = page.getByRole("dialog", { name: "Stop keeping conversations?" });
     await confirm.getByRole("button", { name: "Stop and delete" }).click();
-    await expect(page).toHaveURL(/\/chat$/);
+    await expect(page).toHaveURL(/\/explore$/);
     const list = await (await request.get("/api/chat")).json();
     expect(list.conversations).toEqual([]);
 
@@ -108,7 +116,7 @@ test("chat with Keep my conversations off: answered, stored nowhere", async ({
     await askChat(page, "Unkept question");
     const table = page.getByRole("region", { name: "Requests by service, table" });
     await expect(table.getByRole("cell", { name: "api", exact: true })).toBeVisible();
-    await expect(page).toHaveURL(/\/chat$/);
+    await expect(page).toHaveURL(/\/explore$/);
     expect((await (await request.get("/api/chat")).json()).conversations).toEqual([]);
   } finally {
     await request.patch("/api/me/preferences", { data: { rememberChats: true } });
@@ -119,7 +127,7 @@ test("chat at phone width: the side panel is a sheet, and nothing scrolls sidewa
   page,
 }) => {
   await page.setViewportSize({ width: 390, height: 844 });
-  await page.goto("/chat");
+  await page.goto("/explore");
   const overflow = await page.evaluate(
     () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
   );
@@ -153,7 +161,7 @@ test("new dashboard: Start over asks, then clears every version", async ({ page 
   await expect(page.getByRole("button", { name: /Start from a template/ })).toBeVisible();
 });
 
-test("Open in Chat continues the dashboard's conversation on its own page", async ({
+test("Open in Explore continues the dashboard's conversation on its own page", async ({
   page,
   request,
 }) => {
@@ -168,8 +176,8 @@ test("Open in Chat continues the dashboard's conversation on its own page", asyn
   await chat.getByRole("button", { name: "Send" }).click();
   await expect(chat.getByText(STUB_CHAT_REPLY)).toBeVisible();
 
-  await chat.getByRole("button", { name: "Open in Chat" }).click();
-  await expect(page).toHaveURL(/\/chat\/[0-9a-f-]{36}$/);
+  await chat.getByRole("button", { name: "Open in Explore" }).click();
+  await expect(page).toHaveURL(/\/explore\/[0-9a-f-]{36}$/);
   // The same conversation, its dashboard named, and a link back.
   await expect(page.getByText("What does this dashboard show?").first()).toBeVisible();
   await expect(page.getByText(STUB_CHAT_REPLY)).toBeVisible();
