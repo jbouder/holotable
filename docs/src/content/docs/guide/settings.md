@@ -70,7 +70,7 @@ Stored ranges are always UTC, and the server still decides the concrete
 window a query runs over, so two people in different zones looking at the
 same dashboard see the same data.
 
-**Start page** is the dashboard list, Explore, or one dashboard you can view.
+**Start page** is the dashboard list, Chat, or one dashboard you can view.
 If that dashboard is deleted or you lose access to it, you land on the list
 with a one-time notice instead.
 
@@ -84,13 +84,10 @@ not merely hidden: the prompt boxes, the dashboard list's Recent row and the
 palette stop writing, and turning one off also clears what this browser had.
 The switch follows you; the lists never leave the browser either way.
 
-**Explore** sets how the page opens: the time range (5 minutes to 30 days),
-auto-refresh (off, 30s, 1m, 5m), whether an answer starts as the model drew it
-or as a table, and whether this tab's answers survive a reload. A kept session
-is the questions and how each was drawn, never the rows: on reload every panel
-is checked against the IR again and its query re-run through the guarded
-route. It lives in the tab's `sessionStorage`, belongs to the person who kept
-it, and ends with the tab or with **Start over**.
+**Chat** sets the range a new conversation starts with, live refresh (off,
+30s, 1m, 5m), whether every answer's queries start open, and **Keep my
+conversations**. Turning that off asks first, then deletes every conversation
+kept for you; see [Chat](/guide/chat/#what-is-kept).
 
 ### Local data
 
@@ -151,10 +148,9 @@ once. See [Service-account API tokens](/integrations/api-tokens/).
 
 | Setting | Stored | Why |
 | --- | --- | --- |
-| Time zone, clock, start page, dashboard list defaults, Explore and Chat defaults, which recents to keep | Server, per user | They are choices about you, and should survive a new laptop or a cleared browser |
+| Time zone, clock, start page, dashboard list defaults, Chat defaults, which recents to keep | Server, per user | They are choices about you, and should survive a new laptop or a cleared browser |
 | Theme, motion | This browser | They must apply before the page first draws, which cannot wait for the server. A device-specific choice is often what people want anyway |
 | Drafts, recents, dismissed hints | This browser | They describe what you did on this device |
-| A kept Explore session | This tab | It is one sitting's work; it ends with the tab |
 | Chat conversations | Server, per user, readable only by you | So a question can be continued on another device. Never a result row: panels run again when opened. Bounded by `CHAT_CONVERSATIONS_MAX` and the chat history limits; **Keep my conversations** off stores none and deletes what was kept |
 | Whether Chat's side panel is closed | This browser | A layout choice for this screen |
 

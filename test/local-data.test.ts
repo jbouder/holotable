@@ -1,6 +1,5 @@
 import { test } from "node:test";
-import { EXPLORE_SESSION_KEY } from "@/lib/explore-session-store";
-import { CHAT_EXPANDED_KEY } from "@/lib/chat-layout";
+import { CHAT_EXPANDED_KEY, CHAT_PANEL_CLOSED_KEY } from "@/lib/chat-layout";
 import assert from "node:assert/strict";
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join, relative } from "node:path";
@@ -81,9 +80,7 @@ function populated() {
       { prompt: "p95 latency by service", at: NOW - 1000 },
       { prompt: "error rate", at: NOW - 2000 },
     ]),
-    [promptHistoryKey("w2", "explore")]: JSON.stringify([
-      { prompt: "cpu", at: NOW - 1000 },
-    ]),
+    [promptHistoryKey("w2", "chat")]: JSON.stringify([{ prompt: "cpu", at: NOW - 1000 }]),
     [RECENT_KEY]: JSON.stringify(["d1", "d2", "d3"]),
     [RECENTS_STORAGE_KEY]: JSON.stringify(["page:explore"]),
     [THEME_STORAGE_KEY]: "light",
@@ -232,7 +229,6 @@ const STORAGE_WRITERS: Record<string, string> = {
   "lib/demo-banner.ts": DEMO_BANNER_KEY,
   "lib/session-renewal.ts": SESSION_EXPIRY_KEY,
   "components/resume-session.tsx": RESUME_ATTEMPT_KEY,
-  "lib/explore-session-store.ts": EXPLORE_SESSION_KEY,
   "lib/chat-layout.ts": CHAT_EXPANDED_KEY,
 };
 

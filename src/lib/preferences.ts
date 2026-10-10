@@ -1,14 +1,11 @@
 import { z } from "zod";
 import { DASHBOARD_SORTS, DEFAULT_SORT, type DashboardSort } from "@/lib/dashboard-list";
 import {
-  EXPLORE_START_VIEWS,
-  EXPLORE_TIME_RANGE_VALUES,
-  type ExploreDefaults,
-  type ExploreRefreshMs,
-  type ExploreStartView,
-  type ExploreTimeRange,
-  isExploreRefreshMs,
-} from "@/lib/explore-defaults";
+  CHAT_TIME_RANGE_VALUES,
+  type ChatRefreshMs,
+  type ChatTimeRange,
+  isChatRefreshMs,
+} from "@/lib/chat/defaults";
 import {
   CLOCKS,
   type Clock,
@@ -42,8 +39,7 @@ import {
  * Whether to keep those recents at all does sync (`remember*`): "do not keep
  * what I asked" is a choice about the person, and a second laptop quietly
  * starting to record again would break it. The lists themselves still never
- * leave the browser. Explore's defaults (`explore*`) and Chat's (`chat*`) sync
- * like the rest. `rememberChats` is the one `remember*` that governs a
+ * leave the browser. Chat's defaults (`chat*`) sync like the rest. `rememberChats` is the one `remember*` that governs a
  * server-side store: Chat conversations (#416), which it deletes when off.
  *
  * Preferences are personal: keyed by `sub` alone, never by workspace, and no
@@ -51,7 +47,7 @@ import {
  */
 
 /** Where the app opens after sign-in: a page, or one dashboard by id. */
-export const START_PAGES = ["dashboards", "explore"] as const;
+export const START_PAGES = ["dashboards", "chat"] as const;
 export type StartPage = (typeof START_PAGES)[number] | `dashboard:${string}`;
 
 const DASHBOARD_START =
@@ -62,11 +58,18 @@ export function startDashboardId(start: StartPage): string | null {
   return DASHBOARD_START.exec(start)?.[1] ?? null;
 }
 
-const StartPageSchema = z.custom<StartPage>(
-  (v) =>
-    typeof v === "string" &&
-    ((START_PAGES as readonly string[]).includes(v) || DASHBOARD_START.test(v)),
-  { message: 'must be "dashboards", "explore" or "dashboard:<id>"' },
+/**
+ * Explore became Chat (#416): a start page stored as `"explore"` lands on
+ * Chat, and is written back as `"chat"` on the next save.
+ */
+const StartPageSchema = z.preprocess(
+  (v) => (v === "explore" ? "chat" : v),
+  z.custom<StartPage>(
+    (v) =>
+      typeof v === "string" &&
+      ((START_PAGES as readonly string[]).includes(v) || DASHBOARD_START.test(v)),
+    { message: 'must be "dashboards", "chat" or "dashboard:<id>"' },
+  ),
 );
 
 const TimeZoneSchema = z.string().refine((v) => v === "local" || isValidTimeZone(v), {
@@ -89,18 +92,11 @@ export const PREFERENCE_FIELDS = {
   rememberPrompts: z.boolean({ error: "must be true or false" }),
   rememberRecentDashboards: z.boolean({ error: "must be true or false" }),
   rememberPaletteHistory: z.boolean({ error: "must be true or false" }),
-  exploreTimeRange: z.enum(EXPLORE_TIME_RANGE_VALUES, {
-    error: `must be one of ${EXPLORE_TIME_RANGE_VALUES.join(", ")}`,
-  }),
-  exploreRefreshMs: z.custom<ExploreRefreshMs>(isExploreRefreshMs, {
-    message: "must be 0, 30000, 60000 or 300000",
-  }),
-  exploreStartView: z.enum(EXPLORE_START_VIEWS, {
-    error: `must be one of ${EXPLORE_START_VIEWS.join(", ")}`,
-  }),
-  exploreKeepSession: z.boolean({ error: "must be true or false" }),
   chartPatterns: z.boolean({ error: "must be true or false" }),
-  chatRefreshMs: z.custom<ExploreRefreshMs>(isExploreRefreshMs, {
+  chatTimeRange: z.enum(CHAT_TIME_RANGE_VALUES, {
+    error: `must be one of ${CHAT_TIME_RANGE_VALUES.join(", ")}`,
+  }),
+  chatRefreshMs: z.custom<ChatRefreshMs>(isChatRefreshMs, {
     message: "must be 0, 30000, 60000 or 300000",
   }),
   chatShowQueries: z.boolean({ error: "must be true or false" }),
@@ -119,18 +115,15 @@ export interface Preferences {
   rememberRecentDashboards: boolean;
   /** Keep the command palette's recent commands. */
   rememberPaletteHistory: boolean;
-  exploreTimeRange: ExploreTimeRange;
-  exploreRefreshMs: ExploreRefreshMs;
-  exploreStartView: ExploreStartView;
-  /** Keep Explore's session in the tab across a reload. */
-  exploreKeepSession: boolean;
   /**
    * Fill chart bars, slices and areas with patterns as well as colors, so
    * series can be told apart without color (WCAG 1.4.1). Off by default.
    */
   chartPatterns: boolean;
+  /** The range a new Chat conversation starts with (#416). */
+  chatTimeRange: ChatTimeRange;
   /** How often Chat re-runs the panels on screen (#416); 0 is off. */
-  chatRefreshMs: ExploreRefreshMs;
+  chatRefreshMs: ChatRefreshMs;
   /** Open every Chat panel's and citation's query by default. */
   chatShowQueries: boolean;
   /**
@@ -152,11 +145,8 @@ export const DEFAULT_PREFERENCES: Preferences = {
   rememberPrompts: true,
   rememberRecentDashboards: true,
   rememberPaletteHistory: true,
-  exploreTimeRange: "now-24h",
-  exploreRefreshMs: 0,
-  exploreStartView: "model",
-  exploreKeepSession: false,
   chartPatterns: false,
+  chatTimeRange: "now-24h",
   chatRefreshMs: 0,
   chatShowQueries: false,
   rememberChats: true,
@@ -172,13 +162,29 @@ const KEYS = Object.keys(PREFERENCE_FIELDS) as PreferenceKey[];
 export function parsePreferences(raw: unknown): Preferences {
   const out: Preferences = { ...DEFAULT_PREFERENCES };
   if (typeof raw !== "object" || raw === null || Array.isArray(raw)) return out;
-  const record = raw as Record<string, unknown>;
+  const record = withExploreAliases(raw as Record<string, unknown>);
   for (const key of KEYS) {
     if (!(key in record)) continue;
     const parsed = PREFERENCE_FIELDS[key].safeParse(record[key]);
     if (parsed.success) (out as unknown as Record<string, unknown>)[key] = parsed.data;
   }
   return out;
+}
+
+/**
+ * Explore's defaults, read as Chat's for one release (#416): a row written
+ * before Explore became Chat keeps its range and refresh. The stored row is
+ * not rewritten here; the next save of either field writes the new name.
+ */
+function withExploreAliases(record: Record<string, unknown>): Record<string, unknown> {
+  const aliased = { ...record };
+  if (!("chatTimeRange" in aliased) && "exploreTimeRange" in aliased) {
+    aliased.chatTimeRange = aliased.exploreTimeRange;
+  }
+  if (!("chatRefreshMs" in aliased) && "exploreRefreshMs" in aliased) {
+    aliased.chatRefreshMs = aliased.exploreRefreshMs;
+  }
+  return aliased;
 }
 
 export type PreferencesPatch = Partial<Preferences>;
@@ -257,24 +263,17 @@ export function historyTurnedOff(
   return off;
 }
 
-export function exploreDefaultsOf(prefs: Preferences): ExploreDefaults {
-  return {
-    timeRange: prefs.exploreTimeRange,
-    refreshMs: prefs.exploreRefreshMs,
-    startView: prefs.exploreStartView,
-    keepSession: prefs.exploreKeepSession,
-  };
-}
-
 /** What Chat opens with and how it behaves, from the preferences (#416). */
 export interface ChatPreferences {
-  refreshMs: ExploreRefreshMs;
+  timeRange: ChatTimeRange;
+  refreshMs: ChatRefreshMs;
   showQueries: boolean;
   remember: boolean;
 }
 
 export function chatPreferencesOf(prefs: Preferences): ChatPreferences {
   return {
+    timeRange: prefs.chatTimeRange,
     refreshMs: prefs.chatRefreshMs,
     showQueries: prefs.chatShowQueries,
     remember: prefs.rememberChats,

@@ -15,7 +15,7 @@ import {
   listEditableDashboards,
   saveToExistingDashboard,
   saveToNewDashboard,
-} from "@/lib/explore-save";
+} from "@/lib/chat/add-to-dashboard";
 
 /** The picker's sentinel for "don't append — create one". */
 const NEW_DASHBOARD = "__new__";
@@ -23,17 +23,20 @@ const NEW_DASHBOARD = "__new__";
 export interface SavedPanel {
   dashboardId: string;
   panelId: string;
+  /** The dashboard's title, for "Added to …". */
+  dashboardTitle: string;
 }
 
 /**
- * Pick where an Explore result should land.
+ * Add a Chat panel to a dashboard (#416): an existing one in the source's
+ * workspace that the caller may update, or a new one.
  *
  * The picker is scoped to the source's workspace and to dashboards the caller
  * can update, both enforced by the list route — a dashboard in another
  * workspace could not hold this panel anyway, since a spec's workspace is
  * derived from its panels' sources and must be single-valued.
  */
-export function SavePanelDialog({
+export function AddToDashboardDialog({
   open,
   onOpenChange,
   panel,
@@ -98,11 +101,17 @@ export function SavePanelDialog({
       setError(outcome.error);
       return;
     }
-    onSaved({ dashboardId: outcome.dashboardId, panelId: outcome.panelId });
+    onSaved({
+      dashboardId: outcome.dashboardId,
+      panelId: outcome.panelId,
+      dashboardTitle: creating
+        ? title.trim()
+        : (dashboards?.find((d) => d.id === target)?.title ?? "the dashboard"),
+    });
     onOpenChange(false);
     // A new dashboard opens in the editor with its one panel selected; an
-    // existing one is left alone — Explore keeps the result on screen and
-    // offers a link instead of navigating away from the question.
+    // existing one is left alone — the conversation stays on screen and the
+    // card offers a link instead of navigating away from the question.
     if (creating) {
       router.push(
         `/dashboards/${outcome.dashboardId}/edit?panel=${encodeURIComponent(outcome.panelId)}`,
@@ -119,7 +128,7 @@ export function SavePanelDialog({
     <Dialog
       open={open}
       onOpenChange={onOpenChange}
-      title="Save as panel"
+      title="Add to dashboard"
       className="max-w-lg"
     >
       <div className="space-y-4">

@@ -19,7 +19,7 @@ place of the environment's for their generations; see
 ## Models configured in the app
 
 ([#331](https://github.com/jbouder/holotable/issues/331)) Every generation
-(dashboard, refine, panel edit, Explore, source draft and dashboard chat)
+(dashboard, refine, panel edit, source draft, Chat and dashboard chat)
 resolves its model per request, and the first level that is configured wins:
 
 1. **Personal**: the caller's own model, under Settings → Personal model,
@@ -202,7 +202,7 @@ calls a network: every request is answered with a fixed spec, chosen by the
 output asked for (a dashboard, a panel, a source draft, a chat reply), and
 that spec goes through the same schema, SQL guard and server-side execution as
 a real model's. A request against a Prometheus source gets a recorded PromQL
-dashboard or Explore panel over Holotable's own metrics
+dashboard or panel over Holotable's own metrics
 (`holotable_query_duration_seconds_*`, `holotable_pollers_active`), which the
 compose stack's Prometheus scrapes. It needs no `AI_MODEL` or key. Because it would otherwise let
 a deployment that forgot to configure a model boot green, it is a startup
@@ -224,7 +224,7 @@ suite sets both.
 
 ## Timeouts and retries
 
-Every request to the provider, from every surface (generate, Explore, panel
+Every request to the provider, from every surface (generate, Chat, panel
 edit, source draft, dashboard chat), goes through the same model middleware
 (`src/lib/ai/invoke.ts`):
 

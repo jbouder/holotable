@@ -1,7 +1,7 @@
 import { Panel, type QueryPanel, type VizType, queryTimeField } from "@/lib/ir";
 
 /**
- * Redrawing an Explore result as another kind, without asking the model again.
+ * Redrawing a Chat panel as another kind (#416), without asking the model again.
  *
  * Browser-safe and pure. The rows are the ones the guarded query already
  * returned; only the panel that draws them changes, and every panel built here
@@ -10,7 +10,7 @@ import { Panel, type QueryPanel, type VizType, queryTimeField } from "@/lib/ir";
  */
 
 /** The kinds a result can be switched to. Line and area need a time field. */
-export const EXPLORE_VIEWS = ["line", "area", "bar", "table", "stat"] as const;
+export const CHAT_VIEWS = ["line", "area", "bar", "table", "stat"] as const;
 
 const SERIES_KINDS: ReadonlySet<VizType> = new Set(["line", "area", "bar"]);
 
@@ -53,7 +53,7 @@ function optionsOf(panel: QueryPanel): Options {
  */
 export function viewChoices(panel: QueryPanel): VizType[] {
   const timed = Boolean(queryTimeField(panel.query));
-  const views: VizType[] = EXPLORE_VIEWS.filter(
+  const views: VizType[] = CHAT_VIEWS.filter(
     (v) => timed || (v !== "line" && v !== "area"),
   );
   return views.includes(panel.viz) ? views : [panel.viz, ...views];

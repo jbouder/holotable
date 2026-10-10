@@ -114,7 +114,7 @@ export async function startHref(
   prefs: Preferences,
   lookup?: DashboardLookup,
 ): Promise<string> {
-  if (prefs.startPage === "explore") return "/explore";
+  if (prefs.startPage === "chat") return "/chat";
   const id = startDashboardId(prefs.startPage);
   if (!id) return "/dashboards";
   try {

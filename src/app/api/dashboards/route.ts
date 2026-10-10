@@ -19,7 +19,7 @@ export const runtime = "nodejs";
  * `workspaceId` and `editable` only NARROW that set — the candidate
  * workspaces still come from the validated claims and every one of them is
  * re-checked through `can()`, so a workspace id in the query string can never
- * widen what is returned. `editable=true` is what the Explore "save as panel"
+ * widen what is returned. `editable=true` is what Chat's "Add to dashboard"
  * picker asks for: listing a dashboard the caller cannot update would offer a
  * save the API would then refuse.
  *

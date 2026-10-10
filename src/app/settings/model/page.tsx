@@ -41,9 +41,9 @@ export default async function ModelSettings() {
             , <span className="font-mono">{config.aiModel}</span>
           </>
         ) : null}
-        . A workspace model is used for every dashboard, panel, Explore and chat
-        generation in the workspace from the next request on. Keys are encrypted at rest
-        and never shown again.
+        . A workspace model is used for every dashboard, panel and chat generation in the
+        workspace from the next request on. Keys are encrypted at rest and never shown
+        again.
       </p>
       {views.length === 0 ? (
         <EmptyState

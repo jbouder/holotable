@@ -100,7 +100,7 @@ message.
 The renderer is a third type beside `chart` and `html`: a `view`, a component
 that draws its own image and is handed the same PNG export handle an ECharts
 chart is. The kind says so with `image: true` and leaves `canvas` (which means
-"an ECharts chart") false, so explore never offers a custom visual. The view
+"an ECharts chart") false, so Chat's Show as never offers a custom visual. The view
 resolves the spec's color names, sets its size from the panel for a single
 view, compiles it and builds the view, then merges each poll's rows into it.
 

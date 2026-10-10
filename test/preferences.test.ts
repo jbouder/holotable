@@ -4,7 +4,7 @@ import { HttpError } from "@/lib/auth/authorize";
 import { parseGroups } from "@/lib/auth/claims";
 import {
   DEFAULT_PREFERENCES,
-  exploreDefaultsOf,
+  chatPreferencesOf,
   historyOf,
   historyTurnedOff,
   parsePreferences,
@@ -87,7 +87,7 @@ test("a valid patch passes through", () => {
     },
   );
   assert.equal(startDashboardId(`dashboard:${DASH}`), DASH);
-  assert.equal(startDashboardId("explore"), null);
+  assert.equal(startDashboardId("chat"), null);
 });
 
 test("saving writes the caller's own row, and a body cannot name another subject", async () => {
@@ -147,7 +147,7 @@ test("a start dashboard must be one the caller can view", async () => {
 test("the start page resolves, and a vanished or unreadable dashboard falls back with a notice", async () => {
   const base = { ...DEFAULT_PREFERENCES };
   assert.equal(await startHref(viewer, base), "/dashboards");
-  assert.equal(await startHref(viewer, { ...base, startPage: "explore" }), "/explore");
+  assert.equal(await startHref(viewer, { ...base, startPage: "chat" }), "/chat");
   const start = { ...base, startPage: `dashboard:${DASH}` as const };
   assert.equal(
     await startHref(viewer, start, lookup({ [DASH]: "w" })),
@@ -177,22 +177,20 @@ test("history and Explore defaults: on and as before unless the person says othe
     recentDashboards: true,
     paletteHistory: true,
   });
-  assert.deepEqual(exploreDefaultsOf(prefs), {
+  assert.deepEqual(chatPreferencesOf(prefs), {
     timeRange: "now-24h",
     refreshMs: 0,
-    startView: "model",
-    keepSession: false,
+    showQueries: false,
+    remember: true,
   });
 });
 
-test("history and Explore fields validate like the rest, and turning recents off names the stores", () => {
+test("history and Chat fields validate like the rest, and turning recents off names the stores", () => {
   const ok = parsePreferencesPatch({
     rememberPrompts: false,
     rememberPaletteHistory: true,
-    exploreTimeRange: "now-7d",
-    exploreRefreshMs: 60_000,
-    exploreStartView: "table",
-    exploreKeepSession: true,
+    chatTimeRange: "now-7d",
+    chatRefreshMs: 60_000,
   });
   assert.equal(ok.ok, true);
   if (ok.ok) assert.deepEqual(historyTurnedOff(ok.patch), ["prompts"]);
@@ -201,11 +199,11 @@ test("history and Explore fields validate like the rest, and turning recents off
     ["recent-dashboards", "palette-recents"],
   );
 
-  // Only the ranges and refresh rates Explore offers.
+  // Only the ranges and refresh rates Chat offers; Explore's fields are gone.
   for (const [field, value] of [
-    ["exploreTimeRange", "now-3y"],
-    ["exploreRefreshMs", 1000],
-    ["exploreStartView", "pie"],
+    ["chatTimeRange", "now-3y"],
+    ["chatRefreshMs", 1000],
+    ["exploreStartView", "table"],
     ["rememberPrompts", "no"],
   ] as const) {
     const bad = parsePreferencesPatch({ [field]: value });
@@ -213,8 +211,8 @@ test("history and Explore fields validate like the rest, and turning recents off
     if (!bad.ok) assert.equal(bad.field, field);
   }
   // A stored value that no longer parses falls back alone.
-  const stored = parsePreferences({ exploreRefreshMs: 7, rememberPrompts: false });
-  assert.equal(stored.exploreRefreshMs, 0);
+  const stored = parsePreferences({ chatRefreshMs: 7, rememberPrompts: false });
+  assert.equal(stored.chatRefreshMs, 0);
   assert.equal(stored.rememberPrompts, false);
 });
 
@@ -232,4 +230,25 @@ test("Chat's preferences default to keeping conversations, with nothing refreshi
       patch: { rememberChats: false, chatRefreshMs: 60_000 },
     },
   );
+});
+
+test("Explore's stored defaults are read as Chat's, and an Explore start page lands on Chat", () => {
+  const old = parsePreferences({
+    exploreTimeRange: "now-7d",
+    exploreRefreshMs: 60_000,
+    exploreKeepSession: true,
+    startPage: "explore",
+  });
+  assert.equal(old.chatTimeRange, "now-7d");
+  assert.equal(old.chatRefreshMs, 60_000);
+  assert.equal(old.startPage, "chat");
+  assert.equal("exploreKeepSession" in old, false);
+  // A Chat value already saved wins over the old one.
+  assert.equal(
+    parsePreferences({ exploreTimeRange: "now-7d", chatTimeRange: "now-1h" })
+      .chatTimeRange,
+    "now-1h",
+  );
+  const patch = parsePreferencesPatch({ startPage: "explore" });
+  assert.deepEqual(patch, { ok: true, patch: { startPage: "chat" } });
 });

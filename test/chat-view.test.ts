@@ -7,7 +7,7 @@ import {
   initialView,
   viewChoices,
   viewPanel,
-} from "@/lib/explore-view";
+} from "@/lib/chat/view";
 import {
   csvFilename,
   EMPTY_FILTERS,
@@ -17,16 +17,6 @@ import {
   sortRows,
   toCsv,
 } from "@/lib/result-table";
-import {
-  addEntry,
-  emptySession,
-  MAX_SESSION_ENTRIES,
-  removeEntry,
-  showEntry,
-  togglePin,
-  updateEntry,
-  visibleEntries,
-} from "@/lib/explore-session";
 
 const timed: QueryPanel = {
   id: "explore",
@@ -160,52 +150,5 @@ test("table: CSV quotes what it must and defuses spreadsheet formulas", () => {
     ["a,b", '"say ""hi"", twice",1', "'=HYPERLINK(1),", `'-2,"line\nbreak"`].join("\r\n"),
   );
   assert.equal(csvFilename("p95 latency, by route!"), "p95-latency-by-route.csv");
-  assert.equal(csvFilename("!!!"), "explore-result.csv");
-});
-
-// --- Session -----------------------------------------------------------------
-
-test("session: newest first and shown; pin holds one beside the active one", () => {
-  let s = emptySession<{ id: string; n: number }>();
-  s = addEntry(s, { id: "a", n: 1 });
-  s = addEntry(s, { id: "b", n: 2 });
-  assert.deepEqual(
-    s.entries.map((e) => e.id),
-    ["b", "a"],
-  );
-  assert.equal(s.activeId, "b");
-
-  s = togglePin(s, "a");
-  assert.deepEqual(
-    visibleEntries(s).map((e) => e.id),
-    ["a", "b"],
-  );
-  // The pinned one shown on its own is shown once.
-  s = showEntry(s, "a");
-  assert.deepEqual(
-    visibleEntries(s).map((e) => e.id),
-    ["a"],
-  );
-  s = togglePin(s, "a");
-  assert.equal(s.pinnedId, null);
-
-  s = updateEntry(s, "b", (e) => ({ ...e, n: 20 }));
-  assert.equal(s.entries[0]?.n, 20);
-  assert.equal(
-    updateEntry(s, "zz", (e) => e),
-    s,
-  );
-
-  s = removeEntry(s, "a");
-  assert.deepEqual(s, { entries: [{ id: "b", n: 20 }], activeId: "b", pinnedId: null });
-});
-
-test("session: past the cap the oldest unpinned result goes", () => {
-  let s = emptySession<{ id: string }>();
-  s = addEntry(s, { id: "first" });
-  s = togglePin(s, "first");
-  for (let i = 0; i < MAX_SESSION_ENTRIES; i++) s = addEntry(s, { id: `q${i}` });
-  assert.equal(s.entries.length, MAX_SESSION_ENTRIES);
-  assert.ok(s.entries.some((e) => e.id === "first"));
-  assert.ok(!s.entries.some((e) => e.id === "q0"));
+  assert.equal(csvFilename("!!!"), "chat-result.csv");
 });

@@ -60,7 +60,7 @@ export function PanelActions({
   onShowSql?: () => void;
   /**
    * Open the dashboard chat about this panel (#366). Absent where there is no
-   * chat: an embed, the editor, Explore.
+   * chat: an embed, the editor, Chat.
    */
   onAskAbout?: () => void;
   /**

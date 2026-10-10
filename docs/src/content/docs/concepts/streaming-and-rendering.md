@@ -247,8 +247,8 @@ module under `src/lib/panels/kinds/` that says, in plain data:
 | `kind` | `panel.viz`. `VizType` in `src/lib/ir.ts` is built from the registered names, so an unregistered one fails validation with the list of valid kinds. |
 | `summary` | The [Visualization types](/reference/visualization-types/) reference, generated from it. |
 | `promptHint` | The generation prompt, whose list of kinds is built from the hints. |
-| `canvas` | Drawn by ECharts: PNG export, and whether the explore page plots the panel. |
-| `image` | Draws its own image rather than an ECharts chart (a custom visual): PNG export, but explore does not plot it. |
+| `canvas` | Drawn by ECharts: PNG export. |
+| `image` | Draws its own image rather than an ECharts chart (a custom visual): PNG export. |
 | `timeBrush` | Whether a drag across the chart selects a time range. |
 | `skeleton` | The shape the panel shows while it loads. |
 | `query` | `"required"`, or `"none"` for a kind that runs nothing (text). The IR holds the panel to it, and code that executes or lists queries filters through `hasQuery`. |

@@ -6,79 +6,19 @@ import {
   safeParseDashboard,
   type TimeRange,
 } from "@/lib/ir";
+import { appendPanel, panelIdFromTitle } from "@/lib/panel-placement";
 
 /**
- * Pinning an Explore answer to a dashboard.
+ * Adding a Chat panel to a dashboard (#416).
  *
- * Explore hands back one `Panel` with a fixed id (`explore`) and a full-width
- * layout at the origin — fine for a page that shows a single result, wrong for
- * a dashboard where ids must be unique and panels must not overlap. Placing it
- * is arithmetic over a spec and needs no server, so it lives here as pure
- * functions; the two fetch helpers below are the only part that talks to the
- * API, and they send the same `{spec}` body the editor sends, so a save still
- * goes through `resolveAndValidateDashboard` (workspace derived from the
- * trusted source records, every statement re-validated) and appends a version
- * rather than mutating one.
+ * The two saves send the same `{spec}` body the editor sends, so the panel
+ * goes through the ordinary save: `resolveAndValidateDashboard` derives the
+ * workspace from the trusted source records, re-validates every statement,
+ * and appends a version rather than changing one. Placing the panel is
+ * `src/lib/panel-placement.ts`.
  */
 
-/** `Panel.id` caps at 64; leave room for a `-2` disambiguator. */
-const ID_BASE_MAX = 56;
-/** `PanelLayout.y` caps at 1000. */
-const MAX_Y = 1000;
-
-/**
- * Derive an id candidate from a panel title, so a saved panel reads as itself
- * in the spec instead of as `panel-m4x9q1`.
- */
-export function panelIdFromTitle(title: string): string {
-  const slug = title
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "")
-    .slice(0, ID_BASE_MAX)
-    .replace(/-+$/, "");
-  return slug || "panel";
-}
-
-/**
- * The first of `base`, `base-2`, `base-3`… that no existing panel uses.
- * Deterministic on purpose: a timestamped id would make the result untestable
- * and tells a reader nothing.
- */
-export function uniquePanelId(taken: Iterable<string>, base: string): string {
-  const used = new Set(taken);
-  if (!used.has(base)) return base;
-  for (let n = 2; ; n++) {
-    const candidate = `${base}-${n}`;
-    if (!used.has(candidate)) return candidate;
-  }
-}
-
-/** The y a new row starts at: below every panel already placed. */
-export function bottomOf(panels: Panel[]): number {
-  const bottom = panels.reduce((m, p) => Math.max(m, p.layout.y + p.layout.h), 0);
-  return Math.min(bottom, MAX_Y);
-}
-
-/**
- * Append `panel` to `spec` at the bottom of the grid, under an id unique within
- * that dashboard. Pure: neither argument is mutated.
- */
-export function appendPanel(spec: Dashboard, panel: Panel): Dashboard {
-  const id = uniquePanelId(
-    spec.panels.map((p) => p.id),
-    panelIdFromTitle(panel.title),
-  );
-  return {
-    ...spec,
-    panels: [
-      ...spec.panels,
-      { ...panel, id, layout: { ...panel.layout, x: 0, y: bottomOf(spec.panels) } },
-    ],
-  };
-}
-
-/** A one-panel dashboard holding the Explore result. */
+/** A one-panel dashboard holding a Chat panel. */
 export function newDashboardSpec(input: {
   title: string;
   panel: Panel;

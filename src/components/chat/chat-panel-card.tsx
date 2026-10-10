@@ -1,7 +1,16 @@
 "use client";
 
 import * as React from "react";
-import { Database, Eye, Loader2, RotateCcw, TriangleAlert } from "lucide-react";
+import Link from "next/link";
+import {
+  Database,
+  Eye,
+  LayoutDashboard,
+  Loader2,
+  RotateCcw,
+  TriangleAlert,
+} from "lucide-react";
+import { AddToDashboardDialog, type SavedPanel } from "./add-to-dashboard-dialog";
 import { PanelView, type PanelState } from "@/components/dashboard/PanelView";
 import { PanelSkeleton } from "@/components/dashboard/PanelSkeleton";
 import { CopyButton } from "@/components/settings/copy-button";
@@ -18,7 +27,7 @@ import {
   type ViewSettings,
   viewChoices,
   viewPanel,
-} from "@/lib/explore-view";
+} from "@/lib/chat/view";
 import { type QueryPanel, queryText, type TimeRange, VizType } from "@/lib/ir";
 import type { QueryRows } from "@/lib/panel-query";
 import { EMPTY_FILTERS, filterRows } from "@/lib/result-table";
@@ -39,6 +48,17 @@ function vizLabel(viz: string): string {
   return words.charAt(0).toUpperCase() + words.slice(1);
 }
 
+/**
+ * Where a panel may be added (#416): the conversation's workspace, when the
+ * caller may edit or create a dashboard there, and what a new dashboard
+ * starts with.
+ */
+export interface AddTo {
+  workspaceId: string;
+  timeRange: TimeRange;
+  refreshIntervalMs: number;
+}
+
 /** Rows past which a table offers its filter box. */
 const FILTER_FROM_ROWS = 10;
 
@@ -57,9 +77,12 @@ export function ChatPanelCard({
   timeRange,
   refreshKey,
   showQuery = false,
+  addTo,
 }: {
   conversationId: string | null;
   part: ShowPanelPart;
+  /** Absent: the caller may not add it anywhere, and Copy spec is what is offered. */
+  addTo?: AddTo;
   /** Open the "Show query" details by default (Settings → Show queries). */
   showQuery?: boolean;
   /** The conversation's range: a change runs the panel again. */
@@ -99,6 +122,7 @@ export function ChatPanelCard({
       timeRange={timeRange}
       refreshKey={refreshKey}
       showQuery={showQuery}
+      addTo={addTo}
     />
   );
 }
@@ -146,10 +170,12 @@ function DrawnPanel({
   timeRange,
   refreshKey,
   showQuery,
+  addTo,
 }: {
   conversationId: string | null;
   spec: QueryPanel;
   showQuery: boolean;
+  addTo?: AddTo;
   streamed: QueryRows | null;
   timeRange: TimeRange;
   refreshKey: number;
@@ -160,6 +186,8 @@ function DrawnPanel({
   const [refreshing, setRefreshing] = React.useState(false);
   const [view, setView] = React.useState<ViewSettings>(() => initialView(spec));
   const [filter, setFilter] = React.useState("");
+  const [adding, setAdding] = React.useState(false);
+  const [added, setAdded] = React.useState<SavedPanel | null>(null);
   const latest = React.useRef(0);
   const filterId = React.useId();
 
@@ -264,6 +292,17 @@ function DrawnPanel({
           />
           Re-run
         </Button>
+        {addTo && (
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-7 gap-1.5 px-2 text-xs"
+            onClick={() => setAdding(true)}
+          >
+            <LayoutDashboard className="h-3.5 w-3.5" aria-hidden />
+            Add to dashboard
+          </Button>
+        )}
         <CopyButton value={JSON.stringify(shown, null, 2)} label="Copy spec" />
         {shown.viz === "table" && rows && rows.rows.length > FILTER_FROM_ROWS && (
           <>
@@ -280,6 +319,29 @@ function DrawnPanel({
           </>
         )}
       </div>
+      {added && (
+        <p className="text-xs text-muted">
+          Added to <span className="text-foreground">{added.dashboardTitle}</span> —{" "}
+          <Link
+            className="text-primary underline-offset-2 hover:underline"
+            href={`/dashboards/${added.dashboardId}/edit?panel=${encodeURIComponent(added.panelId)}`}
+          >
+            open
+          </Link>
+        </p>
+      )}
+      {addTo && (
+        <AddToDashboardDialog
+          open={adding}
+          onOpenChange={setAdding}
+          // The panel as shown: Show as applied.
+          panel={shown}
+          workspaceId={addTo.workspaceId}
+          defaultTimeRange={addTo.timeRange}
+          defaultRefreshIntervalMs={addTo.refreshIntervalMs}
+          onSaved={setAdded}
+        />
+      )}
       <QueryDetails panel={spec} timeRange={timeRange} open={showQuery} />
     </div>
   );

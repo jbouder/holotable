@@ -104,7 +104,7 @@ export function PanelView({
   embedded?: boolean;
   /**
    * The panel's links as its menu offers them (#372). A surface that does not
-   * draw links (a share link, the editor, Explore) passes none.
+   * draw links (a share link, the editor, Chat) passes none.
    */
   links?: MenuLinkItem[];
   /**

@@ -9,7 +9,7 @@ import * as React from "react";
  *
  * Only the panel id travels, and the server looks the panel up in the stored
  * spec; nothing here carries SQL. Where there is no provider (an embed, the
- * editor's canvas, Explore) the menu item is simply not offered.
+ * editor's canvas, Chat) the menu item is simply not offered.
  */
 export interface ChatRequest {
   panelId: string;

@@ -279,6 +279,14 @@ Important files:
   and a few sample rows. A stored message never holds result rows
   (`persistableMessage` in `src/lib/chat/persist.ts`). The dashboard chat
   (`src/lib/ai/chat.ts`) is a caller with `draw: false`
+- `src/app/chat/` and `src/components/chat/` — the Chat page (#416), which
+  replaced Explore (`/explore` redirects to it). The page never sends a
+  statement: a kept conversation's turn sends only the new question
+  (`/api/chat/[id]/messages`), a panel runs again through
+  `/api/chat/[id]/panels/[panelId]/run` from its stored spec, and an unkept
+  one (`rememberChats` off) goes through `/api/chat/turn`, which stores
+  nothing. Add to dashboard is the ordinary dashboard save
+  (`src/lib/chat/add-to-dashboard.ts`, `src/lib/panel-placement.ts`)
 - `src/lib/ai/repair.ts` and `src/components/use-repairing-object.ts` — the
   one automatic repair of output that failed its schema (#21). The browser
   sends only `{ repairOf: id }`; the request, the rejected output and the

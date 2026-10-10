@@ -5,7 +5,7 @@ import { EmptyState } from "@/components/ui/empty-state";
 
 /**
  * The empty state for a surface that needs a data source and has none —
- * Explore and the new-dashboard page.
+ * Chat and the new-dashboard page.
  *
  * Both used to say "Create one under Data sources first", which is a dead end
  * for an editor without `source:manage`: they can build dashboards and cannot

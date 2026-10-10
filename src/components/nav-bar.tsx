@@ -7,7 +7,6 @@ import { Collapsible } from "@base-ui/react/collapsible";
 import {
   LayoutDashboard,
   Database,
-  Compass,
   Menu as MenuIcon,
   MessageSquare,
   X,
@@ -19,7 +18,6 @@ import { ProfileMenu, type ProfileMenuAccount } from "@/components/profile-menu"
 
 const LINKS = [
   { href: "/dashboards", label: "Dashboards", Icon: LayoutDashboard },
-  { href: "/explore", label: "Explore", Icon: Compass },
   { href: "/data-sources", label: "Data sources", Icon: Database },
 ] as const;
 

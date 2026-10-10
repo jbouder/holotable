@@ -21,6 +21,7 @@ import { ErrorDisplay } from "@/components/ui/error-display";
 import { Textarea } from "@/components/ui/input";
 import { Menu, MenuCheckboxItem } from "@/components/ui/menu";
 import { PageHeader } from "@/components/ui/page-header";
+import { PromptHistoryMenu, usePromptHistory } from "@/components/prompt-history";
 import { browserStorage } from "@/lib/browser-storage";
 import { readChatPanelOpen, writeChatPanelOpen } from "@/lib/chat-layout";
 import {
@@ -33,12 +34,12 @@ import { SHOW_PANEL_PART } from "@/lib/chat/panel";
 import { persistableMessage } from "@/lib/chat/persist";
 import { useShortcuts } from "@/lib/editor/use-shortcuts";
 import { type ApiError, apiErrorFromThrown } from "@/lib/errors";
-import { timeRangeLabel } from "@/lib/explore-defaults";
+import { timeRangeLabel } from "@/lib/chat/defaults";
 import type { TimeRange } from "@/lib/ir";
 import type { ChatPreferences } from "@/lib/preferences";
 import { CHAT_PANEL_SHORTCUT } from "@/lib/shortcuts";
 import { cn } from "@/lib/utils";
-import { ChatPanelCard, type ShowPanelPart } from "./chat-panel-card";
+import { type AddTo, ChatPanelCard, type ShowPanelPart } from "./chat-panel-card";
 import { ChatSidePanel } from "./chat-side-panel";
 
 /** The most sources one conversation may use, as the server holds it. */
@@ -87,6 +88,8 @@ export function ChatClient({
   canManageSources,
   defaultFrom,
   chatPrefs,
+  addableWorkspaces,
+  defaultRefreshIntervalMs,
   initial,
 }: {
   sources: ChatSourceOption[];
@@ -94,6 +97,8 @@ export function ChatClient({
   canManageSources: boolean;
   defaultFrom: string;
   chatPrefs: ChatPreferences;
+  addableWorkspaces: string[];
+  defaultRefreshIntervalMs: number;
   initial?: InitialConversation;
 }) {
   const [conversationId, setConversationId] = React.useState<string | null>(
@@ -126,6 +131,8 @@ export function ChatClient({
   const workspaceId = initial?.conversation.workspaceId ?? chosen[0]?.workspaceId;
   const effective = workspaceId ? models[workspaceId] : undefined;
   const aiUnavailable = effective?.unavailable ?? null;
+  // Recent questions in this workspace, when this person keeps them (#83).
+  const prompts = usePromptHistory(workspaceId, "chat");
   const unavailable = initial?.unavailableSourceIds ?? [];
   const readOnly =
     initial !== undefined &&
@@ -225,6 +232,7 @@ export function ChatClient({
       window.history.replaceState(null, "", `/chat/${made.value}`);
     }
     setText("");
+    prompts.remember(trimmed);
     // A failed send surfaces through `error`.
     void sendMessage({ text: trimmed });
   }
@@ -310,6 +318,14 @@ export function ChatClient({
             </span>
             <span className="max-md:hidden">Side panel</span>
           </Button>
+          <PromptHistoryMenu
+            history={prompts}
+            disabled={busy}
+            onPick={(prompt) => {
+              setText(prompt);
+              inputRef.current?.focus();
+            }}
+          />
           {(conversationId || messages.length > 0) && (
             <ButtonLink
               href="/chat"
@@ -389,6 +405,15 @@ export function ChatClient({
                 timeRange={timeRange}
                 refreshKey={refreshKey}
                 showQueries={prefs.showQueries}
+                addTo={
+                  workspaceId && addableWorkspaces.includes(workspaceId)
+                    ? {
+                        workspaceId,
+                        timeRange,
+                        refreshIntervalMs: defaultRefreshIntervalMs,
+                      }
+                    : undefined
+                }
               />
             ))}
             {status === "submitted" && <WorkingStatus>Thinking…</WorkingStatus>}
@@ -570,8 +595,10 @@ function Message({
   timeRange,
   refreshKey,
   showQueries,
+  addTo,
 }: {
   message: UIMessage;
+  addTo?: AddTo;
   conversationId: string | null;
   timeRange: TimeRange;
   refreshKey: number;
@@ -623,6 +650,7 @@ function Message({
               timeRange={timeRange}
               refreshKey={refreshKey}
               showQuery={showQueries}
+              addTo={addTo}
             />
           );
         }

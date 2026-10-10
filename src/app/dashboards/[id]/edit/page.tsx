@@ -13,7 +13,7 @@ export default async function EditDashboardPage({
   searchParams,
 }: {
   params: Promise<{ id: string }>;
-  /** `?panel=` preselects a panel — how Explore hands off a saved result. */
+  /** `?panel=` preselects a panel — how Chat hands off an added panel. */
   searchParams: Promise<{ panel?: string }>;
 }) {
   const identity = await getIdentity();

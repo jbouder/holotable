@@ -93,6 +93,7 @@ export default defineConfig({
           items: [
             { label: "Viewing a dashboard", slug: "guide/viewing-a-dashboard" },
             { label: "Editing a dashboard", slug: "guide/editing-a-dashboard" },
+            { label: "Chat", slug: "guide/chat" },
             { label: "Dashboard chat", slug: "guide/dashboard-chat" },
             { label: "Dashboard variables", slug: "guide/variables" },
             { label: "Annotations", slug: "guide/annotations" },

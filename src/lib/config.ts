@@ -769,7 +769,7 @@ export function validateConfig(
 
   // --- AI provider --------------------------------------------------------
   // In demo mode the model is optional: the seeded dashboards, the viewer and
-  // the SQL editor need no key, and the generate, chat and Explore pages say
+  // the SQL editor need no key, and the generate and chat pages say
   // what is missing instead of failing a request (src/lib/ai/configured.ts).
   const aiMissing = demo ? warning : missing;
   const provider = values.AI_PROVIDER ?? "openai-compatible";
