@@ -13,6 +13,7 @@ import { pgConversationStore } from "@/lib/db/conversations";
 import { getSourceById } from "@/lib/db/repo";
 import { TimeRange } from "@/lib/ir";
 import { json, readJson, route } from "@/lib/http";
+import { requestPreferences } from "@/lib/preferences-server";
 import { resolveTimeRange } from "@/lib/time";
 
 export const runtime = "nodejs";
@@ -67,6 +68,14 @@ export const GET = route("chat.list", async (req: Request) => {
 export const POST = route("chat.create", async (req: Request) => {
   const identity = await requireIdentity();
   const body = await readJson(req, CreateBody);
+  // Someone who keeps no conversations gets none stored (#416); the page
+  // runs theirs through /api/chat/turn instead.
+  if (!(await requestPreferences(identity)).rememberChats) {
+    throw new HttpError(
+      409,
+      "conversations are not kept for you; turn on Keep my conversations to save one",
+    );
+  }
   try {
     resolveTimeRange(body.timeRange);
   } catch {

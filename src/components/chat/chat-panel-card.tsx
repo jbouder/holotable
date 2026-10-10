@@ -56,9 +56,12 @@ export function ChatPanelCard({
   part,
   timeRange,
   refreshKey,
+  showQuery = false,
 }: {
   conversationId: string | null;
   part: ShowPanelPart;
+  /** Open the "Show query" details by default (Settings → Show queries). */
+  showQuery?: boolean;
   /** The conversation's range: a change runs the panel again. */
   timeRange: TimeRange;
   /** Bumped to run every panel on screen again (live refresh). */
@@ -95,6 +98,7 @@ export function ChatPanelCard({
       }
       timeRange={timeRange}
       refreshKey={refreshKey}
+      showQuery={showQuery}
     />
   );
 }
@@ -141,9 +145,11 @@ function DrawnPanel({
   streamed,
   timeRange,
   refreshKey,
+  showQuery,
 }: {
   conversationId: string | null;
   spec: QueryPanel;
+  showQuery: boolean;
   streamed: QueryRows | null;
   timeRange: TimeRange;
   refreshKey: number;
@@ -274,7 +280,7 @@ function DrawnPanel({
           </>
         )}
       </div>
-      <QueryDetails panel={spec} timeRange={timeRange} />
+      <QueryDetails panel={spec} timeRange={timeRange} open={showQuery} />
     </div>
   );
 }
@@ -284,10 +290,18 @@ function DrawnPanel({
  * server narrows it to, as a `<details>` under the card — the answer is what
  * is being read, and a modal over it is the wrong shape.
  */
-function QueryDetails({ panel, timeRange }: { panel: QueryPanel; timeRange: TimeRange }) {
+function QueryDetails({
+  panel,
+  timeRange,
+  open,
+}: {
+  panel: QueryPanel;
+  timeRange: TimeRange;
+  open: boolean;
+}) {
   const text = queryText(panel.query);
   return (
-    <details className="border border-border bg-surface-2/60 text-xs">
+    <details open={open} className="border border-border bg-surface-2/60 text-xs">
       <summary className="flex cursor-pointer items-center gap-1.5 px-2.5 py-1.5 text-muted hover:text-foreground">
         <Database className="h-3 w-3 shrink-0" aria-hidden />
         Show query

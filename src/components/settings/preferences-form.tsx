@@ -6,6 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/input";
 import { Select, type SelectOption } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import {
   historyTurnedOff,
   type Preferences,
@@ -120,6 +121,7 @@ export function PreferencesForm({
   const [prefs, setPrefs] = React.useState(initial);
   const [state, setState] = React.useState<SaveState>({ kind: "idle" });
   const zones = React.useMemo(zoneOptions, []);
+  const [confirmForgetChats, setConfirmForgetChats] = React.useState(false);
   const [browserZone, setBrowserZone] = React.useState<string | null>(null);
   React.useEffect(() => setBrowserZone(runtimeTimeZone()), []);
 
@@ -339,6 +341,56 @@ export function PreferencesForm({
           />
         </CardContent>
       </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Chat</CardTitle>
+        </CardHeader>
+        <CardContent className="grid grid-cols-1 gap-4 sm:grid-cols-[12rem_1fr] sm:items-center">
+          <Label className="mb-0" htmlFor="pref-chat-refresh">
+            Live refresh
+          </Label>
+          <Select
+            id="pref-chat-refresh"
+            value={String(prefs.chatRefreshMs)}
+            options={REFRESH_OPTIONS}
+            onValueChange={(v) =>
+              void save({ chatRefreshMs: Number(v) as ExploreRefreshMs })
+            }
+          />
+          <span className="text-sm">Queries</span>
+          <Checkbox
+            checked={prefs.chatShowQueries}
+            onCheckedChange={(checked) => void save({ chatShowQueries: checked })}
+            label="Show every answer's queries open"
+          />
+          <span className="text-sm">Conversations</span>
+          <div className="space-y-1">
+            <Checkbox
+              checked={prefs.rememberChats}
+              onCheckedChange={(checked) =>
+                checked ? void save({ rememberChats: true }) : setConfirmForgetChats(true)
+              }
+              label="Keep my conversations"
+            />
+            <p className="pl-6 text-xs text-muted">
+              Kept on the server, readable only by you. Off, a conversation is gone when
+              you leave the page.
+            </p>
+          </div>
+        </CardContent>
+      </Card>
+      <ConfirmDialog
+        open={confirmForgetChats}
+        onOpenChange={setConfirmForgetChats}
+        title="Stop keeping conversations?"
+        confirmLabel="Stop and delete"
+        danger
+        onConfirm={() => void save({ rememberChats: false })}
+      >
+        Every conversation you have kept is deleted, and new ones are gone when you leave
+        the page. This follows you to every device you sign in on.
+      </ConfirmDialog>
 
       <p className="text-xs text-muted">
         These follow you to any device you sign in on. Every time is still stored in UTC,

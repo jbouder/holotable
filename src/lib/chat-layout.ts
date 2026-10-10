@@ -26,3 +26,27 @@ export function writeChatExpanded(storage: BrowserStorage | null, expanded: bool
     // A browser that refuses storage simply opens collapsed next time.
   }
 }
+
+/**
+ * Whether Chat's side panel (#416) is open on a wide screen. A layout choice
+ * for this browser, like the one above; open is the default, so closed is
+ * what is stored.
+ */
+export const CHAT_PANEL_CLOSED_KEY = "holotable:chat-panel-closed";
+
+export function readChatPanelOpen(storage: BrowserStorage | null): boolean {
+  try {
+    return storage?.getItem(CHAT_PANEL_CLOSED_KEY) !== "1";
+  } catch {
+    return true;
+  }
+}
+
+export function writeChatPanelOpen(storage: BrowserStorage | null, open: boolean) {
+  try {
+    if (open) storage?.removeItem(CHAT_PANEL_CLOSED_KEY);
+    else storage?.setItem(CHAT_PANEL_CLOSED_KEY, "1");
+  } catch {
+    // A browser that refuses storage simply opens the panel next time.
+  }
+}

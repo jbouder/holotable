@@ -217,3 +217,19 @@ test("history and Explore fields validate like the rest, and turning recents off
   assert.equal(stored.exploreRefreshMs, 0);
   assert.equal(stored.rememberPrompts, false);
 });
+
+test("Chat's preferences default to keeping conversations, with nothing refreshing", () => {
+  const prefs = parsePreferences({});
+  assert.equal(prefs.rememberChats, true);
+  assert.equal(prefs.chatRefreshMs, 0);
+  assert.equal(prefs.chatShowQueries, false);
+  const patch = parsePreferencesPatch({ chatRefreshMs: 45_000 });
+  assert.equal(patch.ok, false);
+  assert.deepEqual(
+    parsePreferencesPatch({ rememberChats: false, chatRefreshMs: 60_000 }),
+    {
+      ok: true,
+      patch: { rememberChats: false, chatRefreshMs: 60_000 },
+    },
+  );
+});

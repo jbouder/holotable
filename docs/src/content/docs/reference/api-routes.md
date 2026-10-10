@@ -82,12 +82,13 @@ A share link reaches none of them.
 | Route | Method | Min role | Notes |
 | --- | --- | --- | --- |
 | `/api/chat` | GET | signed in | The caller's conversations, most recently used first, 50 a page; `?after=` is the previous page's `next`. Conversations past `CHAT_HISTORY_RETENTION_DAYS` are not listed |
-| `/api/chat` | POST | viewer | Start a conversation: `{ sourceIds, timeRange }`. Each source needs `source:use`; all must be in one workspace, which is the conversation's, and at most three. Past `CHAT_CONVERSATIONS_MAX` the caller's least recently used conversation is deleted |
+| `/api/chat` | POST | viewer | Start a conversation: `{ sourceIds, timeRange }`. Each source needs `source:use`; all must be in one workspace, which is the conversation's, and at most three. Past `CHAT_CONVERSATIONS_MAX` the caller's least recently used conversation is deleted. A `409` when the caller turned **Keep my conversations** off |
 | `/api/chat` | DELETE | signed in | Delete every one of the caller's conversations, at once |
 | `/api/chat/[id]` | GET | owner | The conversation and its messages. A drawn panel's rows are never stored, so the page runs each panel again; `unavailableSourceIds` names the sources the caller can no longer use |
 | `/api/chat/[id]` | PATCH | owner | Rename it (`title`), or change its `sourceIds` (re-authorized, same workspace) or `timeRange` |
 | `/api/chat/[id]` | DELETE | owner | Delete it and its messages |
 | `/api/chat/[id]/messages` | POST | owner, viewer on its sources | One turn: `{ message }`, the new question only; the history is the stored conversation. Streams the answer, with `runQuery` and `showPanel`. Rate limited and budgeted per workspace; the turn is stored with each panel's rows stripped. Refused with a `403` when none of the conversation's sources is usable any more |
+| `/api/chat/turn` | POST | viewer | One turn of a conversation that is **not kept**, for a caller with Keep my conversations off: `{ sourceIds, timeRange, history, message }`. Nothing is stored; the page sends the history it holds, each drawn panel reduced to its sample, at most 512 KB. The sources are checked as on create |
 | `/api/chat/[id]/panels/[panelId]/run` | POST | owner, viewer on its source | Run a drawn panel again. The body is `{ timeRange? }` and nothing else: the statement is the stored panel's, checked against its source's catalog as it is now, under the caller's row scope |
 
 ## Sources
@@ -119,7 +120,7 @@ A share link reaches none of them.
 | Route | Method | Min role | Notes |
 | --- | --- | --- | --- |
 | `/api/me` | GET | signed in | The caller's own subject, display name, email, platform-admin flag and workspace roles, all from the session. No parameters, so it can only describe the identity that asked. The name and email are display-only and never reach `can()` |
-| `/api/me/preferences` | GET / PATCH | signed in | The caller's own preferences: time zone, clock, start page and dashboard list defaults. PATCH merges a partial object; an unknown key or an invalid value is a 400 naming the field, and a start dashboard must be one the caller can view. No subject parameter, so nobody reads or writes another person's row |
+| `/api/me/preferences` | GET / PATCH | signed in | The caller's own preferences: time zone, clock, start page and dashboard list defaults. PATCH merges a partial object; an unknown key or an invalid value is a 400 naming the field, and a start dashboard must be one the caller can view. Turning `rememberChats` off deletes every one of the caller's Chat conversations. No subject parameter, so nobody reads or writes another person's row |
 | `/api/me/model` | GET, PUT, DELETE | signed in | The caller's own [model](/admin/ai-provider/#models-configured-in-the-app) (#331): `{ config }`, with `settings` (provider, base URL, model, API) and the key's state (`set` with its last four characters, `none`, or `unreadable`), never the key. PUT takes `{ settings, apiKey? }`: a missing `apiKey` keeps the stored key, for the same origin only, and `""` clears it; the base URL is held to the [base URL guard](/admin/ai-provider/#the-base-url-guard). Always the session's own row; refused for a service-account token and in demo mode. Audited as `user.model.update` and `user.model.delete` |
 | `/api/me/model/test` | POST | editor | `{ config, workspaceId }`: one minimal model call with that configuration, admitted by `workspaceId`'s rate limit and budget, which must allow personal keys. Answers `{ ok, model, latencyMs }` or `{ ok: false, message }`. Audited as `user.model.test` |
 

@@ -4,10 +4,14 @@ import { authorizedWorkspaces, can } from "@/lib/auth/authorize";
 import { accessibleWorkspaces, type Identity } from "@/lib/auth/claims";
 import { type CatalogHealth, catalogHealth } from "@/lib/catalog/health";
 import { listSources } from "@/lib/db/repo";
-import { exploreDefaultsOf } from "@/lib/preferences";
+import {
+  type ChatPreferences,
+  chatPreferencesOf,
+  exploreDefaultsOf,
+} from "@/lib/preferences";
 import { requestPreferences } from "@/lib/preferences-server";
 import { buildStarters } from "@/lib/prompts/starters";
-import { isSqlSource } from "@/lib/sources/registry";
+import { isSqlSource, sourceKind } from "@/lib/sources/registry";
 
 /** A source as the Chat page offers it: names and a verdict, never the catalog. */
 export interface ChatSourceOption {
@@ -15,6 +19,8 @@ export interface ChatSourceOption {
   name: string;
   workspaceId: string;
   kind: string;
+  /** The language its queries are written in, from its kind. */
+  language: "sql" | "promql";
   /** Server-decided, as `/api/generate` decides it. */
   catalog: CatalogHealth;
   /** Whether this caller may refresh it (`source:manage` here). */
@@ -30,6 +36,8 @@ export interface ChatPageData {
   canManageSources: boolean;
   /** The range a new conversation starts with, from the person's preferences. */
   defaultFrom: string;
+  /** Live refresh, open queries, and whether conversations are kept. */
+  chatPrefs: ChatPreferences;
 }
 
 /**
@@ -47,14 +55,17 @@ export async function chatPageData(identity: Identity): Promise<ChatPageData> {
     name: s.name,
     workspaceId: s.workspaceId,
     kind: s.kind,
+    language: sourceKind(s).language,
     catalog: catalogHealth(s),
     canRefresh: can(identity, "source:manage", { workspaceId: s.workspaceId }),
     starters: isSqlSource(s) ? buildStarters(s, "panel") : [],
   }));
+  const prefs = await requestPreferences(identity);
   return {
     sources,
     models: await effectiveModels(identity, workspaces),
     canManageSources: authorizedWorkspaces(identity, "source:manage").length > 0,
-    defaultFrom: exploreDefaultsOf(await requestPreferences(identity)).timeRange,
+    defaultFrom: exploreDefaultsOf(prefs).timeRange,
+    chatPrefs: chatPreferencesOf(prefs),
   };
 }

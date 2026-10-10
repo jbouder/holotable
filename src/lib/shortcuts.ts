@@ -16,7 +16,7 @@ import type { Binding, Shortcut } from "@/lib/editor/use-shortcuts";
  */
 
 export interface ShortcutSection {
-  id: "global" | "viewer" | "editor" | "fields";
+  id: "global" | "viewer" | "chat" | "editor" | "fields";
   title: string;
   description: string;
   shortcuts: readonly Shortcut[];
@@ -50,6 +50,17 @@ export const CHAT_OPEN_SHORTCUT = {
   key: "c",
   group: "Chat",
   description: "Ask this dashboard (open the chat)",
+} as const satisfies Shortcut;
+
+/**
+ * Shows or hides Chat's side panel (#416). A bare key, so it never fires
+ * while someone is typing a question.
+ */
+export const CHAT_PANEL_SHORTCUT = {
+  id: "chat-panel",
+  key: "[",
+  group: "Chat",
+  description: "Show or hide the side panel",
 } as const satisfies Shortcut;
 
 /** The dashboard editor's bindings (#121), bound by {@link bindShortcuts}. */
@@ -195,6 +206,12 @@ export const SHORTCUT_SECTIONS: readonly ShortcutSection[] = [
     title: "Dashboards",
     description: "While viewing a dashboard.",
     shortcuts: [PANEL_EXIT_SHORTCUT, CHAT_OPEN_SHORTCUT],
+  },
+  {
+    id: "chat",
+    title: "Chat",
+    description: "On the Chat page.",
+    shortcuts: [CHAT_PANEL_SHORTCUT],
   },
   {
     id: "editor",

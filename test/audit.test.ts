@@ -300,7 +300,6 @@ const EMITTERS: Record<string, string[]> = {
   "dashboards/[id]/chat": ["dashboard.chat", "query.execute"],
   chat: ["chat.create", "chat.delete"],
   "chat/[id]": ["chat.update", "chat.delete"],
-  "chat/[id]/messages": ["chat.turn", "query.execute"],
   "chat/[id]/panels/[panelId]/run": ["query.execute"],
   generate: ["dashboard.generate"],
   query: ["query.execute"],
@@ -338,6 +337,28 @@ const MCP_EMITTERS: Record<string, string[]> = {
   generate: ["dashboard.generate", "source.draft"],
 };
 
+/**
+ * A Chat turn (#416), kept or not, records its events in the one place both
+ * turn routes call, `chatTurnResponse`; held here as the MCP tools are.
+ */
+test("both Chat turn routes record their turn through chatTurnResponse", () => {
+  const turn = readFileSync(new URL("../src/lib/chat/turn.ts", import.meta.url), "utf8");
+  for (const action of ["chat.turn", "query.execute"]) {
+    assert.ok(
+      turn.includes(`action: "${action}"`),
+      `chat/turn.ts does not record ${action}`,
+    );
+  }
+  assert.match(turn, /via: "chat"/);
+  for (const path of ["chat/[id]/messages", "chat/turn"]) {
+    assert.match(
+      api(path),
+      /chatTurnResponse\(/,
+      `${path} does not run chatTurnResponse`,
+    );
+  }
+});
+
 test("each MCP tool records the event its route records", () => {
   for (const [file, actions] of Object.entries(MCP_EMITTERS)) {
     const source = readFileSync(
@@ -364,7 +385,12 @@ test("each listed event is recorded by the route where it happens", () => {
       );
     }
   }
-  const emitted = new Set([...Object.values(EMITTERS).flat(), "authz.denied"]);
+  const emitted = new Set([
+    ...Object.values(EMITTERS).flat(),
+    "authz.denied",
+    // Recorded by chatTurnResponse, held above.
+    "chat.turn",
+  ]);
   assert.deepEqual(
     AUDIT_ACTIONS.filter((a) => !emitted.has(a)),
     [],
