@@ -200,3 +200,24 @@ export async function createPromqlDashboard(request: APIRequestContext) {
   expect(res.ok(), await res.text()).toBe(true);
   return ((await res.json()) as { dashboard: { id: string } }).dashboard.id;
 }
+
+/**
+ * Ask Chat (#416) one question over the demo TimescaleDB source. The stub
+ * draws the recorded "Requests by service" panel, whose SQL runs on the
+ * server against the seeded rows, then answers with its recorded reply.
+ */
+export async function askChat(page: Page, question = "Which service is busiest?") {
+  await page.goto("/chat");
+  await page.getByRole("button", { name: /^Sources:/ }).click();
+  const demo = page.getByRole("menuitemcheckbox", { name: /Demo TimescaleDB metrics/ });
+  if ((await demo.getAttribute("aria-checked")) !== "true") await demo.click();
+  await expect(demo).toHaveAttribute("aria-checked", "true");
+  // The metrics source alone: the stub draws against the first one listed.
+  const others = page
+    .getByRole("menuitemcheckbox", { checked: true })
+    .filter({ hasNotText: "Demo TimescaleDB metrics" });
+  while ((await others.count()) > 0) await others.first().click();
+  await page.keyboard.press("Escape");
+  await page.getByRole("textbox", { name: "Message" }).fill(question);
+  await page.keyboard.press("Enter");
+}

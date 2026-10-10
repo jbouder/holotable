@@ -4,8 +4,15 @@ import * as React from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Collapsible } from "@base-ui/react/collapsible";
-import { LayoutDashboard, Database, Compass, Menu as MenuIcon, X } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import {
+  LayoutDashboard,
+  Database,
+  Compass,
+  Menu as MenuIcon,
+  MessageSquare,
+  X,
+} from "lucide-react";
+import { Button, ButtonLabel, ButtonLink } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { NavSlot } from "@/components/nav-slot";
 import { ProfileMenu, type ProfileMenuAccount } from "@/components/profile-menu";
@@ -28,8 +35,10 @@ const LINKS = [
  * `--collapsible-panel-height` so the height can transition, and keeps it
  * mounted until the closing transition ends.
  *
- * The account menu (#210) stays in the bar at every width and carries Sign
- * out, Settings and the theme. `account` is null for a signed-out visitor,
+ * Chat (#416) is not one of the links: it is the primary action, a filled
+ * button on the right beside the account menu, in the bar at every width
+ * (its label folds to the icon on a phone). The account menu (#210) stays
+ * in the bar at every width too, and carries Sign out, Settings and the theme. `account` is null for a signed-out visitor,
  * who gets no menu: every item in it needs a session.
  */
 export function NavBar({ account }: { account: ProfileMenuAccount | null }) {
@@ -80,6 +89,19 @@ export function NavBar({ account }: { account: ProfileMenuAccount | null }) {
         </nav>
         <div className="flex shrink-0 items-center gap-2">
           <NavSlot />
+          {account && (
+            <ButtonLink
+              href="/chat"
+              size="sm"
+              collapse
+              title="Chat with your data"
+              aria-current={pathname.startsWith("/chat") ? "page" : undefined}
+              className="gap-1.5"
+            >
+              <MessageSquare className="h-4 w-4" aria-hidden />
+              <ButtonLabel>Chat</ButtonLabel>
+            </ButtonLink>
+          )}
           {account && <ProfileMenu account={account} />}
           <Collapsible.Trigger
             render={<Button variant="ghost" size="icon" />}
