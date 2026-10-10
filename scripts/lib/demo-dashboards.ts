@@ -74,7 +74,7 @@ export function demoSpec() {
             "How the demo API is serving: **error rate**, **latency** and **availability** at the top, where traffic and failures come from below them, and the gateway's own log at the bottom. The SLO is 300 ms: amber means slower than that, red slower than a second.",
           ].join("\n"),
         },
-        layout: { x: 0, y: 0, w: 12, h: 2 },
+        layout: { x: 0, y: 0, w: 12, h: 3 },
       },
       {
         id: "error-rate",
@@ -98,7 +98,7 @@ export function demoSpec() {
             { value: 5, color: "danger" },
           ],
         },
-        layout: { x: 0, y: 2, w: 3, h: 3 },
+        layout: { x: 0, y: 3, w: 3, h: 3 },
       },
       {
         id: "p95",
@@ -122,7 +122,7 @@ export function demoSpec() {
             { value: 1000, color: "danger" },
           ],
         },
-        layout: { x: 3, y: 2, w: 3, h: 3 },
+        layout: { x: 3, y: 3, w: 3, h: 3 },
       },
       {
         id: "slow-share",
@@ -147,7 +147,7 @@ export function demoSpec() {
             { value: 25, color: "danger" },
           ],
         },
-        layout: { x: 6, y: 2, w: 3, h: 3 },
+        layout: { x: 6, y: 3, w: 3, h: 3 },
       },
       {
         id: "availability",
@@ -173,7 +173,7 @@ export function demoSpec() {
             { value: 99, color: "success" },
           ],
         },
-        layout: { x: 9, y: 2, w: 3, h: 3 },
+        layout: { x: 9, y: 3, w: 3, h: 3 },
       },
       {
         id: "traffic",
@@ -189,7 +189,7 @@ export function demoSpec() {
         },
         format: "number",
         options: { stacked: true, legend: "top" },
-        layout: { x: 0, y: 5, w: 8, h: 4 },
+        layout: { x: 0, y: 6, w: 8, h: 4 },
       },
       {
         id: "route-status",
@@ -209,7 +209,7 @@ export function demoSpec() {
           value: "requests",
           compact: true,
         },
-        layout: { x: 8, y: 5, w: 4, h: 4 },
+        layout: { x: 8, y: 6, w: 4, h: 4 },
       },
       {
         id: "latency-band",
@@ -253,7 +253,7 @@ export function demoSpec() {
             ],
           },
         },
-        layout: { x: 0, y: 9, w: 6, h: 4 },
+        layout: { x: 0, y: 10, w: 6, h: 4 },
       },
       {
         id: "latency-distribution",
@@ -278,7 +278,7 @@ export function demoSpec() {
             { value: 1000, color: "danger" },
           ],
         },
-        layout: { x: 6, y: 9, w: 6, h: 4 },
+        layout: { x: 6, y: 10, w: 6, h: 4 },
       },
       {
         id: "slowest-routes",
@@ -303,7 +303,7 @@ export function demoSpec() {
             },
           ],
         },
-        layout: { x: 0, y: 13, w: 5, h: 4 },
+        layout: { x: 0, y: 14, w: 5, h: 4 },
       },
       {
         id: "errors-by-route",
@@ -316,7 +316,7 @@ export function demoSpec() {
         },
         format: "number",
         options: { legend: "none", thresholds: [{ value: 0, color: "danger" }] },
-        layout: { x: 5, y: 13, w: 4, h: 4 },
+        layout: { x: 5, y: 14, w: 4, h: 4 },
       },
       {
         id: "by-service",
@@ -329,7 +329,7 @@ export function demoSpec() {
         },
         format: "number",
         options: { legend: "bottom", compact: true },
-        layout: { x: 9, y: 13, w: 3, h: 4 },
+        layout: { x: 9, y: 14, w: 3, h: 4 },
       },
       {
         id: "recent-problems",
@@ -343,7 +343,7 @@ export function demoSpec() {
           sql: "SELECT ts, level, message, host, route, request_id FROM app_logs WHERE level IN ('error', 'warn') ORDER BY ts DESC LIMIT 200",
         },
         options: { message: "message", level: "level" },
-        layout: { x: 0, y: 17, w: 12, h: 5 },
+        layout: { x: 0, y: 18, w: 12, h: 5 },
       },
     ],
   };
@@ -379,7 +379,7 @@ export function fleetSpec(targets: DemoLinkTargets) {
             "Click a host anywhere (a tile, a bar, a lane or a row) to open its detail.",
           ].join("\n"),
         },
-        layout: { x: 0, y: 0, w: 12, h: 2 },
+        layout: { x: 0, y: 0, w: 12, h: 3 },
       },
       {
         id: "cpu-now",
@@ -401,7 +401,7 @@ export function fleetSpec(targets: DemoLinkTargets) {
         },
         format: "percent",
         links: openHost,
-        layout: { x: 0, y: 2, w: 6, h: 2 },
+        layout: { x: 0, y: 3, w: 6, h: 2 },
       },
       {
         id: "disk-now",
@@ -424,7 +424,7 @@ export function fleetSpec(targets: DemoLinkTargets) {
         },
         format: "percent",
         links: openHost,
-        layout: { x: 6, y: 2, w: 6, h: 2 },
+        layout: { x: 6, y: 3, w: 6, h: 2 },
       },
       {
         id: "cpu",
@@ -439,7 +439,7 @@ export function fleetSpec(targets: DemoLinkTargets) {
         options: { legend: "top", yAxis: { min: 0, max: 100 } },
         // A line is a host: a click on one opens it (#373).
         links: openHost,
-        layout: { x: 0, y: 4, w: 8, h: 4 },
+        layout: { x: 0, y: 5, w: 8, h: 4 },
       },
       {
         id: "memory",
@@ -463,7 +463,7 @@ export function fleetSpec(targets: DemoLinkTargets) {
         },
         format: "percent",
         links: openHost,
-        layout: { x: 8, y: 4, w: 4, h: 4 },
+        layout: { x: 8, y: 5, w: 4, h: 4 },
       },
       {
         id: "cpu-heat",
@@ -477,7 +477,7 @@ export function fleetSpec(targets: DemoLinkTargets) {
         format: "percent",
         // A menu item rather than a click: a cell is a host and a minute.
         links: [{ title: "Open host detail", dashboard: targets.hostDetail }],
-        layout: { x: 0, y: 8, w: 12, h: 3 },
+        layout: { x: 0, y: 9, w: 12, h: 3 },
       },
       {
         id: "load-state",
@@ -500,7 +500,7 @@ export function fleetSpec(targets: DemoLinkTargets) {
           ],
         },
         links: openHost,
-        layout: { x: 0, y: 11, w: 12, h: 3 },
+        layout: { x: 0, y: 12, w: 12, h: 3 },
       },
       {
         id: "network-share",
@@ -514,7 +514,7 @@ export function fleetSpec(targets: DemoLinkTargets) {
         },
         format: "bytes",
         options: { path: ["region", "host"], value: "bytes" },
-        layout: { x: 0, y: 14, w: 6, h: 4 },
+        layout: { x: 0, y: 15, w: 6, h: 4 },
       },
       {
         id: "cpu-vs-memory",
@@ -528,7 +528,7 @@ export function fleetSpec(targets: DemoLinkTargets) {
           sql: "SELECT time_bucket('5 minutes', ts) AS period, avg(cpu_pct) AS cpu, avg(mem_pct) AS memory FROM system_metrics GROUP BY period, host ORDER BY period",
         },
         format: "percent",
-        layout: { x: 6, y: 14, w: 6, h: 4 },
+        layout: { x: 6, y: 15, w: 6, h: 4 },
       },
       {
         id: "cpu-ticks",
@@ -565,7 +565,7 @@ export function fleetSpec(targets: DemoLinkTargets) {
             ],
           },
         },
-        layout: { x: 0, y: 18, w: 6, h: 4 },
+        layout: { x: 0, y: 19, w: 6, h: 4 },
       },
       {
         id: "hosts",
@@ -604,7 +604,7 @@ export function fleetSpec(targets: DemoLinkTargets) {
             set: { host: { column: "host" } },
           },
         ],
-        layout: { x: 6, y: 18, w: 6, h: 4 },
+        layout: { x: 6, y: 19, w: 6, h: 4 },
       },
     ],
   };

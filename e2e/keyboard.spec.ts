@@ -35,7 +35,7 @@ test("a dialog traps focus and gives it back to what opened it", async ({
   await waitForPanels(page);
   // The SQL dialog opens from the panel's actions menu, and closing it hands
   // focus back to that menu's trigger.
-  const opener = page.getByRole("button", { name: /^Actions for / }).first();
+  const opener = page.getByRole("button", { name: "Actions for 5xx error rate" });
   await opener.focus();
   await page.keyboard.press("Enter");
   await page.getByRole("menuitem", { name: "Show query" }).click();
@@ -103,25 +103,25 @@ test("in the editor, Delete on a focused panel tile removes it, and undo restore
   request,
 }) => {
   await page.goto(`/dashboards/${await dashboardId(request, DEMO_DASHBOARD)}/edit`);
-  const tile = page.getByRole("button", { name: /^Errors \(5xx\) total, column/ });
+  const tile = page.getByRole("button", { name: /^5xx error rate, column/ });
   await tile.focus();
   // Arrow keys move it: the label follows the panel's new position.
   await page.keyboard.press("ArrowDown");
   await expect(
-    page.getByRole("button", { name: /^Errors \(5xx\) total, column \d+, row 5/ }),
+    page.getByRole("button", { name: /^5xx error rate, column \d+, row 5/ }),
   ).toBeVisible();
-  await page.getByRole("button", { name: /^Errors \(5xx\) total, column/ }).focus();
+  await page.getByRole("button", { name: /^5xx error rate, column/ }).focus();
   await page.keyboard.press("Delete");
   // The demo panel's SQL is not a starter, so the editor asks first.
   const confirm = page.getByRole("dialog");
   if (await confirm.isVisible().catch(() => false)) {
     await confirm.getByRole("button", { name: /^Delete/ }).click();
   }
-  await expect(
-    page.getByRole("button", { name: /^Errors \(5xx\) total, column/ }),
-  ).toHaveCount(0);
+  await expect(page.getByRole("button", { name: /^5xx error rate, column/ })).toHaveCount(
+    0,
+  );
   await page.getByRole("button", { name: "Undo" }).click();
-  await expect(
-    page.getByRole("button", { name: /^Errors \(5xx\) total, column/ }),
-  ).toHaveCount(1);
+  await expect(page.getByRole("button", { name: /^5xx error rate, column/ })).toHaveCount(
+    1,
+  );
 });

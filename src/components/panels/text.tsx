@@ -11,9 +11,16 @@ import { cn } from "@/lib/utils";
 export function TextView({ panel }: PanelBodyProps) {
   const content = typeof panel.options?.content === "string" ? panel.options.content : "";
   return (
-    <div className="h-full overflow-auto">
+    // Focusable, so a keyboard can scroll text longer than its panel, and
+    // named, so what took focus is announced (WCAG 2.1.1), as a table is.
+    <section
+      aria-label={`${panel.title}, text`}
+      // biome-ignore lint/a11y/noNoninteractiveTabindex: a scroll container must be focusable to scroll by keyboard (WCAG 2.1.1)
+      tabIndex={0}
+      className="h-full overflow-auto focus-visible:outline-2 focus-visible:outline-primary"
+    >
       <MarkdownView source={content} />
-    </div>
+    </section>
   );
 }
 

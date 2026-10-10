@@ -101,7 +101,7 @@ test("dashboard chat answers in the panel", async ({ page, request }) => {
   await expect(chat).toHaveCount(0);
 
   // "Ask about this panel" opens the chat on that panel, and sends only its id.
-  const actions = page.getByRole("button", { name: /^Actions for / }).first();
+  const actions = page.getByRole("button", { name: "Actions for 5xx error rate" });
   const title = ((await actions.getAttribute("aria-label")) ?? "").replace(
     /^Actions for /,
     "",
