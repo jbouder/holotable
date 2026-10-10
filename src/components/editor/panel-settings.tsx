@@ -890,12 +890,16 @@ function OptionsJson({
   summary: string;
   open: boolean;
 }) {
-  const schema = panelKind(panel.viz).options;
+  const kind = panelKind(panel.viz);
+  const schema = kind.options;
   const external = JSON.stringify(panel.options ?? {});
   const { draft, setDraft, committed } = useSyncedDraft(external, () =>
     JSON.stringify(panel.options ?? {}, null, 2),
   );
   const [problem, setProblem] = React.useState<string | null>(null);
+  // The kind's own check (a custom visual's compile, #405) runs after the
+  // schema passes; only the answer for the latest edit is shown.
+  const checking = React.useRef(0);
 
   function edit(text: string) {
     setDraft(text);
@@ -912,6 +916,12 @@ function OptionsJson({
       return;
     }
     setProblem(null);
+    if (kind.check) {
+      const run = ++checking.current;
+      void kind.check(parsed.data).then((message) => {
+        if (run === checking.current && message) setProblem(message);
+      });
+    }
     const options = Object.keys(parsed.data).length > 0 ? parsed.data : undefined;
     committed(JSON.stringify(options ?? {}));
     onChange(
@@ -931,7 +941,8 @@ function OptionsJson({
       <Textarea
         id="p-options"
         aria-label={summary}
-        rows={5}
+        // A kind edited only here (a custom visual's spec) gets room for it.
+        rows={open ? 14 : 5}
         className="mt-2 font-mono text-xs"
         spellCheck={false}
         value={draft}

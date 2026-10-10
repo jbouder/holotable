@@ -29,7 +29,11 @@ beside the canvas then edits that panel, top to bottom:
   rather than keeping one its source cannot run. A text panel shows its
   Markdown here.
 - **Visualization**: title, kind, value format and description.
-- **Display**: the presentation options, collapsed until wanted.
+- **Display**: the presentation options, collapsed until wanted. A custom
+  visual's whole spec is edited here, as JSON: a problem the checks find
+  (data other than the panel's rows, a literal color, an unknown mark) is
+  named under the field as you type, and so is the compiler's message when
+  the spec does not compile. See [Custom visuals](/architecture/custom-visuals/).
 - **Links**: where the panel leads (see [Links](#links) below). Not on a text
   panel.
 

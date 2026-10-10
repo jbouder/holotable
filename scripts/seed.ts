@@ -23,6 +23,7 @@ import {
   systemMetricRows,
 } from "./lib/seed-data";
 import {
+  customVisualsSpec,
   demoSpec,
   fleetGridSpec,
   fleetSpec,
@@ -211,6 +212,7 @@ async function ensureDemo() {
     await ensureDashboard(pg, fleetSpec(targets));
     await ensureDashboard(pg, fleetGridSpec(targets));
     await ensureDashboard(pg, logsSpec());
+    await ensureDashboard(pg, customVisualsSpec());
     await ensureDashboard(pg, selfMonitoringSpec());
     if (promUrl) await ensureDashboard(pg, prometheusSelfMonitoringSpec());
   } finally {
