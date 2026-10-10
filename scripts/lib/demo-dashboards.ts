@@ -81,6 +81,45 @@ export function demoSpec() {
         },
         layout: { x: 3, y: 3, w: 9, h: 2 },
       },
+      {
+        id: "latency-distribution",
+        title: "Latency distribution",
+        description:
+          "Every request in the window by 50 ms bucket, on a log scale so the tail shows. Amber from the 300 ms SLO, red from a second.",
+        viz: "histogram",
+        query: {
+          sourceId: "ts-metrics",
+          timeField: "period",
+          sql: "SELECT time_bucket('5 minutes', ts) AS period, floor(duration_ms / 50) * 50 AS bucket, count(*) AS requests FROM http_requests GROUP BY period, bucket ORDER BY period, bucket",
+        },
+        format: "ms",
+        options: {
+          bucket: "bucket",
+          count: "requests",
+          decimals: 0,
+          log: true,
+          thresholds: [
+            { value: 0, color: "success" },
+            { value: 300, color: "warning" },
+            { value: 1000, color: "danger" },
+          ],
+        },
+        layout: { x: 0, y: 5, w: 8, h: 4 },
+      },
+      {
+        id: "error-latency-distribution",
+        title: "5xx latency distribution",
+        description: "The same, for failed requests only: they wait on a timeout first.",
+        viz: "histogram",
+        query: {
+          sourceId: "ts-metrics",
+          timeField: "period",
+          sql: "SELECT time_bucket('5 minutes', ts) AS period, floor(duration_ms / 100) * 100 AS bucket, count(*) AS requests FROM http_requests WHERE status >= 500 GROUP BY period, bucket ORDER BY period, bucket",
+        },
+        format: "ms",
+        options: { bucket: "bucket", count: "requests", decimals: 0 },
+        layout: { x: 8, y: 5, w: 4, h: 4 },
+      },
     ],
   };
 }

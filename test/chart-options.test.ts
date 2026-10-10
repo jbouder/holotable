@@ -61,6 +61,7 @@ test("every chart kind is covered", () => {
       "donut",
       "gauge",
       "state-timeline",
+      "histogram",
     ],
   );
 });

@@ -230,6 +230,17 @@
     "params": ["2026-01-01T00:00:00.000Z", "2026-01-01T01:00:00.000Z"],
     "timeField": "ts"
   },
+  "v1-histogram.json#sql-latency": {
+    "sql": "SELECT * FROM (SELECT time_bucket('5 minutes', ts) AS period, floor(duration_ms / 50) * 50 AS bucket, count(*) AS requests FROM http_requests GROUP BY period, bucket ORDER BY period, bucket) AS _holo\nWHERE _holo.period >= $1::timestamptz\n  AND _holo.period < $2::timestamptz\nLIMIT 5000",
+    "params": ["2026-01-01T00:00:00.000Z", "2026-01-01T01:00:00.000Z"],
+    "timeField": "period"
+  },
+  "v1-histogram.json#prom-latency": {
+    "instant": true,
+    "expr": "sum by (le) (increase(http_request_duration_seconds_bucket{tenant=\"fixture-tenant\"}[1h]))",
+    "time": "2026-01-01T01:00:00.000Z",
+    "timeoutMs": 20000
+  },
   "v1-links.json#requests-by-service": {
     "sql": "SELECT * FROM (SELECT time_bucket('1 minute', ts) AS minute, service, count(*) AS requests FROM http_requests GROUP BY minute, service ORDER BY minute) AS _holo\nWHERE _holo.minute >= $1::timestamptz\n  AND _holo.minute < $2::timestamptz\nLIMIT 5000",
     "params": ["2026-01-01T00:00:00.000Z", "2026-01-01T01:00:00.000Z"],

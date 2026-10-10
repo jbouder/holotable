@@ -179,7 +179,7 @@ export const PROMQL_RULES = `PromQL rules (STRICT) — for a source whose catalo
   lists for the metric.
 - Latency percentiles: histogram_quantile(0.95, sum by (le) (rate(<name>_bucket[5m])))
   over a *_bucket metric with an "le" label.
-- Set "instant": true for a stat, gauge, pie, donut, status-grid or table panel (one value per
+- Set "instant": true for a stat, gauge, pie, donut, status-grid, histogram or table panel (one value per
   series, at the end of the window). Leave it out for a time series: its rows
   carry a "time" column, and the chart draws one line per series.
 - A dashboard variable appears ONLY as a whole label-matcher value: {host=":host"},
@@ -266,6 +266,7 @@ export const PRESENTATION_GUIDE = `Optional per-panel settings; omit each unless
 - 'options' on stat: value (the column to show), decimals, unit, compact, thresholds, sparkline (true to draw the column's history behind the number).
 - 'options' on pie/donut: decimals, unit, compact, legend.
 - 'options' on status-grid: entity (the label column), value, thresholds, or state with states [{state, color}], sort ("label"|"value"|"none"), decimals, unit, compact.
+- 'options' on histogram: bucket, count (the columns), cumulative (true for Prometheus "le" buckets), log (true for a long tail), thresholds (colors bars from a bucket bound, e.g. an SLO), decimals, unit, compact (for the bucket labels).
 - 'options' on table: columns [{name, label, hidden, format, decimals, unit, align}] (listed first, in order), sort {column, order: "asc"|"desc"}.
 - Colors are tokens only: success, warning, danger, info, neutral, orange, purple, teal.
 - 'timeRange' and 'refreshIntervalMs' on a panel override the dashboard's, for a panel that needs a different window or cadence than the rest (e.g. a "today so far" stat over {from:"now-24h", to:"now"} refreshed every 300000ms). Never on a text panel.`;

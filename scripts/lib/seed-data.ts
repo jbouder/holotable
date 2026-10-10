@@ -53,6 +53,19 @@ function pick<T>(items: readonly T[], random: Random): T {
 }
 
 /**
+ * A request's latency, in ms (#404): most are fast, skewed toward the low end;
+ * `/search` is slower; one in fifty is a tail of up to two seconds; a 5xx
+ * waits on a timeout first. A histogram of it has a shape worth drawing.
+ */
+export function requestLatency(route: string, status: number, random: Random): number {
+  const body = 20 + random() ** 2 * 180;
+  const slow = route === "/search" ? 150 + random() * 250 : 0;
+  const tail = random() < 0.02 ? 600 + random() * 1400 : 0;
+  const failed = status >= 500 ? 300 + random() * 200 : 0;
+  return Math.max(1, body + slow + tail + failed);
+}
+
+/**
  * One batch of request events at `at` (epoch ms): each row lands up to a
  * second before it, and never before `floor` when one is given.
  */
@@ -64,12 +77,13 @@ export function httpRequestRows(
   return Array.from({ length: HTTP_ROWS_PER_BATCH }, () => {
     const roll = random();
     const status = roll < 0.9 ? 200 : roll < 0.97 ? 404 : 500;
+    const route = pick(ROUTES, random);
     return {
       ts: new Date(Math.max(floor, at - Math.floor(random() * SPREAD_MS))),
       service: pick(SERVICES, random),
-      route: pick(ROUTES, random),
+      route,
       status,
-      duration_ms: Math.max(1, 40 + random() * 200 + (status >= 500 ? 300 : 0)),
+      duration_ms: requestLatency(route, status, random),
       bytes: Math.floor(200 + random() * 20000),
     };
   });

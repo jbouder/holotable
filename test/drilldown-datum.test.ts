@@ -155,6 +155,20 @@ const CASES: Record<VizType, Case> = {
     click: { dataIndex: 1 },
     expect: { row: { ts: T(1), host: "a", state: "hot" }, series: "a" },
   },
+  histogram: {
+    panel: panel("histogram"),
+    data: {
+      columns: ["bucket", "requests"],
+      rows: [
+        { bucket: 100, requests: 3 },
+        { bucket: 0, requests: 5 },
+        { bucket: 100, requests: 2 },
+      ],
+    },
+    // Bars are ordered by bucket and summed: index 1 is 100, with 3 + 2.
+    click: { dataIndex: 1 },
+    expect: { row: { bucket: 100, requests: 5 }, series: "100" },
+  },
   "status-grid": {
     panel: panel("status-grid", { options: { sort: "value" } }),
     data: BY_HOST,
