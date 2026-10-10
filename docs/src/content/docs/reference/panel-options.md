@@ -265,6 +265,38 @@ A value distribution, one bar per bucket
 With PromQL, an instant query over a classic histogram's buckets reads in
 `cumulative` mode: `sum by (le) (increase(http_request_duration_seconds_bucket[1h]))`.
 
+## `logs`
+
+Log lines, newest first
+([#404](https://github.com/jbouder/holotable/issues/404)). Requires
+`query.timeField`.
+
+| Option | Type | Default | Meaning |
+| --- | --- | --- | --- |
+| `message` | column name | the longest text column | The line's text. |
+| `level` | column name | a column named `level` or `severity` | A level, written on each line and coloring its edge. |
+| `levels` | `[{ state, color }]`, at most 20 | none | A color per level. |
+| `wrap` | boolean | `true` | Wrap long lines, or cut them at the panel's edge. |
+| `order` | `"newest"` \| `"oldest"` | `"newest"` | Which end of the window comes first. |
+| `showTime` | boolean | `true` | Write each line's time, on the viewer's clock. |
+
+- The query returns raw rows: the time column (not bucketed), the message, a
+  level if there is one, and anything else worth reading. Order by time
+  descending and `LIMIT` it; at most 500 lines are drawn.
+- A level without a color in `levels` takes the usual one, in any case:
+  `error`, `fatal` and `critical` are `danger`, `warn` is `warning`, `info` is
+  `info`, `debug` and `trace` are `neutral`. Any other level gets a color
+  worked out from its name.
+- Every column that is not the time, the message or the level is shown, as
+  name and value, when a line is expanded.
+- The text is always the foreground color. The level's color is a stripe on
+  the line's edge, and the level is written, so color is never the only
+  signal.
+- When a poll adds lines above a reader who has scrolled down, the list keeps
+  the line they were reading where it was.
+- To filter by level, put it in the SQL with a
+  [variable](/guide/variables/): `WHERE level = ANY(:level)`.
+
 ## `text`
 
 Markdown, and no query ([#202](https://github.com/jbouder/holotable/issues/202)).

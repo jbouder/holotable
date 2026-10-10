@@ -402,6 +402,57 @@ export function fleetGridSpec(targets: DemoLinkTargets) {
 }
 
 /**
+ * The gateway's log (#404): errors per minute, whose time brush
+ * narrows the window, over the lines themselves, filtered by level.
+ */
+export function logsSpec() {
+  return {
+    specVersion: SPEC_VERSION,
+    title: "Demo gateway logs",
+    timeRange: { from: "now-15m", to: "now" },
+    refreshIntervalMs: 5000,
+    variables: [
+      {
+        name: "level",
+        label: "Level",
+        type: "enum",
+        values: ["error", "warn", "info", "debug"],
+        multi: true,
+        default: ["error", "warn", "info"],
+      },
+    ],
+    panels: [
+      {
+        id: "errors",
+        title: "Errors per minute",
+        description: "Drag across the chart to read the lines from that stretch.",
+        viz: "bar",
+        query: {
+          sourceId: "ts-logs",
+          timeField: "minute",
+          sql: "SELECT time_bucket('1 minute', ts) AS minute, count(*) FILTER (WHERE level = 'error') AS errors FROM app_logs GROUP BY minute ORDER BY minute",
+        },
+        // Every bar is an error count: one step colors them all.
+        options: { legend: "none", thresholds: [{ value: 0, color: "danger" }] },
+        layout: { x: 0, y: 0, w: 12, h: 3 },
+      },
+      {
+        id: "lines",
+        title: "Gateway log",
+        viz: "logs",
+        query: {
+          sourceId: "ts-logs",
+          timeField: "ts",
+          sql: "SELECT ts, level, message, host, route, request_id FROM app_logs WHERE level = ANY(:level) ORDER BY ts DESC LIMIT 200",
+        },
+        options: { message: "message", level: "level" },
+        layout: { x: 0, y: 3, w: 12, h: 6 },
+      },
+    ],
+  };
+}
+
+/**
  * One host up close, the target of the fleet's and the infrastructure
  * dashboard's links. Its `host` picker is what a link sets on arrival, and its
  * host table filters the page in place with a self link (#373).

@@ -169,6 +169,20 @@ const CASES: Record<VizType, Case> = {
     click: { dataIndex: 1 },
     expect: { row: { bucket: 100, requests: 5 }, series: "100" },
   },
+  logs: {
+    panel: panel("logs", { query: { sourceId: "s", sql: "x", timeField: "ts" } }),
+    data: {
+      columns: ["ts", "level", "message"],
+      rows: [
+        { ts: T(0), level: "info", message: "started" },
+        { ts: T(2), level: "error", message: "timeout" },
+        { ts: T(1), level: "warn", message: "slow" },
+      ],
+    },
+    // Lines are newest first: index 1 is the warning.
+    click: { dataIndex: 1 },
+    expect: { row: { ts: T(1), level: "warn", message: "slow" }, series: "warn" },
+  },
   "status-grid": {
     panel: panel("status-grid", { options: { sort: "value" } }),
     data: BY_HOST,

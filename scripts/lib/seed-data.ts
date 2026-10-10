@@ -43,6 +43,18 @@ export interface SystemMetricRow {
   net_out_bytes: number;
 }
 
+export interface AppLogRow {
+  ts: Date;
+  host: string;
+  level: string;
+  route: string;
+  message: string;
+  request_id: string;
+}
+
+/** Lines per live batch of `metrics.app_logs`: about two a second at the default cadence. */
+export const LOG_ROWS_PER_BATCH = 4;
+
 export type Random = () => number;
 
 /** How far before its batch time a row may land; the live loop has always used 1 s. */
@@ -207,4 +219,71 @@ export function* backfillChunks<T>(
     }
   }
   if (chunk.length > 0) yield chunk;
+}
+
+/** A request id, as a gateway would log it: 12 hex digits. */
+function requestId(random: Random): string {
+  return Array.from({ length: 12 }, () => Math.floor(random() * 16).toString(16)).join(
+    "",
+  );
+}
+
+/**
+ * One batch of gateway log lines at `at` (#404): mostly `info` access lines,
+ * some `debug`, a `warn` for a slow request and an `error` for a failed one,
+ * each with the route and a request id to expand to.
+ */
+export function appLogRows(
+  at: number,
+  random: Random = Math.random,
+  floor = Number.NEGATIVE_INFINITY,
+): AppLogRow[] {
+  return Array.from({ length: LOG_ROWS_PER_BATCH }, () => {
+    const ts = new Date(Math.max(floor, at - Math.floor(random() * SPREAD_MS)));
+    const host = pick(HOSTS, random);
+    const route = pick(ROUTES, random);
+    const id = requestId(random);
+    const roll = random();
+    if (roll < 0.04) {
+      const status = pick([500, 502, 503, 504], random);
+      const ms = Math.round(800 + random() * 2200);
+      return {
+        ts,
+        host,
+        level: "error",
+        route,
+        request_id: id,
+        message: `upstream ${status === 504 ? "timeout" : "error"} on ${route}: ${status} after ${ms} ms`,
+      };
+    }
+    if (roll < 0.12) {
+      return {
+        ts,
+        host,
+        level: "warn",
+        route,
+        request_id: id,
+        message: `slow request: ${route} took ${Math.round(requestLatency("/search", 200, random) + 400)} ms`,
+      };
+    }
+    if (roll < 0.3) {
+      return {
+        ts,
+        host,
+        level: "debug",
+        route,
+        request_id: id,
+        message: `cache ${random() < 0.8 ? "hit" : "miss"} for ${route}`,
+      };
+    }
+    const status = random() < 0.92 ? 200 : 404;
+    return {
+      ts,
+      host,
+      level: "info",
+      route,
+      request_id: id,
+      message: `GET ${route} ${status} in ${Math.round(requestLatency(route, status, random))} ms`,
+    };
+  });
 }

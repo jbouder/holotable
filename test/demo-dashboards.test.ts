@@ -14,6 +14,7 @@ import {
   type DemoLinkTargets,
   demoSpec,
   fleetGridSpec,
+  logsSpec,
   fleetSpec,
   hostDetailSpec,
   systemSpec,
@@ -56,6 +57,20 @@ const SYSTEM_METRICS: CatalogTable = {
   ],
 };
 
+const APP_LOGS: CatalogTable = {
+  name: "app_logs",
+  description: "gateway log lines, one per event",
+  timeField: "ts",
+  columns: [
+    { name: "ts", type: "timestamp with time zone" },
+    { name: "host", type: "text" },
+    { name: "level", type: "text", description: "error, warn, info or debug" },
+    { name: "route", type: "text" },
+    { name: "message", type: "text" },
+    { name: "request_id", type: "text" },
+  ],
+};
+
 function source(table: CatalogTable): SqlSourceConfig {
   return {
     kind: "timescaledb",
@@ -71,6 +86,7 @@ function source(table: CatalogTable): SqlSourceConfig {
 const SOURCES: Record<string, SqlSourceConfig> = {
   "ts-metrics": source(HTTP_REQUESTS),
   "ts-system": source(SYSTEM_METRICS),
+  "ts-logs": source(APP_LOGS),
 };
 
 const TARGETS: DemoLinkTargets = { hostDetail: "00000000-0000-4000-8000-000000000001" };
@@ -80,6 +96,7 @@ const SPECS: Record<string, Dashboard> = {
   system: parseDashboard(systemSpec(TARGETS)),
   fleet: parseDashboard(fleetSpec(TARGETS)),
   fleetGrid: parseDashboard(fleetGridSpec(TARGETS)),
+  logs: parseDashboard(logsSpec()),
   hostDetail: parseDashboard(hostDetailSpec()),
 };
 

@@ -14,6 +14,7 @@ import {
   stateTimelineChart,
   stateTimelineShape,
 } from "@/components/charts/state-timeline";
+import { LogsView } from "@/components/panels/logs";
 import { StatView } from "@/components/panels/stat";
 import { StatusGridView } from "@/components/panels/status-grid";
 import { TableView } from "@/components/panels/table";
@@ -47,6 +48,7 @@ export const PANEL_RENDERERS = {
   },
   "status-grid": { type: "html", Body: StatusGridView },
   histogram: { type: "chart", option: histogramChart, shape: histogramShape },
+  logs: { type: "html", Body: LogsView },
   text: { type: "html", Body: TextView },
 } as const satisfies Record<VizType, PanelRenderer>;
 

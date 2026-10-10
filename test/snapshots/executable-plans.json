@@ -259,6 +259,21 @@
     "params": ["api"],
     "variables": ["service"]
   },
+  "v1-logs.json#errors": {
+    "sql": "SELECT * FROM (SELECT time_bucket('1 minute', ts) AS minute, count(*) FILTER (WHERE level = 'error') AS errors FROM app_logs GROUP BY minute ORDER BY minute) AS _holo\nWHERE _holo.minute >= $1::timestamptz\n  AND _holo.minute < $2::timestamptz\nLIMIT 5000",
+    "params": ["2026-01-01T00:00:00.000Z", "2026-01-01T01:00:00.000Z"],
+    "timeField": "minute"
+  },
+  "v1-logs.json#lines": {
+    "sql": "SELECT * FROM (SELECT ts, level, message, host, route, request_id FROM app_logs WHERE level = ANY($3) ORDER BY ts DESC LIMIT 200) AS _holo\nWHERE _holo.ts >= $1::timestamptz\n  AND _holo.ts < $2::timestamptz\nLIMIT 5000",
+    "params": [
+      "2026-01-01T00:00:00.000Z",
+      "2026-01-01T01:00:00.000Z",
+      ["error", "warn", "info"]
+    ],
+    "timeField": "ts",
+    "variables": ["level"]
+  },
   "v1-promql.json#rate": {
     "instant": false,
     "expr": "sum by (route) (rate(http_requests_total{job=\"api\", instance=~\"instance-value\", tenant=\"fixture-tenant\"}[5m]))",
