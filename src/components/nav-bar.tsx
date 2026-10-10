@@ -56,7 +56,10 @@ export function NavBar({ account }: { account: ProfileMenuAccount | null }) {
       open={open}
       onOpenChange={setOpen}
       render={<header />}
-      className="border-b border-border bg-surface"
+      // Sticky across the app. z-30 sits under the overlays' z-40 backdrops,
+      // so a dialog still covers it; the root layout's scroll-pt-14 keeps an
+      // anchor target from landing beneath it.
+      className="sticky top-0 z-30 border-b border-border bg-surface"
     >
       {/*
         A fixed height, not padding around the content: a page's controls

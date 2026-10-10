@@ -258,7 +258,7 @@ function DrawnPanel({
         {choices.length > 1 && (
           <Menu
             label={`Show as: ${vizLabel(shown.viz)}`}
-            className="h-7 gap-1.5 border border-border bg-surface px-2 text-xs text-foreground"
+            className="h-7 w-auto gap-1.5 border border-border bg-surface px-2 text-xs text-foreground"
             trigger={
               <>
                 <Eye className="h-3.5 w-3.5 text-muted" aria-hidden />
