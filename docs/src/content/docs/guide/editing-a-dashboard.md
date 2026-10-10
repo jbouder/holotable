@@ -1,38 +1,29 @@
 ---
 title: Editing a dashboard
-description: What an editing session holds, when it is written, and what happens to work that is never saved.
-sidebar:
-  order: 6
+description: The canvas and the inspector, saving, version history, what happens to work that is never saved, and the keyboard shortcuts.
 ---
 
-The editor (`src/app/dashboards/[id]/edit/`) is where a dashboard spec is
-edited; the only other writers are a rename and a restore from the history. Everything it does happens in the browser until you press Save; a save
-is the one moment a new `dashboard_versions` row is written, and it is the only
-moment the server re-validates the spec and re-checks every statement through
-the SQL guard.
-
-That split is deliberate — the model and the client can propose anything, and
-nothing they propose is trusted until the save re-derives it — but it used to
-mean an editing session had exactly one outcome and no memory. This page
-describes what the session holds now.
+Everything you do in the editor happens in your browser until you press
+**Save**. A save writes a new version of the dashboard, and it is the moment
+the server checks the whole spec again and every query in it; until then
+nothing you have typed has reached the server. This page is what an editing
+session holds and what happens to work that is never saved.
 
 ## The canvas and the inspector
 
-The editor is the dashboard itself. The **canvas** draws every panel with its
-live preview — each panel's guarded query run once through `/api/query`, and run
-again only when that panel's SQL, window or the variable values change, after a
-short pause in typing (`src/lib/preview-runs.ts`). Moving, resizing or restyling
-a panel reuses the rows it already has, and the chart is never recreated: the
-grid moves the panel's card.
+The editor is the dashboard itself. The **canvas** draws every panel with a
+live preview, run when the panel appears and again when its query, window or
+variable values change, after a short pause in typing. Moving, resizing or
+restyling a panel keeps the rows it already has.
 
 Click a panel (or focus it and press Enter) to select it. The **inspector**
 beside the canvas then edits that panel, top to bottom:
 
 - **Ask AI**: the natural-language edit, which runs the model once and shows
   the change as a diff to accept, reject or regenerate.
-- **Data**: the source, the query with its guarded preview, and the panel's
-  own window and refresh. For a SQL source that is the SQL and its time field;
-  for a Prometheus source it is the PromQL, **Instant** and **Min step** (see
+- **Data**: the source, the query with its preview, and the panel's own window
+  and refresh. For a SQL source that is the SQL and its time field; for a
+  Prometheus source it is the PromQL, **Instant** and **Min step** (see
   [Writing the query](/concepts/executing-a-panel/#a-promql-panel)). Choosing a
   source of the other kind restarts the query from that source's starter
   rather than keeping one its source cannot run. A text panel shows its
@@ -60,16 +51,14 @@ two ways to finish, which differ only in where they leave you:
 - **Save and view** does the same and then opens the live dashboard.
 
 The keyboard shortcuts save directly, without the form. The **version note** is
-a short line about
-what changed, stored on the `dashboard_versions` row. Nothing reads it — it is
-not part of the spec, it never reaches the model, and it has no effect on
+a short line about what changed, stored with the version. Nothing reads it — it
+is not part of the spec, it never reaches the model, and it has no effect on
 execution. It is there so a version history reads as a sequence of intentions
 rather than a column of timestamps, and the history page shows it beside each
 version.
 
 A failed save leaves you exactly where you were, with the error and every
-change still in the editor. Nothing about a failure is recoverable by retrying
-from a different place, so the editor does not send you to one.
+change still in the editor.
 
 ## Links
 
@@ -78,8 +67,7 @@ links without JSON. Each link is a row with its title and target, which can be
 edited, moved up or down, or removed. **Add link** opens a form:
 
 - **Leads to**: this dashboard, or another one in the workspace, found by
-  title. The list comes from the server for this workspace, and the form keeps
-  the id it came with; it never takes a typed id.
+  title.
 - **Title**: what the menu item or the click says. It follows the target's
   title until it is changed.
 - **Carry the time range** and **Carry the variable picks**, on by default,
@@ -91,39 +79,38 @@ edited, moved up or down, or removed. **Add link** opens a form:
   flagged, since the target would ignore it.
 
 A link that stays on this dashboard must set at least one of its variables;
-the form refuses it with the same message the schema does. **Links (JSON)**
-edits the whole list as JSON for anything the form does not cover. Link
-changes show in the edit review and in version history, one row per link
-title.
+the form refuses it otherwise. **Links (JSON)** edits the whole list as JSON
+for anything the form does not cover. Link changes show in the edit review and
+in version history, one row per link title.
 
 ## Version history and restore
 
-**Version history** in the dashboard's **More actions** menu opens
-`/dashboards/[id]/versions`: every saved version with its author, time and note.
-Pick one to see what changed between it and the current version, panel by panel
-with SQL as a line diff, or to preview it. The preview runs each panel's query
-once through the same guarded `/api/query` as the editor's preview and saves
-nothing. Viewers can read the history too, since every version in it is a spec
+**Version history** in the dashboard's **More actions** menu lists every saved
+version with its author, time and note. Pick one to see what changed between
+it and the current version, panel by panel with the query as a line diff, or
+to preview it. The preview runs each panel's query once and saves nothing.
+Viewers can read the history too, since every version in it is a dashboard
 they could have seen when it was current.
 
 An editor can **restore** a version. Restore does not edit anything or move the
-dashboard back to an old row. It saves a new version that copies the old spec,
-noted `restored from vN`, so the restore shows up in the history like any other
-save and can itself be undone the same way. The copy is re-checked like a save:
-if a source, table or column the old version reads has since been removed or
-hidden, the restore is refused and the current version stays.
+dashboard back to an old version. It saves a new version that copies the old
+one, noted `restored from vN`, so the restore shows up in the history like any
+other save and can itself be undone the same way. The copy is checked like a
+save: if a source, table or column the old version reads has since been
+removed or hidden, the restore is refused and the current version stays.
 
 ## Details, which are not the spec
 
 **Description and tags** in the dashboard settings (also in the editor's
-overflow menu, and the **Details…** action on a card in the dashboard list) edits the dashboard's *description* and *tags*.
-Those are columns on the `dashboards` row, not fields in the spec: they do not
-make the editor dirty, they are not undoable, they are saved the moment the
-dialog is confirmed, and they do not append a version.
+overflow menu, and the **Details…** action on a card in the dashboard list)
+edits the dashboard's *description* and *tags*. Those are kept beside the
+dashboard rather than in it: they do not make the editor dirty, they are not
+undoable, they are saved the moment the dialog is confirmed, and they do not
+add a version.
 
 The **name** is the opposite case and is edited in the page header with the
-rest of the spec. Renaming from the dashboard list does the same thing the long
-way round — it appends a version whose spec differs only in the title — because
+rest of the dashboard. Renaming from the dashboard list does the same thing the
+long way round — it adds a version that differs only in the title — because
 [the spec owns the title](/architecture/data-model/).
 
 ## Arranging panels
@@ -131,8 +118,7 @@ way round — it appends a version whose spec differs only in the title — beca
 Order, position and size live in one place: the canvas. Drag a panel to move
 it and drag its corner to resize it; with a panel focused, the arrow keys move
 it, Shift and the arrow keys resize it, and Delete removes it. Each gesture is
-one change to the spec, committed when the pointer comes up. There is no
-separate list to keep in step with the grid, and width is not a form field.
+one change, committed when the pointer comes up.
 
 The `Arrange: N-up` presets in the dashboard settings re-flow every panel into
 N columns in reading order, as one undoable step. **Duplicate** copies a panel
@@ -141,59 +127,50 @@ original; anything already there is pushed down rather than covered. The copy
 is selected, because the point of duplicating is to then change it.
 
 Deleting is undoable, so it asks first only when there is work to lose — when
-the panel's SQL is no longer the starter the editor wrote for it.
+the panel's query is no longer the starter the editor wrote for it.
 
 ## New panels
 
-A new panel starts from a query built out of the selected source's own catalog
-(`src/lib/panel-starter.ts`): the first allowlisted table with a time column,
-counted per minute, as a line chart. A source whose tables have no time column
-gets a plain `count(*)` as a stat instead, and a source with no usable table at
-all falls back to `SELECT 1 AS value`.
+**Add panel** offers three starts: a **blank panel**, **describe it to the
+model**, or **from a template**.
 
-Because every name in it comes from the source's allowlist, the starter is
-guaranteed to pass the SQL guard against that source — and it never filters time
-itself, because the server owns the range.
+A blank panel starts from a query built out of the selected source's own
+catalog, so it always runs: on a SQL source, the first table with a time
+column, counted per minute, as a line chart (a plain count as a stat when no
+table has a time column); on a Prometheus source, a rate over its first
+counter, else a histogram's p95, else a gauge's sum. The template picker's
+built-ins for a Prometheus source are golden signals built the same way from
+its catalog.
 
-A new panel on a Prometheus source starts from PromQL instead: a counter's
-`sum(rate(…[5m]))`, else a histogram's p95, else a gauge's sum, else a count of
-any listed metric's series, else `vector(1)`. It is a range query for a line
-and an instant query for a stat, gauge, table or pie. The template picker's
-built-ins for a Prometheus source are golden signals built the same way, from
-its counters, histograms and gauges (`src/lib/builtin-templates-promql.ts`).
-
-**Add panel** offers three starts: a **blank panel** (that starter), **describe
-it to the model**, or **from a template**. Describing adds the same starter and
-puts the cursor in the natural-language box, so the first thing you do with the panel is say what it
-should be. That runs the model once and lands as a reviewable diff, exactly like
-any other natural-language edit.
+Describing adds the same starter and puts the cursor in the natural-language
+box, so the first thing you do with the panel is say what it should be. That
+runs the model once and lands as a reviewable diff, exactly like any other
+natural-language edit.
 
 ## Panel description
 
-The inspector's **Visualization** section has a **Description** field: one sentence saying what the panel
-computes. The model writes one for every panel it generates, and this is where a
-human corrects it. It is shown to readers behind the info control on the panel
-header, never as a paragraph on the dashboard itself.
+The inspector's **Visualization** section has a **Description** field: one
+sentence saying what the panel computes. The model writes one for every panel
+it generates, and this is where a human corrects it. It is shown to readers
+behind the info control on the panel header, never as a paragraph on the
+dashboard itself.
 
 ## Undo and redo
 
-Every change to the spec — adding, duplicating, moving, resizing, deleting or
-editing a panel, arranging the grid, applying a template, accepting a natural-language
-edit, re-pointing panels off a removed source — is one entry on a bounded
-history stack
-(`src/lib/editor/use-history.ts`). Undo and redo walk it; a new change after an
-undo abandons the redo branch.
+Every change — adding, duplicating, moving, resizing, deleting or editing a
+panel, arranging the grid, applying a template, accepting a natural-language
+edit, re-pointing panels off a removed source — is one step. Undo and redo walk
+them; a new change after an undo abandons the redo branch.
 
 Typing coalesces. A burst of keystrokes in one field within a second is one
-entry, so undoing a renamed panel takes back the rename, not the last letter of
-it. Inside a text box the browser's own undo still works: the editor's binding
-is suppressed while focus is in a field.
+step, so undoing a renamed panel takes back the rename, not the last letter of
+it. Inside a text box the browser's own undo still works.
 
 ## Unsaved changes
 
-The editor knows whether anything has actually changed by comparing the working
-spec with the last one written to the server, so typing a character and deleting
-it again is correctly not a change.
+The editor knows whether anything has actually changed by comparing what you
+have with what was last saved, so typing a character and deleting it again is
+correctly not a change.
 
 While there is a real change:
 
@@ -203,25 +180,20 @@ While there is a real change:
 
 ## Draft autosave
 
-The working spec is mirrored to `localStorage` a moment after you stop typing,
-keyed by dashboard and by the signed-in subject
-(`src/lib/editor/drafts.ts`). Reopening the editor offers it back with a summary
-of what it would change.
+A moment after you stop typing, the editor keeps a draft of your work in this
+browser, for this dashboard and this account. Reopening the editor offers it
+back with a summary of what it would change.
 
-Three rules bound what that can do:
+Three things to know about a draft:
 
-- **Nothing is sent to the server.** A draft is an unvalidated spec that only
-  its author has seen. The only thing the system ever writes is an explicit
-  saved version, which is re-validated and re-guarded. A server-side draft
-  table is an explicitly optional extension in
-  [#118](https://github.com/jbouder/holotable/issues/118) and is not built.
-- **A draft never silently wins.** It is restored by a click, never on load. If
-  the dashboard was saved by someone else while the draft sat in your browser,
-  the editor says so and explains that restoring writes your changes as a new
-  version on top of theirs rather than replacing them.
-- **Storage is bounded.** Drafts are per user, capped in size, expire after a
-  week, and expired ones from every dashboard are pruned whenever the editor
-  opens. A draft is cleared on a successful save or an explicit discard.
+- **It is only in your browser.** Nothing is sent to the server until you
+  save, and a draft is not visible to anyone else or from another device.
+- **It never silently wins.** It is restored by a click, never on load. If the
+  dashboard was saved by someone else while the draft sat in your browser, the
+  editor says so: restoring writes your changes as a new version on top of
+  theirs rather than replacing them.
+- **It does not last forever.** A draft expires after a week, and is cleared
+  on a successful save or an explicit discard.
 
 ## Keyboard shortcuts
 

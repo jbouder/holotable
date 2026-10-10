@@ -23,6 +23,10 @@ keep them from regressing (#77, #91).
   controls. Duplicate, Save as template and Delete are also in the inspector's
   named panel menu, and every deletion is one step to undo. The keys are listed
   under *Settings → Shortcuts*.
+- **Command palette.** The listbox follows the APG combobox pattern rather
+  than a menu — real focus stays in the text field and `aria-activedescendant`
+  points at the selection — because a menu would move focus out of the box
+  being typed into.
 - **Focus is always visible.** Every interactive primitive draws
   `focus-visible:outline-2 outline-primary`. A scroll container that can
   overflow (a table panel, an Explore result) is itself focusable, so it can be
