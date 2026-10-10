@@ -59,7 +59,8 @@ async function json<T>(path: string, cookie: string, init: RequestInit = {}): Pr
 
 interface Panel {
   title: string;
-  query: { sourceId: string; sql: string; timeField?: string };
+  /** Absent on a panel that runs no query, such as the dashboard's text panel. */
+  query?: { sourceId: string; sql?: string; timeField?: string };
 }
 
 const started = Date.now();
@@ -78,8 +79,9 @@ const { dashboard } = await json<{ dashboard: { spec: { panels: Panel[] } } }>(
   `/api/dashboards/${seeded.id}`,
   cookie,
 );
-const panel = dashboard.spec.panels.find((p) => p.query.timeField);
-if (!panel) fail("the seeded dashboard has no time-series panel");
+const panel = dashboard.spec.panels.find((p) => p.query?.sql && p.query.timeField);
+if (!panel?.query) fail("the seeded dashboard has no SQL time-series panel");
+const query = panel.query;
 
 // The seeder runs beside the server rather than before it, so /api/ready can
 // answer before the backfill's first rows land. Poll until they do.
@@ -88,9 +90,9 @@ while (true) {
   const result = await json<{ rows: unknown[] }>("/api/query", cookie, {
     method: "POST",
     body: JSON.stringify({
-      sourceId: panel.query.sourceId,
-      sql: panel.query.sql,
-      timeField: panel.query.timeField,
+      sourceId: query.sourceId,
+      sql: query.sql,
+      timeField: query.timeField,
       timeRange: { from: "now-1h", to: "now" },
     }),
   });
