@@ -1,6 +1,6 @@
 import "./lib/env";
 import { Client } from "pg";
-import { type Dashboard, parseDashboard, SPEC_VERSION } from "@/lib/ir";
+import { type Dashboard, parseDashboard } from "@/lib/ir";
 import {
   SELF_SOURCE_ID,
   selfMonitoringConfig,
@@ -20,6 +20,7 @@ import {
   type SystemMetricRow,
   systemMetricRows,
 } from "./lib/seed-data";
+import { demoSpec, fleetSpec, hostDetailSpec, systemSpec } from "./lib/demo-dashboards";
 
 /**
  * Looping seeder.
@@ -172,8 +173,10 @@ async function ensureDemo() {
     }
 
     await ensureDashboard(pg, demoSpec());
-    await ensureDashboard(pg, systemSpec());
-    await ensureDashboard(pg, fleetSpec());
+    // Link targets first: a link names its target by id (#371).
+    const targets = { hostDetail: await ensureDashboard(pg, hostDetailSpec()) };
+    await ensureDashboard(pg, systemSpec(targets));
+    await ensureDashboard(pg, fleetSpec(targets));
     await ensureDashboard(pg, selfMonitoringSpec());
     if (promUrl) await ensureDashboard(pg, prometheusSelfMonitoringSpec());
   } finally {
@@ -183,241 +186,73 @@ async function ensureDemo() {
 
 /**
  * Insert a demo dashboard (and its initial version) if one with that title
- * doesn't exist. Validated first, so a seeded row is a current-version spec
- * like any the app writes.
+ * doesn't exist, and return its id. Validated first, so a seeded row is a
+ * current-version spec like any the app writes.
+ *
+ * A dashboard the seeder wrote and nobody has saved since (its current version
+ * is the seed's) is brought up to the spec here with a new version, so an
+ * install seeded before a demo change, such as the drilldown links, picks it
+ * up on its next start. Once a person saves one, it is theirs and left alone.
  */
-async function ensureDashboard(pg: Client, input: unknown) {
+async function ensureDashboard(pg: Client, input: unknown): Promise<string> {
   const spec: Dashboard = parseDashboard(input);
-  const existing = await pg.query(
-    "SELECT id FROM dashboards WHERE workspace_id = 'demo' AND title = $1 AND deleted_at IS NULL",
-    [spec.title],
+  const json = JSON.stringify(spec);
+  const existing = await pg.query<{
+    id: string;
+    latest: number | null;
+    created_by: string | null;
+    same: boolean | null;
+  }>(
+    `SELECT d.id, v.created_by, v.spec = $2::jsonb AS same,
+            (SELECT max(version) FROM dashboard_versions WHERE dashboard_id = d.id) AS latest
+       FROM dashboards d
+       LEFT JOIN dashboard_versions v ON v.id = d.current_version_id
+      WHERE d.workspace_id = 'demo' AND d.title = $1 AND d.deleted_at IS NULL
+      ORDER BY d.created_at
+      LIMIT 1`,
+    [spec.title, json],
   );
-  if (existing.rowCount !== 0) return;
-  const d = await pg.query(
+  const found = existing.rows[0];
+  if (found) {
+    if (found.created_by === "seed" && found.same === false && found.latest !== null) {
+      await writeVersion(
+        pg,
+        found.id,
+        found.latest + 1,
+        json,
+        "Updated by the demo seeder",
+      );
+      console.log(`updated demo dashboard ${found.id} (${spec.title})`);
+    }
+    return found.id;
+  }
+  const d = await pg.query<{ id: string }>(
     `INSERT INTO dashboards (workspace_id, title, created_by) VALUES ('demo', $1, 'seed') RETURNING id`,
     [spec.title],
   );
   const dashboardId = d.rows[0].id;
-  const v = await pg.query(
-    `INSERT INTO dashboard_versions (dashboard_id, version, spec, created_by)
-     VALUES ($1, 1, $2, 'seed') RETURNING id`,
-    [dashboardId, JSON.stringify(spec)],
-  );
-  await pg.query(`UPDATE dashboards SET current_version_id = $2 WHERE id = $1`, [
-    dashboardId,
-    v.rows[0].id,
-  ]);
+  await writeVersion(pg, dashboardId, 1, json, null);
   console.log(`seeded demo dashboard ${dashboardId} (${spec.title})`);
+  return dashboardId;
 }
 
-function demoSpec() {
-  return {
-    specVersion: SPEC_VERSION,
-    title: "Demo service health",
-    timeRange: { from: "now-1h", to: "now" },
-    refreshIntervalMs: 15000,
-    panels: [
-      {
-        id: "rps",
-        title: "Requests / min",
-        viz: "line",
-        query: {
-          sourceId: "ts-metrics",
-          timeField: "minute",
-          sql: "SELECT time_bucket('1 minute', ts) AS minute, count(*) AS requests FROM http_requests GROUP BY minute ORDER BY minute",
-        },
-        format: "number",
-        layout: { x: 0, y: 0, w: 6, h: 3 },
-      },
-      {
-        id: "latency",
-        title: "p95 latency (ms)",
-        viz: "line",
-        query: {
-          sourceId: "ts-metrics",
-          timeField: "minute",
-          sql: "SELECT time_bucket('1 minute', ts) AS minute, percentile_cont(0.95) WITHIN GROUP (ORDER BY duration_ms) AS p95 FROM http_requests GROUP BY minute ORDER BY minute",
-        },
-        format: "ms",
-        layout: { x: 6, y: 0, w: 6, h: 3 },
-      },
-      {
-        id: "errors",
-        title: "Errors (5xx) total",
-        viz: "stat",
-        query: {
-          sourceId: "ts-metrics",
-          timeField: "minute",
-          sql: "SELECT time_bucket('1 minute', ts) AS minute, count(*) FILTER (WHERE status >= 500) AS errors FROM http_requests GROUP BY minute ORDER BY minute",
-        },
-        format: "number",
-        layout: { x: 0, y: 3, w: 3, h: 2 },
-      },
-      {
-        id: "by-route",
-        title: "Requests by route",
-        viz: "table",
-        query: {
-          sourceId: "ts-metrics",
-          sql: "SELECT route, count(*) AS requests FROM http_requests GROUP BY route ORDER BY requests DESC",
-        },
-        layout: { x: 3, y: 3, w: 9, h: 2 },
-      },
-    ],
-  };
-}
-
-function systemSpec() {
-  return {
-    specVersion: SPEC_VERSION,
-    title: "Demo infrastructure",
-    timeRange: { from: "now-1h", to: "now" },
-    refreshIntervalMs: 15000,
-    panels: [
-      {
-        id: "cpu",
-        title: "Avg CPU % by host",
-        viz: "line",
-        query: {
-          sourceId: "ts-system",
-          timeField: "minute",
-          sql: "SELECT time_bucket('1 minute', ts) AS minute, host, avg(cpu_pct) AS cpu FROM system_metrics GROUP BY minute, host ORDER BY minute",
-        },
-        format: "percent",
-        layout: { x: 0, y: 0, w: 6, h: 3 },
-      },
-      {
-        id: "mem",
-        title: "Avg memory % by host",
-        viz: "line",
-        query: {
-          sourceId: "ts-system",
-          timeField: "minute",
-          sql: "SELECT time_bucket('1 minute', ts) AS minute, host, avg(mem_pct) AS mem FROM system_metrics GROUP BY minute, host ORDER BY minute",
-        },
-        format: "percent",
-        layout: { x: 6, y: 0, w: 6, h: 3 },
-      },
-      {
-        id: "disk",
-        title: "Max disk % used",
-        viz: "stat",
-        query: {
-          sourceId: "ts-system",
-          timeField: "minute",
-          sql: "SELECT time_bucket('1 minute', ts) AS minute, max(disk_pct) AS disk FROM system_metrics GROUP BY minute ORDER BY minute",
-        },
-        format: "percent",
-        layout: { x: 0, y: 3, w: 3, h: 2 },
-      },
-      {
-        id: "by-region",
-        title: "Avg CPU by region",
-        viz: "table",
-        query: {
-          sourceId: "ts-system",
-          sql: "SELECT region, round(avg(cpu_pct)::numeric, 1) AS avg_cpu FROM system_metrics GROUP BY region ORDER BY avg_cpu DESC",
-        },
-        layout: { x: 3, y: 3, w: 9, h: 2 },
-      },
-    ],
-  };
-}
-
-/**
- * The newer panel kinds on the same host metrics: a text header, gauges
- * (#200), and a state timeline (#201) whose states are derived in SQL. A
- * dashboard of its own rather than panels added to "Demo infrastructure",
- * because `ensureDashboard` only inserts a title that is missing: an install
- * seeded before these kinds existed gets this one on its next seed.
- */
-function fleetSpec() {
-  const perHostMinute =
-    "SELECT time_bucket('1 minute', ts) AS minute, host, avg(cpu_pct) AS cpu FROM system_metrics GROUP BY minute, host ORDER BY minute";
-  return {
-    specVersion: SPEC_VERSION,
-    title: "Demo fleet status",
-    timeRange: { from: "now-1h", to: "now" },
-    refreshIntervalMs: 15000,
-    panels: [
-      {
-        id: "about",
-        title: "About this dashboard",
-        viz: "text",
-        options: {
-          content: [
-            "## Fleet status",
-            "",
-            "Where each demo host stands **now**, and how its load has moved over the window.",
-            "",
-            "- **ok** below 70% CPU, **busy** from 70%, **hot** from 85%",
-            "- The data is the demo seeder's `system_metrics` table, written every few seconds",
-          ].join("\n"),
-        },
-        layout: { x: 0, y: 0, w: 12, h: 3 },
-      },
-      {
-        id: "cpu-now",
-        title: "CPU now by host",
-        viz: "gauge",
-        query: { sourceId: "ts-system", timeField: "minute", sql: perHostMinute },
-        options: {
-          variant: "bar",
-          value: "cpu",
-          min: 0,
-          max: 100,
-          thresholds: [
-            { value: 0, color: "success" },
-            { value: 70, color: "warning" },
-            { value: 85, color: "danger" },
-          ],
-        },
-        format: "percent",
-        layout: { x: 0, y: 3, w: 8, h: 3 },
-      },
-      {
-        id: "disk-max",
-        title: "Fullest disk",
-        viz: "gauge",
-        query: {
-          sourceId: "ts-system",
-          timeField: "minute",
-          sql: "SELECT time_bucket('1 minute', ts) AS minute, max(disk_pct) AS disk FROM system_metrics GROUP BY minute ORDER BY minute",
-        },
-        options: {
-          min: 0,
-          max: 100,
-          thresholds: [
-            { value: 0, color: "success" },
-            { value: 80, color: "warning" },
-            { value: 90, color: "danger" },
-          ],
-        },
-        format: "percent",
-        layout: { x: 8, y: 3, w: 4, h: 3 },
-      },
-      {
-        id: "load-state",
-        title: "Host load state",
-        viz: "state-timeline",
-        query: {
-          sourceId: "ts-system",
-          timeField: "minute",
-          sql: "SELECT time_bucket('1 minute', ts) AS minute, host, CASE WHEN avg(cpu_pct) >= 85 THEN 'hot' WHEN avg(cpu_pct) >= 70 THEN 'busy' ELSE 'ok' END AS state FROM system_metrics GROUP BY minute, host ORDER BY minute",
-        },
-        options: {
-          entity: "host",
-          state: "state",
-          states: [
-            { state: "ok", color: "success" },
-            { state: "busy", color: "warning" },
-            { state: "hot", color: "danger" },
-          ],
-        },
-        layout: { x: 0, y: 6, w: 12, h: 4 },
-      },
-    ],
-  };
+/** Append a seed-authored version and make it the dashboard's current one. */
+async function writeVersion(
+  pg: Client,
+  dashboardId: string,
+  version: number,
+  spec: string,
+  note: string | null,
+) {
+  const v = await pg.query<{ id: string }>(
+    `INSERT INTO dashboard_versions (dashboard_id, version, spec, created_by, note)
+     VALUES ($1, $2, $3, 'seed', $4) RETURNING id`,
+    [dashboardId, version, spec, note],
+  );
+  await pg.query(
+    `UPDATE dashboards SET current_version_id = $2, updated_at = now() WHERE id = $1`,
+    [dashboardId, v.rows[0].id],
+  );
 }
 
 /** One multi-row insert; the caller keeps `rows` within the parameter limit. */

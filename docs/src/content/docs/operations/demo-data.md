@@ -20,9 +20,23 @@ the compose stack's own Prometheus, which scrapes the app.
 | Source id | Table | Demo dashboard |
 | --- | --- | --- |
 | `ts-metrics` | `metrics.http_requests` — per-request events | **Demo service health** (RPS, p95 latency, 5xx, requests by route) |
-| `ts-system` | `metrics.system_metrics` — per-host infra metrics | **Demo infrastructure** (CPU/memory by host, disk %, CPU by region) and **Demo fleet status** (a text header, CPU and disk gauges, a host load state timeline) |
+| `ts-system` | `metrics.system_metrics` — per-host infra metrics | **Demo infrastructure** (CPU/memory by host, disk %, CPU by region), **Demo fleet status** (a text header, CPU and disk gauges, a host load state timeline) and **Demo host detail** (one host, picked with a `host` variable) |
 | `holotable-self` | `metrics.holotable_self` — the app's own instruments | **Holotable self-monitoring**, below |
 | `prometheus-self` | Prometheus at `PROMETHEUS_SELF_URL` — the same instruments, scraped | **Holotable self-monitoring (Prometheus)**, below |
+
+The demo dashboards show [drilldown](/guide/drilldown/) too. On **Demo fleet
+status**, a click on a host's CPU bar or on one of its load-state lanes opens
+**Demo host detail** for that host. The CPU chart on **Demo infrastructure**
+has an *Open host detail* item in its panel menu. On **Demo host detail**, a
+click on a row of the host table switches the page to that host in place.
+A link names its target by dashboard id, so the seeder writes **Demo host
+detail** before the dashboards that link to it.
+
+A demo dashboard the seeder wrote and nobody has saved since is brought up to
+the current demo spec on the next start, as a new version noted *Updated by
+the demo seeder*. That is how an install seeded before the drilldown links
+gets them. Once a person saves one of these dashboards, the seeder leaves it
+alone.
 
 Each source is stamped with a `catalog_refreshed_at` as it is written. A source
 that has never been introspected is refused by the [catalog freshness
