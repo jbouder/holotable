@@ -104,7 +104,7 @@ per-minute request rate, and whether each limit comes from the environment,
 is overridden for that workspace, or is off. Source-admins see their own
 workspaces. Only platform admins can change an override, and the change
 applies to the next model request. See
-[LLM rate limits and budgets](/operations/llm-limits/).
+[LLM rate limits and budgets](/admin/llm-limits/).
 
 ### AI context
 
@@ -126,7 +126,7 @@ model, and decide whether people may bring their own. "Test connection" makes
 one small model call with what is in the form. The key is encrypted at rest
 and never shown again: the page says only whether one is stored and its last
 four characters. The next generation in the workspace uses the change. See
-[Models configured in the app](/operations/ai-provider/#models-configured-in-the-app).
+[Models configured in the app](/admin/ai-provider/#models-configured-in-the-app).
 
 ### Personal model
 
@@ -139,7 +139,7 @@ Elsewhere it is kept and ignored.
 
 Mint and revoke service-account API tokens for the workspaces you administer:
 a name, a role (viewer or editor, never more) and an expiry. A token is shown
-once. See [Service-account API tokens](/operations/api-tokens/).
+once. See [Service-account API tokens](/integrations/api-tokens/).
 
 ## What follows you, and what stays on this device
 

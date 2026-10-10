@@ -14,7 +14,7 @@ Only on author, create, or edit — never on view, and never on a poller tick.
 Viewing and ticking replay the stored spec.
 
 The one bounded exception is the [structured-output
-repair](/operations/ai-provider/#structured-output-repair): when an author
+repair](/admin/ai-provider/#structured-output-repair): when an author
 action's output fails the schema, it gets **one** more model call that shows the
 model what was wrong, and that call's own failure is final. The repair is part
 of the same author action, never of a view, and it is rate limited, budgeted
@@ -73,7 +73,7 @@ A ref resolves only for a workspace `SOURCE_SECRET_REFS` grants it to, and
 unset grants nothing. The grant is checked in `resolveCredentials`
 (`src/lib/secrets/credentials.ts`) on every connection, not only when a source
 is saved, so one workspace cannot use another's database role by naming its
-ref. See [Source secret references](/operations/secret-references/).
+ref. See [Source secret references](/admin/secret-references/).
 
 **For a Prometheus source**, `auth: "bearer"` resolves `<REF>_TOKEN`
 (`resolveBearerToken`) and `auth: "basic"` resolves the user name and password,
@@ -106,7 +106,7 @@ The function denylist spans dialects on purpose. Entries in ClickHouse vocabular
 nothing against a PostgreSQL target and mean a future driver inherits them, but
 the PostgreSQL entries are the ones doing work today. A future driver is a
 registered source kind, with its own guard behind the same seam
-([ADR 2](/architecture/decisions/0002-source-kinds/)). Two groups matter most:
+([Source kinds](/architecture/data-model/#source-kinds)). Two groups matter most:
 
 - **Functions that take a query string and execute it** — `query_to_xml` and
   the rest of the `*_to_xml` family. The catalog allowlist never sees the
@@ -136,7 +136,7 @@ tricks, comments, casing, whitespace — and checks that everything poisoned is
 rejected, everything benign is accepted, and everything accepted satisfies an
 independent walk of the parse tree.
 
-A dashboard variable ([Dashboard variables](/concepts/variables/), #67) never
+A dashboard variable ([Dashboard variables](/guide/variables/), #67) never
 widens this. `:name` is found by PostgreSQL's scanner, must be declared, and is
 checked as the `$n` it runs as; a statement's own `$n` is still refused. The
 picked value is a bound parameter, never part of the text, and is checked
@@ -225,7 +225,7 @@ narrowed. The value is a bound parameter read from the verified identity
 for a source without one, so a call site cannot leave it out. A viewer without
 the claim is refused, never served unfiltered, and that includes a platform
 admin. Pollers are keyed by the claim values they run with, so tenants never
-share one. See [Row-level filters](/operations/row-level-filters/).
+share one. See [Row-level filters](/admin/row-level-filters/).
 
 **For a Prometheus source**, the row filter is a tenant label, `{ label, claim
 }`. `applyPromqlRowFilter` (`src/lib/promql/row-filter.ts`) splices
@@ -241,7 +241,7 @@ from the allowlisted metrics only, with the same tenant matcher.
 
 Table and column names and types for the **selected, authorized sources of the
 call: one, or for a dashboard up to three in one workspace, each in its own
-fenced block** ([ADR 1](/architecture/decisions/0001-multi-source-generation/)).
+fenced block** ([More than one source](/concepts/generating-a-panel/#more-than-one-source)).
 Every source is resolved and authorized on its own record, and a panel's SQL
 is validated against the catalog of the source it names, so a table from one
 source under another's id is refused. No sample rows are sent, and no column the catalog marks
@@ -347,7 +347,7 @@ bucket, then a per-workspace daily token budget read back from `llm_usage`.
 Over either, the request is a `429` naming the limit and its reset before the
 model is invoked. Keys come from the validated identity and a trusted record,
 never the request body, and platform admins are not exempt. See
-[LLM rate limits and budgets](/operations/llm-limits/).
+[LLM rate limits and budgets](/admin/llm-limits/).
 
 ## 18. Every change and every refusal is audited, and the audit log is append-only
 

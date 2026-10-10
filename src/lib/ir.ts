@@ -104,7 +104,7 @@ export type PromqlQuery = z.infer<typeof PromqlQuery>;
  * carries. Both branches are strict and each has a field the other lacks, so
  * every spec stored before PromQL existed parses through `SqlQuery` exactly
  * as it did, and a query carrying both is refused. Which language a panel may
- * use is its source's kind's to say (ADR 2), and is checked where it runs.
+ * use is its source's kind's to say (#382), and is checked where it runs.
  *
  * Code reads a query through the helpers below (`isSqlQuery`,
  * `queryLanguage`, `queryTimeField`, `queryText`), never its fields, outside

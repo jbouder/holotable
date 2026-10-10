@@ -19,7 +19,7 @@ docker run -p 3000:3000 ghcr.io/jbouder/holotable:quickstart
 
 Open `http://localhost:3000`. One container holds TimescaleDB, the app, the
 demo seeder and the self-monitoring collector. It needs no `.env`, no Keycloak
-and no key. It signs every visitor in with [demo mode](/operations/demo-mode/)
+and no key. It signs every visitor in with [demo mode](/admin/demo-mode/)
 and writes six hours of demo history before streaming, so the seeded dashboards
 are full within seconds.
 
@@ -36,7 +36,7 @@ release.
 
 The quick-start image has no Prometheus, so it shows the three SQL demo
 sources only. The [Prometheus self-monitoring
-dashboard](/getting-started/demo-data/#the-prometheus-twin) and a Prometheus
+dashboard](/operations/demo-data/#the-prometheus-twin) and a Prometheus
 source to try PromQL against come with Docker Compose, below.
 
 :::caution
@@ -66,9 +66,9 @@ seeder and a Prometheus that scrapes the app, as separate services, with real
 OIDC sign-in. The seeder registers that Prometheus as the `prometheus-self`
 source, so the stack has SQL and PromQL sources to compare. Sign in at
 `http://localhost:3000` as **`demo` / `demo`**, a source-admin in the `demo`
-workspace and a platform admin; see [the local realm](/operations/keycloak/#the-local-realm). The `seed` service
+workspace and a platform admin; see [the local realm](/admin/keycloak/#the-local-realm). The `seed` service
 continuously inserts demo metrics and, once, creates the demo `demo`
-workspace's sources and dashboards. See [Demo data](/getting-started/demo-data/)
+workspace's sources and dashboards. See [Demo data](/operations/demo-data/)
 for what gets created and how to tune it.
 
 Nothing is built on your machine: the app and job services run the published
@@ -105,7 +105,7 @@ docker compose up -d postgres seed # TimescaleDB, migrations, demo data
 npm run dev:demo                   # http://localhost:3000, demo sign-in
 ```
 
-`npm run dev:demo` is `npm run dev` in [demo mode](/operations/demo-mode/), with
+`npm run dev:demo` is `npm run dev` in [demo mode](/admin/demo-mode/), with
 the Keycloak variables blanked for that run. Work on sign-in or authorization
 runs `npm run dev` against the Compose realm instead.
 
@@ -125,7 +125,7 @@ npm run dev                        # http://localhost:3000
 Three things must be true, and each has its own failure mode:
 
 1. **An AI provider is configured.** `AI_MODEL` must be set; there is no default
-   model. See [AI provider](/operations/ai-provider/).
+   model. See [AI provider](/admin/ai-provider/).
 2. **A data source is registered** with a table catalog. Generation sends the
    model that catalog as metadata — it designs against a schema, not against data.
 3. **The source's `secret_ref` is granted to its workspace and has
@@ -133,7 +133,7 @@ Three things must be true, and each has its own failure mode:
    ref (the Docker Compose stack grants `TS_METRICS` to `demo`), and the
    server needs `<REF>_USERNAME` / `<REF>_PASSWORD`. A source whose ref has no
    credentials saves fine but fails on **Test**. See
-   [Source secret references](/operations/secret-references/).
+   [Source secret references](/admin/secret-references/).
 
 ## Scripts
 
@@ -171,7 +171,7 @@ npm run smoke          # check the self-monitoring dashboard answers with scrape
 | `/dashboards/[id]` | Live viewer (SSE) with Live/Pause and a read-only chat assistant | viewer |
 | `/dashboards/[id]/edit` | Panel CRUD/layout, single-panel NL edits, version save | editor |
 | `/dashboards/[id]/versions` | Version history, diff, preview and restore | viewer (restore: editor) |
-| `/embed/dashboards/[id]` | A [share link](/operations/share-links/)'s read-only view, framable by the origins the link names | the link's token |
+| `/embed/dashboards/[id]` | A [share link](/integrations/share-links/)'s read-only view, framable by the origins the link names | the link's token |
 | `/explore` | Ad-hoc NL questions against editable sources | editor |
 | `/settings` | Account, appearance, preferences, local data, shortcuts; workspace AI limits and API tokens for admins. Reached from the account menu | signed in |
 | `/data-sources` | Source CRUD / test / reviewed refresh, a catalog browser with per-column exposure, a structured form with table discovery, plus a natural-language drafter. Viewers get the list and the catalog browser read-only, without connection details or hidden columns | source-admin (read-only: viewer) |

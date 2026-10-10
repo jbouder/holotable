@@ -64,7 +64,7 @@ to anyone who can read the namespace. Credentials go in a Secret, loaded with
 `envFrom`, so its keys are environment variable names verbatim: `SESSION_SECRET`,
 `DATABASE_URL`, `OIDC_CLIENT_SECRET`, the provider API key, and one
 `<REF>_USERNAME` / `<REF>_PASSWORD` pair per source
-[`secret_ref`](/operations/secret-references/).
+[`secret_ref`](/admin/secret-references/).
 
 Source credentials are better off in a Secret of their own, named by
 `sourceSecrets.secretName`. The chart mounts it as a volume and sets
@@ -97,7 +97,7 @@ One more example is not a wiring but a source: `values-prometheus-source.yaml`
 lets source admins register an in-cluster Prometheus, with
 `SOURCE_URL_ALLOWLIST` naming it, a bearer-token `secret_ref`, and a network
 policy whose egress rule names the same endpoint. See
-[Prometheus sources](/operations/prometheus/).
+[Prometheus sources](/admin/prometheus/).
 
 The Vault one is the only one that needs a trick. The Agent injector writes a
 *file*; the app reads its environment. The injected template therefore renders

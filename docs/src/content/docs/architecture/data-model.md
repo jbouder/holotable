@@ -19,13 +19,33 @@ The registry: `kind`, safe `config` (jsonb), `secret_ref`, `workspace_id`,
 variable family from which they are resolved at execution time.
 
 `kind` says which shape `config` holds and which language the source's queries
-are written in ([ADR 2](/architecture/decisions/0002-source-kinds/)), and a row
-whose `config.kind` disagrees with it is refused when it is read:
+are written in, and a row whose `config.kind` disagrees with it is refused
+when it is read:
 
 | `kind` | `config` | Queries |
 | --- | --- | --- |
 | `timescaledb` | `host`, `port`, `database`, `schema`, `ssl`, `tables` (each with its `columns` and `timeField`), optional `rowFilter` `{ column, claim }` | SQL |
 | `prometheus` | `url`, `auth` (`none`, `bearer` or `basic`), `metrics` (each with its `type`, `help` and `labels`), optional `rowFilter` `{ label, claim }` | PromQL |
+
+#### Source kinds
+
+A kind is a registered module, not a `switch` on the column (#382).
+`src/lib/sources/registry.ts` lists the kinds; each declares its stored `kind` (never renamed), its strict
+`config` schema, the `connection`, `catalog` and `listing` projections of a
+source, and the `language` a panel against it carries. Its server half, under
+`src/lib/sources/server/`, holds what the browser never reaches — discovery,
+refresh, the connection test, validation, planning and execution — and a kind
+without one is a compile error. Registering a kind is an import, never a lookup
+by a string a request supplied, and `test/source-kinds.test.ts` fails on a kind
+comparison or a `src/lib/timescaledb/` import outside `src/lib/sources/`.
+
+The discriminator was defaulted rather than migrated: the TimescaleDB branch
+reads a missing `config.kind` as `timescaledb`, so every config stored before
+the union parses unchanged, and the next save writes `kind` into both the
+column and the JSONB from the one value. No other kind may default its
+discriminator. The language belongs to the kind, not the panel: a line chart
+can be drawn from SQL or from PromQL, and what decides is what its source can
+answer. A source's kind cannot change on edit.
 
 `secret_ref` is nullable (migration 018) for a Prometheus source with
 `auth: none`, which needs no credential; a TimescaleDB source and an
@@ -190,7 +210,7 @@ dashboard or source it names is the point.
 Token counters per `(workspace_id, day, route, model)`: `input_tokens`,
 `output_tokens`, `requests`. Each finished model call adds to its row. Never
 prompts, specs, or output. Read before every model request to enforce the
-daily budget; see [LLM rate limits and budgets](/operations/llm-limits/).
+daily budget; see [LLM rate limits and budgets](/admin/llm-limits/).
 
 ### `workspace_limits`
 
@@ -220,7 +240,7 @@ preference is personal and not workspace-scoped. Read through
 and drops or defaults anything stale, so an old row never breaks a page. Only
 `GET` and `PATCH /api/me/preferences` touch it, and only for the caller's own
 `sub`. Theme and motion are deliberately not here; see
-[Settings and your account](/getting-started/settings/).
+[Settings and your account](/guide/settings/).
 
 ### `sessions`
 
@@ -242,7 +262,7 @@ an optional `ended_at` (a range, such as an incident), `kind` (`deploy`,
 `created_at`, and `source` (`manual`, or the name of the pipeline that posted
 it). Every statement filters on `workspace_id`: a read takes it from the
 dashboard record, a write from the path. See
-[Annotations](/concepts/annotations/).
+[Annotations](/guide/annotations/).
 
 ### `dashboard_shares`
 
@@ -251,14 +271,14 @@ One read-only share link (#65): `dashboard_id`, `workspace_id`, `token_hash`
 an optional pinned `time_range`, `created_by`, `created_at`, `expires_at`,
 `revoked_at` and `last_used_at`. Checked on every use of the token, so
 revoking takes effect on the next request. See
-[Share links and embedding](/operations/share-links/).
+[Share links and embedding](/integrations/share-links/).
 
 ### `api_tokens`
 
 One service-account API token (#288): `workspace_id`, `name`, `token_hash`
 (SHA-256 of the `ht_` token), `role` (`viewer` or `editor` only, by a `CHECK`),
 `created_by`, `created_at`, `expires_at`, `revoked_at` and `last_used_at`. See
-[Service-account API tokens](/operations/api-tokens/).
+[Service-account API tokens](/integrations/api-tokens/).
 
 ## Metrics store (TimescaleDB)
 
@@ -270,7 +290,7 @@ One service-account API token (#288): `workspace_id`, `name`, `token_hash`
   raw chunks.
 - `metrics.system_metrics` holds per-host infrastructure samples, and
   `metrics.holotable_self` the app's own Prometheus instruments, scraped by
-  `scripts/self-metrics.ts`. See [Demo data](/getting-started/demo-data/).
+  `scripts/self-metrics.ts`. See [Demo data](/operations/demo-data/).
 - A **read-only** role is created by `timescaledb/init/002_readonly_user.sh`.
   The app only ever connects as this user, via the source's `secret_ref`.
 

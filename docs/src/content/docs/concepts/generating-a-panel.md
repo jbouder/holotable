@@ -65,9 +65,17 @@ under a heading naming its source, and the SQL rules say a panel reads only
 its own source's tables and never combines sources. On save, each panel's
 SQL is validated against the source it names, which is what actually refuses
 a table from one source under another's id. A panel edit or an explore
-question still uses one source. See
-[ADR 1](/architecture/decisions/0001-multi-source-generation/) for the
-options and why this one.
+question still uses one source.
+
+One call over fenced catalogs, rather than one call per source merged
+afterwards or a routing call followed by per-source generation, is what keeps
+invariant 1: a multi-source dashboard is still one author action and one model
+call, budgeted, rate limited, logged and repairable like any other, and a
+single-source request produces exactly the prompt it did before (#104). The
+cap of three is what bounds the prompt; the author chooses whether to pay for
+it. Cross-source joins stay out of scope, since a query runs against one
+source's connection. If quality across sources ever needs routing, that
+changes invariant 1 and is a separate decision.
 
 ## Workspace context
 
@@ -118,7 +126,7 @@ base prompt.
 ## Other dashboards, for links
 
 A generation that writes a dashboard or a panel is also told which other
-dashboards a panel may [link](/concepts/drilldown/) to
+dashboards a panel may [link](/guide/drilldown/) to
 ([#375](https://github.com/jbouder/holotable/issues/375)). The server lists
 them for the caller, from the workspace the sources belong to, and only when
 the caller may view that workspace. It lists the 30 most recently updated,
@@ -134,7 +142,7 @@ an instruction is only a name. Explore writes no links and gets no list.
 The rule the model is given is also enforced. A generated link whose
 `dashboard` is not in the list fails validation on the server and in the
 browser, which reads the same list from the response's `X-Link-Targets`
-header. The one [automatic repair](/operations/ai-provider/#structured-output-repair)
+header. The one [automatic repair](/admin/ai-provider/#structured-output-repair)
 then re-asks with the reason. A link target is always an id from the list
 the server built, never a URL.
 
@@ -214,7 +222,7 @@ source is among the sources, the prompt changes in four ways:
 With several sources of both kinds, a panel's language is its source's. The
 schema the model is bound to says so too: a panel that writes `query.sql`
 against a Prometheus source fails it, and the one
-[repair](/operations/ai-provider/#structured-output-repair) tells the model to
+[repair](/admin/ai-provider/#structured-output-repair) tells the model to
 write `query.promql` instead. The [PromQL guard](/concepts/executing-a-panel/#the-promql-guard)
 is still the enforcement, on save and on every run.
 
@@ -246,7 +254,7 @@ spec as it forms. **The model runs exactly once per author action** — never on
 view, never on a refresh tick. The one exception: output that fails the schema
 gets a single automatic repair, shown as "Fixing it automatically…" while it
 streams (see [Structured-output
-repair](/operations/ai-provider/#structured-output-repair)).
+repair](/admin/ai-provider/#structured-output-repair)).
 
 ## Refining before the first save
 

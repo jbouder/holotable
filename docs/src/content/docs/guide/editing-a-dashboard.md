@@ -73,7 +73,7 @@ from a different place, so the editor does not send you to one.
 
 ## Links
 
-The **Links** section edits the panel's [drilldown](/concepts/drilldown/)
+The **Links** section edits the panel's [drilldown](/guide/drilldown/)
 links without JSON. Each link is a row with its title and target, which can be
 edited, moved up or down, or removed. **Add link** opens a form:
 

@@ -61,5 +61,5 @@ against the code. A change to the IR or the guard that the skill no longer
 describes fails the build.
 
 Connecting an agent to a running Holotable — listing sources, validating and
-running a query, saving a dashboard — is the [MCP server](/operations/mcp/),
+running a query, saving a dashboard — is the [MCP server](/integrations/mcp/),
 which the same client reaches at `/api/mcp` after signing in to the realm.

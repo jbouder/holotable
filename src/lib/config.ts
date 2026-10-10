@@ -939,7 +939,7 @@ export function validateConfig(
   for (const [variable, why] of oidcRequired) {
     if (values[variable]) continue;
     if (production) {
-      error(variable, `is not set: ${why}. See docs/operations/keycloak.`);
+      error(variable, `is not set: ${why}. See docs/admin/keycloak.`);
     } else if (variable === "OIDC_ISSUER" || variable === "OIDC_CLIENT_ID") {
       warning(variable, `is not set; sign-in will fail until it is (${why}).`);
     }
@@ -965,7 +965,7 @@ export function validateConfig(
     if (values.OIDC_MCP_CLIENT_ID === values.OIDC_CLIENT_ID) {
       error(
         "OIDC_MCP_CLIENT_ID",
-        `is "${values.OIDC_MCP_CLIENT_ID}", the same as OIDC_CLIENT_ID. Register a separate public client for MCP clients (docs/operations/keycloak, "MCP clients").`,
+        `is "${values.OIDC_MCP_CLIENT_ID}", the same as OIDC_CLIENT_ID. Register a separate public client for MCP clients (docs/admin/keycloak, "MCP clients").`,
       );
     }
     if (!production && !(values.OIDC_ISSUER && values.OIDC_JWKS_URL)) {

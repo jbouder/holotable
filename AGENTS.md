@@ -101,7 +101,7 @@ Important files:
   the editor draws controls for. A panel's own `timeRange` and
   `refreshIntervalMs` (#114) are read through `panelTimeRange` and
   `panelRefreshMs`; the poller groups panels by cadence under one timer
-- `src/lib/sources/registry.ts` — the source kinds (#382, ADR 2), as the panel
+- `src/lib/sources/registry.ts` — the source kinds (#382), as the panel
   registry is the panel kinds. `SourceConfig` is the union of every kind's
   config on `kind`; a kind's browser-safe module is under
   `src/lib/sources/kinds/` (config schema, `connection`, `catalog`, `listing`,
@@ -785,7 +785,7 @@ Consult:
 - `CONTRIBUTING.md`
 - `SECURITY.md` — the same boundaries stated as a trust model
 - `docs/src/content/docs/architecture/invariants.md`
-- `docs/src/content/docs/operations/keycloak.md`
+- `docs/src/content/docs/admin/keycloak.md`
 - `src/lib/ir.ts`
 
 before making invasive changes.

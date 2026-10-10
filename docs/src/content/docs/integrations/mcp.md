@@ -7,7 +7,7 @@ Holotable is an MCP server
 ([#148](https://github.com/jbouder/holotable/issues/148)): an agent such as
 Claude Code or Claude Desktop connects to `/api/mcp` and gets the same
 capabilities the app has, as typed tools, over the same validated IR and the
-same guarded routes. The [Claude Code skill](/getting-started/writing-specs-with-claude-code/)
+same guarded routes. The [Claude Code skill](/integrations/writing-specs-with-claude-code/)
 teaches a client how to *write* a spec with no server; this is how a client
 *does* things against a running one.
 
@@ -15,7 +15,7 @@ teaches a client how to *write* a spec with no server; this is how a client
 
 The endpoint authenticates MCP clients with the realm, through a second public
 Keycloak client, and tells the client where to sign in itself; the setup is in
-[Keycloak setup, "MCP clients"](/operations/keycloak/#5-mcp-clients). With
+[Keycloak setup, "MCP clients"](/admin/keycloak/#5-mcp-clients). With
 `OIDC_MCP_CLIENT_ID` set and the `holotable-mcp` client in the realm:
 
 ```bash
@@ -25,7 +25,7 @@ claude mcp add --transport http holotable https://holotable.example.com/api/mcp 
 
 Claude Desktop takes the same values under *Bring your own client*. The first
 call opens the realm's sign-in in a browser; the client keeps and refreshes
-the tokens. A [service-account token](/operations/api-tokens/) works too, as
+the tokens. A [service-account token](/integrations/api-tokens/) works too, as
 a static `Authorization: Bearer ht_…` header, with that token's single role.
 
 The transport is streamable HTTP in its stateless form: every call carries its
@@ -58,9 +58,9 @@ never as a protocol error.
 
 The three generation tools use the same model the routes would for the
 caller in that workspace (their [personal or the workspace's
-model](/operations/ai-provider/#models-configured-in-the-app), else the
+model](/admin/ai-provider/#models-configured-in-the-app), else the
 server's), count against the workspace's
-[model rate limit and daily budget](/operations/llm-limits/) like the routes
+[model rate limit and daily budget](/admin/llm-limits/) like the routes
 do, write the same [generation log](/operations/logging/) row, and return a
 spec the IR validated — never data. The routes stream to a browser and leave
 the one [repair](/concepts/generating-a-panel/) of an answer that failed the

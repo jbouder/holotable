@@ -75,7 +75,7 @@ to end.
 Authentication is OIDC-only for real users — there is no local or dev login
 path — so you need the Keycloak from `docker compose` (or your own realm) when
 running the app with `npm run dev`. See
-[Keycloak setup](docs/src/content/docs/operations/keycloak.md) for the
+[Keycloak setup](docs/src/content/docs/admin/keycloak.md) for the
 group-mapper configuration that produces the roles the app authorizes against.
 Scripts and pipelines that are not a person use a service-account API token
 from **Settings → API tokens** instead (#288); it holds one workspace at viewer
@@ -87,7 +87,7 @@ beside any `OIDC_*` variable or with `DEMO_GROUPS` above editor. It is fine for
 working on dashboards, panels and charts. It is **not** for working on
 authentication or authorization: anything under `src/lib/auth/`, the session or
 the claims is tested against the realm. See
-[Demo mode](docs/src/content/docs/operations/demo-mode.md).
+[Demo mode](docs/src/content/docs/admin/demo-mode.md).
 
 The documentation site is a separate Astro project with its own
 `package.json`:
@@ -275,7 +275,7 @@ The short version, five rules:
    add one. Source kinds are registered the same way, in
    `src/lib/sources/registry.ts` with their server half in
    `src/lib/sources/server/registry.ts`: never compare `source.kind` outside
-   `src/lib/sources/`, ask the kind instead (ADR 2 in the docs).
+   `src/lib/sources/`, ask the kind instead ("Source kinds" on the data model page).
 2. **The model generates specs, never data.** The LLM may produce a
    specification and SQL. It must never produce metric values, and the client
    must never render data that did not come from server-side query execution.
@@ -366,29 +366,29 @@ request:
 | `src/lib/panels/` (a panel kind or its options) | `reference/panel-options.md`, "Panel kinds" in `concepts/streaming-and-rendering.md`. The visualization list is generated |
 | `src/lib/sql/safety.ts`, `ast.ts`, `denylist.ts` (the guard) | `concepts/executing-a-panel.md`, invariants 7 and 8, the trust model in `SECURITY.md` |
 | `src/lib/promql/` (the PromQL guard, its rewrites, the plan) | `concepts/executing-a-panel.md` ("The PromQL guard"), `concepts/prometheus-sources.md`, invariants 7 and 8, the trust model in `SECURITY.md`, the skill's `references/promql-rules.md` |
-| `src/lib/sources/` (a source kind, its config or its server half) | `concepts/prometheus-sources.md`, `architecture/data-model.md` (`sources`), ADR 2 in `architecture/decisions/` |
-| `src/lib/prometheus/` (the client, discovery, the connection test) | `operations/prometheus.md`, `concepts/prometheus-sources.md` |
-| `src/lib/sql/row-filter.ts`, `src/lib/row-scope.ts` | `operations/row-level-filters.md`, invariant 8a |
-| `src/lib/sql/variables.ts`, `src/lib/variables.ts`, `variable-selection.ts` | `concepts/variables.md` |
-| `src/lib/drilldown.ts`, `drilldown-targets.ts`, `drilldown-datum.ts`, `panel.links` in `ir.ts` | `concepts/drilldown.md` |
+| `src/lib/sources/` (a source kind, its config or its server half) | `concepts/prometheus-sources.md`, `architecture/data-model.md` (`sources`, "Source kinds") |
+| `src/lib/prometheus/` (the client, discovery, the connection test) | `admin/prometheus.md`, `concepts/prometheus-sources.md` |
+| `src/lib/sql/row-filter.ts`, `src/lib/row-scope.ts` | `admin/row-level-filters.md`, invariant 8a |
+| `src/lib/sql/variables.ts`, `src/lib/variables.ts`, `variable-selection.ts` | `guide/variables.md` |
+| `src/lib/drilldown.ts`, `drilldown-targets.ts`, `drilldown-datum.ts`, `panel.links` in `ir.ts` | `guide/drilldown.md` |
 | `src/lib/auth/authorize.ts` (an action or rule in `can()`) | `architecture/authorization.md` (the action matrix), `SECURITY.md` |
-| `src/lib/auth/` sessions, renewal, revocation, share links, API tokens | `architecture/authorization.md`, `operations/share-links.md`, `operations/api-tokens.md`, `SECURITY.md` |
-| `src/lib/auth/mcp-token.ts`, `/api/mcp`, the realm's MCP client | `operations/keycloak.md` ("MCP clients"), `SECURITY.md` |
-| `src/lib/mcp/` (a tool, the protocol) | `operations/mcp.md`, `SECURITY.md` |
-| `src/components/editor/` (an inspector section), `src/lib/link-form.ts` | `concepts/editing-a-dashboard.md` |
+| `src/lib/auth/` sessions, renewal, revocation, share links, API tokens | `architecture/authorization.md`, `integrations/share-links.md`, `integrations/api-tokens.md`, `SECURITY.md` |
+| `src/lib/auth/mcp-token.ts`, `/api/mcp`, the realm's MCP client | `admin/keycloak.md` ("MCP clients"), `SECURITY.md` |
+| `src/lib/mcp/` (a tool, the protocol) | `integrations/mcp.md`, `SECURITY.md` |
+| `src/components/editor/` (an inspector section), `src/lib/link-form.ts` | `guide/editing-a-dashboard.md` |
 | `src/lib/config.ts` (a variable) | The configuration reference is generated; a startup rule goes in `operations/startup-validation.md`, and the variable in `.env.example` |
 | A route under `src/app/api/` | `reference/api-routes.md` (`test/docs-drift.test.ts` fails until it has a row) |
 | `AUDIT_ACTIONS` in `src/lib/audit.ts` | `operations/audit-log.md` (held by the same test) |
-| `src/lib/settings.ts` (a settings section) | `getting-started/settings.md` (held by the same test) |
+| `src/lib/settings.ts` (a settings section) | `guide/settings.md` (held by the same test) |
 | `src/lib/metrics.ts` (an instrument) | `operations/metrics.md` |
 | `migrations/` (a table or column) | `architecture/data-model.md` |
-| `keycloak/holotable-realm.json` | `operations/keycloak.md` (the local realm, its users, client settings) |
+| `keycloak/holotable-realm.json` | `admin/keycloak.md` (the local realm, its users, client settings) |
 | A color token in `src/app/globals.css` | The contrast table in `architecture/accessibility.md` (`test/contrast.test.ts` fails until it matches) |
-| `src/lib/ai/` (a provider, including `stub`) | `operations/ai-provider.md` |
+| `src/lib/ai/` (a provider, including `stub`) | `admin/ai-provider.md` |
 | `src/lib/ir.ts`, a panel kind, a color token, or a guard rule in `src/lib/sql/` or `src/lib/promql/` | The skill's `.claude/skills/holotable/references/` and `examples/` (`test/holotable-skill.test.ts` holds its examples and lists to the code) |
 | `docker-compose.yml`, `deploy/quickstart/` | `getting-started/quick-start.md`, the quick start in `README.md` |
 | `deploy/helm/holotable/` | `operations/kubernetes.md`, the chart's own `README.md` |
-| `scripts/seed.ts`, `scripts/self-metrics.ts`, `scripts/smoke.ts`, `src/lib/self-monitoring/` | `getting-started/demo-data.md` |
+| `scripts/seed.ts`, `scripts/self-metrics.ts`, `scripts/smoke.ts`, `src/lib/self-monitoring/` | `operations/demo-data.md` |
 | A `package.json` script | `getting-started/quick-start.md` (Scripts), `AGENTS.md` (Development workflow) |
 
 Paths in the table are under `docs/src/content/docs/` unless they say
@@ -396,8 +396,8 @@ otherwise. The Docs workflow builds the site, which fails on a broken internal
 link, and then runs `docs/scripts/check-root-links.mjs` over the root markdown
 files, which fails on a broken relative link, a link to a docs page that does
 not exist, or a backticked repository path that is gone. Run it locally with
-`cd docs && npm run check:links`. The architecture and operations pages end
-with the commit they were last verified against; when you check one against
+`cd docs && npm run check:links`. The architecture, administration, integrations and
+operations pages end with the commit they were last verified against; when you check one against
 the code, move its marker.
 
 ## Style

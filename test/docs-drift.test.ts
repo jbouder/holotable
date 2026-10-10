@@ -82,13 +82,13 @@ test("every audit action is described on the audit log page", () => {
 });
 
 test("every settings section is listed on the settings page", () => {
-  const page = read(`${DOCS}/getting-started/settings.md`);
+  const page = read(`${DOCS}/guide/settings.md`);
   const missing = SETTINGS_SECTIONS.filter(
     (section) => !page.includes(`| \`${section.href}\` |`),
   ).map((section) => section.href);
   assert.deepEqual(
     missing,
     [],
-    "add these to the table in docs/src/content/docs/getting-started/settings.md",
+    "add these to the table in docs/src/content/docs/guide/settings.md",
   );
 });

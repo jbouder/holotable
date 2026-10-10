@@ -34,7 +34,7 @@ can hold:
 ## Using one
 
 Send it as a bearer token. Posting a deploy marker from CI
-([annotations](/concepts/annotations/)) with an editor token:
+([annotations](/guide/annotations/)) with an editor token:
 
 ```sh
 curl -fsS -X POST "$HOLOTABLE_URL/api/workspaces/ops/annotations" \
@@ -54,12 +54,12 @@ curl -fsS -X POST "$HOLOTABLE_URL/api/workspaces/ops/annotations" \
   cannot create or revoke tokens.
 - **Also an MCP credential.** `/api/mcp` accepts one in the same header, by its
   prefix, resolving exactly as above; see
-  [MCP clients](/operations/keycloak/#5-mcp-clients).
+  [MCP clients](/admin/keycloak/#5-mcp-clients).
 - **Not from a browser page.** A mutation that carries an `Origin` from another
   site is refused before authentication, token or not. A token is for a server
   calling the API, not for JavaScript on a web page.
 - **Row-filtered sources.** A token carries no realm claims, so a
-  [row-filtered source](/operations/row-level-filters/) refuses a query made with
+  [row-filtered source](/admin/row-level-filters/) refuses a query made with
   it, rather than returning every row.
 
 Treat a token as a password: keep it in the pipeline's secret store, give it the

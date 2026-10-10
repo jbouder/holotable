@@ -61,7 +61,7 @@ production deployment cannot boot without:
 | `AI_MODEL` | Set. |
 | `OPENAI_API_KEY` | Set when `AI_PROVIDER` is `openai-compatible` (the default). `OPENAI_BASE_URL` is optional and defaults to OpenAI, but must be an http(s) URL when set. |
 | `AI_GATEWAY_API_KEY` | Set when `AI_PROVIDER` is `gateway`. |
-| `OIDC_ISSUER`, `OIDC_CLIENT_ID`, `OIDC_CLIENT_SECRET`, `OIDC_JWKS_URL` | All set: Keycloak is the only way to sign in, and the [client is confidential](/operations/keycloak/). `OIDC_REDIRECT_URI` is derived from the request origin when unset. Under `AUTH_MODE=demo` the rule inverts: any of them (or `OIDC_MCP_CLIENT_ID`) is an error, and `AI_MODEL` and the provider key become warnings; see [Demo mode](/operations/demo-mode/). |
+| `OIDC_ISSUER`, `OIDC_CLIENT_ID`, `OIDC_CLIENT_SECRET`, `OIDC_JWKS_URL` | All set: Keycloak is the only way to sign in, and the [client is confidential](/admin/keycloak/). `OIDC_REDIRECT_URI` is derived from the request origin when unset. Under `AUTH_MODE=demo` the rule inverts: any of them (or `OIDC_MCP_CLIENT_ID`) is an error, and `AI_MODEL` and the provider key become warnings; see [Demo mode](/admin/demo-mode/). |
 
 Every numeric knob (`MAX_QUERY_ROWS`, `MAX_RESULT_BYTES`, `QUERY_TIMEOUT_SECONDS`, …) must be a
 positive integer when set, `AI_MAX_RETRIES` an integer from 0 to 10 (an
@@ -92,7 +92,7 @@ of every live source from the config store and checks two things: that
 never an error: sources are created at runtime, and a source whose credentials
 arrive with the next deploy should not keep the whole server down. The same failure still
 surfaces on **Test** and on every query, see
-[Source secret references](/operations/secret-references/).
+[Source secret references](/admin/secret-references/).
 
 The query waits at most five seconds. If the database is not reachable yet, the
 check degrades to a single warning naming the connection error, and the server
