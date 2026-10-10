@@ -376,6 +376,10 @@ request:
 | `src/lib/auth/mcp-token.ts`, `/api/mcp`, the realm's MCP client | `admin/keycloak.md` ("MCP clients"), `SECURITY.md` |
 | `src/lib/mcp/` (a tool, the protocol) | `integrations/mcp.md`, `SECURITY.md` |
 | `src/components/editor/` (an inspector section), `src/lib/link-form.ts` | `guide/editing-a-dashboard.md` |
+| `src/lib/editor/`, `src/lib/panel-starter.ts`, `src/lib/preview-runs.ts` | "What the editor holds before a save" in `concepts/executing-a-panel.md` |
+| `src/components/dashboard/LiveDashboard.tsx`, `src/lib/connection.ts`, the time picker, a panel's menu | `guide/viewing-a-dashboard.md`, the viewer sections of `concepts/streaming-and-rendering.md` |
+| `src/lib/ai/chat.ts`, `src/app/api/dashboards/[id]/chat/` | `guide/dashboard-chat.md`, "Dashboard chat" in `concepts/generating-a-panel.md` |
+| `src/components/command-palette.tsx`, `src/lib/command-palette.ts`, `/api/search` | `guide/viewing-a-dashboard.md`, "Search and the command palette" in `architecture/authorization.md` |
 | `src/lib/config.ts` (a variable) | The configuration reference is generated; a startup rule goes in `operations/startup-validation.md`, and the variable in `.env.example` |
 | A route under `src/app/api/` | `reference/api-routes.md` (`test/docs-drift.test.ts` fails until it has a row) |
 | `AUDIT_ACTIONS` in `src/lib/audit.ts` | `operations/audit-log.md` (held by the same test) |

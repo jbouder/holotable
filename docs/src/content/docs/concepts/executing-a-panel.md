@@ -344,3 +344,42 @@ Postgres error (`column _holo.minute does not exist`) does not explain the fix:
 > time column "minute" is not produced by this query. Set the panel's timeField
 > to the SELECT output alias of your time bucket (e.g. `time_bucket(...) AS
 > minute`), or clear it when the result has no time column.
+
+## What the editor holds before a save
+
+The editor (`src/app/dashboards/[id]/edit/`) is the one writer of a spec,
+beside a rename and a restore from the history, and nothing it holds reaches
+the server until Save. The model and the client can propose anything; nothing
+they propose is trusted until the save re-derives it. Four things make that
+session usable ([Editing a dashboard](/guide/editing-a-dashboard/)) without
+weakening it:
+
+- **Previews run through `/api/query`.** Each panel's guarded query runs once,
+  and again only when that panel's SQL, window or variable values change, after
+  a short pause in typing (`src/lib/preview-runs.ts`). Moving, resizing or
+  restyling reuses the rows the panel has, and the chart is never recreated.
+- **The starter is guaranteed to run.** A new panel starts from a query built
+  out of the selected source's catalog (`src/lib/panel-starter.ts`): the first
+  allowlisted table with a time column, counted per minute, as a line; a plain
+  `count(*)` as a stat when no table has a time column; `SELECT 1 AS value`
+  when nothing is usable. Every name comes from the allowlist, so it passes the
+  guard against that source, and it never filters time itself, because the
+  server owns the range. A Prometheus source starts from PromQL the same way —
+  a counter's `sum(rate(…[5m]))`, else a histogram's p95, else a gauge's sum,
+  else a count of any listed metric's series, else `vector(1)`; a range query
+  for a line and an instant query for a stat, gauge, table or pie — and its
+  built-in templates are golden signals built from its counters, histograms
+  and gauges (`src/lib/builtin-templates-promql.ts`).
+- **History is a bounded stack** (`src/lib/editor/use-history.ts`). Every
+  change to the spec is one entry, a burst of keystrokes in one field within a
+  second coalesces into one, and the editor's binding is suppressed while
+  focus is in a field so the browser's own undo still works there.
+- **Drafts never reach the server** (`src/lib/editor/drafts.ts`). The working
+  spec is mirrored to `localStorage`, keyed by dashboard and signed-in
+  subject, and offered back by a click, never restored on load. A draft is an
+  unvalidated spec only its author has seen; the only thing the system writes
+  is an explicit saved version, re-validated and re-guarded. A server-side
+  draft table is an explicitly optional extension in
+  [#118](https://github.com/jbouder/holotable/issues/118) and is not built.
+  Drafts are per user, capped in size, expire after a week, and expired ones
+  from every dashboard are pruned whenever the editor opens.

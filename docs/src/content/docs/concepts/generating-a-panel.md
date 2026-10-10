@@ -372,3 +372,87 @@ table catalog and the `secret_ref` *name*. It is prompted to ignore any password
 in the description, and it never emits a credential value. The user reviews the
 draft, then runs **Test** and **Refresh** against the live database, which is the
 source of truth for real columns.
+
+## Dashboard chat
+
+The chat beside a dashboard ([Dashboard chat](/guide/dashboard-chat/)) is a
+**read-only** assistant scoped to one dashboard (`src/lib/ai/chat.ts`,
+`src/app/api/dashboards/[id]/chat/route.ts`). It reasons over the panel specs
+first and may escalate to fetching fresh data through a guarded `runQuery`
+tool.
+
+The tool is scoped to the sources the dashboard already references *and* the
+caller may use — each re-resolved and re-authorized, with unavailable ones
+silently omitted, mirroring the poller's tombstone handling. It runs the same
+`validateSql` → `buildExecutablePlan` → `executePlan` pipeline, injects the
+time range **the reader is viewing**, caps rows (`MAX_TOOL_ROWS`) and
+model-tool steps, and cannot mutate the dashboard. The model still authors SQL,
+never data.
+
+### Answers are about what is on screen
+
+Each question carries the reader's view (#366), so the chat and the charts
+cannot disagree about which window or which slice they mean:
+
+- **The range.** The browser reads `from`/`to` from the URL `LiveDashboard`
+  keeps on the window being viewed; none means the dashboard's own range. The
+  route parses it as an IR time expression and resolves it on the server, the
+  same as the stream; a range that does not resolve is a 400.
+- **The variable picks.** The `var-*` values go through `checkedSelection`,
+  the stream's allowlist, under the reader's row scope. A value the reader may
+  not use does not fail the question: the turn runs with the defaults, and the
+  prompt tells the model so. Values reach the prompt inside a fenced
+  `VARIABLES` block, as untrusted text, and are still bound as parameters.
+- **The panel asked about.** **Ask about this panel** sends only the panel's
+  id; the server looks it up in the stored spec and ignores an id that is not
+  on the dashboard. The browser never supplies SQL.
+
+The route records the range, values and panel on the `dashboard.chat` audit
+event, and each `runQuery` result reports the range and values it was narrowed
+to, which the citation shows.
+
+### What makes it usable
+
+These make it usable rather than a demo (#82, #366):
+
+- **History persists.** A turn is stored in `chat_messages`, keyed by
+  `(dashboard_id, user_sub, id)` — the SDK's own message id, so re-sending a
+  turn updates the row rather than appending a duplicate. A conversation is one
+  reader working something out, so it is scoped per person: two people on the
+  same dashboard have separate histories and cannot see each other's. It is
+  bounded by `CHAT_HISTORY_MAX_MESSAGES` and `CHAT_HISTORY_RETENTION_DAYS`,
+  enforced on write *and* on read, so lowering either takes effect at once
+  rather than whenever someone next sends a message. The sweep runs in the same
+  transaction as the write, which is what keeps the table bounded without a
+  scheduled job. Clearing the chat is a `DELETE` on the same route, and forgets
+  only the caller's own conversation.
+
+  Stored rows are read back as untrusted: `content` is opaque JSONB holding a
+  shape the SDK owns and evolves, so `parseStoredMessage` shape-checks each one
+  and drops what no longer parses. A conversation that starts a turn shorter
+  beats one that replays something half-understood into a prompt.
+
+- **Answers cite their queries.** An assistant message that called `runQuery`
+  renders an expandable "ran this query" footnote with the source id and the
+  statement, plus the titles of any panels whose own query is the same
+  statement. It is read off the message's own tool parts, which the SDK already
+  streamed to the browser — no second request, and nothing the client is told
+  that it was not already holding. The footnote names the range and variable
+  values the server narrowed the rows to, rather than showing a statement that
+  is neither what the model wrote nor what the database saw.
+
+- **Answers are formatted.** Assistant text goes through the same sanitized
+  Markdown subset a text panel uses (`src/lib/markdown.ts`): lists, emphasis,
+  code and small tables, built as React elements, never an HTML string. A
+  reader's own message stays plain text.
+
+- **Suggestions are derived, not generated.** `chatSuggestions` builds three
+  or four questions from the panel titles and viz kinds on the server;
+  `panelChatSuggestions` does the same for the panel asked about. A second
+  model call to decide what to ask a model would cost a round trip and a budget
+  entry to produce three sentences, and would be different every time.
+
+- **Stop actually stops.** The route passes the request's own `AbortSignal`
+  into `streamText`, so a browser that presses stop cancels the provider call
+  instead of leaving it generating — and billing — for an answer nobody is
+  reading. `onEnd` still fires on that path, so the partial answer is stored.
