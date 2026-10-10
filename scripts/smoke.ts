@@ -155,11 +155,28 @@ async function waitForData(target: Target, deadline: number) {
   }
 }
 
+/**
+ * JSON with every object's keys sorted. `jsonb` stores keys in its own order;
+ * the IR's parse puts its own fields back in schema order, but a free-form
+ * record (a custom visual's spec, #405) keeps the order it was read in, so
+ * the comparison is of content, not of key order.
+ */
+function canonical(value: unknown): string {
+  return JSON.stringify(value, (_key, v: unknown) =>
+    v && typeof v === "object" && !Array.isArray(v)
+      ? Object.fromEntries(
+          Object.entries(v as Record<string, unknown>).sort(([a], [b]) =>
+            a < b ? -1 : a > b ? 1 : 0,
+          ),
+        )
+      : v,
+  );
+}
+
 function assertCommittedSpec(target: Target, stored: unknown) {
-  const committed = JSON.stringify(target.committed());
-  if (JSON.stringify(stored) !== committed) {
+  if (canonical(stored) !== canonical(target.committed())) {
     throw new Error(
-      `the stored spec of "${target.title}" is not the committed one — src/lib/self-monitoring/ and the seeded dashboard have drifted. Re-seed, or delete the demo dashboard and let the seeder recreate it.`,
+      `the stored spec of "${target.title}" is not the committed one — the committed spec and the seeded dashboard have drifted. Re-seed, or delete the demo dashboard and let the seeder recreate it.`,
     );
   }
 }
