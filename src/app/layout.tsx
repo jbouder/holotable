@@ -76,7 +76,7 @@ export default async function RootLayout({
   return (
     <html
       lang="en"
-      className={`h-full antialiased ${fontSans.variable} ${fontMono.variable}`}
+      className={`h-full antialiased ${embed ? "" : "scroll-pt-14"} ${fontSans.variable} ${fontMono.variable}`}
       data-theme="dark"
       suppressHydrationWarning
     >

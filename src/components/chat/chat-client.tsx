@@ -419,7 +419,7 @@ export function ChatClient({
           <aside
             id="chat-side-panel"
             aria-label="Conversation"
-            className="fade-in self-start border-r border-border pr-4 md:sticky md:top-4 md:max-h-[calc(100vh-6rem)] md:overflow-y-auto"
+            className="fade-in self-start border-r border-border pr-4 md:sticky md:top-18 md:max-h-[calc(100vh-6rem)] md:overflow-y-auto"
           >
             <div className="mb-2 flex justify-end">
               <Button
@@ -439,7 +439,7 @@ export function ChatClient({
           </aside>
         )}
         {wide && !panelOpen && (
-          <div className="self-start md:sticky md:top-4">
+          <div className="self-start md:sticky md:top-18">
             <Button
               variant="ghost"
               size="icon"
