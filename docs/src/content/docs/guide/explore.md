@@ -48,8 +48,9 @@ A query the model wrote in words ("Ran this query") opens the same way.
 ## The side panel
 
 The side panel holds **Sources**, **History** and **Settings**. Press **[** to
-show or hide it; on a phone it opens from the button in the page header, which
-names the sources and the range.
+show or hide it, or use the button at its top (when it is hidden, the button
+stays in a narrow rail on the left). On a phone it opens from the button above
+the conversation, which names the sources and the range.
 
 **History** lists your conversations under Today, Yesterday and Earlier, each
 named after its first question. Rename one, delete one, or **Delete all

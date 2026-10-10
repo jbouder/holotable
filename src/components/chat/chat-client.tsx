@@ -8,6 +8,8 @@ import {
   Database,
   LayoutDashboard,
   PanelLeft,
+  PanelLeftClose,
+  PanelLeftOpen,
   Plus,
   SendHorizontal,
   Square,
@@ -333,6 +335,8 @@ export function ChatClient({
     />
   );
 
+  const toggleTitle = `${wide && panelOpen ? "Hide" : "Show"} the side panel (${CHAT_PANEL_SHORTCUT.key})`;
+
   const header = (
     <PageHeader
       title={initial?.conversation.title || "Explore"}
@@ -340,22 +344,6 @@ export function ChatClient({
       description="Ask about your data in plain English. Answers come back in words, with charts and tables the server ran for you."
       actions={
         <>
-          <Button
-            variant="secondary"
-            size="sm"
-            className="h-8 gap-1.5"
-            aria-expanded={wide ? panelOpen : sheetOpen}
-            aria-controls={wide ? "chat-side-panel" : undefined}
-            onClick={togglePanel}
-            title={`Show or hide the side panel (${CHAT_PANEL_SHORTCUT.key})`}
-          >
-            <PanelLeft className="h-3.5 w-3.5" aria-hidden />
-            <span className="md:hidden">
-              {chosen.length} {chosen.length === 1 ? "source" : "sources"} ·{" "}
-              {timeRangeLabel(timeRange.from)}
-            </span>
-            <span className="max-md:hidden">Side panel</span>
-          </Button>
           <PromptHistoryMenu
             history={prompts}
             disabled={busy}
@@ -419,17 +407,51 @@ export function ChatClient({
       <div
         className={cn(
           "grid min-h-0 flex-1 grid-cols-1 gap-6",
-          wide && panelOpen && "md:grid-cols-[16rem_minmax(0,1fr)]",
+          wide &&
+            (panelOpen
+              ? "md:grid-cols-[16rem_minmax(0,1fr)]"
+              : "md:grid-cols-[2rem_minmax(0,1fr)]"),
         )}
       >
+        {/* The toggle lives with the panel it shows: at the top of the panel
+            when it is open, and as a narrow rail in its place when it is not. */}
         {wide && panelOpen && (
           <aside
             id="chat-side-panel"
             aria-label="Conversation"
             className="fade-in self-start border-r border-border pr-4 md:sticky md:top-4 md:max-h-[calc(100vh-6rem)] md:overflow-y-auto"
           >
+            <div className="mb-2 flex justify-end">
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8"
+                aria-label="Hide side panel"
+                aria-expanded
+                aria-controls="chat-side-panel"
+                onClick={togglePanel}
+                title={toggleTitle}
+              >
+                <PanelLeftClose className="h-4 w-4" aria-hidden />
+              </Button>
+            </div>
             {panel}
           </aside>
+        )}
+        {wide && !panelOpen && (
+          <div className="self-start md:sticky md:top-4">
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-8 w-8"
+              aria-label="Show side panel"
+              aria-expanded={false}
+              onClick={togglePanel}
+              title={toggleTitle}
+            >
+              <PanelLeftOpen className="h-4 w-4" aria-hidden />
+            </Button>
+          </div>
         )}
         {!wide && (
           <Dialog open={sheetOpen} onOpenChange={setSheetOpen} title="Conversation">
@@ -438,6 +460,20 @@ export function ChatClient({
         )}
 
         <div className="flex min-w-0 flex-col gap-4">
+          {!wide && (
+            <Button
+              variant="secondary"
+              size="sm"
+              className="h-8 gap-1.5 self-start"
+              aria-expanded={sheetOpen}
+              onClick={togglePanel}
+              title={toggleTitle}
+            >
+              <PanelLeft className="h-3.5 w-3.5" aria-hidden />
+              {chosen.length} {chosen.length === 1 ? "source" : "sources"} ·{" "}
+              {timeRangeLabel(timeRange.from)}
+            </Button>
+          )}
           <div
             ref={listRef}
             role="log"
