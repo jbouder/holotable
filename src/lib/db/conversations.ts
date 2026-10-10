@@ -60,6 +60,27 @@ export interface ConversationStore {
     retentionDays: number;
   }): Promise<Conversation>;
   get(id: string, userSub: string, retentionDays: number): Promise<Conversation | null>;
+  /**
+   * This person's conversation on a dashboard (#416, phase 6), made on first
+   * use: at most one per person per dashboard. Its sources are the
+   * dashboard's, so it stores none.
+   */
+  forDashboard(input: {
+    id: string;
+    userSub: string;
+    workspaceId: string;
+    dashboardId: string;
+    timeRange: TimeRange;
+    variables?: VariableValues | null;
+    max: number;
+    retentionDays: number;
+  }): Promise<Conversation>;
+  /** This person's conversation on a dashboard, if they have one. */
+  findForDashboard(
+    userSub: string,
+    dashboardId: string,
+    retentionDays: number,
+  ): Promise<Conversation | null>;
   list(input: {
     userSub: string;
     limit: number;
@@ -192,6 +213,58 @@ export function makeConversationStore(deps: {
         );
         return toConversation(row);
       });
+    },
+
+    async forDashboard(input) {
+      const found = await this.findForDashboard(
+        input.userSub,
+        input.dashboardId,
+        input.retentionDays,
+      );
+      if (found) return found;
+      // Past retention the old row still holds the slot; it goes first.
+      await run(
+        `DELETE FROM conversations
+         WHERE user_sub = $1 AND dashboard_id = $2 AND NOT ${live(3)}`,
+        [input.userSub, input.dashboardId, input.retentionDays],
+      );
+      return transaction(async (tx) => {
+        const [row] = await tx<Row>(
+          `INSERT INTO conversations
+             (id, user_sub, workspace_id, source_ids, dashboard_id, time_range, variables)
+           VALUES ($1, $2, $3, '{}', $4, $5::jsonb, $6::jsonb)
+           ON CONFLICT (user_sub, dashboard_id) WHERE dashboard_id IS NOT NULL
+           DO UPDATE SET updated_at = conversations.updated_at
+           RETURNING ${COLUMNS}`,
+          [
+            input.id,
+            input.userSub,
+            input.workspaceId,
+            input.dashboardId,
+            JSON.stringify(input.timeRange),
+            input.variables ? JSON.stringify(input.variables) : null,
+          ],
+        );
+        await tx(
+          `DELETE FROM conversations
+           WHERE user_sub = $1 AND id NOT IN (
+             SELECT id FROM conversations WHERE user_sub = $1
+             ORDER BY updated_at DESC, id DESC
+             LIMIT $2
+           )`,
+          [input.userSub, input.max],
+        );
+        return toConversation(row);
+      });
+    },
+
+    async findForDashboard(userSub, dashboardId, retentionDays) {
+      const [row] = await run<Row>(
+        `SELECT ${COLUMNS} FROM conversations
+         WHERE user_sub = $1 AND dashboard_id = $2 AND ${live(3)}`,
+        [userSub, dashboardId, retentionDays],
+      );
+      return row ? toConversation(row) : null;
     },
 
     async get(id, userSub, retentionDays) {

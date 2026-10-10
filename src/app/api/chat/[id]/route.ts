@@ -7,11 +7,11 @@ import {
   requestedSources,
   SourceIds,
   Title,
-  usableSources,
+  conversationContext,
 } from "@/lib/chat/conversations";
 import { readStoredChatMessage } from "@/lib/chat/persist";
 import { pgConversationStore } from "@/lib/db/conversations";
-import { getSourceById } from "@/lib/db/repo";
+import { getDashboardById, getSourceById } from "@/lib/db/repo";
 import { TimeRange } from "@/lib/ir";
 import { json, readJson, route } from "@/lib/http";
 import { resolveTimeRange } from "@/lib/time";
@@ -42,15 +42,22 @@ export const GET = route("chat.get", async (_req: Request, ctx: Ctx) => {
     identity,
     pgConversationStore,
   );
-  const [stored, { sources, unavailable }] = await Promise.all([
+  const [stored, { sources, unavailable, dashboard }] = await Promise.all([
     pgConversationStore.messages(conversation.id, identity.sub, conversationRetention()),
-    usableSources({ identity, conversation, getSource: getSourceById }),
+    conversationContext({
+      identity,
+      conversation,
+      getSource: getSourceById,
+      getDashboard: getDashboardById,
+    }),
   ]);
   return json({
     conversation,
     // Names only: what the chip shows, never a connection detail.
     sources: sources.map((s) => ({ id: s.id, name: s.name, kind: s.kind })),
     unavailableSourceIds: unavailable,
+    // The dashboard whose chat this continues, by id and title only.
+    dashboard: dashboard ? { id: dashboard.id, title: dashboard.title } : null,
     messages: stored.map(readStoredChatMessage).filter((m) => m !== null),
   });
 });
@@ -73,6 +80,15 @@ export const PATCH = route("chat.update", async (req: Request, ctx: Ctx) => {
     } catch {
       throw new HttpError(400, "invalid time range", {}, "validation");
     }
+  }
+  // A dashboard's conversation queries the dashboard's sources (#416).
+  if (body.sourceIds && conversation.dashboardId) {
+    throw new HttpError(
+      400,
+      "this conversation uses its dashboard's sources; start a new conversation for others",
+      {},
+      "validation",
+    );
   }
   const sourceIds = body.sourceIds
     ? (

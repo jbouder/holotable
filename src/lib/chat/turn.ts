@@ -7,7 +7,7 @@ import { providerHttpError } from "@/lib/ai/provider-error";
 import { audit } from "@/lib/audit";
 import type { Identity } from "@/lib/auth/claims";
 import { conversationScope, conversationTitle } from "@/lib/chat/conversations";
-import type { TimeRange } from "@/lib/ir";
+import type { Dashboard, TimeRange } from "@/lib/ir";
 import { enforceLlmLimits } from "@/lib/limits/llm";
 import { log } from "@/lib/log";
 import { recordLlmRepair } from "@/lib/metrics";
@@ -38,6 +38,8 @@ export async function chatTurnResponse(input: {
   messages: UIMessage[];
   /** The kept conversation, for the audit rows; absent when nothing is kept. */
   conversationId?: string;
+  /** The dashboard whose chat this continues: its panels go in the prompt. */
+  dashboard?: { id: string; spec: Dashboard };
   abortSignal: AbortSignal;
   onEnd?: (messages: UIMessage[]) => Promise<void>;
 }): Promise<Response> {
@@ -59,7 +61,10 @@ export async function chatTurnResponse(input: {
   const catalog = sources.map((s) => serverKind(s).catalogPrompt(s)).join("\n\n");
   const question = messages.at(-1);
   const promptText = (question && conversationTitle(question)) ?? "";
-  const where = conversationId ? { conversationId } : { kept: false };
+  const where = {
+    ...(conversationId ? { conversationId } : { kept: false }),
+    ...(input.dashboard ? { dashboardId: input.dashboard.id } : {}),
+  };
 
   audit({
     actor: identity,
@@ -76,11 +81,18 @@ export async function chatTurnResponse(input: {
   });
 
   const result = await streamDataChat({
-    system: buildDataChatPrompt({ sources, timeRange: input.timeRange, workspacePrompt }),
+    system: buildDataChatPrompt({
+      sources,
+      timeRange: input.timeRange,
+      workspacePrompt,
+      ...(input.dashboard ? { dashboard: { spec: input.dashboard.spec } } : {}),
+    }),
     scope: conversationScope(
       { timeRange: input.timeRange, variables: input.variables ?? null },
       sources,
       identity,
+      input.timeRange,
+      input.dashboard?.spec,
     ),
     model: resolved.model,
     messages,

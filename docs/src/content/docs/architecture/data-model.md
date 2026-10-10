@@ -138,6 +138,8 @@ back at the row.
 
 ### `chat_messages`
 
+**Superseded** (#416): migration 020 copied every row into `conversations` and `conversation_messages`, the dashboard chat now reads and writes those, and a later migration drops this table. Until then it is read by nothing.
+
 One dashboard-chat message: the SDK's own `id`, `dashboard_id`, `user_sub`,
 `role`, and the whole message as `jsonb` in `content`. The primary key is
 `(dashboard_id, user_sub, id)` — the id is unique per *conversation*, and the
@@ -167,6 +169,8 @@ One person's Chat conversation (#416): `id`, `user_sub`, `workspace_id`,
 DELETE SET NULL`), `title`, `time_range` (an IR `TimeRange`), `variables` and
 the two timestamps. Personal like `user_preferences`: every statement filters
 on `user_sub` from the session, and no route reads another person's.
+
+A conversation with a `dashboard_id` continues that dashboard's chat: at most one per person per dashboard (a partial unique index), with no `source_ids` of its own; its sources are the dashboard's, re-resolved from the current spec on every turn.
 
 Nothing in a row is authorization. `source_ids` are re-resolved and
 re-authorized on every turn and every panel run; `workspace_id` is derived from

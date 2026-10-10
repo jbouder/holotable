@@ -379,7 +379,7 @@ request:
 | `src/components/editor/` (an inspector section), `src/lib/link-form.ts` | `guide/editing-a-dashboard.md` |
 | `src/lib/editor/`, `src/lib/panel-starter.ts`, `src/lib/preview-runs.ts` | "What the editor holds before a save" in `concepts/executing-a-panel.md` |
 | `src/components/dashboard/LiveDashboard.tsx`, `src/lib/connection.ts`, the time picker, a panel's menu | `guide/viewing-a-dashboard.md`, the viewer sections of `concepts/streaming-and-rendering.md` |
-| `src/lib/ai/chat.ts`, `src/app/api/dashboards/[id]/chat/` | `guide/dashboard-chat.md`, "Dashboard chat" in `concepts/generating-a-panel.md` |
+| `src/lib/ai/chat.ts`, `src/app/api/dashboards/[id]/chat/` | "Dashboard chat" in `concepts/generating-a-panel.md` |
 | `src/lib/ai/data-chat.ts`, `src/lib/chat/`, `src/app/api/chat/`, `src/components/chat/` | `guide/chat.md`, "Chat" in `concepts/generating-a-panel.md`, the Chat rows in `reference/api-routes.md` and `operations/audit-log.md`, `architecture/data-model.md` |
 | `src/components/command-palette.tsx`, `src/lib/command-palette.ts`, `/api/search` | `guide/viewing-a-dashboard.md`, "Search and the command palette" in `architecture/authorization.md` |
 | `src/lib/config.ts` (a variable) | The configuration reference is generated; a startup rule goes in `operations/startup-validation.md`, and the variable in `.env.example` |

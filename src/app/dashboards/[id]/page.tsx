@@ -88,7 +88,7 @@ export default async function DashboardViewPage({
 
   return (
     // The provider lets a panel's "Ask about this panel" open the chat (#366).
-    <DashboardChatProvider>
+    <DashboardChatProvider dashboardId={dashboard.id}>
       <div>
         <LiveDashboard
           dashboardId={id}

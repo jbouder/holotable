@@ -9,11 +9,11 @@ import {
   requireUsable,
   runStoredPanel,
   storedPanel,
-  usableSources,
+  conversationContext,
 } from "@/lib/chat/conversations";
 import { PANEL_UNAVAILABLE, readStoredChatMessage } from "@/lib/chat/persist";
 import { pgConversationStore } from "@/lib/db/conversations";
-import { getSourceById } from "@/lib/db/repo";
+import { getDashboardById, getSourceById } from "@/lib/db/repo";
 import { json, readJson, route } from "@/lib/http";
 import { queryStatement } from "@/lib/ir";
 import { rowFilterHttpError } from "@/lib/row-scope";
@@ -55,10 +55,11 @@ export const POST = route(
     );
     if (!panel) throw new HttpError(404, PANEL_UNAVAILABLE);
 
-    const { sources } = await usableSources({
+    const { sources, dashboard } = await conversationContext({
       identity,
       conversation,
       getSource: getSourceById,
+      getDashboard: getDashboardById,
     });
     requireUsable(sources);
     const sourceId = panel.query.sourceId;
@@ -66,7 +67,13 @@ export const POST = route(
     try {
       const run = await runStoredPanel({
         panel,
-        scope: conversationScope(conversation, sources, identity, timeRange),
+        scope: conversationScope(
+          conversation,
+          sources,
+          identity,
+          timeRange,
+          dashboard?.spec,
+        ),
         onQuery: (outcome, stage) =>
           audit({
             actor: identity,

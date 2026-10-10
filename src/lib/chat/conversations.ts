@@ -11,7 +11,15 @@ import type {
 } from "@/lib/db/conversations";
 import { chatPanelSpec, panelIdOf, SHOW_PANEL_PART } from "@/lib/chat/panel";
 import { config } from "@/lib/config";
-import { type QueryPanel, SqlQuery, TimeRange } from "@/lib/ir";
+import {
+  type Dashboard,
+  declaredVariables,
+  type QueryPanel,
+  SqlQuery,
+  TimeRange,
+} from "@/lib/ir";
+import { resolveChatSources } from "@/lib/ai/chat";
+import { chatVariableValues } from "@/lib/ai/dashboard-context";
 import type { SourceRecord } from "@/lib/registry";
 import { QueryExecutionError } from "@/lib/sources/execution";
 import { serverKind } from "@/lib/sources/server/registry";
@@ -198,21 +206,78 @@ export function requireUsable(sources: readonly SourceRecord[]): void {
   }
 }
 
-/** What a conversation's queries run under, on the server. */
+/**
+ * What a conversation's queries run under, on the server. One that continues
+ * a dashboard's chat may reference the dashboard's variables (#67), bound to
+ * the picks it carried over or else the dashboard's defaults.
+ */
 export function conversationScope(
   conversation: Pick<Conversation, "variables" | "timeRange">,
   sources: SourceRecord[],
   identity: Identity,
   timeRange: TimeRange = conversation.timeRange,
+  dashboard?: Dashboard,
 ): ChatScope {
-  const variables = conversation.variables ?? {};
+  const variables =
+    conversation.variables ?? (dashboard ? chatVariableValues(dashboard) : {});
   return {
     sources,
     timeRange,
     identity,
-    declaredVariables: new Set(Object.keys(variables)),
+    declaredVariables: dashboard
+      ? declaredVariables(dashboard)
+      : new Set(Object.keys(variables)),
     variables,
     where: "in this conversation",
+  };
+}
+
+/** What a conversation runs against now: its sources, and its dashboard if any. */
+export interface ConversationContext {
+  sources: SourceRecord[];
+  /** Ids the caller can no longer use; a missing dashboard is named by its id. */
+  unavailable: string[];
+  /** The dashboard it continues the chat of, when the caller may still view it. */
+  dashboard: { id: string; title: string; spec: Dashboard } | null;
+}
+
+/**
+ * The sources a conversation may query now. A plain conversation's are its
+ * own, re-resolved (`usableSources`). One that continues a dashboard's chat
+ * (#416, phase 6) has the dashboard's, as the dashboard chat does: the
+ * sources its panels reference that the caller may use, with
+ * `dashboard:view` re-checked. A dashboard gone or no longer viewable leaves
+ * the conversation read-only.
+ */
+export async function conversationContext(input: {
+  identity: Identity;
+  conversation: Pick<Conversation, "sourceIds" | "workspaceId" | "dashboardId">;
+  getSource: GetSource;
+  getDashboard: (
+    id: string,
+  ) => Promise<{ id: string; workspaceId: string; spec: Dashboard } | null>;
+}): Promise<ConversationContext> {
+  const { identity, conversation } = input;
+  if (!conversation.dashboardId) {
+    return { ...(await usableSources(input)), dashboard: null };
+  }
+  const record = await input.getDashboard(conversation.dashboardId);
+  if (
+    !record ||
+    record.workspaceId !== conversation.workspaceId ||
+    !can(identity, "dashboard:view", { workspaceId: record.workspaceId })
+  ) {
+    return { sources: [], unavailable: [conversation.dashboardId], dashboard: null };
+  }
+  const sources = await resolveChatSources({
+    identity,
+    dashboard: record.spec,
+    getSource: input.getSource,
+  });
+  return {
+    sources,
+    unavailable: [],
+    dashboard: { id: record.id, title: record.spec.title, spec: record.spec },
   };
 }
 

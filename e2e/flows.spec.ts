@@ -153,6 +153,35 @@ test("new dashboard: Start over asks, then clears every version", async ({ page 
   await expect(page.getByRole("button", { name: /Start from a template/ })).toBeVisible();
 });
 
+test("Open in Chat continues the dashboard's conversation on its own page", async ({
+  page,
+  request,
+}) => {
+  await page.goto(`/dashboards/${await dashboardId(request, DEMO_DASHBOARD)}`);
+  await page.getByRole("button", { name: "Ask about this dashboard" }).click();
+  const chat = page.getByRole("dialog", { name: "Dashboard chat" });
+  const clear = chat.getByRole("button", { name: "Clear chat" });
+  if (await clear.isVisible()) await clear.click();
+  await chat
+    .getByRole("textbox", { name: "Message" })
+    .fill("What does this dashboard show?");
+  await chat.getByRole("button", { name: "Send" }).click();
+  await expect(chat.getByText(STUB_CHAT_REPLY)).toBeVisible();
+
+  await chat.getByRole("button", { name: "Open in Chat" }).click();
+  await expect(page).toHaveURL(/\/chat\/[0-9a-f-]{36}$/);
+  // The same conversation, its dashboard named, and a link back.
+  await expect(page.getByText("What does this dashboard show?").first()).toBeVisible();
+  await expect(page.getByText(STUB_CHAT_REPLY)).toBeVisible();
+  await expect(page.getByRole("link", { name: `From ${DEMO_DASHBOARD}` })).toBeVisible();
+
+  // A follow-up there draws a panel over the dashboard's own source.
+  await page.getByRole("textbox", { name: "Message" }).fill("Which service is busiest?");
+  await page.keyboard.press("Enter");
+  const table = page.getByRole("region", { name: "Requests by service, table" });
+  await expect(table.getByRole("cell", { name: "api", exact: true })).toBeVisible();
+});
+
 test("dashboard chat answers in the panel", async ({ page, request }) => {
   // A window that is not the dashboard's own, so the URL carries it (#366).
   await page.goto(

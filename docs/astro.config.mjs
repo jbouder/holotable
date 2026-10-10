@@ -25,6 +25,8 @@ export default defineConfig({
     "/concepts/annotations/": "/guide/annotations/",
     "/concepts/drilldown/": "/guide/drilldown/",
     "/getting-started/settings/": "/guide/settings/",
+    // The dashboard chat guide was folded into Chat (#416).
+    "/guide/dashboard-chat/": "/guide/chat/#beside-a-dashboard",
     "/operations/share-links/": "/integrations/share-links/",
     "/operations/api-tokens/": "/integrations/api-tokens/",
     "/operations/mcp/": "/integrations/mcp/",
@@ -94,7 +96,6 @@ export default defineConfig({
             { label: "Viewing a dashboard", slug: "guide/viewing-a-dashboard" },
             { label: "Editing a dashboard", slug: "guide/editing-a-dashboard" },
             { label: "Chat", slug: "guide/chat" },
-            { label: "Dashboard chat", slug: "guide/dashboard-chat" },
             { label: "Dashboard variables", slug: "guide/variables" },
             { label: "Annotations", slug: "guide/annotations" },
             { label: "Drilldown", slug: "guide/drilldown" },

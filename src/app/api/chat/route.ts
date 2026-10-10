@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { z } from "zod";
 import { audit } from "@/lib/audit";
-import { HttpError, requireIdentity } from "@/lib/auth/authorize";
+import { assertAuthorized, HttpError, requireIdentity } from "@/lib/auth/authorize";
 import {
   CONVERSATIONS_PAGE,
   ConversationId,
@@ -10,7 +10,7 @@ import {
 } from "@/lib/chat/conversations";
 import { config } from "@/lib/config";
 import { pgConversationStore } from "@/lib/db/conversations";
-import { getSourceById } from "@/lib/db/repo";
+import { getDashboardById, getSourceById } from "@/lib/db/repo";
 import { TimeRange } from "@/lib/ir";
 import { json, readJson, route } from "@/lib/http";
 import { requestPreferences } from "@/lib/preferences-server";
@@ -18,12 +18,22 @@ import { resolveTimeRange } from "@/lib/time";
 
 export const runtime = "nodejs";
 
-const CreateBody = z
-  .object({
-    sourceIds: SourceIds,
-    timeRange: TimeRange.default({ from: "now-1h", to: "now" }),
-  })
-  .strict();
+const CreateBody = z.union([
+  z
+    .object({
+      sourceIds: SourceIds,
+      timeRange: TimeRange.default({ from: "now-1h", to: "now" }),
+    })
+    .strict(),
+  // Continue a dashboard's chat (#416, phase 6): this person's one
+  // conversation on it, made on first use, over the dashboard's sources.
+  z
+    .object({
+      dashboardId: z.uuid(),
+      timeRange: TimeRange.optional(),
+    })
+    .strict(),
+]);
 
 /** The `after` cursor of the history list: the last row's `updatedAt` and id. */
 const Cursor = z.object({ updatedAt: z.iso.datetime(), id: ConversationId });
@@ -76,10 +86,39 @@ export const POST = route("chat.create", async (req: Request) => {
       "conversations are not kept for you; turn on Keep my conversations to save one",
     );
   }
-  try {
-    resolveTimeRange(body.timeRange);
-  } catch {
-    throw new HttpError(400, "invalid time range", {}, "validation");
+  if (body.timeRange) {
+    try {
+      resolveTimeRange(body.timeRange);
+    } catch {
+      throw new HttpError(400, "invalid time range", {}, "validation");
+    }
+  }
+  if ("dashboardId" in body) {
+    const dashboard = await getDashboardById(body.dashboardId);
+    if (!dashboard) throw new HttpError(404, "dashboard not found");
+    assertAuthorized(
+      identity,
+      "dashboard:view",
+      { workspaceId: dashboard.workspaceId },
+      { type: "dashboard", id: dashboard.id },
+    );
+    const conversation = await pgConversationStore.forDashboard({
+      id: randomUUID(),
+      userSub: identity.sub,
+      workspaceId: dashboard.workspaceId,
+      dashboardId: dashboard.id,
+      timeRange: body.timeRange ?? dashboard.spec.timeRange,
+      max: config.chatConversationsMax,
+      retentionDays: config.chatHistoryRetentionDays,
+    });
+    audit({
+      actor: identity,
+      action: "chat.create",
+      workspaceId: dashboard.workspaceId,
+      resource: { type: "conversation", id: conversation.id },
+      detail: { dashboardId: dashboard.id, timeRange: conversation.timeRange },
+    });
+    return json({ conversation });
   }
   const { workspaceId, sources } = await requestedSources({
     identity,

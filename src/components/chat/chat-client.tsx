@@ -3,7 +3,15 @@
 import * as React from "react";
 import { useChat } from "@ai-sdk/react";
 import { DefaultChatTransport, type UIMessage } from "ai";
-import { Database, PanelLeft, Plus, SendHorizontal, Square } from "lucide-react";
+import Link from "next/link";
+import {
+  Database,
+  LayoutDashboard,
+  PanelLeft,
+  Plus,
+  SendHorizontal,
+  Square,
+} from "lucide-react";
 import type { EffectiveModel } from "@/lib/ai/model-config";
 import { AiUnavailable } from "@/components/ai-unavailable";
 import { WorkingStatus } from "@/components/composing";
@@ -36,6 +44,7 @@ import { useShortcuts } from "@/lib/editor/use-shortcuts";
 import { type ApiError, apiErrorFromThrown } from "@/lib/errors";
 import { timeRangeLabel } from "@/lib/chat/defaults";
 import type { TimeRange } from "@/lib/ir";
+import type { VariableValues } from "@/lib/sql/variables";
 import type { ChatPreferences } from "@/lib/preferences";
 import { CHAT_PANEL_SHORTCUT } from "@/lib/shortcuts";
 import { cn } from "@/lib/utils";
@@ -55,6 +64,14 @@ export interface InitialConversation {
   };
   messages: UIMessage[];
   unavailableSourceIds: string[];
+  /**
+   * The dashboard whose chat this conversation continues (#416, phase 6): a
+   * link back, and the picks it carries, shown read-only. Its sources are the
+   * dashboard's and cannot be changed here.
+   */
+  dashboard?: { id: string; title: string; picks: VariableValues };
+  /** The question box's starting text ("Ask in Chat" about a panel). */
+  draft?: string;
 }
 
 /** Whether the viewport is at least `md`, where the side panel is an `aside`. */
@@ -114,7 +131,7 @@ export function ChatClient({
     initial?.conversation.timeRange ?? { from: defaultFrom, to: "now" },
   );
   const [prefs, setPrefs] = React.useState(chatPrefs);
-  const [text, setText] = React.useState("");
+  const [text, setText] = React.useState(initial?.draft ?? "");
   const [setupError, setSetupError] = React.useState<ApiError | null>(null);
   const [panelOpen, setPanelOpen] = React.useState(true);
   const [sheetOpen, setSheetOpen] = React.useState(false);
@@ -134,9 +151,12 @@ export function ChatClient({
   // Recent questions in this workspace, when this person keeps them (#83).
   const prompts = usePromptHistory(workspaceId, "chat");
   const unavailable = initial?.unavailableSourceIds ?? [];
+  const fromDashboard = initial?.dashboard;
   const readOnly =
     initial !== undefined &&
-    initial.conversation.sourceIds.every((id) => unavailable.includes(id));
+    (fromDashboard
+      ? unavailable.length > 0 || initial.conversation.sourceIds.length === 0
+      : initial.conversation.sourceIds.every((id) => unavailable.includes(id)));
 
   // What the transport reads when it sends, so these are refs, not state.
   const sendRef = React.useRef({ selected, timeRange });
@@ -247,7 +267,7 @@ export function ChatClient({
 
   async function toggleSource(id: string, on: boolean) {
     const source = sources.find((s) => s.id === id);
-    if (!source) return;
+    if (!source || fromDashboard) return;
     let next: string[];
     if (!on) next = selected.filter((s) => s !== id);
     else if (source.workspaceId !== workspaceId) next = [id];
@@ -285,7 +305,12 @@ export function ChatClient({
       selected={selected}
       workspaceId={workspaceId}
       conversationId={conversationId}
-      busy={busy}
+      busy={busy || Boolean(fromDashboard)}
+      sourcesNote={
+        fromDashboard
+          ? `The sources of ${fromDashboard.title}, as its chat uses them.`
+          : undefined
+      }
       onToggleSource={(id, on) => void toggleSource(id, on)}
       timeRange={timeRange.from}
       onTimeRange={(from) => void changeRange(from)}
@@ -357,6 +382,27 @@ export function ChatClient({
   return (
     <div className="flex w-full flex-1 flex-col gap-4">
       {header}
+      {fromDashboard && (
+        <div className="flex flex-wrap items-center gap-2 text-xs">
+          <Link
+            href={`/dashboards/${fromDashboard.id}`}
+            className="inline-flex items-center gap-1.5 border border-border bg-surface px-2 py-1 text-foreground hover:border-primary"
+          >
+            <LayoutDashboard className="h-3.5 w-3.5 text-muted" aria-hidden />
+            From {fromDashboard.title}
+          </Link>
+          {Object.entries(fromDashboard.picks).map(([name, value]) => (
+            <span
+              key={name}
+              className="border border-border bg-surface-2 px-2 py-1 text-muted"
+              title="Set on the dashboard; change it there"
+            >
+              {name} ={" "}
+              <span className="text-foreground">{[value].flat().join(", ")}</span>
+            </span>
+          ))}
+        </div>
+      )}
       <div
         className={cn(
           "grid min-h-0 flex-1 grid-cols-1 gap-6",
@@ -422,9 +468,11 @@ export function ChatClient({
           <div className="sticky bottom-0 space-y-2 border-t border-border bg-background pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
             {unavailable.length > 0 && (
               <p className="text-sm text-muted">
-                {readOnly
-                  ? "None of this conversation's sources is available to you any more. It is read-only."
-                  : `Not available to you any more: ${unavailable.join(", ")}.`}
+                {readOnly && fromDashboard
+                  ? "This conversation's dashboard is no longer available to you. It is read-only."
+                  : readOnly
+                    ? "None of this conversation's sources is available to you any more. It is read-only."
+                    : `Not available to you any more: ${unavailable.join(", ")}.`}
               </p>
             )}
             {primary && (

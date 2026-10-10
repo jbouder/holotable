@@ -372,7 +372,7 @@ source of truth for real columns.
 
 ## Dashboard chat
 
-The chat beside a dashboard ([Dashboard chat](/guide/dashboard-chat/)) is a
+The chat beside a dashboard ([Dashboard chat](/guide/chat/#beside-a-dashboard)) is a
 **read-only** assistant scoped to one dashboard (`src/lib/ai/chat.ts`,
 `src/app/api/dashboards/[id]/chat/route.ts`). It reasons over the panel specs
 first and may escalate to fetching fresh data through a guarded `runQuery`

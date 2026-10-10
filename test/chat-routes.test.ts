@@ -4,7 +4,10 @@ import { readFileSync } from "node:fs";
 import type { UIMessage } from "ai";
 import { chatSource, recordingExecutor } from "./support/chat";
 import { sqlPlanOf } from "./support/plans";
+import { buildDataChatPrompt } from "@/lib/ai/data-chat";
+import type { Dashboard } from "@/lib/ir";
 import {
+  conversationContext,
   conversationScope,
   conversationTitle,
   ownConversation,
@@ -356,4 +359,94 @@ test("a stored panel is checked against the catalog as it is now", async () => {
   assert.equal(await status(refused), 400);
   assert.equal(exec.plans.length, 0);
   assert.deepEqual(outcomes, ["failure:validate"]);
+});
+
+/* --- A conversation that continues a dashboard's chat (#416, phase 6) ------ */
+
+const board = {
+  id: "0d8f5a3e-0000-4000-8000-000000000001",
+  workspaceId: "ws-1",
+  spec: {
+    specVersion: 1,
+    title: "Traffic",
+    timeRange: { from: "now-1h", to: "now" },
+    refreshIntervalMs: 15_000,
+    variables: [
+      { name: "service", label: "Service", type: "enum", values: ["api", "web"] },
+    ],
+    panels: [
+      {
+        id: "p1",
+        title: "Requests",
+        viz: "table",
+        query: {
+          sourceId: "src-metrics",
+          sql: "SELECT service, count(*) FROM http_requests WHERE service = :service GROUP BY service",
+        },
+        layout: { x: 0, y: 0, w: 12, h: 4 },
+      },
+    ],
+  },
+} as unknown as { id: string; workspaceId: string; spec: Dashboard };
+
+const onBoard = { workspaceId: "ws-1", sourceIds: [], dashboardId: board.id };
+const getDashboard = async (id: string) => (id === board.id ? board : null);
+
+test("a dashboard's conversation queries the dashboard's sources, not its own list", async () => {
+  const context = await conversationContext({
+    identity: alice,
+    conversation: onBoard,
+    getSource,
+    getDashboard,
+  });
+  assert.deepEqual(
+    context.sources.map((s) => s.id),
+    ["src-metrics"],
+  );
+  assert.equal(context.dashboard?.title, "Traffic");
+  // Its queries may use the dashboard's variables, bound to the defaults.
+  const scope = conversationScope(
+    { timeRange: board.spec.timeRange, variables: null },
+    context.sources,
+    alice,
+    undefined,
+    context.dashboard?.spec,
+  );
+  assert.deepEqual([...(scope.declaredVariables ?? [])], ["service"]);
+  assert.deepEqual(scope.variables, { service: "api" });
+});
+
+test("a dashboard gone, moved or out of reach leaves its conversation read-only", async () => {
+  for (const [identity, getter] of [
+    [alice, async () => null],
+    [alice, async () => ({ ...board, workspaceId: "ws-2" })],
+    [outsider, getDashboard],
+  ] as const) {
+    const context = await conversationContext({
+      identity,
+      conversation: onBoard,
+      getSource,
+      getDashboard: getter,
+    });
+    assert.deepEqual(context.sources, []);
+    assert.equal(context.dashboard, null);
+    assert.deepEqual(context.unavailable, [board.id]);
+  }
+});
+
+test("the Chat prompt carries a dashboard's panels and variables, fenced", () => {
+  const prompt = buildDataChatPrompt({
+    sources: [metrics],
+    timeRange: board.spec.timeRange,
+    dashboard: { spec: board.spec },
+  });
+  assert.match(prompt, /continues the chat on the dashboard "Traffic"/);
+  assert.match(prompt, /PANELS/);
+  assert.match(prompt, /panel "p1" — Requests/);
+  assert.match(prompt, /Variables a query may reference as :name/);
+  // Without a dashboard, none of it.
+  assert.doesNotMatch(
+    buildDataChatPrompt({ sources: [metrics], timeRange: board.spec.timeRange }),
+    /PANELS/,
+  );
 });

@@ -211,3 +211,44 @@ test("the generation log takes a chat row", needsDb, async () => {
   assert.ok(row.id);
   await query("DELETE FROM generation_log WHERE id = $1", [row.id]);
 });
+
+test(
+  "a dashboard has one conversation per person, made on first use",
+  needsDb,
+  async () => {
+    const owner = unique("erin");
+    const [d] = await query<{ id: string }>(
+      `INSERT INTO dashboards (workspace_id, title, created_by)
+     VALUES ($1, 'Chat board', $2) RETURNING id`,
+      [WS, owner],
+    );
+    try {
+      const make = () =>
+        store.forDashboard({
+          id: randomUUID(),
+          userSub: owner,
+          workspaceId: WS,
+          dashboardId: d.id,
+          timeRange: RANGE,
+          variables: { service: "api" },
+          max: 200,
+          retentionDays: 30,
+        });
+      const first = await make();
+      const again = await make();
+      assert.equal(again.id, first.id);
+      assert.equal(first.dashboardId, d.id);
+      assert.deepEqual(first.sourceIds, []);
+      assert.deepEqual(first.variables, { service: "api" });
+      assert.equal((await store.findForDashboard(owner, d.id, 30))?.id, first.id);
+      // Someone else's is their own.
+      assert.equal(await store.findForDashboard(ALICE, d.id, 30), null);
+      // Deleting the dashboard keeps the conversation, now unattached.
+      await query("DELETE FROM dashboards WHERE id = $1", [d.id]);
+      assert.equal((await store.get(first.id, owner, 30))?.dashboardId, null);
+    } finally {
+      await query("DELETE FROM conversations WHERE user_sub = $1", [owner]);
+      await query("DELETE FROM dashboards WHERE id = $1", [d.id]);
+    }
+  },
+);

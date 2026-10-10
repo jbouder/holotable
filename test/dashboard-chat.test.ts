@@ -265,3 +265,14 @@ test("a range the server cannot resolve is refused, not thrown", async () => {
   });
   assert.equal(r.ok, false);
 });
+
+test("the dashboard chat's prompt carries the workspace's context (#66)", () => {
+  const prompt = buildSystemPrompt(dashboard, [source], undefined, {
+    glossary: "SLO: the target we promise",
+    metricDefinitions: [],
+    examples: [],
+  });
+  assert.match(prompt, /WORKSPACE_CONTEXT/);
+  assert.match(prompt, /SLO: the target we promise/);
+  assert.doesNotMatch(buildSystemPrompt(dashboard, [source]), /WORKSPACE_CONTEXT/);
+});

@@ -38,9 +38,9 @@ names one that exists.
 | `/api/dashboards/[id]/shares/[shareId]` | DELETE | editor | Revoke a share link at once; its open streams close |
 | `/api/dashboards/[id]/annotations` | GET | viewer | The [annotations](/guide/annotations/) the dashboard shows for `from`/`to` (its own range by default), from the dashboard's own workspace only, honoring its `annotations` setting |
 | `/api/dashboards/[id]/panels/[panelId]/retry` | POST | viewer | Runs a panel the poller is backing off from now instead of at its `retryAt`, on every poller showing the dashboard. Refused (`started: 0`) for a panel that is not backing off or within `MIN_REFRESH_INTERVAL_MS` of its last attempt. The result arrives on the stream |
-| `/api/dashboards/[id]/chat` | POST | viewer | Read-only chat with a guarded `runQuery` tool. Rate limited and budgeted. The turn is persisted for the **caller's own** subject and the request's abort signal cancels the model call |
-| `/api/dashboards/[id]/chat` | GET | viewer | The caller's own stored conversation on this dashboard, bounded by `CHAT_HISTORY_MAX_MESSAGES` / `CHAT_HISTORY_RETENTION_DAYS`. The subject comes from the session, never from the request |
-| `/api/dashboards/[id]/chat` | DELETE | viewer | Forget the caller's own conversation on this dashboard. Nobody else's |
+| `/api/dashboards/[id]/chat` | POST | viewer | Read-only chat with a guarded `runQuery` tool. Rate limited and budgeted. The turn is kept in the **caller's own** [Chat conversation](/guide/chat/#beside-a-dashboard) for this dashboard (made on the first turn; nothing kept when they keep no conversations), and the request's abort signal cancels the model call |
+| `/api/dashboards/[id]/chat` | GET | viewer | The caller's own conversation on this dashboard, bounded by `CHAT_HISTORY_MAX_MESSAGES` / `CHAT_HISTORY_RETENTION_DAYS`, and its `conversationId` for Open in Chat. The subject comes from the session, never from the request |
+| `/api/dashboards/[id]/chat` | DELETE | viewer | Delete the caller's own conversation on this dashboard. Nobody else's |
 
 ## Templates
 
@@ -82,7 +82,7 @@ A share link reaches none of them.
 | Route | Method | Min role | Notes |
 | --- | --- | --- | --- |
 | `/api/chat` | GET | signed in | The caller's conversations, most recently used first, 50 a page; `?after=` is the previous page's `next`. Conversations past `CHAT_HISTORY_RETENTION_DAYS` are not listed |
-| `/api/chat` | POST | viewer | Start a conversation: `{ sourceIds, timeRange }`. Each source needs `source:use`; all must be in one workspace, which is the conversation's, and at most three. Past `CHAT_CONVERSATIONS_MAX` the caller's least recently used conversation is deleted. A `409` when the caller turned **Keep my conversations** off |
+| `/api/chat` | POST | viewer | Start a conversation: `{ sourceIds, timeRange }`, or `{ dashboardId, timeRange? }` for the caller's one conversation on a dashboard they may view (made on first use, over the dashboard's sources; Open in Chat and Ask in Chat). Each source needs `source:use`; all must be in one workspace, which is the conversation's, and at most three. Past `CHAT_CONVERSATIONS_MAX` the caller's least recently used conversation is deleted. A `409` when the caller turned **Keep my conversations** off |
 | `/api/chat` | DELETE | signed in | Delete every one of the caller's conversations, at once |
 | `/api/chat/[id]` | GET | owner | The conversation and its messages. A drawn panel's rows are never stored, so the page runs each panel again; `unavailableSourceIds` names the sources the caller can no longer use |
 | `/api/chat/[id]` | PATCH | owner | Rename it (`title`), or change its `sourceIds` (re-authorized, same workspace) or `timeRange` |

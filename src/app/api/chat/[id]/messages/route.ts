@@ -7,12 +7,12 @@ import {
   ownConversation,
   requireUsable,
   TurnBody,
-  usableSources,
+  conversationContext,
 } from "@/lib/chat/conversations";
 import { persistableMessage, readStoredChatMessage } from "@/lib/chat/persist";
 import { chatTurnResponse } from "@/lib/chat/turn";
 import { pgConversationStore } from "@/lib/db/conversations";
-import { getSourceById } from "@/lib/db/repo";
+import { getDashboardById, getSourceById } from "@/lib/db/repo";
 import { readJson, route } from "@/lib/http";
 
 export const runtime = "nodejs";
@@ -35,10 +35,11 @@ export const POST = route(
       identity,
       pgConversationStore,
     );
-    const { sources } = await usableSources({
+    const { sources, dashboard } = await conversationContext({
       identity,
       conversation,
       getSource: getSourceById,
+      getDashboard: getDashboardById,
     });
     requireUsable(sources);
     const body = await readJson(req, TurnBody);
@@ -61,6 +62,7 @@ export const POST = route(
       variables: conversation.variables,
       messages: [...history.filter((m) => m.id !== question.id), question],
       conversationId: conversation.id,
+      ...(dashboard ? { dashboard: { id: dashboard.id, spec: dashboard.spec } } : {}),
       abortSignal: req.signal,
       onEnd: (finished) =>
         pgConversationStore.append({
