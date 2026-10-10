@@ -74,6 +74,7 @@
               "histogram",
               "logs",
               "treemap",
+              "vega",
               "text"
             ]
           },
@@ -901,6 +902,20 @@
                     "type": "boolean"
                   }
                 },
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "spec": {
+                    "type": "object",
+                    "propertyNames": {
+                      "type": "string"
+                    },
+                    "additionalProperties": {}
+                  }
+                },
+                "required": ["spec"],
                 "additionalProperties": false
               },
               {

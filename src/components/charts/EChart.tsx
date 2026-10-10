@@ -20,8 +20,9 @@ export interface EChartHandle {
    * `backgroundColor` is given rather than defaulted because the canvas is
    * transparent: exported without one, the picture is a dark theme's chart on
    * whatever the viewer's image tool puts behind it, which is usually white.
+   * A custom visual (#405) draws asynchronously, so it may answer later.
    */
-  toPng(backgroundColor: string): string | null;
+  toPng(backgroundColor: string): string | null | Promise<string | null>;
 }
 
 /**

@@ -204,6 +204,14 @@ const CASES: Record<VizType, Case> = {
     click: { dataIndex: 0, name: "web-01" },
     expect: { row: { host: "web-01", cpu: 40 }, series: "web-01" },
   },
+  vega: {
+    panel: panel("vega", {
+      options: { spec: { data: { name: "rows" }, mark: "point" } },
+    }),
+    data: SERIES,
+    click: { dataIndex: 0 },
+    expect: null,
+  },
   text: {
     panel: {
       id: "t",

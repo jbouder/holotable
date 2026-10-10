@@ -20,6 +20,7 @@ import { StatView } from "@/components/panels/stat";
 import { StatusGridView } from "@/components/panels/status-grid";
 import { TableView } from "@/components/panels/table";
 import { TextView } from "@/components/panels/text";
+import { VegaView } from "@/components/panels/vega";
 import type { PanelRenderer } from "@/components/panels/types";
 import type { VizType } from "@/lib/ir";
 
@@ -51,6 +52,7 @@ export const PANEL_RENDERERS = {
   histogram: { type: "chart", option: histogramChart, shape: histogramShape },
   logs: { type: "html", Body: LogsView },
   treemap: { type: "chart", option: treemapChart, shape: treemapShape },
+  vega: { type: "view", Body: VegaView },
   text: { type: "html", Body: TextView },
 } as const satisfies Record<VizType, PanelRenderer>;
 

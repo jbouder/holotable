@@ -63,6 +63,7 @@ test("every kind there was before the registry is still registered, in the same 
     "histogram",
     "logs",
     "treemap",
+    "vega",
     "text",
   ]);
   assert.deepEqual(VizType.options, PANEL_KIND_NAMES);
@@ -93,6 +94,12 @@ test("a kind is drawn on a canvas exactly when its renderer is a chart", () => {
       `${kind.kind}: canvas says ${kind.canvas}`,
     );
     if (kind.timeBrush) assert.ok(kind.canvas, `${kind.kind} brushes but is not a chart`);
+    // `image` is a view that draws its own picture (#405), never a chart.
+    assert.equal(
+      PANEL_RENDERERS[kind.kind].type === "view",
+      kind.image === true,
+      `${kind.kind}: image says ${kind.image}`,
+    );
   }
 });
 

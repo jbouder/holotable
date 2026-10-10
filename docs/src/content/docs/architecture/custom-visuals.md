@@ -79,15 +79,40 @@ Two findings shape the next phases:
   unrelated `TypeError`. The phase 2 validator checks marks, channels and
   types before compiling, so that a refusal names what is wrong.
 
+## The kind
+
+`viz: "vega"` is registered like any other kind
+(`src/lib/panels/kinds/vega.ts`), with one option, `spec`. Its options schema
+runs the structural walk (`src/lib/vega/walk.ts`) on plain JSON, so the IR
+holds a spec to it on every parse, in the browser and the model's output
+schema as on the server. The walk refuses data other than the rows, anything
+that reaches out (`url`, `href`, images, a bound `element`), the theme's
+replacements (`config`, `scheme`, literal colors), and unknown marks and field
+types, naming each. [Panel options](/reference/panel-options/#vega) lists the
+rules.
+
+A kind may declare a `check`, an async check of its options beyond their
+schema, which `resolveAndValidateDashboard` runs for every panel wherever a
+dashboard is saved. The `vega` kind's check compiles the spec, so one the walk
+lets through but the compiler cannot draw is refused with the compiler's
+message.
+
+The renderer is a third type beside `chart` and `html`: a `view`, a component
+that draws its own image and is handed the same PNG export handle an ECharts
+chart is. The kind says so with `image: true` and leaves `canvas` (which means
+"an ECharts chart") false, so explore never offers a custom visual. The view
+resolves the spec's color names, sets its size from the panel for a single
+view, compiles it and builds the view, then merges each poll's rows into it.
+
 ## Phases
 
 1. The spike and this record: the pinned dependencies, the CSP-safe runtime,
    the server compiler, and their tests.
-2. The IR: the `vega` panel kind, the structural walk and its caps, and
-   compiling at every acceptance point.
-3. The renderer: the lazy chunk, theme config from the tokens, the
-   screen-reader table, resize, PNG export, and the axe scan.
-4. Generation, chat, repair and the MCP tools, with evals that show the kind
+2. The IR and the renderer, together, because the renderer registry does not
+   compile without a renderer for every kind: the `vega` kind, the walk, the
+   compile at save, and the view with its theme, size, screen-reader table and
+   PNG export.
+3. Generation, chat, repair and the MCP tools, with evals that show the kind
    is chosen only when no registered kind fits.
-5. The editor's spec field with compiler messages, the docs, and a
-   "Demo custom visuals" dashboard on the demo site.
+4. The editor's spec field with compiler messages, and a "Demo custom
+   visuals" dashboard on the demo site, scanned by axe.

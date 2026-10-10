@@ -1,5 +1,5 @@
 import type { Spec } from "vega";
-import type { TopLevelSpec } from "vega-lite";
+import type { Config, TopLevelSpec } from "vega-lite";
 
 /**
  * Vega-Lite to Vega, on the server (#405).
@@ -22,15 +22,25 @@ export type VegaCompileResult = { ok: true; spec: Spec } | { ok: false; error: s
 
 let compiler: Promise<typeof import("vega-lite")> | undefined;
 
-/** The compiler's output for a spec, or its message. Never throws. */
-export async function compileVegaLite(spec: unknown): Promise<VegaCompileResult> {
+/**
+ * The compiler's output for a spec, or its message. Never throws. `config` is
+ * the theme: Vega-Lite writes its own defaults (a white background among
+ * them) into the Vega it emits, so a theme has to be given here, not later.
+ */
+export async function compileVegaLite(
+  spec: unknown,
+  config?: Config,
+): Promise<VegaCompileResult> {
   if (typeof spec !== "object" || spec === null || Array.isArray(spec)) {
     return { ok: false, error: "a Vega-Lite spec is a JSON object" };
   }
   try {
     compiler ??= import("vega-lite");
     const { compile } = await compiler;
-    return { ok: true, spec: compile(spec as TopLevelSpec).spec };
+    return {
+      ok: true,
+      spec: compile(spec as TopLevelSpec, config ? { config } : {}).spec,
+    };
   } catch (err) {
     return { ok: false, error: err instanceof Error ? err.message : String(err) };
   }

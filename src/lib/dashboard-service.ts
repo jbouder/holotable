@@ -2,6 +2,7 @@ import { serverKind } from "@/lib/sources/server/registry";
 import { HttpError } from "@/lib/auth/authorize";
 import { getSourceById } from "@/lib/db/repo";
 import { type Dashboard, declaredVariables, hasQuery } from "@/lib/ir";
+import { panelKind } from "@/lib/panels/registry";
 import type { SourceRecord } from "@/lib/registry";
 
 /**
@@ -16,6 +17,8 @@ import type { SourceRecord } from "@/lib/registry";
  * - A panel that runs no query (a text panel, #202) references no source and
  *   is skipped; a dashboard needs at least one panel that does, because its
  *   sources are what decide its workspace.
+ * - A kind that checks its options beyond their schema runs that check here:
+ *   a custom visual's spec must compile (#405).
  * - A panel's `:name` references must be variables the dashboard declares
  *   (#67), and a `query` variable's SELECT is held to the same rules as a
  *   panel's: its source exists, is in the dashboard's workspace, and the
@@ -44,6 +47,11 @@ export async function resolveAndValidateDashboard(
     }
     return source;
   };
+
+  for (const panel of spec.panels) {
+    const problem = await panelKind(panel.viz).check?.(panel.options);
+    if (problem) throw new HttpError(400, `panel "${panel.id}": ${problem}`);
+  }
 
   for (const panel of spec.panels.filter(hasQuery)) {
     const source = await sourceOf(panel.query.sourceId);

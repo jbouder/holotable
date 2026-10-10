@@ -471,6 +471,9 @@ function PanelContent({
   if (renderer.type === "html") {
     return <renderer.Body panel={panel} data={data} />;
   }
+  if (renderer.type === "view") {
+    return <renderer.Body panel={panel} data={data} handle={chartRef} />;
+  }
   return (
     <AccessibleChart
       panel={panel}

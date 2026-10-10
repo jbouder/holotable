@@ -247,17 +247,21 @@ module under `src/lib/panels/kinds/` that says, in plain data:
 | `kind` | `panel.viz`. `VizType` in `src/lib/ir.ts` is built from the registered names, so an unregistered one fails validation with the list of valid kinds. |
 | `summary` | The [Visualization types](/reference/visualization-types/) reference, generated from it. |
 | `promptHint` | The generation prompt, whose list of kinds is built from the hints. |
-| `canvas` | PNG export, and whether the explore page plots the panel. |
+| `canvas` | Drawn by ECharts: PNG export, and whether the explore page plots the panel. |
+| `image` | Draws its own image rather than an ECharts chart (a custom visual): PNG export, but explore does not plot it. |
 | `timeBrush` | Whether a drag across the chart selects a time range. |
 | `skeleton` | The shape the panel shows while it loads. |
 | `query` | `"required"`, or `"none"` for a kind that runs nothing (text). The IR holds the panel to it, and code that executes or lists queries filters through `hasQuery`. |
 | `requiresTimeField` | The IR refuses the panel without `query.timeField` (state timeline). |
 | `options` | The kind's own options schema, which `panel.options` is validated against. See [Panel options](/reference/panel-options/). |
 | `starterOptions` | What a panel switched to this kind in the editor starts with, when `{}` would not do. |
+| `check` | A server-side check of the options beyond their schema, run wherever a dashboard is saved. A custom visual's spec must compile. |
 
 How a kind is drawn is the browser half, `PANEL_RENDERERS` in
-`src/components/panels/registry.ts`: either `{ type: "chart", option, shape? }`,
-an ECharts option builder, or `{ type: "html", Body }`, a component. An option
+`src/components/panels/registry.ts`: `{ type: "chart", option, shape? }`,
+an ECharts option builder; `{ type: "html", Body }`, a component; or
+`{ type: "view", Body }`, a component that draws its own image and is handed
+the PNG export handle a chart is (a custom visual). An option
 builder is given the rows and a context: the viewer's time display, and the
 window the server resolved for the rows (sent with every `tick`, and returned
 by `/api/query`), so a chart that runs to "now" ends where the server's window

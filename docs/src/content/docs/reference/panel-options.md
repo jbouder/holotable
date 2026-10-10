@@ -334,6 +334,75 @@ What a whole is made of, level by level
 }
 ```
 
+## `vega`
+
+A custom visual: a Vega-Lite spec over the panel's rows
+([#405](https://github.com/jbouder/holotable/issues/405)). For a view no other
+kind draws; [Custom visuals](/architecture/custom-visuals/) has the why.
+
+| Option | Type | Default | Meaning |
+| --- | --- | --- | --- |
+| `spec` | Vega-Lite JSON, at most 32 KB | required | The view, encoding the query's columns by name. |
+
+The spec is checked wherever the panel is parsed, and compiled wherever the
+dashboard is saved:
+
+- Its `data` is exactly `{ "name": "rows" }`, at the top and anywhere else one
+  appears. The rows are the panel's query result, the only data it sees.
+- Refused anywhere in it: `url`, `href`, an `image` mark, `datasets`, inline
+  `values`, `config`, `usermeta`, a `scheme`, a `projection`, and a parameter
+  bound to an `element`.
+- Every color is a token name (`success`, `warning`, `danger`, `info`,
+  `neutral`, `orange`, `purple`, `teal`), a chart color by index
+  (`palette-0` to `palette-5`) or `transparent`. They are painted as the other
+  kinds paint them.
+- Marks: `arc`, `area`, `bar`, `boxplot`, `circle`, `errorband`, `errorbar`,
+  `line`, `point`, `rect`, `rule`, `square`, `text`, `tick`, `trail`. Field
+  types: `quantitative`, `temporal`, `ordinal`, `nominal`.
+- A spec that passes those checks but does not compile is refused at save,
+  with Vega-Lite's own message.
+
+A single view (one mark, or layers) takes the panel's size. A faceted,
+repeated or concatenated one draws at the sizes its spec gives, scaled down to
+fit the panel when it is larger. The axes, grid
+and legend use the same colors as the other charts. Each poll replaces the
+rows in the same view. The panel exports as a PNG, and its rows are in a
+visually hidden table for a screen reader. A click does not follow a
+[datum link](/guide/drilldown/); the panel menu's links work as for any
+panel.
+
+```json
+{
+  "viz": "vega",
+  "options": {
+    "spec": {
+      "data": { "name": "rows" },
+      "layer": [
+        {
+          "mark": "area",
+          "encoding": {
+            "x": { "field": "minute", "type": "temporal" },
+            "y": { "field": "low", "type": "quantitative" },
+            "y2": { "field": "high" },
+            "color": { "value": "palette-0" },
+            "opacity": { "value": 0.25 }
+          }
+        },
+        {
+          "mark": "line",
+          "encoding": {
+            "x": { "field": "minute", "type": "temporal" },
+            "y": { "field": "mean", "type": "quantitative" },
+            "color": { "value": "palette-0" }
+          }
+        },
+        { "mark": "rule", "encoding": { "y": { "datum": 85 }, "color": { "value": "danger" } } }
+      ]
+    }
+  }
+}
+```
+
 ## `text`
 
 Markdown, and no query ([#202](https://github.com/jbouder/holotable/issues/202)).

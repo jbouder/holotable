@@ -21,6 +21,7 @@ dashboard readable during an incident.
 | Where is the load concentrated over time? | `heatmap` | Time bucket, a dimension, a count. |
 | Do two measures move together? (size vs latency) | `scatter` | Two numeric columns, optionally a label. |
 | I need the exact numbers | `table` | Rows; set `columns` labels and formats. |
+| None of the above fits (a band and a rule, small multiples, a tick plot) | `vega` | Any result; a Vega-Lite spec over `{"name": "rows"}` in token colors. |
 | What is this dashboard for? Who to page? | `text` | No query; Markdown in `options.content`. |
 
 ## Monitoring measures that read well
