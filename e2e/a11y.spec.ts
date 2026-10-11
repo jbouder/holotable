@@ -319,11 +319,13 @@ test("an embed is drawn in the theme its link names, and only a shipped one", as
   await expect(page.locator("html")).toHaveAttribute("data-theme", "light");
   await waitForPanels(page);
   await expectNoA11yViolations(page);
-  // Anything else is the default, and never written into the page.
-  const hostile = await page.goto(`${path}&theme=..%2Fx&scheme=foo`);
+  // Anything else is the default, and never written into the page as a
+  // value: a distinctive name, so an echo cannot hide behind encoding.
+  const hostile = await page.goto(`${path}&theme=zzhostile&scheme=zzscheme`);
   const body = (await hostile?.text()) ?? "";
-  expect(body).not.toContain("../x");
-  expect(body).not.toContain('"foo"');
+  for (const value of ["zzhostile", "zzscheme"]) {
+    expect(body.match(new RegExp(`data-[a-z-]+="${value}"|"${value}"`))).toBeNull();
+  }
   await expect(page.locator("html")).toHaveAttribute("data-palette", "holotable");
   await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
   await context.close();

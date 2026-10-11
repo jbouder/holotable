@@ -18,6 +18,7 @@ export function Select({
   id,
   disabled,
   "aria-label": ariaLabel,
+  "aria-describedby": ariaDescribedBy,
 }: {
   value: string | null;
   onValueChange: (value: string) => void;
@@ -31,6 +32,8 @@ export function Select({
    * neither is announced as an unnamed button (#77).
    */
   "aria-label"?: string;
+  /** The id of a hint that says more than the label does. */
+  "aria-describedby"?: string;
 }) {
   return (
     <BaseSelect.Root
@@ -42,6 +45,7 @@ export function Select({
       <BaseSelect.Trigger
         id={id}
         aria-label={ariaLabel}
+        aria-describedby={ariaDescribedBy}
         className={cn(
           "flex h-10 min-w-40 items-center justify-between gap-2 rounded-lg border border-border-strong bg-surface px-3 text-sm text-foreground focus-visible:outline-2 focus-visible:outline-ring data-[disabled]:cursor-not-allowed data-[disabled]:opacity-50",
           className,

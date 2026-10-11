@@ -11,7 +11,14 @@ import { Input, Label, Textarea } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { ThemePreview } from "@/components/settings/theme-preview";
 import { withEmbedAppearance } from "@/lib/embed-appearance";
-import { isPalette, isTheme, type Palette, PALETTE_INFO, THEMES } from "@/lib/theme";
+import {
+  DEFAULT_PALETTE_ATTRIBUTE,
+  isPalette,
+  isTheme,
+  type Palette,
+  PALETTE_INFO,
+  THEMES,
+} from "@/lib/theme";
 import { type ApiError, apiErrorFromThrown, readApiError } from "@/lib/errors";
 import type { TimeRange } from "@/lib/ir";
 import { describeIssue } from "@/lib/panel-options";
@@ -23,22 +30,27 @@ const EXPIRY_OPTIONS = [1, 7, 30, SHARE_MAX_DAYS].map((d) => ({
   label: d === 1 ? "1 day" : `${d} days`,
 }));
 
-/**
- * Create, list and revoke a dashboard's read-only share links (#65). A new
- * link's URL is shown once, here: the server keeps only its hash.
- */
 const SCHEME_LABELS = {
   dark: "Dark",
   light: "Light",
   system: "The viewer's system",
 } as const;
 
-/** The theme this page is drawn in, for the preview of "Default". */
-function shownPalette(): Palette {
+/**
+ * The server's default theme, which a link with no theme gets, for the
+ * preview of "Default". The root layout writes it on `<html>`; the page's own
+ * `data-palette` is this editor's choice, not what a viewer will see.
+ */
+function defaultPalette(): Palette {
   if (typeof document === "undefined") return PALETTE_INFO[0].name;
-  const shown = document.documentElement.dataset.palette;
-  return isPalette(shown) ? shown : PALETTE_INFO[0].name;
+  const value = document.documentElement.getAttribute(DEFAULT_PALETTE_ATTRIBUTE);
+  return isPalette(value) ? value : PALETTE_INFO[0].name;
 }
+
+/**
+ * Create, list and revoke a dashboard's read-only share links (#65). A new
+ * link's URL is shown once, here: the server keeps only its hash.
+ */
 
 export function ShareDialog({
   dashboardId,
@@ -231,7 +243,11 @@ export function ShareDialog({
               id="share-theme"
               className="w-full"
               value={linkPalette}
-              onValueChange={setLinkPalette}
+              onValueChange={(v) => {
+                setLinkPalette(v);
+                setCopied(false);
+              }}
+              aria-describedby="share-appearance-hint"
               options={[
                 { value: "default", label: "Default" },
                 ...PALETTE_INFO.map((p) => ({ value: p.name, label: p.label })),
@@ -244,7 +260,11 @@ export function ShareDialog({
               id="share-scheme"
               className="w-full"
               value={linkScheme}
-              onValueChange={setLinkScheme}
+              onValueChange={(v) => {
+                setLinkScheme(v);
+                setCopied(false);
+              }}
+              aria-describedby="share-appearance-hint"
               options={[
                 { value: "default", label: "Default" },
                 ...THEMES.map((t) => ({ value: t, label: SCHEME_LABELS[t] })),
@@ -254,13 +274,13 @@ export function ShareDialog({
         </div>
         <span aria-hidden className="block w-56 max-w-full">
           <ThemePreview
-            palette={appearance.palette ?? shownPalette()}
+            palette={appearance.palette ?? defaultPalette()}
             scheme={appearance.scheme ?? "dark"}
           />
         </span>
-        <p className="-mt-1 text-xs text-muted">
+        <p id="share-appearance-hint" className="-mt-1 text-xs text-muted">
           An embed cannot read the viewer&rsquo;s settings, so the link carries its look.
-          Changing these changes the link above too.
+          {created && " Changing these changes the link above."}
         </p>
         <Checkbox
           checked={fixRange}

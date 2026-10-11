@@ -22,6 +22,7 @@ import {
   NONCE_REQUEST_HEADER,
 } from "@/lib/security-headers";
 import { NO_EMBED_APPEARANCE, readEmbedAppearanceHeader } from "@/lib/embed-appearance";
+import { DEFAULT_PALETTE_ATTRIBUTE } from "@/lib/theme";
 import { bootstrapScript } from "@/lib/bootstrap";
 
 const fontSans = Chakra_Petch({
@@ -89,6 +90,7 @@ export default async function RootLayout({
       className={`h-full antialiased ${embed ? "" : "scroll-pt-14"} ${fontSans.variable} ${fontMono.variable}`}
       data-theme={pinned.scheme === "light" ? "light" : "dark"}
       data-palette={pinned.palette ?? config.themeDefaultPalette}
+      {...{ [DEFAULT_PALETTE_ATTRIBUTE]: config.themeDefaultPalette }}
       suppressHydrationWarning
     >
       <head>
