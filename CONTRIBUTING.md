@@ -348,6 +348,27 @@ Dockerfiles, CI's `node-version` and `@types/node` together. The app's
 TypeScript is held below 7 until Next supports it, because 7 drops the
 JavaScript compiler API that `next build` and `next typegen` load.
 
+### Releasing
+
+Versions follow semver; `package.json` and the chart's `appVersion` always
+hold the version being released, and `test/release-version.test.ts` keeps
+them equal. The chart's own `version` moves only when the chart changes.
+
+1. Open a pull request that sets the new version in `package.json`
+   (`npm version <x.y.z> --no-git-tag-version`, which updates the lockfile
+   too) and in `deploy/helm/holotable/Chart.yaml` (`appVersion`, and
+   `version` if the chart changed). Merge it.
+2. Tag that merge commit and push the tag:
+   `git tag v<x.y.z> <sha> && git push origin v<x.y.z>`.
+
+The tag does the rest. CI's `publish` jobs push the images (`<x.y.z>`,
+`latest`, `-migrate`, `-quickstart`); `.github/workflows/release.yml` refuses
+a tag that disagrees with the files, pushes the chart to
+`oci://ghcr.io/jbouder/charts/holotable` (unless that chart version is
+already there), and creates the GitHub Release with notes generated from the
+merged pull requests. A version with a suffix (`1.2.0-rc.1`) is marked as a
+pre-release.
+
 ## Documentation
 
 The docs site (`docs/`) is the canonical explanation of every feature;

@@ -14,9 +14,14 @@ It deploys neither PostgreSQL/TimescaleDB nor Keycloak. Both are external, and
 the chart expects to be told where they are.
 
 ```bash
-helm install holotable deploy/helm/holotable \
-  -f deploy/helm/holotable/examples/values-kubernetes-secret.yaml
+helm install holotable oci://ghcr.io/jbouder/charts/holotable --version <chart version> \
+  -f my-values.yaml
 ```
+
+Each release publishes the chart there (its version is on the release page);
+from a checkout, `deploy/helm/holotable` works the same way, and
+`examples/values-kubernetes-secret.yaml` is a starting point for
+`my-values.yaml`.
 
 The chart's own [README](https://github.com/jbouder/holotable/tree/main/deploy/helm/holotable)
 documents every value. This page is the reasoning behind the ones that are not
@@ -42,10 +47,10 @@ The all-in-one quick-start image, which is not for Kubernetes, is published
 under the same name with a `-quickstart` suffix. Its floating `quickstart` tag
 follows `main`, so `docker run` and the hosted demo show the newest build.
 
-The chart defaults both tags to its `appVersion`, which is the release tag. Until
-the first release is cut, set both explicitly: `image.tag` to `main` or a
-`sha-<short>`, and `migrations.image.tag` to the same value with `-migrate`
-appended. Or pin `image.digest` and `migrations.image.digest`; a digest wins over
+The chart defaults both tags to its `appVersion`, which is the release tag. To
+run something newer than the last release, set both explicitly: `image.tag` to
+`main` or a `sha-<short>`, and `migrations.image.tag` to the same value with
+`-migrate` appended. Or pin `image.digest` and `migrations.image.digest`; a digest wins over
 a tag, the same way the Dockerfile pins its own base.
 
 To run your own build, push both targets to a registry the cluster can pull from
