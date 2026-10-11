@@ -14,6 +14,7 @@ import {
   sourceImpact,
   updateSource,
 } from "@/lib/db/repo";
+import { config } from "@/lib/config";
 import { type Dashboard, SPEC_VERSION } from "@/lib/ir";
 import { upgradeSpec } from "@/lib/ir/upgrade";
 import { SourceConfig } from "@/lib/registry";
@@ -245,5 +246,35 @@ test(
       const read = await getDashboardVersion(created.id, version);
       assert.deepEqual(read?.spec, upgradeSpec(fixture.spec), fixture.file);
     }
+  },
+);
+
+test(
+  "past DASHBOARD_VERSIONS_KEEP a save removes the oldest version, never the current one",
+  needsDb,
+  async () => {
+    const keep = config.dashboardVersionsKeep;
+    assert.ok(keep > 0, "the default keeps a bounded number");
+    const d = await createDashboard({
+      workspaceId: WORKSPACE,
+      createdBy: "tester",
+      spec: spec("Versions cap"),
+    });
+    for (let v = 2; v <= keep + 1; v++) {
+      await saveDashboardVersion({
+        dashboardId: d.id,
+        createdBy: "tester",
+        spec: spec(`Versions cap ${v}`),
+      });
+    }
+    const rows = await query<{ version: number }>(
+      "SELECT version FROM dashboard_versions WHERE dashboard_id = $1 ORDER BY version",
+      [d.id],
+    );
+    assert.equal(rows.length, keep);
+    assert.equal(rows[0].version, 2, "version 1 went first");
+    assert.equal(rows.at(-1)?.version, keep + 1);
+    const current = await getDashboardById(d.id);
+    assert.equal(current?.version, keep + 1, "the current version is the newest kept");
   },
 );

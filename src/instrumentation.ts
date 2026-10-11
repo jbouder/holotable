@@ -54,4 +54,9 @@ export async function register() {
   // is set in the `start` script and in the runtime image to hand them over;
   // without it these handlers still run but Next may exit first.
   installSignalHandlers();
+
+  // The retention sweep (#494): rows past retention in a workspace nobody
+  // writes to are swept on a timer, not only when something is written.
+  const { startRetentionSweep } = await import("@/lib/retention");
+  startRetentionSweep();
 }

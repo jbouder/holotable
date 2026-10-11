@@ -484,6 +484,25 @@ test("chat history limits are bounded, and zero days means keep forever", () => 
   );
 });
 
+test("the retention sweep's interval and the versions kept are counts, zero meaning off", () => {
+  for (const name of ["RETENTION_SWEEP_INTERVAL_MS", "DASHBOARD_VERSIONS_KEEP"]) {
+    for (const value of ["0", "100", "3600000", ""]) {
+      const ok = validateConfig(
+        { ...VALID_PRODUCTION, [name]: value },
+        { production: true },
+      );
+      assert.deepEqual(errors(ok), [], formatConfigProblems(ok));
+    }
+    for (const value of ["-1", "1h", "all"]) {
+      const bad = validateConfig(
+        { ...VALID_PRODUCTION, [name]: value },
+        { production: true },
+      );
+      assert.deepEqual(variables(errors(bad)), [name]);
+    }
+  }
+});
+
 test("generation log retention is non-negative, and zero means keep forever", () => {
   for (const value of ["0", "30", "365", ""]) {
     const ok = validateConfig(

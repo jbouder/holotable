@@ -284,6 +284,23 @@ export const config = {
   generationLogRetentionDays: num("GENERATION_LOG_RETENTION_DAYS", 30),
 
   /**
+   * How often the retention sweep runs (#494), in milliseconds. The
+   * generation log, conversations and their messages are also swept when
+   * they are written, but a quiet workspace writes nothing, so this sweeps
+   * them on a timer too, in bounded batches. Jittered by up to a tenth, so
+   * instances started together do not sweep together. `0` turns the timer
+   * off. Documented default: 1 hour.
+   */
+  retentionSweepIntervalMs: num("RETENTION_SWEEP_INTERVAL_MS", 3_600_000),
+
+  /**
+   * How many versions of one dashboard are kept (#494). A save past the cap
+   * removes the oldest, never the current one. `0` keeps every version.
+   * Documented default: 100.
+   */
+  dashboardVersionsKeep: num("DASHBOARD_VERSIONS_KEEP", 100),
+
+  /**
    * The identity provider's self-service account page, e.g. Keycloak's
    * `<issuer>/account`. The account settings section links to it when set, so
    * people can change the name, email and password the provider owns. Unset
@@ -635,6 +652,8 @@ const EnvSchema = z.object({
   CHAT_HISTORY_RETENTION_DAYS: blank(nonNegativeInt),
   CHAT_CONVERSATIONS_MAX: blank(positiveInt),
   GENERATION_LOG_RETENTION_DAYS: blank(nonNegativeInt),
+  RETENTION_SWEEP_INTERVAL_MS: blank(nonNegativeInt),
+  DASHBOARD_VERSIONS_KEEP: blank(nonNegativeInt),
   SHUTDOWN_GRACE_MS: blank(positiveInt),
   SSE_REAUTH_INTERVAL_MS: blank(positiveInt),
   SSE_SLOW_TICKS: blank(positiveInt),

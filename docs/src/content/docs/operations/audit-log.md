@@ -153,7 +153,9 @@ somewhere they can't reach. A SIEM export is not built in.
 
 ## Retention
 
-Nothing removes audit rows. Volume grows with activity: sign-ins, edits, stream
+Nothing removes audit rows: not the app, and not its retention sweep, which
+covers the generation log and conversations only (#494). Volume grows with
+activity: sign-ins, edits, stream
 opens and statements people run, not the poller's refreshes. Pruning is a
 deliberate maintenance step, run as the table's owner in one transaction so the
 triggers are off only for that transaction:

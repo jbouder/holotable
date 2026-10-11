@@ -98,6 +98,7 @@ interface Instruments {
   sseDrops: Counter<"reason">;
   resultTruncations: Counter<"stage">;
   llmInFlight: Gauge<"model">;
+  retentionDeleted: Counter<"table">;
   /** One set of seen values per bounded label, keyed `metric/label`. */
   seenLabelValues: Map<string, Set<string>>;
 }
@@ -224,6 +225,12 @@ function build(): Instruments {
       name: "holotable_llm_in_flight",
       help: "Model requests running right now, by model.",
       labelNames: ["model"],
+      registers: [registry],
+    }),
+    retentionDeleted: new Counter({
+      name: "holotable_retention_deleted_total",
+      help: "Rows the retention sweep deleted, by table.",
+      labelNames: ["table"],
       registers: [registry],
     }),
     seenLabelValues: new Map(),
@@ -355,6 +362,11 @@ export function trackLlmInFlight(modelId: string): () => void {
     ended = true;
     m.llmInFlight.dec({ model });
   };
+}
+
+/** Rows the retention sweep (#494) deleted from a table. The table is a fixed name. */
+export function recordRetentionDeleted(table: string, rows: number): void {
+  instruments().retentionDeleted.inc({ table }, rows);
 }
 
 /** Report how many pollers are running on this instance. */
