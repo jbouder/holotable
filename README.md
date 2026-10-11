@@ -1,6 +1,28 @@
-# Holotable
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/src/assets/logo-dark.svg">
+    <img alt="" src="docs/src/assets/logo-light.svg" width="72" height="72">
+  </picture>
+</p>
 
-[![CI](https://github.com/jbouder/holotable/actions/workflows/ci.yml/badge.svg)](https://github.com/jbouder/holotable/actions/workflows/ci.yml)
+<h1 align="center">Holotable</h1>
+
+<p align="center">
+  <a href="https://github.com/jbouder/holotable/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/jbouder/holotable/actions/workflows/ci.yml/badge.svg"></a>
+  <a href="https://github.com/jbouder/holotable/actions/workflows/docs.yml"><img alt="Docs" src="https://github.com/jbouder/holotable/actions/workflows/docs.yml/badge.svg"></a>
+  <a href="https://github.com/jbouder/holotable/actions/workflows/demo.yml"><img alt="Demo" src="https://github.com/jbouder/holotable/actions/workflows/demo.yml/badge.svg"></a>
+  <a href="LICENSE"><img alt="License: Apache 2.0" src="https://img.shields.io/github/license/jbouder/holotable"></a>
+  <br>
+  <a href="https://holotable-demo.vibeproject.workers.dev"><img alt="Live demo" src="https://img.shields.io/badge/demo-live-428eff"></a>
+  <a href="https://holotable-docs.vibeproject.workers.dev"><img alt="Documentation" src="https://img.shields.io/badge/docs-holotable--docs-428eff"></a>
+  <a href="https://github.com/jbouder/holotable/pkgs/container/holotable"><img alt="Container image" src="https://img.shields.io/badge/ghcr.io-holotable-2496ED?logo=docker&logoColor=white"></a>
+  <br>
+  <img alt="Next.js 16" src="https://img.shields.io/badge/Next.js-16-000000?logo=nextdotjs">
+  <img alt="React 19" src="https://img.shields.io/badge/React-19-149ECA?logo=react&logoColor=white">
+  <img alt="TypeScript" src="https://img.shields.io/badge/TypeScript-strict-3178C6?logo=typescript&logoColor=white">
+  <img alt="Node.js 22" src="https://img.shields.io/badge/Node.js-22-5FA04E?logo=nodedotjs&logoColor=white">
+  <img alt="TimescaleDB" src="https://img.shields.io/badge/TimescaleDB-PostgreSQL-FDB515?logo=postgresql&logoColor=white">
+</p>
 
 Natural-language monitoring dashboards. Describe what you want to see; a language
 model authors a **validated visualization spec** (SQL + chart config) — never the
