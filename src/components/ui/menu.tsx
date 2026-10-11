@@ -35,7 +35,7 @@ export function Menu({
         aria-label={label}
         title={label}
         className={cn(
-          "tap-target inline-flex h-7 w-7 shrink-0 cursor-pointer items-center justify-center text-muted transition-colors hover:bg-surface-3 hover:text-foreground focus-visible:outline-2 focus-visible:outline-primary data-[popup-open]:bg-surface-3 data-[popup-open]:text-foreground",
+          "tap-target inline-flex h-7 w-7 shrink-0 cursor-pointer items-center justify-center text-muted transition-colors hover:bg-surface-3 hover:text-foreground focus-visible:outline-2 focus-visible:outline-ring data-[popup-open]:bg-surface-3 data-[popup-open]:text-foreground",
           className,
         )}
       >

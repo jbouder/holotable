@@ -194,7 +194,7 @@ export function PanelLayoutGrid({
                   onClick={() => onSelect?.(panel.id)}
                   aria-pressed={renderBody ? selected : undefined}
                   className={cn(
-                    "absolute inset-0 flex touch-none select-none flex-col items-start gap-0.5 overflow-hidden text-left transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary",
+                    "absolute inset-0 flex touch-none select-none flex-col items-start gap-0.5 overflow-hidden text-left transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring",
                     active ? "cursor-grabbing" : "cursor-grab",
                     renderBody
                       ? // Over a live panel the handle is only an outline.

@@ -78,7 +78,7 @@ export function LogsView({ panel, data }: PanelBodyProps) {
       // `relative`, so each line's offsetTop is measured from the list.
       // No browser scroll anchoring (#499): the spacers around the window
       // change size as it moves; the reader's place is kept above, by hand.
-      className="relative max-h-full overflow-auto font-mono text-xs [overflow-anchor:none] focus-visible:outline-2 focus-visible:outline-primary"
+      className="relative max-h-full overflow-auto font-mono text-xs [overflow-anchor:none] focus-visible:outline-2 focus-visible:outline-ring"
     >
       {lines.length === 0 ? (
         <p className="p-2 text-muted">No lines in this window.</p>
@@ -161,7 +161,7 @@ function Line({
       <Collapsible.Trigger
         className={cn(
           row,
-          "group w-full cursor-pointer text-left hover:bg-surface-2 focus-visible:outline-2 focus-visible:outline-primary",
+          "group w-full cursor-pointer text-left hover:bg-surface-2 focus-visible:outline-2 focus-visible:outline-ring",
         )}
         style={stripe}
       >

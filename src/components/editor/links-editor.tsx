@@ -579,7 +579,7 @@ function TargetPicker({
                 <li key={hit.id}>
                   <button
                     type="button"
-                    className="w-full px-2 py-1.5 text-left text-sm hover:bg-surface-2 focus-visible:outline-2 focus-visible:outline-primary"
+                    className="w-full px-2 py-1.5 text-left text-sm hover:bg-surface-2 focus-visible:outline-2 focus-visible:outline-ring"
                     onClick={() => onChange(hit)}
                   >
                     {hit.title}

@@ -132,7 +132,7 @@ export function DashboardListControls({
                 aria-pressed={active}
                 onClick={() => go(toggleTag(query, tag))}
                 className={cn(
-                  "inline-flex cursor-pointer items-center gap-1.5 border px-2.5 py-0.5 text-xs transition-colors focus-visible:outline-2 focus-visible:outline-primary",
+                  "inline-flex cursor-pointer items-center gap-1.5 border px-2.5 py-0.5 text-xs transition-colors focus-visible:outline-2 focus-visible:outline-ring",
                   active
                     ? "border-primary/60 bg-primary/10 text-foreground"
                     : "border-border text-muted hover:border-foreground/40 hover:text-foreground",

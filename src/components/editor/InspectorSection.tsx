@@ -20,7 +20,7 @@ export function InspectorSection({
 }) {
   return (
     <details open={defaultOpen} className="group border-t border-border">
-      <summary className="flex cursor-pointer list-none items-center gap-1.5 py-3 text-sm font-medium text-foreground select-none focus-visible:outline-2 focus-visible:outline-primary [&::-webkit-details-marker]:hidden">
+      <summary className="flex cursor-pointer list-none items-center gap-1.5 py-3 text-sm font-medium text-foreground select-none focus-visible:outline-2 focus-visible:outline-ring [&::-webkit-details-marker]:hidden">
         <ChevronRight
           aria-hidden
           className="h-4 w-4 text-muted transition-transform duration-(--duration-fast) ease-standard group-open:rotate-90"

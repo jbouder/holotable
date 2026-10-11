@@ -83,7 +83,7 @@ function VariablePicker({
       <span>{choice.label}</span>
       <Popover
         label={`${choice.label}: ${summary}`}
-        className="inline-flex h-8 min-w-32 cursor-pointer items-center justify-between gap-2 border border-border bg-surface px-3 text-sm text-foreground focus-visible:outline-2 focus-visible:outline-primary"
+        className="inline-flex h-8 min-w-32 cursor-pointer items-center justify-between gap-2 border border-border bg-surface px-3 text-sm text-foreground focus-visible:outline-2 focus-visible:outline-ring"
         panelClassName="max-h-72 w-56 overflow-auto"
         align="start"
         trigger={

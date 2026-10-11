@@ -56,7 +56,7 @@ export function Autocomplete({
       <BaseAutocomplete.Input
         {...inputProps}
         className={cn(
-          "h-10 w-full border border-border bg-surface px-3 text-sm text-foreground placeholder:text-muted focus-visible:outline-2 focus-visible:outline-primary disabled:cursor-not-allowed disabled:opacity-50",
+          "h-10 w-full border border-border-strong bg-surface px-3 text-sm text-foreground placeholder:text-muted focus-visible:outline-2 focus-visible:outline-ring disabled:cursor-not-allowed disabled:opacity-50",
           className,
         )}
       />

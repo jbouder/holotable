@@ -42,7 +42,7 @@ export function buttonClassName({
     // screen the compact sizes below are left exactly as they were.
     // `press` is the shared transition and the 4% dip on `:active` (#234);
     // it keys off `<html data-motion>` like every other motion rule.
-    "tap-target press inline-flex items-center justify-center gap-2 font-medium cursor-pointer disabled:cursor-not-allowed focus-visible:outline-2 focus-visible:outline-primary",
+    "tap-target press inline-flex items-center justify-center gap-2 font-medium cursor-pointer disabled:cursor-not-allowed focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring",
     VARIANTS[variant],
     SIZES[size],
     collapse && "max-sm:aspect-square max-sm:px-0",
