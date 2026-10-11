@@ -57,6 +57,9 @@ export function Popover({
           className="z-50"
         >
           <BasePopover.Popup
+            // The popup is a dialog, and a dialog needs a name: the trigger's
+            // (axe aria-dialog-name, found by the first scan of an open one).
+            aria-label={label}
             className={cn(
               "max-w-xs border border-border bg-surface p-3 text-xs leading-relaxed text-foreground shadow-xl focus:outline-none",
               // Same enter/exit as `ui/menu.tsx`: fade plus a nudge from the anchor side (#235).
