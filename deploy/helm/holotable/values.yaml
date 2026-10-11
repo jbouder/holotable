@@ -191,6 +191,22 @@ sourceSecrets:
   # -- Where that Secret is mounted.
   mountPath: /var/run/holotable/source-secrets
 
+# Server models (#440). Each entry is rendered into `models.json` in a
+# ConfigMap, mounted at `ai.modelsMountPath`, and `AI_MODELS_FILE` points at
+# it. An entry is a provider kind's settings plus `name`, optional `default`,
+# and `credentials`, which maps each secret field to the NAME of an
+# environment variable (supply the value through `secrets` or
+# `extraEnvFrom`). A value that is not a variable name fails the render,
+# since a ConfigMap is clear text. Empty renders nothing, and the server uses
+# AI_PROVIDER/AI_MODEL as before.
+ai:
+  # -- The server's models, e.g.
+  # `[{name: claude, provider: anthropic, model: claude-sonnet-5-5,
+  # credentials: {apiKey: ANTHROPIC_API_KEY}, default: true}]`.
+  models: []
+  # -- Where the models file's ConfigMap is mounted.
+  modelsMountPath: /etc/holotable/models
+
 # -- Extra volumes on the app pod, for a Vault Agent or CSI secret mount.
 extraVolumes: []
 # -- Extra volume mounts on the app container.

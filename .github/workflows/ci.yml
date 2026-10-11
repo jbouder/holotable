@@ -297,6 +297,10 @@ jobs:
             --set secrets.create=true \
             --set secrets.values.SESSION_SECRET=not-a-real-secret \
             --set sourceSecrets.secretName=holotable-sources \
+            --set 'ai.models[0].name=claude' \
+            --set 'ai.models[0].provider=anthropic' \
+            --set 'ai.models[0].model=claude-sonnet-5-5' \
+            --set 'ai.models[0].credentials.apiKey=ANTHROPIC_API_KEY' \
             > /dev/null
 
       # The guard that keeps invariant 5 (no credential in a client-visible or
@@ -319,6 +323,20 @@ jobs:
           if helm template holotable deploy/helm/holotable \
             --set terminationGracePeriodSeconds=5 > /dev/null 2>&1; then
             echo "::error::terminationGracePeriodSeconds below the drain budget rendered instead of failing"
+            exit 1
+          fi
+
+      # The same invariant for `ai.models` (#440): the models file is a
+      # ConfigMap, so an entry's credentials must name a variable, never hold
+      # the key. The render must refuse a value.
+      - name: A credential value in `ai.models` fails the render
+        run: |
+          if helm template holotable deploy/helm/holotable \
+            --set 'ai.models[0].name=claude' \
+            --set 'ai.models[0].provider=anthropic' \
+            --set 'ai.models[0].model=claude-sonnet-5-5' \
+            --set 'ai.models[0].credentials.apiKey=sk-ant-oops' > /dev/null 2>&1; then
+            echo "::error::a credential value in .Values.ai.models rendered instead of failing"
             exit 1
           fi
 

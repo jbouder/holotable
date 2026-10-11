@@ -27,6 +27,10 @@ spec:
         # `helm upgrade` that only touches `config` leaves the old environment
         # running, because the ConfigMap is loaded with envFrom at start.
         checksum/config: {{ include (print $.Template.BasePath "/configmap.yaml") . | sha256sum }}
+        {{- if .Values.ai.models }}
+        # The models file is read once at boot, like the environment.
+        checksum/models: {{ include (print $.Template.BasePath "/configmap-models.yaml") . | sha256sum }}
+        {{- end }}
         {{- if .Values.secrets.create }}
         checksum/secret: {{ include (print $.Template.BasePath "/secret.yaml") . | sha256sum }}
         {{- end }}
@@ -80,6 +84,10 @@ spec:
             # reconnect hint, the grace period — depends on it.
             - name: NEXT_MANUAL_SIG_HANDLE
               value: "true"
+            {{- if .Values.ai.models }}
+            - name: AI_MODELS_FILE
+              value: {{ include "holotable.modelsFile" . | quote }}
+            {{- end }}
             {{- if .Values.sourceSecrets.secretName }}
             - name: SOURCE_SECRETS_DIR
               value: {{ .Values.sourceSecrets.mountPath | quote }}
@@ -125,6 +133,11 @@ spec:
               mountPath: /tmp
             - name: next-cache
               mountPath: /app/.next/cache
+            {{- if .Values.ai.models }}
+            - name: models
+              mountPath: {{ .Values.ai.modelsMountPath }}
+              readOnly: true
+            {{- end }}
             {{- if .Values.sourceSecrets.secretName }}
             # Mounted whole, never with subPath: a subPath mount is a copy the
             # kubelet does not refresh, which would bring the restart back.
@@ -140,6 +153,11 @@ spec:
           emptyDir: {}
         - name: next-cache
           emptyDir: {}
+        {{- if .Values.ai.models }}
+        - name: models
+          configMap:
+            name: {{ include "holotable.fullname" . }}-models
+        {{- end }}
         {{- if .Values.sourceSecrets.secretName }}
         - name: source-secrets
           secret:

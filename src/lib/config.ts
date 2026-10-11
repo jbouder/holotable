@@ -514,6 +514,7 @@ const EnvSchema = z.object({
     z.enum(["true", "false"], { error: 'must be "true" or "false"' }),
   ),
   AI_MODEL: blank(z.string()),
+  AI_MODELS_FILE: blank(z.string()),
   OPENAI_API: blank(
     z.enum(["chat", "responses"], {
       error: 'must be "chat" (Chat Completions) or "responses" (Responses API), or unset',
@@ -773,11 +774,17 @@ export function validateConfig(
   // what is missing instead of failing a request (src/lib/ai/configured.ts).
   const aiMissing = demo ? warning : missing;
   const provider = values.AI_PROVIDER ?? "openai-compatible";
+  // With AI_MODELS_FILE (#440) the server's models come from the file, which
+  // `src/lib/startup.ts` reads and checks; the legacy variables are then
+  // optional, and checked only when they name a model.
+  const legacy = !values.AI_MODELS_FILE || Boolean(values.AI_PROVIDER || values.AI_MODEL);
   // The recorded model (#88, src/lib/ai/stub.ts) answers every prompt with the
   // same spec. It is for the end-to-end suite, which runs a production build;
   // anywhere else in production it would be a deployment that forgot to
   // configure a model and boots green anyway, so it has to be asked for twice.
-  if (provider === "stub") {
+  if (!legacy) {
+    // Nothing to check: the file lists the server's models.
+  } else if (provider === "stub") {
     if (production && values.AI_STUB_IN_PRODUCTION !== "true") {
       error(
         "AI_PROVIDER",
@@ -795,13 +802,13 @@ export function validateConfig(
       "is not set; every generate request would fail. Set the model id for your AI_PROVIDER (see .env.example).",
     );
   }
-  if (provider === "openai-compatible" && !values.OPENAI_API_KEY) {
+  if (legacy && provider === "openai-compatible" && !values.OPENAI_API_KEY) {
     aiMissing(
       "OPENAI_API_KEY",
       "is not set but AI_PROVIDER is openai-compatible; the provider will reject every request. Set the API key for OPENAI_BASE_URL.",
     );
   }
-  if (provider === "gateway" && !values.AI_GATEWAY_API_KEY) {
+  if (legacy && provider === "gateway" && !values.AI_GATEWAY_API_KEY) {
     aiMissing(
       "AI_GATEWAY_API_KEY",
       "is not set but AI_PROVIDER is gateway; the gateway will reject every request.",

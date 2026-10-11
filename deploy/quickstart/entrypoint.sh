@@ -62,8 +62,8 @@ if [ -z "${METRICS_TOKEN:-}" ]; then
   METRICS_TOKEN="$(secret)"
   export METRICS_TOKEN
 fi
-if [ -z "${AI_MODEL:-}" ]; then
-  log "No model configured: the dashboards, the live viewer and the SQL editor work; generation, Explore and chat are off. Pass -e AI_MODEL=... -e OPENAI_API_KEY=... to turn them on."
+if [ -z "${AI_MODEL:-}" ] && [ -z "${AI_MODELS_FILE:-}" ]; then
+  log "No model configured: the dashboards, the live viewer and the SQL editor work; generation, Explore and chat are off. Pass -e AI_MODEL=... -e OPENAI_API_KEY=... (or mount a models file and pass -e AI_MODELS_FILE=...) to turn them on."
 fi
 
 # --- 1. postgres -----------------------------------------------------------

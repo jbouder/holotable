@@ -136,6 +136,47 @@ key, to an address someone chose. So:
 The environment's own `OPENAI_BASE_URL` is set by the operator and is not
 held to the allowlist.
 
+## Server models: `AI_MODELS_FILE`
+
+([#440](https://github.com/jbouder/holotable/issues/440)) To offer more than
+one server model, or a vendor the variables below cannot describe, list them
+in a JSON file and point `AI_MODELS_FILE` at it:
+
+```json
+{
+  "models": [
+    { "name": "claude", "provider": "anthropic", "model": "claude-sonnet-5-5",
+      "credentials": { "apiKey": "ANTHROPIC_API_KEY" }, "default": true },
+    { "name": "gpt", "provider": "openai", "model": "gpt-5",
+      "credentials": { "apiKey": "OPENAI_API_KEY" } },
+    { "name": "local", "provider": "openai-compatible", "model": "llama3",
+      "baseUrl": "http://ollama.internal:11434/v1", "api": "chat" }
+  ]
+}
+```
+
+- An entry is a [provider kind](#models-configured-in-the-app)'s settings
+  plus `name`, an optional `default` and `credentials`.
+- `credentials` maps each secret field to the **name** of an environment
+  variable, never its value. The file can sit in a ConfigMap; the keys stay
+  in Secrets. A value that is not an `UPPER_SNAKE_CASE` name refuses to boot.
+- `name` is 1 to 40 lowercase letters, digits and dashes, and unique. The
+  model's id is `env:<name>`.
+- At most one entry says `"default": true`. Without one, the default is the
+  model the legacy variables describe, else the file's first entry.
+- A variable an entry names but the server lacks is a warning in
+  development and an error in production. The model stays listed and says
+  which variable is missing.
+- The operator's `baseUrl` is not held to `AI_BASE_URL_ALLOWLIST`, as
+  `OPENAI_BASE_URL` is not. Requests still reach its origin only, and
+  redirects are not followed.
+- The file is read once at boot; a change takes a restart. `npm run
+  config:check` checks it like the server does.
+
+The variables below keep working as one more entry named `default`, listed
+after the file's. With only the variables set, nothing changes. In Helm the
+file is `ai.models`; see [Kubernetes](/operations/kubernetes/).
+
 ## `AI_PROVIDER=gateway`
 
 The bare `AI_MODEL` string is routed by the AI SDK Gateway, using

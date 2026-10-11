@@ -4,6 +4,8 @@ import {
   type ConfigProblem,
   type Environment,
 } from "@/lib/config";
+import { readFileSync } from "node:fs";
+import { checkServerModels } from "@/lib/ai/server-models";
 import {
   type SourceSecretUse,
   validateSecretsDir,
@@ -86,12 +88,42 @@ function describeError(err: unknown): string {
   return message ?? code ?? String(err);
 }
 
+/**
+ * `AI_MODELS_FILE` (#440): read the file and check every entry. A file that
+ * cannot be read is an error anywhere: the operator asked for its models.
+ */
+export function validateServerModelsFile(
+  env: Environment,
+  production: boolean,
+): ConfigProblem[] {
+  const path = env.AI_MODELS_FILE;
+  if (!path) return [];
+  let text: string;
+  try {
+    text = readFileSync(path, "utf8");
+  } catch (err) {
+    const code = (err as { code?: string }).code ?? "error";
+    return [
+      {
+        variable: "AI_MODELS_FILE",
+        message: `${path} could not be read (${code}); mount the models file there or unset AI_MODELS_FILE.`,
+        severity: "error",
+      },
+    ];
+  }
+  return checkServerModels(text, env, production);
+}
+
 export async function runStartupChecks(
   opts: StartupCheckOptions = {},
 ): Promise<StartupCheckResult> {
   const env = opts.env ?? process.env;
   const production = opts.production ?? env.NODE_ENV === "production";
-  const problems = [...validateConfig(env, { production }), ...validateSecretsDir(env)];
+  const problems = [
+    ...validateConfig(env, { production }),
+    ...validateSecretsDir(env),
+    ...validateServerModelsFile(env, production),
+  ];
 
   // Only ask the database when the URL is well-formed: a missing or malformed
   // DATABASE_URL is already reported above, and the query could only add noise.

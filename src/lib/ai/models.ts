@@ -1,9 +1,9 @@
 import { HttpError } from "@/lib/auth/authorize";
 import type { Identity } from "@/lib/auth/claims";
 import type { EffectiveModel, ModelListing, ModelsResponse } from "@/lib/ai/model-config";
+import { serverModelList } from "@/lib/ai/server-model-list";
 import {
   defaultModelDeps,
-  environmentResolution,
   type ModelResolutionDeps,
   parseSettings,
   type ResolvedModel,
@@ -33,31 +33,21 @@ interface Entry {
 }
 
 /**
- * The server's models. Until `AI_MODELS_FILE` (#440) there is one, the
- * environment's `AI_PROVIDER`/`AI_MODEL`, named `default`.
+ * The server's models (#440): `AI_MODELS_FILE`'s entries and the legacy
+ * variables' `default`, the server's default first.
  */
 export function serverModels(env: Environment): Entry[] {
-  const id = "env:default";
-  const provider = env.AI_PROVIDER || "openai-compatible";
-  return [
-    {
-      listing: {
-        id,
-        name: "default",
-        provider,
-        model: provider === "stub" ? "stub" : (env.AI_MODEL ?? ""),
-        scope: "environment" as const,
-        unavailable: null,
-      },
-      resolve: () => environmentResolution(id, env),
+  return serverModelList(env).map((m) => ({
+    listing: {
+      id: m.id,
+      name: m.name,
+      provider: m.provider,
+      model: m.model,
+      scope: "environment" as const,
+      unavailable: m.unavailable,
     },
-  ].map((entry) => {
-    const resolved = entry.resolve();
-    return {
-      ...entry,
-      listing: { ...entry.listing, unavailable: resolved.ok ? null : resolved.problem },
-    };
-  });
+    resolve: m.resolve,
+  }));
 }
 
 function storedEntry(
