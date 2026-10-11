@@ -217,29 +217,32 @@ export function VegaView({ panel, data, handle }: PanelViewProps) {
         />
       </div>
       {table.rows.length > 0 && (
-        <table className="sr-only">
-          <caption>{table.caption}</caption>
-          <thead>
-            <tr>
-              {table.columns.map((c) => (
-                <th key={c} scope="col">
-                  {c}
-                </th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {table.rows.map((cells, i) => (
-              // biome-ignore lint/suspicious/noArrayIndexKey: result rows have no id
-              <tr key={i}>
-                {cells.map((cell, j) => (
-                  // biome-ignore lint/suspicious/noArrayIndexKey: cells are positional
-                  <td key={j}>{cell}</td>
+        // A div, because a table ignores `sr-only`'s one-pixel width (#536).
+        <div className="sr-only">
+          <table>
+            <caption>{table.caption}</caption>
+            <thead>
+              <tr>
+                {table.columns.map((c) => (
+                  <th key={c} scope="col">
+                    {c}
+                  </th>
                 ))}
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {table.rows.map((cells, i) => (
+                // biome-ignore lint/suspicious/noArrayIndexKey: result rows have no id
+                <tr key={i}>
+                  {cells.map((cell, j) => (
+                    // biome-ignore lint/suspicious/noArrayIndexKey: cells are positional
+                    <td key={j}>{cell}</td>
+                  ))}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       )}
     </div>
   );

@@ -62,6 +62,39 @@ test("a dialog traps focus and gives it back to what opened it", async ({
   await expect(opener).toBeFocused();
 });
 
+test("the share dialog keeps focus while it creates a link", async ({
+  page,
+  request,
+}) => {
+  // #540: Create link disabled itself while focused, which dropped focus to
+  // the page behind the modal, and the next Tabs walked the page.
+  await page.goto(`/dashboards/${await dashboardId(request, DEMO_DASHBOARD)}`);
+  await waitForPanels(page);
+  await page.getByRole("button", { name: "More actions" }).click();
+  await page.getByRole("menuitem", { name: /Share read-only/ }).click();
+  const dialog = page.getByRole("dialog", { name: "Share read-only" });
+  const create = dialog.getByRole("button", { name: "Create link" });
+  await create.focus();
+  await page.keyboard.press("Enter");
+  await expect(dialog.getByRole("textbox", { name: "Share link" })).toBeVisible();
+  await expect(create).toBeFocused();
+
+  // Past the last Revoke and round again.
+  for (let i = 0; i < 20; i++) {
+    await page.keyboard.press("Tab");
+    await expect
+      .poll(() => dialog.evaluate((d) => d.contains(document.activeElement)), {
+        message: `Tab ${i + 1} left the dialog`,
+        timeout: 2_000,
+      })
+      .toBe(true);
+  }
+  // Revoke what this test made, so a rerun starts from the same list.
+  for (const revoke of await dialog.getByRole("button", { name: "Revoke" }).all()) {
+    await revoke.click();
+  }
+});
+
 test("the account menu returns focus to its trigger on Escape", async ({ page }) => {
   await page.goto("/dashboards");
   const trigger = page.getByRole("button", { name: /account menu/i });
