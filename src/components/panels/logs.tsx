@@ -76,7 +76,9 @@ export function LogsView({ panel, data }: PanelBodyProps) {
       // biome-ignore lint/a11y/noNoninteractiveTabindex: a scroll container must be focusable to scroll by keyboard (WCAG 2.1.1)
       tabIndex={0}
       // `relative`, so each line's offsetTop is measured from the list.
-      className="relative max-h-full overflow-auto font-mono text-xs focus-visible:outline-2 focus-visible:outline-primary"
+      // No browser scroll anchoring (#499): the spacers around the window
+      // change size as it moves; the reader's place is kept above, by hand.
+      className="relative max-h-full overflow-auto font-mono text-xs [overflow-anchor:none] focus-visible:outline-2 focus-visible:outline-primary"
     >
       {lines.length === 0 ? (
         <p className="p-2 text-muted">No lines in this window.</p>

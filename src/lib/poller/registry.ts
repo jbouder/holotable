@@ -504,7 +504,11 @@ class DashboardPoller {
     event: PollerEvent,
     shared: DeltaMemo = new Map(),
   ) {
-    const timeField = queryTimeField(panel.query);
+    // A panel with its own row limit (#499) is the newest N rows, whole, every
+    // cycle: appending them would grow it past N and put the newest at the
+    // wrong end of a newest-first table. It is small by definition.
+    const timeField =
+      panelRowLimit(panel) === undefined ? queryTimeField(panel.query) : undefined;
     if (event.type !== "panel" || !timeField) {
       this.send(sub, event);
       return;
