@@ -78,3 +78,20 @@ test("no component decides by theme", () => {
     .map(([rel]) => rel);
   assert.deepEqual(found, []);
 });
+
+test("a control inside a tint takes back every ink the tint swaps", () => {
+  // #506 review: in high contrast `.tinted` points the text tokens at the
+  // solid fill's ink. A button or input that draws its own fill inside the
+  // notice must take the page's inks back, or its label vanishes on it.
+  const css = readFileSync(join(ROOT, "app/globals.css"), "utf8");
+  const vars = (body: string) =>
+    [...body.matchAll(/(--[a-z-]+):/g)].map((m) => m[1]).sort();
+  const swap = /\n\.tinted \{([^}]*)\}/.exec(css)?.[1] ?? "";
+  const restore = /\n\.tinted\s*:is\(([^{]*)\)\s*\{([^}]*)\}/.exec(css);
+  assert.ok(swap && restore, "both .tinted rules are in globals.css");
+  assert.deepEqual(vars(restore[2]), vars(swap), "every swapped ink is restored");
+  assert.ok(vars(swap).includes("--primary"), "links on a solid fill take the ink too");
+  for (const selector of ['[class*=" bg-surface"]', '[class*=" bg-primary"]', "input"]) {
+    assert.ok(restore[1].includes(selector), selector);
+  }
+});

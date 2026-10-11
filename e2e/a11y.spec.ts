@@ -278,8 +278,10 @@ test.describe("forced colors", () => {
     await expect(pill).toHaveCSS("outline-style", "solid");
   });
 
-  test("focus is drawn in the system's Highlight", async ({ page }) => {
-    await page.goto("/settings/appearance");
+  test("focus is drawn in the system's Highlight, as a ring even on a filled button", async ({
+    page,
+  }) => {
+    await page.goto("/dashboards");
     await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
     const highlight = await page.evaluate(() => {
       const probe = document.createElement("span");
@@ -289,11 +291,16 @@ test.describe("forced colors", () => {
       probe.remove();
       return color;
     });
-    const button = page.getByRole("button").first();
+    // The primary action: a `bg-primary` fill, which forced colors outline.
+    const button = page.getByRole("link", { name: "Create New Dashboard" });
     await button.focus();
-    await page.keyboard.press("Tab");
     await page.keyboard.press("Shift+Tab");
+    await page.keyboard.press("Tab");
     await expect(button).toHaveCSS("outline-color", highlight);
+    // A real ring, not a color on no outline: the fill's 1px forced-colors
+    // edge must not replace it while focused.
+    await expect(button).toHaveCSS("outline-style", "solid");
+    await expect(button).toHaveCSS("outline-width", "2px");
   });
 });
 
@@ -319,11 +326,13 @@ test("an embed is drawn in the theme its link names, and only a shipped one", as
   await expect(page.locator("html")).toHaveAttribute("data-theme", "light");
   await waitForPanels(page);
   await expectNoA11yViolations(page);
-  // Anything else is the default, and never written into the page.
-  const hostile = await page.goto(`${path}&theme=..%2Fx&scheme=foo`);
+  // Anything else is the default, and never written into the page as a
+  // value: a distinctive name, so an echo cannot hide behind encoding.
+  const hostile = await page.goto(`${path}&theme=zzhostile&scheme=zzscheme`);
   const body = (await hostile?.text()) ?? "";
-  expect(body).not.toContain("../x");
-  expect(body).not.toContain('"foo"');
+  for (const value of ["zzhostile", "zzscheme"]) {
+    expect(body.match(new RegExp(`data-[a-z-]+="${value}"|"${value}"`))).toBeNull();
+  }
   await expect(page.locator("html")).toHaveAttribute("data-palette", "holotable");
   await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
   await context.close();

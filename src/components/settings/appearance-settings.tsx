@@ -59,7 +59,11 @@ function SchemePreview({ theme, palette }: { theme: Theme; palette: Palette }) {
   );
 }
 
-/** A fieldset whose legend names the radio group inside it. */
+/**
+ * A heading and a hint over one radio group, which they name and describe.
+ * Not a fieldset: its legend would name a second group around the same
+ * choice, and a screen reader would announce it twice.
+ */
 function Group({
   legend,
   hint,
@@ -67,17 +71,21 @@ function Group({
 }: {
   legend: string;
   hint: string;
-  children: (labelledBy: string) => React.ReactNode;
+  children: (ids: { labelledBy: string; describedBy: string }) => React.ReactNode;
 }) {
   const id = React.useId();
   return (
-    <fieldset>
-      <legend id={id} className="text-sm font-semibold">
+    <div>
+      <p id={`${id}-label`} className="text-sm font-semibold">
         {legend}
-      </legend>
-      <p className="mt-1 text-sm text-muted">{hint}</p>
-      <div className="mt-3">{children(id)}</div>
-    </fieldset>
+      </p>
+      <p id={`${id}-hint`} className="mt-1 text-sm text-muted">
+        {hint}
+      </p>
+      <div className="mt-3">
+        {children({ labelledBy: `${id}-label`, describedBy: `${id}-hint` })}
+      </div>
+    </div>
   );
 }
 
@@ -89,7 +97,6 @@ function ChartPatternsSetting({ initial }: { initial: boolean }) {
   const apply = useSetChartPatterns();
   const [on, setOn] = React.useState(initial);
   const [error, setError] = React.useState<string | null>(null);
-  const id = React.useId();
 
   async function save(value: boolean) {
     const previous = on;
@@ -110,33 +117,33 @@ function ChartPatternsSetting({ initial }: { initial: boolean }) {
   }
 
   return (
-    <fieldset>
-      <legend id={id} className="text-sm font-semibold">
-        Patterns in charts
-      </legend>
-      <p className="mt-1 text-sm text-muted">
-        Fill bars, slices and areas with patterns as well as colors, so series can be told
-        apart without color.
-      </p>
-      <ChoiceCardGroup
-        value={String(on)}
-        onValueChange={(v) => void save(v === "true")}
-        labelledBy={id}
-        className="mt-3 sm:grid-cols-2"
+    <div>
+      <Group
+        legend="Patterns in charts"
+        hint="Fill bars, slices and areas with patterns as well as colors, so series can be told apart without color."
       >
-        <ChoiceCard value="false" label="Off" description="Solid colors." />
-        <ChoiceCard
-          value="true"
-          label="On"
-          description="Each series also gets a pattern."
-        />
-      </ChoiceCardGroup>
+        {(ids) => (
+          <ChoiceCardGroup
+            value={String(on)}
+            onValueChange={(v) => void save(v === "true")}
+            {...ids}
+            className="sm:grid-cols-2"
+          >
+            <ChoiceCard value="false" label="Off" description="Solid colors." />
+            <ChoiceCard
+              value="true"
+              label="On"
+              description="Each series also gets a pattern."
+            />
+          </ChoiceCardGroup>
+        )}
+      </Group>
       {error && (
         <p role="alert" className="mt-2 text-sm text-danger">
           {error}
         </p>
       )}
-    </fieldset>
+    </div>
   );
 }
 
@@ -155,11 +162,11 @@ export function AppearanceSettings({ chartPatterns }: { chartPatterns: boolean }
         legend="Color scheme"
         hint="Also in the account menu and the command palette."
       >
-        {(labelledBy) => (
+        {(ids) => (
           <ChoiceCardGroup
             value={theme}
             onValueChange={setTheme}
-            labelledBy={labelledBy}
+            {...ids}
             className="sm:grid-cols-3"
           >
             {THEME_OPTIONS.map(({ value, label, Icon }) => (
@@ -185,11 +192,11 @@ export function AppearanceSettings({ chartPatterns }: { chartPatterns: boolean }
           legend="Theme"
           hint="The colors the app is drawn in. Each is shown in the color scheme above."
         >
-          {(labelledBy) => (
+          {(ids) => (
             <ChoiceCardGroup
               value={palette}
               onValueChange={setPalette}
-              labelledBy={labelledBy}
+              {...ids}
               className="sm:grid-cols-2 lg:grid-cols-3"
             >
               {paletteInfo().map((p) => (
@@ -208,11 +215,11 @@ export function AppearanceSettings({ chartPatterns }: { chartPatterns: boolean }
       )}
 
       <Group legend="Motion" hint="Chart animation, transitions and loading shimmer.">
-        {(labelledBy) => (
+        {(ids) => (
           <ChoiceCardGroup
             value={motion}
             onValueChange={setMotion}
-            labelledBy={labelledBy}
+            {...ids}
             className="sm:grid-cols-3"
           >
             {MOTION_OPTIONS.map(({ value, label, hint }) => (

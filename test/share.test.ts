@@ -294,10 +294,34 @@ test("an embed's theme comes from its link, validated, and decides nothing else"
     new URL("../src/app/embed/dashboards/[id]/page.tsx", import.meta.url),
     "utf8",
   );
-  assert.deepEqual(
-    [...page.matchAll(/const \{([^}]*)\} = await searchParams/g)].map((m) => m[1].trim()),
-    ["token"],
+  const uses = page
+    .split("\n")
+    .filter((line) => line.includes("searchParams"))
+    .map((line) => line.trim());
+  assert.ok(
+    uses.every(
+      (line) =>
+        line.startsWith("searchParams,") ||
+        line.startsWith("searchParams: Promise") ||
+        line === "const { token } = await searchParams;",
+    ),
+    uses.join("\n"),
   );
+  // And the layout, which reads the proxy's header back, checks it again.
+  const { readEmbedAppearanceHeader } = await import("@/lib/embed-appearance");
+  assert.deepEqual(readEmbedAppearanceHeader("paper:light"), {
+    palette: "paper",
+    scheme: "light",
+  });
+  for (const forged of ["x:<script>", "../x:dark", "paper", "", null]) {
+    const read = readEmbedAppearanceHeader(forged);
+    assert.ok(read.palette === null || read.palette === "paper", String(forged));
+    assert.ok(read.scheme === null || read.scheme === "dark", String(forged));
+  }
+  assert.deepEqual(readEmbedAppearanceHeader("x:<script>"), {
+    palette: null,
+    scheme: null,
+  });
 });
 
 test("what an editor may ask a share for is checked", () => {

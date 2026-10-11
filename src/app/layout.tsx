@@ -22,6 +22,7 @@ import {
   NONCE_REQUEST_HEADER,
 } from "@/lib/security-headers";
 import { NO_EMBED_APPEARANCE, readEmbedAppearanceHeader } from "@/lib/embed-appearance";
+import { DEFAULT_PALETTE_ATTRIBUTE } from "@/lib/theme";
 import { bootstrapScript } from "@/lib/bootstrap";
 import { themeCss, themeFileInfo } from "@/lib/color/theme-file";
 import { operatorTheme } from "@/lib/operator-theme";
@@ -100,6 +101,7 @@ export default async function RootLayout({
           ? JSON.stringify(themeFileInfo(operator))
           : undefined,
       }}
+      {...{ [DEFAULT_PALETTE_ATTRIBUTE]: config.themeDefaultPalette }}
       suppressHydrationWarning
     >
       <head>

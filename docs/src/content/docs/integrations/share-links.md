@@ -69,8 +69,8 @@ not available. So the link names its look with two query parameters:
 
 | Parameter | Values | Without it |
 | --- | --- | --- |
-| `theme` | A shipped theme: `holotable`, `graphite`, `fjord`, `paper`, `high-contrast` | The server's `THEME_DEFAULT_PALETTE` |
-| `scheme` | `light`, `dark`, or `system`, which follows the host page's device setting | Dark, as before |
+| `theme` | A shipped theme: `holotable`, `graphite`, `fjord`, `paper`, `high-contrast` | What the viewer's browser has stored for Holotable, else the server's `THEME_DEFAULT_PALETTE` |
+| `scheme` | `light`, `dark`, or `system`, the viewer's device setting when the embed loads | What the viewer's browser has stored, else dark |
 
 The proxy checks both against the shipped names. Anything else is treated as
 absent, and is never written into the page or a header. The parameters are
