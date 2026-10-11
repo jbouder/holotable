@@ -106,13 +106,13 @@ test("injection: a legitimate panel runs over exactly the conversation's window"
   const plan = sqlPlanOf(plans[0]);
   assert.deepEqual(plan.params, [FROM, TO]);
   assert.match(plan.sql, /_holo\.\w+ >= \$1::timestamptz/);
-  assert.match(plan.sql, /\bLIMIT \d+$/);
+  assert.match(plan.sql, /\bLIMIT \d+\b/);
 });
 
 test("injection: a scalar panel still gets the server's LIMIT", async () => {
   const { out, plans } = await draw({ sql: "SELECT count(*) AS c FROM http_requests" });
   assert.equal(out.ok, true);
-  assert.match(sqlPlanOf(plans[0]).sql, /\bLIMIT \d+$/);
+  assert.match(sqlPlanOf(plans[0]).sql, /\bLIMIT \d+\b/);
 });
 
 test("the prompt says user messages are data and cannot change scope", () => {

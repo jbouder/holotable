@@ -2,7 +2,7 @@ import { Client, type ClientBase, type PoolClient, Query } from "pg";
 import type { SqlSourceRecord } from "@/lib/registry";
 import { resolveCredentials } from "@/lib/secrets/credentials";
 import { config } from "@/lib/config";
-import type { ExecutablePlan } from "@/lib/sql/safety";
+import { type ExecutablePlan, POSITION_COLUMN, TOTAL_COLUMN } from "@/lib/sql/safety";
 import { sourcePool } from "@/lib/timescaledb/pool";
 import { ResultCollector } from "@/lib/timescaledb/result-cap";
 import { observeQuery } from "@/lib/metrics";
@@ -10,6 +10,7 @@ import { trackInFlight } from "@/lib/shutdown";
 import { isPlainIdentifier } from "@/lib/catalog/identifiers";
 import type { SourceTestResult, TestReadOnly, TestTable } from "@/lib/source-test";
 import { QueryExecutionError, type QueryResult } from "@/lib/sources/execution";
+import type { Truncation } from "@/lib/truncation";
 
 /**
  * A connection of its own, outside the source's pool, for the connection test
@@ -118,7 +119,15 @@ function collectResult(
   return new Promise((resolve, reject) => {
     const collector = new ResultCollector(maxBytes);
     const query = new Query<Record<string, unknown>>(plan.sql, plan.params);
+    // A ranked plan (#486) says how many rows the window held on every row;
+    // the bookkeeping columns are the plan's, never the panel's.
+    let total: number | undefined;
     query.on("row", (row) => {
+      if (plan.ranked) {
+        total ??= Number(row[TOTAL_COLUMN]);
+        delete row[TOTAL_COLUMN];
+        delete row[POSITION_COLUMN];
+      }
       collector.push(serializableRow(row));
     });
     query.on("error", reject);
@@ -127,10 +136,23 @@ function collectResult(
         reject(new QueryExecutionError(collector.exceededMessage()));
         return;
       }
-      resolve({
-        columns: result.fields.map((field) => field.name),
-        rows: collector.rows,
-      });
+      const columns = result.fields
+        .map((field) => field.name)
+        .filter(
+          (name) => !plan.ranked || (name !== TOTAL_COLUMN && name !== POSITION_COLUMN),
+        );
+      const rows = collector.rows;
+      let truncated: Truncation | undefined;
+      if (plan.ranked) {
+        if (total !== undefined && total > rows.length) {
+          truncated = { stage: "rows", kept: rows.length, total };
+        }
+      } else if (plan.maxRows !== undefined && rows.length > plan.maxRows) {
+        // The plan asked for one past the cap to see the cut; that row goes.
+        rows.length = plan.maxRows;
+        truncated = { stage: "rows", kept: rows.length };
+      }
+      resolve({ columns, rows, ...(truncated ? { truncated } : {}) });
     });
     client.query(query);
   });

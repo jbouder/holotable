@@ -1,3 +1,4 @@
+import { parseSync } from "libpg-query";
 import { config } from "@/lib/config";
 import { recordSqlRejection, type SqlRejectionReason } from "@/lib/metrics";
 import { applyRowFilter, type RowFilterBinding } from "@/lib/sql/row-filter";
@@ -376,7 +377,21 @@ export interface ExecutablePlan {
    * last. Present only when the statement references any.
    */
   variables?: string[];
+  /**
+   * The row cap (#486), and how the executor reads what it cut. With a time
+   * field the plan keeps the newest `maxRows` rows in the statement's own
+   * order and adds two bookkeeping columns, {@link POSITION_COLUMN} and
+   * {@link TOTAL_COLUMN}, which the executor strips; without one it asks for
+   * one row past the cap, so a cut is seen rather than guessed.
+   */
+  maxRows?: number;
+  ranked?: boolean;
 }
+
+/** The statement's own row order, kept through the newest-rows cut. */
+export const POSITION_COLUMN = "_holo_pos";
+/** How many rows the window held before the cut. */
+export const TOTAL_COLUMN = "_holo_total";
 
 /**
  * Build the final, guarded executable plan. Assumes `validateSql` already
@@ -441,14 +456,27 @@ export function buildExecutablePlan(input: {
     }
     params.push(input.from, input.to);
     if (input.rowFilter) params.push(input.rowFilter.value);
-    sql = `SELECT * FROM (${inner}) AS _holo
-WHERE _holo.${input.timeField} >= $1::timestamptz
-  AND _holo.${input.timeField} < $2::timestamptz
-LIMIT ${limit}`;
+    // The newest rows, not the first (#486): a series ordered oldest-first
+    // used to keep its oldest 5,000 and lose the live edge. The cut is by the
+    // time field, newest first; the rows that survive go back into the
+    // statement's own order by their position in it, so a newest-first log
+    // stays newest-first. `row_number() OVER ()` numbers rows as the
+    // subquery delivers them, before the cut's sort.
+    const tf = input.timeField;
+    sql = `SELECT * FROM (SELECT _holo.*, row_number() OVER () AS ${POSITION_COLUMN}, count(*) OVER () AS ${TOTAL_COLUMN}
+FROM (${inner}) AS _holo
+WHERE _holo.${tf} >= $1::timestamptz
+  AND _holo.${tf} < $2::timestamptz
+ORDER BY _holo.${tf} DESC, ${POSITION_COLUMN} DESC
+LIMIT ${limit}) AS _holo_kept
+ORDER BY _holo_kept.${POSITION_COLUMN}`;
   } else {
     if (input.rowFilter) params.push(input.rowFilter.value);
-    sql = `SELECT * FROM (${inner}) AS _holo LIMIT ${limit}`;
+    // No time to rank by, so the first rows, as before: one more than the cap
+    // is how the executor knows the cut happened.
+    sql = `SELECT * FROM (${inner}) AS _holo LIMIT ${limit + 1}`;
   }
+  verifyWrapper(sql, inner, input.timeField || undefined, limit);
   params.push(...values);
 
   return {
@@ -456,5 +484,99 @@ LIMIT ${limit}`;
     params,
     timeField: input.timeField,
     ...(names.length > 0 ? { variables: names } : {}),
+    maxRows: limit,
+    ranked: Boolean(input.timeField),
   };
+}
+
+/**
+ * The parse tree's byte offsets into the text it was parsed from: every such
+ * field `@pgsql/types` declares for this parser. They move when the statement
+ * is embedded in the wrapper, and are all that does.
+ */
+const OFFSET_KEYS = new Set([
+  "location",
+  "name_location",
+  "stmt_location",
+  "stmt_len",
+  "list_start",
+  "list_end",
+  "rexpr_list_start",
+  "rexpr_list_end",
+]);
+
+/** A parse tree without source offsets, so two spellings of one tree compare. */
+function shape(value: unknown): unknown {
+  if (Array.isArray(value)) return value.map(shape);
+  if (typeof value !== "object" || value === null) return value;
+  const out: Record<string, unknown> = {};
+  for (const [k, v] of Object.entries(value)) {
+    if (!OFFSET_KEYS.has(k)) out[k] = shape(v);
+  }
+  return out;
+}
+
+type Node = Record<string, unknown>;
+const select = (n: unknown): Node | undefined =>
+  (n as { SelectStmt?: Node } | undefined)?.SelectStmt;
+const subselect = (n: Node | undefined, alias: string): Node | undefined => {
+  const from = n?.fromClause as Array<{ RangeSubselect?: Node }> | undefined;
+  const range = from?.length === 1 ? from[0].RangeSubselect : undefined;
+  return (range?.alias as { aliasname?: string } | undefined)?.aliasname === alias
+    ? select(range?.subquery)
+    : undefined;
+};
+const limitOf = (n: Node | undefined): number | undefined =>
+  (n?.limitCount as { A_Const?: { ival?: { ival?: number } } } | undefined)?.A_Const?.ival
+    ?.ival;
+
+/**
+ * Prove the wrapper is what it says, from a fresh parse of its output (#486):
+ * one SELECT whose `_holo` subquery is exactly the statement that was
+ * checked, under a constant `LIMIT` at the cap — the newest rows by the time
+ * field when there is one — and nothing else. A template edit that put the
+ * limit, the filter or the statement anywhere else fails here, not in front
+ * of a source. Exported for unit testing.
+ */
+export function verifyWrapper(
+  sql: string,
+  inner: string,
+  timeField: string | undefined,
+  limit: number,
+): void {
+  const fail = (why: string): never => {
+    throw new Error(`plan wrapper failed verification: ${why}`);
+  };
+  const stmts = (parseSync(sql) as { stmts?: Array<{ stmt: unknown }> }).stmts ?? [];
+  if (stmts.length !== 1) fail("not one statement");
+  const outer = select(stmts[0].stmt);
+  if (!outer) fail("not a SELECT");
+  let holo: Node | undefined;
+  if (timeField) {
+    if (outer?.whereClause || outer?.limitCount) fail("outer query filters or limits");
+    const cut = subselect(outer, "_holo_kept");
+    if (!cut?.whereClause) fail("no time filter");
+    if (limitOf(cut) !== limit) fail("limit is not the cap");
+    const first = (cut?.sortClause as Array<{ SortBy?: Node }> | undefined)?.[0]?.SortBy;
+    const field = (
+      first?.node as { ColumnRef?: { fields?: Array<{ String?: { sval?: string } }> } }
+    )?.ColumnRef?.fields?.map((f) => f.String?.sval);
+    // Unquoted, so Postgres folds it; the identifier check allows ASCII only.
+    const folded = `_holo.${timeField.toLowerCase()}`;
+    if (first?.sortby_dir !== "SORTBY_DESC" || field?.join(".") !== folded) {
+      fail("the cut is not newest-first on the time field");
+    }
+    holo = subselect(cut, "_holo");
+  } else {
+    if (outer?.whereClause || outer?.sortClause) fail("outer query filters or sorts");
+    if (limitOf(outer) !== limit + 1) fail("limit is not the cap");
+    holo = subselect(outer, "_holo");
+  }
+  const checked = (parseSync(inner) as { stmts?: Array<{ stmt: unknown }> }).stmts ?? [];
+  if (
+    checked.length !== 1 ||
+    JSON.stringify(shape(holo)) !== JSON.stringify(shape(select(checked[0].stmt)))
+  ) {
+    fail("the wrapped statement is not the checked one");
+  }
 }

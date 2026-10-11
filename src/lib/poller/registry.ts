@@ -26,6 +26,7 @@ import {
   recordFailure,
 } from "@/lib/poller/backoff";
 import { decodeResumeToken, encodeResumeToken } from "@/lib/poller/resume";
+import type { Truncation } from "@/lib/truncation";
 import {
   forgetDashboard,
   observePollerTick,
@@ -81,6 +82,8 @@ export type PollerEvent =
        * window is the dashboard's; a panel with its own (#114) ends here.
        */
       window?: { from: number; to: number };
+      /** Where the server cut this cycle's result short (#486). */
+      truncated?: Truncation;
     }
   | { type: "panel-error"; panelId: string; error: string; kind: ErrorKind }
   /**
@@ -263,6 +266,7 @@ export function makePanelExecutor(
         mode: "replace",
         columns: result.columns,
         rows: result.rows,
+        ...(result.truncated ? { truncated: result.truncated } : {}),
       },
     ];
   };

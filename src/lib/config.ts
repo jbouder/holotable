@@ -132,7 +132,7 @@ export const config = {
    */
   promqlMaxRange: str("PROMQL_MAX_RANGE", "7d"),
   /** Max points retained per series in the browser rolling window. */
-  maxWindowPoints: num("MAX_WINDOW_POINTS", 720),
+  maxWindowPoints: num("MAX_WINDOW_POINTS", 1_000),
   /** Statement timeout (seconds) applied to every metrics query. */
   queryTimeoutSeconds: num("QUERY_TIMEOUT_SECONDS", 20),
   /**

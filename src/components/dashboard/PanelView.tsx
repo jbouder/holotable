@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { Clock, Info, Link2 } from "lucide-react";
+import { Clock, Info, Link2, Scissors } from "lucide-react";
 import { hasQuery, type Panel, type TimeRange, panelTimeField } from "@/lib/ir";
 import { type Datum, hasUsableLinks, type MenuLinkItem } from "@/lib/drilldown";
 import type { Selection } from "@/lib/variable-selection";
@@ -21,6 +21,7 @@ import { formatClockTime } from "@/lib/connection";
 import { useChartTheme } from "@/components/chart-theme";
 import { useTimeDisplay } from "@/components/time-display";
 import type { PanelState, PanelStatus } from "@/lib/panel-state";
+import { describeTruncation, type Truncation } from "@/lib/truncation";
 import { PANEL_EXIT_SHORTCUT } from "@/lib/shortcuts";
 import { supportsImageExport } from "@/lib/panel-export";
 import { brushedRange, panelOverride, supportsTimeBrush } from "@/lib/time-range";
@@ -155,6 +156,7 @@ export const PanelView = React.memo(function PanelView({
           </div>
           <div className="flex shrink-0 items-center gap-1">
             <OverrideBadge panel={panel} />
+            {queried && data.truncated && <TruncationBadge truncated={data.truncated} />}
             {showBadge && <StatusBadge status={status} updatedAt={state?.updatedAt} />}
             {!embedded && links && hasUsableLinks(links) && (
               <span className="inline-flex h-7 w-5 items-center justify-center text-muted">
@@ -540,6 +542,32 @@ function OverrideBadge({ panel }: { panel: Panel }) {
       </span>
       <span className="sr-only">{override.description}</span>
     </span>
+  );
+}
+
+/**
+ * Rows this panel does not show (#486): a cap on the server or the browser's
+ * window cut the result, and the chart must not pass as the whole of it. The
+ * label is short enough for the header; the popover says which limit and
+ * what to change. Visible on a phone, like the override badge: a chart read
+ * as complete when it is not is a wrong chart.
+ */
+function TruncationBadge({ truncated }: { truncated: Truncation }) {
+  const { label, detail } = describeTruncation(truncated);
+  return (
+    <Popover
+      label={`${label}: some rows are not shown`}
+      align="end"
+      className="h-auto w-auto max-w-40 gap-1 bg-surface-2 px-2 py-0.5 text-xs font-medium"
+      trigger={
+        <>
+          <Scissors className="h-3 w-3 shrink-0" aria-hidden />
+          <span className="truncate">{label}</span>
+        </>
+      }
+    >
+      {detail}
+    </Popover>
   );
 }
 

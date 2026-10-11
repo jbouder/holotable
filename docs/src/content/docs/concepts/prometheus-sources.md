@@ -128,7 +128,9 @@ panel has no `WHERE`: the server asks the endpoint for the window itself.
   to a multiple of the step, so two polls a few seconds apart ask for the same
   points. The step is the window divided by `PROMQL_MAX_POINTS` (1,000 by
   default), never finer than `PROMETHEUS_MIN_STEP_MS` (15 s), and raised to the
-  panel's `minStep` when it sets one.
+  panel's `minStep` when it sets one. When the point cap is what widened the
+  step, the result says so and the panel shows a badge with the count the
+  finest step would have drawn.
 - **An instant query** goes to `/api/v1/query` with `time` at the window's
   end.
 

@@ -2,6 +2,7 @@ import { isSqlQuery, queryText, queryTimeField } from "@/lib/ir";
 import { type ApiError, apiErrorFromThrown, readApiError } from "@/lib/errors";
 import type { PanelQuery, TimeRange } from "@/lib/ir";
 import type { VariableValues } from "@/lib/sql/variables";
+import { readTruncation, type Truncation } from "@/lib/truncation";
 import { valuesKey } from "@/lib/variable-selection";
 
 /**
@@ -20,6 +21,8 @@ export interface QueryRows {
   rows: Record<string, unknown>[];
   /** The window the server resolved for these rows, in epoch ms. */
   window?: { from: number; to: number };
+  /** Where the rows were cut short (#486). */
+  truncated?: Truncation;
 }
 
 export const EMPTY_ROWS: QueryRows = { columns: [], rows: [] };
@@ -97,12 +100,14 @@ export async function runPanelQuery(
 /** A result body is trusted no further than its shape. */
 function readRows(body: unknown): QueryRows {
   const record = typeof body === "object" && body !== null ? body : {};
-  const { columns, rows, window } = record as Partial<QueryRows>;
+  const { columns, rows, window, truncated } = record as Partial<QueryRows>;
   const resolved = readWindow(window);
+  const cut = readTruncation(truncated);
   return {
     columns: Array.isArray(columns) ? columns : [],
     rows: Array.isArray(rows) ? rows : [],
     ...(resolved && { window: resolved }),
+    ...(cut && { truncated: cut }),
   };
 }
 

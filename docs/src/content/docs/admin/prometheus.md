@@ -81,7 +81,7 @@ the query API. An endpoint that does not publish its flags reads as "unknown".
 
 | Variable | Default | What it bounds |
 | --- | --- | --- |
-| `PROMQL_MAX_POINTS` | `1000` | Points per series in a range query. The step is the window divided by this. |
+| `PROMQL_MAX_POINTS` | `1000` | Points per series in a range query. The step is the window divided by this. A step it widens shows a badge on the panel. Keep it equal to `MAX_WINDOW_POINTS`: the two are one point budget. |
 | `PROMETHEUS_MIN_STEP_MS` | `15000` | The finest step, whatever the window. Keep it at or above the scrape interval. |
 | `PROMETHEUS_MAX_SERIES` | `100` | Series in one result. More is refused with a message that says to aggregate. |
 | `PROMQL_MAX_RANGE` | `7d` | The longest range, subquery or `offset` an expression may write, and how far back a label-values variable looks. |

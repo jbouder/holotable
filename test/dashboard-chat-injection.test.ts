@@ -108,7 +108,7 @@ function assertServerOwnedWindow(r: Awaited<ReturnType<typeof plan>>) {
   assert.deepEqual(sqlPlanOf(r.plan).params, [FROM, TO]);
   assert.match(sqlPlanOf(r.plan).sql, /_holo\.\w+ >= \$1::timestamptz/);
   assert.match(sqlPlanOf(r.plan).sql, /_holo\.\w+ < \$2::timestamptz/);
-  assert.match(sqlPlanOf(r.plan).sql, /\bLIMIT \d+$/);
+  assert.match(sqlPlanOf(r.plan).sql, /\bLIMIT \d+\b/);
   assert.equal(r.source.id, "src-metrics");
 }
 
@@ -259,7 +259,7 @@ test("injection: a scalar query still gets the server's LIMIT", async () => {
   assert.equal(r.ok, true);
   if (r.ok) {
     assert.deepEqual(sqlPlanOf(r.plan).params, []);
-    assert.match(sqlPlanOf(r.plan).sql, /\bLIMIT \d+$/);
+    assert.match(sqlPlanOf(r.plan).sql, /\bLIMIT \d+\b/);
   }
 });
 

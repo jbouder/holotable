@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import {
   AI_ROUTE_MAX_DURATION_MS,
+  config,
   cookieSecure,
   formatConfigProblems,
   validateConfig,
@@ -1116,4 +1117,14 @@ test("AI_ROUTE_MAX_DURATION_MS matches every model-backed route", () => {
     const seconds = Number(/export const maxDuration = (\d+);/.exec(text)?.[1]);
     assert.equal(seconds * 1000, AI_ROUTE_MAX_DURATION_MS, route);
   }
+});
+
+/**
+ * One point budget (#486): a panel holds as many rows as a PromQL series may
+ * have points, so a series fits its panel whole and a cut is never silent.
+ */
+test("the browser's window and the PromQL point cap are one budget", () => {
+  assert.equal(config.maxWindowPoints, config.promqlMaxPoints);
+  const example = parseDotenv(readFileSync(".env.example", "utf8"));
+  assert.equal(example.MAX_WINDOW_POINTS, example.PROMQL_MAX_POINTS);
 });

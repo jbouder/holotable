@@ -243,7 +243,7 @@ test("every panel builds an executable plan with the server's time range", () =>
       to: range.to,
       rowFilter: null,
     });
-    assert.match(plan.sql, /LIMIT \d+$/);
+    assert.match(plan.sql, /\bLIMIT \d+\b/);
     // A panel that declares a time field is filtered by the server, never by
     // the SQL: two bound parameters, and no time expression in the spec.
     assert.equal(

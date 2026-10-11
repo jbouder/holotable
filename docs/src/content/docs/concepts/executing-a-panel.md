@@ -233,10 +233,15 @@ The validated query is wrapped as a subquery, and the dashboard's resolved
 `from`/`to` are injected as **bound parameters** on the declared `timeField`:
 
 ```sql
-SELECT * FROM (<the model's validated SQL>) AS _holo
-WHERE _holo.<timeField> >= $1::timestamptz
-  AND _holo.<timeField> <  $2::timestamptz
-LIMIT <maxQueryRows>          -- default 5000
+SELECT * FROM (
+  SELECT _holo.*, row_number() OVER () AS _holo_pos, count(*) OVER () AS _holo_total
+  FROM (<the model's validated SQL>) AS _holo
+  WHERE _holo.<timeField> >= $1::timestamptz
+    AND _holo.<timeField> <  $2::timestamptz
+  ORDER BY _holo.<timeField> DESC, _holo_pos DESC
+  LIMIT <maxQueryRows>        -- default 5000
+) AS _holo_kept
+ORDER BY _holo_kept._holo_pos
 ```
 
 - `from`/`to` come from `resolveTimeRange` (`src/lib/time.ts`), which turns the
@@ -250,8 +255,20 @@ LIMIT <maxQueryRows>          -- default 5000
   wrapper has no `WHERE`, and the numbering starts at `$1`.
 - `timeField` is re-checked against a strict identifier regex before
   interpolation — it is an identifier, so it cannot be a bound parameter.
-- A hard `LIMIT` caps rows regardless of what the query does, and
-  `MAX_RESULT_BYTES` (default 4 MiB) caps the serialized size of the result:
+- A hard `LIMIT` caps rows regardless of what the query does. With a
+  `timeField` it keeps the **newest** rows (#486): the cut is newest-first on
+  the time field, and the survivors go back into the statement's own order by
+  their position in it, so a series keeps its live edge and a newest-first log
+  stays newest-first. `_holo_total` is how many rows the window held; the
+  executor strips both bookkeeping columns and reports the cut as the
+  result's `truncated`, which the panel shows as a badge. Without a
+  `timeField` the wrapper is `SELECT * FROM (…) AS _holo LIMIT <maxQueryRows + 1>`:
+  the first rows, with one extra asked for so a cut is seen rather than
+  guessed.
+- The wrapper is re-parsed after it is built, and refused unless its `_holo`
+  subquery is exactly the checked statement under the expected `LIMIT`
+  (`verifyWrapper` in `src/lib/sql/safety.ts`).
+- `MAX_RESULT_BYTES` (default 4 MiB) caps the serialized size of the result:
   `executePlan` measures rows as they stream in from Postgres and stops
   keeping them the moment the cap is crossed, so a wide-row result fails with
   an actionable message naming the limit instead of being buffered whole.

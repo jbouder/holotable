@@ -2,6 +2,8 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { mergePanelRows } from "@/lib/stream-merge";
 import { applyPollerEvents, markStale, type PanelStates } from "@/lib/panel-state";
+import { fitToWindow } from "@/lib/stream-merge";
+import { readTruncation } from "@/lib/truncation";
 import type { PollerEvent } from "@/lib/poller/registry";
 
 /**
@@ -97,6 +99,88 @@ test("an append without `since` adds, a replace swaps, and the window stays boun
     mergePanelRows(prev, frame({ columns: [] }), 720).columns,
     prev.columns,
   );
+});
+
+/**
+ * One point budget (#486): a panel keeps the newest `maxWindowPoints` rows
+ * whether they came whole or as an append, and says so when that dropped
+ * any, so a chart never passes as the whole result when it is not.
+ */
+test("the window keeps the newest rows and says when it cut, replace or append", () => {
+  const rows = (n: number) =>
+    Array.from({ length: n }, (_, i) => ({ minute: m(i % 10), i }));
+  const replaced = mergePanelRows(
+    undefined,
+    frame({ mode: "replace", rows: rows(5) }),
+    3,
+  );
+  assert.deepEqual(
+    replaced.rows.map((r) => r.i),
+    [2, 3, 4],
+  );
+  assert.deepEqual(replaced.truncated, { stage: "window", kept: 3, total: 5 });
+
+  // A whole result under the budget is shown as sent, with no badge.
+  const whole = mergePanelRows(undefined, frame({ mode: "replace", rows: rows(3) }), 3);
+  assert.equal(whole.rows.length, 3);
+  assert.equal(whole.truncated, undefined);
+
+  // An append that overflows rolls the oldest off, keeping the last count.
+  const rolled = mergePanelRows(replaced, frame({ rows: [{ minute: m(9), i: 9 }] }), 3);
+  assert.deepEqual(
+    rolled.rows.map((r) => r.i),
+    [3, 4, 9],
+  );
+  assert.deepEqual(rolled.truncated, { stage: "window", kept: 3, total: 5 });
+});
+
+test("a cut the server made rides through, and the browser's own cut is later", () => {
+  const server = { stage: "rows", kept: 4, total: 9 } as const;
+  const sent = Array.from({ length: 4 }, (_, i) => ({ minute: m(i), i }));
+  const shown = mergePanelRows(
+    undefined,
+    frame({ mode: "replace", rows: sent, truncated: server }),
+    10,
+  );
+  assert.deepEqual(shown.truncated, server);
+  // Over the window too: the badge names the window, with the server's total.
+  assert.deepEqual(
+    fitToWindow({ columns: [], rows: sent, truncated: server }, 2).truncated,
+    {
+      stage: "window",
+      kept: 2,
+      total: 9,
+    },
+  );
+  // Without a time field the server cannot count: the total stays unknown.
+  assert.deepEqual(
+    fitToWindow({ columns: [], rows: sent, truncated: { stage: "rows", kept: 4 } }, 2)
+      .truncated,
+    { stage: "window", kept: 2 },
+  );
+});
+
+test("a truncation read off the wire is held to its shape", () => {
+  assert.deepEqual(readTruncation({ stage: "points", kept: 1000, total: 5761 }), {
+    stage: "points",
+    kept: 1000,
+    total: 5761,
+  });
+  for (const bad of [
+    null,
+    "rows",
+    { stage: "everything", kept: 1 },
+    { stage: "rows", kept: -1 },
+    { stage: "rows", kept: Number.NaN },
+    { stage: "rows" },
+  ]) {
+    assert.equal(readTruncation(bad), undefined, JSON.stringify(bad));
+  }
+  // A total that is not more than what was kept is no total.
+  assert.deepEqual(readTruncation({ stage: "rows", kept: 5, total: 5 }), {
+    stage: "rows",
+    kept: 5,
+  });
 });
 
 /**

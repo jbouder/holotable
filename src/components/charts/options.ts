@@ -16,6 +16,7 @@ import {
 } from "@/lib/panels/presentation";
 import type { ThresholdStep } from "@/lib/panels/thresholds";
 import { formatDateTime, type TimeDisplay } from "@/lib/time-display";
+import type { Truncation } from "@/lib/truncation";
 
 export interface PanelData {
   columns: string[];
@@ -25,6 +26,8 @@ export interface PanelData {
    * epoch ms. A live dashboard learns it from each `tick` instead.
    */
   window?: { from: number; to: number };
+  /** Where this result was cut short, server or browser side (#486). */
+  truncated?: Truncation;
 }
 
 const palette = chartPalette();

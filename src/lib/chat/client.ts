@@ -1,3 +1,4 @@
+import { readTruncation } from "@/lib/truncation";
 import { type ApiError, apiErrorFromThrown, readApiError } from "@/lib/errors";
 import type { TimeRange } from "@/lib/ir";
 import { readConversationPage } from "@/lib/chat/history";
@@ -80,12 +81,14 @@ export function readRows(body: unknown): QueryRows {
     Record<keyof QueryRows, unknown>
   >;
   const window = readWindow(record.window);
+  const truncated = readTruncation(record.truncated);
   return {
     columns: Array.isArray(record.columns)
       ? record.columns.filter((c): c is string => typeof c === "string")
       : [],
     rows: Array.isArray(record.rows) ? (record.rows as Record<string, unknown>[]) : [],
     ...(window && { window }),
+    ...(truncated && { truncated }),
   };
 }
 

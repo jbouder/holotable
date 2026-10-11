@@ -32,6 +32,11 @@ export type PromqlPlan =
       end: Date;
       stepSeconds: number;
       timeoutMs: number;
+      /**
+       * Set when `PROMQL_MAX_POINTS` widened the step (#486): how many points
+       * the finest step the panel allows would have drawn over the window.
+       */
+      finestPoints?: number;
     }
   | {
       instant: true;
@@ -48,15 +53,34 @@ export type PromqlPlan =
  * seconds, so the window can be aligned to it.
  */
 export function stepSecondsFor(from: Date, to: Date, minStep?: string): number {
-  const spanMs = Math.max(1, to.getTime() - from.getTime());
+  return Math.ceil(Math.max(finestStepMs(minStep), cappedStepMs(from, to)) / 1_000);
+}
+
+/** The finest step the panel and the operator allow, before the point cap. */
+function finestStepMs(minStep?: string): number {
   const floorMs = minStep ? (durationMs(minStep) ?? 0) : 0;
-  const stepMs = Math.max(
-    floorMs,
-    config.prometheusMinStepMs,
-    Math.ceil(spanMs / Math.max(1, config.promqlMaxPoints)),
-    1_000,
-  );
-  return Math.ceil(stepMs / 1_000);
+  return Math.max(floorMs, config.prometheusMinStepMs, 1_000);
+}
+
+/** The step `PROMQL_MAX_POINTS` asks for over this window. */
+function cappedStepMs(from: Date, to: Date): number {
+  const spanMs = Math.max(1, to.getTime() - from.getTime());
+  return Math.ceil(spanMs / Math.max(1, config.promqlMaxPoints));
+}
+
+/**
+ * How many points the finest allowed step would draw over the window, when
+ * the point cap is what set the step; undefined when it did not widen it.
+ */
+export function finestPointsFor(
+  from: Date,
+  to: Date,
+  minStep?: string,
+): number | undefined {
+  const finest = finestStepMs(minStep);
+  if (cappedStepMs(from, to) <= finest) return undefined;
+  const spanMs = Math.max(1, to.getTime() - from.getTime());
+  return Math.floor(spanMs / (Math.ceil(finest / 1_000) * 1_000)) + 1;
 }
 
 /**
@@ -88,6 +112,7 @@ export function buildPromqlPlan(input: {
   const stepSeconds = stepSecondsFor(input.from, input.to, input.minStep);
   const start = alignToStep(input.from, stepSeconds);
   const end = alignToStep(input.to, stepSeconds);
+  const finestPoints = finestPointsFor(input.from, input.to, input.minStep);
   return {
     instant: false,
     expr,
@@ -95,6 +120,7 @@ export function buildPromqlPlan(input: {
     end: end < start ? start : end,
     stepSeconds,
     timeoutMs,
+    ...(finestPoints !== undefined ? { finestPoints } : {}),
   };
 }
 

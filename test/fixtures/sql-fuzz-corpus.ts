@@ -29,6 +29,16 @@ export const CORPUS: CorpusEntry[] = [
     verdict: "accept",
     note: "as above, with whitespace between the terminators",
   },
+  {
+    sql: "SELECT ts FROM http_requests WHERE status = ANY(ARRAY[200, 201])",
+    verdict: "accept",
+    note: "found by the plan-wrapping property (#486): an array literal records its byte offsets as `list_start`/`list_end`, which move when the statement is wrapped, so the wrapper's check that it holds the checked statement must ignore them",
+  },
+  {
+    sql: "SELECT ts FROM http_requests WHERE status IN (200, 201)",
+    verdict: "accept",
+    note: "found by the IR fixture snapshots (#486): an IN list keeps its offsets as `rexpr_list_start`/`rexpr_list_end`",
+  },
 
   // --- Seeds: one representative per adversarial class ----------------------------
   {
