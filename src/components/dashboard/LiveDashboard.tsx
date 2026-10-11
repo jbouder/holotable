@@ -35,6 +35,7 @@ import {
 } from "@/lib/connection";
 import {
   ACCESS_ENDED_EVENT,
+  CAPACITY_EVENT,
   DRAIN_EVENT,
   DROP_EVENT,
   SESSION_ENDED_EVENT,
@@ -380,6 +381,17 @@ export function LiveDashboard({
     // The server closed this stream for falling behind (#489): the same as a
     // drain from here, a `retry:` hint and a reconnect that resumes.
     es.addEventListener(DROP_EVENT, onDraining);
+    // The server is at its poller limit (#495): say so, and let the retry
+    // hint bring this stream back when there is room.
+    const onCapacity = () => {
+      setStates(markStale);
+      setDashboardError({
+        error: "This server is at its live-dashboard limit; try again shortly.",
+        kind: "infrastructure",
+      });
+      signal({ type: "error", closed: false });
+    };
+    es.addEventListener(CAPACITY_EVENT, onCapacity);
     // The realm ended this session (#28). Close rather than let EventSource
     // retry into a 401; the renewal that follows is refused too, and that
     // refusal is what raises the keepalive's sign-in banner.
@@ -427,6 +439,7 @@ export function LiveDashboard({
     return () => {
       es.removeEventListener(DRAIN_EVENT, onDraining);
       es.removeEventListener(DROP_EVENT, onDraining);
+      es.removeEventListener(CAPACITY_EVENT, onCapacity);
       es.removeEventListener(SESSION_ENDED_EVENT, onSessionEnded);
       es.removeEventListener(SESSION_EXPIRED_EVENT, onSessionExpired);
       es.removeEventListener(ACCESS_ENDED_EVENT, onAccessEnded);

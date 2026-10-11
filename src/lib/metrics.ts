@@ -84,6 +84,7 @@ interface Instruments {
   queryRows: Histogram<"source">;
   sseSubscribers: Gauge<"dashboard">;
   pollersActive: Gauge<string>;
+  pollersLimit: Gauge<string>;
   llmTokens: Counter<"workspace" | "model" | "direction">;
   llmRequests: Counter<"route" | "outcome">;
   llmRepairs: Counter<"route" | "outcome">;
@@ -141,6 +142,11 @@ function build(): Instruments {
     pollersActive: new Gauge({
       name: "holotable_pollers_active",
       help: "Dashboard pollers running on this instance.",
+      registers: [registry],
+    }),
+    pollersLimit: new Gauge({
+      name: "holotable_pollers_limit",
+      help: "Most pollers this instance runs before a new stream is told to retry (MAX_POLLERS, or derived from the heap).",
       registers: [registry],
     }),
     llmTokens: new Counter({
@@ -367,6 +373,11 @@ export function trackLlmInFlight(modelId: string): () => void {
 /** Rows the retention sweep (#494) deleted from a table. The table is a fixed name. */
 export function recordRetentionDeleted(table: string, rows: number): void {
   instruments().retentionDeleted.inc({ table }, rows);
+}
+
+/** Report the most pollers this instance runs (#495). */
+export function setPollerLimit(limit: number): void {
+  instruments().pollersLimit.set(limit);
 }
 
 /** Report how many pollers are running on this instance. */

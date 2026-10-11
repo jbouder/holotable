@@ -84,6 +84,12 @@ spec:
             # reconnect hint, the grace period — depends on it.
             - name: NEXT_MANUAL_SIG_HANDLE
               value: "true"
+            {{- with include "holotable.maxOldSpaceMb" . }}
+            # The heap ceiling from the memory limit (#495), so pressure shows
+            # as garbage collection and a refused stream, not an OOM kill.
+            - name: NODE_OPTIONS
+              value: {{ printf "--max-old-space-size=%s" . | quote }}
+            {{- end }}
             {{- if .Values.ai.models }}
             - name: AI_MODELS_FILE
               value: {{ include "holotable.modelsFile" . | quote }}

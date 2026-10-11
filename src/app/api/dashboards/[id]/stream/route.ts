@@ -12,12 +12,17 @@ import { guardStream, type StreamEnd } from "@/lib/auth/stream-guard";
 import { config } from "@/lib/config";
 import { getDashboardById, getSourceById } from "@/lib/db/repo";
 import { rowScopeFor } from "@/lib/row-scope";
-import { defaultPanelExecutor, getPoller } from "@/lib/poller/registry";
+import {
+  defaultPanelExecutor,
+  getPoller,
+  PollerCapacityError,
+} from "@/lib/poller/registry";
 import { selectionFromParams } from "@/lib/variable-selection";
 import { checkedSelection, variableSourceIds } from "@/lib/variables";
 import { hasQuery, TimeRange, queryStatement } from "@/lib/ir";
 import {
   accessEndedFrame,
+  capacityResponse,
   drainFrame,
   sessionEndedFrame,
   sessionExpiredFrame,
@@ -120,15 +125,24 @@ export const GET = route(
       dashboard.workspaceId,
       scope,
     );
-    const poller = getPoller(
-      id,
-      dashboard.version,
-      dashboard.workspaceId,
-      spec,
-      scope,
-      defaultPanelExecutor,
-      variables,
-    );
+    let poller: ReturnType<typeof getPoller>;
+    try {
+      poller = getPoller(
+        id,
+        dashboard.version,
+        dashboard.workspaceId,
+        spec,
+        scope,
+        defaultPanelExecutor,
+        variables,
+      );
+    } catch (err) {
+      // At the poller cap (#495): this viewer waits and retries, and every
+      // stream already open carries on.
+      if (err instanceof PollerCapacityError)
+        return capacityResponse(req.headers.get("accept"));
+      throw err;
+    }
     // Where the browser got to before it lost the stream (#43). `EventSource`
     // sends the header itself when it reconnects; a page that builds a new
     // one passes it in the query. Untrusted, and decoded by the poller, which

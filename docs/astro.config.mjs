@@ -139,6 +139,7 @@ export default defineConfig({
             { label: "Prometheus endpoints", slug: "admin/prometheus" },
             { label: "Row-level filters", slug: "admin/row-level-filters" },
             { label: "Demo mode", slug: "admin/demo-mode" },
+            { label: "Sizing memory and pollers", slug: "admin/sizing" },
           ],
         },
         {

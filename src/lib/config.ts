@@ -301,6 +301,14 @@ export const config = {
   dashboardVersionsKeep: num("DASHBOARD_VERSIONS_KEEP", 100),
 
   /**
+   * Most dashboard pollers one process runs (#495). A stream that would need
+   * one more is refused and retried shortly; viewers of a running poller are
+   * unaffected. `0` derives it from the heap: half the V8 heap limit (which
+   * the Helm chart sets from the memory limit) over about 11 MB a poller.
+   */
+  maxPollers: num("MAX_POLLERS", 0),
+
+  /**
    * The identity provider's self-service account page, e.g. Keycloak's
    * `<issuer>/account`. The account settings section links to it when set, so
    * people can change the name, email and password the provider owns. Unset
@@ -654,6 +662,7 @@ const EnvSchema = z.object({
   GENERATION_LOG_RETENTION_DAYS: blank(nonNegativeInt),
   RETENTION_SWEEP_INTERVAL_MS: blank(nonNegativeInt),
   DASHBOARD_VERSIONS_KEEP: blank(nonNegativeInt),
+  MAX_POLLERS: blank(nonNegativeInt),
   SHUTDOWN_GRACE_MS: blank(positiveInt),
   SSE_REAUTH_INTERVAL_MS: blank(positiveInt),
   SSE_SLOW_TICKS: blank(positiveInt),

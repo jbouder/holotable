@@ -115,6 +115,43 @@ export function dropFrame(random: () => number = Math.random): string {
 }
 
 /**
+ * The server runs as many pollers as it may and this stream would need one
+ * more (#495). Sent as the only frame of a stream `EventSource` can read (it
+ * cannot read a refused response), with a spread reconnect hint: the browser
+ * says why it is waiting and tries again by itself.
+ */
+export const CAPACITY_EVENT = "capacity";
+
+export function capacityFrame(random: () => number = Math.random): string {
+  const retryMs = 5_000 + Math.floor(random() * 10_000);
+  return `retry: ${retryMs}\nevent: ${CAPACITY_EVENT}\ndata: {"reason":"pollers"}\n\n`;
+}
+
+/** How long a refused non-EventSource caller should wait, in seconds. */
+export const CAPACITY_RETRY_AFTER_SECONDS = 15;
+
+/**
+ * The response to a stream the server has no poller for (#495): a browser's
+ * `EventSource` gets the capacity frame on a 200, since it cannot read any
+ * other status; any other caller gets a 503 with `Retry-After`.
+ */
+export function capacityResponse(accept: string | null): Response {
+  if (accept?.includes("text/event-stream")) {
+    return new Response(capacityFrame(), { headers: STREAM_HEADERS });
+  }
+  return Response.json(
+    {
+      error: "This server is at its live-dashboard limit; try again shortly.",
+      kind: "infrastructure",
+    },
+    {
+      status: 503,
+      headers: { "Retry-After": String(CAPACITY_RETRY_AFTER_SECONDS) },
+    },
+  );
+}
+
+/**
  * The headers of every dashboard stream response. `no-transform` and
  * `X-Accel-Buffering: no` keep a proxy or ingress from compressing or
  * buffering it (#489), which would hold frames back until a buffer filled.

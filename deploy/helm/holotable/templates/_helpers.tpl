@@ -204,3 +204,31 @@ else is most likely the key itself, so refuse to render it.
 {{- define "holotable.modelsFile" -}}
 {{ trimSuffix "/" .Values.ai.modelsMountPath }}/models.json
 {{- end }}
+
+{{/*
+The Node heap ceiling, from the container's memory limit (#495).
+
+Without `--max-old-space-size` V8 sizes its heap from the node's memory, not
+the cgroup's, so the first sign of pressure is the kernel killing the pod
+rather than garbage collection, a metric or a refused stream. Three quarters
+of the limit leaves room for buffers, native memory and the rest of the
+process. No limit renders no flag. A limit under 256Mi fails the render: the
+app cannot hold its own pollers in less.
+*/}}
+{{- define "holotable.maxOldSpaceMb" -}}
+{{- $limit := "" -}}
+{{- with .Values.resources -}}{{- with .limits -}}{{- $limit = toString (.memory | default "") -}}{{- end -}}{{- end -}}
+{{- if $limit -}}
+{{- $mb := 0.0 -}}
+{{- if hasSuffix "Gi" $limit -}}{{- $mb = mulf (float64 (trimSuffix "Gi" $limit)) 1024 -}}
+{{- else if hasSuffix "Mi" $limit -}}{{- $mb = float64 (trimSuffix "Mi" $limit) -}}
+{{- else if hasSuffix "G" $limit -}}{{- $mb = divf (mulf (float64 (trimSuffix "G" $limit)) 1000000000) 1048576 -}}
+{{- else if hasSuffix "M" $limit -}}{{- $mb = divf (mulf (float64 (trimSuffix "M" $limit)) 1000000) 1048576 -}}
+{{- else -}}{{- $mb = divf (float64 $limit) 1048576 -}}
+{{- end -}}
+{{- if lt $mb 256.0 -}}
+{{- fail (printf "resources.limits.memory is %s, below the 256Mi the app needs: its heap is set to three quarters of the limit, and less cannot hold the pollers it serves. Raise the limit." $limit) -}}
+{{- end -}}
+{{- int (mulf $mb 0.75) -}}
+{{- end -}}
+{{- end }}

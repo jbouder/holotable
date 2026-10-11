@@ -1,3 +1,4 @@
+import { getHeapStatistics } from "node:v8";
 import {
   type Dashboard,
   hasQuery,
@@ -33,6 +34,7 @@ import {
   observePollerTick,
   recordPollerSkip,
   setActivePollers,
+  setPollerLimit,
   setSseSubscribers,
 } from "@/lib/metrics";
 
@@ -550,6 +552,8 @@ class DashboardPoller {
   private start() {
     this.running = true;
     setActivePollers(registry.size);
+    // Beside the count, so a dashboard of the two shows the headroom (#495).
+    setPollerLimit(pollerLimit());
     this.runTick();
   }
 
@@ -849,6 +853,30 @@ const registry = new Map<string, DashboardPoller>();
  * of the key too: two viewers with different selections are different
  * statements, and share nothing.
  */
+/** Heap a poller holds at the result caps, measured (#495): its last results. */
+export const POLLER_HEAP_BYTES = 11 * 1024 * 1024;
+
+/**
+ * How many pollers this process runs (#495): `MAX_POLLERS`, or half the V8
+ * heap limit over {@link POLLER_HEAP_BYTES}. The heap limit is what
+ * `--max-old-space-size` sets, which the Helm chart derives from the memory
+ * limit, so the cap follows the container.
+ */
+export function pollerLimit(
+  heapLimit: number = getHeapStatistics().heap_size_limit,
+): number {
+  if (config.maxPollers > 0) return config.maxPollers;
+  return Math.max(1, Math.floor((heapLimit * 0.5) / POLLER_HEAP_BYTES));
+}
+
+/** The process runs as many pollers as it may; a new one has to wait. */
+export class PollerCapacityError extends Error {
+  constructor() {
+    super("This server is at its live-dashboard limit; try again shortly.");
+    this.name = "PollerCapacityError";
+  }
+}
+
 export function getPoller(
   dashboardId: string,
   version: number,
@@ -867,6 +895,12 @@ export function getPoller(
     valuesKey(variables),
   ]);
   const existing = registry.get(key);
+  // A new key needs a new poller, and the process holds at most so many
+  // (#495). Replacing a stalled or older one does not add to the count.
+  if (!existing && registry.size >= pollerLimit()) {
+    setPollerLimit(pollerLimit());
+    throw new PollerCapacityError();
+  }
   if (existing?.isStalled) {
     // Sharing it would hand this subscriber a poller that never ticks again.
     log.warn("poller.stalled_replaced", { dashboardId, version: existing.version });
