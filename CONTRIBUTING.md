@@ -310,14 +310,21 @@ issue and make the case first, rather than arriving with it already written.
 - **Tests.** `test/` uses the native Node test runner via `tsx`. Anything
   touching the SQL guard, the IR schema, authorization, time resolution, or the
   poller should come with a test; those are the areas where a silent regression
-  is most expensive.
+  is most expensive. Tests hold rules, not coverage: do not add one for a
+  label or a formatter, a happy path an `e2e/` journey walks, a seeded
+  dashboard `npm run smoke` already runs, or a shape the typechecker holds.
+  Extend the named test that holds the rule before adding a file.
 - **Component tests** are the exception to "pure logic only", and live in
   `*.test.tsx` beside the rest. `test/support/dom.tsx` mounts a component in
   jsdom (a devDependency; it never reaches the build) and flushes with `act`.
   Reach for it only when a behavior genuinely cannot be tested without a
   render — an error boundary, for instance, since `react-dom/server` does not
   run boundaries at all. Everything else still belongs in `src/lib/` as a
-  function with a plain test.
+  function with a plain test. A surface an `e2e/` journey already drives (a
+  form, a menu, a dialog, a page's header) is not mounted again under jsdom:
+  Base UI's popups render through a portal jsdom never mounts, so such a test
+  can only see the trigger, and a stubbed `fetch` makes it race the render
+  (#511). Playwright is where that surface is proved.
 - **Draft PRs** are fine and encouraged for work you want early eyes on.
 
 Files under `src/lib/sql/`, `src/lib/promql/`, `src/lib/auth/`, `src/lib/secrets/`,

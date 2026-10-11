@@ -47,7 +47,9 @@ Component boundaries, route handlers, streaming and config. App Router only;
   it out of pages, and test it there as functions).
 - `test/` the Node test runner (`*.test.ts`; `*.test.tsx` only for the rare
   test that needs a real React unwind, through `test/support/dom.tsx`).
-  `e2e/` Playwright journeys and axe scans against their own stack.
+  `e2e/` Playwright journeys and axe scans against their own stack. A
+  surface a journey drives is proved there, not mounted again under jsdom,
+  which cannot open a Base UI popup and races a stubbed `fetch` (#511).
 - `docs/` the Astro site (its own `package.json`). `deploy/` the Helm chart,
   the quick-start image and the hosted demo (its own `package.json`, checked
   by `.github/workflows/demo.yml`).
@@ -312,6 +314,13 @@ npm run fixture:capture  # adds a stored spec to the IR fixture library
 npm run smoke            # checks both self-monitoring dashboards end to end
 ```
 
+- **Tests hold rules, not coverage.** A unit test exists because a rule
+  above would otherwise regress silently: a guard, an authorization
+  decision, the IR, time, a registry, a parser of untrusted input. Do not
+  add one for a label or a formatter, a happy path an `e2e/` journey walks,
+  a seeded dashboard `npm run smoke` already runs, or a shape the typechecker
+  holds. Extend the named test that holds the rule before adding a file, and
+  a change that only moves or restyles UI needs no new unit test.
 - **Biome** is the linter and formatter (`npm run lint:fix`); there is no
   ESLint or Prettier. `noFloatingPromises`, `useExhaustiveDependencies`,
   `noExplicitAny` and `noConsole` are errors: fix them rather than suppress.
