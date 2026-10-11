@@ -48,6 +48,25 @@ rather than a rewrite.
   connections (default 5), reused across ticks. A busy dashboard waits for a
   free connection rather than opening more, so it cannot use up the metrics
   database's `max_connections` on its own.
+- **Poller executions per source** (#487). Pollers hold at most
+  `MAX_POOL_PER_SOURCE - 1` executions on one source at once
+  (`src/lib/poller/source-slots.ts`), so Chat, a preview or `/api/query`
+  always finds a connection. A panel waits up to half its interval for a
+  slot. If none frees in time, the panel is skipped for that cycle and shows
+  **waiting**, with its last rows kept. A checkout that timed out in a full
+  pool is treated the same way. Neither is a failure, so neither starts the
+  backoff below. Each cycle reads each source record from the config
+  database once, however many panels use it, and re-checks the workspace for
+  every panel. A new poller's second cycle is pushed back by up to half its
+  interval, so dashboards opened together stop polling together.
+
+  The arithmetic: one source sustains about `slots ÷ query time` executions a
+  second, which is 4 ÷ 0.1 s = 40/s at the defaults and 100 ms queries.
+  Dashboards ask for `panels ÷ interval` executions a second each, so 20
+  dashboards of 20 panels at 15 s ask for about 27/s and fit. 100 such
+  dashboards ask for 133/s and do not. Their panels wait and refresh less
+  often, but none of them fails. Raise `MAX_POOL_PER_SOURCE` only as far as
+  the metrics database's `max_connections` allows across every instance.
 - **Panels that keep failing.** After `POLLER_FAILURE_THRESHOLD` failures in
   a row (default 3), a panel stops running on every tick and backs off,
   doubling from the refresh interval up to `POLLER_MAX_BACKOFF_MS` (default 5

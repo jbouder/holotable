@@ -13,7 +13,7 @@ import { VariableError, type VariableValues } from "@/lib/sql/variables";
 import { valuesKey } from "@/lib/variable-selection";
 import { rowFilterInScope, type RowScope } from "@/lib/row-scope";
 import { resolveTimeRange, TimeRangeError } from "@/lib/time";
-import { QueryExecutionError } from "@/lib/sources/execution";
+import { QueryExecutionError, SourceBusyError } from "@/lib/sources/execution";
 import { serverKind } from "@/lib/sources/server/registry";
 import { config } from "@/lib/config";
 import { type ErrorKind, OPAQUE_MESSAGE } from "@/lib/errors";
@@ -27,6 +27,7 @@ import {
 } from "@/lib/poller/backoff";
 import { decodeResumeToken, encodeResumeToken } from "@/lib/poller/resume";
 import type { Truncation } from "@/lib/truncation";
+import { pollerSourceSlots, type SourceSlots } from "@/lib/poller/source-slots";
 import {
   forgetDashboard,
   observePollerTick,
@@ -100,6 +101,12 @@ export type PollerEvent =
       retryAt: number;
     }
   | { type: "dashboard-error"; error: string; kind: ErrorKind }
+  /**
+   * The panel was not run this cycle because its source had no free slot or
+   * connection (#487). Not a failure: it keeps its rows and is tried on the
+   * next cycle.
+   */
+  | { type: "panel-waiting"; panelId: string }
   | { type: "tombstone"; panelId: string; sourceId: string }
   /**
    * A completed cycle. `window` is the range that cycle ran over, as the
@@ -180,7 +187,16 @@ export type PanelExecutor = (
   dashboardWorkspaceId: string,
   scope: RowScope,
   variables: VariableValues,
+  /**
+   * The cycle's source reads (#487): one read per source per cycle, shared by
+   * every panel on it. Never kept past the cycle, so an edited, deleted or
+   * moved source is seen on the next one. Absent, every execution reads.
+   */
+  sources?: SourceReads,
 ) => Promise<PollerEvent[]>;
+
+/** A cycle's source records, by id, as they were read at its start. */
+export type SourceReads = Map<string, Promise<SourceRecord | null>>;
 
 /**
  * Factory that creates a PanelExecutor with an injectable source resolver.
@@ -190,9 +206,19 @@ export type PanelExecutor = (
 export function makePanelExecutor(
   getSource: (id: string) => Promise<SourceRecord | null> = getSourceById,
 ): PanelExecutor {
-  return async (panel, window, dashboardWorkspaceId, scope, variables) => {
-    // Re-resolve the source on every execution.
-    const source = await getSource(panel.query.sourceId);
+  const read = (id: string, sources?: SourceReads) => {
+    if (!sources) return getSource(id);
+    let record = sources.get(id);
+    if (!record) {
+      record = getSource(id);
+      sources.set(id, record);
+    }
+    return record;
+  };
+  return async (panel, window, dashboardWorkspaceId, scope, variables, sources) => {
+    // Re-resolved every cycle, read once per cycle (#487). The workspace
+    // check below still runs for every execution.
+    const source = await read(panel.query.sourceId, sources);
 
     // Tombstoned, missing, and cross-workspace sources all surface identically
     // as tombstone events so callers cannot distinguish "deleted" from "not
@@ -322,6 +348,19 @@ export function configuredBackoff(): BackoffPolicy {
   return { threshold: config.pollerFailureThreshold, maxMs: config.pollerMaxBackoffMs };
 }
 
+/**
+ * The fraction of half an interval a new poller's second cycle is pushed back
+ * by (#487), in [0, 1). Random in production; a test fixes it.
+ */
+let pollerJitter: () => number = Math.random;
+
+/** Fix the jitter for a test; returns the previous source so it can be put back. */
+export function setPollerJitterForTests(next: () => number): () => number {
+  const previous = pollerJitter;
+  pollerJitter = next;
+  return previous;
+}
+
 class DashboardPoller {
   private subscribers = new Set<Subscriber>();
   /** Each panel's last result, error or tombstone: what a joiner is sent first. */
@@ -355,7 +394,11 @@ class DashboardPoller {
     private executor: PanelExecutor = defaultPanelExecutor,
     private readonly backoff: BackoffPolicy = configuredBackoff(),
     private readonly variables: VariableValues = {},
+    private readonly slots: SourceSlots = pollerSourceSlots(),
   ) {}
+
+  /** Whether this poller's phase has been spread yet (#487); once, after its first cycle. */
+  private jittered = false;
 
   /** The dashboard's refresh interval, never below the server's floor. */
   private get intervalMs(): number {
@@ -564,7 +607,11 @@ class DashboardPoller {
    * (an invalid statement, a missing row-filter claim), clears the count:
    * those never reached the source, so they put no load on it to back off from.
    */
-  private async runPanel(panel: QueryPanel, shown: TimeWindow): Promise<void> {
+  private async runPanel(
+    panel: QueryPanel,
+    shown: TimeWindow,
+    sources?: SourceReads,
+  ): Promise<void> {
     let window: TimeWindow;
     try {
       window = this.windowFor(panel, shown);
@@ -578,6 +625,17 @@ class DashboardPoller {
       });
       return;
     }
+    // A slot on the panel's source (#487), waited for at most half the
+    // panel's interval. None free is a skip, not a failure: the panel keeps
+    // its rows, says it is waiting, and the next cycle tries again.
+    const release = await this.slots.acquire(
+      panel.query.sourceId,
+      this.intervalOf(panel) / 2,
+    );
+    if (!release) {
+      this.notify(panel, { type: "panel-waiting", panelId: panel.id });
+      return;
+    }
     this.executing.add(panel.id);
     const startedAt = Date.now();
     try {
@@ -587,6 +645,7 @@ class DashboardPoller {
         this.dashboardWorkspaceId,
         this.scope,
         this.variables,
+        sources,
       );
       this.health.delete(panel.id);
       const span = { from: window.from.getTime(), to: window.to.getTime() };
@@ -594,6 +653,12 @@ class DashboardPoller {
         this.publish(panel, e.type === "panel" ? { ...e, window: span } : e);
       }
     } catch (err) {
+      // Every connection was busy (#487): a wait, which the source being
+      // slow to free one is not a failure of. Nothing is counted.
+      if (err instanceof SourceBusyError) {
+        this.notify(panel, { type: "panel-waiting", panelId: panel.id });
+        return;
+      }
       const described = describePanelError(err);
       const health = recordFailure(
         this.health.get(panel.id),
@@ -622,7 +687,17 @@ class DashboardPoller {
       }
     } finally {
       this.executing.delete(panel.id);
+      release();
     }
+  }
+
+  /**
+   * Tell this cycle's subscribers something about a panel without making it
+   * what a joiner is sent: a joiner gets the panel's last rows, not that it
+   * was waiting.
+   */
+  private notify(panel: QueryPanel, event: PollerEvent) {
+    for (const sub of this.subscribers) this.deliver(sub, panel, event);
   }
 
   /**
@@ -686,17 +761,25 @@ class DashboardPoller {
       // last published, which is what a joiner is sent. One a viewer is
       // retrying is already running.
       // A text panel (#202) has no query and is never executed.
+      // One read of each source for the whole cycle (#487).
+      const sources: SourceReads = new Map();
       await Promise.all(
         this.spec.panels
           .filter(hasQuery)
           .filter((p) => due.has(this.intervalOf(p)))
           .filter((p) => isDue(this.health.get(p.id), now) && !this.executing.has(p.id))
-          .map((p) => this.runPanel(p, window)),
+          .map((p) => this.runPanel(p, window, sources)),
       );
       // Each interval runs from the end of its cycle, as the dashboard's
       // always did, so a slow cycle is never followed by one at once.
       const finishedAt = Date.now();
-      for (const c of due) this.nextDue.set(c, finishedAt + c);
+      // After its first cycle a poller's phase is spread by up to half its
+      // interval (#487), so dashboards opened together stop polling
+      // together. The first cycle is not delayed: a viewer waits for nothing.
+      const spread = this.jittered ? 0 : pollerJitter();
+      this.jittered = true;
+      for (const c of due)
+        this.nextDue.set(c, finishedAt + c + Math.floor(spread * (c / 2)));
       // Every panel is executed and broadcast by this point, so the tick's cost
       // is the whole cycle — not one query — which is what a refresh interval
       // has to accommodate.

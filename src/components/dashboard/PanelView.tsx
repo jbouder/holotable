@@ -113,7 +113,9 @@ export const PanelView = React.memo(function PanelView({
   // While paused, suppress the transient "live"/"loading" badges — they no
   // longer reflect reality. Error/tombstoned states remain meaningful. A text
   // panel has no status at all.
-  const showBadge = queried && !(paused && (status === "live" || status === "loading"));
+  const showBadge =
+    queried &&
+    !(paused && (status === "live" || status === "loading" || status === "waiting"));
 
   return (
     <>
@@ -402,7 +404,7 @@ function PanelBody({
   if (
     hasQuery(panel) &&
     data.rows.length === 0 &&
-    (!state || state.status === "loading")
+    (!state || state.status === "loading" || state.status === "waiting")
   ) {
     // A skeleton in the panel's own shape rather than a centred spinner: the
     // panel already occupies its final grid cell, and filling it with the
@@ -578,6 +580,7 @@ const STATUS_STYLES: Record<PanelStatus, string> = {
   error: "bg-danger/20 text-danger",
   degraded: "bg-warning/20 text-warning",
   tombstoned: "bg-danger/20 text-danger",
+  waiting: "bg-surface-2 text-muted",
 };
 
 /**
@@ -592,9 +595,11 @@ function StatusBadge({ status, updatedAt }: { status: PanelStatus; updatedAt?: n
     updatedAt === undefined
       ? "No data yet"
       : `Updated at ${formatClockTime(updatedAt, display)}`;
+  // A waiting panel says why its rows are not newer (#487).
+  const title = status === "waiting" ? `Waiting for the source. ${freshness}` : freshness;
   return (
     <span
-      title={freshness}
+      title={title}
       className={cn(
         // Below `sm` the header has room for the title and the actions and
         // nothing else, so the badge steps aside visually and stays readable
@@ -605,7 +610,7 @@ function StatusBadge({ status, updatedAt }: { status: PanelStatus; updatedAt?: n
     >
       {status}
       {/* The tooltip is mouse-only; this is the same fact for everyone else. */}
-      <span className="sr-only">. {freshness}</span>
+      <span className="sr-only">. {title}</span>
     </span>
   );
 }

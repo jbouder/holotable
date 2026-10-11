@@ -145,6 +145,9 @@ Client side (`LiveDashboard.tsx` → `PanelView.tsx` → `EChart.tsx`):
   (`MAX_WINDOW_POINTS`, default 1,000) — old points fall off the front.
 - `replace` swaps the window, held to the same budget; `panel-error`, `panel-degraded` and `tombstone`
   flip panel status.
+- `panel-waiting` (#487) means the panel's source had no free slot or
+  connection this cycle. The panel keeps its rows and shows **waiting**. It is
+  not remembered for a joiner, and it never counts toward backoff.
 - `dashboard-error` belongs to no panel: it renders as a banner above the grid,
   marks every panel stale, and clears on the next completed `tick`.
 - A **staleness watchdog** marks panels `stale` if no `tick` arrives within

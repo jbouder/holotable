@@ -1,7 +1,12 @@
 import { queryTimeField } from "@/lib/ir";
 import { test, mock, afterEach } from "node:test";
 import assert from "node:assert/strict";
-import { getPoller, type PanelExecutor, type PollerEvent } from "@/lib/poller/registry";
+import {
+  getPoller,
+  type PanelExecutor,
+  type PollerEvent,
+  setPollerJitterForTests,
+} from "@/lib/poller/registry";
 import {
   decodeResumeToken,
   encodeResumeToken,
@@ -11,6 +16,9 @@ import { eventFrame, HEARTBEAT_FRAME } from "@/lib/sse";
 import { mergePanelRows } from "@/lib/stream-merge";
 import type { PanelData } from "@/components/charts/options";
 import type { Dashboard } from "@/lib/ir";
+
+// Cycles land on the interval exactly: no spread of the second one (#487).
+setPollerJitterForTests(() => 0);
 
 /**
  * Joining and resuming a shared dashboard stream (#43): each subscriber has

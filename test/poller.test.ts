@@ -1,4 +1,4 @@
-import { test } from "node:test";
+import { mock, test } from "node:test";
 import assert from "node:assert/strict";
 import {
   computeDelta,
@@ -7,10 +7,14 @@ import {
   getPoller,
   invalidatePoller,
   activePollerCount,
+  DashboardPoller,
   makePanelExecutor,
   type PanelExecutor,
   type PollerEvent,
+  setPollerJitterForTests,
+  type SourceReads,
 } from "@/lib/poller/registry";
+import { SourceSlots } from "@/lib/poller/source-slots";
 import { OPAQUE_MESSAGE } from "@/lib/errors";
 import { TimeRangeError } from "@/lib/time";
 import { QueryExecutionError } from "@/lib/sources/execution";
@@ -442,4 +446,171 @@ test("getPoller replaces a stalled poller instead of sharing it", () => {
   assert.equal(next.isStalled, false);
 
   invalidatePoller("dash-stalled");
+});
+
+// --- The source pool under load (#487) -------------------------------------------
+
+test("a cycle reads each source once, however many panels it has", async () => {
+  let reads = 0;
+  const executor = makePanelExecutor(async (id) => {
+    reads++;
+    // Another workspace's source: every panel is a tombstone, and nothing runs.
+    return {
+      id,
+      workspaceId: "elsewhere",
+      tombstonedAt: null,
+    } as unknown as SourceRecord;
+  });
+  const panels = Array.from({ length: 20 }, (_, i) =>
+    asQueryPanel({ ...spec().panels[0], id: `p${i}` }),
+  );
+  const sources: SourceReads = new Map();
+  const window = { from: new Date(0), to: new Date(1) };
+  const events = await Promise.all(
+    panels.map((p) => executor(p, window, "ws", {}, {}, sources)),
+  );
+  assert.equal(reads, 1);
+  assert.ok(events.every(([e]) => e.type === "tombstone"));
+  // The next cycle reads again: nothing is kept across cycles.
+  await executor(panels[0], window, "ws", {}, {}, new Map());
+  assert.equal(reads, 2);
+});
+
+test("a source slot is waited for, handed on, and given up after the wait", async () => {
+  mock.timers.enable({ apis: ["setTimeout"] });
+  try {
+    const slots = new SourceSlots(() => 2);
+    const a = await slots.acquire("s", 1_000);
+    const b = await slots.acquire("s", 1_000);
+    assert.ok(a && b);
+    const waiting = slots.acquire("s", 1_000);
+    const late = slots.acquire("s", 500);
+    a();
+    a(); // a second release is a no-op, never a second slot
+    const handed = await waiting;
+    assert.ok(handed, "a released slot goes to the first waiter");
+    assert.equal(slots.inFlight("s"), 2);
+    mock.timers.tick(500);
+    assert.equal(await late, null, "no slot within the wait is a skip");
+    b();
+    handed();
+    assert.equal(slots.inFlight("s"), 0);
+  } finally {
+    mock.timers.reset();
+  }
+});
+
+/** A seeded generator, so the spread is the same on every run. */
+function seeded(seed: number): () => number {
+  let x = seed;
+  return () => {
+    x = (x * 1_103_515_245 + 12_345) % 2_147_483_648;
+    return x / 2_147_483_648;
+  };
+}
+
+test("a hundred dashboards on one source: no failures, the cap held, every panel fresh", async () => {
+  // The issue's arithmetic (#487): 100 single-panel dashboards on one source,
+  // 100 ms a query, opened together. With one slot below a pool of five, a
+  // cycle's queue drains in 2.5 s, well inside the 15 s interval.
+  mock.timers.enable({ apis: ["setTimeout", "Date"], now: 0 });
+  const restoreJitter = setPollerJitterForTests(seeded(487));
+  const INTERVAL = 15_000;
+  const QUERY_MS = 100;
+  const slots = new SourceSlots(() => 4);
+  let inFlight = 0;
+  let peak = 0;
+  const executor: PanelExecutor = async (panel) => {
+    inFlight++;
+    peak = Math.max(peak, inFlight);
+    await new Promise((r) => setTimeout(r, QUERY_MS));
+    inFlight--;
+    return [{ type: "panel", panelId: panel.id, mode: "replace", columns: [], rows: [] }];
+  };
+  const settle = async () => {
+    for (let i = 0; i < 3; i++) await new Promise((r) => setImmediate(r));
+  };
+  const refreshed: number[][] = [];
+  const failures: PollerEvent[] = [];
+  const stops: Array<() => void> = [];
+  try {
+    for (let d = 0; d < 100; d++) {
+      const times: number[] = [];
+      refreshed.push(times);
+      const poller = new DashboardPoller(
+        `d-load-${d}`,
+        1,
+        "ws",
+        spec({ refreshIntervalMs: INTERVAL }),
+        {},
+        executor,
+        undefined,
+        {},
+        slots,
+      );
+      stops.push(
+        poller.subscribe((e) => {
+          if (e.type === "panel") times.push(Date.now());
+          if (e.type !== "panel" && e.type !== "tick") failures.push(e);
+        }),
+      );
+    }
+    for (let t = 0; t < 4 * INTERVAL; t += 20) {
+      mock.timers.tick(20);
+      await settle();
+    }
+    assert.deepEqual(failures, [], "no panel failed or waited");
+    assert.ok(peak <= 4, `at most four in flight, saw ${peak}`);
+    for (const times of refreshed) {
+      assert.ok(times.length >= 3, `refreshed ${times.length} times in four intervals`);
+      const gaps = [times[0], ...times.slice(1).map((t, i) => t - times[i])];
+      assert.ok(Math.max(...gaps) <= 2 * INTERVAL, `a gap of ${Math.max(...gaps)} ms`);
+    }
+    // And the spread worked: the second cycles do not all start together.
+    const seconds = new Set(refreshed.map((times) => Math.round(times[1] / 1_000)));
+    assert.ok(seconds.size > 5, `second cycles spread over ${seconds.size} seconds`);
+  } finally {
+    for (const stop of stops) stop();
+    setPollerJitterForTests(restoreJitter);
+    mock.timers.reset();
+  }
+});
+
+test("the spread delays only the second cycle, by at most half the interval", async () => {
+  mock.timers.enable({ apis: ["setTimeout", "Date"], now: 0 });
+  const restoreJitter = setPollerJitterForTests(() => 0.999);
+  const INTERVAL = 10_000;
+  const ticks: number[] = [];
+  try {
+    const poller = new DashboardPoller(
+      "d-jitter",
+      1,
+      "ws",
+      spec({ refreshIntervalMs: INTERVAL }),
+      {},
+      noopExecutor,
+    );
+    const stop = poller.subscribe((e) => {
+      if (e.type === "tick") ticks.push(e.at);
+    });
+    for (let t = 0; t < 4 * INTERVAL; t += 100) {
+      mock.timers.tick(100);
+      await new Promise((r) => setImmediate(r));
+    }
+    stop();
+    // The first cycle at once; the second up to half an interval late; then
+    // every interval from there.
+    // The clock advances in 100 ms steps, so each reading is good to one step.
+    const STEP = 100;
+    assert.ok(ticks[0] <= STEP, `first cycle at ${ticks[0]} ms`);
+    const second = ticks[1] - ticks[0];
+    assert.ok(second > 1.4 * INTERVAL && second <= 1.5 * INTERVAL + STEP, `${second} ms`);
+    assert.ok(
+      Math.abs(ticks[2] - ticks[1] - INTERVAL) <= STEP,
+      `${ticks[2] - ticks[1]} ms`,
+    );
+  } finally {
+    setPollerJitterForTests(restoreJitter);
+    mock.timers.reset();
+  }
 });

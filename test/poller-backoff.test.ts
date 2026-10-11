@@ -18,8 +18,12 @@ import {
   type PanelExecutor,
   type PollerEvent,
   retryPanel,
+  setPollerJitterForTests,
 } from "@/lib/poller/registry";
-import { QueryExecutionError } from "@/lib/sources/execution";
+import { QueryExecutionError, SourceBusyError } from "@/lib/sources/execution";
+
+// Cycles land on the interval exactly: no spread of the second one (#487).
+setPollerJitterForTests(() => 0);
 
 /*
  * Poller backoff (#44): the policy as arithmetic, then the poller on a mocked
@@ -172,6 +176,41 @@ test("a panel that keeps failing stops running every tick, and waits longer each
   assert.equal(state.calls, 4);
   await nextTick(); // t=120s
   assert.equal(state.calls, 5);
+  sub.stop();
+});
+
+test("a source too busy to give a connection is a wait, never a failure", async () => {
+  // #487: a checkout that timed out in a saturated pool skips the cycle. It
+  // is not counted, so the panel never backs off, and a joiner is sent the
+  // last rows rather than the wait.
+  const state = { calls: 0, busy: false };
+  const executor: PanelExecutor = async (panel) => {
+    state.calls++;
+    if (state.busy) throw new SourceBusyError("s1");
+    return [
+      {
+        type: "panel",
+        panelId: panel.id,
+        mode: "replace",
+        columns: ["v"],
+        rows: [{ v: 1 }],
+      },
+    ];
+  };
+  const poller = new DashboardPoller("d-busy", 1, "ws", spec(), {}, executor, POLICY);
+  const sub = subscribe(poller);
+  await settle();
+  assert.equal(sub.last()?.type, "panel");
+  state.busy = true;
+  for (let i = 0; i < POLICY.threshold + 2; i++) await nextTick();
+  assert.equal(state.calls, POLICY.threshold + 3, "run every cycle: nothing backs off");
+  assert.ok(sub.events.slice(1).every((e) => e.type === "panel-waiting"));
+  const joiner = subscribe(poller);
+  assert.equal(joiner.events[0]?.type, "panel", "a joiner gets the rows, not the wait");
+  state.busy = false;
+  await nextTick();
+  assert.equal(sub.last()?.type, "panel");
+  joiner.stop();
   sub.stop();
 });
 

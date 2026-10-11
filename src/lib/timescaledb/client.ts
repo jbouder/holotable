@@ -9,7 +9,11 @@ import { observeQuery } from "@/lib/metrics";
 import { trackInFlight } from "@/lib/shutdown";
 import { isPlainIdentifier } from "@/lib/catalog/identifiers";
 import type { SourceTestResult, TestReadOnly, TestTable } from "@/lib/source-test";
-import { QueryExecutionError, type QueryResult } from "@/lib/sources/execution";
+import {
+  QueryExecutionError,
+  type QueryResult,
+  SourceBusyError,
+} from "@/lib/sources/execution";
 import type { Truncation } from "@/lib/truncation";
 
 /**
@@ -195,6 +199,13 @@ export function executePlan(
   });
 }
 
+/** `pg-pool`'s own message when a checkout outlasts `connectionTimeoutMillis`. */
+export function isCheckoutTimeout(err: unknown): boolean {
+  return (
+    err instanceof Error && /timeout exceeded when trying to connect/i.test(err.message)
+  );
+}
+
 async function runPlan(
   source: SqlSourceRecord,
   plan: ExecutablePlan,
@@ -205,7 +216,16 @@ async function runPlan(
   // outside any transaction is returned; anything in doubt is destroyed.
   let reusable = true;
   try {
-    client = await sourcePool(source).connect();
+    const pool = sourcePool(source);
+    // Saturated before the checkout: a timeout from here on is a wait in the
+    // pool's queue, not a source that would not answer (#487).
+    const queued = pool.idleCount === 0 && pool.totalCount >= config.maxPoolPerSource;
+    try {
+      client = await pool.connect();
+    } catch (err) {
+      if (queued && isCheckoutTimeout(err)) throw new SourceBusyError(source.id);
+      throw err;
+    }
     const [transaction, searchPath] = sessionStatements(source.config.schema);
     await client.query(transaction);
     transactionStarted = true;
