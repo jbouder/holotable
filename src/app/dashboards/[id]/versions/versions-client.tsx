@@ -201,6 +201,13 @@ export function VersionHistory({
             Load older versions
           </Button>
         )}
+        {nextBefore === null && (versions.at(-1)?.version ?? 1) > 1 && (
+          // The oldest went when the dashboard passed DASHBOARD_VERSIONS_KEEP
+          // (#494); say so, rather than let version 1 look missing.
+          <p className="text-xs text-muted">
+            Older versions were removed. A dashboard keeps its most recent ones.
+          </p>
+        )}
       </nav>
 
       <section aria-labelledby="version-heading" className="min-w-0 space-y-4">

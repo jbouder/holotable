@@ -1,3 +1,4 @@
+import { config } from "@/lib/config";
 import { query, withTransaction } from "@/lib/db/pg";
 import { type DashboardSort, PAGE_SIZE } from "@/lib/dashboard-list";
 import {
@@ -682,6 +683,15 @@ export async function saveDashboardVersion(input: {
        RETURNING workspace_id, created_by, created_at, description, tags`,
       [input.dashboardId, v.rows[0].id, spec.title],
     );
+    // Keep the newest DASHBOARD_VERSIONS_KEEP (#494): the one just written,
+    // which is now current, is the newest, so it is never among them.
+    if (config.dashboardVersionsKeep > 0) {
+      await client.query(
+        `DELETE FROM dashboard_versions
+         WHERE dashboard_id = $1 AND id <> $2 AND version <= $3::int - $4::int`,
+        [input.dashboardId, v.rows[0].id, version, config.dashboardVersionsKeep],
+      );
+    }
     return {
       id: input.dashboardId,
       workspaceId: d.rows[0].workspace_id,

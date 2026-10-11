@@ -5,6 +5,7 @@ import type { UIMessage } from "ai";
 import { persistableMessage } from "@/lib/chat/persist";
 import { pgConversationStore as store } from "@/lib/db/conversations";
 import { closePool, query } from "@/lib/db/pg";
+import { sweepRetention } from "@/lib/retention";
 import { needsDb, unique } from "./support";
 
 /*
@@ -268,5 +269,83 @@ test(
       await query("DELETE FROM conversations WHERE user_sub = $1", [owner]);
       await query("DELETE FROM dashboards WHERE id = $1", [d.id]);
     }
+  },
+);
+
+/**
+ * The retention sweep (#494) removes what is past retention in every table
+ * it owns, in batches, and nothing else. Ten years, so rows other tests
+ * back-date by weeks are never in its way while the files run side by side.
+ */
+test(
+  "the retention sweep deletes past-retention rows in batches, and only those",
+  needsDb,
+  async () => {
+    const owner = unique("sweep");
+    const DAYS = 3_650;
+    const old = "now() - interval '11 years'";
+    const stale = await create(owner);
+    const fresh = await create(owner);
+    await store.append({
+      conversationId: fresh.id,
+      userSub: owner,
+      messages: [{ id: "m-new", role: "user", content: { parts: [] } }],
+      retention: RETENTION,
+    });
+    await query(`UPDATE conversations SET updated_at = ${old} WHERE id = $1`, [stale.id]);
+    await query(
+      `INSERT INTO conversation_messages (conversation_id, id, role, content, created_at)
+     VALUES ($1, 'm-old', 'user', '{}'::jsonb, ${old})`,
+      [fresh.id],
+    );
+    const logs: string[] = [];
+    for (let i = 0; i < 5; i++) {
+      const [row] = await query<{ id: string }>(
+        `INSERT INTO generation_log
+         (workspace_id, created_by, mode, prompt_redacted, model, attempts, input_tokens, output_tokens, created_at)
+       VALUES ($1, $2, 'chat', 'p', 'stub', 1, 0, 0, ${i < 3 ? old : "now()"}) RETURNING id`,
+        [WS, owner],
+      );
+      logs.push(row.id);
+    }
+    const statements: string[] = [];
+    const deleted = await sweepRetention(
+      [
+        { table: "generation_log", column: "created_at", days: DAYS },
+        { table: "conversations", column: "updated_at", days: DAYS },
+        { table: "conversation_messages", column: "created_at", days: DAYS },
+      ],
+      async (sql, params) => {
+        statements.push(sql);
+        const [r] = await query<{ n: number }>(sql, params);
+        return r?.n ?? 0;
+      },
+      2,
+    );
+    assert.ok(deleted.generation_log >= 3);
+    // Three old log rows at two a batch: a full batch, then a short one.
+    assert.ok(statements.filter((s) => s.includes("generation_log")).length >= 2);
+    const left = await query<{ id: string }>(
+      "SELECT id FROM generation_log WHERE id = ANY($1) ORDER BY created_at",
+      [logs],
+    );
+    assert.deepEqual(new Set(left.map((r) => r.id)), new Set(logs.slice(3)));
+    const conversations = await query<{ id: string }>(
+      "SELECT id FROM conversations WHERE user_sub = $1",
+      [owner],
+    );
+    assert.deepEqual(
+      conversations.map((c) => c.id),
+      [fresh.id],
+    );
+    const messages = await query<{ id: string }>(
+      "SELECT id FROM conversation_messages WHERE conversation_id = $1",
+      [fresh.id],
+    );
+    assert.deepEqual(
+      messages.map((m) => m.id),
+      ["m-new"],
+    );
+    await query("DELETE FROM generation_log WHERE id = ANY($1)", [logs]);
   },
 );

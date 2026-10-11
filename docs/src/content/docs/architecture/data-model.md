@@ -107,6 +107,12 @@ history is readable at `/dashboards/[id]/versions`, and **restore** follows the
 same rule: it appends a new row copying the old spec (noted `restored from vN`)
 rather than moving `current_version_id` back.
 
+A dashboard keeps its newest `DASHBOARD_VERSIONS_KEEP` versions (default 100,
+`0` keeps every one, #494). A save past the cap deletes the oldest in the same
+transaction. The version just written is current and the newest, so it is
+never among them. Share links show the current version, so none is pinned to
+an old one. The history page says when older versions are gone.
+
 :::note[Stored specs are versioned]
 Each spec carries `specVersion`, and every IR object is `.strict()`. A row is
 read through the upgrader chain in `src/lib/ir/upgrade.ts`, which brings it up
@@ -196,6 +202,15 @@ workspace source-admin (or a platform admin) through `GET /api/generation-log`
 — never on a dashboard, source or spec payload. Swept on write by
 `GENERATION_LOG_RETENTION_DAYS`, and the same window is applied on read, so
 shortening it takes effect at once.
+
+**The retention sweep** (#494, `src/lib/retention.ts`) deletes the same rows
+on a timer. That covers the generation log, conversations and conversation
+messages past their retention, so a workspace nobody writes to is swept too.
+It runs every `RETENTION_SWEEP_INTERVAL_MS` (default 1 hour, jittered by up to
+a tenth, `0` turns it off). It deletes in batches of 1,000 and logs a
+`retention.swept` line per run. It also counts `holotable_retention_deleted_total{table}`.
+It never touches `audit_log`, which is append-only. Pruning that table is the
+operator's step in [the audit log](/operations/audit-log/#retention).
 
 There is deliberately no foreign key to `sources`: a log entry outliving the
 source it names is the normal case, and a cascade would erase exactly the
