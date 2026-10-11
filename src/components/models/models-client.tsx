@@ -53,6 +53,12 @@ function workspaceTarget(workspaceId: string): ModelDialogTarget {
     url,
     testUrl: (id) => (id ? `${url}/${encodeURIComponent(id)}/test` : `${url}/test`),
     testBody: (input) => input,
+    discoverBody: (config, id) => ({
+      owner: "workspace",
+      workspaceId,
+      config,
+      ...(id ? { modelId: id } : {}),
+    }),
   };
 }
 
@@ -65,6 +71,14 @@ function personalTarget(testWorkspace: string | null): ModelDialogTarget {
       workspaceId: testWorkspace,
       ...(id ? { modelId: id } : {}),
     }),
+    discoverBody: testWorkspace
+      ? (config, id) => ({
+          owner: "personal",
+          workspaceId: testWorkspace,
+          config,
+          ...(id ? { modelId: id } : {}),
+        })
+      : null,
   };
 }
 

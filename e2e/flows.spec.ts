@@ -514,6 +514,10 @@ test("a source admin adds, tests, sets as default and deletes a workspace model 
   await dialog.getByLabel("Name").fill(name);
   await dialog.getByRole("combobox", { name: "Provider" }).click();
   await page.getByRole("option", { name: "Stub (recorded answers)" }).click();
+  // The stub lists one model (#443); the field still takes any typed id.
+  await dialog.getByRole("button", { name: "List models" }).click();
+  await expect(dialog.getByText(/1 model listed/)).toBeVisible();
+  await dialog.getByLabel(/^Model/).fill("stub");
   await dialog.getByRole("button", { name: "Test connection" }).click();
   await expect(dialog.getByText(/answered in \d+ ms/)).toBeVisible();
   await dialog.getByRole("button", { name: "Add model" }).click();

@@ -1,3 +1,4 @@
+import { listOpenAiStyle } from "@/lib/ai/providers/server/list";
 import { createOpenAI } from "@ai-sdk/openai";
 import { OPENAI_ORIGIN, openaiKind } from "@/lib/ai/providers/kinds/openai";
 import { OPENAI_PROVIDER_OPTIONS } from "@/lib/ai/providers/server/openai-compatible";
@@ -14,4 +15,6 @@ export const openaiServer = defineServerKind(openaiKind, {
       fetch,
     })(settings.model);
   },
+  listModels: (_settings, credentials, fetch) =>
+    listOpenAiStyle(fetch, `${OPENAI_ORIGIN}/v1`, credentials.apiKey),
 });

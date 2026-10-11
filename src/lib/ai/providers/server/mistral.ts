@@ -1,3 +1,4 @@
+import { listOpenAiStyle } from "@/lib/ai/providers/server/list";
 import { createMistral } from "@ai-sdk/mistral";
 import { MISTRAL_ORIGIN, mistralKind } from "@/lib/ai/providers/kinds/mistral";
 import { defineServerKind } from "@/lib/ai/providers/server/types";
@@ -12,4 +13,6 @@ export const mistralServer = defineServerKind(mistralKind, {
       fetch,
     })(settings.model);
   },
+  listModels: (_settings, credentials, fetch) =>
+    listOpenAiStyle(fetch, `${MISTRAL_ORIGIN}/v1`, credentials.apiKey),
 });

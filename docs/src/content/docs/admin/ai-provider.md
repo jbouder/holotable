@@ -73,7 +73,11 @@ with no redirect followed. The credentials and the vendor's URL are always
 passed to the vendor's SDK explicitly, so a stored model never falls back
 to the server's own `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`,
 `AWS_BEARER_TOKEN_BEDROCK` or `*_BASE_URL`. Credentials from a cloud
-identity (Bedrock instance roles, Azure Entra) are not supported. "Test
+identity (Bedrock instance roles, Azure Entra) are not supported. Every kind
+but Azure and Bedrock can **list its models**
+([#443](https://github.com/jbouder/holotable/issues/443)): the dialog asks
+the vendor through the same pinned or guarded fetch, reads the reply under a
+4 MiB cap, and offers the ids as suggestions. "Test
 connection" makes one minimal model call with what is in the form, admitted
 by the workspace's rate limit and budget like a generation.
 
@@ -258,8 +262,9 @@ The server log has the provider's own reply, as `model.request_failed` with
    the aggregator serves over the OpenAI API, point `AI_PROVIDER=gateway` at
    it, or use the vendor's native provider once one is supported.
 
-`npm run eval -- --live --case <name>` with `AI_MODEL` set for that one run is a
-quick way to try a model before switching the server to it.
+`npm run eval -- --live --case <name>` with `AI_MODEL` set for that one run, or
+`--model <name>` for an `AI_MODELS_FILE` entry, is a quick way to try a model
+before switching the server to it.
 
 Any other provider failure reaches the author as the status and a pointer to
 the server log, never as the provider's reply, which can quote the request or
@@ -399,6 +404,7 @@ prompt, which is unchanged by PromQL.
 | `npm run eval` (`--replay`) | Grades each case's recorded answer in `evals/recordings/`. No provider, no spend, deterministic. CI runs it on every pull request and fails on any case that does not pass. |
 | `npm run eval -- --live` | Asks the provider configured in the environment, as the server would, and reports a pass rate. Never fails the run. The `LLM eval (nightly)` workflow runs it with the `AI_MODEL`, `OPENAI_API_KEY` and `OPENAI_BASE_URL` repository secrets and writes the table to the job summary. |
 | `npm run eval -- --live --record` | The same, writing each answer to `evals/recordings/` so replay grades it from then on. |
+| `npm run eval -- --live --model <name>` | Asks the server model of that name instead of the default ([#443](https://github.com/jbouder/holotable/issues/443)): an [`AI_MODELS_FILE`](#server-models-ai_models_file) entry, or `default` for the `AI_*` variables. A recording per provider is one command each. An unknown name exits 1 and lists the names on offer. |
 
 `--case <name>` narrows any of them and `--json <file>` writes the results.
 Only a call that finished is recorded; a provider error or a

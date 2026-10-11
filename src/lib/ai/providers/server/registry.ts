@@ -16,6 +16,7 @@ import { mistralServer } from "@/lib/ai/providers/server/mistral";
 import { openaiServer } from "@/lib/ai/providers/server/openai";
 import { openaiCompatibleServer } from "@/lib/ai/providers/server/openai-compatible";
 import { stubServer } from "@/lib/ai/providers/server/stub";
+import type { DiscoveredModel } from "@/lib/ai/providers/server/list";
 import type {
   BaseModel,
   ProviderOptions,
@@ -77,4 +78,18 @@ export function buildModel(
 /** What `modelSettings()` spreads for a model of this configuration's kind. */
 export function providerOptionsFor(settings: ModelSettings): ProviderOptions {
   return serverProviderKind(settings).providerOptions;
+}
+
+/**
+ * The models a configuration's vendor offers (#443), through the kind's
+ * fetch, or null for a kind whose models are typed by hand.
+ */
+export function discoverModels(
+  settings: ModelSettings,
+  credentials: Credentials,
+  allowlist: BaseUrlAllowlist,
+): Promise<DiscoveredModel[]> | null {
+  const kind = serverProviderKind(settings);
+  if (!kind.listModels) return null;
+  return kind.listModels(settings, credentials, fetchFor(settings, allowlist));
 }

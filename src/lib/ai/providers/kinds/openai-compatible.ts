@@ -64,4 +64,5 @@ export const openaiCompatibleKind = defineProviderKind({
   ],
   endpoint: (settings) => settings.baseUrl,
   userSetsEndpoint: true,
+  listsModels: true,
 });

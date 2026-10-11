@@ -326,6 +326,7 @@ const EMITTERS: Record<string, string[]> = {
   "me/models": ["user.model.create"],
   "me/models/[modelId]": ["user.model.update", "user.model.delete"],
   "me/models/test": ["user.model.test"],
+  "models/discover": ["workspace.model.discover", "user.model.discover"],
   "workspaces/[id]/annotations": ["annotation.create"],
   "workspaces/[id]/annotations/[annotationId]": ["annotation.delete"],
   "dashboards/[id]/shares": ["share.create"],

@@ -22,6 +22,8 @@ export interface ModelDialogTarget {
   /** The test route, or null when there is nowhere to admit the call. */
   testUrl: (id: string | null) => string | null;
   testBody: (input: ModelConfigInput, id: string | null) => unknown;
+  /** "List models" (#443): the discover request for this owner, or null. */
+  discoverBody: ((input: ModelConfigInput, id: string | null) => unknown) | null;
 }
 
 /**
@@ -128,6 +130,14 @@ export function ModelDialog({
           storedKey={initial?.key}
           testUrl={target.testUrl(modelId)}
           testBody={(input) => target.testBody(input, modelId)}
+          discover={
+            target.discoverBody
+              ? {
+                  url: "/api/models/discover",
+                  body: (input) => target.discoverBody?.(input, modelId),
+                }
+              : null
+          }
           allowStub={allowStub}
         />
         <div className="flex flex-wrap items-center justify-end gap-3 border-t border-border pt-4">

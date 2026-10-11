@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { defineProviderKind } from "@/lib/ai/providers/types";
+import { defineProviderKind, modelInput } from "@/lib/ai/providers/types";
 
 /**
  * The recorded model (#88): answers from fixtures, never calls out. For the
@@ -19,8 +19,10 @@ export const stubKind = defineProviderKind({
     })
     .strict(),
   credentials: z.object({}).strict(),
-  fields: [],
+  // Optional: blank is "stub". Drawn so "List models" has a field to fill.
+  fields: [{ ...modelInput("stub"), optional: true }],
   endpoint: () => null,
   userSetsEndpoint: false,
   developmentOnly: true,
+  listsModels: true,
 });

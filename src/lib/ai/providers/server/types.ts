@@ -1,6 +1,7 @@
 import type { JSONValue, LanguageModel } from "ai";
 import type { z } from "zod";
 import type { Credentials } from "@/lib/ai/providers/registry";
+import type { DiscoveredModel } from "@/lib/ai/providers/server/list";
 import type { ProviderKind } from "@/lib/ai/providers/types";
 
 /** A model as an SDK builds it, before the deadline and retry wrap it. */
@@ -28,6 +29,16 @@ export interface ServerProviderKind<Kind extends ProviderKind = ProviderKind> {
     credentials: Credentials,
     fetch: typeof globalThis.fetch,
   ): BaseModel;
+  /**
+   * The models the vendor offers these credentials (#443), through the same
+   * fetch, under a byte cap. Absent for a kind whose models are typed by hand
+   * (Azure deployments, Bedrock foundation models).
+   */
+  listModels?(
+    settings: z.infer<Kind["settings"]>,
+    credentials: Credentials,
+    fetch: typeof globalThis.fetch,
+  ): Promise<DiscoveredModel[]>;
 }
 
 export function defineServerKind<Kind extends ProviderKind>(

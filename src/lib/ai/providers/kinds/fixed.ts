@@ -32,5 +32,7 @@ export function fixedApiKeyKind<Name extends string>(spec: {
     fields: [modelInput(spec.modelPlaceholder), apiKeyField(spec.keyPlaceholder)],
     endpoint: () => spec.origin,
     userSetsEndpoint: false,
+    // Each of these vendors lists its models (#443).
+    listsModels: true,
   });
 }

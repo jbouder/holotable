@@ -39,10 +39,12 @@ configure.
 | `workspace.model.update` | A source-admin replaces a workspace's model (as `workspace.model.create`), or saves the workspace's default and personal-models toggle (`defaultModel`, `previousDefault`, `allowPersonalKeys`) | model or workspace |
 | `workspace.model.delete` | A source-admin deletes a workspace's model | model |
 | `workspace.model.test` | A source-admin tests a workspace model (`provider`, `endpointHost`, `model`); `failure` when the model did not answer | workspace or model |
+| `workspace.model.discover` | A source-admin lists a provider's models for a workspace model (`provider`, `endpointHost`, `count`); `failure` when the provider did not answer | workspace |
 | `user.model.create` | Someone adds a personal model (as `workspace.model.create`) | model |
 | `user.model.update` | Someone replaces a personal model (as `workspace.model.create`) | model |
 | `user.model.delete` | Someone deletes a personal model | model |
 | `user.model.test` | Someone tests a personal model, admitted in a workspace that allows personal models (`provider`, `endpointHost`, `model`) | none |
+| `user.model.discover` | Someone lists a provider's models for a personal model (`provider`, `endpointHost`, `count`) | none |
 | `annotation.create` | An editor or pipeline writes an annotation (`kind`, `at`, `source`) | annotation |
 | `annotation.delete` | An editor deletes an annotation | annotation |
 | `share.create` | An editor creates a read-only share link (`shareId`, `expiresAt`, `allowedOrigins`, `timeRange`) | dashboard |

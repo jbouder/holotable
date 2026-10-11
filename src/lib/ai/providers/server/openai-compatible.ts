@@ -1,3 +1,4 @@
+import { listOpenAiStyle } from "@/lib/ai/providers/server/list";
 import { createOpenAI } from "@ai-sdk/openai";
 import { openaiCompatibleKind } from "@/lib/ai/providers/kinds/openai-compatible";
 import { defineServerKind } from "@/lib/ai/providers/server/types";
@@ -24,4 +25,6 @@ export const openaiCompatibleServer = defineServerKind(openaiCompatibleKind, {
     });
     return settings.api === "chat" ? openai.chat(settings.model) : openai(settings.model);
   },
+  listModels: (settings, credentials, fetch) =>
+    listOpenAiStyle(fetch, settings.baseUrl, credentials.apiKey),
 });
