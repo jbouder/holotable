@@ -89,6 +89,15 @@
   --tinted-danger: var(--danger);
   --tinted-warning: var(--warning);
   --tinted-success: var(--success);
+  --tinted-primary: var(--primary);
+  /* The page's own inks, fixed on the theme's element like the fills, so a
+     control inside a tint that draws its own fill can take them back. */
+  --page-foreground: var(--foreground);
+  --page-muted: var(--muted);
+  --page-primary: var(--primary);
+  --page-danger: var(--danger);
+  --page-warning: var(--warning);
+  --page-success: var(--success);
   --radius: 0;
 }
 
@@ -136,6 +145,12 @@
   --code-string: var(--success);
   --code-number: var(--warning);
   --code-comment: var(--muted);
+  /* Repeated from the dark block, so a light element inside a page in
+     another theme does not inherit that theme's alphas. */
+  --tint-5: 5%;
+  --tint-10: 10%;
+  --tint-15: 15%;
+  --tint-20: 20%;
   --tint-danger: var(--danger);
   --tint-warning: var(--warning);
   --tint-success: var(--success);
@@ -145,6 +160,15 @@
   --tinted-danger: var(--danger);
   --tinted-warning: var(--warning);
   --tinted-success: var(--success);
+  --tinted-primary: var(--primary);
+  /* The page's own inks, fixed on the theme's element like the fills, so a
+     control inside a tint that draws its own fill can take them back. */
+  --page-foreground: var(--foreground);
+  --page-muted: var(--muted);
+  --page-primary: var(--primary);
+  --page-danger: var(--danger);
+  --page-warning: var(--warning);
+  --page-success: var(--success);
 }
 
 /*
@@ -434,6 +458,7 @@
   --tinted-danger: var(--tint-foreground);
   --tinted-warning: var(--tint-foreground);
   --tinted-success: var(--tint-foreground);
+  --tinted-primary: var(--tint-foreground);
 }
 
 [data-palette="high-contrast"][data-theme="light"] {
@@ -479,6 +504,7 @@
   --tinted-danger: var(--tint-foreground);
   --tinted-warning: var(--tint-foreground);
   --tinted-success: var(--tint-foreground);
+  --tinted-primary: var(--tint-foreground);
 }
 
 @theme inline {
@@ -836,7 +862,6 @@ html[data-vt="tab"] [role="tab"][aria-selected="true"] {
   }
 }
 
-/* Selected text (#504): a tint the foreground stays readable on. */
 /*
  * Inside a status tint (#506), text takes the --tinted-* inks. In every theme
  * but high contrast they are the page's own colors, so this changes nothing;
@@ -847,9 +872,35 @@ html[data-vt="tab"] [role="tab"][aria-selected="true"] {
 .tinted {
   --foreground: var(--tinted-foreground);
   --muted: var(--tinted-muted);
+  --primary: var(--tinted-primary);
   --danger: var(--tinted-danger);
   --warning: var(--tinted-warning);
   --success: var(--tinted-success);
+}
+
+/*
+ * A control inside a tint that draws its own fill (a secondary or primary
+ * button, an input, a ghost button while hovered) sits on that fill, not on
+ * the tint, so it takes the page's inks back. Only text drawn straight on the
+ * tint keeps the tint ink. `[class*=" bg-surface"]` matches the unprefixed
+ * utility, not `hover:bg-surface-2`, which only fills on hover.
+ */
+.tinted
+:is(
+  [class^="bg-surface"],
+  [class*=" bg-surface"],
+  [class^="bg-primary"],
+  [class*=" bg-primary"],
+  [class*="hover:bg-surface"]:hover,
+  input,
+  textarea
+) {
+  --foreground: var(--page-foreground);
+  --muted: var(--page-muted);
+  --primary: var(--page-primary);
+  --danger: var(--page-danger);
+  --warning: var(--page-warning);
+  --success: var(--page-success);
 }
 
 /*
@@ -865,8 +916,10 @@ html[data-vt="tab"] [role="tab"][aria-selected="true"] {
   }
   /* A tint, a status pill and a filled button were told apart by their fill;
      an outline does not move the layout. */
-  [class*="bg-tint-"],
-  [class*="bg-primary"] {
+  /* Not while focused: the focus ring below is the outline then. */
+  [class*="bg-tint-"]:not(:focus-visible),
+  [class^="bg-primary"]:not(:focus-visible),
+  [class*=" bg-primary"]:not(:focus-visible) {
     outline: 1px solid CanvasText;
     outline-offset: -1px;
   }
@@ -875,6 +928,7 @@ html[data-vt="tab"] [role="tab"][aria-selected="true"] {
   }
 }
 
+/* Selected text (#504): a tint the foreground stays readable on. */
 ::selection {
   background-color: var(--selection);
   color: var(--foreground);
