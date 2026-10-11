@@ -1,7 +1,14 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import type { Panel } from "@/lib/ir";
-import { lineChart, type PanelData } from "@/components/charts/options";
+import {
+  areaChart,
+  barChart,
+  LARGE_SERIES_POINTS,
+  lineChart,
+  type PanelData,
+  scatterChart,
+} from "@/components/charts/options";
 import { PANEL_RENDERERS } from "@/components/panels/registry";
 import { DEFAULT_CHART_THEME } from "@/lib/color/chart-theme";
 import { LOCAL_TIME_DISPLAY } from "@/lib/time-display";
@@ -116,4 +123,53 @@ test("a well-formed line panel is unchanged by the normalization", () => {
   assert.equal(series.length, 1);
   assert.equal(series[0].name, "v");
   assert.deepEqual(series[0].data, [1, 2]);
+});
+
+/**
+ * Large series (#491): past the threshold a line is sampled and straight,
+ * bars and scatter use large mode, and the chart stops animating; at or under
+ * it the option is what it always was.
+ */
+test("a series past the large threshold is sampled or drawn in large mode, and not before", () => {
+  const ctx = { display: LOCAL_TIME_DISPLAY, theme: DEFAULT_CHART_THEME };
+  const rows = (n: number) =>
+    Array.from({ length: n }, (_, i) => ({
+      ts: new Date(Date.UTC(2026, 9, 11, 0, 0, i)).toISOString(),
+      v: i % 17,
+      w: i % 5,
+    }));
+  const data = (n: number): PanelData => ({ columns: ["ts", "v", "w"], rows: rows(n) });
+  type Series = Record<string, unknown>;
+  const seriesOf = (option: { series?: unknown }) => option.series as Series[];
+  for (const n of [200, LARGE_SERIES_POINTS]) {
+    for (const s of seriesOf(lineChart(panel(), data(n), ctx))) {
+      assert.equal(s.sampling, undefined, `line at ${n}`);
+      assert.equal(s.smooth, true, `line at ${n}`);
+    }
+    for (const s of seriesOf(barChart(panel({ viz: "bar" }), data(n), ctx))) {
+      assert.equal(s.large, undefined, `bar at ${n}`);
+    }
+    for (const s of seriesOf(scatterChart(panel({ viz: "scatter" }), data(n), ctx))) {
+      assert.equal(s.large, undefined, `scatter at ${n}`);
+    }
+  }
+  const big = LARGE_SERIES_POINTS + 1;
+  for (const build of [lineChart, areaChart]) {
+    for (const s of seriesOf(build(panel(), data(big), ctx))) {
+      assert.equal(s.sampling, "lttb");
+      assert.equal(s.smooth, false);
+    }
+  }
+  for (const s of seriesOf(barChart(panel({ viz: "bar" }), data(big), ctx))) {
+    assert.equal(s.large, true);
+    assert.equal(s.largeThreshold, LARGE_SERIES_POINTS);
+  }
+  for (const s of seriesOf(scatterChart(panel({ viz: "scatter" }), data(big), ctx))) {
+    assert.equal(s.large, true);
+  }
+  // Animation is gated on size by ECharts itself, so the motion preference,
+  // which EChart applies as `animation`, still wins below it.
+  const option = lineChart(panel(), data(big), ctx) as Record<string, unknown>;
+  assert.equal(option.animationThreshold, LARGE_SERIES_POINTS);
+  assert.equal(option.animation, undefined, "the builder never turns animation on");
 });
