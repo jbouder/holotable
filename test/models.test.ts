@@ -293,6 +293,32 @@ test("a model is created, renamed, kept and deleted within its owner only", asyn
   assert.deepEqual(after.models, []);
 });
 
+test("a model that needs no credentials is created without any", async () => {
+  const d = deps({ models: [] });
+  const stub = await createModel(
+    workspaceOwner("w"),
+    { name: "Stub", settings: { provider: "stub", model: "stub" } },
+    "root",
+    d,
+  );
+  assert.deepEqual(stub.key, { state: "none" });
+  const local = await createModel(
+    personalOwner(alice),
+    {
+      name: "Local",
+      settings: {
+        provider: "openai-compatible",
+        baseUrl: "https://93.184.216.34/v1",
+        model: "llama3",
+        api: "chat",
+      },
+    },
+    "alice",
+    d,
+  );
+  assert.deepEqual(local.key, { state: "none" });
+});
+
 test("a workspace's default is one of its own models or a server model", async () => {
   const d = deps();
   for (const defaultModel of [foreign.id, mine.id, "env:nope"]) {

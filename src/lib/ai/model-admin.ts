@@ -110,8 +110,10 @@ export async function createModel(
 ): Promise<ModelView> {
   assertConfigurable(deps);
   const write = await prepareWrite(input, null, deps);
+  // A new model has nothing stored to keep: no credentials is none.
+  const credentials = write.credentials === "keep" ? null : write.credentials;
   const created = await deps.store
-    .create(owner, { ...write, name: input.name }, actor)
+    .create(owner, { ...write, credentials, name: input.name }, actor)
     .catch(duplicate);
   return modelView(created) as ModelView;
 }
