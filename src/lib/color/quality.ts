@@ -1,5 +1,6 @@
 import { contrastRatio, type Rgb } from "@/lib/color/contrast";
 import { DEFICIENCIES, deltaE, lightnessHue, simulate } from "@/lib/color/cvd";
+import { PALETTE_INFO } from "@/lib/theme";
 
 /**
  * What makes a theme good here (#501, #504), as measurements.
@@ -19,6 +20,17 @@ import { DEFICIENCIES, deltaE, lightnessHue, simulate } from "@/lib/color/cvd";
  */
 
 export type QualityTier = "builtin" | "operator" | "high-contrast";
+
+/**
+ * The tier a shipped theme is held to: high contrast its own, every other
+ * built-in one. One answer for the test and `npm run themes:check`, which
+ * used to measure high contrast at the built-in tier and so failed on main.
+ */
+export function shippedTier(palette: string): QualityTier {
+  return PALETTE_INFO.find((p) => p.name === palette)?.highContrast
+    ? "high-contrast"
+    : "builtin";
+}
 
 interface Floors {
   /** OKLab lightness step between surfaces. */
