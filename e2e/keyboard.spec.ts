@@ -62,7 +62,10 @@ test("a dialog traps focus and gives it back to what opened it", async ({
   await expect(opener).toBeFocused();
 });
 
-test("the share dialog keeps focus while it creates a link", async ({ page, request }) => {
+test("the share dialog keeps focus while it creates a link", async ({
+  page,
+  request,
+}) => {
   // #540: Create link disabled itself while focused, which dropped focus to
   // the page behind the modal, and the next Tabs walked the page.
   await page.goto(`/dashboards/${await dashboardId(request, DEMO_DASHBOARD)}`);
