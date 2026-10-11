@@ -12,11 +12,52 @@ import { DEFICIENCIES, deltaE, lightnessHue, simulate } from "@/lib/color/cvd";
  * measurement, so a failure names the rule, where it was measured and the
  * number, and `npm run themes:check` prints the same report for a designer.
  *
- * Two tiers: the built-in themes are held higher (body text at AAA) than an
- * operator's theme file (phase 7), which only has to clear AA.
+ * Three tiers: the built-in themes are held higher (body text at AAA) than an
+ * operator's theme file (phase 7), which only has to clear AA; the
+ * high-contrast theme (#506) is held higher again, every text at 7:1 and every
+ * edge at 4.5:1, with the surface ladder carried by borders instead.
  */
 
-export type QualityTier = "builtin" | "operator";
+export type QualityTier = "builtin" | "operator" | "high-contrast";
+
+interface Floors {
+  /** OKLab lightness step between surfaces. */
+  ladder: number;
+  foreground: number;
+  /** Every other text: muted, primary, status, chart text, selection, code. */
+  text: number;
+  border: number;
+  borderStrong: number;
+  /** A label on a solid fill. */
+  onFill: number;
+}
+
+const FLOORS: Record<QualityTier, Floors> = {
+  builtin: {
+    ladder: 0.015,
+    foreground: 7,
+    text: 4.5,
+    border: 1.3,
+    borderStrong: 3,
+    onFill: 4.5,
+  },
+  operator: {
+    ladder: 0.015,
+    foreground: 4.5,
+    text: 4.5,
+    border: 1.3,
+    borderStrong: 3,
+    onFill: 4.5,
+  },
+  "high-contrast": {
+    ladder: 0,
+    foreground: 12,
+    text: 7,
+    border: 4.5,
+    borderStrong: 4.5,
+    onFill: 7,
+  },
+};
 
 export interface Measurement {
   rule: string;
@@ -62,14 +103,14 @@ export const THEME_RULES: readonly ThemeRule[] = [
   {
     id: "surface-ladder",
     why: "Each surface steps from the one below it: enough to see, not so much that a card shouts.",
-    measure: (t) =>
+    measure: (t, tier) =>
       [
         ["background", "surface"],
         ["surface", "surface-2"],
       ].map(([a, b]) => ({
         where: `${b} against ${a} (OKLab ΔL)`,
         measured: Math.abs(lightnessHue(get(t, a)).l - lightnessHue(get(t, b)).l),
-        floor: 0.015,
+        floor: FLOORS[tier].ladder,
       })),
   },
   {
@@ -79,40 +120,44 @@ export const THEME_RULES: readonly ThemeRule[] = [
       SURFACES.map((s) => ({
         where: `foreground on ${s}`,
         measured: ratio(t, "foreground", s),
-        floor: tier === "builtin" ? 7 : 4.5,
+        floor: FLOORS[tier].foreground,
       })),
   },
   {
     id: "muted",
     why: "Secondary text is still text: AA on every surface.",
-    measure: (t) =>
+    measure: (t, tier) =>
       SURFACES.map((s) => ({
         where: `muted on ${s}`,
         measured: ratio(t, "muted", s),
-        floor: 4.5,
+        floor: FLOORS[tier].text,
       })),
   },
   {
     id: "border",
     why: "A card's edge is quiet but visible; a control's edge (border-strong) is a 3:1 component boundary (WCAG 1.4.11).",
-    measure: (t) =>
+    measure: (t, tier) =>
       SURFACES.flatMap((s) => [
-        { where: `border on ${s}`, measured: ratio(t, "border", s), floor: 1.3 },
+        {
+          where: `border on ${s}`,
+          measured: ratio(t, "border", s),
+          floor: FLOORS[tier].border,
+        },
         {
           where: `border-strong on ${s}`,
           measured: ratio(t, "border-strong", s),
-          floor: 3,
+          floor: FLOORS[tier].borderStrong,
         },
       ]),
   },
   {
     id: "primary",
     why: "The accent reads as text and as a fill, and is never mistaken for a status.",
-    measure: (t) => [
+    measure: (t, tier) => [
       ...SURFACES.map((s) => ({
         where: `primary text on ${s}`,
         measured: ratio(t, "primary", s),
-        floor: 4.5,
+        floor: FLOORS[tier].text,
       })),
       {
         where: "primary fill on surface",
@@ -129,11 +174,11 @@ export const THEME_RULES: readonly ThemeRule[] = [
   {
     id: "on-fill",
     why: "A filled button's label.",
-    measure: (t) =>
+    measure: (t, tier) =>
       ["primary", "danger"].map((fill) => ({
         where: `primary-foreground on ${fill}`,
         measured: ratio(t, "primary-foreground", fill),
-        floor: 4.5,
+        floor: FLOORS[tier].onFill,
       })),
   },
   {
@@ -183,11 +228,11 @@ export const THEME_RULES: readonly ThemeRule[] = [
   {
     id: "chart-text",
     why: "Axis labels and legends are text.",
-    measure: (t) => [
+    measure: (t, tier) => [
       {
         where: "chart-text on surface",
         measured: ratio(t, "chart-text", "surface"),
-        floor: 4.5,
+        floor: FLOORS[tier].text,
       },
     ],
   },
@@ -204,23 +249,61 @@ export const THEME_RULES: readonly ThemeRule[] = [
   {
     id: "selection",
     why: "Selected text stays readable.",
-    measure: (t) => [
+    measure: (t, tier) => [
       {
         where: "foreground on selection",
         measured: ratio(t, "foreground", "selection"),
-        floor: 4.5,
+        floor: FLOORS[tier].text,
       },
     ],
   },
   {
     id: "code",
     why: "Syntax colors are text in an editor on the surface.",
-    measure: (t) =>
+    measure: (t, tier) =>
       ["code-keyword", "code-string", "code-number", "code-comment"].map((c) => ({
         where: `${c} on surface`,
         measured: ratio(t, c, "surface"),
-        floor: 4.5,
+        floor: FLOORS[tier].text,
       })),
+  },
+  {
+    id: "status-text",
+    why: "A status is often a word (an error message, a badge): text on every surface.",
+    measure: (t, tier) =>
+      STATUS.flatMap((status) =>
+        SURFACES.map((s) => ({
+          where: `${status} on ${s}`,
+          measured: ratio(t, status, s),
+          floor: FLOORS[tier].text,
+        })),
+      ),
+  },
+  {
+    id: "tint-ink",
+    why: "Inside a tinted notice or badge, text takes --tinted-* (#506). Where a theme makes tints solid, that ink must read on each solid fill.",
+    measure: (t, tier) =>
+      tier !== "high-contrast"
+        ? []
+        : [...STATUS, "primary"].map((fill) => ({
+            where: `tint-foreground on a solid ${fill} fill`,
+            measured: ratio(t, "tint-foreground", fill),
+            floor: FLOORS[tier].onFill,
+          })),
+  },
+  {
+    id: "chart-grid",
+    why: "In high contrast the grid is visible rather than quiet: a 3:1 line on the surface.",
+    measure: (t, tier) =>
+      tier !== "high-contrast"
+        ? []
+        : [
+            {
+              where: "chart-grid on surface",
+              measured: ratio(t, "chart-grid", "surface"),
+              floor: 3,
+            },
+          ],
   },
 ];
 

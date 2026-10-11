@@ -101,7 +101,7 @@ export function ApiTokensCard({
       </CardHeader>
       <CardContent className="space-y-4 text-sm">
         {created && (
-          <div className="space-y-2 border border-success/40 bg-success/10 p-3">
+          <div className="space-y-2 border border-success/40 tinted bg-tint-success/(--tint-10) p-3">
             <p className="font-medium">Copy the token now; it will not be shown again.</p>
             <div className="flex items-center gap-2">
               <code className="min-w-0 flex-1 truncate font-mono text-xs">{created}</code>

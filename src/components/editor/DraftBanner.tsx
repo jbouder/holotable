@@ -32,7 +32,9 @@ export function DraftBanner({
   return (
     <div
       className={`flex flex-wrap items-center justify-between gap-3 border px-3 py-2 text-sm ${
-        conflict ? "border-warning/40 bg-warning/10" : "border-border bg-surface-2"
+        conflict
+          ? "border-warning/40 tinted bg-tint-warning/(--tint-10)"
+          : "border-border bg-surface-2"
       }`}
     >
       <p className="flex items-start gap-2">

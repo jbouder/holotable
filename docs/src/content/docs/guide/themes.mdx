@@ -1,6 +1,6 @@
 ---
 title: Themes
-description: The four built-in themes, what each is for, and how to choose one.
+description: The five built-in themes, what each is for, and how to choose one.
 sidebar:
   order: 6
 ---
@@ -14,6 +14,8 @@ import fjordDark from '../../../../public/images/themes/fjord-dark.png';
 import fjordLight from '../../../../public/images/themes/fjord-light.png';
 import paperDark from '../../../../public/images/themes/paper-dark.png';
 import paperLight from '../../../../public/images/themes/paper-light.png';
+import highContrastDark from '../../../../public/images/themes/high-contrast-dark.png';
+import highContrastLight from '../../../../public/images/themes/high-contrast-light.png';
 
 A theme is a named set of colors. Each comes in a light and a dark color
 scheme, and you choose the two separately in **Settings → Appearance** or from
@@ -35,6 +37,7 @@ measured are on [Theming](/architecture/theming/#quality-bar).
   contrast.
 - **Paper** for a projector, a printout, or anyone who reads a dashboard like a
   report.
+- **High contrast** if AA is not enough for you, or the room is bright.
 
 ## Holotable
 
@@ -78,3 +81,23 @@ warm charcoal, not an inversion of the light one.
 
 <Image src={paperLight} widths={[720, 1440]} sizes="(min-width: 72rem) 68rem, 100vw" alt="The demo dashboard in Paper, light scheme." />
 <Image src={paperDark} widths={[720, 1440]} sizes="(min-width: 72rem) 68rem, 100vw" alt="The demo dashboard in Paper, dark scheme." />
+
+## High contrast
+
+For people who need more than AA. Every text is at least 7:1 against what it
+sits on, and body text is at least 12:1. Borders are at least 4.5:1, and the
+background and cards are nearly one color, so edges carry the structure
+rather than shades. Badges, alerts and status tiles are solid fills instead
+of tints. Chart series are spread across lightness as well as hue, and the
+grid is visible. Its bar is stricter than the other themes', and it is
+described on [Theming](/architecture/theming/#quality-bar).
+
+<Image src={highContrastDark} widths={[720, 1440]} sizes="(min-width: 72rem) 68rem, 100vw" alt="The demo dashboard in High contrast, dark scheme." />
+<Image src={highContrastLight} widths={[720, 1440]} sizes="(min-width: 72rem) 68rem, 100vw" alt="The demo dashboard in High contrast, light scheme." />
+
+## Your operating system's colors
+
+If your operating system forces its own colors (Windows High Contrast, also
+called contrast themes), it overrides every theme. Holotable keeps edges and
+focus visible in that mode. It also redraws charts in the system's colors,
+because the system cannot recolor a chart itself.

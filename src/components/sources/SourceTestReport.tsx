@@ -165,7 +165,7 @@ export function SourceTestReport({
 const TONE_STYLES = {
   ok: "border-success/40 text-success",
   warning: "border-warning/50 text-warning",
-  danger: "border-danger/60 bg-danger/10 text-danger",
+  danger: "border-danger/60 tinted bg-tint-danger/(--tint-10) text-danger",
 } as const;
 
 function ReadOnlyVerdictRow({ result }: { result: SourceTestResult }) {

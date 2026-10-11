@@ -130,7 +130,7 @@ export function CatalogRefreshReview({
       {state.moved && (
         <p
           role="alert"
-          className="drop-in border border-warning/40 bg-warning/5 px-3 py-2 text-xs text-warning"
+          className="drop-in border border-warning/40 tinted bg-tint-warning/(--tint-5) px-3 py-2 text-xs text-warning"
         >
           {state.moved}
         </p>
@@ -171,7 +171,7 @@ function MetricDiffView({ diff }: { diff: MetricCatalogDiff }) {
       {diff.missingMetrics.length > 0 && (
         <div
           role="alert"
-          className="space-y-1 border border-danger/40 bg-danger/5 px-3 py-2 text-xs text-danger"
+          className="space-y-1 border border-danger/40 tinted bg-tint-danger/(--tint-5) px-3 py-2 text-xs text-danger"
         >
           <p className="flex items-center gap-1.5 font-medium">
             <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
@@ -242,7 +242,7 @@ function TableDiffView({ diff }: { diff: CatalogDiff }) {
       {diff.missingTables.length > 0 && (
         <div
           role="alert"
-          className="space-y-1 border border-danger/40 bg-danger/5 px-3 py-2 text-xs text-danger"
+          className="space-y-1 border border-danger/40 tinted bg-tint-danger/(--tint-5) px-3 py-2 text-xs text-danger"
         >
           <p className="flex items-center gap-1.5 font-medium">
             <AlertTriangle className="h-3.5 w-3.5 shrink-0" />

@@ -1173,15 +1173,15 @@ test("the browser's window and the PromQL point cap are one budget", () => {
 
 test("THEME_DEFAULT_PALETTE must name a shipped theme", () => {
   // #503
-  for (const value of ["holotable", "paper", ""]) {
+  for (const value of ["holotable", "paper", "high-contrast", ""]) {
     const ok = validateConfig(
       { ...VALID_PRODUCTION, THEME_DEFAULT_PALETTE: value },
       { production: true },
     );
     assert.deepEqual(errors(ok), [], formatConfigProblems(ok));
   }
-  // A reserved name with no CSS yet is refused like a typo.
-  for (const value of ["foo", "high-contrast", "Holotable"]) {
+  // A name the app does not ship is refused like a typo.
+  for (const value of ["foo", "neon", "Holotable"]) {
     const bad = validateConfig(
       { ...VALID_PRODUCTION, THEME_DEFAULT_PALETTE: value },
       { production: true },

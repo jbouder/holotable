@@ -135,7 +135,7 @@ export function ShareDialog({
         </p>
 
         {created && (
-          <div className="space-y-2 border border-success/40 bg-success/10 p-3">
+          <div className="space-y-2 border border-success/40 tinted bg-tint-success/(--tint-10) p-3">
             <p className="font-medium">Copy the link now; it will not be shown again.</p>
             <div className="flex gap-2">
               <Input

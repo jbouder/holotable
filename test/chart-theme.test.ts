@@ -5,6 +5,7 @@ import { PANEL_RENDERERS } from "@/components/panels/registry";
 import {
   type ChartTheme,
   DEFAULT_CHART_THEME,
+  forcedColorsTheme,
   readChartTheme,
 } from "@/lib/color/chart-theme";
 import type { Panel } from "@/lib/ir";
@@ -76,6 +77,7 @@ test("the defaults are the dark scheme's tokens in globals.css", () => {
   assert.equal(d.text, hex("chart-text"));
   assert.equal(d.line, hex("chart-axis"));
   assert.equal(d.grid, hex("chart-grid"));
+  assert.equal(d.track, hex("chart-track"));
   assert.equal(d.foreground, hex("foreground"));
   assert.equal(d.background, hex("surface"));
   assert.deepEqual(
@@ -101,6 +103,7 @@ const DISTINCT: ChartTheme = {
   text: "#010101",
   line: "#020202",
   grid: "#030303",
+  track: "#060606",
   foreground: "#040404",
   background: "#050505",
   series: [
@@ -180,4 +183,40 @@ test("a token served as lab(), as a production build serves it, reads as hex", (
   assert.equal(resolveColor(" #ABCDEF "), "#abcdef");
   const theme = readChartTheme(style({ "--chart-seq-1": "lab(92.02% -8.2 -11.6)" }));
   assert.match(theme.sequential[0], /^#[0-9a-f]{6}$/);
+});
+
+test("under forced colors a chart draws only in system colors", () => {
+  // #506: a canvas is not recolored by the system, so the chart draws in
+  // the system's own colors, text and lines in CanvasText on Canvas.
+  const system: Record<string, string> = {
+    CanvasText: "#fffff0",
+    Canvas: "#000010",
+    GrayText: "#808081",
+    Highlight: "#00ff01",
+    LinkText: "#ffff02",
+    VisitedText: "#00ff03",
+  };
+  const theme = forcedColorsTheme((k) => system[k] ?? assert.fail(`asked for ${k}`));
+  const allowed = new Set(Object.values(system));
+  const every = [
+    theme.text,
+    theme.line,
+    theme.grid,
+    theme.foreground,
+    theme.background,
+    ...theme.series,
+    ...theme.sequential,
+    ...theme.diverging,
+    ...Object.values(theme.tokens),
+  ];
+  assert.deepEqual(
+    every.filter((c) => !allowed.has(c)),
+    [],
+  );
+  assert.equal(theme.text, system.CanvasText);
+  assert.equal(theme.background, system.Canvas);
+  // Adjacent series differ, so neighbors stay apart.
+  for (let i = 1; i < theme.series.length; i++) {
+    assert.notEqual(theme.series[i], theme.series[i - 1]);
+  }
 });

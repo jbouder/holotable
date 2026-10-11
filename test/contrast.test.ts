@@ -81,6 +81,33 @@ test("every text pairing meets AA in both themes", () => {
   assert.deepEqual(failing, []);
 });
 
+test("a theme that makes tints solid is measured with its ink on the solid fill", () => {
+  // #506: a status tint's alpha and the text inside it are tokens; a theme
+  // that sets them is measured as it paints, not at Holotable's alphas.
+  const css = `${CSS}
+[data-palette="probe"][data-theme="dark"] {
+  --tint-10: 100%;
+  --tint-foreground: oklch(0 0 0);
+  --tinted-danger: var(--tint-foreground);
+}
+[data-palette="probe"][data-theme="light"] {
+}`;
+  const dark = parseThemeBlocks(css).find(
+    (b) => b.palette === "probe" && b.scheme === "dark",
+  );
+  assert.ok(dark);
+  const pair = measureContrast(css).find(
+    (m) =>
+      m.palette === "probe" &&
+      m.theme === "dark" &&
+      m.where.startsWith("text-danger on bg-danger/10"),
+  );
+  assert.equal(
+    pair?.ratio,
+    contrastRatio(dark.tokens["tint-foreground"], dark.tokens.danger),
+  );
+});
+
 test("another palette's blocks are measured on top of Holotable's", () => {
   // #503: a theme is `[data-palette][data-theme]`, overriding what it sets;
   // the table grows a section per theme.

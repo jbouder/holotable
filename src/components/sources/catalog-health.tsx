@@ -97,8 +97,8 @@ export function CatalogHealthNotice({
       className={cn(
         "flex flex-wrap items-center gap-x-3 gap-y-2 border px-3 py-2 text-xs",
         health.blocked
-          ? "border-danger/40 bg-danger/5 text-danger"
-          : "border-warning/40 bg-warning/5 text-warning",
+          ? "border-danger/40 tinted bg-tint-danger/(--tint-5) text-danger"
+          : "border-warning/40 tinted bg-tint-warning/(--tint-5) text-warning",
       )}
     >
       <span className="flex min-w-0 items-start gap-1.5">
