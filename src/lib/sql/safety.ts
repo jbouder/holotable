@@ -416,8 +416,18 @@ export function buildExecutablePlan(input: {
    * bounds and the row-filter value; none is ever written into the text.
    */
   variables?: VariableValues;
+  /**
+   * The rows the panel asks for (#499). Never above `MAX_QUERY_ROWS`: the
+   * smaller of the two is the plan's cap, and anything not a positive whole
+   * number is the server's own.
+   */
+  maxRows?: number;
 }): ExecutablePlan {
-  const limit = config.maxQueryRows;
+  const asked = input.maxRows;
+  const limit =
+    asked !== undefined && Number.isInteger(asked) && asked > 0
+      ? Math.min(asked, config.maxQueryRows)
+      : config.maxQueryRows;
 
   const params: unknown[] = [];
   let inner = stripTerminators(input.sql);

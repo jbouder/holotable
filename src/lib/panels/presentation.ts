@@ -125,6 +125,9 @@ export const TableColumn = z
   .strict();
 export type TableColumn = z.infer<typeof TableColumn>;
 
+/** A panel's own row limit (#499): a whole number of rows, at most the server's cap. */
+export const RowLimit = z.number().int().min(1).max(5_000);
+
 export const TableOptions = z
   .object({
     /**
@@ -137,6 +140,11 @@ export const TableOptions = z
       .object({ column: Column, order: z.enum(["asc", "desc"]).optional() })
       .strict()
       .optional(),
+    /**
+     * How many rows the query is asked for (#499), inside the server's own
+     * row cap. Without it, the cap.
+     */
+    limit: RowLimit.optional(),
   })
   .strict()
   .superRefine((o, ctx) => {

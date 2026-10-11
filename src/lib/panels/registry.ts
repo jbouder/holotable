@@ -68,6 +68,14 @@ export function panelKind(name: PanelKindName): PanelKind<PanelKindName> {
   return BY_NAME.get(name) as PanelKind<PanelKindName>;
 }
 
+/** The rows a panel's query is asked for (#499), when its kind and options say. */
+export function panelRowLimit(panel: {
+  viz: PanelKindName;
+  options?: Record<string, unknown>;
+}): number | undefined {
+  return panelKind(panel.viz).rowLimit?.(panel.options ?? {});
+}
+
 /**
  * A kind by a name that may not be one: a partial spec still streaming from
  * the model, or a value read from somewhere the IR has not validated.

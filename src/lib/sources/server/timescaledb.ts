@@ -88,6 +88,7 @@ const kind: ServerSourceKind = {
         to: input.to,
         rowFilter: input.rowFilter,
         variables: input.variables,
+        maxRows: input.maxRows,
       }),
     };
   },

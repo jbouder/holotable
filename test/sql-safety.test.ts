@@ -330,6 +330,40 @@ ORDER BY _holo_kept._holo_pos`;
   );
 });
 
+test("a panel's own row limit goes inside the guard's cap, never above it", async () => {
+  // #499: a "latest 50" panel is a 50-row query.
+  const sql = "SELECT ts, status FROM http_requests";
+  assert.equal((await validateSql(sql, source)).ok, true);
+  const limitOf = (maxRows: number | undefined, timeField?: string) => {
+    const plan = buildExecutablePlan({
+      sql,
+      timeField,
+      from: new Date(0),
+      to: new Date(1),
+      rowFilter: null,
+      maxRows,
+    });
+    return plan.maxRows;
+  };
+  assert.equal(limitOf(50, "ts"), 50);
+  assert.match(
+    buildExecutablePlan({
+      sql,
+      timeField: "ts",
+      from: new Date(0),
+      to: new Date(1),
+      rowFilter: null,
+      maxRows: 50,
+    }).sql,
+    /\bLIMIT 50\)/,
+  );
+  assert.equal(limitOf(50), 50);
+  assert.equal(limitOf(config.maxQueryRows * 10, "ts"), config.maxQueryRows);
+  for (const bad of [0, -1, 2.5, Number.NaN, undefined]) {
+    assert.equal(limitOf(bad, "ts"), config.maxQueryRows, String(bad));
+  }
+});
+
 test("every trailing terminator is stripped before the query is wrapped", async () => {
   // Found by test/sql-safety.fuzz.test.ts. PostgreSQL reads `SELECT 1;;` as one
   // statement, so the guard accepted it, but only one `;` was stripped and the

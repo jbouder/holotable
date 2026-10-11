@@ -1,3 +1,4 @@
+import { panelRowLimit } from "@/lib/panels/registry";
 import { getHeapStatistics } from "node:v8";
 import {
   type Dashboard,
@@ -259,6 +260,8 @@ export function makePanelExecutor(
         // added since the poller started applies at once.
         rowFilter: rowFilterInScope(source, scope),
         variables,
+        // A table or logs panel that wants fewer rows asks for fewer (#499).
+        maxRows: panelRowLimit(panel),
       });
     } catch (err) {
       if (err instanceof RowFilterDenied) {
@@ -501,7 +504,11 @@ class DashboardPoller {
     event: PollerEvent,
     shared: DeltaMemo = new Map(),
   ) {
-    const timeField = queryTimeField(panel.query);
+    // A panel with its own row limit (#499) is the newest N rows, whole, every
+    // cycle: appending them would grow it past N and put the newest at the
+    // wrong end of a newest-first table. It is small by definition.
+    const timeField =
+      panelRowLimit(panel) === undefined ? queryTimeField(panel.query) : undefined;
     if (event.type !== "panel" || !timeField) {
       this.send(sub, event);
       return;

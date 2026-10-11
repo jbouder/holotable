@@ -102,6 +102,13 @@ export interface PanelKind<K extends string = string> {
    * do (a text panel needs content). Given the panel's title.
    */
   readonly starterOptions?: (title: string) => Record<string, unknown>;
+  /**
+   * How many rows the panel asks its query for, from its options (#499): a
+   * "latest 50 errors" panel is a 50-row query, not 5,000 rows cut in the
+   * browser. The plan applies it inside the guard's own row cap, never above
+   * it. Undefined asks for the cap.
+   */
+  readonly rowLimit?: (options: Record<string, unknown>) => number | undefined;
 }
 
 /**

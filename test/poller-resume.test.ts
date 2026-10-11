@@ -351,3 +351,59 @@ test("a frame carries its id, and an id that could split the frame is dropped", 
   assert.equal(text(encodeEventFrame(event, "a\nevent: x")), 'data: {"a":1}\n\n');
   assert.match(HEARTBEAT_FRAME, /^:[^\n]*\n\n$/);
 });
+
+test("a panel with its own row limit is sent whole every cycle, never appended", async () => {
+  // #499: appending to a "latest 50" table would grow it past 50 and put the
+  // newest rows at the wrong end of a newest-first one.
+  mock.timers.enable({ apis: ["setTimeout"] });
+  const limited: Dashboard = {
+    ...spec(),
+    panels: [
+      {
+        id: "latest",
+        title: "latest",
+        viz: "table",
+        query: { sourceId: "s1", sql: "SELECT ts, v FROM m", timeField: "ts" },
+        options: { limit: 2 },
+        layout: { x: 0, y: 0, w: 6, h: 4 },
+      },
+    ],
+  };
+  let cycle = 0;
+  const executor: PanelExecutor = async (panel) => {
+    cycle++;
+    return [
+      {
+        type: "panel",
+        panelId: panel.id,
+        mode: "replace",
+        columns: ["ts", "v"],
+        rows: [
+          { ts: ts(cycle + 1), v: cycle + 1 },
+          { ts: ts(cycle), v: cycle },
+        ],
+      },
+    ];
+  };
+  const frames: PollerEvent[] = [];
+  const stop = getPoller(
+    `limited-${Date.now()}`,
+    1,
+    "ws",
+    limited,
+    {},
+    executor,
+  ).subscribe((e) => {
+    if (e.type === "panel") frames.push(e);
+  });
+  for (let i = 0; i < 3; i++) {
+    await new Promise((r) => setImmediate(r));
+    mock.timers.tick(INTERVAL);
+  }
+  await new Promise((r) => setImmediate(r));
+  stop();
+  assert.ok(frames.length >= 2);
+  for (const f of frames) {
+    assert.ok(f.type === "panel" && f.mode === "replace" && f.rows.length === 2);
+  }
+});

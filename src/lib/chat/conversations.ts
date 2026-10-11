@@ -1,3 +1,4 @@
+import { panelRowLimit } from "@/lib/panels/registry";
 import { countTruncation } from "@/lib/metrics";
 import { fitToWindow } from "@/lib/stream-merge";
 import type { UIMessage } from "ai";
@@ -328,7 +329,7 @@ export async function runStoredPanel(input: {
   onQuery?: (outcome: "success" | "failure", stage?: string) => void;
 }): Promise<PanelRun> {
   const { panel, scope } = input;
-  const built = await planChatQuery(scope, panel.query);
+  const built = await planChatQuery(scope, panel.query, panelRowLimit(panel));
   if (!built.ok) {
     input.onQuery?.("failure", "validate");
     throw new HttpError(400, built.error, {}, "statement");

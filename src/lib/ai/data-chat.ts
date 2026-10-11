@@ -1,3 +1,4 @@
+import { panelRowLimit } from "@/lib/panels/registry";
 import { countTruncation } from "@/lib/metrics";
 import { fitToWindow } from "@/lib/stream-merge";
 import { config } from "@/lib/config";
@@ -130,6 +131,8 @@ export interface ChatScope {
 export async function planChatQuery(
   scope: ChatScope,
   query: PanelQuery,
+  /** A drawn panel's own row limit (#499), as a dashboard panel's would be. */
+  maxRows?: number,
 ): Promise<ChatQueryPlan> {
   const { sources, identity } = scope;
   const source = sources.find((s) => s.id === query.sourceId);
@@ -158,6 +161,7 @@ export async function planChatQuery(
         claimValue(identity, claim),
       ),
       variables: scope.variables ?? {},
+      maxRows,
     });
     return { ok: true, source, plan };
   } catch (err) {
@@ -420,7 +424,7 @@ export function showPanelTool(input: {
           stage,
           panelId,
         });
-      const built = await planChatQuery(scope, spec.query);
+      const built = await planChatQuery(scope, spec.query, panelRowLimit(spec));
       if (!built.ok) {
         report("failure", "validate");
         return refuse("validate", built.error, spec);

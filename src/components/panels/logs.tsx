@@ -11,6 +11,10 @@ import { LogsOptions } from "@/lib/panels/kinds/logs";
 import { readOptions } from "@/lib/panels/presentation";
 import { type LogLine, logLines } from "@/lib/panel-reading";
 import { cn } from "@/lib/utils";
+import { useVirtualRows } from "@/components/ui/virtual-rows";
+
+/** A line's height before it is measured: one line of `text-xs` and its padding. */
+const LINE_ESTIMATE = 25;
 
 /**
  * Log lines (#404): a time, a level and a message per line, in a monospace
@@ -25,30 +29,32 @@ import { cn } from "@/lib/utils";
  */
 export function LogsView({ panel, data }: PanelBodyProps) {
   const display = useTimeDisplay();
-  const { lines, overflow } = logLines(panel, data, display);
+  const { lines, overflow } = React.useMemo(
+    () => logLines(panel, data, display),
+    [panel, data, display],
+  );
   const o = readOptions(LogsOptions, panel.options);
   const links = useDatumLinks();
   const scroller = React.useRef<HTMLElement>(null);
   /** The first line in view, and how far below the top of the view it sits. */
   const anchor = React.useRef<{ key: string; offset: number } | null>(null);
   const first = lines[0]?.key;
+  // Windowed (#499): every line the panel was sent, a screenful of them in
+  // the DOM. Positions come from measured heights, so the anchor below works
+  // for a line that is not drawn.
+  const keys = React.useMemo(() => lines.map((l) => l.key), [lines]);
+  const rows = useVirtualRows({ scrollRef: scroller, keys, estimate: LINE_ESTIMATE });
+  const { indexAt, offsetOf, refresh } = rows;
 
   const remember = React.useCallback(() => {
     const el = scroller.current;
-    if (!el || el.scrollTop === 0) {
+    if (!el || el.scrollTop === 0 || keys.length === 0) {
       anchor.current = null;
       return;
     }
-    for (const li of el.querySelectorAll<HTMLElement>("li[data-line]")) {
-      if (li.offsetTop + li.offsetHeight > el.scrollTop) {
-        anchor.current = {
-          key: li.dataset.line ?? "",
-          offset: li.offsetTop - el.scrollTop,
-        };
-        return;
-      }
-    }
-  }, []);
+    const index = indexAt(el.scrollTop);
+    anchor.current = { key: keys[index], offset: offsetOf(index) - el.scrollTop };
+  }, [keys, indexAt, offsetOf]);
 
   // `first` changes when a poll brings lines in above the reader.
   // biome-ignore lint/correctness/useExhaustiveDependencies: re-run when the newest line changes
@@ -56,12 +62,11 @@ export function LogsView({ panel, data }: PanelBodyProps) {
     const el = scroller.current;
     const held = anchor.current;
     if (!el || !held) return;
-    const li = [...el.querySelectorAll<HTMLElement>("li[data-line]")].find(
-      (l) => l.dataset.line === held.key,
-    );
-    if (li) el.scrollTop = li.offsetTop - held.offset;
+    const index = keys.indexOf(held.key);
+    if (index >= 0) el.scrollTop = offsetOf(index) - held.offset;
+    refresh();
     remember();
-  }, [first, remember]);
+  }, [first]);
 
   return (
     <section
@@ -71,14 +76,26 @@ export function LogsView({ panel, data }: PanelBodyProps) {
       // biome-ignore lint/a11y/noNoninteractiveTabindex: a scroll container must be focusable to scroll by keyboard (WCAG 2.1.1)
       tabIndex={0}
       // `relative`, so each line's offsetTop is measured from the list.
-      className="relative max-h-full overflow-auto font-mono text-xs focus-visible:outline-2 focus-visible:outline-primary"
+      // No browser scroll anchoring (#499): the spacers around the window
+      // change size as it moves; the reader's place is kept above, by hand.
+      className="relative max-h-full overflow-auto font-mono text-xs [overflow-anchor:none] focus-visible:outline-2 focus-visible:outline-primary"
     >
       {lines.length === 0 ? (
         <p className="p-2 text-muted">No lines in this window.</p>
       ) : (
-        <ol className="divide-y divide-border">
-          {lines.map((line) => (
-            <li key={line.key} data-line={line.key} className="flex items-start gap-1">
+        <ol
+          className="divide-y divide-border"
+          // The lines not drawn, as space, so the scrollbar is the whole log's.
+          style={{ paddingTop: rows.before, paddingBottom: rows.after }}
+        >
+          {lines.slice(rows.start, rows.end).map((line) => (
+            <li
+              key={line.key}
+              ref={rows.measure}
+              data-vkey={line.key}
+              data-line={line.key}
+              className="flex items-start gap-1"
+            >
               <Line line={line} wrap={o.wrap !== false} showTime={o.showTime !== false} />
               {links && (
                 <DatumLinksControl
