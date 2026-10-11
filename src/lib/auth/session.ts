@@ -191,11 +191,17 @@ export async function signSessionToken(
   ttlSeconds = 60 * 60 * 8,
   /** The realm session id, so a back-channel logout can name this token (#28). */
   sid?: string,
+  /**
+   * When the realm last vouched for this person, epoch ms: the sign-in's code
+   * exchange or the renewal's refresh, taken before the call. It is the
+   * token's issue time, so a revocation that lands while the app is still
+   * minting reaches the token (#542). Now, when there is no such moment.
+   */
+  vouchedAt: number = Date.now(),
 ): Promise<string> {
   const claims: JWTPayload = { ...profile.attributes, [GROUPS_CLAIM]: groups };
   if (sid) claims.sid = sid;
-  const now = Date.now();
-  claims[ISSUED_AT_MS_CLAIM] = now;
+  claims[ISSUED_AT_MS_CLAIM] = vouchedAt;
   if (profile.displayName) claims.name = profile.displayName;
   if (profile.email) claims.email = profile.email;
   return new SignJWT(claims)
@@ -203,7 +209,7 @@ export async function signSessionToken(
     .setSubject(sub)
     .setIssuer("holotable")
     .setAudience("holotable")
-    .setIssuedAt(Math.floor(now / 1000))
+    .setIssuedAt(Math.floor(vouchedAt / 1000))
     .setExpirationTime(`${ttlSeconds}s`)
     .sign(sessionSecret());
 }

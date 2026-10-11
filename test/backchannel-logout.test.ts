@@ -61,13 +61,16 @@ test("signing out and straight back in within the same second still signs in", a
   assert.equal(isRevoked({ ...sameSecond, issuedAtMs: at }, at), true);
 
   // The callback's id_token: the server obtained it after the sign-out, by a
-  // code exchange, and passes that moment as its lower bound.
+  // code exchange, and passes the moment before that exchange as its bound.
+  // A fixed instant in the current second, so no boundary can fall between.
   const { identityFromPayload } = await import("@/lib/auth/session");
-  const payload = { sub: "alice", sid: "kc-1", iat: sec(Date.now()) };
+  const signedOut = Math.floor(Date.now() / 1000) * 1000 + 100;
+  const payload = { sub: "alice", sid: "kc-1", iat: sec(signedOut) };
   resetRevocations();
-  revoke({ sid: "kc-1" });
+  revoke({ sid: "kc-1" }, signedOut);
   assert.equal(identityFromPayload(payload), null);
-  assert.notEqual(identityFromPayload(payload, Date.now() + 1), null);
+  assert.equal(identityFromPayload(payload, signedOut - 50), null, "exchanged before it");
+  assert.notEqual(identityFromPayload(payload, signedOut + 600), null);
 
   // The app's own session tokens carry their issue time to the millisecond:
   // one minted before the sign-out is refused, one minted after is good,
@@ -85,27 +88,25 @@ test("signing out and straight back in within the same second still signs in", a
 });
 
 test("only a token this app signed may state its own millisecond", async () => {
-  // A realm token with an `iat_ms` claim gains nothing: the claim is honored
-  // only from the app's own issuer, and only when it agrees with `iat`.
+  // `iat_ms` is honored from Holotable's own issuer, and only when it agrees
+  // with `iat`. A realm token claiming one in the right second gains nothing.
   const { identityFromPayload } = await import("@/lib/auth/session");
-  revoke({ sid: "kc-1" });
-  const iat = sec(Date.now());
-  const late = Date.now() + 5000;
-  assert.equal(
-    identityFromPayload({ sub: "alice", sid: "kc-1", iat, iat_ms: late }),
-    null,
-  );
-  assert.equal(
-    identityFromPayload({
-      sub: "alice",
-      sid: "kc-1",
-      iat,
-      iss: "holotable",
-      iat_ms: late,
-    }),
-    null,
-    "an iat_ms in another second than iat is ignored",
-  );
+  const signedOut = Math.floor(Date.now() / 1000) * 1000 + 100;
+  revoke({ sid: "kc-1" }, signedOut);
+  const iat = sec(signedOut);
+  const later = signedOut + 600; // the same second, after the sign-out
+  for (const iss of [undefined, "https://kc.example.com/realms/holotable"]) {
+    assert.equal(
+      identityFromPayload({ sub: "alice", sid: "kc-1", iat, iat_ms: later, iss }),
+      null,
+      String(iss),
+    );
+  }
+  // From Holotable it counts, and only within its own second.
+  const own = { sub: "alice", sid: "kc-1", iat, iss: "holotable" };
+  assert.notEqual(identityFromPayload({ ...own, iat_ms: later }), null);
+  assert.equal(identityFromPayload({ ...own, iat_ms: later + 5000 }), null);
+  assert.equal(identityFromPayload({ ...own, iat_ms: signedOut - 50 }), null);
 });
 
 test("revoking a subject alone reaches every token issued until then", () => {

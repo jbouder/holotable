@@ -74,7 +74,7 @@ export const GET = route("auth.callback", async (req: Request) => {
   // With a refresh token the session is short-lived and renewable (#27); the
   // refresh token itself stays on the server and the browser gets only an
   // opaque id for it.
-  const issued = await startSession(renewalDeps, identity, tokens);
+  const issued = await startSession(renewalDeps, identity, tokens, signIn.exchangedAt);
   await setSessionCookie(issued.sessionToken, issued.tokenTtl);
   if (issued.renewal) {
     await setSessionIdCookie(issued.renewal.sessionId, issued.renewal.ttl);

@@ -107,6 +107,7 @@ export interface RenewalDeps {
     profile: TokenProfile,
     ttlSeconds: number,
     sid?: string,
+    vouchedAt?: number,
   ): Promise<string>;
   now?: () => number;
 }
@@ -129,6 +130,8 @@ function mint(
   identity: Identity,
   tokenTtl: number,
   oidcSid: string | null,
+  /** When the realm vouched for the person: the token's issue time (#542). */
+  vouchedAt: number,
 ): Promise<string> {
   return deps.signSessionToken(
     identity.sub,
@@ -140,6 +143,7 @@ function mint(
     },
     tokenTtl,
     oidcSid ?? undefined,
+    vouchedAt,
   );
 }
 
@@ -163,8 +167,11 @@ export async function startSession(
   deps: RenewalDeps,
   identity: Identity,
   tokens: TokenSet,
+  /** The moment before the code exchange that produced `tokens`. */
+  vouchedAt?: number,
 ): Promise<IssuedSession> {
   const now = (deps.now ?? Date.now)();
+  const issuedAt = vouchedAt ?? now;
   const oidcSid = oidcSidOf(tokens.id_token);
   if (tokens.refresh_token) {
     const { tokenTtl, rowTtl } = sessionLifetimes(tokens.refresh_expires_in);
@@ -178,7 +185,7 @@ export async function startSession(
         expiresAt: new Date(now + rowTtl * 1000),
       });
       return {
-        sessionToken: await mint(deps, identity, tokenTtl, oidcSid),
+        sessionToken: await mint(deps, identity, tokenTtl, oidcSid, issuedAt),
         tokenTtl,
         expiresAt: now + tokenTtl * 1000,
         renewal: { sessionId, ttl: rowTtl },
@@ -190,7 +197,7 @@ export async function startSession(
     }
   }
   return {
-    sessionToken: await mint(deps, identity, UNRENEWABLE_TTL_SECONDS, oidcSid),
+    sessionToken: await mint(deps, identity, UNRENEWABLE_TTL_SECONDS, oidcSid, issuedAt),
     tokenTtl: UNRENEWABLE_TTL_SECONDS,
     expiresAt: now + UNRENEWABLE_TTL_SECONDS * 1000,
   };
@@ -228,6 +235,9 @@ export async function renewSession(
       if (!refreshToken) return ended("unreadable refresh token");
 
       let tokens: TokenSet;
+      // The realm vouches for the person during this call; the new token is
+      // issued as of before it, so a revocation landing meanwhile reaches it.
+      const vouchedAt = (deps.now ?? Date.now)();
       try {
         tokens = await deps.refreshTokens(refreshToken);
       } catch (err) {
@@ -253,6 +263,7 @@ export async function renewSession(
           identity,
           tokenTtl,
           oidcSidOf(tokens.id_token) ?? session.row.oidcSid,
+          vouchedAt,
         ),
         tokenTtl,
         expiresAt: now + tokenTtl * 1000,
