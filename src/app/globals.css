@@ -881,6 +881,18 @@ html[data-vt="tab"] [role="tab"][aria-selected="true"] {
 }
 
 /*
+ * Text with no color of its own inside a tint inherits a color computed
+ * above the notice, which the swap above cannot reach; the notice states it
+ * from the swapped token. In the base layer, so an explicit text utility on
+ * the notice or inside it still wins.
+ */
+@layer base {
+  .tinted {
+    color: var(--foreground);
+  }
+}
+
+/*
  * A control inside a tint that draws its own fill (a secondary or primary
  * button, an input, a ghost button while hovered) sits on that fill, not on
  * the tint, so it takes the page's inks back. Only text drawn straight on the
