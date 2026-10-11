@@ -227,10 +227,13 @@ test("a source with no row filter plans exactly as before", () => {
   });
   assert.equal(
     plan.sql,
-    `SELECT * FROM (SELECT ts, v FROM m) AS _holo
+    `SELECT * FROM (SELECT _holo.*, row_number() OVER () AS _holo_pos, count(*) OVER () AS _holo_total
+FROM (SELECT ts, v FROM m) AS _holo
 WHERE _holo.ts >= $1::timestamptz
   AND _holo.ts < $2::timestamptz
-LIMIT ${plan.sql.match(/LIMIT (\d+)$/)?.[1]}`,
+ORDER BY _holo.ts DESC, _holo_pos DESC
+LIMIT ${plan.maxRows}) AS _holo_kept
+ORDER BY _holo_kept._holo_pos`,
   );
   assert.equal(
     bindRowFilter({ rowFilter: undefined }, () => undefined),

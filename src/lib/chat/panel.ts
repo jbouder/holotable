@@ -1,5 +1,6 @@
 import type { UIMessage } from "ai";
 import { ExplorePanelAnyLanguage, type PanelLayout, type QueryPanel } from "@/lib/ir";
+import type { Truncation } from "@/lib/truncation";
 
 /**
  * A panel drawn in a Chat answer (#416), as the browser, the store and the
@@ -26,6 +27,8 @@ export type ShownPanel = {
   rowCount: number;
   /** The window the server resolved for these rows, in epoch ms. */
   window: { from: number; to: number };
+  /** Where the rows were cut short (#486). */
+  truncated?: Truncation;
 };
 
 /** A panel the server would not draw, and why: the model may correct it. */

@@ -1,3 +1,5 @@
+import { fitToWindow } from "@/lib/stream-merge";
+import { config } from "@/lib/config";
 import {
   convertToModelMessages,
   generateText,
@@ -430,14 +432,18 @@ export function showPanelTool(input: {
       report("success");
       onPanel?.({ spec, sourceId: spec.query.sourceId, outcome: "accepted" });
       const range = resolveTimeRange(scope.timeRange);
+      // The dashboard's point budget (#486): the same query shows the same
+      // rows, and the same badge, in Chat as on a dashboard.
+      const fitted = fitToWindow(ran.result, config.maxWindowPoints);
       return {
         ok: true,
         panelId,
         spec,
-        columns: ran.result.columns,
-        rows: ran.result.rows,
-        rowCount: ran.result.rows.length,
+        columns: fitted.columns,
+        rows: fitted.rows,
+        rowCount: fitted.rows.length,
         window: { from: range.from.getTime(), to: range.to.getTime() },
+        ...(fitted.truncated ? { truncated: fitted.truncated } : {}),
       };
     },
     // The model narrates from the shape and a sample, never the result set:

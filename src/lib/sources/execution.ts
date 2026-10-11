@@ -1,3 +1,5 @@
+import type { Truncation } from "@/lib/truncation";
+
 /**
  * What executing a plan gives back, whatever the source's kind: the columns
  * and the rows every panel renderer already draws, or an error the author can
@@ -7,6 +9,8 @@
 export interface QueryResult {
   columns: string[];
   rows: Record<string, unknown>[];
+  /** Where the result was cut short (#486); absent when it is whole. */
+  truncated?: Truncation;
 }
 
 /**

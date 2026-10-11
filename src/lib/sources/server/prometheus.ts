@@ -148,6 +148,12 @@ const kind: ServerSourceKind = {
       try {
         const data = await reach(prom, () => runPromqlPlan(target(prom), plan.plan));
         const result = rowsFromPrometheus(data, config.prometheusMaxSeries);
+        // A step the point cap widened draws the window coarser than the
+        // source holds it (#486); say so rather than let it pass as whole.
+        const finest = plan.plan.instant ? undefined : plan.plan.finestPoints;
+        if (finest !== undefined && result.rows.length > 0) {
+          result.truncated = { stage: "points", kept: result.rows.length, total: finest };
+        }
         observeQuery({
           sourceId: prom.id,
           seconds: (performance.now() - startedAt) / 1000,

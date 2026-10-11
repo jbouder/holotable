@@ -1,6 +1,8 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { validateSql, buildExecutablePlan } from "@/lib/sql/safety";
+import { parseSync } from "libpg-query";
+import { config } from "@/lib/config";
+import { validateSql, buildExecutablePlan, verifyWrapper } from "@/lib/sql/safety";
 import { type SqlSourceConfig, TimescaleDbConfig } from "@/lib/registry";
 import { resolveTimeRange, resolveTimeExpr, TimeRangeError } from "@/lib/time";
 import { renderMetrics, resetMetricsForTests } from "@/lib/metrics";
@@ -150,6 +152,181 @@ test("buildExecutablePlan rejects an injection-shaped timeField", () => {
       to: new Date(),
       rowFilter: null,
     }),
+  );
+});
+
+/* -------------------------------------------------------------------------- */
+/* The row cap keeps the live edge (#486)                                     */
+/* -------------------------------------------------------------------------- */
+
+type Tree = Record<string, unknown>;
+const stmtOf = (sql: string): Tree =>
+  (parseSync(sql) as { stmts: Array<{ stmt: { SelectStmt: Tree } }> }).stmts[0].stmt
+    .SelectStmt;
+const subOf = (n: Tree): { alias: string; select: Tree } => {
+  const range = (n.fromClause as Array<{ RangeSubselect: Tree }>)[0].RangeSubselect;
+  return {
+    alias: (range.alias as { aliasname: string }).aliasname,
+    select: (range.subquery as { SelectStmt: Tree }).SelectStmt,
+  };
+};
+const sortKeys = (n: Tree) =>
+  (n.sortClause as Array<{ SortBy: Tree }> | undefined)?.map(({ SortBy }) => {
+    const fields = (
+      SortBy.node as { ColumnRef: { fields: Array<{ String: { sval: string } }> } }
+    ).ColumnRef.fields.map((f) => f.String.sval);
+    return `${fields.join(".")} ${SortBy.sortby_dir}`;
+  });
+const stripLocations = (v: unknown): unknown =>
+  Array.isArray(v)
+    ? v.map(stripLocations)
+    : typeof v === "object" && v !== null
+      ? Object.fromEntries(
+          Object.entries(v)
+            .filter(([k]) => !/location$|_start$|_end$|_len$/.test(k))
+            .map(([k, x]) => [k, stripLocations(x)]),
+        )
+      : v;
+
+test("with a time field the cap keeps the newest rows, in the statement's own order", async () => {
+  const cases: Array<{ name: string; sql: string; timeField: string }> = [
+    { name: "plain", sql: "SELECT ts, status FROM http_requests", timeField: "ts" },
+    {
+      name: "aliased",
+      sql: "SELECT date_trunc('minute', ts) AS bucket, count(*) AS n FROM http_requests GROUP BY bucket ORDER BY bucket",
+      timeField: "bucket",
+    },
+    {
+      name: "inside a CTE",
+      sql: "WITH recent AS (SELECT ts, status FROM http_requests WHERE status >= 500) SELECT ts, status FROM recent",
+      timeField: "ts",
+    },
+    {
+      name: "with its own ORDER BY",
+      sql: "SELECT ts, status FROM http_requests ORDER BY ts DESC, status",
+      timeField: "ts",
+    },
+  ];
+  for (const { name, sql, timeField } of cases) {
+    const r = await validateSql(sql, source);
+    assert.equal(r.ok, true, `${name}: ${r.error}`);
+    const plan = buildExecutablePlan({
+      sql,
+      timeField,
+      from: new Date(0),
+      to: new Date(1),
+      rowFilter: null,
+    });
+    assert.equal(plan.ranked, true, name);
+    assert.equal(plan.maxRows, config.maxQueryRows, name);
+    const outer = stmtOf(plan.sql);
+    // The survivors go back into the order the statement gave them.
+    assert.deepEqual(sortKeys(outer), ["_holo_kept._holo_pos SORTBY_DEFAULT"], name);
+    const cut = subOf(outer);
+    assert.equal(cut.alias, "_holo_kept", name);
+    // The cut is newest-first on the time field, at the cap.
+    assert.deepEqual(
+      sortKeys(cut.select),
+      [`_holo.${timeField} SORTBY_DESC`, "_holo_pos SORTBY_DESC"],
+      name,
+    );
+    assert.equal(
+      (cut.select.limitCount as { A_Const: { ival: { ival: number } } }).A_Const.ival
+        .ival,
+      config.maxQueryRows,
+      name,
+    );
+    // And what it cuts is exactly the statement that was checked.
+    const holo = subOf(cut.select);
+    assert.equal(holo.alias, "_holo", name);
+    assert.deepEqual(stripLocations(holo.select), stripLocations(stmtOf(sql)), name);
+  }
+});
+
+test("without a time field the cap keeps the first rows and asks for one more", async () => {
+  const sql =
+    "SELECT status, count(*) AS n FROM http_requests GROUP BY status ORDER BY n DESC";
+  assert.equal((await validateSql(sql, source)).ok, true);
+  const plan = buildExecutablePlan({
+    sql,
+    from: new Date(0),
+    to: new Date(1),
+    rowFilter: null,
+  });
+  assert.equal(plan.ranked, false);
+  const outer = stmtOf(plan.sql);
+  assert.equal(sortKeys(outer), undefined, "the statement's order is left alone");
+  assert.equal(
+    (outer.limitCount as { A_Const: { ival: { ival: number } } }).A_Const.ival.ival,
+    config.maxQueryRows + 1,
+  );
+  assert.deepEqual(stripLocations(subOf(outer).select), stripLocations(stmtOf(sql)));
+});
+
+test("the wrapper's own check survives offsets that move and names Postgres folds", async () => {
+  // Found by the fuzzer and the fixture snapshots (#486). An array literal
+  // and an IN list keep their byte offsets under keys other than `location`,
+  // which shift when the statement is embedded; and an unquoted time field is folded to lower case
+  // in the parse tree, so `timeField: "A"` sorts on `_holo.a`.
+  const sql =
+    "SELECT ts AS A FROM http_requests WHERE status = ANY(ARRAY[200, 201]) AND status IN (200, 201)";
+  assert.equal((await validateSql(sql, source)).ok, true);
+  const plan = buildExecutablePlan({
+    sql,
+    timeField: "A",
+    from: new Date(0),
+    to: new Date(1),
+    rowFilter: null,
+  });
+  assert.equal(plan.ranked, true);
+});
+
+test("a wrapper that is not the one the guard builds fails verification", () => {
+  const inner = "SELECT ts, status FROM http_requests";
+  const cap = 5;
+  const good = `SELECT * FROM (SELECT _holo.*, row_number() OVER () AS _holo_pos, count(*) OVER () AS _holo_total
+FROM (${inner}) AS _holo
+WHERE _holo.ts >= $1::timestamptz AND _holo.ts < $2::timestamptz
+ORDER BY _holo.ts DESC, _holo_pos DESC
+LIMIT ${cap}) AS _holo_kept
+ORDER BY _holo_kept._holo_pos`;
+  verifyWrapper(good, inner, "ts", cap);
+  const broken: Record<string, string> = {
+    "oldest kept": good.replace("_holo.ts DESC", "_holo.ts ASC"),
+    "another field": good.replace("ORDER BY _holo.ts DESC", "ORDER BY _holo.status DESC"),
+    "a larger limit": good.replace(`LIMIT ${cap})`, `LIMIT ${cap * 10})`),
+    "no limit": good.replace(`LIMIT ${cap})`, ")"),
+    "no time filter": good.replace(/WHERE[^\n]*\n/, ""),
+    "another statement": good.replace(
+      inner,
+      "SELECT ts, status FROM http_requests WHERE true",
+    ),
+    "two statements": `${good}; SELECT 1`,
+  };
+  for (const [name, sql] of Object.entries(broken)) {
+    assert.throws(() => verifyWrapper(sql, inner, "ts", cap), /verification/, name);
+  }
+  const untimed = `SELECT * FROM (${inner}) AS _holo LIMIT ${cap + 1}`;
+  verifyWrapper(untimed, inner, undefined, cap);
+  assert.throws(
+    () =>
+      verifyWrapper(
+        untimed.replace(`LIMIT ${cap + 1}`, "LIMIT ALL"),
+        inner,
+        undefined,
+        cap,
+      ),
+    /verification/,
+  );
+  assert.throws(
+    () =>
+      verifyWrapper(
+        `${untimed.replace(" LIMIT", " ORDER BY 1 LIMIT")}`,
+        inner,
+        undefined,
+        cap,
+      ),
+    /verification/,
   );
 });
 

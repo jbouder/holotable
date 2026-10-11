@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { after, test } from "node:test";
+import { loadModule } from "libpg-query";
 import { config } from "@/lib/config";
 import type { QueryPanel } from "@/lib/ir";
 import { makePanelExecutor } from "@/lib/poller/registry";
@@ -235,4 +236,60 @@ test("a table outside the allowlist is refused end to end", needsDb, async () =>
     (err: unknown) =>
       err instanceof QueryExecutionError && /permission denied/.test(err.message),
   );
+});
+
+/**
+ * Over `MAX_QUERY_ROWS` (#486): with a time field the newest rows survive, in
+ * the statement's own order either way round, with the exact count of what
+ * was cut and none of the wrapper's bookkeeping columns; without one, the
+ * first rows survive and the cut is still reported.
+ */
+test("a result over the row cap keeps the newest rows and says so", needsDb, async () => {
+  await loadModule();
+  const source = readOnlySource();
+  const cap = config.maxQueryRows;
+  const series = (order: "ASC" | "DESC") =>
+    `SELECT ts, 1 AS v FROM generate_series(timestamptz '2026-01-01', timestamptz '2026-01-01' + interval '${cap + 99} seconds', interval '1 second') AS ts ORDER BY ts ${order}`;
+  const window = {
+    from: new Date("2025-01-01"),
+    to: new Date("2027-01-01"),
+    rowFilter: null,
+  };
+  const newest = new Date(
+    Date.parse("2026-01-01T00:00:00Z") + (cap + 99) * 1000,
+  ).getTime();
+
+  for (const order of ["ASC", "DESC"] as const) {
+    const result = await executePlan(
+      source,
+      buildExecutablePlan({ sql: series(order), timeField: "ts", ...window }),
+    );
+    assert.deepEqual(result.columns, ["ts", "v"]);
+    assert.deepEqual(Object.keys(result.rows[0]).sort(), ["ts", "v"]);
+    assert.equal(result.rows.length, cap);
+    assert.deepEqual(result.truncated, { stage: "rows", kept: cap, total: cap + 100 });
+    const times = result.rows.map((r) => Date.parse(String(r.ts)));
+    assert.equal(Math.max(...times), newest, `${order}: the live edge is kept`);
+    const edge = order === "ASC" ? times.at(-1) : times[0];
+    assert.equal(edge, newest, `${order}: the statement's own order is kept`);
+  }
+
+  const untimed = await executePlan(
+    source,
+    buildExecutablePlan({ sql: series("ASC"), ...window }),
+  );
+  assert.equal(untimed.rows.length, cap);
+  assert.deepEqual(untimed.truncated, { stage: "rows", kept: cap });
+
+  const whole = await executePlan(
+    source,
+    buildExecutablePlan({
+      sql: "SELECT now() AS ts",
+      timeField: "ts",
+      ...window,
+      from: new Date(0),
+      to: new Date("2999-01-01"),
+    }),
+  );
+  assert.equal(whole.truncated, undefined);
 });

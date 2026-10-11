@@ -48,6 +48,13 @@ for (const theme of THEMES) {
     test("live dashboard", async ({ page, request }) => {
       await page.goto(`/dashboards/${await dashboardId(request, DEMO_DASHBOARD)}`);
       await waitForPanels(page);
+      // The per-minute series overflow the e2e window (MAX_WINDOW_POINTS), so
+      // the truncation badge (#486) is scanned too, and its popover.
+      const cut = page.getByRole("button", { name: /some rows are not shown/ }).first();
+      await expect(cut).toBeVisible();
+      await expectNoA11yViolations(page);
+      await cut.click();
+      await expect(page.getByText(/MAX_WINDOW_POINTS rows/)).toBeVisible();
       await expectNoA11yViolations(page);
     });
 

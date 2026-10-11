@@ -175,6 +175,11 @@ required to merge. If it fails, the output has the exact statement and a
 `test/fixtures/promql-corpus.ts`) with the verdict it should have, and a named
 test explaining why.
 
+The row cap keeps the newest rows when a plan has a time field, and every cut
+(rows, bytes, points, the browser's window) reaches the panel as a badge
+rather than passing silently. `MAX_WINDOW_POINTS` and `PROMQL_MAX_POINTS` are
+one point budget; `test/config.test.ts` holds them equal.
+
 `npm run eval` grades generation quality against a fixed corpus of prompts
 (`evals/corpus/`): each recorded answer must parse against the IR, pass the
 SQL guard against the case's catalog, name a `timeField` its query returns,

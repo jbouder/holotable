@@ -19,6 +19,7 @@ import { Input } from "@/components/ui/input";
 import { Menu, MenuRadioGroup, MenuRadioItem } from "@/components/ui/menu";
 import { runChatPanel } from "@/lib/chat/client";
 import { chatPanelSpec, type ShownPanel } from "@/lib/chat/panel";
+import { readTruncation } from "@/lib/truncation";
 import { PANEL_UNAVAILABLE } from "@/lib/chat/persist";
 import type { ApiError } from "@/lib/errors";
 import {
@@ -116,6 +117,9 @@ export function ChatPanelCard({
               columns: output.columns ?? [],
               rows: output.rows,
               ...(output.window ? { window: output.window } : {}),
+              ...(output.truncated
+                ? { truncated: readTruncation(output.truncated) }
+                : {}),
             }
           : null
       }

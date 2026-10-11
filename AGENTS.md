@@ -117,6 +117,11 @@ change there needs a test.
   `promql-corpus.ts`) and a named test; never bend the generator around it.
 - **Query rewrites.** Row filters and variables work on the parse tree,
   never a regex, and every rewrite is re-parsed and verified.
+- **Truncation is said.** The row cap keeps the newest rows when the plan
+  has a time field, and every cut (rows, bytes, points, the browser's
+  window) travels as the result's `truncated` to a badge on the panel.
+  `MAX_WINDOW_POINTS` and `PROMQL_MAX_POINTS` are one point budget and stay
+  equal (`test/config.test.ts`).
   `buildExecutablePlan` takes `rowFilter` as a required input, bound with
   `rowFilterFor` / `rowFilterInScope`. A variable's value is always a bound
   parameter, never text.

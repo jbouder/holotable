@@ -142,8 +142,8 @@ Client side (`LiveDashboard.tsx` → `PanelView.tsx` → `EChart.tsx`):
 `LiveDashboard` fans SSE events out to per-panel React state:
 
 - `append` rows are concatenated into a **bounded rolling window**
-  (`MAX_WINDOW_POINTS`, default 720) — old points fall off the front.
-- `replace` swaps the window; `panel-error`, `panel-degraded` and `tombstone`
+  (`MAX_WINDOW_POINTS`, default 1,000) — old points fall off the front.
+- `replace` swaps the window, held to the same budget; `panel-error`, `panel-degraded` and `tombstone`
   flip panel status.
 - `dashboard-error` belongs to no panel: it renders as a banner above the grid,
   marks every panel stale, and clears on the next completed `tick`.
@@ -154,6 +154,13 @@ Client side (`LiveDashboard.tsx` → `PanelView.tsx` → `EChart.tsx`):
   window). A resumed stream keeps them.
 - Each panel records **when its data arrived**; the status badge reports it, so
   panels that go stale independently can be told apart.
+- **Truncation is said, never silent** (#486). A frame carries `truncated`
+  when the server cut its result (the row cap, or a PromQL step the point cap
+  widened), and the window adds its own when it drops rows. The panel header
+  shows a badge (“Newest 1,000 of 1,440 rows”) whose popover names the limit.
+  `MAX_WINDOW_POINTS` and `PROMQL_MAX_POINTS` are **one point budget**: keep
+  them equal, so a PromQL series fits its panel whole. A Chat panel is held
+  to the same budget (`fitToWindow`), so a query reads the same in both.
 - **One commit per tick.** A cycle's frames are queued and applied together
   when its `tick` arrives (or on the next animation frame, for a frame that
   comes alone), through `applyPollerEvents` in `src/lib/panel-state.ts`. A

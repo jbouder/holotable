@@ -7,8 +7,8 @@ import type { VariableValues } from "@/lib/sql/variables";
  * What the database is actually asked, as opposed to what the panel says.
  *
  * A panel's SQL is not the statement that runs. The server wraps it as
- * `SELECT * FROM (<inner>) AS _holo`, adds a `WHERE` on the declared
- * `timeField` bound to parameters it resolved itself, appends a `LIMIT`, and
+ * `(<inner>) AS _holo`, adds a `WHERE` on the declared `timeField` bound to
+ * parameters it resolved itself, keeps the newest rows up to a `LIMIT`, and
  * runs the result inside a read-only transaction with a pinned `search_path`
  * and a statement timeout. None of that was visible anywhere, so the claim
  * that the server owns the time window (invariant 4) was something an author

@@ -81,6 +81,9 @@ export const APP_ENV: Record<string, string> = {
   SESSION_COOKIE_SECURE: "false",
   // Fast enough that a live panel visibly moves while a test watches it.
   DEFAULT_REFRESH_INTERVAL_MS: "2000",
+  // Small enough that the demo's per-minute series overflow it, so the
+  // truncation badge (#486) is on screen for the axe scans.
+  MAX_WINDOW_POINTS: "40",
   MIN_REFRESH_INTERVAL_MS: "1000",
   LOG_LEVEL: "warn",
   // The stack's Prometheus scrapes the app (#390), so the gate is open to it.

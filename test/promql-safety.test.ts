@@ -2,7 +2,12 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { renderMetrics } from "@/lib/metrics";
 import { durationMs, plainString, regexLiteral, stringLiteral } from "@/lib/promql/parse";
-import { buildLabelValuesPlan, buildPromqlPlan, stepSecondsFor } from "@/lib/promql/plan";
+import {
+  buildLabelValuesPlan,
+  buildPromqlPlan,
+  finestPointsFor,
+  stepSecondsFor,
+} from "@/lib/promql/plan";
 import { applyPromqlRowFilter } from "@/lib/promql/row-filter";
 import {
   defaultLimits,
@@ -408,6 +413,24 @@ test("the step covers the window in at most 1,000 points, never under 15s, raise
   assert.equal(stepSecondsFor(FROM, TO, "1m"), 60);
   assert.equal(stepSecondsFor(FROM, TO, "1s"), 15);
   assert.equal(stepSecondsFor(TO, TO), 15);
+});
+
+test("a step the point cap widened says how many points the finest step would draw", () => {
+  // #486: a day at the 15 s floor is 5,761 points; the cap draws it at 87 s
+  // and the plan carries the finer count, which becomes the panel's badge.
+  const day = new Date(TO.getTime() - 86_400_000);
+  assert.equal(finestPointsFor(day, TO), 5_761);
+  assert.equal(
+    buildPromqlPlan({ promql: "up", from: day, to: TO, rowFilter: null }).instant,
+    false,
+  );
+  const widened = buildPromqlPlan({ promql: "up", from: day, to: TO, rowFilter: null });
+  assert.equal(!widened.instant && widened.finestPoints, 5_761);
+  // An hour fits under the cap, and a coarse minStep sets the step itself.
+  assert.equal(finestPointsFor(FROM, TO), undefined);
+  assert.equal(finestPointsFor(day, TO, "5m"), undefined);
+  const whole = buildPromqlPlan({ promql: "up", from: FROM, to: TO, rowFilter: null });
+  assert.equal(!whole.instant && whole.finestPoints, undefined);
 });
 
 test("a range plan's window is aligned to its step", () => {

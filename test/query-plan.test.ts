@@ -1,5 +1,6 @@
-import { test } from "node:test";
+import { before, test } from "node:test";
 import assert from "node:assert/strict";
+import { loadModule } from "libpg-query";
 import type { TimeRange } from "@/lib/ir";
 import { buildQueryPlanView, summarizeLimits } from "@/lib/query-plan";
 import { buildExecutablePlan } from "@/lib/sql/safety";
@@ -12,6 +13,11 @@ import { sessionStatements } from "@/lib/timescaledb/client";
  * the second place a panel's internals are shown to a reader, and widening it
  * has to be a deliberate act rather than something a spread picks up.
  */
+
+// The plan's wrapper is verified from a parse of it (#486).
+before(async () => {
+  await loadModule();
+});
 
 const RANGE: TimeRange = { from: "now-1h", to: "now" };
 const FROM = new Date("2026-09-22T11:00:00.000Z");
@@ -45,7 +51,7 @@ test("the field set is exactly what a reader may see", () => {
 
 test("the executed statement is the wrapper the server actually sends", () => {
   const plan = view("SELECT ts, v FROM m", "ts");
-  assert.match(plan.executedSql, /SELECT \* FROM \(SELECT ts, v FROM m\) AS _holo/);
+  assert.match(plan.executedSql, /FROM \(SELECT ts, v FROM m\) AS _holo\n/);
   assert.match(plan.executedSql, /_holo\.ts >= \$1::timestamptz/);
   assert.match(plan.executedSql, /LIMIT 5000/);
   // And the author's own statement is kept verbatim beside it.
