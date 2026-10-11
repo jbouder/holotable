@@ -33,6 +33,13 @@ export interface TokenRef {
   sid: string | null;
   /** Issued-at, epoch seconds. */
   iat: number;
+  /**
+   * The moment the token was issued, or a moment it cannot have been issued
+   * before, in epoch ms, when this app knows one. Compared exactly, so a
+   * token from a fresh sign-in in the same second as a sign-out is not taken
+   * for one the sign-out revoked. Absent, the whole second of `iat` counts.
+   */
+  issuedAtMs?: number;
 }
 
 interface SubjectRevocation {
@@ -88,9 +95,13 @@ export function revoke(target: { sub?: string; sid?: string }, now = Date.now())
 }
 
 export function isRevoked(ref: TokenRef, now = Date.now()): boolean {
-  // Whole seconds, because `iat` is: a token issued in the second of the
+  // Exactly, when the issue time is known to the millisecond. Otherwise in
+  // whole seconds, because `iat` is: a token issued in the second of the
   // revocation is revoked with it, which errs the safe way.
-  const issuedBy = (at: number) => ref.iat <= Math.floor(at / 1000);
+  const issuedBy = (at: number) =>
+    ref.issuedAtMs !== undefined
+      ? ref.issuedAtMs <= at
+      : ref.iat <= Math.floor(at / 1000);
   if (ref.sid !== null) {
     const session = sids.get(ref.sid);
     if (session && session.forgetAt > now && issuedBy(session.at)) return true;

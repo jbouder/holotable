@@ -66,11 +66,32 @@ function extractGroups(payload: JWTPayload): string[] {
   return [];
 }
 
-function refFromPayload(payload: JWTPayload, sub: string): TokenRef {
+/**
+ * The claim a session token this app signs carries its issue time in, to the
+ * millisecond, so revocation can tell a token minted just after a sign-out
+ * from one minted just before it in the same second.
+ */
+export const ISSUED_AT_MS_CLAIM = "iat_ms";
+
+function refFromPayload(
+  payload: JWTPayload,
+  sub: string,
+  issuedNoEarlierThan?: number,
+): TokenRef {
+  const iat = typeof payload.iat === "number" ? payload.iat : 0;
+  const ms = (payload as Record<string, unknown>)[ISSUED_AT_MS_CLAIM];
+  // Only from a token this app signed, and only when it agrees with `iat`.
+  const own =
+    payload.iss === "holotable" && typeof ms === "number" && Math.floor(ms / 1000) === iat
+      ? ms
+      : undefined;
   return {
     sub,
     sid: typeof payload.sid === "string" ? payload.sid : null,
-    iat: typeof payload.iat === "number" ? payload.iat : 0,
+    iat,
+    ...((own ?? issuedNoEarlierThan) !== undefined
+      ? { issuedAtMs: own ?? issuedNoEarlierThan }
+      : {}),
   };
 }
 
@@ -79,12 +100,19 @@ function refFromPayload(payload: JWTPayload, sub: string): TokenRef {
  * subject or its realm session was revoked. Exported for the sign-in callback,
  * which verifies the realm's id_token itself (#281).
  */
-export function identityFromPayload(payload: JWTPayload): Identity | null {
+export function identityFromPayload(
+  payload: JWTPayload,
+  /**
+   * For a token the server has just obtained itself (the sign-in callback's
+   * code exchange): a moment it cannot have been issued before, epoch ms.
+   */
+  issuedNoEarlierThan?: number,
+): Identity | null {
   const sub = typeof payload.sub === "string" ? payload.sub : null;
   if (!sub) return null;
   // A session the realm ended by back-channel logout (#28) is refused here,
   // on every request, rather than at its expiry.
-  if (isRevoked(refFromPayload(payload, sub))) return null;
+  if (isRevoked(refFromPayload(payload, sub, issuedNoEarlierThan))) return null;
   const attributes = attributesFromClaims(
     payload as Record<string, unknown>,
     config.rowFilterClaims,
@@ -166,6 +194,8 @@ export async function signSessionToken(
 ): Promise<string> {
   const claims: JWTPayload = { ...profile.attributes, [GROUPS_CLAIM]: groups };
   if (sid) claims.sid = sid;
+  const now = Date.now();
+  claims[ISSUED_AT_MS_CLAIM] = now;
   if (profile.displayName) claims.name = profile.displayName;
   if (profile.email) claims.email = profile.email;
   return new SignJWT(claims)
@@ -173,7 +203,7 @@ export async function signSessionToken(
     .setSubject(sub)
     .setIssuer("holotable")
     .setAudience("holotable")
-    .setIssuedAt()
+    .setIssuedAt(Math.floor(now / 1000))
     .setExpirationTime(`${ttlSeconds}s`)
     .sign(sessionSecret());
 }

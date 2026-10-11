@@ -83,13 +83,17 @@ export async function completeSignIn(
   params: { code: string | null; state: string | null },
   handshake: Partial<Handshake>,
   deps: SignInDeps,
-): Promise<{ tokens: TokenSet; claims: JWTPayload }> {
+): Promise<{ tokens: TokenSet; claims: JWTPayload; exchangedAt: number }> {
   const { code, state } = params;
   if (!code || !state || !handshake.state || !sameValue(handshake.state, state)) {
     throw new SignInRefused("state");
   }
   if (!handshake.nonce || !handshake.verifier) throw new SignInRefused("handshake");
 
+  // The realm mints the tokens during the exchange, so none of them existed
+  // before this moment: the sign-out that preceded this sign-in did not
+  // revoke them, even in the same second (#542).
+  const exchangedAt = Date.now();
   const tokens = await deps.exchange(code, handshake.verifier);
   if (!deps.keys) throw new SignInRefused("id_token");
 
@@ -105,5 +109,5 @@ export async function completeSignIn(
   if (typeof claims.nonce !== "string" || !sameValue(claims.nonce, handshake.nonce)) {
     throw new SignInRefused("nonce");
   }
-  return { tokens, claims };
+  return { tokens, claims, exchangedAt };
 }

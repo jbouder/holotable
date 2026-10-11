@@ -68,7 +68,7 @@ export const GET = route("auth.callback", async (req: Request) => {
     throw err;
   }
   const { tokens } = signIn;
-  const identity = identityFromPayload(signIn.claims);
+  const identity = identityFromPayload(signIn.claims, signIn.exchangedAt);
   if (!identity) throw new HttpError(401, "id_token verification failed");
 
   // With a refresh token the session is short-lived and renewable (#27); the

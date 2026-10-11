@@ -94,6 +94,7 @@ export const RESERVED_CLAIMS: ReadonlySet<string> = new Set([
   "exp",
   "nbf",
   "iat",
+  "iat_ms",
   "jti",
   "sid",
   "azp",
