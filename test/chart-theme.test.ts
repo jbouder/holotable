@@ -10,6 +10,7 @@ import {
 import type { Panel } from "@/lib/ir";
 import { readFileSync } from "node:fs";
 import { parseThemeTokens } from "@/lib/color/contrast";
+import { resolveColor } from "@/lib/color/oklch";
 import { COLOR_TOKENS } from "@/lib/panels/colors";
 import { LOCAL_TIME_DISPLAY } from "@/lib/time-display";
 
@@ -166,4 +167,17 @@ test("every chart kind draws all its colors from the theme it is given", () => {
       assert.ok(!drawn.includes(literal), `${viz} still draws ${literal}`);
     }
   }
+});
+
+test("a token served as lab(), as a production build serves it, reads as hex", () => {
+  // #502: the build's CSS pipeline rewrites oklch() tokens into lab(), and a
+  // computed style hands that back; a blend or a contrast check needs hex.
+  assert.equal(resolveColor("lab(100% 0 0)"), "#ffffff");
+  assert.equal(resolveColor("lab(0% 0 0)"), "#000000");
+  // The CSS Color 4 example: lab(54.29% 80.82 69.88) is sRGB red.
+  assert.equal(resolveColor("lab(54.29% 80.82 69.88)"), "#ff0000");
+  assert.equal(resolveColor("rgb(255, 128, 0)"), "#ff8000");
+  assert.equal(resolveColor(" #ABCDEF "), "#abcdef");
+  const theme = readChartTheme(style({ "--chart-seq-1": "lab(92.02% -8.2 -11.6)" }));
+  assert.match(theme.sequential[0], /^#[0-9a-f]{6}$/);
 });

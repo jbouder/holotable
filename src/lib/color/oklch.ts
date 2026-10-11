@@ -69,10 +69,92 @@ export function resolveOklchToken(value: string): string | null {
   return oklchToHex({ l, c, h });
 }
 
+const LAB_RE = /^lab\(\s*([-\d.]+%?)\s+([-\d.]+)\s+([-\d.]+)\s*(?:\/\s*[\d.]+%?\s*)?\)$/i;
+
 /**
- * Resolve any color token to a hex string ECharts can use. OKLCH strings are
- * converted; already-hex/rgb strings are passed through unchanged.
+ * CSS `lab()` (CIE Lab, D50) as hex. A production build's CSS pipeline
+ * rewrites `oklch()` tokens into `lab()`, which is what a computed style then
+ * hands back, so it has to be read as well as `oklch()` (#502).
+ */
+export function resolveLabToken(value: string): string | null {
+  const m = LAB_RE.exec(value.trim());
+  if (!m) return null;
+  const l = parseFloat(m[1]);
+  const a = parseFloat(m[2]);
+  const b = parseFloat(m[3]);
+  const fy = (l + 16) / 116;
+  const fx = fy + a / 500;
+  const fz = fy - b / 200;
+  const e = 216 / 24389;
+  const k = 24389 / 27;
+  const inv = (t: number) => (t ** 3 > e ? t ** 3 : (116 * t - 16) / k);
+  // XYZ against the D50 white point.
+  const x = (0.3457 / 0.3585) * inv(fx);
+  const y = l > k * e ? fy ** 3 : l / k;
+  const z = ((1 - 0.3457 - 0.3585) / 0.3585) * inv(fz);
+  // Bradford D50 -> D65.
+  const x65 = 0.9554734527042182 * x - 0.023098536874261423 * y + 0.0632593086610217 * z;
+  const y65 =
+    -0.028369706963208136 * x + 1.0099954580058226 * y + 0.021041398966943008 * z;
+  const z65 =
+    0.012314001688319899 * x - 0.020507696433477912 * y + 1.3303659366080753 * z;
+  // XYZ D65 -> linear sRGB.
+  const r = 3.2409699419045226 * x65 - 1.537383177570094 * y65 - 0.4986107602930034 * z65;
+  const g =
+    -0.9692436362808796 * x65 + 1.8759675015077202 * y65 + 0.04155505740717559 * z65;
+  const bl =
+    0.05563007969699366 * x65 - 0.20397695888897652 * y65 + 1.0569715142428786 * z65;
+  return `#${toHexChannel(linearToSrgb(r))}${toHexChannel(linearToSrgb(g))}${toHexChannel(linearToSrgb(bl))}`;
+}
+
+const RGB_RE =
+  /^rgba?\(\s*([\d.]+)[\s,]+([\d.]+)[\s,]+([\d.]+)\s*(?:[,/]\s*[\d.]+%?\s*)?\)$/i;
+
+/** `rgb(r, g, b)` or `rgb(r g b)` as hex. */
+function resolveRgb(value: string): string | null {
+  const m = RGB_RE.exec(value.trim());
+  if (!m) return null;
+  const c = (v: string) =>
+    Math.max(0, Math.min(255, Math.round(parseFloat(v))))
+      .toString(16)
+      .padStart(2, "0");
+  return `#${c(m[1])}${c(m[2])}${c(m[3])}`;
+}
+
+/**
+ * Anything else the browser can paint, as hex, by painting it: one pixel on a
+ * canvas, read back. Only in a browser, and only for a syntax the parsers
+ * above do not know; elsewhere the value comes back as it was.
+ */
+function resolveByCanvas(value: string): string | null {
+  if (typeof document === "undefined") return null;
+  try {
+    const ctx = document.createElement("canvas").getContext("2d", {
+      willReadFrequently: true,
+    });
+    if (!ctx) return null;
+    ctx.clearRect(0, 0, 1, 1);
+    ctx.fillStyle = value;
+    ctx.fillRect(0, 0, 1, 1);
+    const [r, g, b] = ctx.getImageData(0, 0, 1, 1).data;
+    return `#${[r, g, b].map((v) => v.toString(16).padStart(2, "0")).join("")}`;
+  } catch {
+    return null;
+  }
+}
+
+const HEX_RE = /^#[0-9a-f]{6}$/i;
+
+/**
+ * Any CSS color as the `#rrggbb` a canvas, a blend or a contrast check can
+ * use: `oklch()` as authored, `lab()` as a production build serves it, and
+ * `rgb()`, converted here; any other syntax painted once in the browser.
+ * A value nothing can read comes back unchanged.
  */
 export function resolveColor(value: string): string {
-  return resolveOklchToken(value) ?? value;
+  const v = value.trim();
+  if (HEX_RE.test(v)) return v.toLowerCase();
+  return (
+    resolveOklchToken(v) ?? resolveLabToken(v) ?? resolveRgb(v) ?? resolveByCanvas(v) ?? v
+  );
 }
