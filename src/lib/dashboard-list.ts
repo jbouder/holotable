@@ -1,4 +1,4 @@
-import { normalizeTag, normalizeTags } from "@/lib/dashboard-metadata";
+import { normalizeTag, normalizeTags } from "@/lib/dashboard-tags";
 
 /**
  * The dashboard list's own state: what is being searched for, which tags are

@@ -14,7 +14,17 @@ import { dashboardListHref, EMPTY_QUERY } from "@/lib/dashboard-list";
 import { animateOut } from "@/lib/motion";
 import { cn } from "@/lib/utils";
 import { useReducedMotion } from "@/components/motion-preference";
-import { DashboardDetailsDialog } from "./DashboardDetailsDialog";
+import dynamic from "next/dynamic";
+
+/**
+ * Loaded the first time a card's details are opened (#493): the form checks
+ * its fields against the metadata schemas, and the list has a card per
+ * dashboard, so a static import put zod on the list's first load.
+ */
+const DashboardDetailsDialog = dynamic(
+  () => import("./DashboardDetailsDialog").then((m) => m.DashboardDetailsDialog),
+  { ssr: false },
+);
 
 /**
  * One dashboard in the list: what it is, how to get to it, and the three
@@ -38,6 +48,9 @@ export function DashboardCard({
 }) {
   const router = useRouter();
   const [details, setDetails] = React.useState(false);
+  // Mounted from the first open on, so closing it still plays its exit.
+  const [detailsOpened, setDetailsOpened] = React.useState(false);
+  if (details && !detailsOpened) setDetailsOpened(true);
   const [favorite, setFavorite] = React.useState(dashboard.favorite);
   const [busy, setBusy] = React.useState(false);
   const [error, setError] = React.useState<ApiError | null>(null);
@@ -194,7 +207,7 @@ export function DashboardCard({
         )}
       </CardContent>
 
-      {canEdit && (
+      {canEdit && detailsOpened && (
         <DashboardDetailsDialog
           dashboardId={dashboard.id}
           initial={{
