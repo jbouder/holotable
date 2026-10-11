@@ -1,6 +1,6 @@
 {
   "model": "kimi-k3",
-  "recordedAt": "2026-10-09T22:41:55.481Z",
-  "requestDigest": "c21fd01b10f93ace97b13d6ff848fd4d87e1f87068980e15cdf7b4ac63bbed56",
-  "text": "{\"id\":\"explore\",\"title\":\"Share of panel queries by outcome\",\"viz\":\"donut\",\"query\":{\"sourceId\":\"eval-prometheus-demo\",\"promql\":\"sum by (outcome) (increase(holotable_query_duration_seconds_count[1h]))\",\"instant\":true},\"layout\":{\"x\":0,\"y\":0,\"w\":12,\"h\":4}}"
+  "recordedAt": "2026-10-11T22:28:31.950Z",
+  "requestDigest": "daaa100e30d6fbb2fe2c1e2beab61a8c679be814987c0ecbbb08171ad1e0d5f4",
+  "text": "{\"id\":\"explore\",\"title\":\"Share of panel queries by outcome\",\"viz\":\"donut\",\"description\":\"The number of panel queries executed in the trailing hour, grouped by outcome, so each slice is that outcome's share of total panel queries.\",\"format\":\"number\",\"query\":{\"sourceId\":\"eval-prometheus-demo\",\"promql\":\"sum by (outcome) (increase(holotable_query_duration_seconds_count[1h]))\",\"instant\":true},\"options\":{\"legend\":\"right\",\"compact\":true,\"decimals\":0,\"unit\":\"queries\"},\"layout\":{\"x\":0,\"y\":0,\"w\":12,\"h\":4}}"
 }
