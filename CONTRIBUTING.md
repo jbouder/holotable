@@ -483,7 +483,8 @@ Match the surrounding code rather than importing conventions from elsewhere.
   `npm run themes:check` while tuning tokens, and see
   [Theming](docs/src/content/docs/architecture/theming.md)). A status tint
   goes through the tint tokens (`tinted bg-tint-<status>/(--tint-<n>)`), so
-  high contrast can make it solid; a chart goes
+  high contrast can make it solid. A new color token also goes in
+  `THEME_FILE_TOKENS`, which an operator's `THEME_FILE` must set. A chart goes
   through `AccessibleChart`, a link styled as a button is
   `ButtonLink`, and an icon-only control has an `aria-label`.
 - This is Next.js 16 and React 19. Check the installed docs in

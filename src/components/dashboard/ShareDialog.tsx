@@ -16,7 +16,7 @@ import {
   isPalette,
   isTheme,
   type Palette,
-  PALETTE_INFO,
+  paletteInfo,
   THEMES,
 } from "@/lib/theme";
 import { type ApiError, apiErrorFromThrown, readApiError } from "@/lib/errors";
@@ -42,9 +42,9 @@ const SCHEME_LABELS = {
  * `data-palette` is this editor's choice, not what a viewer will see.
  */
 function defaultPalette(): Palette {
-  if (typeof document === "undefined") return PALETTE_INFO[0].name;
+  if (typeof document === "undefined") return paletteInfo()[0].name;
   const value = document.documentElement.getAttribute(DEFAULT_PALETTE_ATTRIBUTE);
-  return isPalette(value) ? value : PALETTE_INFO[0].name;
+  return isPalette(value) ? value : paletteInfo()[0].name;
 }
 
 /**
@@ -250,7 +250,7 @@ export function ShareDialog({
               aria-describedby="share-appearance-hint"
               options={[
                 { value: "default", label: "Default" },
-                ...PALETTE_INFO.map((p) => ({ value: p.name, label: p.label })),
+                ...paletteInfo().map((p) => ({ value: p.name, label: p.label })),
               ]}
             />
           </div>

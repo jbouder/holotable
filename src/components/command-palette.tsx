@@ -15,7 +15,7 @@ import {
   rankCommands,
   RECENTS_STORAGE_KEY,
   type SearchResults,
-  STATIC_COMMANDS,
+  staticCommands,
 } from "@/lib/command-palette";
 import { PALETTE_SHORTCUT } from "@/lib/shortcuts";
 import { setPaletteWithTransition, setThemeWithTransition } from "@/lib/theme-transition";
@@ -84,7 +84,11 @@ export function CommandPalette() {
 
   const commands = React.useMemo(
     () =>
-      rankCommands([...commandsFromResults(results), ...STATIC_COMMANDS], query, recents),
+      rankCommands(
+        [...commandsFromResults(results), ...staticCommands()],
+        query,
+        recents,
+      ),
     [results, query, recents],
   );
   const sections = React.useMemo(() => groupCommands(commands), [commands]);

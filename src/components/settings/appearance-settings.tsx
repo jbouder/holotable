@@ -11,7 +11,7 @@ import { useMotionPreference } from "@/components/motion-preference";
 import type { Motion } from "@/lib/motion";
 import { ThemePreview } from "@/components/settings/theme-preview";
 import { ChoiceCard, ChoiceCardGroup } from "@/components/ui/choice-card";
-import { type Palette, PALETTE_INFO, type Theme } from "@/lib/theme";
+import type { Palette, PaletteInfo, Theme } from "@/lib/theme";
 
 const MOTION_OPTIONS: { value: Motion; label: string; hint: string }[] = [
   {
@@ -151,7 +151,14 @@ function ChartPatternsSetting({ initial }: { initial: boolean }) {
  * The `/settings/appearance` controls (#212). Theme and motion apply at once
  * and are per browser; patterns in charts is saved to the account.
  */
-export function AppearanceSettings({ chartPatterns }: { chartPatterns: boolean }) {
+export function AppearanceSettings({
+  chartPatterns,
+  palettes,
+}: {
+  chartPatterns: boolean;
+  /** The themes on offer, from the server, so both renders list the same. */
+  palettes: readonly PaletteInfo[];
+}) {
   const [theme, setTheme] = useThemePreference();
   const [palette, setPalette] = usePalettePreference();
   const [motion, setMotion] = useMotionPreference();
@@ -187,7 +194,7 @@ export function AppearanceSettings({ chartPatterns }: { chartPatterns: boolean }
       </Group>
 
       {/* The named themes (#503), each drawn in the chosen scheme (#507). */}
-      {PALETTE_INFO.length > 1 && (
+      {palettes.length > 1 && (
         <Group
           legend="Theme"
           hint="The colors the app is drawn in. Each is shown in the color scheme above."
@@ -199,7 +206,7 @@ export function AppearanceSettings({ chartPatterns }: { chartPatterns: boolean }
               {...ids}
               className="sm:grid-cols-2 lg:grid-cols-3"
             >
-              {PALETTE_INFO.map((p) => (
+              {palettes.map((p) => (
                 <ChoiceCard
                   key={p.name}
                   value={p.name}

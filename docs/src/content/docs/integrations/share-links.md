@@ -69,7 +69,7 @@ not available. So the link names its look with two query parameters:
 
 | Parameter | Values | Without it |
 | --- | --- | --- |
-| `theme` | A shipped theme: `holotable`, `graphite`, `fjord`, `paper`, `high-contrast` | What the viewer's browser has stored for Holotable, else the server's `THEME_DEFAULT_PALETTE` |
+| `theme` | A theme the server offers: `holotable`, `graphite`, `fjord`, `paper`, `high-contrast`, or the operator's own from [`THEME_FILE`](/admin/themes/) | What the viewer's browser has stored for Holotable, else the server's `THEME_DEFAULT_PALETTE` |
 | `scheme` | `light`, `dark`, or `system`, the viewer's device setting when the embed loads | What the viewer's browser has stored, else dark |
 
 The proxy checks both against the shipped names. Anything else is treated as

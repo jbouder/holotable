@@ -83,6 +83,11 @@ function blockDecls(css: string, at: number): Record<string, string> {
 function resolveDecls(decls: Record<string, string>): Record<string, Rgb> {
   const out: Record<string, Rgb> = {};
   for (const [name, value] of Object.entries(decls)) {
+    // A theme file (#508) may give a token as `#rrggbb`.
+    if (/^#[0-9a-fA-F]{6}$/.test(value)) {
+      out[name] = hexToRgb(value);
+      continue;
+    }
     if (!value.startsWith("oklch(")) continue;
     const hex = resolveOklchToken(value);
     if (hex) out[name] = hexToRgb(hex);
@@ -100,11 +105,21 @@ function resolveDecls(decls: Record<string, string>): Record<string, Rgb> {
  * unqualified blocks (`:root, [data-theme="dark"]` and `[data-theme="light"]`);
  * any other palette is `[data-palette="<name>"][data-theme="dark|light"]`.
  */
-function resolveBlock(decls: Record<string, string>) {
+/** Declarations as written to the tokens and alphas they resolve to. */
+export function resolveBlock(
+  decls: Record<string, string>,
+): Pick<ThemeBlock, "tokens" | "alphas"> {
   return { tokens: resolveDecls(decls), alphas: resolveAlphas(decls) };
 }
 
-export function parseThemeBlocks(css: string): ThemeBlock[] {
+/** One theme in one scheme, as its declarations are written (merged as the cascade does). */
+export interface ThemeDecls {
+  palette: string;
+  scheme: ThemeName;
+  decls: Record<string, string>;
+}
+
+export function parseThemeDecls(css: string): ThemeDecls[] {
   const at = (selector: RegExp): number => {
     const m = selector.exec(css);
     if (!m) throw new Error(`no theme block matching ${selector}`);
@@ -114,30 +129,36 @@ export function parseThemeBlocks(css: string): ThemeBlock[] {
     dark: blockDecls(css, at(/:root,\s*\[data-theme="dark"\]\s*\{/)),
     light: blockDecls(css, at(/(?:^|\n)\[data-theme="light"\]\s*\{/)),
   };
-  const blocks: ThemeBlock[] = [
-    ...(["dark", "light"] as const).map((scheme) => ({
-      palette: "holotable",
-      scheme,
-      // The light block sits on the dark one's `:root` on <html>.
-      ...resolveBlock(scheme === "dark" ? base.dark : { ...base.dark, ...base.light }),
-    })),
-  ];
+  const out: ThemeDecls[] = (["dark", "light"] as const).map((scheme) => ({
+    palette: "holotable",
+    scheme,
+    // The light block sits on the dark one's `:root` on <html>.
+    decls: scheme === "dark" ? base.dark : { ...base.dark, ...base.light },
+  }));
   for (const m of css.matchAll(
     /\[data-palette="([a-z0-9-]+)"\]\[data-theme="(dark|light)"\]\s*\{/g,
   )) {
     const scheme = m[2] as ThemeName;
-    blocks.push({
+    out.push({
       palette: m[1],
       scheme,
       // On top of Holotable's block for the same scheme, as the cascade puts it.
-      ...resolveBlock({
+      decls: {
         ...base.dark,
         ...base[scheme],
         ...blockDecls(css, (m.index ?? 0) + m[0].length),
-      }),
+      },
     });
   }
-  return blocks;
+  return out;
+}
+
+export function parseThemeBlocks(css: string): ThemeBlock[] {
+  return parseThemeDecls(css).map(({ palette, scheme, decls }) => ({
+    palette,
+    scheme,
+    ...resolveBlock(decls),
+  }));
 }
 
 /** Holotable's two blocks, by scheme. */
@@ -270,8 +291,17 @@ export function contrastTable(css: string): string {
 }
 
 export function measureContrast(css: string): MeasuredPair[] {
-  const blocks = parseThemeBlocks(css);
-  return blocks.flatMap(({ palette, scheme, tokens, alphas }) => {
+  return parseThemeBlocks(css).flatMap(measureBlock);
+}
+
+/** Every pairing in one theme in one scheme. */
+export function measureBlock({
+  palette,
+  scheme,
+  tokens,
+  alphas,
+}: ThemeBlock): MeasuredPair[] {
+  {
     const token = (name: string): Rgb => {
       const rgb = tokens[name];
       if (!rgb) throw new Error(`token --${name} is not defined in ${palette} ${scheme}`);
@@ -299,5 +329,5 @@ export function measureContrast(css: string): MeasuredPair[] {
         ratio: contrastRatio(text, bg),
       };
     });
-  });
+  }
 }

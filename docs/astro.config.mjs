@@ -137,6 +137,7 @@ export default defineConfig({
             { label: "Models and providers", slug: "admin/models" },
             { label: "LLM rate limits and budgets", slug: "admin/llm-limits" },
             { label: "Source secret references", slug: "admin/secret-references" },
+            { label: "Your own theme", slug: "admin/themes" },
             { label: "Prometheus endpoints", slug: "admin/prometheus" },
             { label: "Row-level filters", slug: "admin/row-level-filters" },
             { label: "Demo mode", slug: "admin/demo-mode" },

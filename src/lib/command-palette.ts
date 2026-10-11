@@ -1,5 +1,11 @@
 import type { SourceRecord } from "@/lib/registry";
-import { type Palette, PALETTE_INFO, type Theme } from "@/lib/theme";
+import {
+  type Palette,
+  PALETTE_INFO,
+  type PaletteInfo,
+  paletteInfo,
+  type Theme,
+} from "@/lib/theme";
 
 /**
  * What the command palette can offer and how it decides the order.
@@ -124,19 +130,27 @@ export const STATIC_COMMANDS: Command[] = [
     action: { type: "theme", theme: "system" },
   },
   // A named theme each (#503), once there is more than one to choose.
-  ...(PALETTE_INFO.length > 1
-    ? PALETTE_INFO.map(
-        (p): Command => ({
-          id: `action:palette-${p.name}`,
-          kind: "action",
-          title: `Theme: ${p.label}`,
-          subtitle: p.description,
-          keywords: "appearance colour color palette",
-          action: { type: "palette", palette: p.name },
-        }),
-      )
-    : []),
+  ...(PALETTE_INFO.length > 1 ? PALETTE_INFO.map(paletteCommand) : []),
 ];
+
+function paletteCommand(p: PaletteInfo): Command {
+  return {
+    id: `action:palette-${p.name}`,
+    kind: "action",
+    title: `Theme: ${p.label}`,
+    subtitle: p.description,
+    keywords: "appearance colour color palette",
+    action: { type: "palette", palette: p.name },
+  };
+}
+
+/** The static commands, with the operator's theme (#508) when there is one. */
+export function staticCommands(): Command[] {
+  const extra = paletteInfo().filter((p) => !PALETTE_INFO.includes(p));
+  return extra.length > 0
+    ? [...STATIC_COMMANDS, ...extra.map(paletteCommand)]
+    : STATIC_COMMANDS;
+}
 
 /** What `GET /api/search` answers with. Deliberately not a source record. */
 export interface SearchResults {

@@ -6,6 +6,8 @@ import {
 } from "@/lib/config";
 import { readFileSync } from "node:fs";
 import { checkServerModels } from "@/lib/ai/server-models";
+import { loadThemeFile } from "@/lib/operator-theme";
+import { PALETTES } from "@/lib/theme";
 import {
   type SourceSecretUse,
   validateSecretsDir,
@@ -114,6 +116,53 @@ export function validateServerModelsFile(
   return checkServerModels(text, env, production);
 }
 
+/**
+ * `THEME_FILE` (#508): an operator's theme, read and held to the operator
+ * tier of the quality bar. A file that cannot be read is an error anywhere,
+ * as the models file is. One that fails its checks stops a production boot,
+ * naming each failure; in development it is a warning and loads nothing.
+ */
+export function validateThemeFile(
+  env: Environment,
+  production: boolean,
+): ConfigProblem[] {
+  const path = env.THEME_FILE;
+  if (!path) return [];
+  const result = loadThemeFile(path);
+  if (result.unreadable) {
+    return [
+      {
+        variable: "THEME_FILE",
+        message: `${result.problems[0]}; mount the theme file there or unset THEME_FILE.`,
+        severity: "error",
+      },
+    ];
+  }
+  const severity = production ? "error" : "warning";
+  const problems: ConfigProblem[] = result.problems.map((p) => ({
+    variable: "THEME_FILE",
+    message: production ? p : `${p}; the theme is not loaded.`,
+    severity,
+  }));
+  const fallback = env.THEME_DEFAULT_PALETTE;
+  if (
+    fallback &&
+    !(PALETTES as readonly string[]).includes(fallback) &&
+    fallback !== result.theme?.name
+  ) {
+    // In development a theme file that fails loads nothing, and its name as
+    // the default falls back to holotable, so the app still starts.
+    problems.push({
+      variable: "THEME_DEFAULT_PALETTE",
+      message: production
+        ? `is "${fallback}", which is neither a built-in theme nor the theme THEME_FILE loads.`
+        : `is "${fallback}", which is neither a built-in theme nor a loaded THEME_FILE theme; holotable is the default instead.`,
+      severity: production ? "error" : "warning",
+    });
+  }
+  return problems;
+}
+
 export async function runStartupChecks(
   opts: StartupCheckOptions = {},
 ): Promise<StartupCheckResult> {
@@ -123,6 +172,7 @@ export async function runStartupChecks(
     ...validateConfig(env, { production }),
     ...validateSecretsDir(env),
     ...validateServerModelsFile(env, production),
+    ...validateThemeFile(env, production),
   ];
 
   // Only ask the database when the URL is well-formed: a missing or malformed

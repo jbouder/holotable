@@ -1,5 +1,6 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { embedAppearance, embedAppearanceHeader } from "@/lib/embed-appearance";
+import { operatorTheme } from "@/lib/operator-theme";
 import { publicOrigin } from "@/lib/auth/origin";
 import { config as appConfig } from "@/lib/config";
 import { shareFrameAncestors, verifyShareToken } from "@/lib/auth/share";
@@ -82,7 +83,9 @@ export async function proxy(request: NextRequest): Promise<NextResponse> {
   requestHeaders.delete(EMBED_APPEARANCE_HEADER);
   if (embed) {
     requestHeaders.set(EMBED_REQUEST_HEADER, "1");
-    // The link's theme and scheme (#509), validated; only shipped names pass.
+    // The link's theme and scheme (#509), validated; only offered names pass,
+    // the operator's (#508) among them once it has loaded.
+    operatorTheme();
     requestHeaders.set(
       EMBED_APPEARANCE_HEADER,
       embedAppearanceHeader(embedAppearance(request.nextUrl.searchParams)),
