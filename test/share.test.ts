@@ -19,7 +19,11 @@ import { resolveShare } from "@/lib/auth/share-access";
 import { makeShareStore, type ShareRecord, type ShareStore } from "@/lib/db/shares";
 import { Dashboard, queryTimeField } from "@/lib/ir";
 import { redactString } from "@/lib/log";
-import { contentSecurityPolicy, EMBED_REQUEST_HEADER } from "@/lib/security-headers";
+import {
+  contentSecurityPolicy,
+  EMBED_APPEARANCE_HEADER,
+  EMBED_REQUEST_HEADER,
+} from "@/lib/security-headers";
 import { ShareRequest, sharedSpec } from "@/lib/share-view";
 import { proxy } from "@/proxy";
 
@@ -261,6 +265,38 @@ test("an embed may be framed only by the origins its token names", async () => {
   assert.match(
     forged.headers.get("content-security-policy") ?? "",
     /frame-ancestors 'none'/,
+  );
+});
+
+test("an embed's theme comes from its link, validated, and decides nothing else", async () => {
+  // #509: `?theme=` and `?scheme=` reach the layout only as shipped names.
+  const header = async (url: string, headers: Record<string, string> = {}) =>
+    (await proxy(new NextRequest(url, { headers }))).headers.get(
+      `x-middleware-request-${EMBED_APPEARANCE_HEADER}`,
+    );
+  const base = `http://localhost/embed/dashboards/${DASH}?token=t`;
+  assert.equal(await header(`${base}&theme=paper&scheme=light`), "paper:light");
+  assert.equal(await header(base), ":");
+  // Anything else is absent, never echoed.
+  const hostile = await header(`${base}&theme=../x%22%3E&scheme=foo%3Cscript`);
+  assert.equal(hostile, ":");
+  // A request cannot bring its own: stripped on the embed path and every other.
+  assert.equal(await header(base, { [EMBED_APPEARANCE_HEADER]: "x:<script>" }), ":");
+  assert.equal(
+    await header("http://localhost/dashboards", {
+      [EMBED_APPEARANCE_HEADER]: "paper:light",
+    }),
+    null,
+  );
+  // The page decides what it may show from the token alone: it reads no other
+  // search parameter.
+  const page = readFileSync(
+    new URL("../src/app/embed/dashboards/[id]/page.tsx", import.meta.url),
+    "utf8",
+  );
+  assert.deepEqual(
+    [...page.matchAll(/const \{([^}]*)\} = await searchParams/g)].map((m) => m[1].trim()),
+    ["token"],
   );
 });
 
