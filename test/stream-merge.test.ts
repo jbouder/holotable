@@ -231,3 +231,23 @@ test("a batch about no panel, or staleness with nothing live, changes nothing", 
   assert.equal(stale.b.status, "stale");
   assert.equal(stale.a, live.a);
 });
+
+test("an append drops what the server's whole result no longer holds, without a badge", () => {
+  // #530: a window holding fewer rows than the budget kept stale ones until
+  // the count filled.
+  const next = mergePanelRows(
+    prev,
+    frame({
+      since: m(3),
+      oldest: m(2),
+      timeField: "minute",
+      rows: [{ minute: m(3), route: "/a", n: 7 }],
+    }),
+    100,
+  );
+  assert.deepEqual(
+    next.rows.map((r) => r.minute),
+    [m(2), m(2), m(3)],
+  );
+  assert.equal(next.truncated, undefined);
+});

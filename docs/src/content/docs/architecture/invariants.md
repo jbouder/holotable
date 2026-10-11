@@ -284,7 +284,9 @@ joins or resumes is caught up from the last results without another query.
 `EChart` initializes once and applies `setOption(..., { notMerge: false })`; the
 browser keeps a bounded rolling window (`MAX_WINDOW_POINTS`). A query ordered
 newest first (`ORDER BY ts DESC`), which the poller reads off each whole result,
-gets its appends on top and keeps its first rows when the window is full.
+gets its appends on top and keeps its first rows when the window is full. Each
+append also says where the server's whole result now starts, and the browser
+drops what is older, so the held window is what a fresh load would show.
 
 ## 12. SSE is cookie-authenticated
 
