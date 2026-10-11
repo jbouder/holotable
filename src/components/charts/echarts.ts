@@ -23,7 +23,7 @@ import {
   VisualMapComponent,
 } from "echarts/components";
 import { LegacyGridContainLabel } from "echarts/features";
-import { graphic, init, use } from "echarts/core";
+import { init, use } from "echarts/core";
 import type { ECharts } from "echarts/core";
 import { CanvasRenderer } from "echarts/renderers";
 
@@ -77,5 +77,5 @@ use([
   LegacyGridContainLabel,
 ]);
 
-export { graphic, init };
+export { init };
 export type { ECharts };

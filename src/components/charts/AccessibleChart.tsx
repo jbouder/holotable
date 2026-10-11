@@ -41,7 +41,9 @@ export function AccessibleChart({
   // The table lists the newest rows; this is where they start among them all.
   const offset = normalize(data).rows.length - table.rows.length;
   return (
-    <div className="relative h-full w-full">
+    // `fade-in`: the chart arrives with its chunk (#497), after the panel's
+    // skeleton, and enters the way an overlay does rather than popping in.
+    <div className="fade-in relative h-full w-full">
       <EChart
         {...chart}
         description={chartDescription(panel, data.rows.length)}

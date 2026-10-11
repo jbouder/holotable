@@ -1,6 +1,5 @@
 import { panelTimeField } from "@/lib/ir";
 import type { CustomSeriesRenderItem, EChartsOption } from "echarts";
-import { graphic } from "@/components/charts/echarts";
 import {
   asInstant,
   type ChartContext,
@@ -201,6 +200,27 @@ function escapeHtml(text: string): string {
  * need a series per state, and a series count that changes between updates is
  * what a merged `setOption` cannot take back (invariant 11).
  */
+interface Rect {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
+/**
+ * `rect` cut to the part inside `clip`, or null when none of it is. What
+ * ECharts' `graphic.clipRectByRect` does, kept here so this module needs no
+ * ECharts at runtime and the chart library loads only with a chart (#497).
+ */
+export function clipRect(rect: Rect, clip: Rect): Rect | null {
+  const x = Math.max(rect.x, clip.x);
+  const y = Math.max(rect.y, clip.y);
+  const right = Math.min(rect.x + rect.width, clip.x + clip.width);
+  const bottom = Math.min(rect.y + rect.height, clip.y + clip.height);
+  if (right <= x || bottom <= y) return null;
+  return { x, y, width: right - x, height: bottom - y };
+}
+
 function renderSpan(timeline: StateTimeline): CustomSeriesRenderItem {
   return (params, api) => {
     const lane = api.value(0) as number;
@@ -214,7 +234,7 @@ function renderSpan(timeline: StateTimeline): CustomSeriesRenderItem {
       width: number;
       height: number;
     };
-    const shape = graphic.clipRectByRect(
+    const shape = clipRect(
       {
         x: start[0],
         y: start[1] - height / 2,

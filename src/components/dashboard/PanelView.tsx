@@ -9,7 +9,6 @@ import { DatumLinksProvider } from "@/components/dashboard/DatumLinks";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ErrorDisplay } from "@/components/ui/error-display";
 import type { EChartHandle } from "@/components/charts/EChart";
-import { AccessibleChart } from "@/components/charts/AccessibleChart";
 import { PanelSqlDialog } from "@/components/dashboard/PanelSqlDialog";
 import { PanelActions } from "@/components/dashboard/PanelActions";
 import { useAskAboutPanel, useAskInChat } from "@/components/dashboard/chat-bridge";
@@ -30,6 +29,19 @@ import { type Box, DURATION_SLOW_MS, EASE_EMPHASIZED, flipFrom } from "@/lib/mot
 import { useReducedMotion } from "@/components/motion-preference";
 
 export type { PanelState, PanelStatus } from "@/lib/panel-state";
+
+/**
+ * The chart, with ECharts, loaded with the first panel that draws one (#497):
+ * a dashboard of stats, tables and text, or an embed of one, never fetches
+ * it. While it arrives the panel keeps its skeleton's shape; the rows are
+ * already in state, so the chart's first option is the current one and the
+ * merge path after it is unchanged.
+ */
+const AccessibleChart = React.lazy(() =>
+  import("@/components/charts/AccessibleChart").then((m) => ({
+    default: m.AccessibleChart,
+  })),
+);
 
 const EMPTY: PanelData = { columns: [], rows: [] };
 
@@ -465,39 +477,42 @@ function PanelContent({
     return <renderer.Body panel={panel} data={data} handle={chartRef} />;
   }
   return (
-    <AccessibleChart
-      panel={panel}
-      data={data}
-      // A new layout of the same kind (a gauge's dial to bars) is a new chart;
-      // a data update never changes this, so it still merges (invariant 11).
-      key={`${panel.viz}:${renderer.shape?.(panel) ?? ""}`}
-      ref={chartRef}
-      option={renderer.option(panel, data, {
-        display,
-        theme,
-        window: window ?? data.window,
-        annotations,
-      })}
-      crosshairGroup={crosshairGroup}
-      onBrush={
-        onSelectTimeRange && supportsTimeBrush(panel)
-          ? ({ startIndex, endIndex }) => {
-              // A brush names a stretch of history, and the rows behind
-              // the chart are what give the indices a meaning. An
-              // unreadable selection — a gap in the data, a timestamp the
-              // driver serialized as something unexpected — leaves the
-              // window alone rather than guessing at one.
-              const range = brushedRange(
-                data.rows,
-                panelTimeField(panel),
-                startIndex,
-                endIndex,
-              );
-              if (range) onSelectTimeRange(range);
-            }
-          : undefined
-      }
-    />
+    // Shaped like the panel while ECharts arrives (#497); a page loads it once.
+    <React.Suspense fallback={<PanelSkeleton viz={panel.viz} />}>
+      <AccessibleChart
+        panel={panel}
+        data={data}
+        // A new layout of the same kind (a gauge's dial to bars) is a new chart;
+        // a data update never changes this, so it still merges (invariant 11).
+        key={`${panel.viz}:${renderer.shape?.(panel) ?? ""}`}
+        ref={chartRef}
+        option={renderer.option(panel, data, {
+          display,
+          theme,
+          window: window ?? data.window,
+          annotations,
+        })}
+        crosshairGroup={crosshairGroup}
+        onBrush={
+          onSelectTimeRange && supportsTimeBrush(panel)
+            ? ({ startIndex, endIndex }) => {
+                // A brush names a stretch of history, and the rows behind
+                // the chart are what give the indices a meaning. An
+                // unreadable selection — a gap in the data, a timestamp the
+                // driver serialized as something unexpected — leaves the
+                // window alone rather than guessing at one.
+                const range = brushedRange(
+                  data.rows,
+                  panelTimeField(panel),
+                  startIndex,
+                  endIndex,
+                );
+                if (range) onSelectTimeRange(range);
+              }
+            : undefined
+        }
+      />
+    </React.Suspense>
   );
 }
 
