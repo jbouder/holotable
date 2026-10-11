@@ -11,6 +11,15 @@ const nextConfig: NextConfig = {
   // the brand and the first link are. Development-only either way — it is not
   // emitted by `next build` — so turning it off costs nothing in production.
   devIndicators: false,
+  // The app serves no optimized images (#498): nothing uses `next/image`, and
+  // the optimizer's dependency, sharp and its native `@img/*` builds, was 28 MB
+  // of the standalone server. Unoptimized documents that; the exclude keeps the
+  // tracer from copying it in anyway. Reverting both is what `next/image`
+  // would need.
+  images: { unoptimized: true },
+  outputFileTracingExcludes: {
+    "*": ["node_modules/sharp/**", "node_modules/@img/**"],
+  },
   // From 16.3, `next dev` writes a managed block into AGENTS.md and a
   // CLAUDE.md beside it, pointing agents at node_modules/next/dist/docs/.
   // AGENTS.md is written by hand here and already says that, so the block

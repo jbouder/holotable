@@ -62,6 +62,12 @@ docker build -t <registry>/holotable:0.1.0 \
 docker build -t <registry>/holotable:0.1.0-migrate --target migrate .
 ```
 
+The standalone server carries no image library (#498). The app uses no
+`next/image`, so `next.config.ts` sets `images.unoptimized` and keeps `sharp`
+and its native `@img/*` builds out of the trace, which saves about 28 MB. A
+fork that adds `next/image` has to revert both, and CI fails the build if
+`sharp` reappears in `.next/standalone`.
+
 ## Credentials never enter the chart
 
 Everything under `config` is rendered into a **ConfigMap**, which is clear text
