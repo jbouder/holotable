@@ -89,9 +89,12 @@ test("the share dialog keeps focus while it creates a link", async ({
       })
       .toBe(true);
   }
-  // Revoke what this test made, so a rerun starts from the same list.
-  for (const revoke of await dialog.getByRole("button", { name: "Revoke" }).all()) {
-    await revoke.click();
+  // Revoke every active link, so a rerun starts from the same list. One at a
+  // time: each revoke reloads the list, so a locator taken before it is stale.
+  const revokes = dialog.getByRole("button", { name: "Revoke" });
+  for (let left = await revokes.count(); left > 0; left--) {
+    await revokes.first().click();
+    await expect(revokes).toHaveCount(left - 1);
   }
 });
 
