@@ -21,7 +21,7 @@ import { grantedRefs } from "@/lib/secret-refs";
 import { secretRefGrants } from "@/lib/secrets/credentials";
 
 export const runtime = "nodejs";
-export const maxDuration = 60;
+export const maxDuration = 120;
 
 const DraftBody = z.object({
   workspaceId: z.string().min(1).max(128),

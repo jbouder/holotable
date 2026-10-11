@@ -13,7 +13,7 @@ import { json, readJson, route } from "@/lib/http";
 import { enforceLlmLimits } from "@/lib/limits/llm";
 
 export const runtime = "nodejs";
-export const maxDuration = 60;
+export const maxDuration = 120;
 
 /**
  * "Test connection" for a model not yet saved (#439): one minimal call with the configuration

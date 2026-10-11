@@ -1154,6 +1154,11 @@ test("AI_ROUTE_MAX_DURATION_MS matches every model-backed route", () => {
     "src/app/api/sources/generate/route.ts",
     "src/app/api/dashboards/[id]/chat/route.ts",
     "src/app/api/mcp/route.ts",
+    "src/app/api/chat/turn/route.ts",
+    "src/app/api/chat/[id]/messages/route.ts",
+    "src/app/api/me/models/test/route.ts",
+    "src/app/api/workspaces/[id]/models/test/route.ts",
+    "src/app/api/workspaces/[id]/models/[modelId]/test/route.ts",
   ]) {
     const text = readFileSync(route, "utf8");
     const seconds = Number(/export const maxDuration = (\d+);/.exec(text)?.[1]);

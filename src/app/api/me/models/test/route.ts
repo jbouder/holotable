@@ -11,7 +11,7 @@ import { enforceLlmLimits } from "@/lib/limits/llm";
 import { WorkspaceId } from "@/lib/workspace-limits";
 
 export const runtime = "nodejs";
-export const maxDuration = 60;
+export const maxDuration = 120;
 
 const Body = z
   .object({

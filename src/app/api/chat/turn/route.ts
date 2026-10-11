@@ -15,7 +15,7 @@ import { readJson, route } from "@/lib/http";
 import { resolveTimeRange } from "@/lib/time";
 
 export const runtime = "nodejs";
-export const maxDuration = 60;
+export const maxDuration = 120;
 
 /** The history rides along, reduced by the page, so the body is capped. */
 const MAX_BODY_BYTES = 512 * 1024;

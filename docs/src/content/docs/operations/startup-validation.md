@@ -66,8 +66,8 @@ production deployment cannot boot without:
 
 Every numeric knob (`MAX_QUERY_ROWS`, `MAX_RESULT_BYTES`, `QUERY_TIMEOUT_SECONDS`, …) must be a
 positive integer when set, `AI_MAX_RETRIES` an integer from 0 to 10 (an
-`AI_REQUEST_TIMEOUT_MS` of 60000 or more is a **warning**: the model-backed
-routes end at 60s), `LLM_RATE_PER_MINUTE` and `LLM_DAILY_TOKEN_BUDGET`
+`AI_REQUEST_TIMEOUT_MS` of 120000 or more is a **warning**: the model-backed
+routes end at 120s), `LLM_RATE_PER_MINUTE` and `LLM_DAILY_TOKEN_BUDGET`
 a non-negative integer (`0` disables that limit, which in production is a
 **warning** on every boot), `DEFAULT_TIME_FROM`/`DEFAULT_TIME_TO` must be
 time expressions the server can resolve, and `CSP_REPORT_ONLY` must be `true`
