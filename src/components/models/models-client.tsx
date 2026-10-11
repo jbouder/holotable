@@ -237,7 +237,7 @@ export function ModelsClient({ data }: { data: ModelsPageData }) {
     });
 
   return (
-    <div className="mx-auto w-full max-w-5xl space-y-6">
+    <div className="w-full space-y-6">
       <PageHeader
         title="Models"
         description="The models generation, Explore and chat can use: the server's, each workspace's, and your own."

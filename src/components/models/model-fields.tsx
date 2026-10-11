@@ -4,6 +4,7 @@ import * as React from "react";
 import { Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Autocomplete } from "@/components/ui/autocomplete";
 import { Input, Label } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { apiErrorFromThrown, readApiError } from "@/lib/errors";
@@ -67,6 +68,10 @@ export function ModelFields({
     { kind: "idle" | "busy" } | { kind: "done" | "error"; message: string }
   >({ kind: "idle" });
   const kind = providerKind(draft.provider);
+  const suggestions = React.useMemo(
+    () => (listed ?? []).map((m) => ({ value: m.id, label: m.name })),
+    [listed],
+  );
   const hasKey = storedKey?.state === "set" || storedKey?.state === "unreadable";
   const noun = credentialsNoun(kind);
   const providers = selectableKinds(!allowStub).map((k) => ({
@@ -206,6 +211,18 @@ export function ModelFields({
                   options={[...(field.options ?? [])]}
                   onValueChange={(v) => setField(field, v)}
                 />
+              ) : field.in === "settings" && field.name === "model" && listed ? (
+                <Autocomplete
+                  id={fieldId}
+                  spellCheck={false}
+                  disabled={disabled}
+                  maxLength={field.maxLength}
+                  placeholder={field.placeholder}
+                  value={value}
+                  suggestions={suggestions}
+                  onValueChange={(v) => setField(field, v)}
+                  aria-describedby={describedBy}
+                />
               ) : (
                 <Input
                   id={fieldId}
@@ -227,21 +244,7 @@ export function ModelFields({
                   value={value}
                   onChange={(e) => setField(field, e.target.value)}
                   aria-describedby={describedBy}
-                  list={
-                    field.in === "settings" && field.name === "model" && listed
-                      ? `${id}-listed`
-                      : undefined
-                  }
                 />
-              )}
-              {field.in === "settings" && field.name === "model" && listed && (
-                <datalist id={`${id}-listed`}>
-                  {listed.map((m) => (
-                    <option key={m.id} value={m.id}>
-                      {m.name ?? m.id}
-                    </option>
-                  ))}
-                </datalist>
               )}
               {field.help && (
                 <p id={`${fieldId}-help`} className="mt-1 text-xs text-muted">
