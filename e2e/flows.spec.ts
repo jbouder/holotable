@@ -517,7 +517,12 @@ test("a source admin adds, tests, sets as default and deletes a workspace model 
   // The stub lists one model (#443); the field still takes any typed id.
   await dialog.getByRole("button", { name: "List models" }).click();
   await expect(dialog.getByText(/1 model listed/)).toBeVisible();
+  // The suggestions open under the field as it is typed in; Tab moves on and
+  // closes them, as it would for a person.
   await dialog.getByLabel(/^Model/).fill("stub");
+  await expect(page.getByRole("option", { name: /stub/ })).toBeVisible();
+  await dialog.getByLabel(/^Model/).press("Tab");
+  await expect(page.getByRole("option", { name: /stub/ })).toHaveCount(0);
   await dialog.getByRole("button", { name: "Test connection" }).click();
   await expect(dialog.getByText(/answered in \d+ ms/)).toBeVisible();
   await dialog.getByRole("button", { name: "Add model" }).click();
