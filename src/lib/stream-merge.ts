@@ -16,6 +16,13 @@ import { readTruncation, type Truncation } from "@/lib/truncation";
  * A frame that says `newestFirst` (#531) runs the other way: an append goes on
  * top, and the window keeps the first rows rather than the last.
  *
+ * An append also drops what is older than `oldest`, the oldest timestamp in
+ * the cycle's whole result (#530): what the window has moved past. A panel
+ * whose window holds fewer rows than the budget kept those until the count
+ * filled. The server's own result is the measure, not the window's `from`,
+ * so a bucket labelled before `from` that a full result keeps is kept here
+ * too. That is the window moving, not a cut, so it is not a truncation.
+ *
  * Either way the window keeps the newest `maxWindowPoints` rows, and says so in
  * `truncated` when that dropped any, as it carries a cut the server made
  * (#486).
@@ -53,7 +60,12 @@ export function mergePanelRows(
     since !== undefined && timeField
       ? prev.rows.filter((r) => String(r[timeField]) < since)
       : prev.rows;
-  const rows = event.newestFirst ? [...event.rows, ...kept] : [...kept, ...event.rows];
+  const joined = event.newestFirst ? [...event.rows, ...kept] : [...kept, ...event.rows];
+  const { oldest } = event;
+  const rows =
+    timeField && oldest !== undefined
+      ? joined.filter((r) => String(r[timeField]) >= oldest)
+      : joined;
   if (rows.length <= maxWindowPoints) return finish(rows, server);
   // The window is full and rolling: what it drops is the oldest. The total is
   // the one the last full result counted, which a rolling window keeps close to.

@@ -89,6 +89,12 @@ export type PollerEvent =
        */
       newestFirst?: true;
       /**
+       * On a time-series `append`: the oldest timestamp in this cycle's whole
+       * result. The browser drops what it holds from before it, so its window
+       * is what a full result would show (#530).
+       */
+      oldest?: string;
+      /**
        * The window these rows were selected over (epoch ms). The tick's
        * window is the dashboard's; a panel with its own (#114) ends here.
        */
@@ -181,6 +187,17 @@ export function computeDelta(
  * Read off the whole result every cycle, not a delta, which may hold one
  * timestamp. Exported for unit testing.
  */
+/** The oldest timestamp in a result, compared as the cursor is. Exported for unit testing. */
+export function oldestTime(
+  rows: Record<string, unknown>[],
+  timeField: string,
+): string | undefined {
+  return rows.reduce<string | undefined>((acc, r) => {
+    const v = String(r[timeField]);
+    return acc === undefined || v < acc ? v : acc;
+  }, undefined);
+}
+
 export function isNewestFirst(
   rows: Record<string, unknown>[],
   timeField: string,
@@ -546,7 +563,15 @@ class DashboardPoller {
         cursor: delta.cursor,
         event:
           delta.mode === "append"
-            ? { ...event, ...order, mode: "append", rows: delta.fresh, since, timeField }
+            ? {
+                ...event,
+                ...order,
+                mode: "append",
+                rows: delta.fresh,
+                since,
+                timeField,
+                oldest: oldestTime(event.rows, timeField),
+              }
             : { ...event, ...order, mode: "replace", rows: delta.fresh },
       };
       shared.set(key, cut);

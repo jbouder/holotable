@@ -459,6 +459,8 @@ test("a newest-first panel's appends land on top, and the window keeps the top",
   assert.ok(frames.length >= 3);
   assert.ok(frames.every((f) => f.newestFirst === true));
   assert.equal(frames[1].mode, "append");
+  // Each append says where the whole result now starts (#530).
+  assert.equal(frames[1].oldest, ts(0));
 
   let held: PanelData | undefined;
   for (const f of frames) held = mergePanelRows(held, f, 3);
