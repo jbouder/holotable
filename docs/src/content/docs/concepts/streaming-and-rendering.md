@@ -294,9 +294,17 @@ down and recreated on a data tick, so streaming feels continuous.
 
 ## A rendering detail worth knowing
 
-Design tokens are authored in **OKLCH**, but ECharts cannot parse `oklch()`.
-`chartPalette()` (`src/lib/color/oklch.ts`) resolves tokens to RGB/hex before
-they reach any chart option.
+Design tokens are authored in **OKLCH**, but ECharts cannot parse `oklch()`,
+and a canvas cannot read a CSS variable at all. The series palette is
+`chartPalette()` (`src/lib/color/oklch.ts`), resolved to hex once. The chrome
+around the series — axis and legend text, axis lines, grid lines, a gauge's
+track — is the page's own `--muted`, `--border`, `--surface-2` and
+`--foreground`, read off `<html>`'s computed style by `useChartTheme()`
+(`src/lib/color/chart-theme.ts`) and handed to every option builder as
+`ctx.theme`. A theme change re-reads them and the chart merges the new colors
+in, so a chart's text is the same gray as the text beside it in either theme
+and no chart is recreated. `test/chart-theme.test.ts` holds every chart kind
+to this: none may draw a color that suits only one theme.
 
 What the viewer does with the stream once it arrives — the time picker, pausing,
 fullscreen, exports, the command palette and the dashboard chat — is

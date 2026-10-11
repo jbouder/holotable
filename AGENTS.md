@@ -221,7 +221,9 @@ Checked, not hoped for:
 ECharts, through the existing chart components. Charts merge new data and are
 never recreated (FLIP a panel's card, never its chart). Design tokens are
 authored in OKLCH and are converted before they reach ECharts, so chart
-colors come from the token system too.
+colors come from the token system too: series from `chartPalette()`, and
+axis text, lines and grid from `ctx.theme` (`useChartTheme`, read off the
+page), never a literal that suits one theme (`test/chart-theme.test.ts`).
 
 ### Motion rules
 

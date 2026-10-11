@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import type { Panel } from "@/lib/ir";
 import { lineChart, type PanelData } from "@/components/charts/options";
 import { PANEL_RENDERERS } from "@/components/panels/registry";
+import { DEFAULT_CHART_THEME } from "@/lib/color/chart-theme";
 import { LOCAL_TIME_DISPLAY } from "@/lib/time-display";
 
 function panel(overrides: Partial<Panel> = {}): Panel {
@@ -71,7 +72,11 @@ for (const { viz, option } of CHARTS) {
   test(`a chart's option builder does not throw on unexpected row shapes (${viz})`, () => {
     for (const data of JUNK) {
       assert.doesNotThrow(
-        () => option(panel({ viz }), data, { display: LOCAL_TIME_DISPLAY }),
+        () =>
+          option(panel({ viz }), data, {
+            display: LOCAL_TIME_DISPLAY,
+            theme: DEFAULT_CHART_THEME,
+          }),
         `viz=${viz} data=${JSON.stringify(data, (_k, v) => (typeof v === "bigint" || typeof v === "symbol" ? String(v) : v))}`,
       );
     }
@@ -89,7 +94,7 @@ test("non-object rows are dropped rather than rendered", () => {
         { ts: "t1", v: 2 },
       ] as unknown as PanelData["rows"],
     },
-    { display: LOCAL_TIME_DISPLAY },
+    { display: LOCAL_TIME_DISPLAY, theme: DEFAULT_CHART_THEME },
   );
   assert.deepEqual((option.xAxis as { data: string[] }).data, ["t0", "t1"]);
 });
@@ -104,7 +109,7 @@ test("a well-formed line panel is unchanged by the normalization", () => {
         { ts: "t1", v: 2 },
       ],
     },
-    { display: LOCAL_TIME_DISPLAY },
+    { display: LOCAL_TIME_DISPLAY, theme: DEFAULT_CHART_THEME },
   );
   assert.deepEqual((option.xAxis as { data: string[] }).data, ["t0", "t1"]);
   const series = option.series as { name: string; data: number[] }[];

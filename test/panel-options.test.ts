@@ -16,12 +16,13 @@ import { COLOR_TOKENS, tokenHex } from "@/lib/panels/colors";
 import { PRESENTATION_GUIDE } from "@/lib/ai/generate";
 import { OPTION_GROUPS } from "@/lib/panels/presentation";
 import { PANEL_KINDS } from "@/lib/panels/registry";
+import { DEFAULT_CHART_THEME } from "@/lib/color/chart-theme";
 import { LOCAL_TIME_DISPLAY } from "@/lib/time-display";
 
 /** Panel presentation options (#115). */
 
 const LAYOUT = { x: 0, y: 0, w: 6, h: 4 };
-const ctx = { display: LOCAL_TIME_DISPLAY };
+const ctx = { display: LOCAL_TIME_DISPLAY, theme: DEFAULT_CHART_THEME };
 
 function panel(viz: string, options?: unknown, extra: Record<string, unknown> = {}) {
   return {
@@ -111,14 +112,17 @@ test("every group a kind lists is fields of that kind's options", () => {
 test("a panel without options draws exactly as before", () => {
   const p = parse(panel("line"));
   const option = lineChart(p, series, ctx) as Record<string, unknown>;
-  assert.deepEqual(option.legend, { top: 0, textStyle: { color: "#9aa0aa" } });
+  assert.deepEqual(option.legend, {
+    top: 0,
+    textStyle: { color: DEFAULT_CHART_THEME.text },
+  });
   assert.deepEqual(option.grid, { left: 44, right: 16, top: 24, bottom: 28 });
   assert.deepEqual(option.tooltip, { trigger: "axis", borderRadius: 0 });
   assert.equal(option.visualMap, undefined);
   assert.deepEqual(option.yAxis, {
     type: "value",
-    axisLabel: { color: "#9aa0aa" },
-    splitLine: { lineStyle: { color: "#2a2f3a" } },
+    axisLabel: { color: DEFAULT_CHART_THEME.text },
+    splitLine: { lineStyle: { color: DEFAULT_CHART_THEME.grid } },
   });
   for (const s of option.series as Record<string, unknown>[]) {
     assert.equal("stack" in s, false);

@@ -146,7 +146,7 @@ export function histogramShape(panel: Panel): string {
   return JSON.stringify(panel.options ?? {});
 }
 
-export const histogramChart: ChartOptionBuilder = normalized((panel, data) => {
+export const histogramChart: ChartOptionBuilder = normalized((panel, data, { theme }) => {
   const { bars, countKey } = histogramBars(panel, data);
   const o = readOptions(HistogramOptions, panel.options);
   return {
@@ -162,13 +162,13 @@ export const histogramChart: ChartOptionBuilder = normalized((panel, data) => {
     xAxis: {
       type: "category",
       data: bars.map((b) => b.label),
-      axisLabel: { color: "#9aa0aa", hideOverlap: true },
-      axisLine: { lineStyle: { color: "#3a3f4b" } },
+      axisLabel: { color: theme.text, hideOverlap: true },
+      axisLine: { lineStyle: { color: theme.line } },
     },
     yAxis: {
       type: o.log ? "log" : "value",
-      axisLabel: { color: "#9aa0aa" },
-      splitLine: { lineStyle: { color: "#2a2f3a" } },
+      axisLabel: { color: theme.text },
+      splitLine: { lineStyle: { color: theme.grid } },
     },
     series: [
       {

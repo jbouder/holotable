@@ -16,6 +16,7 @@ import {
 } from "@/components/charts/state-timeline";
 import { Panel } from "@/lib/ir";
 import { fallbackToken, tokenHex } from "@/lib/panels/colors";
+import { DEFAULT_CHART_THEME } from "@/lib/color/chart-theme";
 import { LOCAL_TIME_DISPLAY } from "@/lib/time-display";
 
 /*
@@ -24,7 +25,7 @@ import { LOCAL_TIME_DISPLAY } from "@/lib/time-display";
  */
 
 const LAYOUT = { x: 0, y: 0, w: 6, h: 4 };
-const CTX = { display: LOCAL_TIME_DISPLAY };
+const CTX = { display: LOCAL_TIME_DISPLAY, theme: DEFAULT_CHART_THEME };
 
 function gauge(options: Record<string, unknown> = {}, format?: "percent"): Panel {
   return Panel.parse({

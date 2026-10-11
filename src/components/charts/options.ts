@@ -1,6 +1,7 @@
 import { panelTimeField } from "@/lib/ir";
 import type { EChartsOption } from "echarts";
 import type { Panel } from "@/lib/ir";
+import type { ChartTheme } from "@/lib/color/chart-theme";
 import { chartPalette } from "@/lib/color/oklch";
 import { ANNOTATION_COLORS, type Annotation } from "@/lib/annotations";
 import { formatValue } from "@/lib/format";
@@ -125,33 +126,34 @@ export function timeAxisLabels(values: unknown[], display: TimeDisplay): string[
 
 const TOOLTIP_AXIS = { trigger: "axis", borderRadius: 0 } as const;
 
-const BASE: EChartsOption = {
-  color: palette,
-  grid: { left: 44, right: 16, top: 24, bottom: 28 },
-  tooltip: TOOLTIP_AXIS,
-  legend: { top: 0, textStyle: { color: "#9aa0aa" } },
-  backgroundColor: "transparent",
-};
+const GRID = { left: 44, right: 16, top: 24, bottom: 28 };
 
-const LEGEND_TEXT = { color: "#9aa0aa" };
+/** What every cartesian chart starts from. */
+function base(theme: ChartTheme): EChartsOption {
+  return {
+    color: palette,
+    grid: GRID,
+    tooltip: TOOLTIP_AXIS,
+    legend: legendAt(undefined, theme),
+    backgroundColor: "transparent",
+  };
+}
 
 /** Where the legend goes (#115). `top` is where it always was. */
-function legendAt(position: LegendPosition | undefined): EChartsOption["legend"] {
+function legendAt(
+  position: LegendPosition | undefined,
+  theme: ChartTheme,
+): EChartsOption["legend"] {
+  const textStyle = { color: theme.text };
   switch (position) {
     case "none":
       return { show: false };
     case "bottom":
-      return { bottom: 0, type: "scroll", textStyle: LEGEND_TEXT };
+      return { bottom: 0, type: "scroll", textStyle };
     case "right":
-      return {
-        right: 0,
-        top: "middle",
-        orient: "vertical",
-        type: "scroll",
-        textStyle: LEGEND_TEXT,
-      };
+      return { right: 0, top: "middle", orient: "vertical", type: "scroll", textStyle };
     default:
-      return BASE.legend;
+      return { top: 0, textStyle };
   }
 }
 
@@ -209,6 +211,11 @@ export interface ChartContext {
    * one that leaves is cleared by the merge rather than by a new chart.
    */
   annotations?: readonly Annotation[];
+  /**
+   * The page around the series (#502): axis and legend text, lines and
+   * grid, read off `<html>` so a chart follows the theme as the page does.
+   */
+  theme: ChartTheme;
 }
 
 /** One kind's chart: a panel spec and its current (bounded) rows as an ECharts option. */
@@ -232,7 +239,7 @@ export function normalized(build: ChartOptionBuilder): ChartOptionBuilder {
  * the panel's time field.
  */
 function buildSeries(type: "line" | "bar", area: boolean): ChartOptionBuilder {
-  return (panel, data, { display, annotations }) => {
+  return (panel, data, { display, annotations, theme }) => {
     const x = xKey(panel, data);
     const keys = seriesKeys(panel, data);
     const xValues = data.rows.map((r) => r[x]);
@@ -244,16 +251,16 @@ function buildSeries(type: "line" | "bar", area: boolean): ChartOptionBuilder {
     const number = valueFormatter(panel, numberDisplay(o));
     const axis = o.yAxis;
     return {
-      ...BASE,
+      ...base(theme),
       grid: gridFor(o.legend, axis?.label !== undefined),
-      legend: legendAt(o.legend),
+      legend: legendAt(o.legend, theme),
       tooltip: { ...TOOLTIP_AXIS, ...(number ? { valueFormatter: number } : {}) },
       ...(o.thresholds?.length ? { visualMap: thresholdMap(o.thresholds) } : {}),
       xAxis: {
         type: "category",
         data: categories,
-        axisLabel: { color: "#9aa0aa", hideOverlap: true },
-        axisLine: { lineStyle: { color: "#3a3f4b" } },
+        axisLabel: { color: theme.text, hideOverlap: true },
+        axisLine: { lineStyle: { color: theme.line } },
       },
       yAxis: {
         type: axis?.log ? "log" : "value",
@@ -264,11 +271,11 @@ function buildSeries(type: "line" | "bar", area: boolean): ChartOptionBuilder {
               name: axis.label,
               nameLocation: "middle",
               nameGap: 48,
-              nameTextStyle: { color: "#9aa0aa" },
+              nameTextStyle: { color: theme.text },
             }
           : {}),
-        axisLabel: { color: "#9aa0aa", ...(number ? { formatter: number } : {}) },
-        splitLine: { lineStyle: { color: "#2a2f3a" } },
+        axisLabel: { color: theme.text, ...(number ? { formatter: number } : {}) },
+        splitLine: { lineStyle: { color: theme.grid } },
       },
       series: keys.map((k, i) => ({
         name: k,
@@ -290,30 +297,36 @@ function buildSeries(type: "line" | "bar", area: boolean): ChartOptionBuilder {
 export const lineChart = normalized(buildSeries("line", false));
 export const areaChart = normalized(buildSeries("line", true));
 export const barChart = normalized(buildSeries("bar", false));
-export const scatterChart = normalized((_panel, data) => buildScatter(data));
-export const heatmapChart = normalized((panel, data, { display }) =>
-  buildHeatmap(panel, data, display),
+export const scatterChart = normalized((_panel, data, { theme }) =>
+  buildScatter(data, theme),
 );
-export const pieChart = normalized((panel, data) => buildPie(panel, data, false));
-export const donutChart = normalized((panel, data) => buildPie(panel, data, true));
+export const heatmapChart = normalized((panel, data, { display, theme }) =>
+  buildHeatmap(panel, data, display, theme),
+);
+export const pieChart = normalized((panel, data, { theme }) =>
+  buildPie(panel, data, false, theme),
+);
+export const donutChart = normalized((panel, data, { theme }) =>
+  buildPie(panel, data, true, theme),
+);
 
-function buildScatter(data: PanelData): EChartsOption {
+function buildScatter(data: PanelData, theme: ChartTheme): EChartsOption {
   const numericColumns = data.columns.filter((column) => isNumeric(data.rows, column));
   const [x, ...seriesKeys] = numericColumns;
   return {
-    ...BASE,
+    ...base(theme),
     tooltip: { trigger: "item", borderRadius: 0 },
     xAxis: {
       type: "value",
       name: x,
-      axisLabel: { color: "#9aa0aa" },
-      axisLine: { lineStyle: { color: "#3a3f4b" } },
-      splitLine: { lineStyle: { color: "#2a2f3a" } },
+      axisLabel: { color: theme.text },
+      axisLine: { lineStyle: { color: theme.line } },
+      splitLine: { lineStyle: { color: theme.grid } },
     },
     yAxis: {
       type: "value",
-      axisLabel: { color: "#9aa0aa" },
-      splitLine: { lineStyle: { color: "#2a2f3a" } },
+      axisLabel: { color: theme.text },
+      splitLine: { lineStyle: { color: theme.grid } },
     },
     series: seriesKeys.map((key) => ({
       name: key,
@@ -330,7 +343,12 @@ function buildScatter(data: PanelData): EChartsOption {
  * is the panel's x key (timeField or first column); the value is the first
  * numeric column that isn't the category.
  */
-function buildPie(panel: Panel, data: PanelData, donut: boolean): EChartsOption {
+function buildPie(
+  panel: Panel,
+  data: PanelData,
+  donut: boolean,
+  theme: ChartTheme,
+): EChartsOption {
   const x = xKey(panel, data);
   const valueKey = seriesKeys(panel, data)[0] ?? data.columns.find((c) => c !== x) ?? x;
   const radius = donut ? ["48%", "72%"] : "72%";
@@ -351,7 +369,7 @@ function buildPie(panel: Panel, data: PanelData, donut: boolean): EChartsOption 
       borderRadius: 0,
       ...(number ? { valueFormatter: number } : {}),
     },
-    legend: legendAt(o.legend),
+    legend: legendAt(o.legend, theme),
     series: [
       {
         type: "pie",
@@ -361,8 +379,8 @@ function buildPie(panel: Panel, data: PanelData, donut: boolean): EChartsOption 
           name: toText(r[x]),
           value: toNumber(r[valueKey]) || 0,
         })),
-        label: { color: "#9aa0aa" },
-        labelLine: { lineStyle: { color: "#3a3f4b" } },
+        label: { color: theme.text },
+        labelLine: { lineStyle: { color: theme.line } },
       },
     ],
   };
@@ -462,6 +480,7 @@ function buildHeatmap(
   panel: Panel,
   data: PanelData,
   display: TimeDisplay,
+  theme: ChartTheme,
 ): EChartsOption {
   const [xk, yk, vk] = data.columns;
   const xs = [...new Set(data.rows.map((r) => toText(r[xk])))];
@@ -477,8 +496,8 @@ function buildHeatmap(
     backgroundColor: "transparent",
     tooltip: { position: "top" },
     grid: { left: 60, right: 16, top: 24, bottom: 40 },
-    xAxis: { type: "category", data: xLabels, axisLabel: { color: "#9aa0aa" } },
-    yAxis: { type: "category", data: ys, axisLabel: { color: "#9aa0aa" } },
+    xAxis: { type: "category", data: xLabels, axisLabel: { color: theme.text } },
+    yAxis: { type: "category", data: ys, axisLabel: { color: theme.text } },
     visualMap: {
       min: 0,
       max,
@@ -487,7 +506,7 @@ function buildHeatmap(
       left: "center",
       bottom: 0,
       inRange: { color: [palette[5], palette[0], palette[3]] },
-      textStyle: { color: "#9aa0aa" },
+      textStyle: { color: theme.text },
     },
     series: [{ type: "heatmap", data: values, progressive: 1000 }],
   };
