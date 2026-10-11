@@ -533,3 +533,32 @@ test("a stream whose token expired reconnects without renewing when another rene
     if (!hadWindow) delete g.window;
   }
 });
+
+test("a token minted while the realm session is being revoked is revoked with it", async () => {
+  // #542: a session token is issued as of the moment the realm vouched for
+  // the person, before the refresh, not when the app signs it. A back-channel
+  // revocation landing during the refresh therefore reaches the new token.
+  const { revoke, resetRevocations } = await import("@/lib/auth/revocation");
+  resetRevocations();
+  const store = memoryStore();
+  const issued = await signedIn(store);
+  // Real time, with real waits, so the app signs strictly after the revoke:
+  // were the token stamped when signed, it would outlive the revocation.
+  const pause = () => new Promise((r) => setTimeout(r, 15));
+  const d = {
+    ...deps(store, {
+      refresh: async () => {
+        await pause();
+        revoke({ sid: "kc-session-1" });
+        await pause();
+        return { id_token: "id-2", refresh_token: "rt-2", refresh_expires_in: 1800 };
+      },
+      identities: new Map([["id-2", alice]]),
+    }),
+    now: () => Date.now(),
+  };
+  const outcome = await renewSession(d, issued.renewal?.sessionId ?? "");
+  assert.ok(outcome.ok);
+  assert.equal(await verifySessionToken(outcome.sessionToken), null);
+  resetRevocations();
+});

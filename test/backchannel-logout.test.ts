@@ -47,6 +47,68 @@ test("a realm session's token issued after its revocation is good", () => {
   );
 });
 
+test("signing out and straight back in within the same second still signs in", async () => {
+  // #542: a sign-out revokes the realm session's tokens up to now; the next
+  // sign-in reuses that realm session's sid, and can land in the same second.
+  // Where the issue time is known to the millisecond it is compared exactly,
+  // so the fresh token is good and the earlier one in that second is not.
+  const at = NOW + 86;
+  revoke({ sid: "kc-1" }, at);
+  const sameSecond = { sub: "alice", sid: "kc-1", iat: sec(at) };
+  assert.equal(isRevoked(sameSecond, at), true, "seconds alone err the safe way");
+  assert.equal(isRevoked({ ...sameSecond, issuedAtMs: at + 700 }, at), false);
+  assert.equal(isRevoked({ ...sameSecond, issuedAtMs: at - 50 }, at), true);
+  assert.equal(isRevoked({ ...sameSecond, issuedAtMs: at }, at), true);
+
+  // The callback's id_token: the server obtained it after the sign-out, by a
+  // code exchange, and passes the moment before that exchange as its bound.
+  // A fixed instant in the current second, so no boundary can fall between.
+  const { identityFromPayload } = await import("@/lib/auth/session");
+  const signedOut = Math.floor(Date.now() / 1000) * 1000 + 100;
+  const payload = { sub: "alice", sid: "kc-1", iat: sec(signedOut) };
+  resetRevocations();
+  revoke({ sid: "kc-1" }, signedOut);
+  assert.equal(identityFromPayload(payload), null);
+  assert.equal(identityFromPayload(payload, signedOut - 50), null, "exchanged before it");
+  assert.notEqual(identityFromPayload(payload, signedOut + 600), null);
+
+  // The app's own session tokens carry their issue time to the millisecond:
+  // one minted before the sign-out is refused, one minted after is good,
+  // whichever second each falls in.
+  resetRevocations();
+  const before = await signSessionToken("alice", [], {}, 3600, "kc-1");
+  const signedOutAt = Date.now();
+  revoke({ sid: "kc-1" }, signedOutAt);
+  // A tie with the sign-out's own millisecond counts as revoked; a real
+  // sign-in is hundreds of them later.
+  while (Date.now() <= signedOutAt) await new Promise((r) => setTimeout(r, 1));
+  const after = await signSessionToken("alice", [], {}, 3600, "kc-1");
+  assert.equal(await verifySessionToken(before), null);
+  assert.notEqual(await verifySessionToken(after), null);
+});
+
+test("only a token this app signed may state its own millisecond", async () => {
+  // `iat_ms` is honored from Holotable's own issuer, and only when it agrees
+  // with `iat`. A realm token claiming one in the right second gains nothing.
+  const { identityFromPayload } = await import("@/lib/auth/session");
+  const signedOut = Math.floor(Date.now() / 1000) * 1000 + 100;
+  revoke({ sid: "kc-1" }, signedOut);
+  const iat = sec(signedOut);
+  const later = signedOut + 600; // the same second, after the sign-out
+  for (const iss of [undefined, "https://kc.example.com/realms/holotable"]) {
+    assert.equal(
+      identityFromPayload({ sub: "alice", sid: "kc-1", iat, iat_ms: later, iss }),
+      null,
+      String(iss),
+    );
+  }
+  // From Holotable it counts, and only within its own second.
+  const own = { sub: "alice", sid: "kc-1", iat, iss: "holotable" };
+  assert.notEqual(identityFromPayload({ ...own, iat_ms: later }), null);
+  assert.equal(identityFromPayload({ ...own, iat_ms: later + 5000 }), null);
+  assert.equal(identityFromPayload({ ...own, iat_ms: signedOut - 50 }), null);
+});
+
 test("revoking a subject alone reaches every token issued until then", () => {
   revoke({ sub: "alice" }, NOW);
   assert.equal(isRevoked({ sub: "alice", sid: "kc-1", iat: sec(NOW) - 60 }, NOW), true);
