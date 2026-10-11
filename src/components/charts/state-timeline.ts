@@ -1,6 +1,6 @@
 import { panelTimeField } from "@/lib/ir";
 import type { CustomSeriesRenderItem, EChartsOption } from "echarts";
-import { graphic } from "echarts";
+import { graphic } from "@/components/charts/echarts";
 import {
   asInstant,
   type ChartContext,

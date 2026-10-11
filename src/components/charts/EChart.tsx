@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import * as echarts from "echarts";
+import * as echarts from "@/components/charts/echarts";
 import type { EChartsOption } from "echarts";
 import { useChartPatterns } from "@/components/chart-patterns";
 import { useReducedMotion } from "@/components/motion-preference";
