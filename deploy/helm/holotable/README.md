@@ -23,8 +23,8 @@ from a checkout, `deploy/helm/holotable` works the same way, and
 1. **Images.** CI publishes both targets to `ghcr.io/jbouder/holotable`,
    multi-arch: `<version>` and `<version>-migrate` on a release tag, `main`
    and `main-migrate` on every merge to `main`. The tags default to the chart's
-   `appVersion`; until a release exists, set `image.tag: main` and
-   `migrations.image.tag: main-migrate`. To run your own
+   `appVersion`, the release the chart was cut with; to run something newer,
+   set `image.tag: main` and `migrations.image.tag: main-migrate`. To run your own
    build instead, push both targets of the repository `Dockerfile` and point
    `image.repository` and `migrations.image.repository` at your registry:
 

@@ -98,10 +98,30 @@ jobs:
     permissions:
       contents: write
     steps:
+      # For CHANGELOG.md; the chart comes from the artifact.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           name: chart
           path: dist
+
+      # The curated part of the notes: this version's section of
+      # CHANGELOG.md, which test/release-version.test.ts requires to exist,
+      # from its heading to the next version's. `--generate-notes` appends
+      # the merged pull requests after it.
+      - name: This version's changelog section
+        env:
+          VERSION: ${{ needs.verify.outputs.version }}
+        run: |
+          awk -v v="$VERSION" '
+            /^## / { on = index($0, "## " v " ") == 1 || $0 == "## " v }
+            on { print }
+          ' CHANGELOG.md > changelog-section.md
+          if ! grep -q . changelog-section.md; then
+            echo "::error::CHANGELOG.md has no '## $VERSION' section"
+            exit 1
+          fi
 
       - name: Create the release
         env:
@@ -119,7 +139,9 @@ jobs:
           \`\`\`
 
           Images: \`$IMAGE:$VERSION\` and \`$IMAGE:$VERSION-migrate\` (linux/amd64, linux/arm64), published by CI on this tag.
+
           EOF
+          cat changelog-section.md >> notes.md
           # A pre-release version (1.2.0-rc.1) is marked as one; 0.x is not.
           prerelease=""
           case "$VERSION" in *-*) prerelease="--prerelease" ;; esac

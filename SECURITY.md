@@ -6,11 +6,17 @@ sharp edge, so the trust model is written down here rather than left implied.
 
 ## Supported versions
 
-Holotable is pre-1.0. Images are published from `main` (`ghcr.io/jbouder/holotable:main`
-and `:quickstart`), but there are no tagged releases yet, so there is nothing
-to back-port to: **only `main` is supported**, and security fixes land as
-commits on `main` and in the next published image. This section will be
-replaced with a real version support table once releases exist.
+Holotable is pre-1.0: there is one supported line, the latest release, and a
+fix ships as the next patch of it rather than as a back-port.
+
+| Version | Supported | What a fix looks like |
+| --- | --- | --- |
+| 0.1.x (latest release) | Yes | The next 0.1.x patch, as `ghcr.io/jbouder/holotable:<version>` and the chart |
+| `main` | Yes, as the next release | A commit on `main`, in the next `:main` image and the next release |
+| Anything older than the latest release | No | Upgrade |
+
+An advisory names the first fixed version. Until 1.0, a minor release may
+also change behavior; the changelog says so.
 
 ## Reporting a vulnerability
 
