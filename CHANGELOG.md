@@ -65,8 +65,10 @@ second.
 - A newest-first table's appends land on top (#531); a panel's window drops
   rows the server's result no longer holds (#530); crosshair sync finds the
   right category.
-- Focus stays in the Share dialog while it creates a link (#540); a chart's
-  screen-reader table no longer scrolls the page sideways (#536).
+- A button that is busy with its own work keeps keyboard focus instead of
+  dropping it to the page, which also keeps focus in the Share dialog while
+  it creates a link (#540); a chart's screen-reader table no longer scrolls
+  the page sideways (#536).
 
 ### Upgrading
 
