@@ -24,7 +24,7 @@ import {
 import { resolveTimeRange } from "@/lib/time";
 import { rowScopeFor } from "@/lib/row-scope";
 import { checkedSelection, variableSourceIds } from "@/lib/variables";
-import { requireModel } from "@/lib/ai/model-resolution";
+import { requireModel } from "@/lib/ai/models";
 import { enforceLlmLimits } from "@/lib/limits/llm";
 import { messagesToPersist } from "@/lib/chat-history";
 import { config } from "@/lib/config";

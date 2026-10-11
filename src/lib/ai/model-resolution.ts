@@ -1,18 +1,16 @@
 import { HttpError } from "@/lib/auth/authorize";
-import type { Identity } from "@/lib/auth/claims";
 import { aiConfigProblem, aiUnavailableMessage } from "@/lib/ai/configured";
 import { type BaseUrlAllowlist, parseBaseUrlAllowlist } from "@/lib/ai/base-url";
 import { checkBaseUrl } from "@/lib/ai/guarded-fetch";
 import {
   credentialsNoun,
-  type EffectiveModel,
   type KeyState,
   keyHint,
   type ModelConfigInput,
   type ModelConfigView,
   ModelSettings,
   type ModelSource,
-  type WorkspaceModelView,
+  type ModelView,
 } from "@/lib/ai/model-config";
 import { configuredModel, getModel, type Model } from "@/lib/ai/provider";
 import {
@@ -26,11 +24,11 @@ import {
 import type { ProviderKind } from "@/lib/ai/providers/types";
 import { config, type Environment } from "@/lib/config";
 import {
-  type ModelConfigStore,
-  type ModelConfigWrite,
-  pgModelConfigStore,
-  type StoredModelConfig,
-} from "@/lib/db/model-configs";
+  type ModelStore,
+  type ModelWrite,
+  pgModelStore,
+  type StoredModel,
+} from "@/lib/db/models";
 import { rememberSecret } from "@/lib/log";
 import { openSecret, sealSecret } from "@/lib/secrets/seal";
 
@@ -116,8 +114,11 @@ export function stubAllowed(env: Environment = process.env): boolean {
   return env.NODE_ENV !== "production" || env.AI_STUB_IN_PRODUCTION === "true";
 }
 
+/** What a stored model is built from: its kind, its settings, its sealed credentials. */
+export type StoredConfig = Pick<StoredModel, "provider" | "settings" | "credentials">;
+
 export interface ModelResolutionDeps {
-  store: ModelConfigStore;
+  store: ModelStore;
   /** `AUTH_MODE=demo` turns both in-app levels off. */
   demo: boolean;
   env: Environment;
@@ -129,16 +130,21 @@ let defaultAllowlist: BaseUrlAllowlist | undefined;
 export function defaultModelDeps(): ModelResolutionDeps {
   defaultAllowlist ??= parseBaseUrlAllowlist(config.aiBaseUrlAllowlist);
   return {
-    store: pgModelConfigStore,
+    store: pgModelStore,
     demo: config.authMode === "demo",
     env: process.env,
     allowlist: defaultAllowlist,
   };
 }
 
+/**
+ * A model ready for a generation, or why the one chosen cannot be. `id` is
+ * the catalog id (a uuid, or `env:<name>` for a server model); `modelId` is
+ * the vendor's model id, as the generation log and the limits count it.
+ */
 export type ResolvedModel =
-  | { ok: true; source: ModelSource; modelId: string; model: Model }
-  | { ok: false; source: ModelSource; problem: string };
+  | { ok: true; id: string; source: ModelSource; modelId: string; model: Model }
+  | { ok: false; id: string | null; source: ModelSource; problem: string };
 
 const UNREADABLE_SETTINGS: Record<"personal" | "workspace", string> = {
   personal:
@@ -161,7 +167,7 @@ const MISSING_CREDENTIALS: Record<"personal" | "workspace", string> = {
     "This workspace's model has no usable credentials stored. A source-admin must enter them again under Settings → Workspace model.",
 };
 
-function parseSettings(stored: StoredModelConfig): ModelSettings | null {
+export function parseSettings(stored: StoredConfig): ModelSettings | null {
   const parsed = ModelSettings.safeParse({
     ...(stored.settings as object),
     provider: stored.provider,
@@ -169,100 +175,56 @@ function parseSettings(stored: StoredModelConfig): ModelSettings | null {
   return parsed.success ? parsed.data : null;
 }
 
-/** A stored level as a model, or why it cannot be one. Builds nothing that calls out. */
-function fromStored(
+/** A stored model as a model to call, or why it cannot be one. Builds nothing that calls out. */
+export function storedResolution(
+  id: string,
   source: "personal" | "workspace",
-  stored: StoredModelConfig,
+  stored: StoredConfig,
   allowlist: BaseUrlAllowlist,
 ): ResolvedModel {
   const settings = parseSettings(stored);
-  if (!settings) return { ok: false, source, problem: UNREADABLE_SETTINGS[source] };
+  if (!settings) return { ok: false, id, source, problem: UNREADABLE_SETTINGS[source] };
   const opened = openCredentials(stored.credentials);
   if (opened.state === "unreadable") {
-    return { ok: false, source, problem: UNREADABLE_KEY[source] };
+    return { ok: false, id, source, problem: UNREADABLE_KEY[source] };
   }
   const credentials = parseCredentials(
     kindOf(settings),
     opened.state === "ok" ? opened.credentials : {},
   );
-  if (!credentials.ok) return { ok: false, source, problem: MISSING_CREDENTIALS[source] };
+  if (!credentials.ok) {
+    return { ok: false, id, source, problem: MISSING_CREDENTIALS[source] };
+  }
   return {
     ok: true,
+    id,
     source,
     modelId: settings.model,
     model: configuredModel(settings, credentials.credentials, allowlist),
   };
 }
 
-function fromEnvironment(env: Environment): ResolvedModel {
+/**
+ * The environment's model (`AI_PROVIDER`, `AI_MODEL`, …) as the server model
+ * named `default`, until `AI_MODELS_FILE` (#440).
+ */
+export function environmentResolution(id: string, env: Environment): ResolvedModel {
   const problem = aiConfigProblem(env);
   if (problem) {
-    return { ok: false, source: "environment", problem: aiUnavailableMessage(problem) };
+    return {
+      ok: false,
+      id,
+      source: "environment",
+      problem: aiUnavailableMessage(problem),
+    };
   }
   return {
     ok: true,
+    id,
     source: "environment",
     modelId: env.AI_MODEL ?? "",
-    model: getModel(),
+    model: getModel(env),
   };
-}
-
-/**
- * The model for a generation by `identity` in `workspaceId`: the first level
- * that is configured, even when it is broken. A broken workspace key is
- * reported, never silently replaced by the environment's model, which may be
- * billed to someone else.
- */
-export async function resolveModel(
-  input: { identity: Identity; workspaceId: string },
-  deps: ModelResolutionDeps = defaultModelDeps(),
-): Promise<ResolvedModel> {
-  if (deps.demo) return fromEnvironment(deps.env);
-  const [workspace, personal] = await Promise.all([
-    deps.store.workspace(input.workspaceId),
-    deps.store.user(input.identity.sub),
-  ]);
-  if (personal && workspace?.allowPersonalKeys) {
-    return fromStored("personal", personal, deps.allowlist);
-  }
-  if (workspace?.config) return fromStored("workspace", workspace.config, deps.allowlist);
-  return fromEnvironment(deps.env);
-}
-
-/** {@link resolveModel}, or a 503 that says what to configure. For the generation routes. */
-export async function requireModel(
-  input: { identity: Identity; workspaceId: string },
-  deps?: ModelResolutionDeps,
-): Promise<Extract<ResolvedModel, { ok: true }>> {
-  const resolved = await resolveModel(input, deps);
-  if (!resolved.ok) throw new HttpError(503, resolved.problem);
-  return resolved;
-}
-
-/** What a page shows about the model a generation here would use. */
-export async function effectiveModel(
-  input: { identity: Identity; workspaceId: string },
-  deps?: ModelResolutionDeps,
-): Promise<EffectiveModel> {
-  const resolved = await resolveModel(input, deps);
-  return resolved.ok
-    ? { source: resolved.source, model: resolved.modelId, unavailable: null }
-    : { source: resolved.source, model: "", unavailable: resolved.problem };
-}
-
-/** {@link effectiveModel} for each workspace, keyed by id. */
-export async function effectiveModels(
-  identity: Identity,
-  workspaceIds: readonly string[],
-  deps?: ModelResolutionDeps,
-): Promise<Record<string, EffectiveModel>> {
-  const entries = await Promise.all(
-    [...new Set(workspaceIds)].map(
-      async (workspaceId) =>
-        [workspaceId, await effectiveModel({ identity, workspaceId }, deps)] as const,
-    ),
-  );
-  return Object.fromEntries(entries);
 }
 
 /* -------------------------------------------------------------------------- */
@@ -282,8 +244,10 @@ function keyState(sealed: Buffer | null, settings: ModelSettings): KeyState {
   return { state: "set", hint: first ? keyHint(first) : null };
 }
 
-/** A stored configuration as the settings page sees it: never the key. */
-export function configView(stored: StoredModelConfig): ModelConfigView | null {
+/** A stored model's configuration as a page sees it: never the credentials. */
+export function configView(
+  stored: StoredConfig & Pick<StoredModel, "updatedBy" | "updatedAt">,
+): ModelConfigView | null {
   const settings = parseSettings(stored);
   if (!settings) return null;
   return {
@@ -294,19 +258,21 @@ export function configView(stored: StoredModelConfig): ModelConfigView | null {
   };
 }
 
-export async function workspaceModelView(
-  workspaceId: string,
-  deps: ModelResolutionDeps = defaultModelDeps(),
-): Promise<WorkspaceModelView> {
-  const record = await deps.store.workspace(workspaceId);
+/** A catalog model as a page sees it, or null when its settings no longer parse. */
+export function modelView(stored: StoredModel): ModelView | null {
+  const config = configView(stored);
+  if (!config) return null;
   return {
-    workspaceId,
-    config: record?.config ? configView(record.config) : null,
-    allowPersonalKeys: record?.allowPersonalKeys ?? false,
+    ...config,
+    id: stored.id,
+    name: stored.name,
+    scope: stored.scope,
+    createdBy: stored.createdBy,
+    createdAt: stored.createdAt,
   };
 }
 
-/** May a configuration be saved at all? Demo mode has the environment's model only. */
+/** May a model be saved at all? Demo mode has the server's models only. */
 export function assertConfigurable(deps: ModelResolutionDeps = defaultModelDeps()): void {
   if (deps.demo) {
     throw new HttpError(
@@ -329,9 +295,9 @@ export function assertConfigurable(deps: ModelResolutionDeps = defaultModelDeps(
  */
 export async function prepareWrite(
   input: ModelConfigInput,
-  current: StoredModelConfig | null,
+  current: StoredConfig | null,
   deps: ModelResolutionDeps = defaultModelDeps(),
-): Promise<ModelConfigWrite> {
+): Promise<Omit<ModelWrite, "name">> {
   const { settings } = input;
   const kind = kindOf(settings);
   if (kind.developmentOnly && !stubAllowed(deps.env)) {
@@ -343,7 +309,7 @@ export async function prepareWrite(
     if (problem) throw new HttpError(400, problem);
   }
 
-  let credentials: ModelConfigWrite["credentials"];
+  let credentials: ModelWrite["credentials"];
   if (input.credentials === undefined) {
     if (current?.credentials) {
       const previous = parseSettings(current);
@@ -385,7 +351,7 @@ function requireCredentials(kind: ProviderKind, raw: unknown): Credentials {
  */
 export async function modelForTest(
   input: ModelConfigInput,
-  current: StoredModelConfig | null,
+  current: StoredConfig | null,
   deps: ModelResolutionDeps = defaultModelDeps(),
 ): Promise<Model> {
   const write = await prepareWrite(input, current, deps);

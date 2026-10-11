@@ -58,10 +58,37 @@ export const ModelConfigInput = z
   .strict();
 export type ModelConfigInput = z.infer<typeof ModelConfigInput>;
 
-/** The workspace PUT: its configuration (or null to use the environment) and the toggle. */
+/** What a model is called: unique within its owner, ignoring case. */
+export const ModelName = z
+  .string()
+  .trim()
+  .min(1, "name the model")
+  .max(80, "at most 80 characters");
+
+/** A catalog model's POST and PUT body (#439): its name and configuration. */
+export const ModelInput = ModelConfigInput.extend({ name: ModelName }).strict();
+export type ModelInput = z.infer<typeof ModelInput>;
+
+/** The prefix of a server model's id: `env:<name>`. */
+export const SERVER_MODEL_PREFIX = "env:";
+
+/** A model id as a request may carry it: a catalog uuid, or `env:<name>`. */
+export const ModelId = z
+  .string()
+  .max(64)
+  .regex(
+    /^(?:[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}|env:[a-z0-9][a-z0-9-]{0,39})$/i,
+    "not a model id",
+  );
+
+/**
+ * The workspace PUT (#439): which model a generation uses when nobody picks
+ * (a workspace model's id, a server model's `env:<name>`, or null for the
+ * server's default), and whether people may use their own models here.
+ */
 export const WorkspaceModelInput = z
   .object({
-    config: ModelConfigInput.nullable(),
+    defaultModel: ModelId.nullable(),
     allowPersonalKeys: z.boolean(),
   })
   .strict();
@@ -83,11 +110,51 @@ export interface ModelConfigView {
   updatedAt: string;
 }
 
+/** A catalog model (#439) as a page sees it: never the credentials. */
+export interface ModelView extends ModelConfigView {
+  id: string;
+  name: string;
+  scope: "workspace" | "personal";
+  createdBy: string;
+  createdAt: string;
+}
+
+/**
+ * A workspace's models as its settings page sees them: every one, the
+ * default, and the personal-keys toggle. `config` is the default when it is
+ * one of the workspace's own, for the single-model card until the Models
+ * page (#441).
+ */
 export interface WorkspaceModelView {
   workspaceId: string;
-  /** Null when the workspace uses the environment's model. */
-  config: ModelConfigView | null;
+  models: ModelView[];
+  defaultModel: string | null;
+  config: ModelView | null;
   allowPersonalKeys: boolean;
+}
+
+/**
+ * One model a caller may use in a workspace, as `GET /api/models` lists it
+ * (#439): enough to pick it, never its settings beyond the model id, never
+ * its credentials. `unavailable` is why it cannot be called (credentials
+ * unreadable after a `SESSION_SECRET` rotation, a server variable unset), or
+ * null.
+ */
+export interface ModelListing {
+  id: string;
+  name: string;
+  provider: string;
+  model: string;
+  scope: ModelSource;
+  unavailable: string | null;
+}
+
+/** `GET /api/models`: the caller's listing, and what a generation uses when nobody picks. */
+export interface ModelsResponse {
+  workspaceId: string;
+  models: ModelListing[];
+  /** The id a request without `modelId` resolves to, or null when none can. */
+  defaultModel: string | null;
 }
 
 /**

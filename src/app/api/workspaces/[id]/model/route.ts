@@ -1,94 +1,59 @@
 import { audit } from "@/lib/audit";
-import { assertAuthorized, HttpError, requireIdentity } from "@/lib/auth/authorize";
+import { requireIdentity } from "@/lib/auth/authorize";
 import { WorkspaceModelInput } from "@/lib/ai/model-config";
 import {
-  assertConfigurable,
-  defaultModelDeps,
-  prepareWrite,
+  assertManages,
+  saveWorkspaceModelSettings,
   workspaceModelView,
-} from "@/lib/ai/model-resolution";
-import { endpointHost } from "@/lib/ai/providers/registry";
+  workspaceOf,
+} from "@/lib/ai/model-admin";
+import { defaultModelDeps } from "@/lib/ai/model-resolution";
 import { json, readJson, route } from "@/lib/http";
-import { WorkspaceId } from "@/lib/workspace-limits";
 
 export const runtime = "nodejs";
 
-function workspaceOf(id: string): string {
-  const workspaceId = WorkspaceId.safeParse(id);
-  if (!workspaceId.success) throw new HttpError(400, "invalid workspace id");
-  return workspaceId.data;
-}
-
 /**
- * The workspace's model configuration (#331), for whoever holds
- * `source:manage` there: the provider, base URL and model, whether personal
- * keys are allowed, and the key's state (set, with its last four characters;
- * none; or unreadable). Never the key.
+ * A workspace's model settings (#331, #439), for whoever holds
+ * `source:manage` there: its models, which one a generation uses when
+ * nobody picks, and whether people may use their own models here. Never a
+ * credential.
  */
 export const GET = route(
   "workspaces.model.get",
   async (_req: Request, ctx: RouteContext<"/api/workspaces/[id]/model">) => {
     const identity = await requireIdentity();
     const workspaceId = workspaceOf((await ctx.params).id);
-    assertAuthorized(
-      identity,
-      "source:manage",
-      { workspaceId },
-      { type: "workspace", id: workspaceId },
-    );
+    assertManages(identity, workspaceId);
     return json(await workspaceModelView(workspaceId));
   },
 );
 
 /**
- * Replace the workspace's model configuration. `config: null` goes back to
- * the environment's model; the personal-keys toggle is saved either way. The
- * base URL is held to the address rules, DNS included, before anything is
- * written, and a key left out is kept only for the same origin. Takes effect
- * on the next generation: resolution reads the row every time.
+ * Set the default (a workspace model's id, a server model's `env:<name>`,
+ * or null for the server's default) and the personal-models toggle. Takes
+ * effect on the next generation: resolution reads the row every time.
  */
 export const PUT = route(
   "workspaces.model.update",
   async (req: Request, ctx: RouteContext<"/api/workspaces/[id]/model">) => {
     const identity = await requireIdentity();
     const workspaceId = workspaceOf((await ctx.params).id);
-    assertAuthorized(
-      identity,
-      "source:manage",
-      { workspaceId },
-      { type: "workspace", id: workspaceId },
-    );
+    assertManages(identity, workspaceId);
     const deps = defaultModelDeps();
-    assertConfigurable(deps);
-    const body = await readJson(req, WorkspaceModelInput, { maxBytes: 16_384 });
-    const current = await deps.store.workspace(workspaceId);
-    const write = body.config
-      ? await prepareWrite(body.config, current?.config ?? null, deps)
-      : null;
-    await deps.store.saveWorkspace({
-      workspaceId,
-      config: write,
-      allowPersonalKeys: body.allowPersonalKeys,
-      updatedBy: identity.sub,
-    });
+    const body = await readJson(req, WorkspaceModelInput, { maxBytes: 4_096 });
+    const before = await deps.store.workspace(workspaceId);
+    const view = await saveWorkspaceModelSettings(workspaceId, body, identity.sub, deps);
     audit({
       actor: identity,
       action: "workspace.model.update",
       workspaceId,
       resource: { type: "workspace", id: workspaceId },
       detail: {
-        // Which endpoint and model, never the key: only whether it changed.
-        ...(body.config
-          ? {
-              provider: body.config.settings.provider,
-              endpointHost: endpointHost(body.config.settings),
-              model: body.config.settings.model,
-              keyChanged: body.config.credentials !== undefined,
-            }
-          : { cleared: current?.config != null }),
+        defaultModel: body.defaultModel,
+        previousDefault: before?.defaultModel ?? null,
         allowPersonalKeys: body.allowPersonalKeys,
       },
     });
-    return json(await workspaceModelView(workspaceId, deps));
+    return json(view);
   },
 );

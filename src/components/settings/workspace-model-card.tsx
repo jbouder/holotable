@@ -12,6 +12,7 @@ import {
   draftFromView,
   inputFromDraft,
   type ModelConfigDraft,
+  type ModelView,
   type WorkspaceModelView,
 } from "@/lib/ai/model-config";
 import { formatInstant } from "@/lib/time-range";
@@ -39,6 +40,7 @@ export function WorkspaceModelCard({
 }) {
   const display = useTimeDisplay();
   const base = `/api/workspaces/${encodeURIComponent(initial.workspaceId)}/model`;
+  const modelsBase = `${base}s`;
   const [view, setView] = React.useState(initial);
   const [useOwn, setUseOwn] = React.useState(initial.config !== null);
   const [allowPersonal, setAllowPersonal] = React.useState(initial.allowPersonalKeys);
@@ -49,30 +51,53 @@ export function WorkspaceModelCard({
 
   const touch = () => setStatus({ kind: "idle" });
 
+  async function request(url: string, method: string, body?: unknown) {
+    const res = await fetch(url, {
+      method,
+      headers: body === undefined ? undefined : { "Content-Type": "application/json" },
+      body: body === undefined ? undefined : JSON.stringify(body),
+    });
+    if (!res.ok) throw new Error((await readApiError(res)).error);
+    return res.json() as Promise<unknown>;
+  }
+
+  /**
+   * The card edits the workspace's default model (#439): a first save adds
+   * one and makes it the default, later saves replace it, and turning it off
+   * deletes it, which goes back to the server's model.
+   */
   async function save(e: React.FormEvent) {
     e.preventDefault();
-    let config = null;
+    let input = null;
     if (useOwn) {
       const built = inputFromDraft(draft);
       if (!built.ok) {
         setStatus({ kind: "error", message: built.message });
         return;
       }
-      config = built.input;
+      input = { ...built.input, name: view.config?.name ?? "Workspace model" };
     }
     setStatus({ kind: "saving" });
     try {
-      const res = await fetch(base, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ config, allowPersonalKeys: allowPersonal }),
-      });
-      if (!res.ok) {
-        setStatus({ kind: "error", message: (await readApiError(res)).error });
-        return;
+      let defaultModel = view.config ? null : view.defaultModel;
+      if (input) {
+        const saved = (await request(
+          view.config
+            ? `${modelsBase}/${encodeURIComponent(view.config.id)}`
+            : modelsBase,
+          view.config ? "PUT" : "POST",
+          input,
+        )) as ModelView;
+        defaultModel = saved.id;
+      } else if (view.config) {
+        await request(`${modelsBase}/${encodeURIComponent(view.config.id)}`, "DELETE");
       }
-      const next = (await res.json()) as WorkspaceModelView;
+      const next = (await request(base, "PUT", {
+        defaultModel,
+        allowPersonalKeys: allowPersonal,
+      })) as WorkspaceModelView;
       setView(next);
+      setUseOwn(next.config !== null);
       setDraft(draftFromView(next.config));
       setStatus({ kind: "saved" });
     } catch (err) {
@@ -126,7 +151,11 @@ export function WorkspaceModelCard({
                 touch();
               }}
               storedKey={view.config?.key}
-              testUrl={`${base}/test`}
+              testUrl={
+                view.config
+                  ? `${modelsBase}/${encodeURIComponent(view.config.id)}/test`
+                  : `${modelsBase}/test`
+              }
               testBody={(input) => input}
               allowStub={allowStub}
             />

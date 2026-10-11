@@ -4,7 +4,7 @@ import {
   streamSourceDraft,
 } from "@/lib/ai/generate";
 import { recordGeneration } from "@/lib/ai/log";
-import { requireModel } from "@/lib/ai/model-resolution";
+import { requireModel } from "@/lib/ai/models";
 import {
   createDashboard,
   getDashboardById,

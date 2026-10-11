@@ -35,11 +35,14 @@ configure.
 | `template.create`, `template.delete` | Workspace templates | template |
 | `workspace.limits.update` | A platform admin changes a workspace's LLM limits (`before`, `after`) | workspace |
 | `workspace.prompt.update` | A source-admin saves a workspace's prompt customization (`glossaryChars`, `metricDefinitions`, `examples`: sizes, not the text) | workspace |
-| `workspace.model.update` | A source-admin saves a workspace's [model](/admin/ai-provider/#models-configured-in-the-app) (`provider`, `baseUrlHost`, `model`, `keyChanged`, `allowPersonalKeys`, or `cleared`; never the key) | workspace |
-| `workspace.model.test` | A source-admin tests a workspace model configuration (`baseUrlHost`, `model`); `failure` when the model did not answer | workspace |
-| `user.model.update` | Someone saves their personal model (`provider`, `baseUrlHost`, `model`, `keyChanged`; never the key) | none |
-| `user.model.delete` | Someone removes their personal model | none |
-| `user.model.test` | Someone tests a personal model configuration, admitted in a workspace that allows personal keys (`baseUrlHost`, `model`) | none |
+| `workspace.model.create` | A source-admin adds a [model](/admin/ai-provider/#models-configured-in-the-app) to a workspace (`name`, `provider`, `endpointHost`, `model`, `keyChanged`; never a credential) | model |
+| `workspace.model.update` | A source-admin replaces a workspace's model (as `workspace.model.create`), or saves the workspace's default and personal-models toggle (`defaultModel`, `previousDefault`, `allowPersonalKeys`) | model or workspace |
+| `workspace.model.delete` | A source-admin deletes a workspace's model | model |
+| `workspace.model.test` | A source-admin tests a workspace model (`provider`, `endpointHost`, `model`); `failure` when the model did not answer | workspace or model |
+| `user.model.create` | Someone adds a personal model (as `workspace.model.create`) | model |
+| `user.model.update` | Someone replaces a personal model (as `workspace.model.create`) | model |
+| `user.model.delete` | Someone deletes a personal model | model |
+| `user.model.test` | Someone tests a personal model, admitted in a workspace that allows personal models (`provider`, `endpointHost`, `model`) | none |
 | `annotation.create` | An editor or pipeline writes an annotation (`kind`, `at`, `source`) | annotation |
 | `annotation.delete` | An editor deletes an annotation | annotation |
 | `share.create` | An editor creates a read-only share link (`shareId`, `expiresAt`, `allowedOrigins`, `timeRange`) | dashboard |

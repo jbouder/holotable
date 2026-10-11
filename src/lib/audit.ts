@@ -68,8 +68,11 @@ export const AUDIT_ACTIONS = [
   "template.delete",
   "workspace.limits.update",
   "workspace.prompt.update",
+  "workspace.model.create",
   "workspace.model.update",
+  "workspace.model.delete",
   "workspace.model.test",
+  "user.model.create",
   "user.model.update",
   "user.model.delete",
   "user.model.test",
@@ -93,7 +96,8 @@ export type AuditResourceType =
   | "template"
   | "workspace"
   | "annotation"
-  | "conversation";
+  | "conversation"
+  | "model";
 
 /** What an event acted on. */
 export interface AuditResource {

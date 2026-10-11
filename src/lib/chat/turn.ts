@@ -2,7 +2,7 @@ import { APICallError, createIdGenerator, type UIMessage } from "ai";
 import { buildDataChatPrompt, streamDataChat } from "@/lib/ai/data-chat";
 import { ModelTimeoutError } from "@/lib/ai/invoke";
 import { recordGeneration } from "@/lib/ai/log";
-import { requireModel } from "@/lib/ai/model-resolution";
+import { requireModel } from "@/lib/ai/models";
 import { providerHttpError } from "@/lib/ai/provider-error";
 import { audit } from "@/lib/audit";
 import type { Identity } from "@/lib/auth/claims";

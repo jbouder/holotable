@@ -30,19 +30,16 @@ import {
   type ModelResolutionDeps,
   openCredentials,
   prepareWrite,
-  resolveModel,
   sealCredentials,
-  workspaceModelView,
 } from "@/lib/ai/model-resolution";
+import { workspaceModelView } from "@/lib/ai/model-admin";
+import { resolveModel } from "@/lib/ai/models";
 import { providerErrorMessage } from "@/lib/ai/provider-error";
 import { auditRow } from "@/lib/audit";
 import { parseGroups } from "@/lib/auth/claims";
 import { sealRefreshToken } from "@/lib/auth/refresh-token";
-import type {
-  ModelConfigStore,
-  StoredModelConfig,
-  WorkspaceModelRecord,
-} from "@/lib/db/model-configs";
+import type { StoredModel } from "@/lib/db/models";
+import { memoryModelStore, storedModel } from "./support/models";
 import { redactString, rememberSecret } from "@/lib/log";
 import { openSecret, sealSecret } from "@/lib/secrets/seal";
 
@@ -302,43 +299,53 @@ test("a refused connection is not retried, and says why in its own words", () =>
 /* Resolution                                                                 */
 /* -------------------------------------------------------------------------- */
 
-function stored(
-  overrides: Partial<StoredModelConfig> & { model?: string } = {},
-): StoredModelConfig {
+function stored(overrides: Partial<StoredModel> & { model?: string } = {}): StoredModel {
   const { model = "ws-model", ...rest } = overrides;
-  return {
-    provider: "openai-compatible",
+  return storedModel({
     settings: { baseUrl: "https://api.example.com/v1", model, api: "chat" },
     credentials: sealCredentials({ apiKey: "sk-workspace-key-0123456789" }),
-    updatedBy: "admin",
-    updatedAt: "2026-10-07T00:00:00.000Z",
     ...rest,
-  };
+  });
 }
 
-function fakeStore(rows: {
-  workspace?: WorkspaceModelRecord | null;
-  user?: StoredModelConfig | null;
-}): ModelConfigStore {
-  return {
-    workspace: async () => rows.workspace ?? null,
-    user: async () => rows.user ?? null,
-    saveWorkspace: async () => {
-      throw new Error("not in this test");
-    },
-    saveUser: async () => {
-      throw new Error("not in this test");
-    },
-    deleteUser: async () => false,
-  };
-}
-
+/**
+ * The 017 shapes as the catalog holds them after 022's data move: the
+ * workspace's slot is a workspace model and its default, the person's slot a
+ * personal model.
+ */
 function deps(
-  rows: Parameters<typeof fakeStore>[0],
+  rows: {
+    workspace?: { allowPersonalKeys: boolean; config: StoredModel | null } | null;
+    user?: StoredModel | null;
+  },
   overrides: Partial<ModelResolutionDeps> = {},
 ): ModelResolutionDeps {
+  const models = [
+    ...(rows.workspace?.config ? [rows.workspace.config] : []),
+    ...(rows.user
+      ? [
+          {
+            ...rows.user,
+            scope: "personal" as const,
+            workspaceId: null,
+            userSub: "alice",
+          },
+        ]
+      : []),
+  ];
   return {
-    store: fakeStore(rows),
+    store: memoryModelStore({
+      models,
+      workspaces: rows.workspace
+        ? [
+            {
+              workspaceId: "w",
+              defaultModel: rows.workspace.config?.id ?? null,
+              allowPersonalKeys: rows.workspace.allowPersonalKeys,
+            },
+          ]
+        : [],
+    }),
     demo: false,
     env: {},
     allowlist: NO_ALLOWLIST,
@@ -348,8 +355,10 @@ function deps(
 
 const alice = parseGroups("alice", ["/workspaces/w/editor"]);
 const input = { identity: alice, workspaceId: "w" };
-const workspaceRow = (allowPersonalKeys: boolean, config = stored()) => ({
-  workspaceId: "w",
+const workspaceRow = (
+  allowPersonalKeys: boolean,
+  config: StoredModel | null = stored(),
+) => ({
   config,
   allowPersonalKeys,
 });
@@ -359,6 +368,7 @@ test("with nothing configured in the app, the environment answers exactly as bef
   const missing = await resolveModel(input, deps({}));
   assert.deepEqual(missing, {
     ok: false,
+    id: "env:default",
     source: "environment",
     problem:
       "No model configured. Set AI_MODEL and OPENAI_API_KEY on the server to generate with AI.",
@@ -399,7 +409,7 @@ test("a personal model is used only where the workspace allows personal keys", a
   // Allowed, with no workspace model of its own: personal, else environment.
   const envFallback = await resolveModel(
     input,
-    deps({ workspace: { workspaceId: "w", config: null, allowPersonalKeys: true } }),
+    deps({ workspace: { config: null, allowPersonalKeys: true } }),
   );
   assert.equal(envFallback.source, "environment");
 });
