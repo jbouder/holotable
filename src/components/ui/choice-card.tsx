@@ -18,13 +18,16 @@ export function ChoiceCardGroup<Value extends string>({
   value,
   onValueChange,
   labelledBy,
+  describedBy,
   className,
   children,
 }: {
   value: Value;
   onValueChange: (value: Value) => void;
-  /** The id of the visible heading that names the group (a fieldset's legend). */
+  /** The id of the visible heading that names the group. */
   labelledBy: string;
+  /** The id of a hint that says what the choice is for. */
+  describedBy?: string;
   className?: string;
   children: React.ReactNode;
 }) {
@@ -33,6 +36,7 @@ export function ChoiceCardGroup<Value extends string>({
       value={value}
       onValueChange={(next) => onValueChange(next as Value)}
       aria-labelledby={labelledBy}
+      aria-describedby={describedBy}
       className={cn("grid grid-cols-1 gap-3", className)}
     >
       {children}
