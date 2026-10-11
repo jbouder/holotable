@@ -67,54 +67,58 @@ export function AccessibleChart({
       )}
       {table.rows.length > 0 && (
         // Hidden until a keyboard tabs into its links, when it shows over the
-        // chart: a focused control must be visible (WCAG 2.4.7).
-        <table
+        // chart: a focused control must be visible (WCAG 2.4.7). The box is a
+        // div because a table ignores `sr-only`'s one-pixel width, and a wide
+        // one made the page scroll sideways (#536).
+        <div
           className={cn(
             "sr-only",
             links &&
-              "focus-within:not-sr-only focus-within:absolute focus-within:inset-0 focus-within:z-10 focus-within:block focus-within:overflow-auto focus-within:bg-surface focus-within:text-left focus-within:text-sm",
+              "focus-within:not-sr-only focus-within:absolute focus-within:inset-0 focus-within:z-10 focus-within:overflow-auto focus-within:bg-surface focus-within:text-left focus-within:text-sm",
           )}
         >
-          <caption>{table.caption}</caption>
-          <thead>
-            <tr>
-              {table.columns.map((c) => (
-                <th key={c} scope="col">
-                  {c}
-                </th>
-              ))}
-              {links && (
-                <th scope="col">
-                  <span className="sr-only">Links</span>
-                </th>
-              )}
-            </tr>
-          </thead>
-          <tbody>
-            {table.rows.map((row, i) => (
-              // Result rows have no identity, and this table is render-only.
-              // biome-ignore lint/suspicious/noArrayIndexKey: result rows have no id
-              <tr key={i}>
-                {row.map((cell, j) => (
-                  // biome-ignore lint/suspicious/noArrayIndexKey: cells are positional
-                  <td key={j} className="px-2 py-1">
-                    {cell}
-                  </td>
+          <table>
+            <caption>{table.caption}</caption>
+            <thead>
+              <tr>
+                {table.columns.map((c) => (
+                  <th key={c} scope="col">
+                    {c}
+                  </th>
                 ))}
                 {links && (
-                  <td>
-                    <RowLinks
-                      panel={panel}
-                      data={data}
-                      index={offset + i}
-                      label={row[0] ?? ""}
-                    />
-                  </td>
+                  <th scope="col">
+                    <span className="sr-only">Links</span>
+                  </th>
                 )}
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {table.rows.map((row, i) => (
+                // Result rows have no identity, and this table is render-only.
+                // biome-ignore lint/suspicious/noArrayIndexKey: result rows have no id
+                <tr key={i}>
+                  {row.map((cell, j) => (
+                    // biome-ignore lint/suspicious/noArrayIndexKey: cells are positional
+                    <td key={j} className="px-2 py-1">
+                      {cell}
+                    </td>
+                  ))}
+                  {links && (
+                    <td>
+                      <RowLinks
+                        panel={panel}
+                        data={data}
+                        index={offset + i}
+                        label={row[0] ?? ""}
+                      />
+                    </td>
+                  )}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       )}
     </div>
   );
