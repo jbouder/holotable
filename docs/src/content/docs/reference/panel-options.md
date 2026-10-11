@@ -97,13 +97,16 @@ Plus the number options and thresholds above.
 | --- | --- | --- | --- |
 | `columns` | `[{ name, label?, hidden?, format?, decimals?, unit?, compact?, align?, width? }]`, at most 50 | none | Listed columns come first, in this order, and the rest follow as the query returned them. A listed column the result lacks is skipped. |
 | `sort` | `{ column, order? }` | the query's order | `order` is `"asc"` (the default) or `"desc"`. Numbers sort as numbers, empty cells last. |
+| `limit` | whole number, 1 to 5,000 | the server's row cap | How many rows the query is asked for. Applied inside the server's own `LIMIT`, never above it ([#499](https://github.com/jbouder/holotable/issues/499)). |
 
 - `label` is the header; `hidden: true` leaves the column out.
 - `format` (`number`, `bytes`, `percent`, `ms`) and the number options write a
   numeric cell; without them a cell is shown as returned.
 - `align` is `left`, `center` or `right`; `width` is in pixels, 40 to 800.
-- Without `sort` the table shows the newest 100 rows, as before; with one, the
-  first 100 in its order.
+- The table shows every row it was sent, scrolling through them (#499). Only
+  the rows in view are drawn, so a long result costs no more to show than a
+  short one. For "the latest 50", set `limit` rather than writing `LIMIT` in
+  the SQL.
 
 The editor's **Columns** section edits names, headers, format, alignment,
 visibility and order; `width`, `decimals` and `unit` per column are edited in
@@ -279,10 +282,13 @@ Log lines, newest first
 | `wrap` | boolean | `true` | Wrap long lines, or cut them at the panel's edge. |
 | `order` | `"newest"` \| `"oldest"` | `"newest"` | Which end of the window comes first. |
 | `showTime` | boolean | `true` | Write each line's time, on the viewer's clock. |
+| `limit` | whole number, 1 to 5,000 | the server's row cap | How many lines the query is asked for, inside the server's own `LIMIT` ([#499](https://github.com/jbouder/holotable/issues/499)). |
 
 - The query returns raw rows: the time column (not bucketed), the message, a
   level if there is one, and anything else worth reading. Order by time
-  descending and `LIMIT` it; at most 500 lines are drawn.
+  descending, and set `limit` to how many lines to show. The list scrolls
+  through every line it was sent, drawing only those in view, and keeps a
+  reader's place when new lines arrive above.
 - A level without a color in `levels` takes the usual one, in any case:
   `error`, `fatal` and `critical` are `danger`, `warn` is `warning`, `info` is
   `info`, `debug` and `trace` are `neutral`. Any other level gets a color

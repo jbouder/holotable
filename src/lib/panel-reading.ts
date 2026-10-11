@@ -161,8 +161,12 @@ export function statusGrid(panel: Panel, data: PanelData): StatusGrid {
   };
 }
 
-/** The most lines a logs panel draws. */
-export const LOG_LINES_MAX = 500;
+/**
+ * The most lines a logs panel takes: the server's own row cap (#499). The
+ * list is windowed, so the panel shows every line it was sent, and a cut the
+ * server made is the panel's badge, not a footer here.
+ */
+export const LOG_LINES_MAX = 5_000;
 
 /** A level's color when the panel did not assign one. */
 const LEVEL_COLORS: Record<string, ColorToken> = {
@@ -271,8 +275,11 @@ export function logLines(
   return { lines, overflow: Math.max(0, rows.length - LOG_LINES_MAX) };
 }
 
-/** The most rows a table shows, as before options. */
-export const TABLE_ROWS_MAX = 100;
+/**
+ * The most rows a table takes: the server's own row cap (#499). The table is
+ * windowed, so it shows every row it was sent.
+ */
+export const TABLE_ROWS_MAX = 5_000;
 
 export interface TableViewColumn {
   name: string;

@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { StateColor } from "@/lib/panels/kinds/state-timeline";
+import { readOptions, RowLimit } from "@/lib/panels/presentation";
 import { definePanelKind } from "@/lib/panels/types";
 
 const Column = z.string().min(1).max(128);
@@ -25,6 +26,11 @@ export const LogsOptions = z
     order: z.enum(["newest", "oldest"]).optional(),
     /** Show each line's time (the default). */
     showTime: z.boolean().optional(),
+    /**
+     * How many lines the query is asked for (#499), inside the server's own
+     * row cap. Without it, the cap.
+     */
+    limit: RowLimit.optional(),
   })
   .strict()
   .superRefine((o, ctx) => {
@@ -48,7 +54,7 @@ export const logs = definePanelKind({
   summary:
     "Log lines: a time, a message and an optional level, newest first, each expandable to the rest of its row. Requires `query.timeField`.",
   promptHint:
-    "raw events to read (log lines, audit entries, recent errors): return the raw time column (set as 'query.timeField', no bucketing), a message column and optionally a level column, ORDER BY time DESC LIMIT 200; name them in options.message and options.level. Other columns are shown when a line is expanded.",
+    "raw events to read (log lines, audit entries, recent errors): return the raw time column (set as 'query.timeField', no bucketing), a message column and optionally a level column, ORDER BY time DESC; set options.limit (for example 200) to how many lines to show rather than writing LIMIT in the SQL; name the columns in options.message and options.level. Other columns are shown when a line is expanded.",
   promqlHint:
     "not for a Prometheus source: a PromQL result has no lines to read. Use 'table' for an instant query's series.",
   canvas: false,
@@ -57,4 +63,5 @@ export const logs = definePanelKind({
   query: "required",
   requiresTimeField: true,
   options: LogsOptions,
+  rowLimit: (options) => readOptions(LogsOptions, options).limit,
 });

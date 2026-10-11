@@ -49,6 +49,11 @@ export interface PlanInput {
   rowFilter: RowFilterBinding | null;
   /** Values already checked against what the dashboard allows (#67). */
   variables?: VariableValues;
+  /**
+   * The rows the panel asks for (#499), from its options; the plan clamps it
+   * to the guard's own cap. Absent asks for the cap.
+   */
+  maxRows?: number;
 }
 
 export interface ServerSourceKind {

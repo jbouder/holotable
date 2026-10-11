@@ -1,3 +1,4 @@
+import { panelRowLimit } from "@/lib/panels/registry";
 import { getHeapStatistics } from "node:v8";
 import {
   type Dashboard,
@@ -259,6 +260,8 @@ export function makePanelExecutor(
         // added since the poller started applies at once.
         rowFilter: rowFilterInScope(source, scope),
         variables,
+        // A table or logs panel that wants fewer rows asks for fewer (#499).
+        maxRows: panelRowLimit(panel),
       });
     } catch (err) {
       if (err instanceof RowFilterDenied) {

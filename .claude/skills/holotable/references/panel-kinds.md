@@ -68,7 +68,9 @@ unless the rows are per time bucket.
 Options: `columns` (up to 50 entries `{ name, label, hidden, format, decimals,
 unit, compact, align: "left"|"center"|"right", width: 40–800 }`; listed columns
 come first, in order, and each name once), `sort` (`{ column, order:
-"asc"|"desc" }`).
+"asc"|"desc" }`), `limit` (1–5,000: how many rows the query is asked for; use it
+for "the latest N" instead of a SQL `LIMIT`). Every row sent is shown; the
+table scrolls.
 
 With PromQL: an instant query; one row per series, a column per label, then `value`.
 
@@ -164,16 +166,17 @@ With PromQL: an instant query over a classic histogram's buckets, `sum by (le) (
 
 Raw events to read: log lines, audit entries, recent errors. Return the raw
 time column (no bucketing) as `query.timeField`, a message column and,
-optionally, a level column, `ORDER BY ts DESC LIMIT 200`. Lines are shown
-newest first; every other column is shown when a line is expanded.
-Requires `query.timeField`. At most 500 lines are drawn. Filter by level in the SQL,
+optionally, a level column, `ORDER BY ts DESC`, with `options.limit` (say 200)
+for how many lines rather than a SQL `LIMIT`. Lines are shown newest first;
+every other column is shown when a line is expanded.
+Requires `query.timeField`. Every line sent is shown; the list scrolls. Filter by level in the SQL,
 with a variable for a picker (`WHERE level = ANY(:level)`).
 
 Options: `message` (default the longest text column), `level` (the level
 column; default one named `level` or `severity`), `levels` (up to 20 `{ state, color }` pairs; without one, `error` and
 `fatal` are `danger`, `warn` is `warning`, `info` is `info`, `debug` is
 `neutral`), `wrap` (default `true`), `order` (`"newest"`, the default, or
-`"oldest"`), `showTime` (default `true`).
+`"oldest"`), `showTime` (default `true`), `limit` (1–5,000).
 
 With PromQL: not for a Prometheus source; a PromQL result has no lines. Use `table` for an instant query's series.
 

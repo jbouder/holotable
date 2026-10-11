@@ -15,7 +15,7 @@ import { withOptions } from "@/lib/panel-options";
 import { COLOR_TOKENS, tokenHex } from "@/lib/panels/colors";
 import { PRESENTATION_GUIDE } from "@/lib/ai/generate";
 import { OPTION_GROUPS } from "@/lib/panels/presentation";
-import { PANEL_KINDS } from "@/lib/panels/registry";
+import { PANEL_KINDS, panelRowLimit } from "@/lib/panels/registry";
 import { DEFAULT_CHART_THEME } from "@/lib/color/chart-theme";
 import { LOCAL_TIME_DISPLAY } from "@/lib/time-display";
 
@@ -142,8 +142,9 @@ test("a panel without options draws exactly as before", () => {
       ["b", "b"],
     ],
   );
-  assert.equal(table.rows.length, TABLE_ROWS_MAX);
-  assert.equal(table.rows[0].a, 50, "the newest rows, as before");
+  // Every row the panel was sent (#499): the table is windowed, not capped.
+  assert.equal(table.rows.length, Math.min(rows.length, TABLE_ROWS_MAX));
+  assert.equal(table.rows[0].a, 0, "in the result's order");
   assert.equal(table.columns[0].text(1234.5678), "1234.5678", "cells as returned");
 });
 
@@ -356,4 +357,19 @@ test("a stat's number takes the theme's status token, so it reads in both themes
     createElement(StatView, { panel: stat, data: { columns: ["v"], rows: [{ v: 3 }] } }),
   );
   assert.match(html, /color:var\(--warning\)/);
+});
+
+test("a table or logs panel's limit is the rows its query asks for, and no other kind has one", () => {
+  // #499: the plan reads it through the registry, never by kind name.
+  assert.equal(panelRowLimit(Panel.parse(panel("table", { limit: 50 }))), 50);
+  assert.equal(panelRowLimit(Panel.parse(panel("logs", { limit: 200 }))), 200);
+  assert.equal(
+    panelRowLimit(Panel.parse(panel("table"))),
+    undefined,
+    "no limit is the cap",
+  );
+  assert.equal(panelRowLimit(Panel.parse(panel("line"))), undefined);
+  // Above the server's cap is refused by the IR, not clamped quietly.
+  assert.notDeepEqual(issues(panel("table", { limit: 50_000 })), []);
+  assert.notDeepEqual(issues(panel("line", { limit: 50 })), [], "a chart takes no limit");
 });
