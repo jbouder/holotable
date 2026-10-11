@@ -75,7 +75,7 @@ export function setTheme(theme: Theme) {
  * page.
  */
 
-/** Every name a palette may have, shipped or reserved for a later phase. */
+/** The built-in palettes' names. */
 export const PALETTES = [
   "holotable",
   "graphite",
@@ -83,7 +83,15 @@ export const PALETTES = [
   "paper",
   "high-contrast",
 ] as const;
-export type Palette = (typeof PALETTES)[number];
+export type BuiltinPalette = (typeof PALETTES)[number];
+/**
+ * A palette's name: a built-in one, or the operator's own from `THEME_FILE`
+ * (#508), whose name is checked against {@link PALETTE_NAME} when it loads.
+ */
+export type Palette = string;
+
+/** What a palette may be called: also all an operator's theme name may be. */
+export const PALETTE_NAME = /^[a-z][a-z0-9-]{1,31}$/;
 
 export const PALETTE_STORAGE_KEY = "palette";
 
@@ -106,9 +114,8 @@ export interface PaletteInfo {
 }
 
 /**
- * The palettes with CSS in `globals.css`, in the order the controls list
- * them. A reserved name not listed here is never offered, and stored or
- * configured falls back to the default.
+ * The built-in palettes, with CSS in `globals.css`, in the order the controls
+ * list them. {@link paletteInfo} adds the operator's, when there is one.
  */
 export const PALETTE_INFO: readonly PaletteInfo[] = [
   {
@@ -139,8 +146,58 @@ export const PALETTE_INFO: readonly PaletteInfo[] = [
   },
 ];
 
+/**
+ * The operator's theme (#508), as the controls offer it. The server sets it
+ * from `THEME_FILE` before it renders; the browser reads the same entry from
+ * `<html data-operator-palette>`, which the root layout writes, so a server
+ * render and the page it hydrates list the same themes.
+ */
+let operatorPalette: PaletteInfo | null = null;
+let operatorRead = false;
+
+export const OPERATOR_PALETTE_ATTRIBUTE = "data-operator-palette";
+
+export function registerOperatorPalette(info: PaletteInfo | null): void {
+  operatorPalette = info;
+  operatorRead = true;
+}
+
+/** An operator entry as the layout serializes it, checked again on the way in. */
+export function parseOperatorPalette(
+  value: string | null | undefined,
+): PaletteInfo | null {
+  if (!value) return null;
+  try {
+    const v = JSON.parse(value) as Partial<PaletteInfo>;
+    if (
+      typeof v.name !== "string" ||
+      !PALETTE_NAME.test(v.name) ||
+      (PALETTES as readonly string[]).includes(v.name) ||
+      typeof v.label !== "string" ||
+      typeof v.description !== "string"
+    ) {
+      return null;
+    }
+    return { name: v.name, label: v.label, description: v.description };
+  } catch {
+    return null;
+  }
+}
+
+/** Every palette the app offers: the built-ins, then the operator's. */
+export function paletteInfo(): readonly PaletteInfo[] {
+  if (!operatorRead && typeof document !== "undefined") {
+    registerOperatorPalette(
+      parseOperatorPalette(
+        document.documentElement.getAttribute(OPERATOR_PALETTE_ATTRIBUTE),
+      ),
+    );
+  }
+  return operatorPalette ? [...PALETTE_INFO, operatorPalette] : PALETTE_INFO;
+}
+
 export function isPalette(value: string | null | undefined): value is Palette {
-  return PALETTE_INFO.some((p) => p.name === value);
+  return paletteInfo().some((p) => p.name === value);
 }
 
 /** The stored palette, or `fallback` when none is stored or it is not shipped. */

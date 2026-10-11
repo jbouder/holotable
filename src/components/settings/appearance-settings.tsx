@@ -11,7 +11,7 @@ import { useMotionPreference } from "@/components/motion-preference";
 import type { Motion } from "@/lib/motion";
 import { ThemePreview } from "@/components/settings/theme-preview";
 import { ChoiceCard, ChoiceCardGroup } from "@/components/ui/choice-card";
-import { type Palette, PALETTE_INFO, type Theme } from "@/lib/theme";
+import { type Palette, paletteInfo, type Theme } from "@/lib/theme";
 
 const MOTION_OPTIONS: { value: Motion; label: string; hint: string }[] = [
   {
@@ -180,7 +180,7 @@ export function AppearanceSettings({ chartPatterns }: { chartPatterns: boolean }
       </Group>
 
       {/* The named themes (#503), each drawn in the chosen scheme (#507). */}
-      {PALETTE_INFO.length > 1 && (
+      {paletteInfo().length > 1 && (
         <Group
           legend="Theme"
           hint="The colors the app is drawn in. Each is shown in the color scheme above."
@@ -192,7 +192,7 @@ export function AppearanceSettings({ chartPatterns }: { chartPatterns: boolean }
               labelledBy={labelledBy}
               className="sm:grid-cols-2 lg:grid-cols-3"
             >
-              {PALETTE_INFO.map((p) => (
+              {paletteInfo().map((p) => (
                 <ChoiceCard
                   key={p.name}
                   value={p.name}

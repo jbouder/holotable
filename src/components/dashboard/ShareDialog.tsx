@@ -11,7 +11,7 @@ import { Input, Label, Textarea } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { ThemePreview } from "@/components/settings/theme-preview";
 import { withEmbedAppearance } from "@/lib/embed-appearance";
-import { isPalette, isTheme, type Palette, PALETTE_INFO, THEMES } from "@/lib/theme";
+import { isPalette, isTheme, type Palette, paletteInfo, THEMES } from "@/lib/theme";
 import { type ApiError, apiErrorFromThrown, readApiError } from "@/lib/errors";
 import type { TimeRange } from "@/lib/ir";
 import { describeIssue } from "@/lib/panel-options";
@@ -35,9 +35,9 @@ const SCHEME_LABELS = {
 
 /** The theme this page is drawn in, for the preview of "Default". */
 function shownPalette(): Palette {
-  if (typeof document === "undefined") return PALETTE_INFO[0].name;
+  if (typeof document === "undefined") return paletteInfo()[0].name;
   const shown = document.documentElement.dataset.palette;
-  return isPalette(shown) ? shown : PALETTE_INFO[0].name;
+  return isPalette(shown) ? shown : paletteInfo()[0].name;
 }
 
 export function ShareDialog({
@@ -234,7 +234,7 @@ export function ShareDialog({
               onValueChange={setLinkPalette}
               options={[
                 { value: "default", label: "Default" },
-                ...PALETTE_INFO.map((p) => ({ value: p.name, label: p.label })),
+                ...paletteInfo().map((p) => ({ value: p.name, label: p.label })),
               ]}
             />
           </div>

@@ -4,7 +4,7 @@ import {
   DEFAULT_PALETTE,
   DEFAULT_THEME,
   type Palette,
-  PALETTE_INFO,
+  paletteInfo,
   PALETTE_STORAGE_KEY,
   THEME_STORAGE_KEY,
 } from "@/lib/theme";
@@ -28,7 +28,7 @@ export function bootstrapScript(
   // which `validateConfig` has already held to the shipped list. An embed's
   // link may pin either choice (#509); a pinned one is not read from storage.
   // Both are validated names from a closed list, so each is a constant here.
-  const shipped = JSON.stringify(PALETTE_INFO.map((p) => p.name));
+  const shipped = JSON.stringify(paletteInfo().map((p) => p.name));
   const scheme = pinned.scheme
     ? `var p=${JSON.stringify(pinned.scheme)};`
     : `var p=localStorage.getItem(${JSON.stringify(THEME_STORAGE_KEY)});`;

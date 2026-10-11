@@ -1180,7 +1180,8 @@ test("THEME_DEFAULT_PALETTE must name a shipped theme", () => {
     );
     assert.deepEqual(errors(ok), [], formatConfigProblems(ok));
   }
-  // A name the app does not ship is refused like a typo.
+  // A name the app does not ship is refused like a typo, unless a THEME_FILE
+  // may supply it (#508), which the startup check then holds to the file.
   for (const value of ["foo", "neon", "Holotable"]) {
     const bad = validateConfig(
       { ...VALID_PRODUCTION, THEME_DEFAULT_PALETTE: value },
@@ -1188,4 +1189,53 @@ test("THEME_DEFAULT_PALETTE must name a shipped theme", () => {
     );
     assert.deepEqual(variables(errors(bad)), ["THEME_DEFAULT_PALETTE"]);
   }
+});
+
+test("THEME_FILE: unreadable, malformed and below the bar each stop a production boot", async () => {
+  // #508
+  const { mkdtempSync, writeFileSync } = await import("node:fs");
+  const { tmpdir } = await import("node:os");
+  const { join } = await import("node:path");
+  const { validateThemeFile } = await import("@/lib/startup");
+  const { exportTheme } = await import("../scripts/themes-export");
+  const css = readFileSync(new URL("../src/app/globals.css", import.meta.url), "utf8");
+  const dir = mkdtempSync(join(tmpdir(), "theme-file-"));
+  const write = (name: string, body: unknown) => {
+    const path = join(dir, name);
+    writeFileSync(path, typeof body === "string" ? body : JSON.stringify(body));
+    return path;
+  };
+  const good = exportTheme(css, "graphite", "acme");
+  const check = (path: string, production = true, extra: Record<string, string> = {}) =>
+    validateThemeFile({ THEME_FILE: path, ...extra }, production);
+
+  assert.deepEqual(check(write("good.json", good)), []);
+  // The file's own name is a valid default, and only with the file.
+  assert.deepEqual(
+    check(write("good2.json", good), true, { THEME_DEFAULT_PALETTE: "acme" }),
+    [],
+  );
+  assert.deepEqual(
+    variables(check(write("good3.json", good), true, { THEME_DEFAULT_PALETTE: "other" })),
+    ["THEME_DEFAULT_PALETTE"],
+  );
+
+  const missing = check(join(dir, "nope.json"));
+  assert.equal(missing[0]?.severity, "error");
+  assert.match(missing[0]?.message ?? "", /could not be read/);
+
+  const badToken = check(
+    write("bad.json", { ...good, dark: { ...good.dark, muted: "grey" } }),
+  );
+  assert.equal(badToken[0]?.severity, "error");
+  assert.match(badToken[0]?.message ?? "", /dark\.muted/);
+
+  const dim = { ...good, light: { ...good.light, muted: "oklch(0.62 0.006 70)" } };
+  const failing = check(write("dim.json", dim));
+  assert.ok(failing.every((p) => p.severity === "error"));
+  assert.ok(failing.some((p) => /muted on (bg-)?surface-2, light/.test(p.message)));
+  // In development the same file warns and loads nothing.
+  const dev = check(write("dim2.json", dim), false);
+  assert.ok(dev.length > 0 && dev.every((p) => p.severity === "warning"));
+  assert.match(dev[0]?.message ?? "", /not loaded/);
 });

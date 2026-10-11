@@ -1,4 +1,11 @@
-import { DEFAULT_PALETTE, isPalette, PALETTE_INFO, type Palette } from "@/lib/theme";
+import {
+  DEFAULT_PALETTE,
+  isPalette,
+  PALETTE_INFO,
+  PALETTE_NAME,
+  type Palette,
+  PALETTES,
+} from "@/lib/theme";
 import { z } from "zod";
 import {
   CLAIM_NAME,
@@ -347,14 +354,17 @@ export const config = {
    */
   authMode: (process.env.AUTH_MODE === "demo" ? "demo" : "oidc") as AuthMode,
   /**
-   * The named theme a browser shows before its person picks one (#503).
-   * A name the app does not ship is refused at boot by `validateConfig`, and
-   * reads as `holotable` here. Server-only: the root layout renders it onto
-   * `<html>` and into the first-paint script.
+   * The named theme a browser shows before its person picks one (#503): a
+   * built-in theme, or the one `THEME_FILE` loads (#508). A name the app does
+   * not offer is refused at boot, and reads as `holotable` here. Read when
+   * used, after the operator's theme has registered. Server-only: the root
+   * layout renders it onto `<html>` and into the first-paint script.
    */
-  themeDefaultPalette: (isPalette(process.env.THEME_DEFAULT_PALETTE)
-    ? process.env.THEME_DEFAULT_PALETTE
-    : DEFAULT_PALETTE) as Palette,
+  get themeDefaultPalette(): Palette {
+    return isPalette(process.env.THEME_DEFAULT_PALETTE)
+      ? process.env.THEME_DEFAULT_PALETTE
+      : DEFAULT_PALETTE;
+  },
   /**
    * The groups every demo visitor's session carries, in the same
    * `/workspaces/{id}/{role}` form as a Keycloak `groups` claim, parsed by the
@@ -630,10 +640,11 @@ const EnvSchema = z.object({
   ),
   DEMO_GROUPS: blank(z.string()),
   THEME_DEFAULT_PALETTE: blank(
-    z.string().refine(isPalette, {
-      message: `must be a theme the app ships: ${PALETTE_INFO.map((p) => p.name).join(", ")}`,
-    }),
+    z
+      .string()
+      .regex(PALETTE_NAME, "must be a theme's name: lowercase letters, digits, dashes"),
   ),
+  THEME_FILE: blank(z.string().startsWith("/", "must be an absolute path")),
   ROW_FILTER_CLAIMS: blank(z.string()),
   ALLOWED_ORIGINS: blank(z.string()),
 
@@ -734,6 +745,20 @@ export function validateConfig(
   // once (for its shape) rather than twice.
   const values: Partial<Env> = parsed.success ? parsed.data : partialParse(env);
   const demo = values.AUTH_MODE === "demo";
+
+  // --- Themes -------------------------------------------------------------
+  // A default that is not built in must be the operator's own, which only
+  // `THEME_FILE` can supply; src/lib/startup.ts checks it names that file.
+  if (
+    values.THEME_DEFAULT_PALETTE &&
+    !(PALETTES as readonly string[]).includes(values.THEME_DEFAULT_PALETTE) &&
+    !values.THEME_FILE
+  ) {
+    error(
+      "THEME_DEFAULT_PALETTE",
+      `must be a theme the app ships (${PALETTE_INFO.map((p) => p.name).join(", ")}), or the name in THEME_FILE.`,
+    );
+  }
 
   // --- Config store -------------------------------------------------------
   if (!values.DATABASE_URL) {

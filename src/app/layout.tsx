@@ -23,6 +23,9 @@ import {
 } from "@/lib/security-headers";
 import { NO_EMBED_APPEARANCE, readEmbedAppearanceHeader } from "@/lib/embed-appearance";
 import { bootstrapScript } from "@/lib/bootstrap";
+import { themeCss, themeFileInfo } from "@/lib/color/theme-file";
+import { operatorTheme } from "@/lib/operator-theme";
+import { OPERATOR_PALETTE_ATTRIBUTE } from "@/lib/theme";
 
 const fontSans = Chakra_Petch({
   subsets: ["latin"],
@@ -53,6 +56,9 @@ export default async function RootLayout({
   // A share link's embed page (#65): no navigation, account, banner or
   // palette, and no session read at all. The proxy sets this and strips it
   // from any request that sent it itself.
+  // The operator's theme (#508), loaded once; it registers with the theme
+  // controls before anything below asks which themes exist.
+  const operator = operatorTheme();
   const embed = requestHeaders.get(EMBED_REQUEST_HEADER) === "1";
   // An embed's link may pin its theme and scheme (#509), read back validated.
   const pinned = embed
@@ -89,6 +95,11 @@ export default async function RootLayout({
       className={`h-full antialiased ${embed ? "" : "scroll-pt-14"} ${fontSans.variable} ${fontMono.variable}`}
       data-theme={pinned.scheme === "light" ? "light" : "dark"}
       data-palette={pinned.palette ?? config.themeDefaultPalette}
+      {...{
+        [OPERATOR_PALETTE_ATTRIBUTE]: operator
+          ? JSON.stringify(themeFileInfo(operator))
+          : undefined,
+      }}
       suppressHydrationWarning
     >
       <head>
@@ -104,6 +115,18 @@ export default async function RootLayout({
           attribute reads as "" after parsing), so React would report a
           mismatch on hydration; that is expected, not a bug.
         */}
+        {/*
+          The operator's theme (#508): two blocks of `--token: value`, written
+          from the file's parsed numbers by themeCss, never from its text, and
+          stamped with the nonce like the script below.
+        */}
+        {operator && (
+          <style
+            nonce={nonce}
+            // biome-ignore lint/security/noDangerouslySetInnerHtml: generated from parsed numbers only
+            dangerouslySetInnerHTML={{ __html: themeCss(operator) }}
+          />
+        )}
         <script
           nonce={nonce}
           suppressHydrationWarning
