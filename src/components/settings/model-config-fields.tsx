@@ -8,20 +8,17 @@ import { Input, Label } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { apiErrorFromThrown, readApiError } from "@/lib/errors";
 import {
+  credentialsNoun,
   describeKey,
+  emptyDraft,
   inputFromDraft,
   type KeyState,
-  MODEL_CONFIG_LIMITS,
   type ModelConfigDraft,
   type ModelConfigInput,
-  type OpenAiApi,
 } from "@/lib/ai/model-config";
 import type { ModelTestResult } from "@/lib/ai/model-test-result";
-
-const API_OPTIONS = [
-  { value: "responses", label: "Responses API (/responses)" },
-  { value: "chat", label: "Chat Completions (/chat/completions)" },
-];
+import { providerKind, selectableKinds } from "@/lib/ai/providers/registry";
+import type { ProviderField } from "@/lib/ai/providers/types";
 
 type TestStatus =
   | { kind: "idle" }
@@ -30,11 +27,13 @@ type TestStatus =
   | { kind: "error"; message: string };
 
 /**
- * The fields of one OpenAI-compatible model configuration (#331), shared by
- * the workspace and personal settings pages, with "Test connection". The key
- * field is write-only: it starts empty whatever is stored, and blank keeps
- * the stored key. `testBody` wraps the input in what the page's test route
- * expects.
+ * The fields of one model configuration (#331, #438), shared by the
+ * workspace and personal settings pages, with "Test connection": a provider
+ * select over the registry's kinds, then the fields the chosen kind draws.
+ * Credentials fields are write-only: they start empty whatever is stored,
+ * and blank keeps the stored ones. `testBody` wraps the input in what the
+ * page's test route expects. `allowStub` lists the recorded model, which the
+ * server accepts only outside production or for the end-to-end suite.
  */
 export function ModelConfigFields({
   draft,
@@ -43,18 +42,26 @@ export function ModelConfigFields({
   testUrl,
   testBody,
   disabled,
+  allowStub = false,
 }: {
   draft: ModelConfigDraft;
-  onChange: (patch: Partial<ModelConfigDraft>) => void;
+  onChange: (next: ModelConfigDraft) => void;
   storedKey: KeyState | undefined;
   /** Null hides "Test connection", when there is nowhere to admit the call. */
   testUrl: string | null;
   testBody: (input: ModelConfigInput) => unknown;
   disabled?: boolean;
+  allowStub?: boolean;
 }) {
   const id = React.useId();
   const [test, setTest] = React.useState<TestStatus>({ kind: "idle" });
+  const kind = providerKind(draft.provider);
   const hasKey = storedKey?.state === "set" || storedKey?.state === "unreadable";
+  const noun = credentialsNoun(kind);
+  const providers = selectableKinds(!allowStub).map((k) => ({
+    value: k.kind,
+    label: k.label,
+  }));
 
   async function runTest() {
     const built = inputFromDraft(draft);
@@ -80,91 +87,126 @@ export function ModelConfigFields({
     }
   }
 
-  const change = (patch: Partial<ModelConfigDraft>) => {
+  const change = (next: ModelConfigDraft) => {
     setTest({ kind: "idle" });
-    onChange(patch);
+    onChange(next);
   };
+
+  const setField = (field: ProviderField, value: string) =>
+    change({ ...draft, [field.in]: { ...draft[field.in], [field.name]: value } });
+
+  const chooseProvider = (provider: string) => {
+    // A new kind starts empty, but keeps the model id typed so far.
+    const next = emptyDraft(provider);
+    if ("model" in next.settings) next.settings.model = draft.settings.model ?? "";
+    change(next);
+  };
+
+  const credentialsField = kind?.fields.find((f) => f.in === "credentials");
 
   return (
     <div className="space-y-4">
-      <p className="text-xs text-muted">
-        Any endpoint that speaks the OpenAI API: OpenAI, OpenRouter, Groq, Together,
-        Ollama, vLLM, LM Studio.
-      </p>
       <div className="grid gap-4 sm:grid-cols-2">
-        <div>
-          <Label htmlFor={`${id}-base`}>Base URL</Label>
-          <Input
-            id={`${id}-base`}
-            type="url"
-            inputMode="url"
-            autoComplete="off"
-            spellCheck={false}
-            disabled={disabled}
-            maxLength={MODEL_CONFIG_LIMITS.baseUrl}
-            placeholder="https://openrouter.ai/api/v1"
-            value={draft.baseUrl}
-            onChange={(e) => change({ baseUrl: e.target.value })}
-          />
-        </div>
-        <div>
-          <Label htmlFor={`${id}-model`}>Model</Label>
-          <Input
-            id={`${id}-model`}
-            autoComplete="off"
-            spellCheck={false}
-            disabled={disabled}
-            maxLength={MODEL_CONFIG_LIMITS.model}
-            placeholder="openai/gpt-4o-mini"
-            value={draft.model}
-            onChange={(e) => change({ model: e.target.value })}
-          />
-        </div>
-        <div>
-          <Label htmlFor={`${id}-api`}>API</Label>
+        <div className="sm:col-span-2">
+          <Label htmlFor={`${id}-provider`}>Provider</Label>
           <Select
-            id={`${id}-api`}
-            className="w-full"
+            id={`${id}-provider`}
+            className="w-full sm:w-80"
             disabled={disabled}
-            value={draft.api}
-            options={API_OPTIONS}
-            onValueChange={(v) => change({ api: v as OpenAiApi })}
+            value={draft.provider}
+            options={providers}
+            onValueChange={chooseProvider}
           />
+          {kind && <p className="mt-1 text-xs text-muted">{kind.description}</p>}
         </div>
-        <div>
-          <Label htmlFor={`${id}-key`}>API key</Label>
-          <Input
-            id={`${id}-key`}
-            type="password"
-            autoComplete="new-password"
-            spellCheck={false}
-            disabled={disabled || draft.clearKey}
-            maxLength={MODEL_CONFIG_LIMITS.apiKey}
-            placeholder={hasKey ? "Leave blank to keep the stored key" : "sk-…"}
-            value={draft.apiKey}
-            onChange={(e) => change({ apiKey: e.target.value })}
-            aria-describedby={`${id}-key-state`}
-          />
-          <p
-            id={`${id}-key-state`}
-            className={
-              storedKey?.state === "unreadable"
-                ? "mt-1 text-xs text-warning"
-                : "mt-1 text-xs text-muted"
-            }
-          >
-            {describeKey(storedKey)} Never shown again after it is saved.
-          </p>
-          {hasKey && (
-            <Checkbox
-              className="mt-2"
-              disabled={disabled}
-              checked={draft.clearKey}
-              onCheckedChange={(clearKey) => change({ clearKey, apiKey: "" })}
-              label="Remove the stored key (for an endpoint that needs none)"
-            />
-          )}
-        </div>
+        {kind?.fields.map((field) => {
+          const fieldId = `${id}-${field.in}-${field.name}`;
+          const value =
+            (field.in === "settings" ? draft.settings : draft.credentials)[field.name] ??
+            "";
+          const describedBy =
+            field === credentialsField
+              ? `${id}-key-state`
+              : field.help
+                ? `${fieldId}-help`
+                : undefined;
+          return (
+            <div key={fieldId}>
+              <Label htmlFor={fieldId}>
+                {field.label}
+                {field.optional && <span className="text-muted"> (optional)</span>}
+              </Label>
+              {field.input === "select" ? (
+                <Select
+                  id={fieldId}
+                  className="w-full"
+                  disabled={disabled}
+                  value={value}
+                  options={[...(field.options ?? [])]}
+                  onValueChange={(v) => setField(field, v)}
+                />
+              ) : (
+                <Input
+                  id={fieldId}
+                  type={
+                    field.secret ? "password" : field.input === "url" ? "url" : "text"
+                  }
+                  inputMode={field.input === "url" ? "url" : undefined}
+                  autoComplete={field.secret ? "new-password" : "off"}
+                  spellCheck={false}
+                  disabled={
+                    disabled || (field.in === "credentials" && draft.clearCredentials)
+                  }
+                  maxLength={field.maxLength}
+                  placeholder={
+                    field.in === "credentials" && hasKey
+                      ? `Leave blank to keep the stored ${noun}`
+                      : field.placeholder
+                  }
+                  value={value}
+                  onChange={(e) => setField(field, e.target.value)}
+                  aria-describedby={describedBy}
+                />
+              )}
+              {field.help && (
+                <p id={`${fieldId}-help`} className="mt-1 text-xs text-muted">
+                  {field.help}
+                </p>
+              )}
+              {field === credentialsField && (
+                <>
+                  <p
+                    id={`${id}-key-state`}
+                    className={
+                      storedKey?.state === "unreadable"
+                        ? "mt-1 text-xs text-warning"
+                        : "mt-1 text-xs text-muted"
+                    }
+                  >
+                    {describeKey(storedKey, noun)} Never shown again after it is saved.
+                  </p>
+                  {hasKey && (
+                    <Checkbox
+                      className="mt-2"
+                      disabled={disabled}
+                      checked={draft.clearCredentials}
+                      onCheckedChange={(clearCredentials) =>
+                        change({
+                          ...draft,
+                          clearCredentials,
+                          credentials: Object.fromEntries(
+                            Object.keys(draft.credentials).map((k) => [k, ""]),
+                          ),
+                        })
+                      }
+                      label={`Remove the stored ${noun} (for an endpoint that needs none)`}
+                    />
+                  )}
+                </>
+              )}
+            </div>
+          );
+        })}
       </div>
       {testUrl && (
         <div className="flex flex-wrap items-center gap-3">
@@ -183,7 +225,7 @@ export function ModelConfigFields({
           <p role="status" className="text-xs">
             {test.kind === "done" && test.result.ok && (
               <span className="fade-in text-success">
-                Connected: {test.result.model || draft.model} answered in{" "}
+                Connected: {test.result.model || draft.settings.model} answered in{" "}
                 {test.result.latencyMs} ms.
               </span>
             )}

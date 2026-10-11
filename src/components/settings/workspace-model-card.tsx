@@ -23,17 +23,19 @@ type Status =
   | { kind: "error"; message: string };
 
 /**
- * One workspace's model (#331), for a source-admin: its own OpenAI-compatible
- * endpoint or the server's, and whether people may use their own key here.
+ * One workspace's model (#331), for a source-admin: its own model, of any
+ * provider kind (#438), or the server's, and whether people may use their own key here.
  * `serverModel` is the environment's model id, for the line that says what a
  * generation here will use.
  */
 export function WorkspaceModelCard({
   initial,
   serverModel,
+  allowStub = false,
 }: {
   initial: WorkspaceModelView;
   serverModel: string;
+  allowStub?: boolean;
 }) {
   const display = useTimeDisplay();
   const base = `/api/workspaces/${encodeURIComponent(initial.workspaceId)}/model`;
@@ -119,13 +121,14 @@ export function WorkspaceModelCard({
           {useOwn && (
             <ModelConfigFields
               draft={draft}
-              onChange={(patch) => {
-                setDraft((d) => ({ ...d, ...patch }));
+              onChange={(next) => {
+                setDraft(next);
                 touch();
               }}
               storedKey={view.config?.key}
               testUrl={`${base}/test`}
               testBody={(input) => input}
+              allowStub={allowStub}
             />
           )}
           <Checkbox

@@ -35,14 +35,35 @@ refuses with a `503` naming the fix. It never falls through to the next level,
 which may be billed to someone else. The settings pages and every prompt box
 say which level a generation in that workspace uses.
 
-A configuration is an **OpenAI-compatible** endpoint: base URL, model id, API
-key, and the Responses or Chat Completions switch (`OPENAI_API` above). That
-covers OpenAI, OpenRouter, Groq, Together, Ollama, vLLM, LM Studio and
-anything else that speaks the OpenAI API. Native providers are a follow-up;
-the stored row names its provider and keeps its settings as JSON, so adding
-one needs no migration. "Test connection" makes one minimal model call with
-what is in the form, admitted by the workspace's rate limit and budget like a
-generation.
+A configuration names a **provider kind** and that kind's settings
+([#438](https://github.com/jbouder/holotable/issues/438)). The kinds are a
+registry (`src/lib/ai/providers/registry.ts`), one module per kind, so a new
+vendor is a new module and needs no migration: the stored row names its
+provider and keeps its settings as JSON.
+
+| Kind | What it talks to | Settings beyond the model id | Credentials | Where requests go |
+|---|---|---|---|---|
+| `openai-compatible` | Any endpoint that speaks the OpenAI API: OpenRouter, Groq, Together, Ollama, vLLM, LM Studio | Base URL; Responses or Chat Completions | API key, optional | The typed base URL, held to the [base URL guard](#the-base-url-guard) |
+| `openai` | OpenAI | | API key | `api.openai.com` |
+| `anthropic` | Anthropic (Claude) | | API key | `api.anthropic.com` |
+| `google` | Google Gemini (AI Studio key) | | API key | `generativelanguage.googleapis.com` |
+| `gateway` | The Vercel AI Gateway; the model is `provider/model` | | API key | `ai-gateway.vercel.sh` |
+| `azure` | Azure OpenAI; the model is the deployment name | Resource name; API version (optional); Responses or Chat Completions | API key | `<resource>.openai.azure.com` |
+| `bedrock` | Amazon Bedrock | Region | Access key ID, secret access key, session token (optional) | `bedrock-runtime.<region>.amazonaws.com` |
+| `mistral` | Mistral | | API key | `api.mistral.ai` |
+| `xai` | xAI (Grok) | | API key | `api.x.ai` |
+| `stub` | Recorded answers, no network; for the end-to-end suite | | none | nowhere; refused in production unless `AI_STUB_IN_PRODUCTION=true` |
+
+Only `openai-compatible` has a base URL a person types. Every other kind's
+host is the vendor's own, derived at most from a resource name or region
+that must be a single DNS label, and every request is held to that origin
+with no redirect followed. The credentials and the vendor's URL are always
+passed to the vendor's SDK explicitly, so a stored model never falls back
+to the server's own `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`,
+`AWS_BEARER_TOKEN_BEDROCK` or `*_BASE_URL`. Credentials from a cloud
+identity (Bedrock instance roles, Azure Entra) are not supported. "Test
+connection" makes one minimal model call with what is in the form, admitted
+by the workspace's rate limit and budget like a generation.
 
 Which level answered is recorded on every generation log row
 (`modelConfig`) and on the `dashboard.generate`, `source.draft` and
@@ -51,20 +72,25 @@ per-workspace budget apply whichever level is used. Both levels are off in
 [demo mode](/admin/demo-mode/): the settings sections are not listed and
 the routes refuse.
 
-### The API key
+### Credentials
 
 - Sealed at rest with AES-256-GCM under a key derived from `SESSION_SECRET`
   by HKDF with its own label (`src/lib/secrets/seal.ts`), the same
   arrangement as the refresh token. A row edited in the database fails to
-  open rather than yielding a different key.
-- **Write-only.** No route returns it. A settings page shows whether one is
-  stored and, for a key of 16 characters or more, its last four characters.
-  A blank key field keeps the stored key; "Remove the stored key" clears it,
-  for an endpoint that needs none.
-- Kept only for the **same origin**. Changing the base URL to a different
-  host requires entering the key again, so a stored key cannot be redirected
-  to a host its owner never chose.
-- Never in a log line, the generation log or an audit row: each key is
+  open rather than yielding a different key. A lone API key is sealed as the
+  key itself, and anything else (a Bedrock key pair) as a JSON object; a row
+  sealed before [#438](https://github.com/jbouder/holotable/issues/438)
+  reads as an API key, so nothing is re-sealed.
+- **Write-only.** No route returns them. A settings page shows whether any
+  are stored and, for a first secret of 16 characters or more, its last four
+  characters. Blank fields keep the stored credentials; "Remove the stored
+  key" clears them, for an endpoint that needs none. A kind with several
+  fields takes them all at once.
+- Kept only while requests go to the **same origin**. Changing the provider,
+  the base URL's host, an Azure resource or an AWS region requires entering
+  them again, so stored credentials cannot be redirected to a host their
+  owner never chose.
+- Never in a log line, the generation log or an audit row: each value is
   registered with the log's redaction when it is opened or saved, so it is
   removed wherever it appears, whatever its shape.
 

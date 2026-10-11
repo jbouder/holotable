@@ -2,7 +2,7 @@ import { notFound } from "next/navigation";
 import { Cpu } from "lucide-react";
 import { authorizedWorkspaces, getIdentity } from "@/lib/auth/authorize";
 import { accessibleWorkspaces } from "@/lib/auth/claims";
-import { workspaceModelView } from "@/lib/ai/model-resolution";
+import { stubAllowed, workspaceModelView } from "@/lib/ai/model-resolution";
 import { config } from "@/lib/config";
 import { knownWorkspaceIds } from "@/lib/db/repo";
 import { sectionVisible, settingsSection } from "@/lib/settings";
@@ -57,6 +57,7 @@ export default async function ModelSettings() {
             key={view.workspaceId}
             initial={view}
             serverModel={config.aiModel}
+            allowStub={stubAllowed()}
           />
         ))
       )}

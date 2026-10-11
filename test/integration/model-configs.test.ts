@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { after, test } from "node:test";
-import { openModelKey, sealModelKey } from "@/lib/ai/model-resolution";
+import { openCredentials, sealCredentials } from "@/lib/ai/model-resolution";
 import { pgModelConfigStore as store } from "@/lib/db/model-configs";
 import { closePool, query } from "@/lib/db/pg";
 import { needsDb, unique } from "./support";
@@ -34,15 +34,15 @@ test(
       config: {
         provider: "openai-compatible",
         settings,
-        apiKey: sealModelKey("sk-first"),
+        credentials: sealCredentials({ apiKey: "sk-first" }),
       },
       allowPersonalKeys: false,
       updatedBy: "admin",
     });
     assert.deepEqual(first.config?.settings, settings);
-    assert.deepEqual(openModelKey(first.config?.apiKey ?? null), {
+    assert.deepEqual(openCredentials(first.config?.credentials ?? null), {
       state: "ok",
-      key: "sk-first",
+      credentials: { apiKey: "sk-first" },
     });
 
     const kept = await store.saveWorkspace({
@@ -50,25 +50,25 @@ test(
       config: {
         provider: "openai-compatible",
         settings: { ...settings, model: "m2" },
-        apiKey: "keep",
+        credentials: "keep",
       },
       allowPersonalKeys: true,
       updatedBy: "admin",
     });
     assert.deepEqual(kept.config?.settings, { ...settings, model: "m2" });
     assert.equal(kept.allowPersonalKeys, true);
-    assert.deepEqual(openModelKey(kept.config?.apiKey ?? null), {
+    assert.deepEqual(openCredentials(kept.config?.credentials ?? null), {
       state: "ok",
-      key: "sk-first",
+      credentials: { apiKey: "sk-first" },
     });
 
     const cleared = await store.saveWorkspace({
       workspaceId: WORKSPACE,
-      config: { provider: "openai-compatible", settings, apiKey: null },
+      config: { provider: "openai-compatible", settings, credentials: null },
       allowPersonalKeys: true,
       updatedBy: "admin",
     });
-    assert.equal(cleared.config?.apiKey, null);
+    assert.equal(cleared.config?.credentials, null);
 
     // Back to the environment: the row stays for the toggle, with no key.
     const env = await store.saveWorkspace({
@@ -97,14 +97,17 @@ test(
       config: {
         provider: "openai-compatible",
         settings,
-        apiKey: sealModelKey("sk-mine"),
+        credentials: sealCredentials({ apiKey: "sk-mine" }),
       },
     });
     const kept = await store.saveUser({
       sub: SUB,
-      config: { provider: "openai-compatible", settings, apiKey: "keep" },
+      config: { provider: "openai-compatible", settings, credentials: "keep" },
     });
-    assert.deepEqual(openModelKey(kept.apiKey), { state: "ok", key: "sk-mine" });
+    assert.deepEqual(openCredentials(kept.credentials), {
+      state: "ok",
+      credentials: { apiKey: "sk-mine" },
+    });
     assert.equal(kept.updatedBy, SUB);
     assert.equal(await store.deleteUser(SUB), true);
     assert.equal(await store.deleteUser(SUB), false);

@@ -1,18 +1,19 @@
 import { query } from "@/lib/db/pg";
 
 /**
- * `workspace_llm_config` and `user_llm_config` rows (#331). The key is the
- * sealed ciphertext, opened only in `src/lib/ai/model-resolution.ts`; the
+ * `workspace_llm_config` and `user_llm_config` rows (#331). The credentials
+ * are the sealed ciphertext in `api_key` (a bare key, or since #438 a JSON
+ * object of a kind's fields), opened only in `src/lib/ai/model-resolution.ts`; the
  * settings are raw JSON, parsed there against `ModelSettings`. The workspace
  * is always the caller's authorized one, from the path or from a trusted
  * record, and the subject is always the verified identity's.
  */
 
-/** One stored configuration. `apiKey` is sealed, or null for none. */
+/** One stored configuration. `credentials` is sealed, or null for none. */
 export interface StoredModelConfig {
   provider: string;
   settings: unknown;
-  apiKey: Buffer | null;
+  credentials: Buffer | null;
   updatedBy: string;
   updatedAt: string;
 }
@@ -24,11 +25,11 @@ export interface WorkspaceModelRecord {
   allowPersonalKeys: boolean;
 }
 
-/** What a save writes. `apiKey: "keep"` leaves the stored ciphertext as it is. */
+/** What a save writes. `credentials: "keep"` leaves the stored ciphertext as it is. */
 export interface ModelConfigWrite {
   provider: string;
   settings: unknown;
-  apiKey: Buffer | null | "keep";
+  credentials: Buffer | null | "keep";
 }
 
 export interface ModelConfigStore {
@@ -74,7 +75,7 @@ function workspaceRecord(row: WorkspaceRow): WorkspaceModelRecord {
         : {
             provider: row.provider,
             settings: row.settings,
-            apiKey: row.api_key,
+            credentials: row.api_key,
             updatedBy: row.updated_by,
             updatedAt: iso(row.updated_at),
           },
@@ -86,7 +87,7 @@ function userRecord(row: UserRow): StoredModelConfig {
   return {
     provider: row.provider,
     settings: row.settings,
-    apiKey: row.api_key,
+    credentials: row.api_key,
     updatedBy: row.user_sub,
     updatedAt: iso(row.updated_at),
   };
@@ -105,8 +106,8 @@ export const pgModelConfigStore: ModelConfigStore = {
   },
 
   async saveWorkspace({ workspaceId, config, allowPersonalKeys, updatedBy }) {
-    const keep = config?.apiKey === "keep";
-    const key = config && config.apiKey !== "keep" ? config.apiKey : null;
+    const keep = config?.credentials === "keep";
+    const key = config && config.credentials !== "keep" ? config.credentials : null;
     const rows = await query<WorkspaceRow>(
       `INSERT INTO workspace_llm_config AS c
          (workspace_id, provider, settings, api_key, allow_personal_keys, updated_by, updated_at)
@@ -143,8 +144,8 @@ export const pgModelConfigStore: ModelConfigStore = {
   },
 
   async saveUser({ sub, config }) {
-    const keep = config.apiKey === "keep";
-    const key = config.apiKey === "keep" ? null : config.apiKey;
+    const keep = config.credentials === "keep";
+    const key = config.credentials === "keep" ? null : config.credentials;
     const rows = await query<UserRow>(
       `INSERT INTO user_llm_config AS c (user_sub, provider, settings, api_key, updated_at)
        VALUES ($1, $2, $3::jsonb, $4, now())

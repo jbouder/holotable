@@ -28,10 +28,10 @@ import {
 import {
   configView,
   type ModelResolutionDeps,
-  openModelKey,
+  openCredentials,
   prepareWrite,
   resolveModel,
-  sealModelKey,
+  sealCredentials,
   workspaceModelView,
 } from "@/lib/ai/model-resolution";
 import { providerErrorMessage } from "@/lib/ai/provider-error";
@@ -66,13 +66,13 @@ test("a sealed value opens under its own label and secret, and nothing else", ()
 
 test("a refresh token never opens as a model key: each use has its own label", () => {
   const token = sealRefreshToken("rt-1", SECRET);
-  assert.deepEqual(openModelKey(token, SECRET), { state: "unreadable" });
+  assert.deepEqual(openCredentials(token, SECRET), { state: "unreadable" });
 });
 
 test("a model key sealed before SESSION_SECRET rotated reads as unreadable, not as a crash", () => {
-  const sealed = sealModelKey("sk-old-key-0000000000", OTHER);
-  assert.deepEqual(openModelKey(sealed, SECRET), { state: "unreadable" });
-  assert.deepEqual(openModelKey(null, SECRET), { state: "none" });
+  const sealed = sealCredentials({ apiKey: "sk-old-key-0000000000" }, OTHER);
+  assert.deepEqual(openCredentials(sealed, SECRET), { state: "unreadable" });
+  assert.deepEqual(openCredentials(null, SECRET), { state: "none" });
 });
 
 /* -------------------------------------------------------------------------- */
@@ -309,7 +309,7 @@ function stored(
   return {
     provider: "openai-compatible",
     settings: { baseUrl: "https://api.example.com/v1", model, api: "chat" },
-    apiKey: sealModelKey("sk-workspace-key-0123456789"),
+    credentials: sealCredentials({ apiKey: "sk-workspace-key-0123456789" }),
     updatedBy: "admin",
     updatedAt: "2026-10-07T00:00:00.000Z",
     ...rest,
@@ -413,7 +413,7 @@ test("demo mode turns both levels off", async () => {
 });
 
 test("a key that can no longer be read is reported, never replaced by the next level", async () => {
-  const rotated = stored({ apiKey: sealModelKey("sk-old", OTHER) });
+  const rotated = stored({ credentials: sealCredentials({ apiKey: "sk-old" }, OTHER) });
   const resolved = await resolveModel(
     input,
     deps({ workspace: workspaceRow(false, rotated) }),
@@ -426,7 +426,7 @@ test("a key that can no longer be read is reported, never replaced by the next l
     input,
     deps({
       workspace: workspaceRow(true),
-      user: { ...personal, apiKey: rotated.apiKey },
+      user: { ...personal, credentials: rotated.credentials },
     }),
   );
   assert.equal(mine.source, "personal");
@@ -449,7 +449,7 @@ test("a stored configuration that no longer parses is reported, not thrown", asy
 
 const ip = (baseUrl: string, apiKey?: string): ModelConfigInput => ({
   settings: { provider: "openai-compatible", baseUrl, model: "m", api: "responses" },
-  ...(apiKey === undefined ? {} : { apiKey }),
+  ...(apiKey === undefined ? {} : { credentials: apiKey === "" ? null : { apiKey } }),
 });
 // An address literal is checked without DNS, which keeps these offline.
 const PUBLIC = "https://93.184.216.34/v1";
@@ -457,26 +457,26 @@ const PUBLIC = "https://93.184.216.34/v1";
 test("a save seals a new key, keeps the stored one, or clears it", async () => {
   const d = deps({});
   const fresh = await prepareWrite(ip(PUBLIC, "sk-new-key-0123456789"), null, d);
-  assert.ok(Buffer.isBuffer(fresh.apiKey));
-  assert.ok(!fresh.apiKey.toString("utf8").includes("sk-new-key"));
-  assert.deepEqual(openModelKey(fresh.apiKey), {
+  assert.ok(Buffer.isBuffer(fresh.credentials));
+  assert.ok(!fresh.credentials.toString("utf8").includes("sk-new-key"));
+  assert.deepEqual(openCredentials(fresh.credentials), {
     state: "ok",
-    key: "sk-new-key-0123456789",
+    credentials: { apiKey: "sk-new-key-0123456789" },
   });
   assert.deepEqual(fresh.settings, { baseUrl: PUBLIC, model: "m", api: "responses" });
 
   const current = stored({
     settings: { baseUrl: `${PUBLIC}/`, model: "m", api: "chat" },
   });
-  assert.equal((await prepareWrite(ip(PUBLIC), current, d)).apiKey, "keep");
-  assert.equal((await prepareWrite(ip(PUBLIC, ""), current, d)).apiKey, null);
+  assert.equal((await prepareWrite(ip(PUBLIC), current, d)).credentials, "keep");
+  assert.equal((await prepareWrite(ip(PUBLIC, ""), current, d)).credentials, null);
 });
 
 test("a stored key cannot be pointed at a different host without entering it again", async () => {
   const current = stored({ settings: { baseUrl: PUBLIC, model: "m", api: "chat" } });
   await assert.rejects(
     prepareWrite(ip("https://93.184.216.35/v1"), current, deps({})),
-    /host changed, so enter the API key again/,
+    /different host than the stored key was entered for, so enter the API key again/,
   );
   // With the key entered again, it is a new key for the new host.
   const moved = await prepareWrite(
@@ -484,7 +484,7 @@ test("a stored key cannot be pointed at a different host without entering it aga
     current,
     deps({}),
   );
-  assert.ok(Buffer.isBuffer(moved.apiKey));
+  assert.ok(Buffer.isBuffer(moved.credentials));
 });
 
 test("a save refuses a base URL the guard refuses", async () => {
@@ -505,7 +505,7 @@ test("a save refuses a base URL the guard refuses", async () => {
 const KEY = "ollama-has-no-shape-but-this-is-a-key";
 
 test("a view of a configuration carries the key's state and last four characters, never the key", async () => {
-  const row = stored({ apiKey: sealModelKey(KEY) });
+  const row = stored({ credentials: sealCredentials({ apiKey: KEY }) });
   const view = configView(row);
   assert.deepEqual(view?.key, { state: "set", hint: "-key" });
   assert.ok(!JSON.stringify(view).includes(KEY));
@@ -515,17 +515,20 @@ test("a view of a configuration carries the key's state and last four characters
   assert.ok(!JSON.stringify(ws).includes("apiKey"));
   assert.equal(ws.allowPersonalKeys, true);
 
-  assert.deepEqual(configView(stored({ apiKey: sealModelKey("short") }))?.key, {
-    state: "set",
-    hint: null,
-  });
+  assert.deepEqual(
+    configView(stored({ credentials: sealCredentials({ apiKey: "short" }) }))?.key,
+    {
+      state: "set",
+      hint: null,
+    },
+  );
   assert.equal(keyHint("0123456789abcde"), null);
   assert.equal(keyHint("0123456789abcdef"), "cdef");
 });
 
 test("an opened key is scrubbed from log lines, audit rows and the generation log", () => {
-  const sealed = sealModelKey(KEY);
-  openModelKey(sealed);
+  const sealed = sealCredentials({ apiKey: KEY });
+  openCredentials(sealed);
   assert.equal(
     redactString(`provider said: bad key ${KEY}!`),
     "provider said: bad key [redacted]!",
@@ -566,11 +569,14 @@ test("a key too short to match safely is not registered, so ordinary words survi
 
 test("the form keeps a stored key when the key field is blank, and clears it on request", () => {
   const base = {
-    baseUrl: " https://openrouter.ai/api/v1 ",
-    model: " openai/gpt-4o-mini ",
-    api: "responses" as const,
-    apiKey: "",
-    clearKey: false,
+    provider: "openai-compatible",
+    settings: {
+      baseUrl: " https://openrouter.ai/api/v1 ",
+      model: " openai/gpt-4o-mini ",
+      api: "responses",
+    },
+    credentials: { apiKey: "" },
+    clearCredentials: false,
   };
   const keep = inputFromDraft(base);
   assert.ok(keep.ok);
@@ -582,15 +588,22 @@ test("the form keeps a stored key when the key field is blank, and clears it on 
       api: "responses",
     },
   });
-  const replace = inputFromDraft({ ...base, apiKey: " sk-1 " });
-  assert.equal(replace.ok && replace.input.apiKey, "sk-1");
-  const clear = inputFromDraft({ ...base, apiKey: "ignored", clearKey: true });
-  assert.equal(clear.ok && clear.input.apiKey, "");
+  const replace = inputFromDraft({ ...base, credentials: { apiKey: " sk-1 " } });
+  assert.deepEqual(replace.ok && replace.input.credentials, { apiKey: "sk-1" });
+  const clear = inputFromDraft({
+    ...base,
+    credentials: { apiKey: "ignored" },
+    clearCredentials: true,
+  });
+  assert.equal(clear.ok && clear.input.credentials, null);
 
-  const bad = inputFromDraft({ ...base, baseUrl: "openrouter" });
+  const bad = inputFromDraft({
+    ...base,
+    settings: { ...base.settings, baseUrl: "openrouter" },
+  });
   assert.equal(bad.ok, false);
   assert.match(!bad.ok ? bad.message : "", /^Base URL/);
-  const noModel = inputFromDraft({ ...base, model: " " });
+  const noModel = inputFromDraft({ ...base, settings: { ...base.settings, model: " " } });
   assert.match(!noModel.ok ? noModel.message : "", /^Model/);
 });
 
@@ -601,4 +614,185 @@ test("the key's state is described without the key", () => {
     "A key ending in abcd is stored.",
   );
   assert.match(describeKey({ state: "unreadable" }), /SESSION_SECRET changed/);
+});
+
+/* -------------------------------------------------------------------------- */
+/* Provider kinds (#438)                                                      */
+/* -------------------------------------------------------------------------- */
+
+const PAIR = {
+  accessKeyId: "AKIAPAIRTEST00000000",
+  secretAccessKey: "bedrock-secret-access-key-0123456789",
+};
+
+test("a bare key sealed before #438 opens as { apiKey }, and a lone key is still sealed bare", () => {
+  const legacy = sealSecret("sk-legacy-key-0123456789", "holotable model-api-key v1");
+  assert.deepEqual(openCredentials(legacy), {
+    state: "ok",
+    credentials: { apiKey: "sk-legacy-key-0123456789" },
+  });
+  // What #331 code would read during a rolling update: the key itself.
+  const fresh = sealCredentials({ apiKey: "sk-fresh-key-0123456789" });
+  assert.equal(
+    openSecret(fresh as Buffer, "holotable model-api-key v1"),
+    "sk-fresh-key-0123456789",
+  );
+  assert.equal(sealCredentials({}), null);
+  assert.equal(sealCredentials({ apiKey: "" }), null);
+});
+
+test("a Bedrock key pair round-trips sealed, and never reaches a log line, an audit row or a view", async () => {
+  const sealed = sealCredentials(PAIR);
+  assert.ok(sealed && !sealed.toString("utf8").includes(PAIR.secretAccessKey));
+  assert.deepEqual(openCredentials(sealed), { state: "ok", credentials: PAIR });
+
+  assert.equal(
+    redactString(`denied ${PAIR.secretAccessKey} for ${PAIR.accessKeyId}`),
+    "denied [redacted] for [redacted]",
+  );
+  const audit = auditRow({
+    actor: alice,
+    action: "workspace.model.test",
+    workspaceId: "w",
+    detail: { message: `refused ${PAIR.secretAccessKey}` },
+  });
+  assert.ok(!JSON.stringify(audit).includes(PAIR.secretAccessKey));
+
+  const row = stored({
+    provider: "bedrock",
+    settings: { region: "us-east-1", model: "anthropic.claude" },
+    credentials: sealed,
+  });
+  const view = configView(row);
+  assert.deepEqual(view?.key, { state: "set", hint: "0000" });
+  assert.ok(!JSON.stringify(view).includes(PAIR.secretAccessKey));
+  const ws = await workspaceModelView("w", deps({ workspace: workspaceRow(false, row) }));
+  assert.ok(!JSON.stringify(ws).includes(PAIR.secretAccessKey));
+});
+
+const fixed = (
+  provider: string,
+  settings: Record<string, unknown>,
+  credentials?: Record<string, string> | null,
+): ModelConfigInput =>
+  ({
+    settings: { provider, ...settings },
+    ...(credentials === undefined ? {} : { credentials }),
+  }) as ModelConfigInput;
+
+test("a fixed vendor needs its key, and keeps it only while requests go to the same host", async () => {
+  const d = deps({});
+  await assert.rejects(
+    prepareWrite(fixed("anthropic", { model: "claude" }), null, d),
+    /API key/,
+  );
+  await assert.rejects(
+    prepareWrite(fixed("anthropic", { model: "claude" }, null), null, d),
+    /API key/,
+  );
+  const saved = await prepareWrite(
+    fixed("anthropic", { model: "claude" }, { apiKey: "sk-ant-0123456789abcdef" }),
+    null,
+    d,
+  );
+  assert.deepEqual(saved.settings, { model: "claude" });
+  assert.equal(saved.provider, "anthropic");
+
+  const current = stored({
+    provider: "anthropic",
+    settings: { model: "claude" },
+    credentials: saved.credentials as Buffer,
+  });
+  // Another model at the same vendor keeps the key.
+  assert.equal(
+    (await prepareWrite(fixed("anthropic", { model: "claude-2" }), current, d))
+      .credentials,
+    "keep",
+  );
+  // Another vendor does not.
+  await assert.rejects(
+    prepareWrite(fixed("openai", { model: "gpt" }), current, d),
+    /different host/,
+  );
+
+  const azure = stored({
+    provider: "azure",
+    settings: { resourceName: "one", model: "dep", api: "chat" },
+  });
+  await assert.rejects(
+    prepareWrite(
+      fixed("azure", { resourceName: "two", model: "dep", api: "chat" }),
+      azure,
+      d,
+    ),
+    /different host/,
+  );
+  assert.equal(
+    (
+      await prepareWrite(
+        fixed("azure", { resourceName: "one", model: "dep2", api: "chat" }),
+        azure,
+        d,
+      )
+    ).credentials,
+    "keep",
+  );
+
+  // A key pair is entered whole.
+  await assert.rejects(
+    prepareWrite(
+      fixed("bedrock", { region: "us-east-1", model: "m" }, { accessKeyId: "AKIA" }),
+      null,
+      d,
+    ),
+    /Secret access key/,
+  );
+});
+
+test("the stub kind is refused on a production server unless it is the end-to-end suite's", async () => {
+  const stub = fixed("stub", {});
+  await assert.rejects(
+    prepareWrite(stub, null, deps({}, { env: { NODE_ENV: "production" } })),
+    /not available on a production server/,
+  );
+  const allowed = await prepareWrite(
+    stub,
+    null,
+    deps({}, { env: { NODE_ENV: "production", AI_STUB_IN_PRODUCTION: "true" } }),
+  );
+  assert.equal(allowed.provider, "stub");
+  assert.equal((await prepareWrite(stub, null, deps({}))).provider, "stub");
+});
+
+test("a stored model of every kind resolves; one missing its credentials is reported", async () => {
+  const kinds: Array<[string, Record<string, unknown>, Record<string, string>]> = [
+    ["openai", { model: "gpt" }, { apiKey: "k" }],
+    ["anthropic", { model: "claude" }, { apiKey: "k" }],
+    ["google", { model: "gemini" }, { apiKey: "k" }],
+    ["gateway", { model: "a/b" }, { apiKey: "k" }],
+    ["azure", { resourceName: "r", model: "d" }, { apiKey: "k" }],
+    ["bedrock", { region: "us-east-1", model: "m" }, PAIR],
+    ["mistral", { model: "m" }, { apiKey: "k" }],
+    ["xai", { model: "grok" }, { apiKey: "k" }],
+    ["stub", {}, {}],
+  ];
+  for (const [provider, settings, credentials] of kinds) {
+    const row = stored({ provider, settings, credentials: sealCredentials(credentials) });
+    const resolved = await resolveModel(
+      input,
+      deps({ workspace: workspaceRow(false, row) }),
+    );
+    assert.equal(resolved.ok, true, provider);
+  }
+  const keyless = stored({
+    provider: "anthropic",
+    settings: { model: "c" },
+    credentials: null,
+  });
+  const missing = await resolveModel(
+    input,
+    deps({ workspace: workspaceRow(false, keyless) }),
+  );
+  assert.equal(missing.ok, false);
+  assert.match(!missing.ok ? missing.problem : "", /no usable credentials/);
 });

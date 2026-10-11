@@ -7,6 +7,7 @@ import {
   prepareWrite,
   workspaceModelView,
 } from "@/lib/ai/model-resolution";
+import { endpointHost } from "@/lib/ai/providers/registry";
 import { json, readJson, route } from "@/lib/http";
 import { WorkspaceId } from "@/lib/workspace-limits";
 
@@ -80,9 +81,9 @@ export const PUT = route(
         ...(body.config
           ? {
               provider: body.config.settings.provider,
-              baseUrlHost: new URL(body.config.settings.baseUrl).host,
+              endpointHost: endpointHost(body.config.settings),
               model: body.config.settings.model,
-              keyChanged: body.config.apiKey !== undefined,
+              keyChanged: body.config.credentials !== undefined,
             }
           : { cleared: current?.config != null }),
         allowPersonalKeys: body.allowPersonalKeys,
