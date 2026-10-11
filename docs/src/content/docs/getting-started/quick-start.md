@@ -77,9 +77,10 @@ pulls a native build.
 
 | Image | What it is |
 | --- | --- |
-| `ghcr.io/jbouder/holotable:main` | The app, following the `main` branch. |
-| `ghcr.io/jbouder/holotable:main-migrate` | The job image that runs migrations, the seeder and the self-monitoring collector. |
-| `ghcr.io/jbouder/holotable:quickstart` | Everything in one container, for step 1. |
+| `ghcr.io/jbouder/holotable:0.1.0`, `:latest` | The app, at a release. `latest` moves only on a release. |
+| `ghcr.io/jbouder/holotable:0.1.0-migrate`, `:latest-migrate` | The job image that runs migrations, the seeder and the self-monitoring collector, at the same release. |
+| `ghcr.io/jbouder/holotable:main`, `:main-migrate` | The same two, following the `main` branch. |
+| `ghcr.io/jbouder/holotable:quickstart` | Everything in one container, for step 1, following `main`; `:0.1.0-quickstart` pins a release. |
 
 `HOLOTABLE_TAG` in `.env` picks the tag. Leave it unset to follow `main`, or set
 a release version such as `0.1.0` to pin one; see
