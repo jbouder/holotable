@@ -148,23 +148,23 @@ export type ResolvedModel =
 
 const UNREADABLE_SETTINGS: Record<"personal" | "workspace", string> = {
   personal:
-    "Your personal model configuration can no longer be read. Save it again under Settings → Personal model.",
+    "Your personal model configuration can no longer be read. Save it again on the Models page.",
   workspace:
-    "This workspace's model configuration can no longer be read. A source-admin must save it again under Settings → Workspace model.",
+    "This workspace's model configuration can no longer be read. A source-admin must save it again on the Models page.",
 };
 
 const UNREADABLE_KEY: Record<"personal" | "workspace", string> = {
   personal:
-    "Your personal model key can no longer be read, because the server's SESSION_SECRET changed. Enter it again under Settings → Personal model.",
+    "Your personal model key can no longer be read, because the server's SESSION_SECRET changed. Enter it again on the Models page.",
   workspace:
-    "This workspace's model key can no longer be read, because the server's SESSION_SECRET changed. A source-admin must enter it again under Settings → Workspace model.",
+    "This workspace's model key can no longer be read, because the server's SESSION_SECRET changed. A source-admin must enter it again on the Models page.",
 };
 
 const MISSING_CREDENTIALS: Record<"personal" | "workspace", string> = {
   personal:
-    "Your personal model has no usable credentials stored. Enter them again under Settings → Personal model.",
+    "Your personal model has no usable credentials stored. Enter them again on the Models page.",
   workspace:
-    "This workspace's model has no usable credentials stored. A source-admin must enter them again under Settings → Workspace model.",
+    "This workspace's model has no usable credentials stored. A source-admin must enter them again on the Models page.",
 };
 
 export function parseSettings(stored: StoredConfig): ModelSettings | null {

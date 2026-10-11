@@ -1,6 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { existsSync } from "node:fs";
+import { modelsPageVisible } from "@/lib/ai/models-page";
 import { parseGroups } from "@/lib/auth/claims";
 import { STATIC_COMMANDS } from "@/lib/command-palette";
 import {
@@ -56,20 +57,28 @@ test("the command palette offers Settings", () => {
   assert.deepEqual(command?.action, { type: "navigate", href: "/settings" });
 });
 
-test("the workspace model section is listed for whoever manages a workspace (#331)", () => {
-  assert.ok(!ids(["/workspaces/w/editor"]).includes("model"));
-  assert.ok(ids(["/workspaces/w/source-admin"]).includes("model"));
-  assert.ok(ids(["/platform-admins"]).includes("model"));
+test("models are their own page, not settings sections (#441)", () => {
+  for (const groups of [
+    ["/workspaces/w/source-admin"],
+    ["/platform-admins"],
+    ["/workspaces/w/editor"],
+  ]) {
+    const listed = ids(groups);
+    assert.ok(!listed.includes("model" as never));
+    assert.ok(!listed.includes("personal-model" as never));
+  }
 });
 
-test("the personal model section is listed for a person who generates, never a token (#331)", () => {
-  assert.ok(!ids(["/workspaces/w/viewer"]).includes("personal-model"));
-  assert.ok(ids(["/workspaces/w/editor"]).includes("personal-model"));
+test("the Models page is for a person who generates somewhere, never a token (#441)", () => {
+  assert.equal(modelsPageVisible(parseGroups("v", ["/workspaces/w/viewer"])), false);
+  assert.equal(modelsPageVisible(parseGroups("e", ["/workspaces/w/editor"])), true);
+  assert.equal(
+    modelsPageVisible({ ...parseGroups("root", []), platformAdmin: true }),
+    true,
+  );
   const token = {
     ...parseGroups("token:1", ["/workspaces/w/editor"]),
     serviceAccount: { tokenId: "1", name: "ci" },
   };
-  const tokenIds = visibleSections(token).map((s) => s.id);
-  assert.ok(!tokenIds.includes("personal-model"));
-  assert.ok(!tokenIds.includes("model"));
+  assert.equal(modelsPageVisible(token), false);
 });

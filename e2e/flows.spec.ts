@@ -496,6 +496,50 @@ test("an author adds a link in the inspector, and a reader follows it (#374)", a
   expect(new URL(page.url()).searchParams.getAll("var-route")).toEqual(["/search"]);
 });
 
+test("a source admin adds, tests, sets as default and deletes a workspace model (#441)", async ({
+  page,
+}) => {
+  const name = `E2E stub ${Date.now().toString(36)}`;
+  await page.goto("/dashboards");
+  await page
+    .getByRole("navigation", { name: "Main" })
+    .getByRole("link", { name: "Models" })
+    .click();
+  await expect(page).toHaveURL(/\/models$/);
+  await expect(page.getByRole("heading", { level: 1, name: "Models" })).toBeVisible();
+  await expect(page.getByText("Server", { exact: true })).toBeVisible();
+
+  await page.getByRole("button", { name: "Add model to demo" }).click();
+  const dialog = page.getByRole("dialog", { name: "Add model" });
+  await dialog.getByLabel("Name").fill(name);
+  await dialog.getByRole("combobox", { name: "Provider" }).click();
+  await page.getByRole("option", { name: "Stub (recorded answers)" }).click();
+  await dialog.getByRole("button", { name: "Test connection" }).click();
+  await expect(dialog.getByText(/answered in \d+ ms/)).toBeVisible();
+  await dialog.getByRole("button", { name: "Add model" }).click();
+  await expect(dialog).toBeHidden();
+
+  const row = page.getByRole("row").filter({ hasText: name });
+  await expect(row).toBeVisible();
+  await row.getByRole("button", { name: /Set as default/ }).click();
+  await expect(row.getByText("Default", { exact: true })).toBeVisible();
+  await expect(page.getByText(`generations here use ${name}`)).toBeVisible();
+
+  await page.getByRole("button", { name: `Delete ${name}` }).click();
+  await page
+    .getByRole("dialog", { name: `Delete ${name}?` })
+    .getByRole("button", { name: "Delete" })
+    .click();
+  await expect(row).toHaveCount(0);
+});
+
+test("the old model settings sections open the Models page (#441)", async ({ page }) => {
+  await page.goto("/settings/model");
+  await expect(page).toHaveURL(/\/models$/);
+  await page.goto("/settings/personal-model");
+  await expect(page).toHaveURL(/\/models$/);
+});
+
 test.describe("as a viewer", () => {
   test.use({ storageState: storageStatePath("viewer") });
 
@@ -512,5 +556,20 @@ test.describe("as a viewer", () => {
       page.getByRole("heading", { name: "This page could not be found." }),
     ).toBeVisible();
     await expect(page.locator("#p-title")).toHaveCount(0);
+  });
+
+  test("a viewer generates nowhere, so has no Models link and no Models page (#441)", async ({
+    page,
+  }) => {
+    await page.goto("/dashboards");
+    await expect(
+      page
+        .getByRole("navigation", { name: "Main" })
+        .getByRole("link", { name: "Models" }),
+    ).toHaveCount(0);
+    await page.goto("/models");
+    await expect(
+      page.getByRole("heading", { name: "This page could not be found." }),
+    ).toBeVisible();
   });
 });

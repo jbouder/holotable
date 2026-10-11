@@ -21,10 +21,7 @@ export function TableHead({
   );
 }
 
-export function TableBody({
-  className,
-  ...props
-}: React.HTMLAttributes<HTMLTableSectionElement>) {
+export function TableBody({ className, ...props }: React.ComponentPropsWithRef<"tbody">) {
   return <tbody className={className} {...props} />;
 }
 
