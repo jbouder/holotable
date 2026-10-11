@@ -1234,8 +1234,14 @@ test("THEME_FILE: unreadable, malformed and below the bar each stop a production
   const failing = check(write("dim.json", dim));
   assert.ok(failing.every((p) => p.severity === "error"));
   assert.ok(failing.some((p) => /muted on (bg-)?surface-2, light/.test(p.message)));
-  // In development the same file warns and loads nothing.
-  const dev = check(write("dim2.json", dim), false);
+  // In development the same file warns and loads nothing, and a default
+  // that names it falls back rather than stopping the start.
+  const dev = check(write("dim2.json", dim), false, { THEME_DEFAULT_PALETTE: "acme" });
   assert.ok(dev.length > 0 && dev.every((p) => p.severity === "warning"));
   assert.match(dev[0]?.message ?? "", /not loaded/);
+  assert.ok(
+    dev.some(
+      (p) => p.variable === "THEME_DEFAULT_PALETTE" && /holotable/.test(p.message),
+    ),
+  );
 });

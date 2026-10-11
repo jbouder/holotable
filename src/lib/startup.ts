@@ -150,10 +150,14 @@ export function validateThemeFile(
     !(PALETTES as readonly string[]).includes(fallback) &&
     fallback !== result.theme?.name
   ) {
+    // In development a theme file that fails loads nothing, and its name as
+    // the default falls back to holotable, so the app still starts.
     problems.push({
       variable: "THEME_DEFAULT_PALETTE",
-      message: `is "${fallback}", which is neither a built-in theme nor the theme THEME_FILE loads.`,
-      severity: "error",
+      message: production
+        ? `is "${fallback}", which is neither a built-in theme nor the theme THEME_FILE loads.`
+        : `is "${fallback}", which is neither a built-in theme nor a loaded THEME_FILE theme; holotable is the default instead.`,
+      severity: production ? "error" : "warning",
     });
   }
   return problems;

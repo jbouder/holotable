@@ -83,6 +83,8 @@ THEME_FILE: text-muted on bg-surface-2, light: 4.20:1 (needs 4.5:1)
 ```
 
 In development it is a warning, and the server runs on the built-in themes.
+A `THEME_DEFAULT_PALETTE` naming that theme then falls back to Holotable, with
+a warning.
 A file that cannot be read is an error everywhere.
 
 The High contrast theme exports too, but it is held to a stricter tier of its
