@@ -4,12 +4,20 @@ import * as React from "react";
 import { Moon, Sun, Monitor } from "lucide-react";
 import {
   applyTheme,
+  DEFAULT_PALETTE,
   DEFAULT_THEME,
+  isPalette,
+  type Palette,
+  PALETTE_EVENT,
   savedTheme,
   type Theme,
   THEME_EVENT,
 } from "@/lib/theme";
-import { applyThemeWithTransition, setThemeWithTransition } from "@/lib/theme-transition";
+import {
+  applyThemeWithTransition,
+  setPaletteWithTransition,
+  setThemeWithTransition,
+} from "@/lib/theme-transition";
 import { cn } from "@/lib/utils";
 
 export const THEME_OPTIONS: { value: Theme; label: string; Icon: typeof Sun }[] = [
@@ -65,6 +73,28 @@ export function useThemePreference(): [Theme, (value: Theme) => void] {
   }, []);
 
   return [theme, update];
+}
+
+/**
+ * The named theme (#503) as React state, like {@link useThemePreference}:
+ * adopted from `<html data-palette>` after hydration (the bootstrap script put
+ * the stored one, or the server's default, there before first paint) and
+ * kept in step with every other control through {@link PALETTE_EVENT}.
+ */
+export function usePalettePreference(): [Palette, (value: Palette) => void] {
+  const [palette, setPalette] = React.useState<Palette>(DEFAULT_PALETTE);
+  React.useEffect(() => {
+    const shown = document.documentElement.dataset.palette;
+    if (isPalette(shown)) setPalette(shown);
+    const onPalette = (e: Event) => setPalette((e as CustomEvent<Palette>).detail);
+    window.addEventListener(PALETTE_EVENT, onPalette);
+    return () => window.removeEventListener(PALETTE_EVENT, onPalette);
+  }, []);
+  const update = React.useCallback((value: Palette) => {
+    setPalette(value);
+    setPaletteWithTransition(value);
+  }, []);
+  return [palette, update];
 }
 
 export function ThemeToggle() {

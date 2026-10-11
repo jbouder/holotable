@@ -64,3 +64,81 @@ export function setTheme(theme: Theme) {
   }
   window.dispatchEvent(new CustomEvent<Theme>(THEME_EVENT, { detail: theme }));
 }
+
+/*
+ * The named theme (#503): a palette of tokens beside the scheme. `Theme`
+ * above keeps meaning light or dark; a palette is which designed set of
+ * colors those come in. `<html data-palette>` carries it, resolved before
+ * first paint like `data-theme`, and `globals.css` gives a palette its own
+ * blocks as `[data-palette="<name>"][data-theme="dark|light"]`. Holotable's
+ * are the unqualified blocks, so no attribute and `holotable` are the same
+ * page.
+ */
+
+/** Every name a palette may have, shipped or reserved for a later phase. */
+export const PALETTES = [
+  "holotable",
+  "graphite",
+  "fjord",
+  "paper",
+  "high-contrast",
+] as const;
+export type Palette = (typeof PALETTES)[number];
+
+export const PALETTE_STORAGE_KEY = "palette";
+
+/** The palette when nothing chose one: the server's `THEME_DEFAULT_PALETTE` overrides it. */
+export const DEFAULT_PALETTE: Palette = "holotable";
+
+/** Broadcast when the palette changes, as {@link THEME_EVENT} is for the scheme. */
+export const PALETTE_EVENT = "holotable:palette";
+
+/** A palette the app ships CSS for, as the controls offer it. */
+export interface PaletteInfo {
+  name: Palette;
+  label: string;
+  description: string;
+}
+
+/**
+ * The palettes with CSS in `globals.css`, in the order the controls list
+ * them. A reserved name not listed here is never offered, and stored or
+ * configured falls back to the default.
+ */
+export const PALETTE_INFO: readonly PaletteInfo[] = [
+  {
+    name: "holotable",
+    label: "Holotable",
+    description: "Cool slate surfaces with a blue accent.",
+  },
+];
+
+export function isPalette(value: string | null | undefined): value is Palette {
+  return PALETTE_INFO.some((p) => p.name === value);
+}
+
+/** The stored palette, or `fallback` when none is stored or it is not shipped. */
+export function savedPalette(fallback: Palette = DEFAULT_PALETTE): Palette {
+  try {
+    const value = window.localStorage.getItem(PALETTE_STORAGE_KEY);
+    return isPalette(value) ? value : fallback;
+  } catch {
+    return fallback;
+  }
+}
+
+/** Put a palette on `<html>`. Does not store anything. */
+export function applyPalette(palette: Palette) {
+  document.documentElement.dataset.palette = palette;
+}
+
+/** Apply, store, and tell every other control in this tab about it. */
+export function setPalette(palette: Palette) {
+  applyPalette(palette);
+  try {
+    window.localStorage.setItem(PALETTE_STORAGE_KEY, palette);
+  } catch {
+    // The palette still applies when storage is unavailable.
+  }
+  window.dispatchEvent(new CustomEvent<Palette>(PALETTE_EVENT, { detail: palette }));
+}

@@ -18,7 +18,7 @@ import {
   STATIC_COMMANDS,
 } from "@/lib/command-palette";
 import { PALETTE_SHORTCUT } from "@/lib/shortcuts";
-import { setThemeWithTransition } from "@/lib/theme-transition";
+import { setPaletteWithTransition, setThemeWithTransition } from "@/lib/theme-transition";
 import { isMotionActive } from "@/lib/motion";
 import { useReducedMotion } from "@/components/motion-preference";
 import { useFlip } from "@/components/use-flip";
@@ -181,6 +181,10 @@ export function CommandPalette() {
         return;
       case "theme":
         setThemeWithTransition(command.action.theme);
+        setOpen(false);
+        return;
+      case "palette":
+        setPaletteWithTransition(command.action.palette);
         setOpen(false);
         return;
       case "refresh-catalog": {

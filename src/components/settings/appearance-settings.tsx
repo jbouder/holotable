@@ -2,10 +2,14 @@
 
 import * as React from "react";
 import { useSetChartPatterns } from "@/components/chart-patterns";
-import { THEME_OPTIONS, useThemePreference } from "@/components/theme-toggle";
+import {
+  THEME_OPTIONS,
+  usePalettePreference,
+  useThemePreference,
+} from "@/components/theme-toggle";
 import { useMotionPreference } from "@/components/motion-preference";
 import type { Motion } from "@/lib/motion";
-import type { Theme } from "@/lib/theme";
+import { type Palette, PALETTE_INFO, type Theme } from "@/lib/theme";
 import { cn } from "@/lib/utils";
 
 const MOTION_OPTIONS: { value: Motion; label: string; hint: string }[] = [
@@ -23,10 +27,11 @@ const MOTION_OPTIONS: { value: Motion; label: string; hint: string }[] = [
 ];
 
 /** A miniature of the palette, drawn with the real tokens under `data-theme`. */
-function Swatch({ theme }: { theme: "light" | "dark" }) {
+function Swatch({ theme, palette }: { theme: "light" | "dark"; palette?: Palette }) {
   return (
     <span
       data-theme={theme}
+      data-palette={palette}
       className="flex h-full flex-1 flex-col gap-1 bg-background p-1.5"
     >
       <span className="h-2 w-3/4 bg-surface-2" />
@@ -159,12 +164,44 @@ function ChartPatternsSetting({ initial }: { initial: boolean }) {
  */
 export function AppearanceSettings({ chartPatterns }: { chartPatterns: boolean }) {
   const [theme, setTheme] = useThemePreference();
+  const [palette, setPalette] = usePalettePreference();
   const [motion, setMotion] = useMotionPreference();
 
   return (
     <>
+      {/* The named themes (#503), once there is more than one to choose. */}
+      {PALETTE_INFO.length > 1 && (
+        <fieldset>
+          <legend className="text-sm font-semibold">Theme</legend>
+          <p className="mt-1 text-sm text-muted">
+            The colors the app is drawn in, in light and dark.
+          </p>
+          <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-3">
+            {PALETTE_INFO.map((p) => (
+              <Choice
+                key={p.name}
+                name="palette"
+                value={p.name}
+                checked={palette === p.name}
+                onChange={() => setPalette(p.name)}
+              >
+                <span
+                  aria-hidden
+                  className="flex h-14 w-full overflow-hidden border border-border"
+                >
+                  <Swatch theme="light" palette={p.name} />
+                  <Swatch theme="dark" palette={p.name} />
+                </span>
+                <span className="font-medium">{p.label}</span>
+                <span className="text-xs text-muted">{p.description}</span>
+              </Choice>
+            ))}
+          </div>
+        </fieldset>
+      )}
+
       <fieldset>
-        <legend className="text-sm font-semibold">Theme</legend>
+        <legend className="text-sm font-semibold">Color scheme</legend>
         <p className="mt-1 text-sm text-muted">
           Also in the account menu and the command palette.
         </p>
@@ -208,7 +245,8 @@ export function AppearanceSettings({ chartPatterns }: { chartPatterns: boolean }
       </fieldset>
 
       <p className="text-xs text-muted">
-        Theme and motion are kept in this browser and apply before the page draws.
+        Theme, color scheme and motion are kept in this browser and apply before the page
+        draws.
       </p>
 
       <ChartPatternsSetting initial={chartPatterns} />

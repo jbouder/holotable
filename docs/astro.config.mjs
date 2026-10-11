@@ -166,6 +166,7 @@ export default defineConfig({
             { label: "Data model", slug: "architecture/data-model" },
             { label: "Motion", slug: "architecture/motion" },
             { label: "Accessibility", slug: "architecture/accessibility" },
+            { label: "Theming", slug: "architecture/theming" },
             { label: "Custom visuals", slug: "architecture/custom-visuals" },
           ],
         },

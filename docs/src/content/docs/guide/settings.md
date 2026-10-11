@@ -11,8 +11,8 @@ with your name beside them on a wider screen. It holds four things:
 
 - **Settings**, the page described below.
 - **Keyboard shortcuts**, which opens the shortcuts section of Settings.
-- **Theme**: Light, Dark or System. The command palette and the Appearance
-  section change the same setting, and all three stay in step.
+- **Color scheme**: Light, Dark or System. The command palette and the
+  Appearance section change the same setting, and all three stay in step.
 - **Sign out**.
 
 The menu is the same at every screen width. Settings is also in the command
@@ -46,6 +46,13 @@ name, email and password.
 The same information is available to scripts from `GET /api/me`.
 
 ### Appearance
+
+**Color scheme** is Light, Dark or System. **Theme** is the named set of
+colors the scheme comes in. It appears here and in the command palette once
+the app ships more than one, and until then every page is Holotable. Both are
+kept in this browser and apply before the page draws. An operator sets the
+theme a new browser starts with (`THEME_DEFAULT_PALETTE`). See
+[Theming](/architecture/theming/).
 
 **Motion** has three choices. *Follow system* respects the operating system's
 reduced-motion setting. *Reduce* stops transitions, entrances and slides, the

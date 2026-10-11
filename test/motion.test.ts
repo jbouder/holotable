@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { runInNewContext } from "node:vm";
-import { BOOTSTRAP_SCRIPT } from "@/lib/bootstrap";
+import { BOOTSTRAP_SCRIPT, bootstrapScript } from "@/lib/bootstrap";
 import {
   animateOut,
   DEFAULT_MOTION,
@@ -95,6 +95,25 @@ test("unreadable storage leaves the server's attributes alone and does not throw
     motion: undefined,
     colorScheme: undefined,
   });
+});
+
+test("the bootstrap script puts a shipped palette on <html>, else the server's default", () => {
+  // #503
+  const palette = (stored: string | null, script = BOOTSTRAP_SCRIPT) => {
+    const dataset: Record<string, string> = {};
+    runInNewContext(script, {
+      document: { documentElement: { dataset, style: {} } },
+      localStorage: { getItem: (key: string) => (key === "palette" ? stored : null) },
+      matchMedia: () => ({ matches: false }),
+    });
+    return dataset.palette;
+  };
+  assert.equal(palette("holotable"), "holotable");
+  assert.equal(palette(null), "holotable");
+  // A reserved name with no CSS, or anything else, is the default.
+  assert.equal(palette("graphite"), "holotable");
+  assert.equal(palette('"><script>'), "holotable");
+  assert.equal(palette(null, bootstrapScript("holotable")), "holotable");
 });
 
 /* ---------- The helpers (#234) ---------- */

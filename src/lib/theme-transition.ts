@@ -1,5 +1,5 @@
 import { isMotionActive } from "@/lib/motion";
-import { applyTheme, setTheme, type Theme } from "@/lib/theme";
+import { applyTheme, type Palette, setPalette, setTheme, type Theme } from "@/lib/theme";
 import { withViewTransition } from "@/lib/view-transition";
 
 /**
@@ -24,4 +24,9 @@ export function setThemeWithTransition(theme: Theme) {
 /** Apply only (the OS changed under "system"), inside a theme crossfade. */
 export function applyThemeWithTransition(theme: Theme) {
   withViewTransition(() => applyTheme(theme), isMotionActive(), "theme");
+}
+
+/** A palette change (#503), the same crossfade as a scheme change. */
+export function setPaletteWithTransition(palette: Palette) {
+  withViewTransition(() => setPalette(palette), isMotionActive(), "theme");
 }
