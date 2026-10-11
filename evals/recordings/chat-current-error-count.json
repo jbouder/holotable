@@ -1,24 +1,24 @@
 {
   "model": "kimi-k3",
-  "recordedAt": "2026-10-10T15:33:28.609Z",
-  "requestDigest": "4c9a469d169578441f8cd2632538f41659e0cca0aebe01a6dade362411012651",
-  "text": "I can't give you a number: every query I ran against `http_requests` for this window (now-24h → now) came back with zero rows — even a plain count of all requests and a per-status breakdown. That means the table appears to have no data in this time range (or the source isn't returning rows), so the 5xx count is unavailable, not zero-confirmed. You may want to check that the demo source is ingesting data for this window.",
+  "recordedAt": "2026-10-11T22:25:46.272Z",
+  "requestDigest": "d412de45b4355876fbf7657a468dc851be9917dfbe4ba01760a4711f42249740",
+  "text": "I can't give you a number: the query against `http_requests` returned no result rows at all (even a plain `count(*)` came back empty), so either there's no request data in this 24h window or the source isn't returning rows. I won't guess — you'd need to check the source or try a different window.",
   "steps": [
     {
       "text": "",
       "toolCalls": [
         {
           "toolName": "runQuery",
-          "input": "{\"sourceId\":\"eval-demo\",\"sql\":\"SELECT count(*) AS errors_5xx FROM http_requests WHERE status >= 500 AND status < 600\"}"
+          "input": "{\"sourceId\":\"eval-demo\",\"sql\":\"SELECT count(*) AS server_errors FROM http_requests WHERE status >= 500 AND status < 600\"}"
         }
       ]
     },
     {
-      "text": "The query returned no rows, which is unexpected for a `count(*)`. Let me retry with a slightly different formulation.",
+      "text": "The query returned no result row, which is unexpected for a `count(*)`. Let me retry:",
       "toolCalls": [
         {
           "toolName": "runQuery",
-          "input": "{\"sourceId\":\"eval-demo\",\"sql\":\"SELECT count(*)::bigint AS errors_5xx, count(*) FILTER (WHERE status >= 500) AS ge500 FROM http_requests\"}"
+          "input": "{\"sourceId\":\"eval-demo\",\"sql\":\"SELECT count(*)::bigint AS server_errors FROM http_requests WHERE status >= 500\"}"
         }
       ]
     },
@@ -27,12 +27,12 @@
       "toolCalls": [
         {
           "toolName": "runQuery",
-          "input": "{\"sourceId\":\"eval-demo\",\"sql\":\"SELECT status, count(*) AS n FROM http_requests GROUP BY status ORDER BY n DESC LIMIT 20\"}"
+          "input": "{\"sourceId\":\"eval-demo\",\"sql\":\"SELECT count(*) AS total_requests, count(*) FILTER (WHERE status >= 500) AS server_errors FROM http_requests\"}"
         }
       ]
     },
     {
-      "text": "I can't give you a number: every query I ran against `http_requests` for this window (now-24h → now) came back with zero rows — even a plain count of all requests and a per-status breakdown. That means the table appears to have no data in this time range (or the source isn't returning rows), so the 5xx count is unavailable, not zero-confirmed. You may want to check that the demo source is ingesting data for this window.",
+      "text": "I can't give you a number: the query against `http_requests` returned no result rows at all (even a plain `count(*)` came back empty), so either there's no request data in this 24h window or the source isn't returning rows. I won't guess — you'd need to check the source or try a different window.",
       "toolCalls": []
     }
   ]
