@@ -25,3 +25,16 @@ export class QueryExecutionError extends Error {
     this.name = "QueryExecutionError";
   }
 }
+
+/**
+ * Every connection to the source was busy for as long as a checkout may wait
+ * (#487). Not the query's fault and not the source's: the poller skips the
+ * tick and tries again, without counting a failure or backing off, and the
+ * panel says it is waiting for the source rather than showing an error.
+ */
+export class SourceBusyError extends Error {
+  constructor(sourceId: string) {
+    super(`every connection to source "${sourceId}" was busy`);
+    this.name = "SourceBusyError";
+  }
+}

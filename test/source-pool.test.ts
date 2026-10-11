@@ -11,7 +11,7 @@ import {
 import { secretRefEnvVars } from "@/lib/secret-refs";
 import { SecretRefError } from "@/lib/secrets/credentials";
 import type { ExecutablePlan } from "@/lib/sql/safety";
-import { QueryExecutionError } from "@/lib/sources/execution";
+import { QueryExecutionError, SourceBusyError } from "@/lib/sources/execution";
 import { executePlan } from "@/lib/timescaledb/client";
 import {
   closeSourcePools,
@@ -362,4 +362,27 @@ test("pooled connections are reused, capped, and left clean", {
   } finally {
     await closeSourcePools();
   }
+});
+
+test("a checkout that timed out in a full pool is a wait; at a free one it is a failure", async () => {
+  // #487: the poller skips a cycle for the first and backs off for the second,
+  // so the two must not be told apart by the message alone, which pg-pool
+  // gives both a connect that hung and a wait in its queue.
+  await withFakePools(async () => {
+    const pool = sourcePool(source()) as unknown as FakePool & {
+      idleCount: number;
+      totalCount: number;
+    };
+    pool.connect = async () => {
+      throw new Error("timeout exceeded when trying to connect");
+    };
+    pool.idleCount = 0;
+    pool.totalCount = appConfig.maxPoolPerSource;
+    await assert.rejects(executePlan(source(), plan), SourceBusyError);
+    pool.totalCount = 0;
+    await assert.rejects(
+      executePlan(source(), plan),
+      (err) => !(err instanceof SourceBusyError) && /timeout exceeded/.test(String(err)),
+    );
+  });
 });

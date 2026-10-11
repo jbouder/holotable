@@ -3,10 +3,18 @@ import assert from "node:assert/strict";
 import { config } from "@/lib/config";
 import { cycleMs, type Dashboard, Panel, panelTimeRange } from "@/lib/ir";
 import { createLogger, setLogger } from "@/lib/log";
-import { getPoller, type PanelExecutor, type PollerEvent } from "@/lib/poller/registry";
+import {
+  getPoller,
+  type PanelExecutor,
+  type PollerEvent,
+  setPollerJitterForTests,
+} from "@/lib/poller/registry";
 import { diffPanels } from "@/lib/panel-diff";
 import { mergePanelRows } from "@/lib/stream-merge";
 import { panelOverride, supportsTimeBrush } from "@/lib/time-range";
+
+// Cycles land on the interval exactly: no spread of the second one (#487).
+setPollerJitterForTests(() => 0);
 
 /** A panel's own time range and refresh interval (#114). */
 

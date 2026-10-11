@@ -9,7 +9,9 @@ export type PanelStatus =
   | "stale"
   | "error"
   | "degraded"
-  | "tombstoned";
+  | "tombstoned"
+  /** Its source had no free connection this cycle (#487); the rows are the last ones. */
+  | "waiting";
 
 export interface PanelState {
   data: PanelData;
@@ -79,6 +81,9 @@ function applyOne(
       };
     case "tombstone":
       return { data, status: "tombstoned", updatedAt: cur?.updatedAt };
+    case "panel-waiting":
+      // A wait is not news about the rows: they and their age stay.
+      return { ...(cur ?? { data }), status: "waiting" };
     case "panel":
       return {
         data: mergePanelRows(cur?.data, event, maxWindowPoints),
