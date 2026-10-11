@@ -98,6 +98,11 @@ export interface PaletteInfo {
   name: Palette;
   label: string;
   description: string;
+  /**
+   * Held to the high-contrast quality tier (#506) rather than the built-in
+   * one: every text at 7:1, every edge at 4.5:1, tints as solid fills.
+   */
+  highContrast?: true;
 }
 
 /**
@@ -125,6 +130,12 @@ export const PALETTE_INFO: readonly PaletteInfo[] = [
     name: "paper",
     label: "Paper",
     description: "Ivory and ink with a deep blue accent, for reading like a report.",
+  },
+  {
+    name: "high-contrast",
+    label: "High contrast",
+    description: "Every text at 7:1 or more, strong edges and solid status fills.",
+    highContrast: true,
   },
 ];
 

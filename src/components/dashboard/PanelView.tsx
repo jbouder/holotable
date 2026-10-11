@@ -590,11 +590,11 @@ function TruncationBadge({ truncated }: { truncated: Truncation }) {
 
 const STATUS_STYLES: Record<PanelStatus, string> = {
   loading: "bg-surface-2 text-muted",
-  live: "bg-success/20 text-success",
+  live: "tinted bg-tint-success/(--tint-20) text-success",
   stale: "bg-surface-2 text-muted",
-  error: "bg-danger/20 text-danger",
-  degraded: "bg-warning/20 text-warning",
-  tombstoned: "bg-danger/20 text-danger",
+  error: "tinted bg-tint-danger/(--tint-20) text-danger",
+  degraded: "tinted bg-tint-warning/(--tint-20) text-warning",
+  tombstoned: "tinted bg-tint-danger/(--tint-20) text-danger",
   waiting: "bg-surface-2 text-muted",
 };
 

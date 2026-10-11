@@ -133,7 +133,7 @@ function bands(
   theme: ChartTheme,
 ): [number, string][] {
   const steps = gaugeOptions(panel).thresholds ?? [];
-  const track = theme.grid;
+  const track = theme.track;
   if (steps.length === 0) return [[1, track]];
   const stops: [number, string][] = [];
   let color: string = track;
@@ -227,7 +227,7 @@ function bars(readings: GaugeReading[], theme: ChartTheme): EChartsOption {
         type: "bar",
         barMaxWidth: 18,
         showBackground: true,
-        backgroundStyle: { color: theme.grid },
+        backgroundStyle: { color: theme.track },
         data: readings.map((r) => ({
           value: r.fraction,
           itemStyle: { color: tokenHex(r.color, theme) },

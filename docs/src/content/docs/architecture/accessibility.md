@@ -401,6 +401,101 @@ read as text on `surface-2` is too light to carry white at AA.
 | primary button | 7.67:1 | 7.21:1 |
 | danger button | 7.26:1 | 6.23:1 |
 
+### high-contrast
+
+| Pairing | Dark | Light |
+| --- | --- | --- |
+| text-foreground on bg-background | 20.62:1 | 21.00:1 |
+| text-foreground on bg-surface | 20.50:1 | 20.47:1 |
+| text-foreground on bg-surface-2 | 19.17:1 | 18.43:1 |
+| text-muted on bg-background | 14.33:1 | 10.86:1 |
+| text-muted on bg-surface | 14.24:1 | 10.59:1 |
+| text-muted on bg-surface-2 | 13.32:1 | 9.53:1 |
+| text-primary on bg-background | 11.91:1 | 9.75:1 |
+| text-primary on bg-surface | 11.84:1 | 9.50:1 |
+| text-primary on bg-surface-2 | 11.07:1 | 8.55:1 |
+| text-danger on bg-background | 8.66:1 | 8.05:1 |
+| text-danger on bg-surface | 8.61:1 | 7.84:1 |
+| text-danger on bg-surface-2 | 8.05:1 | 7.06:1 |
+| text-warning on bg-background | 16.07:1 | 12.89:1 |
+| text-warning on bg-surface | 15.98:1 | 12.57:1 |
+| text-warning on bg-surface-2 | 14.94:1 | 11.31:1 |
+| text-success on bg-background | 13.41:1 | 9.17:1 |
+| text-success on bg-surface | 13.33:1 | 8.93:1 |
+| text-success on bg-surface-2 | 12.47:1 | 8.04:1 |
+| text-foreground on hover:bg-surface-3 | 16.48:1 | 16.06:1 |
+| text-danger on bg-danger/5 (badges, alerts) | 8.66:1 | 8.05:1 |
+| text-danger on bg-danger/10 (badges, alerts) | 8.66:1 | 8.05:1 |
+| text-danger on bg-danger/15 (badges, alerts) | 8.66:1 | 8.05:1 |
+| text-danger on bg-danger/20 (badges, alerts) | 8.66:1 | 8.05:1 |
+| text-warning on bg-warning/5 (badges, alerts) | 16.07:1 | 12.89:1 |
+| text-warning on bg-warning/10 (badges, alerts) | 16.07:1 | 12.89:1 |
+| text-warning on bg-warning/15 (badges, alerts) | 16.07:1 | 12.89:1 |
+| text-warning on bg-warning/20 (badges, alerts) | 16.07:1 | 12.89:1 |
+| text-success on bg-success/5 (badges, alerts) | 13.41:1 | 9.17:1 |
+| text-success on bg-success/10 (badges, alerts) | 13.41:1 | 9.17:1 |
+| text-success on bg-success/15 (badges, alerts) | 13.41:1 | 9.17:1 |
+| text-success on bg-success/20 (badges, alerts) | 13.41:1 | 9.17:1 |
+| text-primary on bg-primary/10 | 10.38:1 | 7.94:1 |
+| text-foreground on a success status tile | 13.41:1 | 9.17:1 |
+| text-foreground on a warning status tile | 16.07:1 | 12.89:1 |
+| text-foreground on a danger status tile | 8.66:1 | 8.05:1 |
+| text-foreground on a info status tile | 11.91:1 | 9.75:1 |
+| text-foreground on a neutral status tile | 14.33:1 | 10.86:1 |
+| text-foreground on a orange status tile | 10.67:1 | 6.22:1 |
+| text-foreground on a purple status tile | 7.80:1 | 6.65:1 |
+| text-foreground on a teal status tile | 7.07:1 | 6.20:1 |
+| success as text on bg-background | 13.41:1 | 9.17:1 |
+| success as text on bg-surface | 13.33:1 | 8.93:1 |
+| success as text on bg-surface-2 | 12.47:1 | 8.04:1 |
+| warning as text on bg-background | 16.07:1 | 12.89:1 |
+| warning as text on bg-surface | 15.98:1 | 12.57:1 |
+| warning as text on bg-surface-2 | 14.94:1 | 11.31:1 |
+| danger as text on bg-background | 8.66:1 | 8.05:1 |
+| danger as text on bg-surface | 8.61:1 | 7.84:1 |
+| danger as text on bg-surface-2 | 8.05:1 | 7.06:1 |
+| info as text on bg-background | 11.91:1 | 9.75:1 |
+| info as text on bg-surface | 11.84:1 | 9.50:1 |
+| info as text on bg-surface-2 | 11.07:1 | 8.55:1 |
+| neutral as text on bg-background | 14.33:1 | 10.86:1 |
+| neutral as text on bg-surface | 14.24:1 | 10.59:1 |
+| neutral as text on bg-surface-2 | 13.32:1 | 9.53:1 |
+| orange as text on bg-background | 10.67:1 | 6.22:1 |
+| orange as text on bg-surface | 10.61:1 | 6.06:1 |
+| orange as text on bg-surface-2 | 9.92:1 | 5.46:1 |
+| purple as text on bg-background | 7.80:1 | 6.65:1 |
+| purple as text on bg-surface | 7.75:1 | 6.49:1 |
+| purple as text on bg-surface-2 | 7.25:1 | 5.84:1 |
+| teal as text on bg-background | 7.07:1 | 6.20:1 |
+| teal as text on bg-surface | 7.03:1 | 6.04:1 |
+| teal as text on bg-surface-2 | 6.57:1 | 5.44:1 |
+| chart text on bg-background | 14.33:1 | 10.86:1 |
+| chart text on bg-surface | 14.24:1 | 10.59:1 |
+| chart text on bg-surface-2 | 13.32:1 | 9.53:1 |
+| chart series 1 on bg-surface | 11.84:1 | 9.50:1 |
+| chart series 2 on bg-surface | 14.27:1 | 6.25:1 |
+| chart series 3 on bg-surface | 10.61:1 | 6.06:1 |
+| chart series 4 on bg-surface | 6.87:1 | 4.27:1 |
+| chart series 5 on bg-surface | 7.75:1 | 6.49:1 |
+| chart series 6 on bg-surface | 7.03:1 | 6.04:1 |
+| chart series 7 on bg-surface | 5.87:1 | 11.46:1 |
+| chart series 8 on bg-surface | 17.64:1 | 15.51:1 |
+| primary button | 11.91:1 | 9.75:1 |
+| danger button | 8.66:1 | 8.05:1 |
+
+## High contrast and forced colors
+
+The High contrast theme holds every text at 7:1 and every border at 4.5:1,
+and draws tints as solid fills. Its tables are above, and its rules are on
+[Theming](/architecture/theming/#quality-bar). Under the operating system's
+forced colors, filled and tinted elements get an outline and focus is drawn
+in `Highlight`. Charts redraw in system colors
+([Theming](/architecture/theming/#forced-colors)). The e2e suite emulates
+forced colors and checks the chart opt-out, the outlines and the focus
+color directly. axe-core cannot measure contrast in that mode.
+
+![A line chart under forced colors: white axes and labels on black, series in the system's cyan, yellow and white.](/images/themes/forced-colors.png)
+
 ## Automated checks
 
 - `npm test`: the contrast table above, the chart table and description

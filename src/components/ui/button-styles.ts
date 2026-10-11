@@ -15,7 +15,10 @@ const VARIANTS: Record<Variant, string> = {
   secondary:
     "bg-surface-2 text-foreground hover:bg-surface border border-border disabled:opacity-50",
   ghost: "bg-transparent text-foreground hover:bg-surface-2 disabled:opacity-50",
-  danger: "bg-danger text-primary-foreground hover:opacity-90 disabled:opacity-50",
+  // The fill is --tint-danger, fixed on the theme's element, so a danger
+  // button inside a tinted notice keeps its fill where `.tinted` swaps the
+  // status inks (#506).
+  danger: "bg-tint-danger text-primary-foreground hover:opacity-90 disabled:opacity-50",
 };
 
 const SIZES: Record<Size, string> = {

@@ -16,8 +16,14 @@ export interface ChartTheme {
   text: string;
   /** Axis lines and pie label lines: `--chart-axis`. */
   line: string;
-  /** Grid lines, a gauge's track, a bar's background: `--chart-grid`. */
+  /** Grid lines: `--chart-grid`. */
   grid: string;
+  /**
+   * A gauge's track and a bar's background, under a label: `--chart-track`.
+   * Its own token, because high contrast makes the grid visible (#506) and a
+   * label must still read on the track.
+   */
+  track: string;
   /** The one value a gauge writes large: `--foreground`. */
   foreground: string;
   /** What a chart sits on, for an exported image: `--surface`. */
@@ -45,6 +51,7 @@ export const DEFAULT_CHART_THEME: ChartTheme = {
   text: oklchToHex({ l: 0.7, c: 0.02, h: 265 }),
   line: oklchToHex({ l: 0.35, c: 0.02, h: 265 }),
   grid: oklchToHex({ l: 0.26, c: 0.02, h: 265 }),
+  track: oklchToHex({ l: 0.26, c: 0.02, h: 265 }),
   foreground: oklchToHex({ l: 0.96, c: 0.01, h: 265 }),
   background: oklchToHex({ l: 0.21, c: 0.02, h: 265 }),
   series: [
@@ -100,6 +107,7 @@ export function readChartTheme(
     text: read("--chart-text", d.text),
     line: read("--chart-axis", d.line),
     grid: read("--chart-grid", d.grid),
+    track: read("--chart-track", d.track),
     foreground: read("--foreground", d.foreground),
     background: read("--surface", d.background),
     series: Array.from({ length: SERIES_COUNT }, (_, i) =>
@@ -113,6 +121,49 @@ export function readChartTheme(
       read("--chart-div-mid", d.diverging[1]),
       read("--chart-div-high", d.diverging[2]),
     ],
+    tokens,
+  };
+}
+
+/** The media query for the operating system's forced colors (Windows High Contrast). */
+export const FORCED_COLORS_QUERY = "(forced-colors: active)";
+
+/**
+ * A chart's colors when the operating system forces its own (#506).
+ *
+ * Forced colors replace every CSS color with a system one but cannot reach
+ * into a canvas, so a chart drawn in the page's tokens can vanish into the
+ * system background. The chart's container opts out of the adjustment
+ * (`forced-color-adjust: none` in `globals.css`) and draws in the system
+ * colors instead: `CanvasText` for text and lines, `Canvas` behind, and the
+ * few other system colors for series. They are not many, so series lean on
+ * order and the "Patterns in charts" setting more than on hue.
+ *
+ * `system` resolves a system color keyword to a hex string; the hook does
+ * that with a probe element.
+ */
+export function forcedColorsTheme(system: (keyword: string) => string): ChartTheme {
+  const text = system("CanvasText");
+  const gray = system("GrayText");
+  const highlight = system("Highlight");
+  const link = system("LinkText");
+  const visited = system("VisitedText");
+  const tokens = Object.fromEntries(
+    (Object.keys(COLOR_TOKENS) as ColorToken[]).map((t) => [
+      t,
+      t === "neutral" ? gray : text,
+    ]),
+  ) as Record<ColorToken, string>;
+  return {
+    text,
+    line: text,
+    grid: gray,
+    track: system("Canvas"),
+    foreground: text,
+    background: system("Canvas"),
+    series: [highlight, link, text, visited, gray, highlight, link, text],
+    sequential: [gray, gray, link, highlight, text],
+    diverging: [link, gray, highlight],
     tokens,
   };
 }

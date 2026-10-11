@@ -126,7 +126,7 @@ function FixedRangeBadge({
   onChange: (range: TimeRange) => void;
 }) {
   return (
-    <span className="inline-flex items-center gap-1 bg-warning/15 py-0.5 pl-2 pr-1 text-xs font-medium text-warning">
+    <span className="inline-flex items-center gap-1 tinted bg-tint-warning/(--tint-15) py-0.5 pl-2 pr-1 text-xs font-medium text-warning">
       Fixed range
       <Button
         variant="ghost"

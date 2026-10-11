@@ -61,6 +61,7 @@
   --chart-text: var(--muted);
   --chart-axis: var(--border);
   --chart-grid: var(--surface-2);
+  --chart-track: var(--surface-2);
   /* The spec's palette-only color tokens: a series each, by family. A theme
      that orders its series differently points them elsewhere (#505). */
   --orange: var(--chart-3);
@@ -70,6 +71,24 @@
   --code-string: var(--success);
   --code-number: var(--warning);
   --code-comment: var(--muted);
+  /* Status tints (#506): a notice, badge or status tile is its status at a
+     low alpha, with that status as its text. Each alpha is a token, so a theme
+     can make tints solid fills; text inside one (`.tinted`) then takes
+     --tint-foreground. The fill colors are fixed here, on the theme's own
+     element, so `.tinted` can swap the text tokens without the fill following. */
+  --tint-5: 5%;
+  --tint-10: 10%;
+  --tint-15: 15%;
+  --tint-20: 20%;
+  --tint-danger: var(--danger);
+  --tint-warning: var(--warning);
+  --tint-success: var(--success);
+  --tint-foreground: var(--foreground);
+  --tinted-foreground: var(--foreground);
+  --tinted-muted: var(--muted);
+  --tinted-danger: var(--danger);
+  --tinted-warning: var(--warning);
+  --tinted-success: var(--success);
   --radius: 0;
 }
 
@@ -109,6 +128,7 @@
   --chart-text: var(--muted);
   --chart-axis: var(--border);
   --chart-grid: var(--surface-2);
+  --chart-track: var(--surface-2);
   --orange: var(--chart-3);
   --purple: var(--chart-5);
   --teal: var(--chart-6);
@@ -116,6 +136,15 @@
   --code-string: var(--success);
   --code-number: var(--warning);
   --code-comment: var(--muted);
+  --tint-danger: var(--danger);
+  --tint-warning: var(--warning);
+  --tint-success: var(--success);
+  --tint-foreground: var(--foreground);
+  --tinted-foreground: var(--foreground);
+  --tinted-muted: var(--muted);
+  --tinted-danger: var(--danger);
+  --tinted-warning: var(--warning);
+  --tinted-success: var(--success);
 }
 
 /*
@@ -355,8 +384,108 @@
   --radius: 4px;
 }
 
+/*
+ * High contrast (#506): for people who need more than AA. Every text token at
+ * 7:1 or more, borders at 4.5:1, the background and surface nearly one color
+ * so edges carry the structure, a grid you can see, and tints drawn as solid
+ * fills with --tint-foreground on them. Held to the high-contrast tier in
+ * src/lib/color/quality.ts.
+ */
+[data-palette="high-contrast"][data-theme="dark"] {
+  --background: oklch(0.1 0 0);
+  --surface: oklch(0.11 0 0);
+  --surface-2: oklch(0.17 0 0);
+  --surface-3: oklch(0.24 0 0);
+  --foreground: oklch(1 0 0);
+  --muted: oklch(0.88 0 0);
+  --border: oklch(0.68 0 0);
+  --border-strong: oklch(0.82 0 0);
+  --ring: oklch(0.9 0.18 100);
+  --selection: oklch(0.42 0.15 259);
+  --primary: oklch(0.82 0.12 235);
+  --primary-foreground: oklch(0.1 0 0);
+  --danger: oklch(0.76 0.16 22);
+  --warning: oklch(0.92 0.16 95);
+  --success: oklch(0.84 0.17 155);
+  --chart-1: oklch(0.82 0.12 235);
+  --chart-2: oklch(0.86 0.17 150);
+  --chart-3: oklch(0.8 0.15 65);
+  --chart-4: oklch(0.7 0.2 25);
+  --chart-5: oklch(0.72 0.17 300);
+  --chart-6: oklch(0.66 0.12 190);
+  --chart-7: oklch(0.66 0.22 340);
+  --chart-8: oklch(0.95 0.15 100);
+  --chart-seq-1: oklch(0.32 0.06 235);
+  --chart-seq-2: oklch(0.48 0.1 235);
+  --chart-seq-3: oklch(0.64 0.13 235);
+  --chart-seq-4: oklch(0.8 0.12 220);
+  --chart-seq-5: oklch(0.95 0.06 200);
+  --chart-div-low: oklch(0.72 0.14 235);
+  --chart-div-mid: oklch(0.4 0 0);
+  --chart-div-high: oklch(0.7 0.2 25);
+  --chart-grid: oklch(0.5 0 0);
+  --tint-5: 100%;
+  --tint-10: 100%;
+  --tint-15: 100%;
+  --tint-20: 100%;
+  --tint-foreground: oklch(0.1 0 0);
+  --tinted-foreground: var(--tint-foreground);
+  --tinted-muted: var(--tint-foreground);
+  --tinted-danger: var(--tint-foreground);
+  --tinted-warning: var(--tint-foreground);
+  --tinted-success: var(--tint-foreground);
+}
+
+[data-palette="high-contrast"][data-theme="light"] {
+  --background: oklch(1 0 0);
+  --surface: oklch(0.99 0 0);
+  --surface-2: oklch(0.955 0 0);
+  --surface-3: oklch(0.91 0 0);
+  --foreground: oklch(0 0 0);
+  --muted: oklch(0.36 0 0);
+  --border: oklch(0.45 0 0);
+  --border-strong: oklch(0.3 0 0);
+  --ring: oklch(0.42 0.22 265);
+  --selection: oklch(0.88 0.12 95);
+  --primary: oklch(0.4 0.2 262);
+  --primary-foreground: oklch(1 0 0);
+  --danger: oklch(0.45 0.19 25);
+  --warning: oklch(0.32 0.07 70);
+  --success: oklch(0.39 0.11 150);
+  --chart-1: oklch(0.4 0.2 262);
+  --chart-2: oklch(0.47 0.13 150);
+  --chart-3: oklch(0.5 0.13 60);
+  --chart-4: oklch(0.6 0.2 25);
+  --chart-5: oklch(0.5 0.2 305);
+  --chart-6: oklch(0.48 0.09 200);
+  --chart-7: oklch(0.36 0.15 340);
+  --chart-8: oklch(0.25 0 0);
+  --chart-seq-1: oklch(0.92 0.04 235);
+  --chart-seq-2: oklch(0.76 0.09 245);
+  --chart-seq-3: oklch(0.6 0.15 255);
+  --chart-seq-4: oklch(0.45 0.19 262);
+  --chart-seq-5: oklch(0.3 0.14 265);
+  --chart-div-low: oklch(0.42 0.18 262);
+  --chart-div-mid: oklch(0.9 0 0);
+  --chart-div-high: oklch(0.48 0.2 25);
+  --chart-grid: oklch(0.62 0 0);
+  --tint-5: 100%;
+  --tint-10: 100%;
+  --tint-15: 100%;
+  --tint-20: 100%;
+  --tint-foreground: oklch(1 0 0);
+  --tinted-foreground: var(--tint-foreground);
+  --tinted-muted: var(--tint-foreground);
+  --tinted-danger: var(--tint-foreground);
+  --tinted-warning: var(--tint-foreground);
+  --tinted-success: var(--tint-foreground);
+}
+
 @theme inline {
   --color-border-strong: var(--border-strong);
+  --color-tint-danger: var(--tint-danger);
+  --color-tint-warning: var(--tint-warning);
+  --color-tint-success: var(--tint-success);
   --color-ring: var(--ring);
   --color-chart-1: var(--chart-1);
   --color-chart-2: var(--chart-2);
@@ -708,6 +837,44 @@ html[data-vt="tab"] [role="tab"][aria-selected="true"] {
 }
 
 /* Selected text (#504): a tint the foreground stays readable on. */
+/*
+ * Inside a status tint (#506), text takes the --tinted-* inks. In every theme
+ * but high contrast they are the page's own colors, so this changes nothing;
+ * where a theme makes tints solid fills it points them at --tint-foreground.
+ * The fill itself is `bg-tint-<status>`, fixed on the theme's element above,
+ * so it does not follow the swap.
+ */
+.tinted {
+  --foreground: var(--tinted-foreground);
+  --muted: var(--tinted-muted);
+  --danger: var(--tinted-danger);
+  --warning: var(--tinted-warning);
+  --success: var(--tinted-success);
+}
+
+/*
+ * The operating system's forced colors (Windows High Contrast, #506). The
+ * system replaces every color and strips backgrounds, so what a background
+ * carried has to become an edge, and a chart's canvas, which the system
+ * cannot recolor, opts out and is drawn in system colors by `useChartTheme`.
+ */
+@media (forced-colors: active) {
+  [data-echarts-canvas] {
+    forced-color-adjust: none;
+    background-color: Canvas;
+  }
+  /* A tint, a status pill and a filled button were told apart by their fill;
+     an outline does not move the layout. */
+  [class*="bg-tint-"],
+  [class*="bg-primary"] {
+    outline: 1px solid CanvasText;
+    outline-offset: -1px;
+  }
+  :focus-visible {
+    outline-color: Highlight;
+  }
+}
+
 ::selection {
   background-color: var(--selection);
   color: var(--foreground);

@@ -18,6 +18,39 @@ designed set of colors that comes in both schemes, on `<html data-palette>`
 | Accent | `--primary`, `--primary-foreground` | Links, primary buttons |
 | Focus and selection | `--ring`, `--selection` | The focus outline, selected text |
 | Code | `--code-keyword`, `--code-string`, `--code-number`, `--code-comment` | SQL and PromQL highlighting |
+| Tints | `--tint-5` … `--tint-20`, `--tint-<status>`, `--tint-foreground`, `--tinted-*` | Status notices, badges and tiles (below) |
+
+## Status tints
+
+A notice, a badge or a status tile is its status color at a low alpha, with
+the status as its text. Markup draws one as
+`tinted bg-tint-<status>/(--tint-<n>)`:
+
+- `--tint-<n>` is the alpha, `10%` and so on, and a theme may change it.
+  High contrast sets every one to `100%`, so tints become solid fills.
+- `bg-tint-<status>` reads `--tint-<status>`. It is fixed on the theme's own
+  element, so it keeps the status color inside the tint.
+- `.tinted` points `--foreground`, `--muted` and the three status colors at
+  the `--tinted-*` inks. They are the page's own colors in every theme but
+  high contrast, where they are `--tint-foreground`, the ink that reads on a
+  solid fill.
+
+No component asks which theme is on, and `test/color-literals.test.ts` holds
+both rules: no bare `bg-<status>/<n>` tint, and no theme comparison in a
+component. `CONTRAST_PAIRS` measures each tint at its theme's alpha and ink.
+
+## Forced colors
+
+The operating system's forced colors (`@media (forced-colors: active)`)
+replace every color and strip backgrounds. `globals.css` gives tinted and
+filled elements an outline, since their fill no longer tells them apart, and
+draws focus in `Highlight`. A chart's container opts out of the adjustment
+(`forced-color-adjust: none`), because the system cannot recolor a canvas.
+`useChartTheme` then reads `forcedColorsTheme`: text and lines in
+`CanvasText` on `Canvas`, with series from the few other system colors.
+`e2e/a11y.spec.ts` emulates forced colors and asserts these rules directly.
+axe-core does not model forced colors: it would measure the page's own
+colors against the system's background.
 | Status | `--success`, `--warning`, `--danger` | Badges, alerts, thresholds |
 | Chart series | `--chart-1` … `--chart-8` | Categorical series, each at least 3:1 on `--surface` |
 | Chart ramps | `--chart-seq-1` … `--chart-seq-5`, `--chart-div-low/mid/high` | Sequential and diverging scales |
@@ -48,7 +81,8 @@ computed style off `<html>`.
 
 ## Shipped themes
 
-Holotable, Graphite, Fjord and Paper ship, each in both schemes. The
+Holotable, Graphite, Fjord, Paper and High contrast ship, each in both
+schemes. The
 [Themes](/guide/themes/) guide shows them and says what each is for. A
 theme sets every color token itself, so its intent does not depend on
 Holotable's values, and inherits only the aliases (`--chart-text`, the
@@ -110,5 +144,18 @@ draws its outline 2px out (`outline-offset-2`), so a band of surface always
 sits between the ring and the fill. One ring color can then work on every
 fill without a contrast pair for each.
 
-The built-in themes are held to the stricter tier. A theme file an operator
-supplies is checked at the operator tier, which relaxes body text to AA.
+The built-in themes are held to the built-in tier. A theme file an operator
+supplies is checked at the operator tier, which relaxes body text to AA. High
+contrast (`highContrast` in `PALETTE_INFO`) has its own, stricter tier:
+
+| Floor | Built in | High contrast |
+| --- | --- | --- |
+| Body text | 7:1 | 12:1 |
+| Every other text, statuses included | 4.5:1 | 7:1 |
+| `--border` / `--border-strong` | 1.3:1 / 3:1 | 4.5:1 / 4.5:1 |
+| A label on a solid fill | 4.5:1 | 7:1 |
+| Surface ladder | ΔL 0.015 | none; borders carry it |
+| `--chart-grid` on the surface | none | 3:1 |
+| `--tint-foreground` on each solid status fill | none | 7:1 |
+
+Statuses as text (`status-text`) are measured in every tier.

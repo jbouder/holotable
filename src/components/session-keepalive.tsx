@@ -104,7 +104,7 @@ export function SessionKeepalive({ expiresAt: initial }: { expiresAt: number }) 
 
   return (
     <Notice open={ended} role="alert">
-      <div className="flex flex-wrap items-center gap-3 border-b border-warning/30 bg-warning/10 px-4 py-2 text-sm sm:px-6">
+      <div className="flex flex-wrap items-center gap-3 border-b border-warning/30 tinted bg-tint-warning/(--tint-10) px-4 py-2 text-sm sm:px-6">
         <p className="flex-1">
           <span className="font-medium">Your session has ended.</span>{" "}
           <span className="text-muted">

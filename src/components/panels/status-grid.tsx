@@ -1,6 +1,7 @@
 import { DatumLinksBody } from "@/components/dashboard/DatumLinks";
 import type { PanelBodyProps } from "@/components/panels/types";
 import { STATUS_TILE_TINT } from "@/lib/color/contrast";
+import { cn } from "@/lib/utils";
 import { tokenCss } from "@/lib/panels/colors";
 import { StatusGridOptions } from "@/lib/panels/kinds/status-grid";
 import { readOptions } from "@/lib/panels/presentation";
@@ -63,6 +64,9 @@ function tileName(tile: StatusTile): string {
 
 function Tile({ tile }: { tile: StatusTile }) {
   const hex = tile.color ? tokenCss(tile.color) : undefined;
+  // The text of a colored tile takes the tint ink. It goes on the text, not
+  // the tile, whose fill names the status variable `.tinted` swaps.
+  const ink = hex ? "tinted" : undefined;
   return (
     <div
       className="flex h-full flex-col gap-0.5 rounded-md border border-l-4 border-border bg-surface-2 px-2 py-1.5"
@@ -70,22 +74,30 @@ function Tile({ tile }: { tile: StatusTile }) {
         hex
           ? {
               borderLeftColor: hex,
-              // Composited in sRGB, which is what `CONTRAST_PAIRS` measures.
-              backgroundColor: `color-mix(in srgb, ${hex} ${STATUS_TILE_TINT * 100}%, var(--surface-2))`,
+              // Composited in sRGB, which is what `CONTRAST_PAIRS` measures, at
+              // the theme's tint alpha: a solid fill in high contrast (#506).
+              backgroundColor: `color-mix(in srgb, ${hex} var(--tint-${STATUS_TILE_TINT * 100}), var(--surface-2))`,
             }
           : undefined
       }
     >
-      <span className="truncate text-xs text-foreground" title={tile.label}>
+      <span className={cn("truncate text-xs text-foreground", ink)} title={tile.label}>
         {tile.label}
       </span>
       {tile.text && (
-        <span className="truncate text-base font-semibold tabular-nums text-foreground">
+        <span
+          className={cn(
+            "truncate text-base font-semibold tabular-nums text-foreground",
+            ink,
+          )}
+        >
           {tile.text}
         </span>
       )}
       {tile.state && (
-        <span className="truncate text-xs font-medium text-foreground">{tile.state}</span>
+        <span className={cn("truncate text-xs font-medium text-foreground", ink)}>
+          {tile.state}
+        </span>
       )}
     </div>
   );

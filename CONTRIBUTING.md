@@ -481,7 +481,9 @@ Match the surrounding code rather than importing conventions from elsewhere.
   [Accessibility](docs/src/content/docs/architecture/accessibility.md)), and
   every theme clears the quality bar (`test/theme-quality.test.ts`; run
   `npm run themes:check` while tuning tokens, and see
-  [Theming](docs/src/content/docs/architecture/theming.md)); a chart goes
+  [Theming](docs/src/content/docs/architecture/theming.md)). A status tint
+  goes through the tint tokens (`tinted bg-tint-<status>/(--tint-<n>)`), so
+  high contrast can make it solid; a chart goes
   through `AccessibleChart`, a link styled as a button is
   `ButtonLink`, and an icon-only control has an `aria-label`.
 - This is Next.js 16 and React 19. Check the installed docs in

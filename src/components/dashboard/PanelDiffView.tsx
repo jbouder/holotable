@@ -18,8 +18,9 @@ import { cn } from "@/lib/utils";
  */
 
 const LINE_STYLES: Record<SqlLine["kind"], string> = {
-  add: "bg-success/10 text-foreground",
-  remove: "bg-danger/10 text-muted line-through decoration-danger/40",
+  add: "tinted bg-tint-success/(--tint-10) text-foreground",
+  remove:
+    "tinted bg-tint-danger/(--tint-10) text-muted line-through decoration-danger/40",
   context: "text-muted",
 };
 
@@ -45,13 +46,15 @@ export function FieldRow({
       <span className="text-muted">{label}</span>
       {changed ? (
         <span className="flex flex-wrap items-center gap-1.5">
-          <span className="bg-danger/10 px-1.5 py-0.5 text-muted line-through decoration-danger/40">
+          <span className="tinted bg-tint-danger/(--tint-10) px-1.5 py-0.5 text-muted line-through decoration-danger/40">
             {before}
           </span>
           <span aria-hidden="true" className="text-muted">
             →
           </span>
-          <span className="bg-success/10 px-1.5 py-0.5 text-foreground">{after}</span>
+          <span className="tinted bg-tint-success/(--tint-10) px-1.5 py-0.5 text-foreground">
+            {after}
+          </span>
         </span>
       ) : (
         <span className="text-foreground">{before}</span>

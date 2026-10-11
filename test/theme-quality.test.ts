@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs";
 import { test } from "node:test";
 import { hexToRgb, parseThemeBlocks } from "@/lib/color/contrast";
 import { DEFICIENCIES, deltaE, MACHADO, simulate } from "@/lib/color/cvd";
-import { qualityReport } from "@/lib/color/quality";
+import { type QualityTier, qualityReport } from "@/lib/color/quality";
 import { PALETTE_INFO } from "@/lib/theme";
 
 /*
@@ -16,10 +16,16 @@ import { PALETTE_INFO } from "@/lib/theme";
 const CSS = readFileSync(new URL("../src/app/globals.css", import.meta.url), "utf8");
 const BLOCKS = parseThemeBlocks(CSS);
 
-test("every shipped theme clears the built-in quality bar in both schemes", () => {
+/** The tier a shipped theme is held to: high contrast its own, every other built in. */
+const tierOf = (palette: string) =>
+  PALETTE_INFO.find((p) => p.name === palette)?.highContrast
+    ? "high-contrast"
+    : "builtin";
+
+test("every shipped theme clears its quality bar in both schemes", () => {
   assert.ok(BLOCKS.length >= 2);
   const failures = BLOCKS.flatMap((b) =>
-    qualityReport(b.tokens, "builtin")
+    qualityReport(b.tokens, tierOf(b.palette))
       .filter((m) => !m.ok)
       .map(
         (m) =>
@@ -52,13 +58,23 @@ test("a broken token fails and names its rule", () => {
   assert.ok(qualityReport(merged).some((m) => m.rule === "status-distinct" && !m.ok));
 });
 
-test("the operator tier holds body text at AA, the built-in tier at AAA", () => {
-  const dark = BLOCKS.find((b) => b.palette === "holotable" && b.scheme === "dark");
-  assert.ok(dark);
-  const floor = (tier: "builtin" | "operator") =>
-    qualityReport(dark.tokens, tier).find((m) => m.rule === "foreground")?.floor;
-  assert.equal(floor("builtin"), 7);
-  assert.equal(floor("operator"), 4.5);
+test("the tiers: body text at AA for an operator, AAA built in, 12:1 in high contrast", () => {
+  const hc = BLOCKS.find((b) => b.palette === "high-contrast" && b.scheme === "dark");
+  assert.ok(hc);
+  const floor = (tier: QualityTier, rule: string, where?: string) =>
+    qualityReport(hc.tokens, tier).find(
+      (m) => m.rule === rule && (!where || m.where === where),
+    )?.floor;
+  assert.equal(floor("operator", "foreground"), 4.5);
+  assert.equal(floor("builtin", "foreground"), 7);
+  assert.equal(floor("high-contrast", "foreground"), 12);
+  // #506: every text at 7:1 and every edge at 4.5:1 in high contrast.
+  assert.equal(floor("high-contrast", "muted"), 7);
+  assert.equal(floor("high-contrast", "status-text"), 7);
+  assert.equal(floor("high-contrast", "border", "border on surface"), 4.5);
+  // And only there are tints solid, so only there is their ink measured.
+  assert.ok(qualityReport(hc.tokens, "high-contrast").some((m) => m.rule === "tint-ink"));
+  assert.ok(!qualityReport(hc.tokens, "builtin").some((m) => m.rule === "tint-ink"));
 });
 
 /*

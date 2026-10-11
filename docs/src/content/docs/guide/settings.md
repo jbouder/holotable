@@ -48,7 +48,8 @@ The same information is available to scripts from `GET /api/me`.
 ### Appearance
 
 **Color scheme** is Light, Dark or System. **Theme** is the named set of
-colors the scheme comes in: Holotable, Graphite, Fjord or Paper. Both are also
+colors the scheme comes in: Holotable, Graphite, Fjord, Paper or High
+contrast. Both are also
 in the command palette. Both are kept in this browser and apply before the
 page draws. An operator sets the theme a new browser starts with
 (`THEME_DEFAULT_PALETTE`). [Themes](/guide/themes/) shows each one and what it

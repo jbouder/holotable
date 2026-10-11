@@ -229,6 +229,9 @@ Checked, not hoped for:
   in `src/lib/color/quality.ts` (`test/theme-quality.test.ts`): borders,
   the focus ring (`outline-ring`, never `outline-primary`), selection, code
   colors, and statuses and series distinct under a color-vision deficiency.
+  A status tint is `tinted bg-tint-<status>/(--tint-<n>)`, never a bare
+  `bg-<status>/<n>`, and no component asks which theme is on
+  (`test/color-literals.test.ts`).
 - A chart goes through `AccessibleChart`; a link styled as a button is
   `ButtonLink` (never `<Link><Button>`); an icon-only control has an
   `aria-label`; every input has a label; focus is visible and keyboard order

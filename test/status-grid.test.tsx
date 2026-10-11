@@ -199,7 +199,10 @@ test("each tile writes its label, value and state, so color is never the only si
   assert.match(html, /web-10/);
   assert.match(html, /75/);
   // A tinted tile, and no text drawn in the tint's color.
-  assert.match(html, /color-mix\(in srgb, var\(--[a-z0-9-]+\) 20%, var\(--surface-2\)\)/);
+  assert.match(
+    html,
+    /color-mix\(in srgb, var\(--[a-z0-9-]+\) var\(--tint-20\), var\(--surface-2\)\)/,
+  );
   assert.doesNotMatch(html, /[^-]color:\s*#/);
 });
 

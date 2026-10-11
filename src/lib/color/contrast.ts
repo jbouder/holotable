@@ -51,6 +51,17 @@ export interface ThemeBlock {
   palette: string;
   scheme: ThemeName;
   tokens: Record<string, Rgb>;
+  /** Percentage tokens as fractions: the tint alphas (`--tint-10: 10%`, #506). */
+  alphas: Record<string, number>;
+}
+
+function resolveAlphas(decls: Record<string, string>): Record<string, number> {
+  const out: Record<string, number> = {};
+  for (const [name, value] of Object.entries(decls)) {
+    const pct = /^(\d+(?:\.\d+)?)%$/.exec(value);
+    if (pct) out[name] = Number(pct[1]) / 100;
+  }
+  return out;
 }
 
 /** A block's custom properties, as written. */
@@ -89,6 +100,10 @@ function resolveDecls(decls: Record<string, string>): Record<string, Rgb> {
  * unqualified blocks (`:root, [data-theme="dark"]` and `[data-theme="light"]`);
  * any other palette is `[data-palette="<name>"][data-theme="dark|light"]`.
  */
+function resolveBlock(decls: Record<string, string>) {
+  return { tokens: resolveDecls(decls), alphas: resolveAlphas(decls) };
+}
+
 export function parseThemeBlocks(css: string): ThemeBlock[] {
   const at = (selector: RegExp): number => {
     const m = selector.exec(css);
@@ -100,8 +115,12 @@ export function parseThemeBlocks(css: string): ThemeBlock[] {
     light: blockDecls(css, at(/(?:^|\n)\[data-theme="light"\]\s*\{/)),
   };
   const blocks: ThemeBlock[] = [
-    { palette: "holotable", scheme: "dark", tokens: resolveDecls(base.dark) },
-    { palette: "holotable", scheme: "light", tokens: resolveDecls(base.light) },
+    ...(["dark", "light"] as const).map((scheme) => ({
+      palette: "holotable",
+      scheme,
+      // The light block sits on the dark one's `:root` on <html>.
+      ...resolveBlock(scheme === "dark" ? base.dark : { ...base.dark, ...base.light }),
+    })),
   ];
   for (const m of css.matchAll(
     /\[data-palette="([a-z0-9-]+)"\]\[data-theme="(dark|light)"\]\s*\{/g,
@@ -111,7 +130,8 @@ export function parseThemeBlocks(css: string): ThemeBlock[] {
       palette: m[1],
       scheme,
       // On top of Holotable's block for the same scheme, as the cascade puts it.
-      tokens: resolveDecls({
+      ...resolveBlock({
+        ...base.dark,
         ...base[scheme],
         ...blockDecls(css, (m.index ?? 0) + m[0].length),
       }),
@@ -132,8 +152,13 @@ export interface ContrastPair {
   text: string;
   /** The background token, opaque. */
   on: string;
-  /** A tint of `tint` at this opacity over `on`, as `bg-<tint>/<n>` draws it. */
-  tint?: { token: string; alpha: number };
+  /**
+   * A tint of `tint` at this opacity over `on`, as `bg-<tint>/<n>` draws it.
+   * `tokenized` is a status tint drawn through the tint tokens (#506): its
+   * alpha is the theme's `--tint-<n>` and its text the `--tinted-*` ink, so
+   * a theme that makes tints solid is measured as it paints them.
+   */
+  tint?: { token: string; alpha: number; tokenized?: true };
   /**
    * The ratio required, when it is not AA for text: a chart series is a
    * graphic, held to the 3:1 of WCAG 1.4.11 (#502).
@@ -173,7 +198,7 @@ export const CONTRAST_PAIRS: readonly ContrastPair[] = [
     [0.05, 0.1, 0.15, 0.2].map((alpha) => ({
       text: status,
       on: "surface",
-      tint: { token: status, alpha },
+      tint: { token: status, alpha, tokenized: true as const },
       where: `text-${status} on bg-${status}/${alpha * 100} (badges, alerts)`,
     })),
   ),
@@ -186,7 +211,11 @@ export const CONTRAST_PAIRS: readonly ContrastPair[] = [
   ...(Object.keys(COLOR_TOKENS) as ColorToken[]).map((color) => ({
     text: "foreground",
     on: "surface-2",
-    tint: { token: COLOR_TOKENS[color].slice(2), alpha: STATUS_TILE_TINT },
+    tint: {
+      token: COLOR_TOKENS[color].slice(2),
+      alpha: STATUS_TILE_TINT,
+      tokenized: true as const,
+    },
     where: `text-foreground on a ${color} status tile`,
   })),
   // A spec color as text (a stat's number, #502), on every surface.
@@ -242,7 +271,7 @@ export function contrastTable(css: string): string {
 
 export function measureContrast(css: string): MeasuredPair[] {
   const blocks = parseThemeBlocks(css);
-  return blocks.flatMap(({ palette, scheme, tokens }) => {
+  return blocks.flatMap(({ palette, scheme, tokens, alphas }) => {
     const token = (name: string): Rgb => {
       const rgb = tokens[name];
       if (!rgb) throw new Error(`token --${name} is not defined in ${palette} ${scheme}`);
@@ -251,12 +280,23 @@ export function measureContrast(css: string): MeasuredPair[] {
     return CONTRAST_PAIRS.map((pair) => {
       const base = token(pair.on);
       const tint = pair.tint;
-      const bg = tint ? over(token(tint.token), tint.alpha, base) : base;
+      let bg = base;
+      let text = token(pair.text);
+      if (tint) {
+        // A tokenized tint takes the theme's alpha and, inside it, the
+        // `.tinted` ink (#506); both are the page's own values unless the
+        // theme changes them.
+        const alpha = tint.tokenized
+          ? (alphas[`tint-${Math.round(tint.alpha * 100)}`] ?? tint.alpha)
+          : tint.alpha;
+        bg = over(token(tint.token), alpha, base);
+        if (tint.tokenized) text = tokens[`tinted-${pair.text}`] ?? text;
+      }
       return {
         ...pair,
         palette,
         theme: scheme,
-        ratio: contrastRatio(token(pair.text), bg),
+        ratio: contrastRatio(text, bg),
       };
     });
   });

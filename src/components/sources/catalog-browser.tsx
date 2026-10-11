@@ -534,7 +534,7 @@ function HideImpactConfirm({
   return (
     <div
       role="alert"
-      className="drop-in basis-full space-y-2 border border-warning/40 bg-warning/5 px-3 py-2 text-xs"
+      className="drop-in basis-full space-y-2 border border-warning/40 tinted bg-tint-warning/(--tint-5) px-3 py-2 text-xs"
     >
       <p className="flex items-start gap-1.5 text-warning">
         <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden />

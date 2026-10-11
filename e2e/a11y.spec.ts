@@ -256,3 +256,42 @@ test("the named theme is on <html> before first paint", async ({ page }) => {
   await page.goto("/dashboards", { waitUntil: "domcontentloaded" });
   await expect(page.locator("html")).toHaveAttribute("data-palette", "holotable");
 });
+
+// The operating system's forced colors (#506): Windows High Contrast replaces
+// every color. axe-core does not model forced colors: it measures the page's
+// own colors against the system's Canvas and fails every text node. So this
+// asserts what the forced-colors rules in globals.css promise instead.
+test.describe("forced colors", () => {
+  test.beforeEach(async ({ page }) => {
+    await page.emulateMedia({ forcedColors: "active", colorScheme: "light" });
+    await setAppearance(page, "light");
+  });
+
+  test("a chart opts out and draws, a tint keeps an edge", async ({ page, request }) => {
+    await page.goto(`/dashboards/${await dashboardId(request, DEMO_DASHBOARD)}`);
+    await waitForPanels(page);
+    const canvas = page.locator("[data-echarts-canvas]").first();
+    await expect(canvas).toHaveCSS("forced-color-adjust", "none");
+    // A status pill was told apart by its fill, which the system strips.
+    const pill = page.locator(".tinted[class*='bg-tint-']").first();
+    await expect(pill).toHaveCSS("outline-style", "solid");
+  });
+
+  test("focus is drawn in the system's Highlight", async ({ page }) => {
+    await page.goto("/settings/appearance");
+    await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
+    const highlight = await page.evaluate(() => {
+      const probe = document.createElement("span");
+      probe.style.color = "Highlight";
+      document.body.append(probe);
+      const color = getComputedStyle(probe).color;
+      probe.remove();
+      return color;
+    });
+    const button = page.getByRole("button").first();
+    await button.focus();
+    await page.keyboard.press("Tab");
+    await page.keyboard.press("Shift+Tab");
+    await expect(button).toHaveCSS("outline-color", highlight);
+  });
+});

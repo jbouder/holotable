@@ -948,7 +948,7 @@ export function EditDashboardClient({
         return (
           <div
             key={sourceId}
-            className="flex flex-wrap items-center justify-between gap-3 border border-warning/40 bg-warning/10 px-3 py-2 text-sm"
+            className="flex flex-wrap items-center justify-between gap-3 border border-warning/40 tinted bg-tint-warning/(--tint-10) px-3 py-2 text-sm"
           >
             <p className="flex items-start gap-2">
               <Unplug className="mt-0.5 h-4 w-4 shrink-0 text-warning" />

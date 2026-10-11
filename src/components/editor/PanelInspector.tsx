@@ -206,7 +206,7 @@ export function PanelInspector({
       </div>
 
       {sourceMissing && (
-        <div className="mb-3 flex flex-wrap items-center justify-between gap-2 border border-warning/40 bg-warning/10 px-3 py-2 text-sm">
+        <div className="mb-3 flex flex-wrap items-center justify-between gap-2 border border-warning/40 tinted bg-tint-warning/(--tint-10) px-3 py-2 text-sm">
           <span>This panel&rsquo;s data source has been removed.</span>
           <Button variant="secondary" size="sm" onClick={onRepoint}>
             Re-point to another source

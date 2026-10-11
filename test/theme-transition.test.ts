@@ -101,13 +101,13 @@ test("a palette applies, stores and broadcasts like the scheme; only shipped one
   } finally {
     window.removeEventListener(PALETTE_EVENT, onPalette);
   }
-  // A reserved name with no CSS, or junk, reads back as the fallback.
-  window.localStorage.setItem(PALETTE_STORAGE_KEY, "high-contrast");
+  // A name the app does not ship reads back as the fallback.
+  window.localStorage.setItem(PALETTE_STORAGE_KEY, "neon");
   assert.equal(savedPalette(), "holotable");
   window.localStorage.setItem(PALETTE_STORAGE_KEY, "neon");
   assert.equal(savedPalette("holotable"), "holotable");
   assert.equal(isPalette("holotable"), true);
   assert.equal(isPalette("graphite"), true);
-  assert.equal(isPalette("high-contrast"), false, "reserved until it ships");
+  assert.equal(isPalette("high-contrast"), true);
   window.localStorage.removeItem(PALETTE_STORAGE_KEY);
 });
