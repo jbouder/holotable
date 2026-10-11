@@ -332,7 +332,7 @@ needs a test.
 
 ### Dependency updates
 
-Dependabot (`.github/dependabot.yml`) opens version updates weekly for the app,
+Dependabot (`.github/dependabot.yml`) opens version updates monthly for the app,
 the docs site, the hosted demo's Worker, both Dockerfiles' base images and the
 workflow actions. Minor and patch updates arrive grouped; each major arrives on
 its own. Review one like any other pull request: read the changelog for

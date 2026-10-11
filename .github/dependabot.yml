@@ -8,7 +8,7 @@
 # every update the same way they gate a hand-written change.
 #
 # Minor and patch updates arrive grouped, one pull request per ecosystem and
-# dependency type per week. A major is never in a group, so it arrives as its
+# dependency type per month. A major is never in a group, so it arrives as its
 # own pull request: a `next` or `react` major is a framework migration (see the
 # framework warning in AGENTS.md), not a version bump.
 #
@@ -41,7 +41,7 @@ updates:
   - package-ecosystem: npm
     directory: /
     schedule:
-      interval: weekly
+      interval: monthly
     ignore:
       # Node 25+ is not proposed; see the header.
       - dependency-name: "@types/node"
@@ -68,7 +68,7 @@ updates:
   - package-ecosystem: npm
     directory: /docs
     schedule:
-      interval: weekly
+      interval: monthly
     open-pull-requests-limit: 5
     commit-message:
       prefix: chore
@@ -88,7 +88,7 @@ updates:
   - package-ecosystem: npm
     directory: /deploy/cloudflare/demo
     schedule:
-      interval: weekly
+      interval: monthly
     ignore:
       # Node 25+ is not proposed; see the header.
       - dependency-name: "@types/node"
@@ -110,7 +110,7 @@ updates:
   - package-ecosystem: docker
     directory: /
     schedule:
-      interval: weekly
+      interval: monthly
     ignore:
       # Node 25+ is not proposed; see the header.
       - dependency-name: node
@@ -127,7 +127,7 @@ updates:
   - package-ecosystem: docker
     directory: /deploy/quickstart
     schedule:
-      interval: weekly
+      interval: monthly
     ignore:
       # Node 25+ is not proposed; see the header.
       - dependency-name: node
@@ -143,7 +143,7 @@ updates:
   - package-ecosystem: github-actions
     directory: /
     schedule:
-      interval: weekly
+      interval: monthly
     open-pull-requests-limit: 5
     commit-message:
       prefix: chore
@@ -160,7 +160,7 @@ updates:
   - package-ecosystem: github-actions
     directory: /.github/actions/setup
     schedule:
-      interval: weekly
+      interval: monthly
     open-pull-requests-limit: 5
     commit-message:
       prefix: chore

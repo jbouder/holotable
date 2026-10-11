@@ -744,7 +744,7 @@ settings sections tables to the code, and the Docs workflow fails on a broken
 link in the site or in the root markdown files.
 
 Dependency updates arrive from Dependabot (`.github/dependabot.yml`), grouped
-minor and patch updates weekly and each major on its own. They are reviewed and
+minor and patch updates monthly and each major on its own. They are reviewed and
 merged by a person like any other pull request; nothing auto-merges. A `next`
 or `react` major is a framework migration, not a version bump. Every action
 in `.github/workflows/` is pinned to a full commit SHA with its version as a
