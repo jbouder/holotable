@@ -91,6 +91,9 @@ test("a control inside a tint takes back every ink the tint swaps", () => {
   assert.ok(swap && restore, "both .tinted rules are in globals.css");
   assert.deepEqual(vars(restore[2]), vars(swap), "every swapped ink is restored");
   assert.ok(vars(swap).includes("--primary"), "links on a solid fill take the ink too");
+  // Bare text inherits a color computed above the notice; the notice states
+  // its own, in a layer the text utilities outrank.
+  assert.match(css, /@layer base \{\s*\.tinted \{\s*color: var\(--foreground\);/);
   for (const selector of ['[class*=" bg-surface"]', '[class*=" bg-primary"]', "input"]) {
     assert.ok(restore[1].includes(selector), selector);
   }
