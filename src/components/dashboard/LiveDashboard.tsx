@@ -12,8 +12,9 @@ import { VariablePickers } from "@/components/dashboard/VariablePicker";
 import { AnnotationsControl, useAnnotations } from "@/components/dashboard/Annotations";
 import type { PollerEvent } from "@/lib/poller/registry";
 import { DashboardGrid } from "@/components/dashboard/DashboardGrid";
-import { PanelView, type PanelState } from "@/components/dashboard/PanelView";
+import { PanelView } from "@/components/dashboard/PanelView";
 import {
+  type Datum,
   datumLinkItems,
   hasDatumLinks,
   type LinkTargets,
@@ -39,27 +40,19 @@ import {
   SESSION_EXPIRED_EVENT,
 } from "@/lib/sse";
 import { ensureSession, renewSession } from "@/lib/session-renewal";
-import { mergePanelRows } from "@/lib/stream-merge";
+import {
+  applyPollerEvents,
+  markStale,
+  type PanelState,
+  type PanelStates,
+} from "@/lib/panel-state";
 import { type QueryRows, readWindow } from "@/lib/panel-query";
+import type { Panel } from "@/lib/ir";
+import type { Annotation } from "@/lib/annotations";
 import { HIDDEN_STREAM_GRACE_MS } from "@/lib/stream-idle";
 import { isRolling, rangeSearch } from "@/lib/time-range";
 import { Notice } from "@/components/notice";
 import { useHiddenFor, useIdle } from "@/components/dashboard/use-stream-idle";
-
-/**
- * A panel that was live is now only as fresh as its last frame. Used on a
- * transport error, on the server's drain frame, and by the watchdog.
- *
- * `updatedAt` is deliberately left alone: it records when the data arrived, and
- * going stale does not change that. It is what the panel's tooltip reports.
- */
-function markStale(prev: Record<string, PanelState>): Record<string, PanelState> {
-  const out: Record<string, PanelState> = {};
-  for (const [k, v] of Object.entries(prev)) {
-    out[k] = v.status === "live" ? { ...v, status: "stale" } : v;
-  }
-  return out;
-}
 
 /**
  * Live dashboard viewer.
@@ -143,7 +136,7 @@ export function LiveDashboard({
     (picks: Selection) => setSelection((s) => ({ ...s, ...picks })),
     [],
   );
-  const [states, setStates] = React.useState<Record<string, PanelState>>({});
+  const [states, setStates] = React.useState<PanelStates>({});
   const [live, setLive] = React.useState(true);
   // Set when the idle timer, not the user, paused the stream, so the page can
   // say why the numbers stopped.
@@ -227,56 +220,37 @@ export function LiveDashboard({
     setConnection((prev) => reduceConnection(prev, s));
   }, []);
 
-  const applyEvent = React.useCallback(
-    (event: PollerEvent, at: number) => {
-      setStates((prev) => {
-        // Neither carries a panel id: a tick is freshness, a dashboard error is
-        // handled by the caller and shown above the grid.
-        if (event.type === "tick" || event.type === "dashboard-error") return prev;
-        const cur = prev[event.panelId];
-        if (event.type === "panel-error") {
-          return {
-            ...prev,
-            [event.panelId]: {
-              data: cur?.data ?? { columns: [], rows: [] },
-              status: "error",
-              error: { error: event.error, kind: event.kind },
-              updatedAt: cur?.updatedAt,
-            },
-          };
-        }
-        if (event.type === "panel-degraded") {
-          return {
-            ...prev,
-            [event.panelId]: {
-              data: cur?.data ?? { columns: [], rows: [] },
-              status: "degraded",
-              error: { error: event.error, kind: event.kind },
-              failures: event.failures,
-              retryAt: event.retryAt,
-              updatedAt: cur?.updatedAt,
-            },
-          };
-        }
-        if (event.type === "tombstone") {
-          return {
-            ...prev,
-            [event.panelId]: {
-              data: cur?.data ?? { columns: [], rows: [] },
-              status: "tombstoned",
-              updatedAt: cur?.updatedAt,
-            },
-          };
-        }
-        // event.type === "panel"
-        const next = mergePanelRows(cur?.data, event, maxWindowPoints);
-        return {
-          ...prev,
-          [event.panelId]: { data: next, status: "live", updatedAt: at },
-        };
-      });
+  /**
+   * The frames of one tick, applied together (#485). EventSource delivers each
+   * frame as its own task, so applying them as they come would be one React
+   * commit per panel; they wait here until the tick that closes the cycle, or
+   * the next animation frame for one that arrives on its own (a retry's
+   * result, a joiner's snapshot), and land in one update.
+   */
+  const pendingRef = React.useRef<PollerEvent[]>([]);
+  const flushScheduledRef = React.useRef<number | null>(null);
+  const flushEvents = React.useCallback(() => {
+    if (flushScheduledRef.current !== null) {
+      cancelAnimationFrame(flushScheduledRef.current);
+      flushScheduledRef.current = null;
+    }
+    const events = pendingRef.current;
+    if (events.length === 0) return;
+    pendingRef.current = [];
+    const at = Date.now();
+    setStates((prev) => applyPollerEvents(prev, events, maxWindowPoints, at));
+  }, [maxWindowPoints]);
+  const queueEvent = React.useCallback(
+    (event: PollerEvent) => {
+      pendingRef.current.push(event);
+      if (flushScheduledRef.current === null) {
+        flushScheduledRef.current = requestAnimationFrame(() => {
+          flushScheduledRef.current = null;
+          flushEvents();
+        });
+      }
     },
-    [maxWindowPoints],
+    [flushEvents],
   );
 
   /**
@@ -331,6 +305,7 @@ export function LiveDashboard({
       renewTriedRef.current = false;
       if (fresh) {
         fresh = false;
+        pendingRef.current = [];
         setStates({});
       }
       setDashboardError(null);
@@ -342,22 +317,29 @@ export function LiveDashboard({
       try {
         const event = JSON.parse(msg.data) as PollerEvent;
         if (event.type === "tick") {
+          // The cycle is complete: its frames land in this same commit.
+          flushEvents();
           lastTickRef.current = event.at;
           // Untrusted like the rest of the frame: kept only if it is a window.
-          setResolvedWindow(readWindow(event.window));
+          // An unchanged window keeps its identity, so it re-renders nothing.
+          const next = readWindow(event.window);
+          setResolvedWindow((prev) =>
+            prev && next && prev.from === next.from && prev.to === next.to ? prev : next,
+          );
           // A tick only arrives on a completed cycle, so it is also the signal
           // that whatever broke the last one is over.
           setDashboardError(null);
           signal({ type: "tick", at: event.at });
         }
         if (event.type === "dashboard-error") {
+          flushEvents();
           setDashboardError({ error: event.error, kind: event.kind });
           // The stream is healthy, the data behind it is not: every panel is
           // now only as fresh as its last frame, so say so rather than leave a
           // live badge over frozen charts.
           setStates(markStale);
         }
-        applyEvent(event, Date.now());
+        if (event.type !== "tick" && event.type !== "dashboard-error") queueEvent(event);
       } catch {
         /* ignore malformed frame */
       }
@@ -367,7 +349,8 @@ export function LiveDashboard({
       // the browser saying it will NOT retry — an expired session on the
       // stream route, typically — which is the one case a manual Reconnect
       // cannot fix by itself but must still be distinguishable from a retry
-      // already in flight.
+      // already in flight. Frames that arrived first are applied first.
+      flushEvents();
       setStates(markStale);
       const closed = es.readyState === EventSource.CLOSED;
       signal({ type: "error", closed });
@@ -388,6 +371,7 @@ export function LiveDashboard({
     // after a spread-out delay, so say "stale" now rather than wait out the
     // watchdog.
     const onDraining = () => {
+      flushEvents();
       setStates(markStale);
       signal({ type: "error", closed: false });
     };
@@ -442,8 +426,11 @@ export function LiveDashboard({
       es.removeEventListener(SESSION_EXPIRED_EVENT, onSessionExpired);
       es.removeEventListener(ACCESS_ENDED_EVENT, onAccessEnded);
       es.close();
+      // A closed stream's frames are applied now rather than dropped; a fresh
+      // one clears them on open.
+      flushEvents();
     };
-  }, [applyEvent, live, suspended, signal, streamUrl, reconnectNonce]);
+  }, [flushEvents, queueEvent, live, suspended, signal, streamUrl, reconnectNonce]);
 
   // Staleness watchdog. Disabled while paused — a paused dashboard is not stale.
   // An absolute window is frozen by definition: the poller keeps ticking, but
@@ -579,39 +566,109 @@ export function LiveDashboard({
         panels={spec.panels}
         empty={empty}
         renderPanel={(panel) => (
-          <PanelView
+          <LivePanel
             panel={panel}
             state={states[panel.id]}
-            onRetry={
-              states[panel.id]?.status === "degraded" && live && !shared
-                ? () => void retryPanel(panel.id)
-                : undefined
-            }
-            paused={!live}
-            timeRange={panelTimeRange(panel, timeRange)}
+            live={live}
+            shared={shared}
+            timeRange={timeRange}
+            selection={selection}
+            linkTargets={linkTargets}
             dashboardTitle={spec.title}
-            crosshairGroup={dashboardId}
-            onSelectTimeRange={shared ? undefined : setTimeRange}
-            embedded={shared}
-            // The other side of a share link has no session to follow one with.
-            links={
-              shared ? undefined : menuLinks(panel, linkTargets, { timeRange, selection })
-            }
-            datumLinks={
-              !shared && hasDatumLinks(panel, linkTargets)
-                ? (datum) =>
-                    datumLinkItems(panel, linkTargets, { timeRange, selection }, datum)
-                : undefined
-            }
-            onPick={shared ? undefined : pick}
-            // A panel with its own window (#114) is sent it with its rows.
-            window={panel.timeRange ? undefined : resolvedWindow}
-            // Hidden is an empty list rather than none, so the merge clears
-            // the marks instead of leaving them on the chart (invariant 11).
-            annotations={annotations && (annotationsShown ? annotations : [])}
+            dashboardId={dashboardId}
+            onRetry={retryPanel}
+            onSelectTimeRange={setTimeRange}
+            onPick={pick}
+            window={resolvedWindow}
+            annotations={annotations && (annotationsShown ? annotations : NO_ANNOTATIONS)}
           />
         )}
       />
     </div>
   );
 }
+
+/** Hidden annotations: one empty list, so hiding them renders each panel once. */
+const NO_ANNOTATIONS: Annotation[] = [];
+
+/**
+ * One panel of the live grid, deriving what `PanelView` takes from props
+ * that are stable across ticks (#485). Memoized like `PanelView`: a tick that
+ * leaves this panel's state alone renders neither, because nothing here is a
+ * fresh closure or array unless what it is built from changed.
+ */
+const LivePanel = React.memo(function LivePanel({
+  panel,
+  state,
+  live,
+  shared,
+  timeRange,
+  selection,
+  linkTargets,
+  dashboardTitle,
+  dashboardId,
+  onRetry,
+  onSelectTimeRange,
+  onPick,
+  window,
+  annotations,
+}: {
+  panel: Panel;
+  state: PanelState | undefined;
+  live: boolean;
+  shared: boolean;
+  timeRange: TimeRange;
+  selection: Selection;
+  linkTargets: LinkTargets;
+  dashboardTitle: string;
+  dashboardId: string;
+  onRetry: (panelId: string) => Promise<void>;
+  onSelectTimeRange: (range: TimeRange) => void;
+  onPick: (picks: Selection) => void;
+  window: QueryRows["window"];
+  annotations: Annotation[] | undefined;
+}) {
+  const degraded = state?.status === "degraded";
+  const retry = React.useMemo(
+    () => (degraded && live && !shared ? () => void onRetry(panel.id) : undefined),
+    [degraded, live, shared, onRetry, panel.id],
+  );
+  const panelRange = React.useMemo(
+    () => panelTimeRange(panel, timeRange),
+    [panel, timeRange],
+  );
+  // The other side of a share link has no session to follow one with.
+  const links = React.useMemo(
+    () => (shared ? undefined : menuLinks(panel, linkTargets, { timeRange, selection })),
+    [shared, panel, linkTargets, timeRange, selection],
+  );
+  const datumLinks = React.useMemo(
+    () =>
+      !shared && hasDatumLinks(panel, linkTargets)
+        ? (datum: Datum) =>
+            datumLinkItems(panel, linkTargets, { timeRange, selection }, datum)
+        : undefined,
+    [shared, panel, linkTargets, timeRange, selection],
+  );
+  return (
+    <PanelView
+      panel={panel}
+      state={state}
+      onRetry={retry}
+      paused={!live}
+      timeRange={panelRange}
+      dashboardTitle={dashboardTitle}
+      crosshairGroup={dashboardId}
+      onSelectTimeRange={shared ? undefined : onSelectTimeRange}
+      embedded={shared}
+      links={links}
+      datumLinks={datumLinks}
+      onPick={shared ? undefined : onPick}
+      // A panel with its own window (#114) is sent it with its rows.
+      window={panel.timeRange ? undefined : window}
+      // Hidden is an empty list rather than none, so the merge clears the
+      // marks instead of leaving them on the chart (invariant 11).
+      annotations={annotations}
+    />
+  );
+});

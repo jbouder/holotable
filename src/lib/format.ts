@@ -45,11 +45,31 @@ function withUnit(text: string, unit: string | undefined): string {
  */
 function fixed(n: number, decimals: number | undefined, d: NumberDisplay): string {
   if (decimals === undefined && !d.compact) return String(round(n, 2));
-  return n.toLocaleString(undefined, {
-    notation: d.compact ? "compact" : "standard",
-    minimumFractionDigits: decimals ?? 0,
-    maximumFractionDigits: decimals ?? 1,
-  });
+  return numberFormat(d.compact ? "compact" : "standard", decimals).format(n);
+}
+
+/**
+ * One `Intl.NumberFormat` per shape (#485): `toLocaleString` builds a new
+ * formatter on every call, and an axis or a table formats a value per row.
+ */
+const numberFormats = new Map<string, Intl.NumberFormat>();
+
+function numberFormat(
+  notation: "compact" | "standard",
+  decimals: number | undefined,
+  max: number = decimals ?? 1,
+): Intl.NumberFormat {
+  const key = `${notation}|${decimals ?? ""}|${max}`;
+  let format = numberFormats.get(key);
+  if (!format) {
+    format = new Intl.NumberFormat(undefined, {
+      notation,
+      minimumFractionDigits: decimals ?? 0,
+      maximumFractionDigits: max,
+    });
+    numberFormats.set(key, format);
+  }
+  return format;
 }
 
 function round(n: number, digits: number): number {
@@ -58,8 +78,7 @@ function round(n: number, digits: number): number {
 }
 
 function formatNumber(n: number): string {
-  if (Math.abs(n) >= 1000)
-    return n.toLocaleString(undefined, { maximumFractionDigits: 2 });
+  if (Math.abs(n) >= 1000) return numberFormat("standard", undefined, 2).format(n);
   return String(round(n, 3));
 }
 

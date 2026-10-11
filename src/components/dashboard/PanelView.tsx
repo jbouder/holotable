@@ -20,7 +20,7 @@ import { panelRenderer } from "@/components/panels/registry";
 import { formatClockTime } from "@/lib/connection";
 import { useChartTheme } from "@/components/chart-theme";
 import { useTimeDisplay } from "@/components/time-display";
-import type { ApiError } from "@/lib/errors";
+import type { PanelState, PanelStatus } from "@/lib/panel-state";
 import { PANEL_EXIT_SHORTCUT } from "@/lib/shortcuts";
 import { supportsImageExport } from "@/lib/panel-export";
 import { brushedRange, panelOverride, supportsTimeBrush } from "@/lib/time-range";
@@ -28,37 +28,19 @@ import { cn } from "@/lib/utils";
 import { type Box, DURATION_SLOW_MS, EASE_EMPHASIZED, flipFrom } from "@/lib/motion";
 import { useReducedMotion } from "@/components/motion-preference";
 
-export type PanelStatus =
-  | "loading"
-  | "live"
-  | "stale"
-  | "error"
-  | "degraded"
-  | "tombstoned";
-
-export interface PanelState {
-  data: PanelData;
-  status: PanelStatus;
-  error?: ApiError;
-  /**
-   * When this panel's data last arrived. Panels go stale independently — one
-   * failing query does not stop the others — so the dashboard-wide "updated Ns
-   * ago" is not the answer for any individual panel.
-   */
-  updatedAt?: number;
-  /**
-   * A `degraded` panel (#44): how many times it has failed in a row, and when
-   * the server tries it next. `retrying` is set while a viewer's "Retry now"
-   * waits for the result, which replaces the whole state when it arrives.
-   */
-  failures?: number;
-  retryAt?: number;
-  retrying?: boolean;
-}
+export type { PanelState, PanelStatus } from "@/lib/panel-state";
 
 const EMPTY: PanelData = { columns: [], rows: [] };
 
-export function PanelView({
+/**
+ * One panel on a page of them.
+ *
+ * Memoized (#485): a tick that changes one panel's rows renders that panel
+ * and no other, as long as the caller passes the same `state` object to a
+ * panel whose rows did not change (`applyPollerEvents` does) and stable
+ * callbacks. The props are compared shallowly.
+ */
+export const PanelView = React.memo(function PanelView({
   panel,
   state,
   onRetry,
@@ -235,7 +217,7 @@ export function PanelView({
       )}
     </>
   );
-}
+});
 
 /**
  * Fullscreen as a piece of state, with the keyboard contract that makes it a

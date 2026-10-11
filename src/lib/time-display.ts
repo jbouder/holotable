@@ -38,6 +38,38 @@ function intlZone(display: TimeDisplay): string | undefined {
   return display.timeZone === "local" ? undefined : display.timeZone;
 }
 
+/**
+ * One `Intl.DateTimeFormat` per locale and option set (#485).
+ *
+ * Constructing a formatter costs far more than using one, and a chart asks for
+ * a label per point: 720 points built 720 formatters, about 15 ms a chart per
+ * tick. The zone and the clock are part of the options, so a changed
+ * preference is a different key and never reads a formatter built for the old
+ * one. The key space is the zones a person picks times a handful of shapes;
+ * the cap only stops a pathological caller from growing it without bound.
+ */
+const formatters = new Map<string, Intl.DateTimeFormat>();
+const MAX_FORMATTERS = 256;
+
+export function cachedDateTimeFormat(
+  locale: string | undefined,
+  options: Intl.DateTimeFormatOptions,
+): Intl.DateTimeFormat {
+  const key = `${locale ?? ""}|${JSON.stringify(options)}`;
+  let format = formatters.get(key);
+  if (!format) {
+    if (formatters.size >= MAX_FORMATTERS) formatters.clear();
+    format = new Intl.DateTimeFormat(locale, options);
+    formatters.set(key, format);
+  }
+  return format;
+}
+
+/** How many formatters are cached; for the tests that hold the cache's keys. */
+export function cachedFormatterCount(): number {
+  return formatters.size;
+}
+
 function clockOptions(clock: Clock): Intl.DateTimeFormatOptions {
   if (clock === "12h") return { hourCycle: "h12" };
   if (clock === "24h") return { hourCycle: "h23" };
@@ -53,7 +85,7 @@ export function formatDateTime(
   display: TimeDisplay = LOCAL_TIME_DISPLAY,
   opts: { seconds?: boolean; year?: boolean } = {},
 ): string {
-  return date.toLocaleString(undefined, {
+  return cachedDateTimeFormat(undefined, {
     ...(opts.year ? { year: "numeric" } : {}),
     month: "short",
     day: "numeric",
@@ -62,7 +94,7 @@ export function formatDateTime(
     ...(opts.seconds ? { second: "2-digit" } : {}),
     timeZone: intlZone(display),
     ...clockOptions(display.clock),
-  });
+  }).format(date);
 }
 
 /**
@@ -75,14 +107,13 @@ export function formatClock(
   display: TimeDisplay = LOCAL_TIME_DISPLAY,
 ): string {
   const twelve = display.clock === "12h";
-  const text = new Intl.DateTimeFormat(twelve ? undefined : "en-GB", {
+  return cachedDateTimeFormat(twelve ? undefined : "en-GB", {
     hour: twelve ? "numeric" : "2-digit",
     minute: "2-digit",
     second: "2-digit",
     hourCycle: twelve ? "h12" : "h23",
     timeZone: intlZone(display),
   }).format(date);
-  return text;
 }
 
 interface WallTime {
@@ -106,7 +137,7 @@ export function wallTime(date: Date, display: TimeDisplay): WallTime {
       second: date.getSeconds(),
     };
   }
-  const parts = new Intl.DateTimeFormat("en-US", {
+  const parts = cachedDateTimeFormat("en-US", {
     timeZone: display.timeZone,
     hourCycle: "h23",
     year: "numeric",

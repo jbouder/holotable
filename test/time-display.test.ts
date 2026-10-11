@@ -2,9 +2,12 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
-import { timeAxisLabels } from "@/components/charts/options";
+import { lineChart, timeAxisLabels } from "@/components/charts/options";
+import { DEFAULT_CHART_THEME } from "@/lib/color/chart-theme";
+import { Panel } from "@/lib/ir";
 import { formatClockTime, formatAge } from "@/lib/connection";
 import {
+  cachedFormatterCount,
   formatClock,
   formatDateTime,
   fromZonedInput,
@@ -181,4 +184,55 @@ test("no date is formatted outside the shared helper", () => {
   };
   walk("src");
   assert.deepEqual(offenders, []);
+});
+
+/**
+ * The formatter cache (#485): one `Intl.DateTimeFormat` per zone, clock and
+ * shape. Reused across calls, and keyed so that a changed preference never
+ * reads a formatter built for the old one.
+ */
+test("formatters are reused, and a zone or clock change is a different one", () => {
+  const instant = at("2026-09-22T14:05:09Z");
+  formatDateTime(instant, UTC);
+  const warmed = cachedFormatterCount();
+  for (let i = 0; i < 100; i++) formatDateTime(instant, UTC);
+  assert.equal(cachedFormatterCount(), warmed);
+  // Warm caches for one zone and clock, then switch: the answer follows.
+  assert.match(formatDateTime(instant, BERLIN), /16:05/);
+  assert.match(formatDateTime(instant, NEW_YORK), /10:05/);
+  assert.match(formatDateTime(instant, { ...NEW_YORK, clock: "24h" }), /10:05/);
+  assert.doesNotMatch(formatDateTime(instant, { ...NEW_YORK, clock: "24h" }), /AM/i);
+  assert.match(formatClock(instant, UTC), /^14:05:09$/);
+  assert.match(formatClock(instant, BERLIN), /^16:05:09$/);
+  assert.match(formatClock(instant, { ...UTC, clock: "12h" }), /2:05:09/);
+});
+
+/**
+ * The spike's number (#485): a line chart's options for 720 points took
+ * ~13 ms, nearly all of it building a date formatter per label. Timing is
+ * machine-dependent, so it runs only with `BENCH=1`.
+ */
+test("line options for 720 points build in under a millisecond", {
+  skip: process.env.BENCH !== "1",
+}, () => {
+  const start = Date.parse("2026-10-11T00:00:00Z");
+  const rows = Array.from({ length: 720 }, (_, i) => ({
+    t: new Date(start + i * 60_000).toISOString(),
+    v: Math.sin(i / 20) * 100,
+  }));
+  const panel = Panel.parse({
+    id: "l",
+    title: "Requests",
+    viz: "line",
+    query: { sourceId: "src-1", sql: "SELECT t, v FROM m", timeField: "t" },
+    layout: { x: 0, y: 0, w: 6, h: 4 },
+  });
+  const data = { columns: ["t", "v"], rows };
+  const ctx = { display: UTC, theme: DEFAULT_CHART_THEME };
+  for (let i = 0; i < 20; i++) lineChart(panel, data, ctx);
+  const runs = 50;
+  const t0 = performance.now();
+  for (let i = 0; i < runs; i++) lineChart(panel, data, ctx);
+  const each = (performance.now() - t0) / runs;
+  assert.ok(each < 1, `${each.toFixed(3)} ms per build`);
 });
