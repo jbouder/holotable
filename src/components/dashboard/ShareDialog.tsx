@@ -289,7 +289,11 @@ export function ShareDialog({
         />
         {problem && <p className="text-xs text-danger">{problem}</p>}
         <div className="flex justify-end">
-          <Button onClick={() => void create()} disabled={busy}>
+          {/*
+            Focusable while busy: a disabled button drops its focus to the
+            page behind the modal, and the next Tab walks the page (#540).
+          */}
+          <Button onClick={() => void create()} disabled={busy} focusableWhenDisabled>
             {busy && <Loader2 className="h-4 w-4 animate-spin" />}
             Create link
           </Button>
