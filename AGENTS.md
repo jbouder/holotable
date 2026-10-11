@@ -1,507 +1,227 @@
 # AGENTS.md
 
-## Purpose
+Holotable is a natural-language dashboard builder for monitoring data. People
+describe a dashboard; a model writes a **validated spec** (never the data);
+the server runs the spec's guarded queries against TimescaleDB/PostgreSQL or
+Prometheus and streams the results.
 
-Holotable is a **natural-language dashboard builder for monitoring data**.
+This file is the rules a change has to follow. What each feature does and why
+is on the docs site (`docs/src/content/docs/`), which is canonical;
+`CONTRIBUTING.md` is the human-facing version of this file, so keep the two in
+step. Many rules below are held by a test named beside them: when one fails,
+it is telling you the rule.
 
-Users describe the dashboard they want in plain English. The model generates a
-**validated dashboard specification** (not the underlying data), and the app
-executes guarded SQL against TimescaleDB/PostgreSQL to render live dashboards.
+## Invariants
 
-When making changes, preserve these product invariants:
+- **The model generates specs, never data.** No flow where a model returns
+  metric values, the browser trusts model-produced points, or a chart skips
+  server-side execution.
+- **The Zod IR (`src/lib/ir.ts`) is the one contract** between generation,
+  APIs, persistence and rendering. Types are inferred from it; never add a
+  parallel TypeScript shape.
+- **Every query is untrusted**, whoever wrote it: SELECT-only, read-only,
+  allowlisted, row- and time-bounded, through the SQL guard
+  (`src/lib/sql/safety.ts`) or the PromQL guard (`src/lib/promql/safety.ts`).
+  Never weaken a guard for convenience.
+- **The server owns time.** The IR carries expressions like `now-15m`; only
+  the server resolves and enforces windows.
+- **Sources are opaque ids.** No connection detail, credential or secret in a
+  spec, a panel or anything sent to the browser.
+- **Authorization is `can()`** (`src/lib/auth/authorize.ts`), from the
+  validated token's `groups` claim (or a service-account token's one role).
+  Never from a workspace id in a request; re-authorize the source on every
+  execution, not only at the route.
 
-- The LLM generates **specs**, never raw metric values.
-- The **shared Zod IR** is the contract between generation, persistence, APIs,
-  and rendering.
-- SQL emitted or handled by the system is **untrusted** and must stay guarded.
-- The **server** is the authority for time windows and execution constraints.
-- Credentials/secrets must never be persisted in dashboard specs.
+## Next.js 16 and React 19
 
----
+Exact versions are in `package.json`. Do not assume older Next or React
+behavior: read the installed guides in `node_modules/next/dist/docs/` and
+follow the patterns already in the repository, especially for Server/Client
+Component boundaries, route handlers, streaming and config. App Router only;
+`"use client"` only where hooks, browser APIs or interaction need it.
 
-## Framework warning: treat this as Next.js 16, not generic “Next.js”
+## Where things are
 
-This repository uses:
+- `src/app/` routes and pages; `src/components/` UI, with primitives in
+  `src/components/ui/` (reuse before adding); `src/lib/` domain logic (keep
+  it out of pages, and test it there as functions).
+- `test/` the Node test runner (`*.test.ts`; `*.test.tsx` only for the rare
+  test that needs a real React unwind, through `test/support/dom.tsx`).
+  `e2e/` Playwright journeys and axe scans against their own stack.
+- `docs/` the Astro site (its own `package.json`). `deploy/` the Helm chart,
+  the quick-start image and the hosted demo (its own `package.json`, checked
+  by `.github/workflows/demo.yml`).
+- `.claude/skills/holotable/` the `/holotable` skill.
+  `test/holotable-skill.test.ts` holds its lists of panel kinds, formats and
+  color tokens to the code, so a change to those updates its `references/`.
 
-- `next@16.3.8`
-- `react@19.3.0`
-- App Router
-- Tailwind CSS v4
+## Extension points: register, never branch
 
-Do **not** assume behavior from older Next.js or React versions.
+Three registries own their kinds. Add a kind by registering it; never
+`switch` on, or compare, a kind outside its registry.
 
-Before changing framework-sensitive code, consult the installed docs in:
+- **Panel kinds**: `src/lib/panels/registry.ts`, one module per kind under
+  `kinds/`. Its renderer is one line in `src/components/panels/registry.ts`
+  and its click mapping one in `src/lib/drilldown-datum.ts`; neither
+  compiles without them. `panel.query` is optional (a text panel runs none):
+  filter with `hasQuery`. Read a panel's window and cadence through
+  `panelTimeRange` / `panelRefreshMs`.
+- **Source kinds**: `src/lib/sources/registry.ts` (browser half under
+  `kinds/`, server half under `server/`). Ask `sourceKind()` /
+  `serverKind()`; never import `src/lib/timescaledb/` from a route. Read a
+  query through `isSqlQuery` / `queryText` / `queryTimeField`, not its
+  fields. Held by `test/source-kinds.test.ts` and
+  `test/query-language.test.ts`.
+- **Model provider kinds**: `src/lib/ai/providers/registry.ts`. Ask
+  `kindOf()` / `serverProviderKind()`; never compare `provider` or import an
+  `@ai-sdk/*` package outside `src/lib/ai/providers/`. A server half passes
+  its credentials and the vendor's URL to the SDK explicitly, through the
+  fetch the registry picks. Held by `test/provider-kinds.test.ts`.
 
-- `node_modules/next/dist/docs/`
-- the current patterns already used in this repository
+The same idea elsewhere: `/settings` sections are data in
+`src/lib/settings.ts` (a gated section's page also calls `notFound()`), and
+audit actions are `AUDIT_ACTIONS` in `src/lib/audit.ts`, each held to the
+route that emits it by `test/audit.test.ts`. A new mutating route records an
+audit event.
 
-Be especially careful around:
+## Changing the IR
 
-- Server vs Client Component boundaries
-- routing/navigation APIs
-- request/runtime behavior in route handlers
-- streaming/data-fetching patterns
-- build/runtime config
-- React 19 behavior
+An additive, optional field needs nothing special. A change that would make a
+stored spec fail to parse (a renamed, removed or newly required field, a
+dropped kind) is breaking:
 
-Prefer following existing repository patterns over generic prior knowledge.
+- bump `SPEC_VERSION` and append an upgrader to `UPGRADERS` in
+  `src/lib/ir/upgrade.ts` (pure, on plain JSON, importing nothing from
+  `ir.ts`);
+- add fixtures of the new version beside the old ones in
+  `test/fixtures/specs/` (never edit one; `npm run fixture:capture` reads one
+  from a live dashboard), and rewrite the snapshots with
+  `UPDATE_SNAPSHOTS=1 npm test`;
+- read any spec you did not just build through `StoredDashboard`, never
+  `Dashboard`;
+- check SQL that reads raw `spec` jsonb (`VERSION_COLUMNS` in
+  `src/lib/db/repo.ts`, the source-impact queries), which assumes a
+  top-level `panels` array.
 
----
+## Security-sensitive code
 
-## Repository structure
+The paths in `.github/CODEOWNERS` (the SQL and PromQL guards, `auth/`,
+`secrets/`, the IR, time, row scope, variables, the base-URL guard,
+`metrics-access.ts`) are where a quiet regression is a vulnerability. A
+change there needs a test.
 
-Key locations:
+- **Guards.** Run `npm run test:fuzz` after any SQL or PromQL guard change.
+  Promote a counterexample into `test/fixtures/sql-fuzz-corpus.ts` (or
+  `promql-corpus.ts`) and a named test; never bend the generator around it.
+- **Query rewrites.** Row filters and variables work on the parse tree,
+  never a regex, and every rewrite is re-parsed and verified.
+  `buildExecutablePlan` takes `rowFilter` as a required input, bound with
+  `rowFilterFor` / `rowFilterInScope`. A variable's value is always a bound
+  parameter, never text.
+- **Model calls.** A generation route calls `requireModel(...)` before the
+  limits; every `streamObject` / `streamText` spreads
+  `...modelSettings(model)` and sets no `onError` of its own
+  (`test/ai-invoke.test.ts`). A new generation surface uses
+  `useRepairingObject`, not `useObject`.
+- **Untrusted URLs.** A typed model or source URL is fetched only through
+  the guarded fetch (`src/lib/ai/base-url.ts`, `src/lib/ai/guarded-fetch.ts`),
+  checked at DNS time, with a byte cap on the reply.
+- **Secrets and logs.** Credentials are sealed (`src/lib/secrets/seal.ts`),
+  never returned, and registered with `rememberSecret` when opened. Write
+  through `log` (`src/lib/log.ts`), never `console`; a log line never carries
+  a credential, and SQL and prompts are reduced to digests.
+- **Credentials that are not people.** Share links (`hts_`) are accepted
+  only by the stream route and `src/app/embed/` (`test/share.test.ts`); MCP
+  access tokens only by `/api/mcp` (`test/mcp-auth.test.ts`);
+  service-account tokens (`ht_`) are one workspace at viewer or editor,
+  never more. `Identity.displayName` and `email` never feed an authorization
+  decision.
+- **The browser sends ids, not statements.** Explore and chat send the
+  question; a stored panel reruns from its stored spec; a stored message
+  never holds result rows. A schema repair sends only `{ repairOf: id }`,
+  the rest comes from the server. A drilldown link names a dashboard by id,
+  resolved and re-checked on the server; the browser builds hrefs only to
+  those.
+- **Workspace scope.** Annotations, prompt context and every other
+  workspace-owned row are read and written with the workspace from the
+  record or the path, and every statement filters on it. An example query in
+  a workspace's prompt context passes the guard before it is saved and again
+  before the model sees it.
+- **Closed by default.** `/api/metrics` answers nothing until `METRICS_TOKEN`
+  or `METRICS_ALLOWED_CIDRS` is set. The realm's refresh token stays sealed
+  on the server; the browser holds only an opaque id scoped to `/api/auth`.
+- **CSP.** An inline `<script>` or `<style>` needs the nonce from
+  `src/proxy.ts`. Custom visuals (Vega) evaluate through `vega-interpreter`,
+  never `new Function`; only the modules listed in
+  `test/vega-runtime.test.ts` import Vega.
 
-- `src/app/` — App Router routes, layouts, pages, API routes
-- `src/components/` — UI and feature components
-- `src/lib/` — shared domain logic, schemas, formatting, utilities
-- `scripts/` — migration, seeding, integration-runner and fixture-capture
-  scripts
-- `test/` — Node test runner tests (`*.test.ts`; `*.test.tsx` for the few that
-  need a real render, via the jsdom harness in `test/support/dom.tsx`)
-- `docs/` — the Astro + Starlight documentation site (its own `package.json`;
-  content under `docs/src/content/docs/`)
-- `e2e/` — the Playwright suite (`npm run e2e`): journeys and axe scans
-  against its own stack in `e2e/compose.yml`, signed in through the realm
-- `timescaledb/` — database bootstrap/schema assets
-- `deploy/` — the Helm chart (`deploy/helm/holotable/`, with runnable example
-  values under `examples/`), a reference Argo CD `Application`, and the
-  all-in-one quick-start image (`deploy/quickstart/`: TimescaleDB, the server
-  and the demo jobs under one `entrypoint.sh`, in demo mode), and the hosted
-  demo (`deploy/cloudflare/demo/`: a Worker with per-IP limits fronting one
-  Cloudflare Container on that image; its own `package.json`, excluded from the
-  root `tsconfig`, checked by `.github/workflows/demo.yml`)
-- `.github/` — CI workflows, issue forms, the pull request template, `CODEOWNERS`,
-  `dependabot.yml`
-- `.claude/skills/holotable/` — the `/holotable` Claude Code skill (#147):
-  knowledge-only guidance for writing and reviewing specs, with no server
-  connection. `test/holotable-skill.test.ts` runs its examples through the IR
-  and the SQL guard and holds its lists of panel kinds, formats and color
-  tokens to the code, so a change to any of those updates the skill's
-  `references/` in the same pull request
+## Auth
 
-Important files:
+Keycloak OIDC is the only way a real person signs in. `src/app/api/auth/` has
+exactly five routes (`login`, `callback`, `logout`, `refresh`,
+`backchannel-logout`). Never add a development-only path or a seeded user;
+make the local Keycloak work instead.
 
-- `src/lib/ir.ts` — the canonical shared dashboard IR schema
-- `src/lib/ir/upgrade.ts` — the upgrader chain that brings a stored spec of any
-  earlier `specVersion` up to the current one before it is validated
-- `src/lib/panels/registry.ts` — the panel kinds (#61). `VizType`, the
-  generation prompt's viz list and the docs reference are built from it; each
-  kind is a module under `src/lib/panels/kinds/`, and its renderer is one line
-  in `src/components/panels/registry.ts`, which does not compile without one.
-  Never add a `switch` on `panel.viz`: register the kind instead. A kind
-  declares its `options` schema (validated as `panel.options`), whether it
-  runs a query at all (`query: "none"` for text, #202) and whether it needs a
-  time field. `panel.query` is optional because of that: anything that
-  executes, validates, lists or re-points queries filters with `hasQuery`.
-  Text-panel Markdown is rendered by `src/lib/markdown.ts` into React
-  elements, never as an HTML string. Options several kinds share (numbers,
-  legend, axis, thresholds, #115) are fragments in
-  `src/lib/panels/presentation.ts`; a kind's `optionGroups` names the ones
-  the editor draws controls for. A panel's own `timeRange` and
-  `refreshIntervalMs` (#114) are read through `panelTimeRange` and
-  `panelRefreshMs`; the poller groups panels by cadence under one timer
-- `src/lib/sources/registry.ts` — the source kinds (#382), as the panel
-  registry is the panel kinds. `SourceConfig` is the union of every kind's
-  config on `kind`; a kind's browser-safe module is under
-  `src/lib/sources/kinds/` (config schema, `connection`, `catalog`, `listing`,
-  `language`) and its server half under `src/lib/sources/server/`
-  (`discover`, `refresh`, `test`, `validate`, `plan`, `execute`, the catalog
-  prompt). Never compare `source.kind` or import `src/lib/timescaledb/` from a
-  route: ask `sourceKind(record)` or `serverKind(record)` and use what comes
-  back. `test/source-kinds.test.ts` fails on either outside `src/lib/sources/`
-- `src/lib/ai/providers/registry.ts` — the provider kinds (#438), as the
-  source and panel registries are: `openai-compatible`, `openai`,
-  `anthropic`, `google`, `gateway`, `azure`, `bedrock`, `mistral`, `xai`,
-  `stub`. A kind's browser-safe module is under `providers/kinds/` (its
-  `settings` and `credentials` schemas, form `fields`, `endpoint`,
-  `listsModels`) and its server half under `providers/server/` (`build`
-  with the vendor's SDK, `providerOptions`, `listModels`). `ModelSettings` is
-  the union of every kind's settings. Never compare a model's `provider` or
-  import an `@ai-sdk/*` package outside `src/lib/ai/providers/`: ask
-  `kindOf(settings)` or `serverProviderKind(settings)`.
-  `test/provider-kinds.test.ts` fails on either, and drives one request per
-  kind to check it reaches its own origin with its own credentials and
-  never the server's environment. A server half passes the credentials and
-  the vendor's URL to its SDK explicitly, and gets the fetch
-  `providers/server/registry.ts` picks (the base URL guard for a typed
-  endpoint, `pinnedFetch` to the vendor's origin otherwise)
-- `src/components/charts/vega-runtime.ts` and `src/lib/vega/compile.ts` — custom
-  visuals (#405): a Vega-Lite spec drawn over the panel's rows. The runtime
-  parses with `ast: true` and evaluates with `vega-interpreter`, because Vega's
-  default expression compiler uses `new Function` and the CSP has no
-  `'unsafe-eval'`; its loader refuses every URL. Both import Vega dynamically
-  (Vega's Node canvas module awaits at its top level), and they are the only
-  modules that name it; `test/vega-runtime.test.ts` holds that list.
-  `docs/src/content/docs/architecture/custom-visuals.md` is the decision
-- `src/lib/sql/safety.ts` — the SQL guard every generated query passes through
-- `src/lib/sources/server/types.ts` — `ServerSourceKind`, the one shape every
-  kind's server half has (#385): `check`, `plan`, `execute`, `planView`,
-  `labelValues`, `test`, `checkConfig`. The poller, `/api/query`, `/api/sql/*`,
-  variables, chat and the MCP tools call it and never ask which language they
-  hold; each kind refuses a query in the other language itself. Discovery,
-  refresh and the connection test are per kind too (#386); only what is SQL by
-  nature (hiding a column, its impact) stays behind `requireSqlSource`.
-  `src/lib/prometheus/` is the HTTP client (guarded fetch under
-  `SOURCE_URL_ALLOWLIST`, credentials per request, byte cap as the body
-  arrives), discovery and the test, and the conversion of results to wide
-  rows. A query is read through the IR's helpers (`isSqlQuery`, `queryText`,
-  `queryTimeField`), never its fields, outside the SQL modules;
-  `test/query-language.test.ts` holds that
-- `src/lib/promql/` — the PromQL guard (#384), the same guard for a
-  Prometheus source: `parse.ts` (the real grammar, `@prometheus-io/lezer-promql`),
-  `safety.ts` (`validatePromql`: allowlisted node types, the metric allowlist,
-  `@` refused, ranges bounded by `PROMQL_MAX_RANGE`, variables only as a
-  matcher's whole value), `variables.ts` and `row-filter.ts` (the rewrites,
-  each verified by re-parse) and `plan.ts`, and `completion.ts` (the editor's
-  metric and label completion, #388). `npm run test:fuzz` runs its fuzz suite
-  beside the SQL one
-- `src/lib/sql/ast.ts` — the PostgreSQL parse-tree walk the guard is built on
-- `src/lib/sql/row-filter.ts` — row-level filters (#31): every real table a
-  statement reads is spliced, at the parser's byte offsets, into a subquery
-  narrowed to the viewer's rows, and the result is re-parsed and verified.
-  `buildExecutablePlan` takes `rowFilter` as a required input; bind it with
-  `rowFilterFor`/`rowFilterInScope` (`src/lib/row-scope.ts`), which refuse a
-  viewer without the claim. Pollers are keyed by the claim values (`RowScope`)
-- `src/lib/sql/variables.ts` — dashboard variables in SQL (#67): `:name`
-  references are found by PostgreSQL's scanner, never a regex, and become `$n`
-  placeholders bound after the time and row-filter parameters; a value never
-  enters the text. `validateSql`/`checkSql` take the declared names, and a
-  caller that validates a dashboard's panel SQL passes
-  `declaredVariables(spec)`. Which values a viewer may bind is
-  `src/lib/variables.ts` (a `query` variable's guarded SELECT, in the
-  dashboard's workspace, under the viewer's row scope) and
-  `src/lib/variable-selection.ts` (`var-*` URL picks, defaults, the allowlist
-  check). Picks are part of the poller key
-- `src/lib/drilldown.ts` and `src/lib/drilldown-targets.ts` — drilldown
-  (#370): a panel's `links` name a target dashboard by opaque id, never a URL.
-  The page resolves targets on the server (same workspace, `can()` on every
-  load) and the browser builds hrefs only to those; an href carries time
-  expressions and `var-*` picks, which the target re-checks like a typed URL.
-  Share links and embeds show no links. A click maps back to its row through
-  `datumOf` in `src/lib/drilldown-datum.ts`, one mapping per panel kind (a new
-  kind does not compile without one); the clickable bodies read
-  `useDatumLinks()` from `src/components/dashboard/DatumLinks.tsx`
-- `src/lib/annotations.ts`, `src/lib/annotation-service.ts` and
-  `src/lib/db/annotations.ts` — annotations (#68): workspace-scoped events
-  drawn on time-series panels. Reads take the workspace from the dashboard
-  record, writes from the path, and every statement filters on it
-- `src/lib/auth/share.ts` and `src/lib/auth/share-access.ts` — read-only
-  share links (#65): signed `hts_` tokens checked against a hashed, revocable
-  row on every use, resolving to an identity `can()` allows `dashboard:view`
-  on one dashboard and nothing else. Only the stream route and
-  `src/app/embed/` accept one, never `getIdentity()`; `test/share.test.ts`
-  holds that list. The page gets `sharedSpec()` (no SQL or source ids)
-- `src/lib/auth/mcp-token.ts` — how an MCP client authenticates (#149): the
-  one route that accepts a realm-issued access token is `/api/mcp`, in a
-  bearer header, minted for the public `OIDC_MCP_CLIENT_ID` client (`aud` and
-  `azp`), verified on every request and refused once its `sid` is revoked.
-  The 401 challenge and `/.well-known/oauth-protected-resource` send the
-  client to the realm itself; Holotable mints nothing. `getIdentity()` never
-  reaches it, `verifySessionToken` refuses a token minted for that client,
-  and `test/mcp-auth.test.ts` holds the list of routes that import it
-- `src/lib/mcp/` — the MCP server behind `/api/mcp` (#148): `protocol.ts` is
-  the stateless streamable-HTTP JSON-RPC layer (no sessions, no SSE, no
-  dependency; the official SDK's client drives it in `test/mcp-client.test.ts`),
-  `tool.ts` is what a tool is (one zod schema validates the arguments and,
-  as JSON Schema, documents them; a failure is `isError`, never a protocol
-  error), and `tools/` are thin façades over the same functions the HTTP
-  routes call, each with the route's `assertAuthorized` and audit event
-  (`test/audit.test.ts` holds that) and reached through `McpDeps` so tests
-  hand in fakes. A tool returns specs and guarded rows, never a connection
-  detail or a credential; generation repairs a schema failure once, inline,
-  as a second admitted model call
-- `src/lib/auth/authorize.ts` — the central `can()` check
-- `src/lib/auth/renewal.ts` — session renewal (#27): the realm's refresh token
-  is sealed in `sessions` (`refresh-token.ts`) and never reaches the browser,
-  which holds only an opaque id in a cookie scoped to `/api/auth`. Renewal
-  re-derives the groups from the realm's fresh id_token; it is not on the
-  request path, which still verifies the stateless session token alone
-- `src/lib/auth/revocation.ts` — sessions ended before their tokens expire
-  (#28): back-channel logout and sign-out revoke by the realm `sid` the token
-  carries, `verifySessionToken` consults the set on every request, and open
-  dashboard streams listen for it and close. Process-local, because the app is
-  one instance by design
-- `src/lib/auth/stream-guard.ts` — how long an open dashboard stream stays
-  authorized (#32): it ends at its token's expiry, on revocation, and when the
-  re-check every `SSE_REAUTH_INTERVAL_MS` finds the dashboard no longer
-  viewable. A stream cannot see a renewed cookie, so expiry ends it and the
-  browser reconnects and resumes
-- `src/lib/audit.ts` — the append-only audit log (#30). `audit()` is
-  fire-and-forget and never fails a request; `auditRow` is the one place a row
-  is built and redacted. A new mutating route, or a new kind of execution,
-  records its event here and adds it to `AUDIT_ACTIONS`; `test/audit.test.ts`
-  holds each action to the route that emits it. `assertAuthorized` records
-  refusals itself, and takes the resource as an optional fourth argument
-- `src/lib/settings.ts` — the `/settings` sections as data. A new section is
-  an entry here and a page under `src/app/settings/<id>/`; a gated section
-  also calls `notFound()` from its page, because hiding the link is never the
-  only check. The header's account menu (`src/components/profile-menu.tsx`)
-  links into it
-- `src/lib/preferences.ts` — the per-user preferences stored server-side in
-  `user_preferences`. Theme and motion are deliberately not in it: they are
-  applied by the root layout's inline script before first paint and stay in
-  `localStorage`. The file header records which choices sync and why
-- `src/lib/account.ts` — the `GET /api/me` summary and the role descriptions
-  on the account page, derived from `can()`. `Identity.displayName` and
-  `email` are display-only and must never feed an authorization decision
-- `src/lib/time.ts` — server-side time expression/range resolution
-- `src/lib/registry.ts` — source registry: safe connection config and catalog
-- `src/lib/secrets/credentials.ts` — `secret_ref` resolution: the
-  `SOURCE_SECRET_REFS` workspace grant, checked on every connection, then the
-  credentials from `SOURCE_SECRETS_DIR` files or the environment. Server-only;
-  the browser-safe half (grant parsing, readiness) is `src/lib/secret-refs.ts`
-- `src/lib/security-headers.ts` and `src/proxy.ts` — the header baseline and
-  the per-request Content-Security-Policy nonce; an inline `<script>` or
-  `<style>` needs the nonce or the browser blocks it
-- `src/lib/metrics.ts` and `src/lib/metrics-access.ts` — the Prometheus
-  instruments and the gate on `/api/metrics`; a scrape is unauthenticated by
-  session, so the endpoint stays closed until `METRICS_TOKEN` or
-  `METRICS_ALLOWED_CIDRS` is set
-- `src/lib/log.ts` and the `route()` wrapper in `src/lib/http.ts` — the JSON
-  log, the per-request `AsyncLocalStorage` context, and the redaction pass
-  every payload goes through; a log line never carries a credential, and SQL
-  and prompt text is reduced to a digest
-- `src/lib/ai/log.ts` — the generation log: one redacted prompt/spec pair per
-  model call. `redactPrompt` is deliberately more aggressive than the log's
-  `redactString` (it also eats `*_API_KEY`-family assignments and long
-  base64/hex runs), the catalog is kept as a hash rather than as text, and a
-  write that fails is dropped rather than failing the generation. The only
-  reader is `GET /api/generation-log`, behind `source:manage`
-- `src/lib/ai/invoke.ts` — the deadline and jittered retry on every model
-  request (#22), as a model middleware `getModel()` applies. A new
-  `streamObject`/`streamText` call spreads `...modelSettings()` from
-  `provider.ts`, which also turns the SDK's own retry off and carries the
-  `onError` that logs a failed call through `log` instead of the SDK's raw
-  console dump (#343); `test/ai-invoke.test.ts` fails on a call site that does
-  not, or that sets its own `onError`
-- `src/lib/ai/models.ts`, `src/lib/ai/model-resolution.ts` and
-  `src/lib/ai/model-config.ts` — the model catalog (#331, #437): server
-  models (`AI_MODELS_FILE`, read by `server-model-list.ts`, and the legacy
-  `AI_*` variables as `default`, ids `env:<name>`), workspace and personal
-  models (`llm_models`, `src/lib/db/models.ts`). A generation route calls
-  `requireModel({ identity, workspaceId, modelId?, preferred? })` before the
-  limits and hands `resolved.model` to the stream, which spreads
-  `...modelSettings(model)`; a `modelId` the catalog does not grant the
-  caller there is a 400, and without one the default chain is the
-  conversation's model, the person's last pick
-  (`user_preferences.modelByWorkspace`), their first personal model where
-  allowed, the workspace's default, the server's. `resolved.source` and
-  `resolved.id` go on the generation log row and the audit event.
-  Credentials are sealed (`src/lib/secrets/seal.ts`, their own HKDF label),
-  never returned, and registered with the log's redaction
-  (`rememberSecret`) when opened. The writes behind the routes are
-  `model-admin.ts`, all through `prepareWrite`. A typed base URL is
-  untrusted: `ai/base-url.ts` holds the rules and `ai/guarded-fetch.ts`
-  applies them at DNS time on every connection. Demo mode has the server's
-  models only and refuses every write
-- `src/lib/ai/data-chat.ts` and `src/lib/chat/` — the Chat engine (#416):
-  one `streamText` turn over a conversation's sources with two guarded tools,
-  `runQuery` and `showPanel`. `showPanel` takes an IR panel spec (`ChatPanel`,
-  no id, layout or window: the server assigns them), runs it once under the
-  conversation's window and the viewer's row filter, and streams the rows to
-  the browser; `toModelOutput` gives the model only the columns, the row count
-  and a few sample rows. A stored message never holds result rows
-  (`persistableMessage` in `src/lib/chat/persist.ts`). The dashboard chat
-  (`src/lib/ai/chat.ts`) is a caller with `draw: false`
-- `src/app/explore/` and `src/components/chat/` — the Explore page (#416,
-  #431), built on the Chat engine above; `/chat` redirects to it. The page never sends a
-  statement: a kept conversation's turn sends only the new question
-  (`/api/chat/[id]/messages`), a panel runs again through
-  `/api/chat/[id]/panels/[panelId]/run` from its stored spec, and an unkept
-  one (`rememberChats` off) goes through `/api/chat/turn`, which stores
-  nothing. Add to dashboard is the ordinary dashboard save
-  (`src/lib/chat/add-to-dashboard.ts`, `src/lib/panel-placement.ts`)
-- `src/lib/ai/repair.ts` and `src/components/use-repairing-object.ts` — the
-  one automatic repair of output that failed its schema (#21). The browser
-  sends only `{ repairOf: id }`; the request, the rejected output and the
-  issues come from the server's process-local store, and taking an entry
-  removes it. A new generation surface uses `useRepairingObject`, not
-  `useObject`, and its route remembers failures the way `/api/generate` does
-- `src/lib/workspace-prompt.ts`, `src/lib/ai/prompt.ts` and
-  `src/lib/workspace-prompt-service.ts` — per-workspace prompt customization
-  (#66): a glossary, metric definitions and example panels that `baseSystem`
-  puts in a fenced `WORKSPACE_CONTEXT` block between the catalog and the rules.
-  Every field is capped, so the prompt stays bounded; an example's SQL passes
-  the guard against a live source in the same workspace before it is saved,
-  and again against the current catalog before it is shown to the model
-- `src/lib/ai/prompt-dashboards.ts` and `src/lib/ai/link-targets.ts` — what a
-  generation may link to (#375): the workspace's dashboards the caller may
-  view, as a fenced `DASHBOARDS` block (`dashboardsBlock` in
-  `src/lib/ai/prompt.ts`). A generated link to any other id fails the schema
-  on the server and, through the `X-Link-Targets` header that
-  `useRepairingObject` reads, in the browser, so the one repair runs
-- `src/lib/self-monitoring/` — the committed self-monitoring demo: the
-  dashboard spec (also an IR snapshot), the source catalog, and the Prometheus
-  text-format parser the collector uses; and `prometheus.ts`, its PromQL twin
-  over the compose stack's Prometheus (#390), the `prometheus-self` source.
-  `test/self-monitoring.test.ts` holds both specs, both catalogs and the
-  collector's metric allowlist to one contract, so a panel cannot be written
-  against a metric nothing collects or the app never exports
-- `src/app/globals.css` — design tokens and Tailwind v4 theme setup
-- `next.config.ts` — standalone output, `pg` externalization
-- `package.json` — authoritative scripts/tooling
-- `SECURITY.md` — the trust model and the disclosure process
-- `CONTRIBUTING.md` — the human-facing version of this file
+`AUTH_MODE=demo` is the one exception, for evaluation and the public demo: it
+changes *minting*, never *verification*, and its guards in `validateConfig`
+(no `OIDC_*`, no group above editor) stay boot errors. It is not a way to
+develop auth code: anything touching `src/lib/auth/`, sessions or claims runs
+against the realm.
 
-The paths with a `CODEOWNERS` entry (`src/lib/sql/`, `src/lib/promql/`, `src/lib/auth/`,
-`src/lib/secrets/`, `ir.ts` and `ir/`, `time.ts`, `registry.ts`,
-`metrics-access.ts`, `row-scope.ts`, `variables.ts`, `variable-selection.ts`,
-`ai/base-url.ts`, `ai/guarded-fetch.ts`) are
-the ones where a quiet regression stops being a bug and becomes a
-vulnerability. Changes there need a test.
+## UI and UX
 
-For `src/lib/sql/` that test is often already written for you:
-`test/sql-safety.fuzz.test.ts` generates statements from adversarial shapes and
-checks that poisoned ones are rejected, benign ones accepted, and accepted ones
-satisfy an independent parse-tree oracle. Run `npm run test:fuzz` after any
-guard change; a failure prints the statement and a replay line. Promote the
-counterexample into `test/fixtures/sql-fuzz-corpus.ts` and a named test rather
-than adjusting the generator to avoid it. `src/lib/promql/` has the same
-pair: `test/promql-safety.fuzz.test.ts`, with its corpus in
-`test/fixtures/promql-corpus.ts`, and `npm run test:fuzz` runs both.
+Consistent, high-quality UI is a requirement, not polish: a change that works
+but looks, moves or reads differently from the rest of the app is not done.
+Before building UI, look at how the nearest existing surface does the same
+thing and match it.
 
-Component tests are deliberately rare. `react-dom/server` does not run error
-boundaries — a throwing child propagates straight out of `renderToStaticMarkup`
-— so anything that depends on a real React unwind mounts through
-`test/support/dom.tsx` (jsdom, devDependency only) and is named `*.test.tsx`.
-Prefer extracting the logic into `src/lib/` and testing it as a function; reach
-for a render only when there is nothing to extract.
+### Styling and components
 
----
+- Tailwind v4 utilities and the tokens in `src/app/globals.css` (surfaces,
+  borders, muted text, the primary accent), composed with `cn()` from
+  `src/lib/utils.ts`. No literal colors, no one-off spacing scales, no new
+  fonts. Check every change in **both** themes.
+- Use the primitives in `src/components/ui/` before writing markup:
+  `Button` / `ButtonLink`, `Input`, `Select`, `Autocomplete`, `Checkbox`,
+  `Menu`, `Popover`, `Dialog`, `ConfirmDialog`, `Card`, `Table`, `Badge`,
+  `PageHeader`, `EmptyState`, `Skeleton`, `ErrorDisplay`. A new kind of
+  control becomes a primitive there, built on Base UI and styled like its
+  neighbors, not a one-off in a feature.
+- Never a native browser widget where the app has a primitive: no
+  `<select>`, `<datalist>`, `window.confirm`/`alert`, or browser-drawn date
+  pickers. The browser draws those in its own style, different in each
+  browser and outside the theme.
+- Every page renders `PageHeader` (title, one sentence on what the page is
+  for, the page's actions) in every state, and has a deliberate empty state
+  (`EmptyState`), loading state (`Skeleton`, shaped like what is coming) and
+  error state (`ErrorDisplay`). A destructive action asks through
+  `ConfirmDialog` and names what it removes.
+- Layouts work from phone width up with no sideways scroll; full-width pages
+  use the full width, and text stays at a readable measure.
+- Keep presentation separate from domain logic: logic in `src/lib/`, tested
+  as functions; components small and composable.
 
-## Core architectural rules
+### Accessibility
 
-### 1) The shared IR is the contract
+Checked, not hoped for:
 
-`src/lib/ir.ts` defines the single shared Zod schema used across:
-
-- model output
-- API validation
-- persistence
-- client rendering
-
-If you change dashboard structure, panel structure, value formats, or time
-expressions:
-
-- update the Zod schema first
-- keep types inferred from Zod
-- update all producers/consumers consistently
-- do not create parallel ad hoc shapes that drift from the IR
-
-Avoid “temporary” incompatible types.
-
-Saved specs cannot be regenerated, so a change that would make a stored spec
-fail to parse (a renamed or removed field, a new required one, a dropped viz
-type) is a **breaking** change:
-
-- bump `SPEC_VERSION` in `src/lib/ir.ts`
-- append the upgrader from the previous version to `UPGRADERS` in
-  `src/lib/ir/upgrade.ts`: a pure function on plain JSON that imports nothing
-  from `ir.ts`
-- test it against a fixture of the previous version. `test/ir-contract.test.ts`
-  (#90) holds every spec in `test/fixtures/specs/` to loading, passing the
-  guard and planning as its snapshot says; a fixture is never edited (its
-  digest is in `index.json`), so add fixtures of the new version beside the
-  old ones (`npm run fixture:capture` reads one from a live dashboard). The IR's
-  JSON Schema is snapshotted in `test/snapshots/`; rewrite both snapshots with
-  `UPDATE_SNAPSHOTS=1 npm test` and review the diff
-- read any spec you did not just build (a database row, a template, a file, a
-  draft, a request body) through `StoredDashboard`, never `Dashboard` directly
-- check the SQL that reads raw `spec` jsonb without upgrading it: the version
-  history's panel count (`VERSION_COLUMNS` in `src/lib/db/repo.ts`) and the
-  source-impact queries assume `panels` is a top-level array
-
-An additive, optional field needs none of this.
-
-### 2) The model must not generate data
-
-The model may generate dashboard/panel specifications and SQL, but not actual
-result datasets.
-
-Do not introduce flows where:
-
-- the LLM returns metric data
-- the client trusts model-produced data points
-- rendered charts bypass server-side query execution
-
-### 3) Treat all model SQL as untrusted
-
-Even when a query originates from the app or model, treat it as untrusted input.
-
-Preserve or strengthen guardrails such as:
-
-- SELECT-only behavior
-- read-only execution
-- disallowing dangerous/non-deterministic constructs where applicable
-- row/time/window limits
-- allowlists and catalog-driven access
-- server-controlled time filtering
-
-Never weaken SQL validation or execution constraints for convenience.
-
-### 4) The server owns time
-
-The server is the source of truth for concrete time ranges.
-
-The IR may carry relative expressions like `now-15m`, but actual resolution and
-enforcement belong on the server. Avoid pushing authoritative time-window logic
-into the client or model.
-
-### 5) Source references must stay opaque
-
-Panels should reference data sources through stable IDs, not embedded connection
-details or credentials.
-
-Do not store secrets, raw credentials, or unsafe connection information in:
-
-- dashboard specs
-- panel configs
-- client-visible payloads
-
----
-
-## UI and design conventions
-
-This app uses a dark monitoring-dashboard aesthetic with tokens defined in
-`src/app/globals.css`.
-
-### Styling rules
-
-- Use **Tailwind CSS v4** utilities and existing theme tokens.
-- Reuse the CSS variables/tokens already defined in `globals.css`.
 - Every text/background token pairing meets WCAG AA in both themes;
-  `test/contrast.test.ts` measures them (`src/lib/color/contrast.ts`) and the
-  table in `docs/src/content/docs/architecture/accessibility.md`. A new
-  pairing goes in `CONTRAST_PAIRS`. A chart goes through `AccessibleChart`,
-  a link styled as a button is `ButtonLink` (never `<Link><Button>`), and an
-  icon-only control has an `aria-label`. `npm run e2e` scans with axe.
-- Prefer existing composition helpers like `cn()` from `src/lib/utils.ts`.
-- Reuse existing UI primitives in `src/components/ui/` before adding new ones.
-- Keep styling consistent with current surfaces, borders, muted text, and
-  primary accent usage.
+  `test/contrast.test.ts` measures them (`src/lib/color/contrast.ts`) and
+  the table in `docs/src/content/docs/architecture/accessibility.md`. A new
+  pairing goes in `CONTRAST_PAIRS`.
+- A chart goes through `AccessibleChart`; a link styled as a button is
+  `ButtonLink` (never `<Link><Button>`); an icon-only control has an
+  `aria-label`; every input has a label; focus is visible and keyboard order
+  follows the page.
+- `npm run e2e` scans every main surface with axe in both themes; a new page,
+  dialog or menu adds itself to `e2e/a11y.spec.ts`.
 
-### Component rules
+### Charts
 
-- Prefer small, composable components.
-- Keep presentational logic separate from domain/data logic when practical.
-- Put reusable domain logic in `src/lib/`, not inside page components.
-- Use `"use client"` only when required by hooks, browser APIs, or client-only
-  interactivity.
-
-### Visualization rules
-
-The repo uses ECharts.
-
-When working on charts/panels:
-
-- preserve stable rendering behavior
-- avoid unnecessary chart recreation
-- prefer incremental updates / existing data-flow patterns
-- keep chart colors compatible with the token system
-
-Note: design tokens are authored in OKLCH and may need runtime conversion before
-being passed to ECharts.
+ECharts, through the existing chart components. Charts merge new data and are
+never recreated (FLIP a panel's card, never its chart). Design tokens are
+authored in OKLCH and are converted before they reach ECharts, so chart
+colors come from the token system too.
 
 ### Motion rules
 
@@ -570,273 +290,48 @@ before first paint (#212). The rules:
 - **Spinners freezing under Reduce is intended.** `animate-spin` and
   `animate-pulse` become a single frame at `0.01ms`; do not "fix" it.
 
----
+## Checks
 
-## Data, auth, and infra conventions
-
-### Database
-
-This project uses PostgreSQL/TimescaleDB-related flows.
-
-Be careful when changing:
-
-- schema assumptions
-- source configuration objects
-- migration scripts
-- seed behavior
-- polling/streaming logic
-- query execution boundaries
-
-Prefer additive, migration-safe changes.
-
-### Auth
-
-Keycloak OIDC is the **only** way to authenticate a real user. There is no
-local login, no password store, no dev-login bypass, and no seeded user —
-`src/app/api/auth/` has exactly five routes (`login`, which `src/proxy.ts`
-sends a page request without a session to, and which renews before it goes to
-the realm; `callback`, `logout`; `refresh`, which renews a session only from a
-fresh realm-issued id_token and never mints one on its own, #27; and
-`backchannel-logout`, which only ever ends sessions, #28).
-Do not add a development-only authentication path; make the local Keycloak
-work instead.
-
-The one exception is `AUTH_MODE=demo` (#251), for evaluation and the public
-demo only. In it `/api/auth/login` mints an ordinary first-party session for
-every visitor, with no login screen, holding `DEMO_GROUPS`; `callback` is a
-404. The exception is in *minting*, never in *verification*:
-`verifySessionToken`, the claims parser and `can()` are unchanged, and a demo
-session is checked exactly like any other. Its guards are boot errors in
-`validateConfig` and must stay that way: demo mode refuses any `OIDC_*`
-variable, and refuses `DEMO_GROUPS` that reach `source-admin` or
-`/platform-admins`. It is **not** a way to develop auth code. Anything that
-touches `src/lib/auth/`, the session or the claims still runs against the
-realm.
-
-Two credentials are not people, and neither is a way in for one:
-
-- **Service-account API tokens** (#288, `src/lib/auth/api-token.ts`):
-  `Authorization: Bearer ht_…`, minted by a source-admin under
-  `/settings/tokens`, hashed in `api_tokens`. A token resolves to one
-  workspace at viewer or editor, never source-admin or platform admin, and
-  `can()` decides its requests from that role exactly as for a person. It
-  cannot open a dashboard stream or manage tokens.
-- **Share links** (#65): view one dashboard, and only through the stream and
-  `src/app/embed/`.
-
-Authorization is derived exclusively from the validated identity token's
-`groups` claim (or, for a service-account token, its row's single role) and
-is centralized in `can()` (`src/lib/auth/authorize.ts`).
-Group paths map to per-workspace roles, highest role wins, and parsing fails
-closed (`src/lib/auth/claims.ts`).
-
-When touching auth:
-
-- preserve secure defaults
-- do not broaden access implicitly
-- never derive authorization from a workspace id supplied in a request
-- re-authorize the source on every execution, not just at the route boundary
-- do not hardcode secrets
-
----
-
-## Development workflow
-
-Use the existing package scripts:
+Before finishing: `npm run lint`, `npm run typecheck`, `npm test`, and
+`npm run build` for anything framework- or build-sensitive. Those are CI's
+required checks. CI also runs migrations, integration, Helm, images and
+smoke, end-to-end and a long fuzz; they do not gate the merge, but they are
+expected to pass. The other scripts, and when to reach for them:
 
 ```bash
-npm run dev        # dev server
-npm run dev:demo   # dev server in AUTH_MODE=demo, Keycloak variables blanked
-npm run build      # production build
-npm run start      # run the production build
-npm run lint       # biome check (lint + format, no writes)
-npm run lint:fix   # biome check --write
-npm run format     # biome format --write
-npm run typecheck  # next typegen && tsc --noEmit
-npm test           # node --test via tsx
-npm run test:fuzz  # property-based SQL and PromQL guard suites alone (FUZZ_RUNS, FUZZ_SEED)
-npm run test:integration # real-server suites against TimescaleDB (Testcontainers, or MIGRATE_TEST_DATABASE_URL)
-npm run e2e        # Playwright journey + axe scans (e2e/; Docker; AI_PROVIDER=stub; realm sign-in)
-npm run fixture:capture  # add a stored dashboard spec to the IR fixture library
-npm run eval       # grade recorded generations (evals/); --live --record re-records
-npm run config:check # validate the environment as the server does at startup (exit 1 = would not boot)
-npm run migrate    # apply Postgres migrations (--check, --dry-run, --down)
-npm run migrate:verify # round-trip every migration (scratch database)
-npm run seed       # looping metrics seeder
-npm run self-metrics # scrape the app's own /api/metrics into metrics.holotable_self
-npm run smoke      # end-to-end check of both self-monitoring demo dashboards
+npm run dev:demo         # dev server in AUTH_MODE=demo, no Keycloak needed (not for auth work)
+npm run test:fuzz        # after any SQL or PromQL guard change (FUZZ_RUNS, FUZZ_SEED)
+npm run test:integration # after a change to queries, repos or migrations (Docker, or MIGRATE_TEST_DATABASE_URL)
+npm run e2e              # after a UI or auth change: Playwright journeys and axe scans (Docker)
+npm run migrate:verify   # after adding a migration: round-trips every one on a scratch database
+npm run config:check     # after adding an environment variable
+npm run eval             # after a prompt change: grades recorded generations (--live --record re-records)
+npm run fixture:capture  # adds a stored spec to the IR fixture library
+npm run smoke            # checks both self-monitoring dashboards end to end
 ```
 
-Before finalizing code changes, run the checks relevant to your change:
-
-- `npm run lint`
-- `npm run typecheck`
-- `npm test`
-- `npm run build` for framework/build-sensitive changes
-
-CI (`.github/workflows/ci.yml`) runs all four on every pull request as three
-jobs — `Static checks` (lint, typecheck), `Test` (tests, `config:check` on
-`.env.example`, the LLM eval replay) and `Build` — and those three are the
-required checks on `main`. The same workflow also round-trips the migrations
-and runs the real-database integration suites against one TimescaleDB
-(`Database`), lints and renders the Helm chart, builds the Docker images and
-runs the self-monitoring smoke test against exactly those images (`Images and
-smoke`), runs the Playwright and axe `End-to-end and accessibility` suite, and
-a long fuzz of the SQL guard; those report on every pull request but do not
-gate the merge, so read them. Every Node job starts with the composite action
-in `.github/actions/setup/` (Node 22, `npm ci`); a Node bump is one edit
-there, and `test/workflow-pins.test.ts` holds its pins like a workflow's.
-Five constraints CI enforces that are easy to break accidentally:
-
-- `lint` is **Biome**, linter and formatter in one tool, configured entirely in
-  `biome.json`. CI runs `biome ci`, which never writes, so an unformatted file
-  fails the build. Run `npm run lint:fix` (safe fixes) or `npm run format`
-  before finishing. There is no ESLint and no Prettier; do not add either.
-- `typecheck` runs `next typegen` first on purpose. Next 16 writes the route
-  helper types (`RouteContext`, `PageProps`, `LayoutProps`) into `.next/types`,
-  which `tsconfig.json` includes; a bare `tsc --noEmit` on a cold checkout
-  fails without them.
-- `build` must succeed with **no** `.env` at all. Every value in
-  `src/lib/config.ts` has a fallback. If a change makes the build require a
-  secret, the change is wrong. Startup validation (`validateConfig` in
-  `src/lib/config.ts`, run from `src/instrumentation.ts`) is a runtime concern
-  and is skipped during the build phase on purpose.
-- The `Helm chart` job renders `deploy/helm/holotable` with its defaults, with
-  each example values file, and with every optional object enabled, and then
-  asserts that two *bad* renders still fail: a credential under `.Values.config`
-  (which would land in a ConfigMap in clear text) and a
-  `terminationGracePeriodSeconds` below the drain budget (which would make the
-  kubelet `SIGKILL` the server mid-drain). Those two guards are `fail` calls in
-  the templates; if you change them, change the assertions with them.
-- The server refuses to boot on an invalid configuration. When a change reads a
-  new environment variable, add it to `EnvSchema`/`validateConfig` with a
-  message that names the variable and what to do, keep a *missing* value a
-  warning in development and an error in production, and cover it in
-  `test/config.test.ts`. `npm run config:check` must still exit 0 on
-  `.env.example` in development mode; CI checks that.
-
-Four Biome rules are errors deliberately: `noFloatingPromises`,
-`useExhaustiveDependencies`, `noExplicitAny` (which matches the TypeScript rule
-below), and `noConsole`, which now allows nothing in `src/` — write through
-`log` from `src/lib/log.ts` instead. `scripts/` and `test/` are exempt, since a
-CLI's output is its interface. Fix violations rather than suppressing them. A deliberate
-fire-and-forget promise is marked with the `void` operator — that is the
-sanctioned opt-out and it makes the intent visible at the call site; a bare
-`// biome-ignore` needs a reason and should be rare.
-
-If changing database-related code, also consider whether `migrate` or `seed`
-behavior is impacted.
-
-A new migration in `migrations/` must declare its down path in the file —
-either a `-- rollback:` section whose remainder undoes it, or an
-`-- irreversible: <reason>` line. `loadMigrations` in
-`scripts/lib/migrations.ts` throws on a migration that declares neither, so
-every mode including `--check` fails until it is written. The `Migrations` CI
-job rolls each reversible migration back against a TimescaleDB service
-container and asserts the schema fingerprint matches the previous step, so an
-incomplete down path fails CI. Prefer expand/contract over an in-place change
-to an existing column: during a rolling update both versions of the code run at
-once. `docs/src/content/docs/operations/migrations.md` has both.
-
-A change that alters something the docs describe updates the page in the same
-pull request. `CONTRIBUTING.md` has the checklist of which source file maps to
-which page. `test/docs-drift.test.ts` holds the API routes, audit actions and
-settings sections tables to the code, and the Docs workflow fails on a broken
-link in the site or in the root markdown files.
-
-Dependency updates arrive from Dependabot (`.github/dependabot.yml`), grouped
-minor and patch updates monthly and each major on its own. They are reviewed and
-merged by a person like any other pull request; nothing auto-merges. A `next`
-or `react` major is a framework migration, not a version bump. Every action
-in `.github/workflows/` is pinned to a full commit SHA with its version as a
-trailing `# vX.Y.Z` comment, never a tag; `test/workflow-pins.test.ts` fails on
-an unpinned `uses:`. Node 25 and later
-(the `node` base images and `@types/node`) are ignored in `dependabot.yml`, so
-only the LTS line up to 24 is proposed; a Node major is taken in one pull
-request that moves both Dockerfiles, CI's `node-version` and `@types/node`
-together. TypeScript 7 and later are ignored for the app until Next supports
-them: 7 drops the JavaScript compiler API that `next build` and `next typegen`
-load.
-
-`CONTRIBUTING.md` says the same things for human contributors, including the
-branch and Conventional Commit conventions and the pull request template's
-invariants checklist. Keep the two in step.
-
----
-
-## Coding standards
-
-### TypeScript
-
-- Maintain `strict` TypeScript compatibility.
-- Prefer explicit types at module boundaries.
-- Infer types from Zod schemas where possible.
-- Avoid `any` unless absolutely necessary and narrowly scoped.
-
-### React / Next.js
-
-- Default to Server Components unless client behavior is required.
-- Keep client components focused on interaction and presentation.
-- Use Next navigation/routing patterns already established in the repo.
-- Do not introduce legacy Pages Router conventions.
-
-### Validation and parsing
-
-- Validate untrusted inputs at boundaries.
-- Prefer shared schema-based validation over hand-rolled checks.
-- Fail clearly when invariants are violated.
-
-### Utilities
-
-- Reuse existing helpers before creating new abstractions.
-- Keep helpers focused and side-effect-light.
-
----
-
-## What to avoid
-
-Do **not**:
-
-- assume old Next.js behavior without checking current repo patterns
-- duplicate the IR in separate TypeScript-only interfaces
-- embed secrets or connection strings in dashboard specs
-- let the client become the authority for protected query execution
-- weaken SQL safety checks
-- add broad dependencies when existing utilities/components are sufficient
-- introduce large architectural rewrites unless explicitly requested
-
----
-
-## Preferred change style
-
-When implementing changes:
-
-1. Understand the relevant schema, route, and UI flow first.
-2. Make the smallest change that preserves architectural invariants.
-3. Reuse existing patterns and primitives.
-4. Keep server/client boundaries deliberate.
-5. Verify with lint/tests/build as appropriate.
-
----
-
-## If you are unsure
-
-If a requested change appears to conflict with the architecture, prefer:
-
-- preserving the IR contract
-- preserving SQL safety
-- preserving server authority over time/query execution
-- preserving secret isolation
-- preserving existing Next.js 16 patterns
-
-Consult:
-
-- the docs site under `docs/src/content/docs/`, which is the canonical
-  explanation of every feature (`README.md` is only a landing page)
-- `CONTRIBUTING.md`
-- `SECURITY.md` — the same boundaries stated as a trust model
-- `docs/src/content/docs/architecture/invariants.md`
-- `docs/src/content/docs/admin/keycloak.md`
-- `src/lib/ir.ts`
-
-before making invasive changes.
+- **Biome** is the linter and formatter (`npm run lint:fix`); there is no
+  ESLint or Prettier. `noFloatingPromises`, `useExhaustiveDependencies`,
+  `noExplicitAny` and `noConsole` are errors: fix them rather than suppress.
+  A deliberate fire-and-forget is `void promise`.
+- **Typecheck** runs `next typegen` first; a bare `tsc` fails on a cold
+  checkout.
+- **Build with no `.env`.** Every config value has a fallback. A new
+  environment variable goes in `EnvSchema` / `validateConfig` with a message
+  naming it, warns in development and errors in production, and is covered
+  in `test/config.test.ts`; `npm run config:check` must still pass on
+  `.env.example`.
+- **Migrations** declare their down path (`-- rollback:` or
+  `-- irreversible: <reason>`) and prefer expand/contract, since old and new
+  code run together during a rollout. CI rolls each one back and compares
+  schema fingerprints.
+- **Helm**: the chart's two `fail` guards (a credential under
+  `.Values.config`, a grace period below the drain budget) have assertions in
+  CI; change them together.
+- **Docs**: a change to something the docs describe updates the page in the
+  same pull request (`CONTRIBUTING.md` maps source files to pages).
+  `test/docs-drift.test.ts` holds the API routes, audit actions and settings
+  tables to the code.
+- **Actions** are pinned to a full commit SHA with a `# vX.Y.Z` comment
+  (`test/workflow-pins.test.ts`). Dependabot's ignores (Node 25+,
+  TypeScript 7+) are explained in `.github/dependabot.yml`.

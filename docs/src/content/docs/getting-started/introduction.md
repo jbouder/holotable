@@ -71,7 +71,7 @@ in the repository instead, and each is the one place its topic is kept:
 - [`CONTRIBUTING.md`](https://github.com/jbouder/holotable/blob/main/CONTRIBUTING.md) —
   local setup, the checks, conventions, and which pages a change must update.
 - [`AGENTS.md`](https://github.com/jbouder/holotable/blob/main/AGENTS.md) — the
-  same conventions in more detail, written for coding agents.
+  same rules, condensed for coding agents.
 - The [Helm chart README](https://github.com/jbouder/holotable/tree/main/deploy/helm/holotable) —
   every chart value. [Deploying on Kubernetes](/operations/kubernetes/) is the
   reasoning behind them.

@@ -258,8 +258,7 @@ guarantees, each with a named enforcement point.
 Read [Invariants](docs/src/content/docs/architecture/invariants.md) in full
 before changing generation, execution, or authorization. [SECURITY.md](SECURITY.md)
 describes the same boundaries from the trust side, and
-[AGENTS.md](AGENTS.md) — written for coding agents but accurate for humans —
-covers the repository conventions in more detail than this file does.
+[AGENTS.md](AGENTS.md) is the same rules, condensed for coding agents.
 
 The short version, five rules:
 
@@ -268,8 +267,8 @@ The short version, five rules:
    dashboard or panel structure changes, change the schema first and let types
    be inferred from it. Do not introduce a parallel TypeScript-only interface
    that can drift. A change that would stop a saved spec parsing bumps
-   `SPEC_VERSION` and adds an upgrader to `src/lib/ir/upgrade.ts` (see
-   AGENTS.md); the fixture library in `test/fixtures/specs/` fails until it
+   `SPEC_VERSION` and adds an upgrader to `src/lib/ir/upgrade.ts` (AGENTS.md,
+   "Changing the IR", has the steps); the fixture library in `test/fixtures/specs/` fails until it
    does. Panel kinds are registered in `src/lib/panels/registry.ts`,
    not listed in `ir.ts`; the docs page "Streaming and rendering" says how to
    add one. Source kinds are registered the same way, in
@@ -354,7 +353,7 @@ JavaScript compiler API that `next build` and `next typegen` load.
 The docs site (`docs/`) is the canonical explanation of every feature;
 `README.md` is a landing page that links into it. `SECURITY.md` is canonical
 for the trust model and disclosure, this file for contributor workflow, and
-`AGENTS.md` repeats these conventions in more detail for coding agents. Say a
+`AGENTS.md` condenses these rules for coding agents. Say a
 thing in one place and link to it from the others.
 
 A change to something a page describes updates that page in the same pull
@@ -396,7 +395,7 @@ request:
 | `docker-compose.yml`, `deploy/quickstart/` | `getting-started/quick-start.md`, the quick start in `README.md` |
 | `deploy/helm/holotable/` | `operations/kubernetes.md`, the chart's own `README.md` |
 | `scripts/seed.ts`, `scripts/self-metrics.ts`, `scripts/smoke.ts`, `src/lib/self-monitoring/` | `operations/demo-data.md` |
-| A `package.json` script | `getting-started/quick-start.md` (Scripts), `AGENTS.md` (Development workflow) |
+| A `package.json` script | `getting-started/quick-start.md` (Scripts), `AGENTS.md` (Checks) |
 
 Paths in the table are under `docs/src/content/docs/` unless they say
 otherwise. The Docs workflow builds the site, which fails on a broken internal
