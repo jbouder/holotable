@@ -11,6 +11,11 @@ const nextConfig: NextConfig = {
   // the brand and the first link are. Development-only either way — it is not
   // emitted by `next build` — so turning it off costs nothing in production.
   devIndicators: false,
+  // From 16.3, `next dev` writes a managed block into AGENTS.md and a
+  // CLAUDE.md beside it, pointing agents at node_modules/next/dist/docs/.
+  // AGENTS.md is written by hand here and already says that, so the block
+  // would only be an uncommitted change after every dev run.
+  agentRules: false,
   // The per-response headers that do not vary by request. The
   // Content-Security-Policy needs a fresh nonce each time and is set by
   // src/proxy.ts. `next build` runs with NODE_ENV=production, so a production

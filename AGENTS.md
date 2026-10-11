@@ -23,8 +23,8 @@ When making changes, preserve these product invariants:
 
 This repository uses:
 
-- `next@16.2.10`
-- `react@19.2.7`
+- `next@16.3.8`
+- `react@19.3.0`
 - App Router
 - Tailwind CSS v4
 
