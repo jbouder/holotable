@@ -74,6 +74,10 @@ g.getComputedStyle = dom.window.getComputedStyle.bind(dom.window);
 // fallbacks, and jsdom (which has no `Element.animate`) is never asked to
 // animate. A test of the motion itself passes `enabled` or sets `allow`.
 dom.window.document.documentElement.dataset.motion = "reduce";
+// The chart theme (#502) watches `<html data-theme>`; jsdom has a real
+// MutationObserver on its window, it is only not a global here.
+g.MutationObserver = dom.window.MutationObserver;
+
 // ECharts and the chart wrapper observe their container; jsdom has no
 // ResizeObserver and the panels under test never need a real one.
 g.ResizeObserver = class {

@@ -282,7 +282,7 @@ export const stateTimelineChart: ChartOptionBuilder = normalized((panel, data, c
       text: timeline.hiddenLanes > 0 ? `+${timeline.hiddenLanes} more not shown` : "",
       right: 0,
       bottom: 0,
-      textStyle: { color: "#9aa0aa", fontSize: 11, fontWeight: "normal" },
+      textStyle: { color: ctx.theme.text, fontSize: 11, fontWeight: "normal" },
     },
     // Room on the right for the last time label, which is centred on the
     // window's end.
@@ -292,19 +292,19 @@ export const stateTimelineChart: ChartOptionBuilder = normalized((panel, data, c
       min: timeline.from,
       max: timeline.to,
       axisLabel: {
-        color: "#9aa0aa",
+        color: ctx.theme.text,
         hideOverlap: true,
         formatter: (v: number) =>
           formatDateTime(new Date(v), ctx.display, { seconds: false }),
       },
-      axisLine: { lineStyle: { color: "#3a3f4b" } },
+      axisLine: { lineStyle: { color: ctx.theme.line } },
       splitLine: { show: false },
     },
     yAxis: {
       type: "category",
       inverse: true,
       data: timeline.lanes,
-      axisLabel: { color: "#9aa0aa" },
+      axisLabel: { color: ctx.theme.text },
       axisLine: { show: false },
       axisTick: { show: false },
     },

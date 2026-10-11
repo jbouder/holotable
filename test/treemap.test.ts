@@ -12,6 +12,7 @@ import {
 import { AA_TEXT, contrastRatio, hexToRgb } from "@/lib/color/contrast";
 import { chartPalette } from "@/lib/color/oklch";
 import { Panel } from "@/lib/ir";
+import { DEFAULT_CHART_THEME } from "@/lib/color/chart-theme";
 import { LOCAL_TIME_DISPLAY } from "@/lib/time-display";
 
 /*
@@ -20,7 +21,7 @@ import { LOCAL_TIME_DISPLAY } from "@/lib/time-display";
  */
 
 const LAYOUT = { x: 0, y: 0, w: 6, h: 4 };
-const CTX = { display: LOCAL_TIME_DISPLAY };
+const CTX = { display: LOCAL_TIME_DISPLAY, theme: DEFAULT_CHART_THEME };
 
 function treemap(options: Record<string, unknown> = {}): Panel {
   return Panel.parse({

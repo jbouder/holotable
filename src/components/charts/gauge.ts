@@ -1,3 +1,4 @@
+import type { ChartTheme } from "@/lib/color/chart-theme";
 import { panelTimeField } from "@/lib/ir";
 import type { EChartsOption } from "echarts";
 import {
@@ -131,9 +132,14 @@ function withAlpha(hex: string, alpha: number): string {
  * The dial's track: the threshold steps as bands, faint, so the value's own
  * color reads as where it is now and the bands as where the lines are.
  */
-function bands(panel: Panel, min: number, max: number): [number, string][] {
+function bands(
+  panel: Panel,
+  min: number,
+  max: number,
+  theme: ChartTheme,
+): [number, string][] {
   const steps = gaugeOptions(panel).thresholds ?? [];
-  const track = "#2a2f3a";
+  const track = theme.grid;
   if (steps.length === 0) return [[1, track]];
   const stops: [number, string][] = [];
   let color: string = track;
@@ -146,7 +152,11 @@ function bands(panel: Panel, min: number, max: number): [number, string][] {
   return stops;
 }
 
-function radial(panel: Panel, reading: GaugeReading | undefined): EChartsOption {
+function radial(
+  panel: Panel,
+  reading: GaugeReading | undefined,
+  theme: ChartTheme,
+): EChartsOption {
   const min = reading?.min ?? DEFAULT_MIN;
   const max = reading?.max ?? DEFAULT_MAX;
   // Clamped for the drawing; the text below says what it really is.
@@ -169,14 +179,14 @@ function radial(panel: Panel, reading: GaugeReading | undefined): EChartsOption 
           width: 14,
           itemStyle: { color: tokenHex(reading?.color ?? DEFAULT_COLOR) },
         },
-        axisLine: { lineStyle: { width: 14, color: bands(panel, min, max) } },
+        axisLine: { lineStyle: { width: 14, color: bands(panel, min, max, theme) } },
         pointer: { show: false },
         anchor: { show: false },
         axisTick: { show: false },
         splitLine: { show: false },
         splitNumber: 1,
         axisLabel: {
-          color: "#9aa0aa",
+          color: theme.text,
           distance: 20,
           formatter: (v: number) => formatValue(v, panel.format, gaugeOptions(panel)),
         },
@@ -186,7 +196,7 @@ function radial(panel: Panel, reading: GaugeReading | undefined): EChartsOption 
           offsetCenter: [0, "8%"],
           fontSize: 24,
           fontWeight: 600,
-          color: "#e6e8ee",
+          color: theme.foreground,
           formatter: () => text,
         },
         data: [{ value: drawn, name: reading?.label ?? "" }],
@@ -195,7 +205,7 @@ function radial(panel: Panel, reading: GaugeReading | undefined): EChartsOption 
   };
 }
 
-function bars(readings: GaugeReading[]): EChartsOption {
+function bars(readings: GaugeReading[], theme: ChartTheme): EChartsOption {
   return {
     backgroundColor: "transparent",
     grid: { left: 8, right: 64, top: 8, bottom: 8, containLabel: true },
@@ -214,7 +224,7 @@ function bars(readings: GaugeReading[]): EChartsOption {
       type: "category",
       inverse: true,
       data: readings.map((r) => r.label),
-      axisLabel: { color: "#9aa0aa" },
+      axisLabel: { color: theme.text },
       axisLine: { show: false },
       axisTick: { show: false },
     },
@@ -223,7 +233,7 @@ function bars(readings: GaugeReading[]): EChartsOption {
         type: "bar",
         barMaxWidth: 18,
         showBackground: true,
-        backgroundStyle: { color: "#2a2f3a" },
+        backgroundStyle: { color: theme.grid },
         data: readings.map((r) => ({
           value: r.fraction,
           itemStyle: { color: tokenHex(r.color) },
@@ -231,7 +241,7 @@ function bars(readings: GaugeReading[]): EChartsOption {
         label: {
           show: true,
           position: "right",
-          color: "#9aa0aa",
+          color: theme.text,
           formatter: (p: unknown) =>
             readings[(p as { dataIndex: number }).dataIndex]?.text ?? "",
         },
@@ -240,11 +250,11 @@ function bars(readings: GaugeReading[]): EChartsOption {
   };
 }
 
-export const gaugeChart: ChartOptionBuilder = normalized((panel, data) => {
+export const gaugeChart: ChartOptionBuilder = normalized((panel, data, { theme }) => {
   const readings = gaugeReadings(panel, data);
   return gaugeOptions(panel).variant === "bar"
-    ? bars(readings)
-    : radial(panel, readings[0]);
+    ? bars(readings, theme)
+    : radial(panel, readings[0], theme);
 });
 
 /** A dial and a bar list are different charts: switching remounts, data never does. */

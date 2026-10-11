@@ -9,6 +9,7 @@ import { type AnnotationStore, makeAnnotationStore } from "@/lib/db/annotations"
 import { Dashboard } from "@/lib/ir";
 import { tokenHex } from "@/lib/panels/colors";
 import { TimeRangeError } from "@/lib/time";
+import { DEFAULT_CHART_THEME } from "@/lib/color/chart-theme";
 import { LOCAL_TIME_DISPLAY } from "@/lib/time-display";
 
 /** Annotations (#68). */
@@ -225,7 +226,7 @@ test("a range between two rows still covers its span", () => {
 
 test("marks ride on the chart without changing it when there are none", () => {
   const panel = spec().panels[0];
-  const ctx = { display: LOCAL_TIME_DISPLAY };
+  const ctx = { display: LOCAL_TIME_DISPLAY, theme: DEFAULT_CHART_THEME };
   const plain = lineChart(panel, rows, ctx) as { series: Record<string, unknown>[] };
   assert.equal("markLine" in plain.series[0], false, "no annotations, no marks");
   const empty = lineChart(panel, rows, { ...ctx, annotations: [] }) as {

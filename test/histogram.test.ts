@@ -8,6 +8,7 @@ import {
 import type { PanelData } from "@/components/charts/options";
 import { Panel } from "@/lib/ir";
 import { tokenHex } from "@/lib/panels/colors";
+import { DEFAULT_CHART_THEME } from "@/lib/color/chart-theme";
 import { LOCAL_TIME_DISPLAY } from "@/lib/time-display";
 
 /*
@@ -16,7 +17,7 @@ import { LOCAL_TIME_DISPLAY } from "@/lib/time-display";
  */
 
 const LAYOUT = { x: 0, y: 0, w: 6, h: 4 };
-const CTX = { display: LOCAL_TIME_DISPLAY };
+const CTX = { display: LOCAL_TIME_DISPLAY, theme: DEFAULT_CHART_THEME };
 const T = (m: number) => `2026-10-09T10:0${m}:00Z`;
 
 function histogram(

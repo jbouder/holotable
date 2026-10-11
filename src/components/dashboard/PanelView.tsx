@@ -18,6 +18,7 @@ import { Popover } from "@/components/ui/popover";
 import type { ChartContext, PanelData } from "@/components/charts/options";
 import { panelRenderer } from "@/components/panels/registry";
 import { formatClockTime } from "@/lib/connection";
+import { useChartTheme } from "@/components/chart-theme";
 import { useTimeDisplay } from "@/components/time-display";
 import type { ApiError } from "@/lib/errors";
 import { PANEL_EXIT_SHORTCUT } from "@/lib/shortcuts";
@@ -468,6 +469,7 @@ function PanelContent({
   annotations?: ChartContext["annotations"];
 }) {
   const display = useTimeDisplay();
+  const theme = useChartTheme();
   // The registry decides how the kind is drawn (#61); nothing here names one.
   const renderer = panelRenderer(panel.viz);
   if (renderer.type === "html") {
@@ -486,6 +488,7 @@ function PanelContent({
       ref={chartRef}
       option={renderer.option(panel, data, {
         display,
+        theme,
         window: window ?? data.window,
         annotations,
       })}
