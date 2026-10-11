@@ -123,6 +123,23 @@ test("chat with Keep my conversations off: answered, stored nowhere", async ({
   }
 });
 
+for (const width of [1440, 390]) {
+  test(`the demo dashboard at ${width} px does not scroll sideways`, async ({
+    page,
+    request,
+  }) => {
+    // #536: a chart's screen-reader table is clipped to a pixel, but a table
+    // ignores its width, so it reached past the page and made it scroll.
+    await page.setViewportSize({ width, height: 900 });
+    await page.goto(`/dashboards/${await dashboardId(request, DEMO_DASHBOARD)}`);
+    await waitForPanels(page);
+    const overflow = await page.evaluate(
+      () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
+    );
+    expect(overflow).toBeLessThanOrEqual(0);
+  });
+}
+
 test("chat at phone width: the side panel is a sheet, and nothing scrolls sideways", async ({
   page,
 }) => {
