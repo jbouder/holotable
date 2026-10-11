@@ -3,7 +3,8 @@ import assert from "node:assert/strict";
 import { readdirSync } from "node:fs";
 
 import "./support/demo-env";
-import { demoLogin, demoSubject, DEMO_DISPLAY_NAME, safeNextPath } from "@/lib/auth/demo";
+import { demoLogin, demoSubject, DEMO_DISPLAY_NAME } from "@/lib/auth/demo";
+import { safeNextPath } from "@/lib/auth/next-path";
 import { verifySessionToken, signSessionToken } from "@/lib/auth/session";
 import { can } from "@/lib/auth/authorize";
 import { config } from "@/lib/config";

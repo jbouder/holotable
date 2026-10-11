@@ -36,6 +36,17 @@ test("revoking a realm session reaches its tokens and no other session's", () =>
   assert.equal(isRevoked({ sub: "bob", sid: null, iat: sec(NOW) - 60 }, NOW), false);
 });
 
+test("a realm session's token issued after its revocation is good", () => {
+  // Sign-out here ends this app's session, not the realm's; signing in again
+  // gets a new id_token with the same sid, and must not be refused.
+  revoke({ sub: "alice", sid: "kc-1" }, NOW);
+  assert.equal(isRevoked({ sub: "alice", sid: "kc-1", iat: sec(NOW) }, NOW), true);
+  assert.equal(
+    isRevoked({ sub: "alice", sid: "kc-1", iat: sec(NOW) + 5 }, NOW + 5000),
+    false,
+  );
+});
+
 test("revoking a subject alone reaches every token issued until then", () => {
   revoke({ sub: "alice" }, NOW);
   assert.equal(isRevoked({ sub: "alice", sid: "kc-1", iat: sec(NOW) - 60 }, NOW), true);
