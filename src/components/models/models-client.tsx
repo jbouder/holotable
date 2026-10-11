@@ -184,7 +184,8 @@ export function ModelsClient({ data }: { data: ModelsPageData }) {
         <Button
           variant="ghost"
           size="sm"
-          disabled={tests[rowId]?.busy || target.testUrl(row.id) === null}
+          busy={tests[rowId]?.busy}
+          disabled={target.testUrl(row.id) === null}
           title={
             target.testUrl(row.id) === null
               ? "Personal models can be tested once a workspace allows them."

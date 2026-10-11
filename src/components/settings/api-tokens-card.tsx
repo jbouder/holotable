@@ -147,7 +147,7 @@ export function ApiTokensCard({
               options={dayOptions}
             />
           </div>
-          <Button type="submit" disabled={busy || !name.trim()}>
+          <Button type="submit" busy={busy} disabled={!name.trim()}>
             {busy && <Loader2 className="h-4 w-4 animate-spin" />}
             Create token
           </Button>

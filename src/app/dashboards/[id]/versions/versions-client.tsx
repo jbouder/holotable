@@ -195,7 +195,7 @@ export function VersionHistory({
             size="sm"
             className="w-full"
             onClick={() => void loadOlder()}
-            disabled={loadingMore}
+            busy={loadingMore}
           >
             {loadingMore && <Loader2 className="h-4 w-4 animate-spin" />}
             Load older versions

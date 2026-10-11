@@ -179,7 +179,7 @@ export function WorkspaceLimitsCard({
                 placeholder={`Default: ${fmt.format(r.global)}`}
               />
             </div>
-            <Button type="submit" disabled={status.kind === "saving"}>
+            <Button type="submit" busy={status.kind === "saving"}>
               {status.kind === "saving" ? "Saving…" : "Save limits"}
             </Button>
           </div>

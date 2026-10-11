@@ -77,7 +77,7 @@ export function SaveDashboardDialog({
           <Button type="button" variant="secondary" onClick={() => onOpenChange(false)}>
             Cancel
           </Button>
-          <Button type="submit" disabled={!trimmed || saving}>
+          <Button type="submit" busy={saving} disabled={!trimmed}>
             {saving ? (
               <Loader2 className="h-4 w-4 animate-spin" />
             ) : (

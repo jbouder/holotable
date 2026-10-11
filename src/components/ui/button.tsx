@@ -14,12 +14,33 @@ export interface ButtonProps extends React.ComponentPropsWithoutRef<typeof BaseB
    * toolbar row shrinks instead of overflowing on a phone.
    */
   collapse?: boolean;
+  /**
+   * The work this button started is running. Disabled, but it keeps focus
+   * and says it is busy: a `disabled` button drops focus to the page (to
+   * the page behind a modal, in a dialog), so the next Tab starts over
+   * (#540). Pass `disabled` for anything else that holds it off.
+   */
+  busy?: boolean;
 }
 
 export const Button = React.forwardRef<HTMLElement, ButtonProps>(
-  ({ className, variant = "primary", size = "md", collapse = false, ...props }, ref) => (
+  (
+    {
+      className,
+      variant = "primary",
+      size = "md",
+      collapse = false,
+      busy = false,
+      disabled,
+      ...props
+    },
+    ref,
+  ) => (
     <BaseButton
       ref={ref}
+      disabled={disabled || busy}
+      focusableWhenDisabled={busy || undefined}
+      aria-busy={busy || undefined}
       className={
         // Base UI also takes a function of the button's state.
         typeof className === "function"
