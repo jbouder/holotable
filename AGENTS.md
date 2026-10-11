@@ -320,6 +320,7 @@ npm run config:check     # after adding an environment variable
 npm run eval             # after a prompt change: grades recorded generations (--live --record re-records)
 npm run fixture:capture  # adds a stored spec to the IR fixture library
 npm run smoke            # checks both self-monitoring dashboards end to end
+npm run load:stream      # many viewers of one dashboard stream, some stalled (against dev:demo)
 ```
 
 - **Tests hold rules, not coverage.** A unit test exists because a rule

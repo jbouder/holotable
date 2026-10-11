@@ -12,19 +12,18 @@ import { guardStream, type StreamEnd } from "@/lib/auth/stream-guard";
 import { config } from "@/lib/config";
 import { getDashboardById, getSourceById } from "@/lib/db/repo";
 import { rowScopeFor } from "@/lib/row-scope";
-import { defaultPanelExecutor, getPoller, type PollerEvent } from "@/lib/poller/registry";
+import { defaultPanelExecutor, getPoller } from "@/lib/poller/registry";
 import { selectionFromParams } from "@/lib/variable-selection";
 import { checkedSelection, variableSourceIds } from "@/lib/variables";
 import { hasQuery, TimeRange, queryStatement } from "@/lib/ir";
 import {
   accessEndedFrame,
   drainFrame,
-  eventFrame,
-  HEARTBEAT_FRAME,
-  HEARTBEAT_MS,
   sessionEndedFrame,
   sessionExpiredFrame,
+  STREAM_HEADERS,
 } from "@/lib/sse";
+import { subscriberStream } from "@/lib/sse-stream";
 import { onDrain } from "@/lib/shutdown";
 import { route } from "@/lib/http";
 import { audit } from "@/lib/audit";
@@ -159,55 +158,32 @@ export const GET = route(
         })),
       },
     });
-    const encoder = new TextEncoder();
-
-    const stream = new ReadableStream<Uint8Array>({
-      start(controller) {
-        const write = (frame: string) => {
-          try {
-            controller.enqueue(encoder.encode(frame));
-          } catch {
-            /* controller closed */
-          }
-        };
-        const send = (event: PollerEvent, eventId?: string) => {
-          write(eventFrame(JSON.stringify(event), eventId));
-        };
-        // Prime the stream so the connection opens promptly.
-        write(": connected\n\n");
-
-        const unsubscribe = poller.subscribe(send, resumeToken);
-        // A comment every so often, so a proxy that closes quiet connections
-        // does not close one whose dashboard refreshes slowly (#43).
-        const heartbeat = setInterval(() => write(HEARTBEAT_FRAME), HEARTBEAT_MS);
-
+    const stream = subscriberStream({
+      subscribe: (listener, resume) => poller.subscribe(listener, resume),
+      resumeToken,
+      slowTicks: config.sseSlowTicks,
+      signal: req.signal,
+      // A viewer, or a proxy in front of one, that stopped reading (#489).
+      // Recorded on the stream's own action, so the row beside the one that
+      // opened it says why it ended.
+      onDrop: (reason) =>
+        audit({
+          actor: identity,
+          action: "dashboard.stream",
+          workspaceId: dashboard.workspaceId,
+          resource: { type: "dashboard", id },
+          outcome: "failure",
+          detail: { dropped: reason },
+        }),
+      attach(handle) {
         // Graceful shutdown (#47): hand the browser a reconnect delay before
         // the socket goes away, so it comes back to a healthy instance on a
         // spread-out timer instead of retrying into this one immediately. The
         // hook is unregistered on close, or the set would grow by one entry
         // for every connection the instance ever served.
-        let unregisterDrain = () => {};
-        let stopGuard = () => {};
-
-        const close = () => {
-          clearInterval(heartbeat);
-          unsubscribe();
-          unregisterDrain();
-          stopGuard();
-          try {
-            controller.close();
-          } catch {
-            /* already closed */
-          }
-        };
-
-        unregisterDrain = onDrain(() => {
-          try {
-            controller.enqueue(encoder.encode(drainFrame()));
-          } catch {
-            /* controller closed */
-          }
-          close();
+        const unregisterDrain = onDrain(() => {
+          handle.write(drainFrame());
+          handle.close();
         });
 
         // The stream is authorized above, once; this keeps it authorized
@@ -219,7 +195,7 @@ export const GET = route(
         // revocation (the revoke route names it by `shareSessionId`), and
         // when the re-check finds it revoked or the dashboard gone; each as
         // `access-ended`, since there is no session to renew.
-        stopGuard = guardStream({
+        const stopGuard = guardStream({
           expiresAt: shared
             ? Date.parse(shared.share.expiresAt)
             : token
@@ -248,26 +224,17 @@ export const GET = route(
             );
           },
           onEnd: (why) => {
-            try {
-              const frame = shared ? accessEndedFrame : END_FRAMES[why];
-              controller.enqueue(encoder.encode(frame()));
-            } catch {
-              /* controller closed */
-            }
-            close();
+            handle.write((shared ? accessEndedFrame : END_FRAMES[why])());
+            handle.close();
           },
         });
-
-        req.signal.addEventListener("abort", close);
+        return () => {
+          unregisterDrain();
+          stopGuard();
+        };
       },
     });
 
-    return new Response(stream, {
-      headers: {
-        "Content-Type": "text/event-stream",
-        "Cache-Control": "no-cache, no-transform",
-        Connection: "keep-alive",
-      },
-    });
+    return new Response(stream, { headers: STREAM_HEADERS });
   },
 );

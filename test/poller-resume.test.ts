@@ -12,7 +12,7 @@ import {
   encodeResumeToken,
   MAX_RESUME_TOKEN_CHARS,
 } from "@/lib/poller/resume";
-import { eventFrame, HEARTBEAT_FRAME } from "@/lib/sse";
+import { encodeEventFrame, HEARTBEAT_FRAME } from "@/lib/sse";
 import { mergePanelRows } from "@/lib/stream-merge";
 import type { PanelData } from "@/components/charts/options";
 import type { Dashboard } from "@/lib/ir";
@@ -344,8 +344,10 @@ test("a token that is not one is no resume, never an error", () => {
 });
 
 test("a frame carries its id, and an id that could split the frame is dropped", () => {
-  assert.equal(eventFrame('{"a":1}', "abc"), 'id: abc\ndata: {"a":1}\n\n');
-  assert.equal(eventFrame('{"a":1}'), 'data: {"a":1}\n\n');
-  assert.equal(eventFrame('{"a":1}', "a\nevent: x"), 'data: {"a":1}\n\n');
+  const text = (frame: Uint8Array) => new TextDecoder().decode(frame);
+  const event = { a: 1 };
+  assert.equal(text(encodeEventFrame(event, "abc")), 'id: abc\ndata: {"a":1}\n\n');
+  assert.equal(text(encodeEventFrame(event)), 'data: {"a":1}\n\n');
+  assert.equal(text(encodeEventFrame(event, "a\nevent: x")), 'data: {"a":1}\n\n');
   assert.match(HEARTBEAT_FRAME, /^:[^\n]*\n\n$/);
 });

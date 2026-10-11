@@ -36,6 +36,7 @@ import {
 import {
   ACCESS_ENDED_EVENT,
   DRAIN_EVENT,
+  DROP_EVENT,
   SESSION_ENDED_EVENT,
   SESSION_EXPIRED_EVENT,
 } from "@/lib/sse";
@@ -376,6 +377,9 @@ export function LiveDashboard({
       signal({ type: "error", closed: false });
     };
     es.addEventListener(DRAIN_EVENT, onDraining);
+    // The server closed this stream for falling behind (#489): the same as a
+    // drain from here, a `retry:` hint and a reconnect that resumes.
+    es.addEventListener(DROP_EVENT, onDraining);
     // The realm ended this session (#28). Close rather than let EventSource
     // retry into a 401; the renewal that follows is refused too, and that
     // refusal is what raises the keepalive's sign-in banner.
@@ -422,6 +426,7 @@ export function LiveDashboard({
     es.addEventListener(ACCESS_ENDED_EVENT, onAccessEnded);
     return () => {
       es.removeEventListener(DRAIN_EVENT, onDraining);
+      es.removeEventListener(DROP_EVENT, onDraining);
       es.removeEventListener(SESSION_ENDED_EVENT, onSessionEnded);
       es.removeEventListener(SESSION_EXPIRED_EVENT, onSessionExpired);
       es.removeEventListener(ACCESS_ENDED_EVENT, onAccessEnded);

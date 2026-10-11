@@ -66,15 +66,65 @@ export function accessEndedFrame(): string {
 }
 
 /**
- * A poller event as a frame. `id` is the resume token (#43): the browser keeps
- * the last one it saw and hands it back on reconnect. SSE ids may not contain
- * a newline; the token is base64url, and anything else is dropped rather than
+ * A poller event as a frame, its `data:` line serialized once per event
+ * object (#489). `id` is the resume token (#43): the browser keeps the last
+ * one it saw and hands it back on reconnect. SSE ids may not contain a
+ * newline; the token is base64url, and anything else is dropped rather than
  * allowed to split the frame.
+ *
+ * The poller hands every subscriber the same object for the same payload (a
+ * delta is shared by every subscriber on the same cursor), so a tick on a
+ * dashboard a hundred people watch is serialized once, not a hundred times.
+ * Weakly held: an event nobody holds any more takes its bytes with it.
  */
-export function eventFrame(data: string, id?: string): string {
-  const idLine = id && !/[\r\n\0]/.test(id) ? `id: ${id}\n` : "";
-  return `${idLine}data: ${data}\n\n`;
+const encoded = new WeakMap<object, Uint8Array>();
+const utf8 = new TextEncoder();
+let serializations = 0;
+
+export function encodeEventFrame(event: object, id?: string): Uint8Array {
+  let data = encoded.get(event);
+  if (!data) {
+    serializations++;
+    data = utf8.encode(`data: ${JSON.stringify(event)}\n\n`);
+    encoded.set(event, data);
+  }
+  const idLine = id && !/[\r\n\0]/.test(id) ? utf8.encode(`id: ${id}\n`) : null;
+  if (!idLine) return data;
+  const frame = new Uint8Array(idLine.length + data.length);
+  frame.set(idLine);
+  frame.set(data, idLine.length);
+  return frame;
 }
+
+/** How many events have been serialized in this process. For tests. */
+export function serializationCount(): number {
+  return serializations;
+}
+
+/**
+ * A subscriber that has not read for `SSE_SLOW_TICKS` cycles is closed
+ * (#489), with a reconnect hint spread like the drain's so the dropped come
+ * back apart. The client treats it as a reconnect after the delay, resuming
+ * from its last event id.
+ */
+export const DROP_EVENT = "drop";
+
+export function dropFrame(random: () => number = Math.random): string {
+  const retryMs = RECONNECT_BASE_MS + Math.floor(random() * RECONNECT_SPREAD_MS);
+  return `retry: ${retryMs}\nevent: ${DROP_EVENT}\ndata: {"reason":"slow"}\n\n`;
+}
+
+/**
+ * The headers of every dashboard stream response. `no-transform` and
+ * `X-Accel-Buffering: no` keep a proxy or ingress from compressing or
+ * buffering it (#489), which would hold frames back until a buffer filled.
+ */
+export const STREAM_HEADERS: Readonly<Record<string, string>> = {
+  "Content-Type": "text/event-stream",
+  "Cache-Control": "no-cache, no-transform",
+  Connection: "keep-alive",
+  "X-Accel-Buffering": "no",
+};
 
 /** A comment line: ignored by `EventSource`, but traffic to a proxy. */
 export const HEARTBEAT_FRAME = ": keepalive\n\n";

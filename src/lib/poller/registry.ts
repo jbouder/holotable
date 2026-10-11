@@ -120,7 +120,10 @@ export type PollerEvent =
  * `id`, when present, is the SSE event id to send with the frame: the
  * subscriber's cursors after it, for resuming (#43).
  */
-type Listener = (event: PollerEvent, id?: string) => void;
+export type Listener = (event: PollerEvent, id?: string) => void;
+
+/** One publish's deltas, by the cursor they were cut from (#489). */
+type DeltaMemo = Map<string, { cursor: string | undefined; event: PollerEvent }>;
 
 interface Subscriber {
   listener: Listener;
@@ -489,22 +492,35 @@ class DashboardPoller {
    * the rows newer than this subscriber's cursor, and the frame carries the
    * advanced cursors as its event id.
    */
-  private deliver(sub: Subscriber, panel: QueryPanel, event: PollerEvent) {
+  private deliver(
+    sub: Subscriber,
+    panel: QueryPanel,
+    event: PollerEvent,
+    shared: DeltaMemo = new Map(),
+  ) {
     const timeField = queryTimeField(panel.query);
     if (event.type !== "panel" || !timeField) {
       this.send(sub, event);
       return;
     }
     const since = sub.cursors.get(panel.id);
-    const delta = computeDelta(event.rows, timeField, since);
-    if (delta.cursor !== undefined) sub.cursors.set(panel.id, delta.cursor);
-    this.send(
-      sub,
-      delta.mode === "append"
-        ? { ...event, mode: "append", rows: delta.fresh, since, timeField }
-        : { ...event, mode: "replace", rows: delta.fresh },
-      encodeResumeToken(this.version, sub.cursors),
-    );
+    // Subscribers on the same cursor get the same delta, as the same object
+    // (#489), so the stream serializes it once for all of them.
+    const key = since ?? "";
+    let cut = shared.get(key);
+    if (!cut) {
+      const delta = computeDelta(event.rows, timeField, since);
+      cut = {
+        cursor: delta.cursor,
+        event:
+          delta.mode === "append"
+            ? { ...event, mode: "append", rows: delta.fresh, since, timeField }
+            : { ...event, mode: "replace", rows: delta.fresh },
+      };
+      shared.set(key, cut);
+    }
+    if (cut.cursor !== undefined) sub.cursors.set(panel.id, cut.cursor);
+    this.send(sub, cut.event, encodeResumeToken(this.version, sub.cursors));
   }
 
   private send(sub: Subscriber, event: PollerEvent, id?: string) {
@@ -578,7 +594,8 @@ class DashboardPoller {
   /** A panel's outcome for this cycle: remembered, then sent to everyone. */
   private publish(panel: QueryPanel, event: PollerEvent) {
     this.latest.set(panel.id, event);
-    for (const sub of this.subscribers) this.deliver(sub, panel, event);
+    const shared: DeltaMemo = new Map();
+    for (const sub of this.subscribers) this.deliver(sub, panel, event, shared);
   }
 
   private scheduleNext() {
@@ -697,7 +714,8 @@ class DashboardPoller {
    * was waiting.
    */
   private notify(panel: QueryPanel, event: PollerEvent) {
-    for (const sub of this.subscribers) this.deliver(sub, panel, event);
+    const shared: DeltaMemo = new Map();
+    for (const sub of this.subscribers) this.deliver(sub, panel, event, shared);
   }
 
   /**
