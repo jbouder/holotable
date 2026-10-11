@@ -63,7 +63,7 @@
     "undici": "8.11.0",
     "vega": "6.4.0",
     "vega-interpreter": "2.3.2",
-    "vega-lite": "6.4.3",
+    "vega-lite": "6.5.0",
     "zod": "4.6.5"
   },
   "devDependencies": {
