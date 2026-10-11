@@ -30,6 +30,9 @@ A **source-admin** of the workspace can:
 
 - **Add model**: give it a name, choose a provider, and fill in what that
   provider asks for. See [the provider kinds](/admin/ai-provider/#models-configured-in-the-app).
+- **List models**, in the dialog once the key is in: ask the provider which
+  models the key may use, and pick one in the Model field. Any id can still
+  be typed. Azure deployments and Bedrock models are typed by hand.
 - **Test**: make one small model call, so a wrong model id or key is found now
   rather than on someone's next generation. The call counts against the
   workspace's [limits](/admin/llm-limits/).

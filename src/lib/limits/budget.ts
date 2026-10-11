@@ -15,7 +15,12 @@
 import type { LanguageModelUsage } from "ai";
 
 /** Which LLM-backed route produced the usage. A fixed set, safe as a label. */
-export type LlmRoute = "generate" | "source-draft" | "chat" | "model-test";
+export type LlmRoute =
+  | "generate"
+  | "source-draft"
+  | "chat"
+  | "model-test"
+  | "model-discover";
 
 export interface UsageDelta {
   workspaceId: string;

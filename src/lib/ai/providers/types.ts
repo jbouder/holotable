@@ -95,6 +95,8 @@ export interface ProviderKind<
   userSetsEndpoint: boolean;
   /** Listed on the provider select only outside production (the stub). */
   developmentOnly?: boolean;
+  /** The vendor can list its models, so the form offers "List models" (#443). */
+  listsModels?: boolean;
 }
 
 /** Identity function that keeps a kind's literal types. */

@@ -17,6 +17,7 @@ import {
   type ModelConfigInput,
 } from "@/lib/ai/model-config";
 import type { ModelTestResult } from "@/lib/ai/model-test-result";
+import type { DiscoveredModel } from "@/lib/ai/model-config";
 import { providerKind, selectableKinds } from "@/lib/ai/providers/registry";
 import type { ProviderField } from "@/lib/ai/providers/types";
 
@@ -41,6 +42,7 @@ export function ModelFields({
   storedKey,
   testUrl,
   testBody,
+  discover = null,
   disabled,
   allowStub = false,
 }: {
@@ -50,11 +52,20 @@ export function ModelFields({
   /** Null hides "Test connection", when there is nowhere to admit the call. */
   testUrl: string | null;
   testBody: (input: ModelConfigInput) => unknown;
+  /**
+   * "List models" (#443): where to ask, and the body around the form's
+   * input. Null hides it; it shows only for a kind that can list.
+   */
+  discover?: { url: string; body: (input: ModelConfigInput) => unknown } | null;
   disabled?: boolean;
   allowStub?: boolean;
 }) {
   const id = React.useId();
   const [test, setTest] = React.useState<TestStatus>({ kind: "idle" });
+  const [listed, setListed] = React.useState<DiscoveredModel[] | null>(null);
+  const [listing, setListing] = React.useState<
+    { kind: "idle" | "busy" } | { kind: "done" | "error"; message: string }
+  >({ kind: "idle" });
   const kind = providerKind(draft.provider);
   const hasKey = storedKey?.state === "set" || storedKey?.state === "unreadable";
   const noun = credentialsNoun(kind);
@@ -87,8 +98,58 @@ export function ModelFields({
     }
   }
 
+  /**
+   * Ask the vendor which models these credentials may use. The model field
+   * may still be empty, so a placeholder stands in for it; the list fills
+   * the field's suggestions, and any id can still be typed.
+   */
+  async function runList() {
+    if (!discover) return;
+    const built = inputFromDraft({
+      ...draft,
+      settings: { ...draft.settings, model: draft.settings.model?.trim() || "*" },
+    });
+    if (!built.ok) {
+      setListing({ kind: "error", message: built.message });
+      return;
+    }
+    setListing({ kind: "busy" });
+    try {
+      const res = await fetch(discover.url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(discover.body(built.input)),
+      });
+      if (!res.ok) {
+        setListing({ kind: "error", message: (await readApiError(res)).error });
+        return;
+      }
+      const result = (await res.json()) as
+        | { ok: true; models: DiscoveredModel[] }
+        | { ok: false; message: string };
+      if (!result.ok) {
+        setListing({ kind: "error", message: result.message });
+        return;
+      }
+      setListed(result.models);
+      setListing({
+        kind: "done",
+        message:
+          result.models.length === 0
+            ? "The provider listed no models; type the model id."
+            : `${result.models.length} ${result.models.length === 1 ? "model" : "models"} listed: pick one in the Model field, or type any id.`,
+      });
+    } catch (err) {
+      setListing({ kind: "error", message: apiErrorFromThrown(err).error });
+    }
+  }
+
   const change = (next: ModelConfigDraft) => {
     setTest({ kind: "idle" });
+    if (next.provider !== draft.provider) {
+      setListed(null);
+      setListing({ kind: "idle" });
+    }
     onChange(next);
   };
 
@@ -166,7 +227,21 @@ export function ModelFields({
                   value={value}
                   onChange={(e) => setField(field, e.target.value)}
                   aria-describedby={describedBy}
+                  list={
+                    field.in === "settings" && field.name === "model" && listed
+                      ? `${id}-listed`
+                      : undefined
+                  }
                 />
+              )}
+              {field.in === "settings" && field.name === "model" && listed && (
+                <datalist id={`${id}-listed`}>
+                  {listed.map((m) => (
+                    <option key={m.id} value={m.id}>
+                      {m.name ?? m.id}
+                    </option>
+                  ))}
+                </datalist>
               )}
               {field.help && (
                 <p id={`${fieldId}-help`} className="mt-1 text-xs text-muted">
@@ -222,6 +297,20 @@ export function ModelFields({
             )}
             Test connection
           </Button>
+          {discover && kind?.listsModels && (
+            <Button
+              type="button"
+              variant="secondary"
+              size="sm"
+              disabled={disabled || listing.kind === "busy"}
+              onClick={() => void runList()}
+            >
+              {listing.kind === "busy" && (
+                <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
+              )}
+              List models
+            </Button>
+          )}
           <p role="status" className="text-xs">
             {test.kind === "done" && test.result.ok && (
               <span className="fade-in text-success">
@@ -234,6 +323,14 @@ export function ModelFields({
             )}
             {test.kind === "error" && (
               <span className="fade-in text-danger">{test.message}</span>
+            )}
+          </p>
+          <p role="status" className="basis-full text-xs">
+            {listing.kind === "done" && (
+              <span className="fade-in text-muted">{listing.message}</span>
+            )}
+            {listing.kind === "error" && (
+              <span className="fade-in text-danger">{listing.message}</span>
             )}
           </p>
         </div>

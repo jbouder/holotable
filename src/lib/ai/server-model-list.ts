@@ -183,3 +183,26 @@ export function serverModelProblem(env: Environment = process.env): string | nul
   if (!chosen) return "AI_MODELS_FILE lists no models";
   return chosen.unavailable;
 }
+
+/**
+ * A server model by its name, for `npm run eval -- --live --model <name>`
+ * (#443); without a name, the server's default. An unknown name says which
+ * names are on offer.
+ */
+export function serverModelByName(
+  name: string | undefined,
+  env: Environment = process.env,
+): { ok: true; model: ServerModel } | { ok: false; message: string } {
+  const all = serverModelList(env);
+  if (!name) {
+    return all[0]
+      ? { ok: true, model: all[0] }
+      : { ok: false, message: "No server model is configured." };
+  }
+  const found = all.find((m) => m.name === name);
+  if (found) return { ok: true, model: found };
+  return {
+    ok: false,
+    message: `No server model is named "${name}". On offer: ${all.map((m) => m.name).join(", ") || "none"}.`,
+  };
+}

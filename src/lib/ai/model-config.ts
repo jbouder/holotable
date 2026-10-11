@@ -344,3 +344,9 @@ export interface ModelsPageData {
   demo: boolean;
   allowStub: boolean;
 }
+
+/** One model a vendor lists (#443): the id to configure, and its display name. */
+export interface DiscoveredModel {
+  id: string;
+  name?: string;
+}

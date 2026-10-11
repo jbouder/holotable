@@ -13,13 +13,17 @@ import {
 } from "./lib/eval";
 
 /*
- * npm run eval -- [--replay | --live] [--record] [--case <name>]… [--json <file>]
+ * npm run eval -- [--replay | --live [--model <name>]] [--record] [--case <name>]… [--json <file>]
  *
  *   --replay   (default) Grade every case's recorded answer. Free, deterministic,
  *              and run on every pull request: any failure exits 1.
- *   --live     Ask the configured provider (AI_PROVIDER/AI_MODEL, as the server
- *              would) and report a pass rate. Exits 0 whatever the rate: it
- *              measures, it does not gate. Spends tokens.
+ *   --live     Ask the server's default model (AI_MODELS_FILE's, else
+ *              AI_PROVIDER/AI_MODEL, as the server would) and report a pass
+ *              rate. Exits 0 whatever the rate: it measures, it does not gate.
+ *              Spends tokens.
+ *   --model    With --live, ask the server model of this name instead (#443):
+ *              an AI_MODELS_FILE entry, or `default` for the AI_* variables.
+ *              An unknown name exits 1 and lists the names on offer.
  *   --record   With --live, write each answer to evals/recordings/, replacing
  *              the old one, so replay grades it from then on.
  *   --case     Run only the named case(s).
@@ -36,12 +40,14 @@ const { values } = parseArgs({
     record: { type: "boolean", default: false },
     case: { type: "string", multiple: true },
     json: { type: "string" },
+    model: { type: "string" },
   },
 });
 
 async function main(): Promise<number> {
   if (values.replay && values.live) throw new Error("choose one of --replay and --live");
   if (values.record && !values.live) throw new Error("--record needs --live");
+  if (values.model && !values.live) throw new Error("--model needs --live");
   const live = values.live === true;
 
   const only = new Set(values.case ?? []);
@@ -54,8 +60,19 @@ async function main(): Promise<number> {
   // Resolved only for a live run, so a replay never needs a model configured.
   // (The provider module itself is already loaded through the request path
   // the replay drives; what it must not need is `AI_MODEL`.)
-  // The server's default model (#440): AI_MODELS_FILE's, else AI_MODEL's.
-  const model = live ? await serverDefaultModel() : null;
+  // The server model named by --model, else the server's default (#440, #443).
+  let model = null;
+  if (live) {
+    const { serverModelByName } = await import("@/lib/ai/server-model-list");
+    const found = serverModelByName(values.model);
+    if (!found.ok) {
+      console.error(found.message);
+      return 1;
+    }
+    const resolved = found.model.resolve();
+    if (!resolved.ok) throw new Error(resolved.problem);
+    model = resolved.model;
+  }
 
   const results: CaseResult[] = [];
   for (const c of cases) {
@@ -186,13 +203,3 @@ main().then(
     process.exit(2);
   },
 );
-
-async function serverDefaultModel() {
-  const { serverDefault } = await import("@/lib/ai/server-model-list");
-  const chosen = serverDefault();
-  const resolved = chosen?.resolve();
-  if (!resolved?.ok) {
-    throw new Error(resolved?.problem ?? "no server model is configured");
-  }
-  return resolved.model;
-}

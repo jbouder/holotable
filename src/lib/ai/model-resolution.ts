@@ -369,15 +369,15 @@ function requireCredentials(kind: ProviderKind, raw: unknown): Credentials {
 }
 
 /**
- * A configuration as a model, for "Test connection": the one submitted, with
- * the stored credentials when the form left them out (same origin only, as
- * for a save).
+ * A configuration and the credentials to call it with, for "Test connection"
+ * and "List models": the one submitted, with the stored credentials when the
+ * form left them out (same origin only, as for a save).
  */
-export async function modelForTest(
+export async function configForUse(
   input: ModelConfigInput,
   current: StoredConfig | null,
   deps: ModelResolutionDeps = defaultModelDeps(),
-): Promise<Model> {
+): Promise<{ settings: ModelSettings; credentials: Credentials }> {
   const write = await prepareWrite(input, current, deps);
   let credentials: Credentials = {};
   if (write.credentials === "keep") {
@@ -388,10 +388,21 @@ export async function modelForTest(
         "The stored credentials can no longer be read; enter them again.",
       );
     }
-    if (opened.state === "ok")
+    if (opened.state === "ok") {
       credentials = requireCredentials(kindOf(input.settings), opened.credentials);
+    }
   } else if (input.credentials) {
     credentials = requireCredentials(kindOf(input.settings), input.credentials);
   }
-  return configuredModel(input.settings, credentials, deps.allowlist);
+  return { settings: input.settings, credentials };
+}
+
+/** {@link configForUse} as a model, for "Test connection". */
+export async function modelForTest(
+  input: ModelConfigInput,
+  current: StoredConfig | null,
+  deps: ModelResolutionDeps = defaultModelDeps(),
+): Promise<Model> {
+  const { settings, credentials } = await configForUse(input, current, deps);
+  return configuredModel(settings, credentials, deps.allowlist);
 }

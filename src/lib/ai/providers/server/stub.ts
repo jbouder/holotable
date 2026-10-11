@@ -6,4 +6,6 @@ export const stubServer = defineServerKind(stubKind, {
   kind: "stub",
   providerOptions: {},
   build: () => stubModel(),
+  // A fixed list, so "List models" has something to show in the e2e stack.
+  listModels: async () => [{ id: "stub", name: "Recorded answers" }],
 });

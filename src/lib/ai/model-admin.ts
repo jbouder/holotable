@@ -11,13 +11,17 @@ import {
   assertConfigurable,
   defaultModelDeps,
   type ModelResolutionDeps,
+  configForUse,
   modelForTest,
   modelView,
   prepareWrite,
 } from "@/lib/ai/model-resolution";
+import { baseUrlRefusal } from "@/lib/ai/guarded-fetch";
+import { type DiscoveredModel, ModelListError } from "@/lib/ai/providers/server/list";
+import { discoverModels } from "@/lib/ai/providers/server/registry";
 import { serverModels } from "@/lib/ai/models";
 import type { Model } from "@/lib/ai/provider";
-import { endpointHost } from "@/lib/ai/providers/registry";
+import { endpointHost, kindOf } from "@/lib/ai/providers/registry";
 import { DuplicateModelName, type ModelOwner, type StoredModel } from "@/lib/db/models";
 import { WorkspaceId } from "@/lib/workspace-limits";
 
@@ -165,6 +169,49 @@ export async function modelToTest(
     if (!current) throw new HttpError(404, "model not found");
   }
   return modelForTest(input, current, deps);
+}
+
+/** What "List models" answers (#443): the vendor's ids, or why not, in words safe to show. */
+export type DiscoverResult =
+  | { ok: true; models: DiscoveredModel[] }
+  | { ok: false; message: string };
+
+/**
+ * The models a configuration's vendor offers, for "List models": the form's
+ * settings, with the stored credentials of `modelId` when the form left them
+ * out (same origin only). A kind that cannot list is a 400.
+ */
+export async function modelsToDiscover(
+  owner: ModelOwner,
+  input: ModelConfigInput,
+  modelId: string | null,
+  deps: ModelResolutionDeps = defaultModelDeps(),
+): Promise<DiscoverResult> {
+  assertConfigurable(deps);
+  let current: StoredModel | null = null;
+  if (modelId) {
+    current = await deps.store.get(owner, modelId);
+    if (!current) throw new HttpError(404, "model not found");
+  }
+  const { settings, credentials } = await configForUse(input, current, deps);
+  const listing = discoverModels(settings, credentials, deps.allowlist);
+  if (!listing) {
+    throw new HttpError(
+      400,
+      `${kindOf(settings).label} does not list its models; type the model id.`,
+    );
+  }
+  try {
+    return { ok: true, models: await listing };
+  } catch (err) {
+    if (err instanceof ModelListError) return { ok: false, message: err.message };
+    const refused = baseUrlRefusal(err);
+    if (refused) return { ok: false, message: refused.message };
+    return {
+      ok: false,
+      message: "The provider could not be reached to list its models.",
+    };
+  }
 }
 
 /**
