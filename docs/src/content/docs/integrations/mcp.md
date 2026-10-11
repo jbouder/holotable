@@ -54,7 +54,13 @@ never as a protocol error.
 | `save_dashboard` | `POST /api/dashboards`, `PUT /api/dashboards/[id]` | editor | Creates a dashboard from a spec, or saves a new version when `dashboardId` is given. The spec is read as a stored spec (an older `specVersion` is upgraded), every panel's source is resolved and its SQL run through the guard, and the workspace is the one the sources belong to, never an argument |
 | `generate_dashboard` | `POST /api/generate` (`dashboard`) | editor | A complete spec from a description, against one source and up to two more of the same workspace |
 | `generate_panel` | `POST /api/generate` (`explore`) | editor | One panel from a question against a source |
+| `list_models` | `GET /api/models` | viewer | The models the caller may generate with in a workspace, ids and names only, and the default ([#442](https://github.com/jbouder/holotable/issues/442)) |
 | `generate_source` | `POST /api/sources/generate` | source-admin | A source draft, of the `kind` asked for when one is: the safe connection config (or a Prometheus URL and auth mode) and a best-effort table or metric catalog, naming a granted `secret_ref` when it needs one. Registering it stays in the app |
+
+The three `generate_*` tools take an optional `model`: an id from
+`list_models`, or a server model's name. The catalog must grant it to the
+caller in that workspace, or the call fails; without it, the generation uses
+the caller's default there, as the app does.
 
 The three generation tools use the same model the routes would for the
 caller in that workspace (their [personal or the workspace's

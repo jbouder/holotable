@@ -4,7 +4,7 @@ import {
   streamSourceDraft,
 } from "@/lib/ai/generate";
 import { recordGeneration } from "@/lib/ai/log";
-import { requireModel } from "@/lib/ai/models";
+import { requireModel, usableModels } from "@/lib/ai/models";
 import {
   createDashboard,
   getDashboardById,
@@ -19,6 +19,7 @@ import type { McpTool } from "@/lib/mcp/tool";
 import { dashboardTools } from "@/lib/mcp/tools/dashboards";
 import type { McpDeps } from "@/lib/mcp/tools/deps";
 import { generationTools } from "@/lib/mcp/tools/generate";
+import { modelTools } from "@/lib/mcp/tools/models";
 import { sourceTools } from "@/lib/mcp/tools/sources";
 import { sqlTools } from "@/lib/mcp/tools/sql";
 import { invalidatePoller } from "@/lib/poller/registry";
@@ -41,6 +42,7 @@ export function defaultMcpDeps(): McpDeps {
     invalidatePoller,
     enforceLlmLimits,
     requireModel,
+    usableModels,
     workspacePromptFor,
     listLinkableDashboards,
     streamDashboard,
@@ -58,6 +60,7 @@ export function mcpTools(deps: McpDeps = defaultMcpDeps()): McpTool[] {
     ...sqlTools(deps),
     ...dashboardTools(deps),
     ...generationTools(deps),
+    ...modelTools(deps),
   ];
 }
 

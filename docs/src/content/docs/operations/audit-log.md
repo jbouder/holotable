@@ -25,10 +25,10 @@ configure.
 | `dashboard.update` | Save, rename or metadata edit (`fields`), restore (`restoredFrom`) | dashboard |
 | `dashboard.delete` | Delete | dashboard |
 | `dashboard.stream` | A viewer opens or resumes a dashboard's live stream | dashboard |
-| `dashboard.generate` | A generation finishes, or fails (`modelConfig`: which [level](/admin/ai-provider/#models-configured-in-the-app) answered) | source |
-| `dashboard.chat` | A chat turn starts (`modelConfig`, and the `timeRange`, `variables` and `panelId` it runs with) | dashboard |
+| `dashboard.generate` | A generation finishes, or fails (`modelConfig`: which [level](/admin/ai-provider/#models-configured-in-the-app) answered; `modelId`: the catalog model, an id or `env:<name>`) | source |
+| `dashboard.chat` | A chat turn starts (`modelConfig`, `modelId`, and the `timeRange`, `variables` and `panelId` it runs with) | dashboard |
 | `chat.create`, `chat.update`, `chat.delete` | A [conversation](/reference/api-routes/#chat-explore) is started (`sourceIds` and `timeRange`, or `dashboardId` for one that continues a dashboard's chat), renamed or changed (`renamed`, `sourceIds`, `timeRange`: what changed, never the title), or deleted (`deleted`: a count; `all` when every one went) | conversation, or — for delete-all |
-| `chat.turn` | An Explore turn starts (`modelConfig`, `timeRange`, `sourceIds`) | conversation |
+| `chat.turn` | An Explore turn starts (`modelConfig`, `modelId`, `timeRange`, `sourceIds`) | conversation |
 | `query.execute` | A statement run from preview (`via: "preview"`), by a chat (`via: "chat"`, with `conversationId` and `panelId` for Explore) or by an MCP client's `run_query` (`via: "mcp"`) | source |
 | `source.create`, `source.update`, `source.delete` | Source changes, including hiding a column (`fields: ["catalog"]`) | source |
 | `source.test`, `source.refresh`, `source.discover`, `source.draft` | Connection test, applied catalog refresh, table discovery, drafted source | source, or — before one exists |

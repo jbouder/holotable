@@ -39,6 +39,7 @@ import {
 import { ErrorDisplay } from "@/components/ui/error-display";
 import { RepairingNote } from "@/components/repairing-note";
 import { useRepairingObject } from "@/components/use-repairing-object";
+import { ModelChip, useModelChoice } from "@/components/model-chip";
 import { FIRST_DASHBOARD_DOCS_URL } from "@/lib/onboarding";
 import { apiErrorFromThrown, readApiError } from "@/lib/errors";
 import { buildSourceDescriptionStarters } from "@/lib/prompts/starters";
@@ -758,9 +759,16 @@ function NaturalLanguageDrafter({
     },
   });
 
+  // The model chip (#442): the drafting model, the person's pick or the default.
+  const choice = useModelChoice(workspaceId);
+
   function draft() {
     if (isLoading || !description.trim()) return;
-    submit({ workspaceId, prompt: description });
+    submit({
+      workspaceId,
+      prompt: description,
+      ...(choice.modelId ? { modelId: choice.modelId } : {}),
+    });
   }
 
   return (
@@ -772,6 +780,7 @@ function NaturalLanguageDrafter({
         draft fills in the form below for you to review, adjust, and create.
       </p>
       <div className="flex flex-wrap items-center gap-2">
+        <ModelChip choice={choice} disabled={isLoading} />
         {presets.map((preset) => (
           <button
             key={preset}

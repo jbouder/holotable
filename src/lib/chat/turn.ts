@@ -40,11 +40,20 @@ export async function chatTurnResponse(input: {
   conversationId?: string;
   /** The dashboard whose chat this continues: its panels go in the prompt. */
   dashboard?: { id: string; spec: Dashboard };
+  /** The model the turn names (#442): must be usable here. */
+  modelId?: string | null;
+  /** The conversation's own model, used while usable. */
+  preferredModel?: string | null;
   abortSignal: AbortSignal;
   onEnd?: (messages: UIMessage[]) => Promise<void>;
 }): Promise<Response> {
   const { identity, workspaceId, sources, messages, conversationId } = input;
-  const resolved = await requireModel({ identity, workspaceId });
+  const resolved = await requireModel({
+    identity,
+    workspaceId,
+    modelId: input.modelId,
+    preferred: input.preferredModel,
+  });
   const usage = await enforceLlmLimits({
     identity,
     workspaceId,
@@ -75,6 +84,7 @@ export async function chatTurnResponse(input: {
       ...where,
       messageCount: messages.length,
       modelConfig: resolved.source,
+      modelId: resolved.id,
       timeRange: input.timeRange,
       sourceIds: sources.map((s) => s.id),
     },

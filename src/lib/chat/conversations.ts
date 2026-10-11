@@ -1,5 +1,6 @@
 import type { UIMessage } from "ai";
 import { z } from "zod";
+import { ModelId } from "@/lib/ai/model-config";
 import { assertAuthorized, can, HttpError } from "@/lib/auth/authorize";
 import type { Identity } from "@/lib/auth/claims";
 import { type ChatExecutor, type ChatScope, planChatQuery } from "@/lib/ai/data-chat";
@@ -82,6 +83,8 @@ export const TurnBody = z.object({
         `a question is at most ${MAX_QUESTION_CHARS} characters`,
       ),
   }),
+  // The model this turn, and the conversation from now on, uses (#442).
+  modelId: ModelId.optional(),
 });
 export type TurnBody = z.infer<typeof TurnBody>;
 

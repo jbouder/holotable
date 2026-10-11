@@ -207,6 +207,7 @@ export default async function DashboardViewPage({
       */}
         <DashboardChat
           dashboardId={id}
+          workspaceId={dashboard.workspaceId}
           dashboardTitle={dashboard.spec.title}
           panels={dashboard.spec.panels.map((p) => ({
             id: p.id,

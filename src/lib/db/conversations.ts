@@ -23,6 +23,8 @@ export interface Conversation {
   title: string;
   timeRange: TimeRange;
   variables: VariableValues | null;
+  /** The catalog model its turns use (#442), or null for the default. */
+  modelId: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -95,6 +97,8 @@ export interface ConversationStore {
       workspaceId?: string;
       sourceIds?: string[];
       timeRange?: TimeRange;
+      /** The model its turns use from now on (#442). */
+      modelId?: string;
     },
   ): Promise<Conversation | null>;
   /** Whether a conversation of this person's was deleted. */
@@ -127,12 +131,13 @@ interface Row extends Record<string, unknown> {
   title: string;
   time_range: unknown;
   variables: unknown;
+  model_id: string | null;
   created_at: Date | string;
   updated_at: Date | string;
 }
 
 const COLUMNS =
-  "id, workspace_id, source_ids, dashboard_id, title, time_range, variables, created_at, updated_at";
+  "id, workspace_id, source_ids, dashboard_id, title, time_range, variables, model_id, created_at, updated_at";
 
 const iso = (v: Date | string) => new Date(v).toISOString();
 
@@ -152,6 +157,7 @@ function toConversation(row: Row): Conversation {
     title: row.title,
     timeRange: range.success ? range.data : { from: "now-1h", to: "now" },
     variables: row.variables != null && variables.success ? variables.data : null,
+    modelId: row.model_id ?? null,
     createdAt: iso(row.created_at),
     updatedAt: iso(row.updated_at),
   };
@@ -305,6 +311,7 @@ export function makeConversationStore(deps: {
            workspace_id = coalesce($4, workspace_id),
            source_ids = coalesce($5, source_ids),
            time_range = coalesce($6::jsonb, time_range),
+           model_id = coalesce($7, model_id),
            updated_at = now()
          WHERE id = $1 AND user_sub = $2
          RETURNING ${COLUMNS}`,
@@ -315,6 +322,7 @@ export function makeConversationStore(deps: {
           patch.workspaceId ?? null,
           patch.sourceIds ?? null,
           patch.timeRange ? JSON.stringify(patch.timeRange) : null,
+          patch.modelId ?? null,
         ],
       );
       return row ? toConversation(row) : null;

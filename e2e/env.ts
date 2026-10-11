@@ -61,6 +61,9 @@ export const APP_ENV: Record<string, string> = {
   // The recorded model (src/lib/ai/stub.ts): deterministic, offline, free.
   AI_PROVIDER: "stub",
   AI_STUB_IN_PRODUCTION: "true",
+  // Two more server models, both the stub, so a journey can pick one (#442).
+  // The legacy variables above stay the server's default, named "default".
+  AI_MODELS_FILE: join(ROOT, "e2e", "models.json"),
   AI_MODEL: "",
   OPENAI_API_KEY: "",
   AI_GATEWAY_API_KEY: "",

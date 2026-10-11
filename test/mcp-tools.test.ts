@@ -181,6 +181,8 @@ interface Calls {
   recorded: LanguageModelUsage[];
   generations: unknown[];
   starts: { repair: boolean }[];
+  /** The `modelId` each generation asked the catalog for (#442). */
+  modelRequests: (string | null)[];
 }
 
 function fakeDeps(
@@ -197,6 +199,7 @@ function fakeDeps(
     recorded: [],
     generations: [],
     starts: [],
+    modelRequests: [],
   };
   const sources: SourceRecord[] = [app, prom, other, removed];
   const rows = Array.from({ length: MAX_TOOL_ROWS + 50 }, (_, i) => ({
@@ -247,12 +250,37 @@ function fakeDeps(
         },
       } as Awaited<ReturnType<McpDeps["enforceLlmLimits"]>>;
     },
-    requireModel: async () => ({
-      ok: true,
-      id: "9b1e4f5a-1c2d-4e3f-8a9b-0c1d2e3f4a5b",
-      source: "workspace",
-      modelId: "ws-model",
-      model: {} as Model,
+    requireModel: async (input) => {
+      calls.modelRequests.push(input.modelId ?? null);
+      return {
+        ok: true,
+        id: input.modelId ?? "9b1e4f5a-1c2d-4e3f-8a9b-0c1d2e3f4a5b",
+        source: "workspace",
+        modelId: "ws-model",
+        model: {} as Model,
+      };
+    },
+    usableModels: async (_identity, workspaceId) => ({
+      workspaceId,
+      models: [
+        {
+          id: "env:claude",
+          name: "claude",
+          provider: "anthropic",
+          model: "claude-sonnet-5-5",
+          scope: "environment",
+          unavailable: null,
+        },
+        {
+          id: "env:gpt",
+          name: "gpt",
+          provider: "openai",
+          model: "gpt-5",
+          scope: "environment",
+          unavailable: "OPENAI_API_KEY is not set on the server.",
+        },
+      ],
+      defaultModel: "env:claude",
     }),
     workspacePromptFor: async () => null,
     listLinkableDashboards: async () => [],
@@ -317,6 +345,7 @@ test("the tools are the ones the issue names, each annotated, and the instructio
       "generate_dashboard",
       "generate_panel",
       "generate_source",
+      "list_models",
     ],
   );
   for (const t of tools) {
@@ -630,6 +659,58 @@ test("generate_dashboard is admitted, recorded and audited like the route, and r
     ).ok,
     false,
   );
+});
+
+test("a generation names its model by id or by a server model's name (#442)", async () => {
+  const { deps, calls } = fakeDeps({}, [
+    { object: generated },
+    { object: generated },
+    { object: generated },
+  ]);
+  const tools = mcpTools(deps);
+  for (const model of [undefined, "claude", "9b1e4f5a-1c2d-4e3f-8a9b-0c1d2e3f4a5c"]) {
+    const result = await call(tools, "generate_dashboard", {
+      sourceId: "src-app",
+      prompt: "requests over time",
+      ...(model ? { model } : {}),
+    });
+    assert.ok(result.ok, result.text);
+  }
+  assert.deepEqual(calls.modelRequests, [
+    null,
+    "env:claude",
+    "9b1e4f5a-1c2d-4e3f-8a9b-0c1d2e3f4a5c",
+  ]);
+});
+
+test("list_models answers the caller's listing, ids and names only (#442)", async () => {
+  const { deps } = fakeDeps();
+  const tools = mcpTools(deps);
+  const result = await call(tools, "list_models", { workspaceId: "ws-1" });
+  assert.ok(result.ok, result.text);
+  assert.deepEqual(result.data, {
+    models: [
+      {
+        id: "env:claude",
+        name: "claude",
+        provider: "anthropic",
+        model: "claude-sonnet-5-5",
+        scope: "environment",
+      },
+      {
+        id: "env:gpt",
+        name: "gpt",
+        provider: "openai",
+        model: "gpt-5",
+        scope: "environment",
+        unavailable: "OPENAI_API_KEY is not set on the server.",
+      },
+    ],
+    defaultModel: "env:claude",
+  });
+  assert.equal(tool(tools, "list_models").annotations.readOnlyHint, true);
+  const elsewhere = await call(tools, "list_models", { workspaceId: "ws-other" });
+  assert.equal(elsewhere.ok, false);
 });
 
 test("a rate limit or budget refusal is the tool's answer, before any model call", async () => {

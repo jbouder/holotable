@@ -26,6 +26,7 @@ const Body = z
     timeRange: TimeRange,
     history: UnkeptHistory,
     message: TurnBody.shape.message,
+    modelId: TurnBody.shape.modelId,
   })
   .strict();
 
@@ -56,6 +57,7 @@ export const POST = route("chat.turn.unkept", async (req: Request) => {
     sources,
     timeRange: body.timeRange,
     messages: [...(body.history as UIMessage[]), body.message as UIMessage],
+    modelId: body.modelId,
     abortSignal: req.signal,
   });
 });

@@ -5,6 +5,7 @@ import { readJson, route } from "@/lib/http";
 import { audit } from "@/lib/audit";
 import { type OnGenerationFinish, streamSourceDraft } from "@/lib/ai/generate";
 import { recordGeneration } from "@/lib/ai/log";
+import { ModelId } from "@/lib/ai/model-config";
 import { requireModel } from "@/lib/ai/models";
 import { textResponseOnceStarted } from "@/lib/ai/provider-error";
 import {
@@ -25,6 +26,8 @@ export const maxDuration = 60;
 const DraftBody = z.object({
   workspaceId: z.string().min(1).max(128),
   prompt: z.string().min(1).max(4000),
+  // The model the caller picked (#442); the catalog must grant it here.
+  modelId: ModelId.optional(),
 });
 type DraftBody = z.infer<typeof DraftBody>;
 
@@ -65,7 +68,11 @@ export const POST = route("sources.draft", async (req: Request) => {
     workspaceId: body.workspaceId,
   });
 
-  const resolved = await requireModel({ identity, workspaceId: body.workspaceId });
+  const resolved = await requireModel({
+    identity,
+    workspaceId: body.workspaceId,
+    modelId: body.modelId,
+  });
 
   const usage = await enforceLlmLimits({
     identity,
@@ -113,6 +120,7 @@ export const POST = route("sources.draft", async (req: Request) => {
         prompt: body.prompt,
         model: event.modelId,
         modelConfig: resolved.source,
+        modelId: resolved.id,
         ...(repair ? { attempt: 2 } : {}),
       },
     });

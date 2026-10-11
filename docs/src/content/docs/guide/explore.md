@@ -18,7 +18,9 @@ box, or under **Sources** in the side panel: up to three, all in one
 workspace. Type a question and press **Enter** (**Shift+Enter** starts a new
 line). **Stop**, or **Esc** in the box, cancels an answer that is still being
 written. An empty conversation offers a few questions built from the first
-source's catalog.
+source's catalog. The model chip beside the sources picks which
+[model](/guide/models/#picking-a-model) answers; the conversation keeps it for
+every later turn.
 
 The answer is read-only. Explore can query the sources you picked and draw panels
 from them; it cannot change a source or a dashboard. Everything it runs goes

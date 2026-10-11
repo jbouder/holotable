@@ -18,13 +18,13 @@ import type { EffectiveModel } from "@/lib/ai/model-config";
 import { AiUnavailable } from "@/components/ai-unavailable";
 import { WorkingStatus } from "@/components/composing";
 import { COMPOSER_CHIP_CLASS, SourceChipLabel } from "@/components/composer-chip";
+import { ModelChip, useModelChoice } from "@/components/model-chip";
 import { NoSources } from "@/components/onboarding/no-sources";
 import { MarkdownView } from "@/components/panels/text";
 import {
   CatalogHealthNotice,
   useCatalogRefresh,
 } from "@/components/sources/catalog-health";
-import { Badge } from "@/components/ui/badge";
 import { Button, ButtonLink } from "@/components/ui/button";
 import { Dialog } from "@/components/ui/dialog";
 import { ErrorDisplay } from "@/components/ui/error-display";
@@ -66,6 +66,8 @@ export interface InitialConversation {
     workspaceId: string;
     sourceIds: string[];
     timeRange: TimeRange;
+    /** The model its turns use (#442), or null for the default. */
+    modelId?: string | null;
   };
   messages: UIMessage[];
   unavailableSourceIds: string[];
@@ -152,7 +154,15 @@ export function ChatClient({
   const chosen = sources.filter((s) => selected.includes(s.id));
   const workspaceId = initial?.conversation.workspaceId ?? chosen[0]?.workspaceId;
   const effective = workspaceId ? models[workspaceId] : undefined;
-  const aiUnavailable = effective?.unavailable ?? null;
+  // The model chip (#442): seeded with the conversation's own model; a pick
+  // goes with the next turn and becomes the conversation's.
+  const choice = useModelChoice(
+    workspaceId ?? null,
+    initial?.conversation.modelId ?? null,
+  );
+  const aiUnavailable = choice.current
+    ? choice.current.unavailable
+    : (effective?.unavailable ?? null);
   // Recent questions in this workspace, when this person keeps them (#83).
   const prompts = usePromptHistory(workspaceId, "chat");
   const unavailable = initial?.unavailableSourceIds ?? [];
@@ -164,10 +174,10 @@ export function ChatClient({
       : initial.conversation.sourceIds.every((id) => unavailable.includes(id)));
 
   // What the transport reads when it sends, so these are refs, not state.
-  const sendRef = React.useRef({ selected, timeRange });
+  const sendRef = React.useRef({ selected, timeRange, modelId: choice.modelId });
   React.useEffect(() => {
-    sendRef.current = { selected, timeRange };
-  }, [selected, timeRange]);
+    sendRef.current = { selected, timeRange, modelId: choice.modelId };
+  }, [selected, timeRange, choice.modelId]);
 
   const [transport] = React.useState(
     () =>
@@ -179,7 +189,12 @@ export function ChatClient({
               // the history from the store.
               {
                 api: `/api/chat/${idRef.current}/messages`,
-                body: { message: messages.at(-1) },
+                body: {
+                  message: messages.at(-1),
+                  ...(sendRef.current.modelId
+                    ? { modelId: sendRef.current.modelId }
+                    : {}),
+                },
               }
             : // Not kept: the history this page holds, each drawn panel
               // reduced to its sample before it leaves.
@@ -190,6 +205,9 @@ export function ChatClient({
                   timeRange: sendRef.current.timeRange,
                   history: messages.slice(0, -1).map(persistableMessage),
                   message: messages.at(-1),
+                  ...(sendRef.current.modelId
+                    ? { modelId: sendRef.current.modelId }
+                    : {}),
                 },
               },
       }),
@@ -340,7 +358,6 @@ export function ChatClient({
   const header = (
     <PageHeader
       title={initial?.conversation.title || "Explore"}
-      badge={effective?.model && <Badge title="Model">{effective.model}</Badge>}
       description="Ask about your data in plain English. Answers come back in words, with charts and tables the server ran for you."
       actions={
         <>
@@ -581,7 +598,7 @@ export function ChatClient({
                   }}
                 />
                 <div className="pointer-events-none absolute inset-x-2 bottom-2 flex items-center justify-between gap-2">
-                  <div className="pointer-events-auto min-w-0">
+                  <div className="pointer-events-auto flex min-w-0 items-center">
                     <Menu
                       label={`Sources: ${chosen.map((s) => s.name).join(", ") || "none"}`}
                       className={cn(
@@ -629,6 +646,11 @@ export function ChatClient({
                         );
                       })}
                     </Menu>
+                    <ModelChip
+                      choice={choice}
+                      disabled={busy}
+                      className="ml-2 h-8 max-w-[min(14rem,40vw)] px-2.5"
+                    />
                   </div>
                   <div className="pointer-events-auto shrink-0">
                     {busy ? (

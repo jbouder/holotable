@@ -540,6 +540,40 @@ test("the old model settings sections open the Models page (#441)", async ({ pag
   await expect(page).toHaveURL(/\/models$/);
 });
 
+test("a generation runs on the model picked on the chip, and the audit row names it (#442)", async ({
+  page,
+  request,
+}) => {
+  await page.goto("/dashboards/new");
+  // Whatever this person last picked here; a rerun may start on stub-b.
+  const chip = page.getByRole("button", { name: /^Model: / });
+  await expect(chip).toBeVisible();
+  await chip.click();
+  await page.getByRole("menuitemradio", { name: /^stub-b\b/ }).click();
+  await expect(page.getByRole("button", { name: /^Model: stub-b/ })).toBeVisible();
+
+  const prompt = `Checkout health ${Date.now().toString(36)}`;
+  await page.getByLabel("Describe the dashboard").fill(prompt);
+  await page.getByRole("button", { name: "Generate" }).click();
+  const preview = page.getByRole("region", { name: "Dashboard preview" });
+  await expect(preview.getByRole("button", { name: "Save dashboard" })).toBeVisible();
+
+  // The audit row is written as the stream finishes; it names the catalog id.
+  await expect
+    .poll(async () => {
+      const res = await request.get("/api/audit?action=dashboard.generate&limit=20");
+      const { entries } = (await res.json()) as {
+        entries: Array<{ detail: { modelId?: string; prompt?: string } }>;
+      };
+      return entries.find((e) => e.detail.modelId === "env:stub-b") ? "found" : "missing";
+    })
+    .toBe("found");
+
+  // The pick is remembered: a fresh page in the workspace starts on it.
+  await page.goto("/dashboards/new");
+  await expect(page.getByRole("button", { name: /^Model: stub-b/ })).toBeVisible();
+});
+
 test.describe("as a viewer", () => {
   test.use({ storageState: storageStatePath("viewer") });
 

@@ -182,17 +182,47 @@ export function MenuRadioGroup<T extends string>({
 export function MenuRadioItem({
   value,
   children,
+  disabled,
+  title,
+  closeOnClick = false,
 }: {
   value: string;
   children: React.ReactNode;
+  disabled?: boolean;
+  /** Why it is disabled, on hover. */
+  title?: string;
+  /** Close the menu on a pick, for a choice whose effect is shown elsewhere. */
+  closeOnClick?: boolean;
 }) {
   return (
-    <BaseMenu.RadioItem value={value} closeOnClick={false} className={ITEM_CLASS}>
+    <BaseMenu.RadioItem
+      value={value}
+      disabled={disabled}
+      title={title}
+      closeOnClick={closeOnClick}
+      className={ITEM_CLASS}
+    >
       {children}
       <BaseMenu.RadioItemIndicator className="ml-auto text-primary">
         <Check className="h-4 w-4" aria-hidden />
       </BaseMenu.RadioItemIndicator>
     </BaseMenu.RadioItem>
+  );
+}
+
+/**
+ * A caption inside a {@link MenuRadioGroup}, for a list that falls into
+ * parts (the model chip's Server / Workspace / Yours). Hidden from a screen
+ * reader like the group's own caption; each item says its part in its name.
+ */
+export function MenuCaption({ children }: { children: React.ReactNode }) {
+  return (
+    <div
+      aria-hidden
+      className="px-2 pt-2 pb-0.5 text-xs font-semibold uppercase tracking-wide text-muted"
+    >
+      {children}
+    </div>
   );
 }
 

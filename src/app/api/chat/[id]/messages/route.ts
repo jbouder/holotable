@@ -63,9 +63,18 @@ export const POST = route(
       messages: [...history.filter((m) => m.id !== question.id), question],
       conversationId: conversation.id,
       ...(dashboard ? { dashboard: { id: dashboard.id, spec: dashboard.spec } } : {}),
+      // A pick in the turn wins and is kept on the conversation; without
+      // one, the conversation's own model while it is usable (#442).
+      modelId: body.modelId,
+      preferredModel: conversation.modelId,
       abortSignal: req.signal,
-      onEnd: (finished) =>
-        pgConversationStore.append({
+      onEnd: async (finished) => {
+        if (body.modelId && body.modelId !== conversation.modelId) {
+          await pgConversationStore.update(conversation.id, identity.sub, {
+            modelId: body.modelId,
+          });
+        }
+        await pgConversationStore.append({
           conversationId: conversation.id,
           userSub: identity.sub,
           messages: messagesToPersist(finished, storedIds)
@@ -73,7 +82,8 @@ export const POST = route(
             .map((m) => ({ id: m.id, role: m.role, content: m })),
           title: conversationTitle(question),
           retention,
-        }),
+        });
+      },
     });
   },
 );

@@ -49,6 +49,28 @@ Your own models, billed to you, with **Add model**, **Edit**, **Test** and
 personal models; the section says which those are. Elsewhere they are kept
 and ignored.
 
+## Picking a model
+
+Every place that asks the model something has a **model chip** beside the
+source chip ([#442](https://github.com/jbouder/holotable/issues/442)): a new
+dashboard and its follow-ups, the panel editor's "Describe a change", the
+source drafter on Data sources, Explore, and the dashboard chat. It shows the
+model the next request will use. Its menu lists the models you may use in
+that workspace under Server, Workspace and Yours; one that cannot be called
+is greyed out with the reason. **Manage models…** opens this page.
+
+- **Your pick is remembered** per workspace, on every device: the next new
+  dashboard or conversation there starts on the model you used last.
+- **A conversation keeps its model.** An Explore conversation, or a
+  dashboard's chat, uses the model it was asked with for every later turn
+  and after a reload, until you change the chip. If that model is deleted,
+  the next turn uses your default instead.
+- Without a pick, a request uses your last pick in that workspace if you
+  can still use it, else your first personal model where personal models are
+  allowed, else the workspace's default, else the server's.
+
+Each generation's audit row names the model it used.
+
 ## Credentials
 
 A key is encrypted at rest and never shown again. The page says only whether

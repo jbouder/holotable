@@ -31,7 +31,6 @@ import { PromptHistoryMenu, usePromptHistory } from "@/components/prompt-history
 import { PROMPT_MAX_LENGTH, promptLabel } from "@/lib/prompt-history";
 import { browserStorage } from "@/lib/browser-storage";
 import { COMPOSER_CHIP_CLASS, SourceChipLabel } from "@/components/composer-chip";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input, Label } from "@/components/ui/input";
 import { AiUnavailable } from "@/components/ai-unavailable";
@@ -63,6 +62,7 @@ import { SaveDashboardDialog } from "@/components/dashboard/SaveDashboardDialog"
 import { ErrorDisplay } from "@/components/ui/error-display";
 import { RepairingNote } from "@/components/repairing-note";
 import { useRepairingObject } from "@/components/use-repairing-object";
+import { ModelChip, useModelChoice } from "@/components/model-chip";
 import { type ApiError, apiErrorFromThrown, readApiError } from "@/lib/errors";
 import type { CatalogHealth } from "@/lib/catalog/health";
 import {
@@ -159,8 +159,13 @@ export function NewDashboardClient({
   );
   const source = sources.find((s) => s.id === sourceId);
   const effective = source ? models[source.workspaceId] : undefined;
-  const model = effective?.model ?? "";
-  const aiUnavailable = effective?.unavailable ?? null;
+  // The model chip (#442): the person's pick, else the default the server
+  // resolves; until the listing loads, what the page was rendered with.
+  const choice = useModelChoice(source?.workspaceId ?? null);
+  const model = choice.current?.model ?? effective?.model ?? "";
+  const aiUnavailable = choice.current
+    ? choice.current.unavailable
+    : (effective?.unavailable ?? null);
   const additionalChoices = additionalSourceChoices(sources, sourceId);
   const additionalSources = additionalChoices.filter((s) => additionalIds.includes(s.id));
   // Suggestions for the selected source. Server-built from its catalog, so they
@@ -235,12 +240,14 @@ export function NewDashboardClient({
             ...(additionalIds.length > 0 ? { additionalSourceIds: additionalIds } : {}),
             prompt: input.instruction,
             current: input.base,
+            ...(choice.modelId ? { modelId: choice.modelId } : {}),
           }
         : {
             mode: "dashboard",
             sourceId,
             ...(additionalIds.length > 0 ? { additionalSourceIds: additionalIds } : {}),
             prompt: input.instruction,
+            ...(choice.modelId ? { modelId: choice.modelId } : {}),
           },
     );
   }
@@ -394,7 +401,6 @@ export function NewDashboardClient({
     <div className="flex flex-1 flex-col space-y-6">
       <PageHeader
         title="New dashboard"
-        badge={model && <Badge title="Generation model">{model}</Badge>}
         description={description}
         actions={
           // On a fresh screen, other ways to start: a template (which starts
@@ -443,6 +449,7 @@ export function NewDashboardClient({
               onToggle={pickSource}
             />
           )}
+          <ModelChip choice={choice} disabled={isLoading} />
           <Label htmlFor="prompt" className="sr-only">
             {refining ? "Refine it" : "Describe the dashboard"}
           </Label>

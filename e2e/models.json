@@ -1,0 +1,6 @@
+{
+  "models": [
+    { "name": "stub-a", "provider": "stub" },
+    { "name": "stub-b", "provider": "stub" }
+  ]
+}
