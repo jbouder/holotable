@@ -146,6 +146,7 @@ export function PanelPreview({
           variant="secondary"
           size="sm"
           onClick={preview.validate}
+          busy={busy === "validate"}
           disabled={busy !== null}
         >
           {busy === "validate" ? (
@@ -159,6 +160,7 @@ export function PanelPreview({
           variant="secondary"
           size="sm"
           onClick={preview.run}
+          busy={busy === "run"}
           disabled={busy !== null}
           title="Run preview (Ctrl/⌘ + Enter)"
         >
@@ -173,6 +175,7 @@ export function PanelPreview({
           variant="secondary"
           size="sm"
           onClick={preview.explain}
+          busy={busy === "plan"}
           disabled={busy !== null}
           title="Show the statement the server would send"
         >

@@ -722,7 +722,8 @@ export function EditDashboardClient({
         <Button
           type="submit"
           size="icon"
-          disabled={isLoading || !nlPrompt.trim() || aiUnavailable !== null}
+          busy={isLoading}
+          disabled={!nlPrompt.trim() || aiUnavailable !== null}
           aria-label="Apply NL edit"
           title={`Apply NL edit${hint("run")}`}
           className="absolute bottom-4 right-2"
@@ -904,7 +905,7 @@ export function EditDashboardClient({
                   <Button
                     type="button"
                     variant="secondary"
-                    disabled={saving}
+                    busy={saving}
                     title={`Save and view${saveViewHint}`}
                     onClick={() => void save({ navigate: true })}
                   >
@@ -912,7 +913,7 @@ export function EditDashboardClient({
                   </Button>
                   <Button
                     type="submit"
-                    disabled={saving}
+                    busy={saving}
                     title={`Save a version and keep editing${saveHint}`}
                   >
                     Save version

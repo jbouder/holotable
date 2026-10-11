@@ -181,7 +181,8 @@ export function AddToDashboardDialog({
           </Button>
           <Button
             onClick={save}
-            disabled={saving || dashboards === null || (creating && !title.trim())}
+            busy={saving}
+            disabled={dashboards === null || (creating && !title.trim())}
           >
             {saving ? (
               <Loader2 className="h-4 w-4 animate-spin" />

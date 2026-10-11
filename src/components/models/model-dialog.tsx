@@ -147,7 +147,7 @@ export function ModelDialog({
           <Button type="button" variant="secondary" onClick={() => onOpenChange(false)}>
             Cancel
           </Button>
-          <Button type="submit" disabled={saving}>
+          <Button type="submit" busy={saving}>
             {saving ? "Saving…" : initial ? "Save changes" : "Add model"}
           </Button>
         </div>

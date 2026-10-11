@@ -213,7 +213,9 @@ thing and match it.
   for, the page's actions) in every state, and has a deliberate empty state
   (`EmptyState`), loading state (`Skeleton`, shaped like what is coming) and
   error state (`ErrorDisplay`). A destructive action asks through
-  `ConfirmDialog` and names what it removes.
+  `ConfirmDialog` and names what it removes. A button whose own work is
+  running passes `busy`, not `disabled`: a disabled button drops focus to
+  the page behind it (#540).
 - Layouts work from phone width up with no sideways scroll; full-width pages
   use the full width, and text stays at a readable measure.
 - Keep presentation separate from domain logic: logic in `src/lib/`, tested
