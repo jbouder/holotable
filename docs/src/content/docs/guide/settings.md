@@ -49,11 +49,15 @@ The same information is available to scripts from `GET /api/me`.
 
 **Color scheme** is Light, Dark or System. **Theme** is the named set of
 colors the scheme comes in: Holotable, Graphite, Fjord, Paper or High
-contrast. Both are also
-in the command palette. Both are kept in this browser and apply before the
-page draws. An operator sets the theme a new browser starts with
+contrast. The themes are a gallery. Each card draws a little of the app in
+that theme, in the scheme chosen above it, and System shows light and dark
+side by side. Arrow keys move between the cards and choose. Both settings are
+also in the command palette. Both are kept in this browser and apply before
+the page draws. An operator sets the theme a new browser starts with
 (`THEME_DEFAULT_PALETTE`). [Themes](/guide/themes/) shows each one and what it
 is for.
+
+![Settings, Appearance: the color scheme cards above a gallery of five theme previews, the chosen one checked.](/images/settings-appearance.png)
 
 **Motion** has three choices. *Follow system* respects the operating system's
 reduced-motion setting. *Reduce* stops transitions, entrances and slides, the

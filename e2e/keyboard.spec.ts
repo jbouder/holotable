@@ -125,3 +125,33 @@ test("in the editor, Delete on a focused panel tile removes it, and undo restore
     1,
   );
 });
+
+test("the theme gallery is a radio group: Tab reaches the choice, arrows move and choose", async ({
+  page,
+}) => {
+  // #507: a ChoiceCard group. Tab from the group before it reaches the chosen
+  // card, an arrow key moves to the next one and chooses it, and the page
+  // follows at once.
+  await page.goto("/settings/appearance");
+  const themes = page.getByRole("radiogroup", { name: "Theme" });
+  const holotable = themes.getByRole("radio", { name: "Holotable" });
+  const graphite = themes.getByRole("radio", { name: "Graphite" });
+  const scheme = page
+    .getByRole("radiogroup", { name: "Color scheme" })
+    .getByRole("radio", { checked: true });
+  // The server's markup already says which card is chosen; retry until the
+  // keys reach a hydrated group, so an early press is not the test's result.
+  await expect(async () => {
+    await scheme.focus();
+    await page.keyboard.press("Tab");
+    await expect(holotable).toBeFocused({ timeout: 500 });
+    await page.keyboard.press("ArrowRight");
+    await expect(graphite).toHaveAttribute("aria-checked", "true", { timeout: 500 });
+  }).toPass();
+  await expect(graphite).toBeFocused();
+  await expect(page.locator("html")).toHaveAttribute("data-palette", "graphite");
+  // The ring itself, not the chosen card's inset ring (a shadow).
+  await expect(graphite).toHaveCSS("outline-style", "solid");
+  // Every card is named by its label and described by its sentence.
+  await expect(graphite).toHaveAccessibleDescription(/violet accent/);
+});

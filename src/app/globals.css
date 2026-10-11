@@ -146,7 +146,7 @@
   --code-number: var(--warning);
   --code-comment: var(--muted);
   /* Repeated from the dark block, so a light element inside a page in
-     another theme does not inherit that theme's alphas. */
+     another theme (a Settings preview, #507) does not inherit its alphas. */
   --tint-5: 5%;
   --tint-10: 10%;
   --tint-15: 15%;
@@ -169,6 +169,7 @@
   --page-danger: var(--danger);
   --page-warning: var(--warning);
   --page-success: var(--success);
+  --radius: 0;
 }
 
 /*
@@ -521,6 +522,7 @@
   --color-chart-6: var(--chart-6);
   --color-chart-7: var(--chart-7);
   --color-chart-8: var(--chart-8);
+  --color-chart-grid: var(--chart-grid);
   --color-background: var(--background);
   --color-surface: var(--surface);
   --color-surface-2: var(--surface-2);
