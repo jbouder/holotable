@@ -142,7 +142,7 @@ an instruction is only a name. An explore panel writes no links and gets no list
 The rule the model is given is also enforced. A generated link whose
 `dashboard` is not in the list fails validation on the server and in the
 browser, which reads the same list from the response's `X-Link-Targets`
-header. The one [automatic repair](/admin/ai-provider/#structured-output-repair)
+header. The one [automatic repair](/admin/models/#structured-output-repair)
 then re-asks with the reason. A link target is always an id from the list
 the server built, never a URL.
 
@@ -222,7 +222,7 @@ source is among the sources, the prompt changes in four ways:
 With several sources of both kinds, a panel's language is its source's. The
 schema the model is bound to says so too: a panel that writes `query.sql`
 against a Prometheus source fails it, and the one
-[repair](/admin/ai-provider/#structured-output-repair) tells the model to
+[repair](/admin/models/#structured-output-repair) tells the model to
 write `query.promql` instead. The [PromQL guard](/concepts/executing-a-panel/#the-promql-guard)
 is still the enforcement, on save and on every run.
 
@@ -254,7 +254,7 @@ spec as it forms. **The model runs exactly once per author action** — never on
 view, never on a refresh tick. The one exception: output that fails the schema
 gets a single automatic repair, shown as "Fixing it automatically…" while it
 streams (see [Structured-output
-repair](/admin/ai-provider/#structured-output-repair)).
+repair](/admin/models/#structured-output-repair)).
 
 ## Refining before the first save
 

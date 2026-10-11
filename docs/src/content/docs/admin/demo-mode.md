@@ -66,12 +66,14 @@ natural-language edit and the dashboard chat show a notice naming the variables
 to set, instead of sending a request that can only fail. With
 `AUTH_MODE=oidc` a missing model is still an error in production.
 
-The [models configured in the app](/admin/ai-provider/#models-configured-in-the-app)
-are off in demo mode: the environment's model is the only one. The Workspace
-model and Personal model settings are not listed, their routes refuse, and a
-row left in the database from an earlier non-demo run is ignored, so a
-visitor can neither spend someone's stored key nor point the server at an
-address of their choosing.
+Only the server's models are used in demo mode: the [models configured in
+the app](/admin/models/#models-configured-in-the-app) are off. The
+[Models page](/guide/models/) lists the server's models and nothing else, it
+has no Add, and every model route refuses a write. A model stored by an
+earlier non-demo run is ignored. So a visitor can neither spend someone's
+stored key nor point the server at an address of their choosing. The
+[model chip](/guide/models/#picking-a-model) still picks among the server's
+models when the operator declares more than one in `AI_MODELS_FILE`.
 
 ## Not for auth development
 

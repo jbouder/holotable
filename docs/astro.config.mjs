@@ -35,7 +35,8 @@ export default defineConfig({
     "/getting-started/writing-specs-with-claude-code/":
       "/integrations/writing-specs-with-claude-code/",
     "/operations/keycloak/": "/admin/keycloak/",
-    "/operations/ai-provider/": "/admin/ai-provider/",
+    "/operations/ai-provider/": "/admin/models/",
+    "/admin/ai-provider/": "/admin/models/",
     "/operations/llm-limits/": "/admin/llm-limits/",
     "/operations/secret-references/": "/admin/secret-references/",
     "/operations/prometheus/": "/admin/prometheus/",
@@ -132,7 +133,7 @@ export default defineConfig({
           label: "Administration",
           items: [
             { label: "Keycloak setup", slug: "admin/keycloak" },
-            { label: "AI provider", slug: "admin/ai-provider" },
+            { label: "Models and providers", slug: "admin/models" },
             { label: "LLM rate limits and budgets", slug: "admin/llm-limits" },
             { label: "Source secret references", slug: "admin/secret-references" },
             { label: "Prometheus endpoints", slug: "admin/prometheus" },

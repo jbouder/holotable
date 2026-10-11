@@ -125,7 +125,7 @@ npm run dev                        # http://localhost:3000
 Three things must be true, and each has its own failure mode:
 
 1. **An AI provider is configured.** `AI_MODEL` must be set; there is no default
-   model. See [AI provider](/admin/ai-provider/).
+   model. See [AI provider](/admin/models/).
 2. **A data source is registered** with a table catalog. Generation sends the
    model that catalog as metadata — it designs against a schema, not against data.
 3. **The source's `secret_ref` is granted to its workspace and has

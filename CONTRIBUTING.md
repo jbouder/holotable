@@ -390,7 +390,8 @@ request:
 | `migrations/` (a table or column) | `architecture/data-model.md` |
 | `keycloak/holotable-realm.json` | `admin/keycloak.md` (the local realm, its users, client settings) |
 | A color token in `src/app/globals.css` | The contrast table in `architecture/accessibility.md` (`test/contrast.test.ts` fails until it matches) |
-| `src/lib/ai/` (a provider, including `stub`) | `admin/ai-provider.md` |
+| `src/lib/ai/providers/` (a provider kind, including `stub`), `src/lib/ai/server-models.ts` | `admin/models.md` |
+| `src/app/models/`, `src/components/models/`, `src/components/model-chip.tsx` | `guide/models.md` |
 | `src/lib/ir.ts`, a panel kind, a color token, or a guard rule in `src/lib/sql/` or `src/lib/promql/` | The skill's `.claude/skills/holotable/references/` and `examples/` (`test/holotable-skill.test.ts` holds its examples and lists to the code) |
 | `docker-compose.yml`, `deploy/quickstart/` | `getting-started/quick-start.md`, the quick start in `README.md` |
 | `deploy/helm/holotable/` | `operations/kubernetes.md`, the chart's own `README.md` |

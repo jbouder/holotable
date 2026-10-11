@@ -14,7 +14,7 @@ The page has three sections.
 ## Server
 
 The models the operator declared, in
-[`AI_MODELS_FILE`](/admin/ai-provider/#server-models-ai_models_file) or the
+[`AI_MODELS_FILE`](/admin/models/#server-models-ai_models_file) or the
 `AI_*` variables. Each row has its name, provider, model id and where its
 credentials come from, such as "From ANTHROPIC_API_KEY". A model whose
 variable is not set says which one. The server's default is marked. The
@@ -29,7 +29,7 @@ a generation there uses when nobody picks.
 A **source-admin** of the workspace can:
 
 - **Add model**: give it a name, choose a provider, and fill in what that
-  provider asks for. See [the provider kinds](/admin/ai-provider/#models-configured-in-the-app).
+  provider asks for. See [the provider kinds](/admin/models/#models-configured-in-the-app).
 - **List models**, in the dialog once the key is in: ask the provider which
   models the key may use, and pick one in the Model field. Any id can still
   be typed. Azure deployments and Bedrock models are typed by hand.
@@ -81,7 +81,7 @@ one is stored and its last four characters. Leaving a key field blank when
 editing keeps the stored key, and "Remove the stored key" clears it.
 Changing where requests go, such as another provider, another base URL host,
 an Azure resource or an AWS region, asks for the key again. The full rules
-are in [Credentials](/admin/ai-provider/#credentials).
+are in [Credentials](/admin/models/#credentials).
 
 Settings → Workspace model and Settings → Personal model, from before this
 page, now open it.

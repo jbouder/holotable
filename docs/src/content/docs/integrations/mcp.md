@@ -64,7 +64,7 @@ the caller's default there, as the app does.
 
 The three generation tools use the same model the routes would for the
 caller in that workspace (their [personal or the workspace's
-model](/admin/ai-provider/#models-configured-in-the-app), else the
+model](/admin/models/#models-configured-in-the-app), else the
 server's), count against the workspace's
 [model rate limit and daily budget](/admin/llm-limits/) like the routes
 do, write the same [generation log](/operations/logging/) row, and return a

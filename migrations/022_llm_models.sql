@@ -51,38 +51,53 @@ CREATE UNIQUE INDEX IF NOT EXISTS llm_models_user_name
 
 ALTER TABLE workspace_llm_config ADD COLUMN IF NOT EXISTS default_model TEXT;
 
--- The data move. A workspace's slot keeps its id across the two statements
--- through a temporary table, so the default can name it.
-CREATE TEMPORARY TABLE llm_models_moved ON COMMIT DROP AS
-SELECT gen_random_uuid() AS id, c.*
-FROM workspace_llm_config c
-WHERE c.provider IS NOT NULL
-  AND NOT EXISTS (
-    SELECT 1 FROM llm_models m
-    WHERE m.scope = 'workspace' AND m.workspace_id = c.workspace_id
-  );
+-- The data move, once, while the 017 slots exist: migration 024 drops them,
+-- and the whole set must still re-run as a no-op on a database past it.
+-- PL/pgSQL plans each statement when it runs, so a branch that does not run
+-- may name columns that are gone. A workspace's slot keeps its id across the
+-- two statements through a temporary table, so the default can name it.
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_schema = current_schema()
+      AND table_name = 'workspace_llm_config' AND column_name = 'provider'
+  ) THEN
+    CREATE TEMPORARY TABLE llm_models_moved ON COMMIT DROP AS
+    SELECT gen_random_uuid() AS id, c.*
+    FROM workspace_llm_config c
+    WHERE c.provider IS NOT NULL
+      AND NOT EXISTS (
+        SELECT 1 FROM llm_models m
+        WHERE m.scope = 'workspace' AND m.workspace_id = c.workspace_id
+      );
 
-INSERT INTO llm_models
-  (id, scope, workspace_id, name, provider, settings, credentials,
-   created_by, updated_by, created_at, updated_at)
-SELECT id, 'workspace', workspace_id, 'Workspace model', provider, settings, api_key,
-       updated_by, updated_by, updated_at, updated_at
-FROM llm_models_moved;
+    INSERT INTO llm_models
+      (id, scope, workspace_id, name, provider, settings, credentials,
+       created_by, updated_by, created_at, updated_at)
+    SELECT id, 'workspace', workspace_id, 'Workspace model', provider, settings, api_key,
+           updated_by, updated_by, updated_at, updated_at
+    FROM llm_models_moved;
 
-UPDATE workspace_llm_config c
-SET default_model = m.id::text
-FROM llm_models_moved m
-WHERE c.workspace_id = m.workspace_id AND c.default_model IS NULL;
+    UPDATE workspace_llm_config c
+    SET default_model = m.id::text
+    FROM llm_models_moved m
+    WHERE c.workspace_id = m.workspace_id AND c.default_model IS NULL;
+  END IF;
 
-INSERT INTO llm_models
-  (id, scope, user_sub, name, provider, settings, credentials,
-   created_by, updated_by, created_at, updated_at)
-SELECT gen_random_uuid(), 'personal', u.user_sub, 'Personal model', u.provider,
-       u.settings, u.api_key, u.user_sub, u.user_sub, u.updated_at, u.updated_at
-FROM user_llm_config u
-WHERE NOT EXISTS (
-  SELECT 1 FROM llm_models m WHERE m.scope = 'personal' AND m.user_sub = u.user_sub
-);
+  IF to_regclass('user_llm_config') IS NOT NULL THEN
+    INSERT INTO llm_models
+      (id, scope, user_sub, name, provider, settings, credentials,
+       created_by, updated_by, created_at, updated_at)
+    SELECT gen_random_uuid(), 'personal', u.user_sub, 'Personal model', u.provider,
+           u.settings, u.api_key, u.user_sub, u.user_sub, u.updated_at, u.updated_at
+    FROM user_llm_config u
+    WHERE NOT EXISTS (
+      SELECT 1 FROM llm_models m WHERE m.scope = 'personal' AND m.user_sub = u.user_sub
+    );
+  END IF;
+END
+$$;
 
 -- rollback:
 -- The 017 slots still hold what was copied, so going back loses only the

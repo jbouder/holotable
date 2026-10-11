@@ -29,7 +29,6 @@ after(async () => {
   await query("DELETE FROM workspace_llm_config WHERE workspace_id = ANY($1)", [
     workspaces,
   ]);
-  await query("DELETE FROM user_llm_config WHERE user_sub = $1", [LEGACY_SUB]);
   await closePool();
 });
 
@@ -136,59 +135,100 @@ test("a person's models are theirs alone", needsDb, async () => {
   assert.equal((await store.list(mine)).length, 1);
 });
 
-test("migration 022 moves a 017 slot into the catalog once", needsDb, async () => {
-  const legacyKey = sealCredentials({ apiKey: "sk-legacy" });
-  await query(
-    `INSERT INTO workspace_llm_config
-       (workspace_id, provider, settings, api_key, allow_personal_keys, updated_by)
-     VALUES ($1, 'openai-compatible', $2::jsonb, $3, true, 'admin')`,
-    [
-      LEGACY_WS,
-      JSON.stringify({ baseUrl: "https://api.example.com/v1", model: "m", api: "chat" }),
-      legacyKey,
-    ],
-  );
-  await query(
-    `INSERT INTO user_llm_config (user_sub, provider, settings, api_key)
-     VALUES ($1, 'openai-compatible', $2::jsonb, NULL)`,
-    [
-      LEGACY_SUB,
-      JSON.stringify({
-        baseUrl: "https://api.example.com/v1",
-        model: "mine",
-        api: "chat",
-      }),
-    ],
-  );
-
-  const migration = loadMigrations().find((m) => m.name.startsWith("022_"));
-  assert.ok(migration);
-  const client = await ownerClient();
-  try {
-    // Twice: the move is guarded, so a second run copies nothing.
-    for (let run = 0; run < 2; run++) {
+test(
+  "migration 022 moves a 017 slot into the catalog once, and 024 drops the slots",
+  needsDb,
+  async () => {
+    const migrations = loadMigrations();
+    const expand = migrations.find((m) => m.name.startsWith("022_"));
+    const contract = migrations.find((m) => m.name.startsWith("024_"));
+    assert.ok(expand && contract?.down);
+    const client = await ownerClient();
+    const run = async (sql: string) => {
       await client.query("BEGIN");
-      await client.query(migration.up);
+      await client.query(sql);
       await client.query("COMMIT");
+    };
+    try {
+      // Back to the expand state: 024's rollback brings the 017 slots back.
+      await run(contract.down);
+      const legacyKey = sealCredentials({ apiKey: "sk-legacy" });
+      await client.query(
+        `INSERT INTO workspace_llm_config
+         (workspace_id, provider, settings, api_key, allow_personal_keys, updated_by)
+       VALUES ($1, 'openai-compatible', $2::jsonb, $3, true, 'admin')`,
+        [
+          LEGACY_WS,
+          JSON.stringify({
+            baseUrl: "https://api.example.com/v1",
+            model: "m",
+            api: "chat",
+          }),
+          legacyKey,
+        ],
+      );
+      await client.query(
+        `INSERT INTO user_llm_config (user_sub, provider, settings, api_key)
+       VALUES ($1, 'openai-compatible', $2::jsonb, NULL)`,
+        [
+          LEGACY_SUB,
+          JSON.stringify({
+            baseUrl: "https://api.example.com/v1",
+            model: "mine",
+            api: "chat",
+          }),
+        ],
+      );
+      // Twice: the move is guarded, so a second run copies nothing.
+      await run(expand.up);
+      await run(expand.up);
+
+      const moved = await store.list({ scope: "workspace", workspaceId: LEGACY_WS });
+      assert.equal(moved.length, 1);
+      assert.equal(moved[0].name, "Workspace model");
+      assert.deepEqual(openCredentials(moved[0].credentials), {
+        state: "ok",
+        credentials: { apiKey: "sk-legacy" },
+      });
+      const ws = await store.workspace(LEGACY_WS);
+      assert.equal(ws?.defaultModel, moved[0].id);
+      assert.equal(ws?.allowPersonalKeys, true);
+      const personal = await store.list({ scope: "personal", sub: LEGACY_SUB });
+      assert.deepEqual(
+        personal.map((m) => [
+          m.name,
+          (m.settings as { model: string }).model,
+          m.credentials,
+        ]),
+        [["Personal model", "mine", null]],
+      );
+    } finally {
+      // Forward again: the slots go, the catalog and the default stay.
+      await run(contract.up);
+      await client.end();
     }
-  } finally {
-    await client.end();
-  }
-
-  const moved = await store.list({ scope: "workspace", workspaceId: LEGACY_WS });
-  assert.equal(moved.length, 1);
-  assert.equal(moved[0].name, "Workspace model");
-  assert.deepEqual(openCredentials(moved[0].credentials), {
-    state: "ok",
-    credentials: { apiKey: "sk-legacy" },
-  });
-  const ws = await store.workspace(LEGACY_WS);
-  assert.equal(ws?.defaultModel, moved[0].id);
-  assert.equal(ws?.allowPersonalKeys, true);
-
-  const personal = await store.list({ scope: "personal", sub: LEGACY_SUB });
-  assert.deepEqual(
-    personal.map((m) => [m.name, (m.settings as { model: string }).model, m.credentials]),
-    [["Personal model", "mine", null]],
-  );
-});
+    const columns = await query<{ column_name: string }>(
+      `SELECT column_name FROM information_schema.columns
+      WHERE table_name = 'workspace_llm_config' ORDER BY column_name`,
+    );
+    assert.deepEqual(
+      columns.map((c) => c.column_name),
+      [
+        "allow_personal_keys",
+        "default_model",
+        "updated_at",
+        "updated_by",
+        "workspace_id",
+      ],
+    );
+    assert.equal(
+      (
+        await query<{ t: string | null }>(
+          "SELECT to_regclass('user_llm_config')::text AS t",
+        )
+      )[0].t,
+      null,
+    );
+    assert.equal((await store.workspace(LEGACY_WS))?.allowPersonalKeys, true);
+  },
+);

@@ -100,7 +100,7 @@ policy whose egress rule names the same endpoint. See
 [Prometheus sources](/admin/prometheus/). And `values-models.yaml` declares
 two server models from two vendors in `ai.models`, which the chart renders
 into the file `AI_MODELS_FILE` names; the file holds variable names, and the
-keys stay in the Secret. See [Server models](/admin/ai-provider/#server-models-ai_models_file).
+keys stay in the Secret. See [Server models](/admin/models/#server-models-ai_models_file).
 
 The Vault one is the only one that needs a trick. The Agent injector writes a
 *file*; the app reads its environment. The injected template therefore renders

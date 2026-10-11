@@ -11,7 +11,7 @@ same three steps the app walks you through on a fresh install, in the same
 order, so you can follow either one.
 
 Before you begin you need the app running and signed in, an `AI_PROVIDER` and
-`AI_MODEL` configured (see [AI provider](/admin/ai-provider/)), and a
+`AI_MODEL` configured (see [AI provider](/admin/models/)), and a
 **read-only** PostgreSQL or TimescaleDB role that can reach the tables you want
 to watch. You also need the `source-admin` role in a workspace for steps 1 and
 2, and `editor` for step 3; see the
@@ -169,7 +169,7 @@ saved version you now have to clean up.
 
 **"Generation is unavailable" or a 500 on send.** No AI provider is configured.
 `AI_PROVIDER` and `AI_MODEL` must be set, with the matching key. See
-[AI provider](/admin/ai-provider/).
+[AI provider](/admin/models/).
 
 **`credentials for secret_ref "X" are not configured on the server`.** The
 source names a secret reference the server has no values for. Set `X_USERNAME`
