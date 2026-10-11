@@ -138,8 +138,8 @@ afterEach(() => {
   harness = null;
 });
 
-// Whether it offers SQL is a menu item, and Base UI's menu popup does not
-// mount under jsdom (see test/panel-actions.test.tsx); PanelView gates it on
+// Whether it offers SQL is a menu item, and Base UI's menu popup renders
+// through a portal that does not mount under jsdom; PanelView gates it on
 // `hasQuery`, as it does the status badge asserted here.
 test("a text panel renders at once, with no query or status", async () => {
   const panel = Panel.parse({
