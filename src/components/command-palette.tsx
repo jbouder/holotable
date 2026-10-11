@@ -24,7 +24,18 @@ import { useReducedMotion } from "@/components/motion-preference";
 import { useFlip } from "@/components/use-flip";
 import { cn } from "@/lib/utils";
 import { useHistoryPreferences } from "@/components/history-preferences";
-import { RefreshCatalogDialog } from "@/components/sources/catalog-refresh";
+import dynamic from "next/dynamic";
+
+/**
+ * Loaded the first time a palette action reviews a catalog (#493): the review
+ * reads the catalog schemas, and the palette is on every page, so a static
+ * import put zod in every route's first load.
+ */
+const RefreshCatalogDialog = dynamic(
+  () =>
+    import("@/components/sources/catalog-refresh").then((m) => m.RefreshCatalogDialog),
+  { ssr: false },
+);
 
 const ICONS: Record<CommandKind, typeof Search> = {
   dashboard: LayoutDashboard,
@@ -62,6 +73,9 @@ export function CommandPalette() {
   const [reviewing, setReviewing] = React.useState<{ id: string; name: string } | null>(
     null,
   );
+  // Mounted from the first review on, so closing it still plays its exit.
+  const [reviewed, setReviewed] = React.useState(false);
+  if (reviewing && !reviewed) setReviewed(true);
   const inputRef = React.useRef<HTMLInputElement>(null);
   const listRef = React.useRef<HTMLDivElement>(null);
   // Re-ranking while typing slides the options rather than re-dealing them
@@ -303,14 +317,16 @@ export function CommandPalette() {
           </BaseDialog.Popup>
         </BaseDialog.Portal>
       </BaseDialog.Root>
-      <RefreshCatalogDialog
-        source={reviewing}
-        onClose={() => setReviewing(null)}
-        onApplied={() => {
-          setReviewing(null);
-          router.refresh();
-        }}
-      />
+      {reviewed && (
+        <RefreshCatalogDialog
+          source={reviewing}
+          onClose={() => setReviewing(null)}
+          onApplied={() => {
+            setReviewing(null);
+            router.refresh();
+          }}
+        />
+      )}
     </>
   );
 }

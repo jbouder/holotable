@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { type HistoryPreferences, KEEP_ALL_HISTORY } from "@/lib/preferences";
+import { type HistoryPreferences, KEEP_ALL_HISTORY } from "@/lib/history-settings";
 
 /**
  * Which recents this person keeps, handed down from the root layout, which

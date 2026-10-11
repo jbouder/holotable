@@ -3,16 +3,27 @@
 import * as React from "react";
 import { useRouter } from "next/navigation";
 import { Check, Loader2, Upload } from "lucide-react";
-import {
-  type DashboardExportFile,
-  type ImportTarget,
-  type SourceMapping,
-  importDashboard,
-  readExportFile,
-  referencedSourceIds,
+import type {
+  DashboardExportFile,
+  ImportTarget,
+  SourceMapping,
 } from "@/lib/dashboard-export";
+
+/**
+ * The export format's reader, loaded when a file is picked (#493): it parses
+ * with the IR's schemas, and this button is on the dashboard list, where
+ * nothing else needs zod in the browser.
+ */
+type ExportLib = typeof import("@/lib/dashboard-export") &
+  Pick<typeof import("@/lib/drilldown"), "linkTargetIds">;
+const loadExportLib = async (): Promise<ExportLib> => {
+  const [exportLib, drilldown] = await Promise.all([
+    import("@/lib/dashboard-export"),
+    import("@/lib/drilldown"),
+  ]);
+  return { ...exportLib, linkTargetIds: drilldown.linkTargetIds };
+};
 import type { ApiError } from "@/lib/errors";
-import { linkTargetIds } from "@/lib/drilldown";
 import { Button, ButtonLabel } from "@/components/ui/button";
 import { Label } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
@@ -42,6 +53,7 @@ export function ImportDashboard({ targets }: { targets: ImportTarget[] }) {
   const [mapping, setMapping] = React.useState<SourceMapping>({});
   const [importing, setImporting] = React.useState(false);
   const [error, setError] = React.useState<ApiError | null>(null);
+  const [lib, setLib] = React.useState<ExportLib | null>(null);
   const inputRef = React.useRef<HTMLInputElement>(null);
 
   function reset() {
@@ -63,7 +75,9 @@ export function ImportDashboard({ targets }: { targets: ImportTarget[] }) {
     if (!picked) return;
     setFileName(picked.name);
     setMapping({});
-    const outcome = readExportFile(await picked.text());
+    const exportLib = lib ?? (await loadExportLib());
+    setLib(exportLib);
+    const outcome = exportLib.readExportFile(await picked.text());
     if (!outcome.ok) {
       setFile(null);
       setError(outcome.error);
@@ -75,18 +89,18 @@ export function ImportDashboard({ targets }: { targets: ImportTarget[] }) {
 
   const target = targets.find((t) => t.workspaceId === workspaceId) ?? targets[0];
   const available = new Set((target?.sources ?? []).map((s) => s.id));
-  const referenced = file ? referencedSourceIds(file.spec) : [];
+  const referenced = file && lib ? lib.referencedSourceIds(file.spec) : [];
   const resolvedId = (id: string) => mapping[id] ?? id;
   const unresolved = referenced.filter((id) => !available.has(resolvedId(id)));
   // Panel links name dashboards by id (#372), which a file written on another
   // instance cannot resolve here. Not an error: such a link shows disabled.
-  const linkedDashboards = file ? linkTargetIds(file.spec) : [];
+  const linkedDashboards = file && lib ? lib.linkTargetIds(file.spec) : [];
 
   async function runImport() {
-    if (!file || !target) return;
+    if (!file || !target || !lib) return;
     setImporting(true);
     setError(null);
-    const outcome = await importDashboard({
+    const outcome = await lib.importDashboard({
       workspaceId: target.workspaceId,
       file,
       sourceMapping: mapping,

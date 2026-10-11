@@ -39,6 +39,10 @@ behavior: read the installed guides in `node_modules/next/dist/docs/` and
 follow the patterns already in the repository, especially for Server/Client
 Component boundaries, route handlers, streaming and config. App Router only;
 `"use client"` only where hooks, browser APIs or interaction need it.
+A client module that pulls in zod or the AI SDK for something a page opens
+on demand (a dialog, the dashboard chat) loads through `next/dynamic` or
+`import()`; `test/client-bundle.test.ts` holds `/`, `/dashboards`,
+`/settings` and the dashboard view to that.
 
 ## Where things are
 
