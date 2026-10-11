@@ -62,6 +62,8 @@
   --chart-axis: var(--border);
   --chart-grid: var(--surface-2);
   --chart-track: var(--surface-2);
+  /* How strongly a mark behind a value is drawn: a stat's sparkline, a gauge's bands. */
+  --chart-faint: 0.35;
   /* The spec's palette-only color tokens: a series each, by family. A theme
      that orders its series differently points them elsewhere (#505). */
   --orange: var(--chart-3);
@@ -138,6 +140,8 @@
   --chart-axis: var(--border);
   --chart-grid: var(--surface-2);
   --chart-track: var(--surface-2);
+  /* How strongly a mark behind a value is drawn: a stat's sparkline, a gauge's bands. */
+  --chart-faint: 0.35;
   --orange: var(--chart-3);
   --purple: var(--chart-5);
   --teal: var(--chart-6);
@@ -449,6 +453,7 @@
   --chart-div-mid: oklch(0.4 0 0);
   --chart-div-high: oklch(0.7 0.2 25);
   --chart-grid: oklch(0.5 0 0);
+  --chart-faint: 0.6;
   --tint-5: 100%;
   --tint-10: 100%;
   --tint-15: 100%;
@@ -495,6 +500,7 @@
   --chart-div-mid: oklch(0.9 0 0);
   --chart-div-high: oklch(0.48 0.2 25);
   --chart-grid: oklch(0.62 0 0);
+  --chart-faint: 0.6;
   --tint-5: 100%;
   --tint-10: 100%;
   --tint-15: 100%;
@@ -946,4 +952,21 @@ html[data-vt="tab"] [role="tab"][aria-selected="true"] {
 ::selection {
   background-color: var(--selection);
   color: var(--foreground);
+}
+
+/*
+ * A theme preview drawn in the viewer's chosen color scheme (#549), from
+ * `<html data-theme-choice>`, which the bootstrap script writes before first
+ * paint. Dark, the default, when nothing chose. Unlayered, so it outranks the
+ * `flex` utility on the same element.
+ */
+.scheme-when-light,
+.scheme-when-system,
+html[data-theme-choice="light"] .scheme-when-dark,
+html[data-theme-choice="system"] .scheme-when-dark {
+  display: none;
+}
+html[data-theme-choice="light"] .scheme-when-light,
+html[data-theme-choice="system"] .scheme-when-system {
+  display: flex;
 }

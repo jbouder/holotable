@@ -22,7 +22,8 @@ scheme, and you choose the two separately in **Settings → Appearance**, where
 the [theme gallery](/guide/settings/#appearance) previews each one, or from
 the command palette (type "Theme"). The choice is kept in this browser and
 applies before the page draws. An operator picks the theme a new browser
-starts with (`THEME_DEFAULT_PALETTE`).
+starts with (`THEME_DEFAULT_PALETTE`). A browser that never chose one follows
+that default, including when the operator changes it.
 
 Every theme is held to the same bar: AA contrast for all text and AAA for body
 text, visible borders and focus, and status colors and chart series that stay
@@ -89,8 +90,9 @@ For people who need more than AA. Every text is at least 7:1 against what it
 sits on, and body text is at least 12:1. Borders are at least 4.5:1, and the
 background and cards are nearly one color, so edges carry the structure
 rather than shades. Badges, alerts and status tiles are solid fills instead
-of tints. Chart series are spread across lightness as well as hue, and the
-grid is visible. Its bar is stricter than the other themes', and it is
+of tints. Chart series are spread across lightness as well as hue, the
+grid is visible, and the marks behind a value (a stat's sparkline, a gauge's
+threshold bands) are drawn stronger. Its bar is stricter than the other themes', and it is
 described on [Theming](/architecture/theming/#quality-bar).
 
 <Image src={highContrastDark} widths={[720, 1440]} sizes="(min-width: 72rem) 68rem, 100vw" alt="The demo dashboard in High contrast, dark scheme." />

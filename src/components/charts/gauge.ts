@@ -140,7 +140,7 @@ function bands(
   for (const step of steps) {
     const at = (step.value - min) / (max - min);
     if (at > 0 && at < 1) stops.push([at, color]);
-    if (at < 1) color = withAlpha(tokenHex(step.color, theme), 0.35);
+    if (at < 1) color = withAlpha(tokenHex(step.color, theme), theme.faint);
   }
   stops.push([1, color]);
   return stops;

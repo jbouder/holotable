@@ -51,6 +51,9 @@ export function applyTheme(theme: Theme) {
       : theme;
 
   document.documentElement.dataset.theme = resolved;
+  // The choice as well as what it resolved to, so markup that draws the
+  // choice (the theme gallery) follows it from first paint (#549).
+  document.documentElement.dataset.themeChoice = theme;
   document.documentElement.style.colorScheme = resolved;
 }
 
@@ -84,11 +87,15 @@ export const PALETTES = [
   "high-contrast",
 ] as const;
 export type BuiltinPalette = (typeof PALETTES)[number];
+declare const checkedPalette: unique symbol;
+
 /**
  * A palette's name: a built-in one, or the operator's own from `THEME_FILE`
  * (#508), whose name is checked against {@link PALETTE_NAME} when it loads.
+ * Any other string becomes one only through {@link isPalette}, so an unchecked
+ * value cannot reach `data-palette` by accident (#549).
  */
-export type Palette = string;
+export type Palette = BuiltinPalette | (string & { readonly [checkedPalette]: true });
 
 /** What a palette may be called: also all an operator's theme name may be. */
 export const PALETTE_NAME = /^[a-z][a-z0-9-]{1,31}$/;

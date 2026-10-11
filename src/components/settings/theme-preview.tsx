@@ -17,9 +17,31 @@ export function ThemePreview({
   scheme,
 }: {
   palette: Palette;
-  /** `system` draws light and dark side by side. */
-  scheme: "light" | "dark" | "system";
+  /**
+   * `system` draws light and dark side by side. `chosen` draws whichever the
+   * viewer chose, read by CSS off `<html data-theme-choice>`, which the
+   * bootstrap script writes before first paint: a server render cannot know
+   * it, and a preview drawn from React state would redraw after hydration
+   * for every viewer whose choice is not the default (#549).
+   */
+  scheme: "light" | "dark" | "system" | "chosen";
 }) {
+  if (scheme === "chosen") {
+    return (
+      <>
+        <span className="scheme-when-dark flex w-full overflow-hidden rounded-lg border border-border">
+          <Scene palette={palette} scheme="dark" />
+        </span>
+        <span className="scheme-when-light flex w-full overflow-hidden rounded-lg border border-border">
+          <Scene palette={palette} scheme="light" />
+        </span>
+        <span className="scheme-when-system flex w-full overflow-hidden rounded-lg border border-border">
+          <Scene palette={palette} scheme="light" compact />
+          <Scene palette={palette} scheme="dark" compact />
+        </span>
+      </>
+    );
+  }
   return (
     <span className="flex w-full overflow-hidden rounded-lg border border-border">
       {scheme === "system" ? (
