@@ -154,6 +154,13 @@ Client side (`LiveDashboard.tsx` → `PanelView.tsx` → `EChart.tsx`):
   window). A resumed stream keeps them.
 - Each panel records **when its data arrived**; the status badge reports it, so
   panels that go stale independently can be told apart.
+- **One commit per tick.** A cycle's frames are queued and applied together
+  when its `tick` arrives (or on the next animation frame, for a frame that
+  comes alone), through `applyPollerEvents` in `src/lib/panel-state.ts`. A
+  panel no frame names keeps its state object, and `PanelView` is memoized,
+  so a tick that changes one panel renders that panel and no other. Chart
+  options are memoized on what they read, and every date and number goes
+  through a cached `Intl` formatter rather than building one per label.
 
 `PanelView` looks `panel.viz` up in the panel registry and draws what it
 finds:

@@ -101,11 +101,22 @@ test("source → generate → save → stream → pause → resume → edit → 
     await expect(
       page.locator('[data-panel-id="requests"][data-status="live"]'),
     ).toBeVisible();
+    // Tag the panel's chart canvas: a tick merges into the same chart, so the
+    // tag is still there after it (invariant 11, #485). A recreated chart
+    // would be a fresh, untagged canvas.
+    const canvas = page.locator('[data-panel-id="requests"] canvas').first();
+    await canvas.evaluate((el) => {
+      el.setAttribute("data-e2e-chart", "original");
+    });
     // And it keeps arriving: the stub dashboard refreshes every 2s.
     const first = (await sseCounts(page)).ticks;
     await expect
       .poll(async () => (await sseCounts(page)).ticks, { timeout: 30_000 })
-      .toBeGreaterThan(first);
+      .toBeGreaterThan(first + 1);
+    await expect(
+      page.locator('[data-panel-id="requests"] canvas[data-e2e-chart="original"]'),
+      "a tick merges into the chart rather than recreating it",
+    ).toHaveCount(1);
   });
 
   await test.step("pause stops the stream; resume starts it again", async () => {

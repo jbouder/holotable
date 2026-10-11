@@ -1,6 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { mergePanelRows } from "@/lib/stream-merge";
+import { applyPollerEvents, markStale, type PanelStates } from "@/lib/panel-state";
 import type { PollerEvent } from "@/lib/poller/registry";
 
 /**
@@ -96,4 +97,53 @@ test("an append without `since` adds, a replace swaps, and the window stays boun
     mergePanelRows(prev, frame({ columns: [] }), 720).columns,
     prev.columns,
   );
+});
+
+/**
+ * A tick's frames land in one step (#485), and a panel no frame names keeps
+ * its state object: that identity is what lets a memoized `PanelView` skip
+ * it, so one changed panel renders one panel.
+ */
+test("a batch is one new state, and an untouched panel keeps its own", () => {
+  const states: PanelStates = {
+    a: { data: prev, status: "live", updatedAt: 1 },
+    b: { data: prev, status: "live", updatedAt: 1 },
+    c: { data: prev, status: "error", updatedAt: 1 },
+  };
+  const next = applyPollerEvents(
+    states,
+    [
+      frame({
+        panelId: "a",
+        mode: "replace",
+        rows: [{ minute: m(5), route: "/a", n: 1 }],
+      }),
+      { type: "panel-error", panelId: "c", error: "boom", kind: "statement" },
+      frame({ panelId: "a", rows: [{ minute: m(6), route: "/a", n: 2 }] }),
+      { type: "tick", at: 2 },
+    ],
+    100,
+    2,
+  );
+  assert.notEqual(next, states);
+  assert.equal(next.b, states.b, "a panel no frame names keeps its state object");
+  // Later frames build on earlier ones in the same batch.
+  assert.deepEqual(
+    next.a.data.rows.map((r) => r.minute),
+    [m(5), m(6)],
+  );
+  assert.equal(next.a.updatedAt, 2);
+  assert.equal(next.c.status, "error");
+  assert.equal(states.a.data, prev, "the previous state is not mutated");
+});
+
+test("a batch about no panel, or staleness with nothing live, changes nothing", () => {
+  const states: PanelStates = { a: { data: prev, status: "error" } };
+  assert.equal(applyPollerEvents(states, [{ type: "tick", at: 1 }], 100, 1), states);
+  assert.equal(applyPollerEvents(states, [], 100, 1), states);
+  assert.equal(markStale(states), states);
+  const live: PanelStates = { ...states, b: { data: prev, status: "live" } };
+  const stale = markStale(live);
+  assert.equal(stale.b.status, "stale");
+  assert.equal(stale.a, live.a);
 });
