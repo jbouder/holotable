@@ -72,7 +72,7 @@ export type PromqlRejectionReason =
   | "variable";
 
 /** What happened to a model request at the admission gate. */
-export type LlmRequestOutcome = "admitted" | "rate_limited" | "over_budget";
+export type LlmRequestOutcome = "admitted" | "rate_limited" | "over_budget" | "busy";
 
 /** Which side of a model call the tokens were spent on. */
 export type TokenDirection = "input" | "output";

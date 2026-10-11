@@ -61,13 +61,19 @@ export const POST = route("models.discover", async (req: Request) => {
       throw new HttpError(403, "This workspace does not allow personal models.");
     }
   }
-  await enforceLlmLimits({
+  const admitted = await enforceLlmLimits({
     identity,
     workspaceId,
     route: "model-discover",
     model: body.config.settings.model || "discover",
   });
-  const result = await modelsToDiscover(owner, body.config, body.modelId ?? null, deps);
+  // Listing models spends no tokens; the slot it held (#496) is freed after.
+  const result = await modelsToDiscover(
+    owner,
+    body.config,
+    body.modelId ?? null,
+    deps,
+  ).finally(() => admitted.release());
   const detail = {
     provider: body.config.settings.provider,
     endpointHost: endpointHost(body.config.settings),

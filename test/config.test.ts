@@ -489,6 +489,7 @@ test("the retention sweep's interval and the versions kept are counts, zero mean
     "RETENTION_SWEEP_INTERVAL_MS",
     "DASHBOARD_VERSIONS_KEEP",
     "MAX_POLLERS",
+    "LLM_MAX_IN_FLIGHT",
   ]) {
     for (const value of ["0", "100", "3600000", ""]) {
       const ok = validateConfig(

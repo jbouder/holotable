@@ -37,6 +37,7 @@ import {
   utcDay,
 } from "@/lib/limits/budget";
 import { MemoryRateLimitStore, type RateLimitStore } from "@/lib/limits/rate";
+import { LlmReservations, RESERVE_TOKENS_PER_CALL } from "@/lib/limits/reservations";
 import { log } from "@/lib/log";
 import { recordLlmRequest, recordLlmTokens } from "@/lib/metrics";
 
@@ -64,6 +65,12 @@ export interface LlmLimitDeps {
   now: () => Date;
   /** The model id recorded with usage, for the per-model counters. */
   model: () => string;
+  /** Admitted, unsettled calls (#496): reserved budget and the in-flight count. */
+  reservations: LlmReservations;
+  /** Most calls in flight across every workspace; 0 is no cap. */
+  maxInFlight: number;
+  /** How long an unsettled reservation lasts: the model deadline, plus slack. */
+  reservationTtlMs: number;
 }
 
 export interface LlmUsageRecorder {
@@ -72,10 +79,17 @@ export interface LlmUsageRecorder {
    * response: a failure to record is logged, not surfaced.
    */
   record(usage: LanguageModelUsage): void;
+  /**
+   * Settle without usage, for a caller that turned out not to call the model.
+   * Recording settles too; either is safe to call more than once.
+   */
+  release(): void;
 }
 
 /** One bucket map per server instance, shared by all three routes. */
 const rateStore = new MemoryRateLimitStore();
+/** One set of reservations per server instance, like the buckets. */
+const reservations = new LlmReservations();
 
 function defaultDeps(): LlmLimitDeps {
   return {
@@ -88,6 +102,9 @@ function defaultDeps(): LlmLimitDeps {
     },
     now: () => new Date(),
     model: () => config.aiModel || "unknown",
+    reservations,
+    maxInFlight: config.llmMaxInFlight,
+    reservationTtlMs: config.aiRequestTimeoutMs + 15_000,
   };
 }
 
@@ -103,6 +120,9 @@ export function resolveLimits(
 }
 
 const fmt = new Intl.NumberFormat("en-US");
+
+/** What a refusal for a busy server tells the caller to wait, in seconds. */
+const BUSY_RETRY_SECONDS = 5;
 
 /**
  * Admit one model call for `identity` in `workspaceId`, or throw a 429.
@@ -140,10 +160,26 @@ export async function enforceLlmLimits(
     );
   }
 
-  // 2. Budget: tokens already used today across every route in the workspace.
+  // 2. The global cap (#496): calls in flight across every workspace, so a
+  //    burst reaches this gate, not the provider's own rate limit.
+  if (
+    deps.maxInFlight > 0 &&
+    deps.reservations.inFlight(now.getTime()) >= deps.maxInFlight
+  ) {
+    recordLlmRequest(route, "busy");
+    throw new HttpError(
+      429,
+      `the model is busy: ${fmt.format(deps.maxInFlight)} requests are already running on this server; retry after ${BUSY_RETRY_SECONDS}s`,
+      { "Retry-After": String(BUSY_RETRY_SECONDS) },
+    );
+  }
+
+  // 3. Budget: tokens already used today across every route in the workspace,
+  //    and those reserved by calls admitted and still running (#496).
   const day = utcDay(now);
   const budget = checkBudget(
-    await deps.budgetStore.tokensUsed(workspaceId, day),
+    (await deps.budgetStore.tokensUsed(workspaceId, day)) +
+      deps.reservations.reserved(workspaceId, day, now.getTime()),
     { dailyTokens: limits.dailyTokenBudget },
     now,
   );
@@ -162,8 +198,18 @@ export async function enforceLlmLimits(
 
   const model = input.model || deps.model();
   recordLlmRequest(route, "admitted");
+  // Admitted: hold an estimate against today until the usage is known. It
+  // expires at the model deadline if nothing ever settles it.
+  const settle = deps.reservations.reserve({
+    workspaceId,
+    day,
+    tokens: limits.dailyTokenBudget > 0 ? RESERVE_TOKENS_PER_CALL : 0,
+    expiresAt: now.getTime() + deps.reservationTtlMs,
+  });
   return {
+    release: settle,
     record(usage) {
+      settle();
       const tokens = tokensFromUsage(usage);
       recordLlmTokens({ workspaceId, model, ...tokens });
       void deps.budgetStore

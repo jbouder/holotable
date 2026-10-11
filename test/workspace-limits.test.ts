@@ -1,3 +1,4 @@
+import { LlmReservations } from "@/lib/limits/reservations";
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { HttpError } from "@/lib/auth/authorize";
@@ -98,6 +99,9 @@ test("the view says a workspace is out of budget exactly when the gate refuses i
           getWorkspaceLimits: async () => overrides,
           defaults: DEFAULTS,
           now: () => NOW,
+          reservations: new LlmReservations(),
+          maxInFlight: 0,
+          reservationTtlMs: 60_000,
           model: () => "m",
         },
       );
