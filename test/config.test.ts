@@ -485,7 +485,11 @@ test("chat history limits are bounded, and zero days means keep forever", () => 
 });
 
 test("the retention sweep's interval and the versions kept are counts, zero meaning off", () => {
-  for (const name of ["RETENTION_SWEEP_INTERVAL_MS", "DASHBOARD_VERSIONS_KEEP"]) {
+  for (const name of [
+    "RETENTION_SWEEP_INTERVAL_MS",
+    "DASHBOARD_VERSIONS_KEEP",
+    "MAX_POLLERS",
+  ]) {
     for (const value of ["0", "100", "3600000", ""]) {
       const ok = validateConfig(
         { ...VALID_PRODUCTION, [name]: value },

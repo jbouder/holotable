@@ -83,6 +83,11 @@ ENV PORT=3000 HOSTNAME=0.0.0.0
 # Next's, which exits 143 without draining. `node server.js` is PID 1 here, so
 # the signal from `docker stop` or a pod eviction arrives directly.
 ENV NEXT_MANUAL_SIG_HANDLE=true
+# A heap ceiling for `docker run` with no other say (#495): V8 otherwise sizes
+# its heap from the host, not the container, and pressure ends in an OOM kill.
+# Sized for a 1 GiB container; the Helm chart derives it from the memory limit
+# instead, and `-e NODE_OPTIONS=...` overrides it.
+ENV NODE_OPTIONS=--max-old-space-size=768
 # Liveness only: /api/health answers whenever the process is serving, with no
 # I/O. The slim base has no curl or wget, so the probe is Node's own fetch.
 # Readiness (database, Keycloak) is /api/ready, which an orchestrator probes

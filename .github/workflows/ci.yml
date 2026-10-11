@@ -326,6 +326,19 @@ jobs:
             exit 1
           fi
 
+      # The heap guard (#495): the heap is three quarters of the memory
+      # limit, and a limit too small to hold the pollers must refuse to
+      # render rather than deploy a pod that is OOM-killed under load.
+      - name: A memory limit below the heap floor fails the render
+        run: |
+          if helm template holotable deploy/helm/holotable \
+            --set resources.limits.memory=128Mi > /dev/null 2>&1; then
+            echo "::error::a memory limit below 256Mi rendered instead of failing"
+            exit 1
+          fi
+          helm template holotable deploy/helm/holotable --set resources.limits.memory=2Gi \
+            | grep -q -- '--max-old-space-size=1536'
+
       # The same invariant for `ai.models` (#440): the models file is a
       # ConfigMap, so an entry's credentials must name a variable, never hold
       # the key. The render must refuse a value.

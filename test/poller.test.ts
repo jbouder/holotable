@@ -9,6 +9,8 @@ import {
   activePollerCount,
   DashboardPoller,
   makePanelExecutor,
+  PollerCapacityError,
+  pollerLimit,
   type PanelExecutor,
   type PollerEvent,
   setPollerJitterForTests,
@@ -16,6 +18,8 @@ import {
 } from "@/lib/poller/registry";
 import { SourceSlots } from "@/lib/poller/source-slots";
 import { OPAQUE_MESSAGE } from "@/lib/errors";
+import { config } from "@/lib/config";
+import { capacityResponse } from "@/lib/sse";
 import { TimeRangeError } from "@/lib/time";
 import { QueryExecutionError } from "@/lib/sources/execution";
 import { createLogger, setLogger } from "@/lib/log";
@@ -613,4 +617,50 @@ test("the spread delays only the second cycle, by at most half the interval", as
     setPollerJitterForTests(restoreJitter);
     mock.timers.reset();
   }
+});
+
+// --- Memory caps (#495) -------------------------------------------------------------
+
+test("past MAX_POLLERS a new dashboard is refused, and a running one is still served", () => {
+  const writable = config as { maxPollers: number };
+  const before = writable.maxPollers;
+  const started = activePollerCount();
+  writable.maxPollers = started + 1;
+  try {
+    const first = getPoller("dash-cap-a", 1, "ws", spec(), {}, noopExecutor);
+    const stop = first.subscribe(() => {});
+    assert.throws(
+      () => getPoller("dash-cap-b", 1, "ws", spec(), {}, noopExecutor),
+      PollerCapacityError,
+    );
+    // The same key is the same poller, at the cap or not.
+    assert.equal(getPoller("dash-cap-a", 1, "ws", spec(), {}, noopExecutor), first);
+    stop();
+  } finally {
+    writable.maxPollers = before;
+    invalidatePoller("dash-cap-a");
+  }
+});
+
+test("the poller cap follows the heap when MAX_POLLERS is unset", () => {
+  const writable = config as { maxPollers: number };
+  const before = writable.maxPollers;
+  writable.maxPollers = 0;
+  try {
+    // Half of a 768 MiB heap over 11 MB a poller.
+    assert.equal(pollerLimit(768 * 1024 * 1024), 34);
+    assert.equal(pollerLimit(1), 1, "never below one");
+  } finally {
+    writable.maxPollers = before;
+  }
+});
+
+test("a refused stream tells EventSource on a 200 and anyone else with 503 and Retry-After", async () => {
+  const browser = capacityResponse("text/event-stream");
+  assert.equal(browser.status, 200);
+  assert.match(await browser.text(), /^retry: \d+\nevent: capacity\n/);
+  const other = capacityResponse("application/json");
+  assert.equal(other.status, 503);
+  assert.equal(other.headers.get("retry-after"), "15");
+  assert.match((await other.json()).error, /live-dashboard limit/);
 });

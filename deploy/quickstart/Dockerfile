@@ -70,6 +70,9 @@ COPY deploy/quickstart/entrypoint.sh /usr/local/bin/holotable-quickstart
 # advertises cgroup v2 without a memory.max file (Cloudflare Containers), the
 # script computes "0MB" and timescaledb-tune panics, which aborts initdb. The
 # stock settings are plenty for a demo-sized database.
+# A heap ceiling (#495): this container also runs Postgres, so the app takes
+# half a gigabyte rather than V8's guess from the host. Override with -e.
+ENV NODE_OPTIONS=--max-old-space-size=512
 ENV NODE_ENV=production \
     NO_TS_TUNE=true \
     NEXT_TELEMETRY_DISABLED=1 \

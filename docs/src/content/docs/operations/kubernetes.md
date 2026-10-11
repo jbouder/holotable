@@ -204,6 +204,14 @@ voluntary disruption entirely — `kubectl drain` on that node waits forever. Us
 `maxUnavailable: 1` if you want one at all.
 :::
 
+## Memory
+
+`resources.limits.memory` (1Gi by default) sets the Node heap too. The chart
+passes `NODE_OPTIONS=--max-old-space-size` at three quarters of the limit, so
+pressure shows up as garbage collection and refused streams rather than an
+OOM kill. A limit below 256Mi fails the render. How many live dashboards that
+holds, and `MAX_POLLERS`, are on [Sizing memory and pollers](/admin/sizing/).
+
 ## Metrics
 
 [`/api/metrics`](/operations/metrics/) answers `404` until `METRICS_TOKEN` or
