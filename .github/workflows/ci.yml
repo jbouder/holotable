@@ -95,6 +95,16 @@ jobs:
         env:
           NEXT_TELEMETRY_DISABLED: 1
 
+      # The image library Next's optimizer would use is excluded from the
+      # standalone server (#498): nothing uses `next/image`, and it was a
+      # third of the server's size. This fails if a change brings it back.
+      - name: The standalone server carries no image library
+        run: |
+          if [ -e .next/standalone/node_modules/sharp ] || [ -e .next/standalone/node_modules/@img ]; then
+            echo "::error::sharp or @img is in .next/standalone; see images.unoptimized in next.config.ts"
+            exit 1
+          fi
+
   fuzz:
     name: Fuzz the SQL guard
     runs-on: ubuntu-latest
