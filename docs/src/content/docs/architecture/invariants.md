@@ -14,7 +14,7 @@ Only on author, create, or edit — never on view, and never on a poller tick.
 Viewing and ticking replay the stored spec.
 
 The one bounded exception is the [structured-output
-repair](/admin/ai-provider/#structured-output-repair): when an author
+repair](/admin/models/#structured-output-repair): when an author
 action's output fails the schema, it gets **one** more model call that shows the
 model what was wrong, and that call's own failure is final. The repair is part
 of the same author action, never of a view, and it is rate limited, budgeted

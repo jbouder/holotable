@@ -1,20 +1,28 @@
 ---
-title: AI provider
-description: Selecting a provider and model, and the compatible endpoints that are known to work.
+title: Models and providers
+description: The provider kinds, server models from AI_MODELS_FILE or the AI_* variables, workspace and personal models, how a request's model is resolved, the credentials rules and the base URL guard.
 sidebar:
   order: 3
 ---
 
-The server's provider and model are **environment-selected**. No model
-catalog or model-specific data is baked into the code
-(`src/lib/ai/provider.ts`).
+Holotable calls one model per request, chosen from a **catalog**
+([#437](https://github.com/jbouder/holotable/issues/437)):
 
-`AI_MODEL` must be set; **there is no default model**. Choosing the concrete
-provider and model is deliberately left to the deployment.
+- **Server models**, declared by the operator in
+  [`AI_MODELS_FILE`](#server-models-ai_models_file), or by the `AI_*`
+  variables as the one model named `default`. Read-only in the app.
+- **Workspace models**, which a source-admin adds for a workspace, one of
+  them (or a server model) its default.
+- **Personal models**, which a person adds for themselves, usable only in
+  workspaces that allow them.
 
-A workspace, and a person, can also set a model in the app, which takes the
-place of the environment's for their generations; see
-[Models configured in the app](#models-configured-in-the-app).
+Each is a [provider kind](#models-configured-in-the-app) and that kind's
+settings. No vendor's model list is baked into the code: a model id is
+typed, or picked from what the vendor lists. The [Models page](/guide/models/)
+shows them all, and the [model chip](/guide/models/#picking-a-model) picks
+one per request. There is **no default model**: with neither `AI_MODELS_FILE`
+nor `AI_MODEL` set, and no workspace model, generation says what to
+configure.
 
 ## Models configured in the app
 

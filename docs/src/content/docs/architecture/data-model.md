@@ -147,8 +147,10 @@ chat.
 
 One person's Explore conversation (#416, the Chat engine): `id`, `user_sub`, `workspace_id`,
 `source_ids`, `dashboard_id` (set when it continues a dashboard's chat; `ON
-DELETE SET NULL`), `title`, `time_range` (an IR `TimeRange`), `variables` and
-the two timestamps. Personal like `user_preferences`: every statement filters
+DELETE SET NULL`), `title`, `time_range` (an IR `TimeRange`), `variables`,
+`model_id` (the catalog model its turns use, #442: a model's uuid or
+`env:<name>`, NULL for the default, checked on every turn and never a foreign
+key, so a deleted model falls back to the default) and the two timestamps. Personal like `user_preferences`: every statement filters
 on `user_sub` from the session, and no route reads another person's.
 
 A conversation with a `dashboard_id` continues that dashboard's chat: at most one per person per dashboard (a partial unique index), with no `source_ids` of its own; its sources are the dashboard's, re-resolved from the current spec on every turn.
@@ -225,6 +227,29 @@ Token counters per `(workspace_id, day, route, model)`: `input_tokens`,
 prompts, specs, or output. Read before every model request to enforce the
 daily budget; see [LLM rate limits and budgets](/admin/llm-limits/).
 
+### `llm_models`
+
+The model catalog (#439): one row per workspace or personal model. `id`
+(uuid), `scope` (`workspace` or `personal`), `workspace_id` (for a workspace
+model) or `user_sub` (for a personal one), `name` (unique per owner, ignoring
+case), `provider` (a provider kind, no CHECK, as kinds are code),
+`settings` (the kind's browser-safe settings, validated on read),
+`credentials` (sealed: AES-256-GCM under a key derived from `SESSION_SECRET`
+with its own label; a bare API key, or a JSON object of the kind's fields;
+NULL for none), `created_by`, `updated_by` and the two timestamps. Every
+statement filters on the owner from the path or the session, so an id alone
+reaches nothing. No route returns `credentials`. Server models are never
+stored: they come from the environment. See [Models and providers](/admin/models/).
+
+### `workspace_llm_config`
+
+One row per workspace that has chosen something about models: `default_model`
+(a workspace model's id or `env:<name>`, NULL for the server's default;
+checked in code, cleared when that model is deleted), `allow_personal_keys`,
+`updated_by`, `updated_at`. Migration 017 also gave it a single model slot
+(`provider`, `settings`, `api_key`) and a per-person `user_llm_config` table;
+022 copied them into `llm_models` and 024 dropped them.
+
 ### `workspace_limits`
 
 Optional per-workspace overrides of `LLM_RATE_PER_MINUTE` and
@@ -247,7 +272,9 @@ is logged and treated as no customization. Written only by
 
 One row per subject: `sub` (primary key), `prefs` (JSONB), `updated_at`. It
 holds the choices that follow a person between devices: time zone, clock,
-start page and dashboard list defaults. Keyed by `sub` alone, because a
+start page and dashboard list defaults, and the model last picked in each
+workspace (`modelByWorkspace`, #442, written by the server when a request
+names a model). Keyed by `sub` alone, because a
 preference is personal and not workspace-scoped. Read through
 `parsePreferences` in `src/lib/preferences.ts`, which validates field by field
 and drops or defaults anything stale, so an old row never breaks a page. Only

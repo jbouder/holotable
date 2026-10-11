@@ -61,7 +61,7 @@ production deployment cannot boot without:
 | `AI_MODEL` | Set, unless `AI_MODELS_FILE` lists the server's models. |
 | `OPENAI_API_KEY` | Set when `AI_PROVIDER` is `openai-compatible` (the default). `OPENAI_BASE_URL` is optional and defaults to OpenAI, but must be an http(s) URL when set. |
 | `AI_GATEWAY_API_KEY` | Set when `AI_PROVIDER` is `gateway`. |
-| `AI_MODELS_FILE` | When set, the file is readable and every entry parses: a known provider kind, valid settings, a unique name, at most one default, and credentials that name environment variables. Each variable an entry names is set. A file that does not parse is an error in development too. See [Server models](/admin/ai-provider/#server-models-ai_models_file). |
+| `AI_MODELS_FILE` | When set, the file is readable and every entry parses: a known provider kind, valid settings, a unique name, at most one default, and credentials that name environment variables. Each variable an entry names is set. A file that does not parse is an error in development too. See [Server models](/admin/models/#server-models-ai_models_file). |
 | `OIDC_ISSUER`, `OIDC_CLIENT_ID`, `OIDC_CLIENT_SECRET`, `OIDC_JWKS_URL` | All set: Keycloak is the only way to sign in, and the [client is confidential](/admin/keycloak/). `OIDC_REDIRECT_URI` is derived from the request origin when unset. Under `AUTH_MODE=demo` the rule inverts: any of them (or `OIDC_MCP_CLIENT_ID`) is an error, and `AI_MODEL` and the provider key become warnings; see [Demo mode](/admin/demo-mode/). |
 
 Every numeric knob (`MAX_QUERY_ROWS`, `MAX_RESULT_BYTES`, `QUERY_TIMEOUT_SECONDS`, …) must be a

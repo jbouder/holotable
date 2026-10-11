@@ -110,6 +110,22 @@ Important files:
   prompt). Never compare `source.kind` or import `src/lib/timescaledb/` from a
   route: ask `sourceKind(record)` or `serverKind(record)` and use what comes
   back. `test/source-kinds.test.ts` fails on either outside `src/lib/sources/`
+- `src/lib/ai/providers/registry.ts` — the provider kinds (#438), as the
+  source and panel registries are: `openai-compatible`, `openai`,
+  `anthropic`, `google`, `gateway`, `azure`, `bedrock`, `mistral`, `xai`,
+  `stub`. A kind's browser-safe module is under `providers/kinds/` (its
+  `settings` and `credentials` schemas, form `fields`, `endpoint`,
+  `listsModels`) and its server half under `providers/server/` (`build`
+  with the vendor's SDK, `providerOptions`, `listModels`). `ModelSettings` is
+  the union of every kind's settings. Never compare a model's `provider` or
+  import an `@ai-sdk/*` package outside `src/lib/ai/providers/`: ask
+  `kindOf(settings)` or `serverProviderKind(settings)`.
+  `test/provider-kinds.test.ts` fails on either, and drives one request per
+  kind to check it reaches its own origin with its own credentials and
+  never the server's environment. A server half passes the credentials and
+  the vendor's URL to its SDK explicitly, and gets the fetch
+  `providers/server/registry.ts` picks (the base URL guard for a typed
+  endpoint, `pinnedFetch` to the vendor's origin otherwise)
 - `src/components/charts/vega-runtime.ts` and `src/lib/vega/compile.ts` — custom
   visuals (#405): a Vega-Lite spec drawn over the panel's rows. The runtime
   parses with `ast: true` and evaluates with `vega-interpreter`, because Vega's
@@ -259,17 +275,26 @@ Important files:
   `onError` that logs a failed call through `log` instead of the SDK's raw
   console dump (#343); `test/ai-invoke.test.ts` fails on a call site that does
   not, or that sets its own `onError`
-- `src/lib/ai/model-resolution.ts` and `src/lib/ai/model-config.ts` — models
-  configured in the app (#331): per request, the caller's personal model (when
-  the workspace allows personal keys), else the workspace's, else the
-  environment's. A generation route calls `requireModel` before the limits and
-  hands `resolved.model` to the stream, which spreads `...modelSettings(model)`;
-  `resolved.source` goes on the generation log row and the audit event. The
-  key is sealed (`src/lib/secrets/seal.ts`, its own HKDF label), never
-  returned, and registered with the log's redaction (`rememberSecret`) when it
-  is opened. The base URL is untrusted: `ai/base-url.ts` holds the rules and
-  `ai/guarded-fetch.ts` applies them at DNS time on every connection. Both
-  levels are off in demo mode
+- `src/lib/ai/models.ts`, `src/lib/ai/model-resolution.ts` and
+  `src/lib/ai/model-config.ts` — the model catalog (#331, #437): server
+  models (`AI_MODELS_FILE`, read by `server-model-list.ts`, and the legacy
+  `AI_*` variables as `default`, ids `env:<name>`), workspace and personal
+  models (`llm_models`, `src/lib/db/models.ts`). A generation route calls
+  `requireModel({ identity, workspaceId, modelId?, preferred? })` before the
+  limits and hands `resolved.model` to the stream, which spreads
+  `...modelSettings(model)`; a `modelId` the catalog does not grant the
+  caller there is a 400, and without one the default chain is the
+  conversation's model, the person's last pick
+  (`user_preferences.modelByWorkspace`), their first personal model where
+  allowed, the workspace's default, the server's. `resolved.source` and
+  `resolved.id` go on the generation log row and the audit event.
+  Credentials are sealed (`src/lib/secrets/seal.ts`, their own HKDF label),
+  never returned, and registered with the log's redaction
+  (`rememberSecret`) when opened. The writes behind the routes are
+  `model-admin.ts`, all through `prepareWrite`. A typed base URL is
+  untrusted: `ai/base-url.ts` holds the rules and `ai/guarded-fetch.ts`
+  applies them at DNS time on every connection. Demo mode has the server's
+  models only and refuses every write
 - `src/lib/ai/data-chat.ts` and `src/lib/chat/` — the Chat engine (#416):
   one `streamText` turn over a conversation's sources with two guarded tools,
   `runQuery` and `showPanel`. `showPanel` takes an IR panel spec (`ChatPanel`,

@@ -21,7 +21,7 @@ import { config, type Environment } from "@/lib/config";
  * server half under `providers/server/` (#438); nothing here names a vendor.
  * We do NOT hard-code any model catalog or model-specific data: which
  * concrete provider and model to run is left to deployment (see
- * docs/src/content/docs/admin/ai-provider.md).
+ * docs/src/content/docs/admin/models.md).
  *
  * Every model is wrapped with the deadline and retry from ./invoke.ts (#22).
  */
