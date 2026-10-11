@@ -354,6 +354,24 @@ test("ALLOWED_ORIGINS holds exact origins (#25)", () => {
   }
 });
 
+test("SSE_SLOW_TICKS is a positive whole number of cycles or unset", () => {
+  for (const value of ["1", "3", ""]) {
+    const ok = validateConfig(
+      { ...VALID_PRODUCTION, SSE_SLOW_TICKS: value },
+      { production: true },
+    );
+    assert.deepEqual(errors(ok), [], formatConfigProblems(ok));
+  }
+  // 0 would drop every stream on its first cycle.
+  for (const value of ["0", "-1", "two"]) {
+    const bad = validateConfig(
+      { ...VALID_PRODUCTION, SSE_SLOW_TICKS: value },
+      { production: true },
+    );
+    assert.deepEqual(variables(errors(bad)), ["SSE_SLOW_TICKS"]);
+  }
+});
+
 test("SSE_REAUTH_INTERVAL_MS is a positive number of milliseconds or unset", () => {
   for (const value of ["5000", "60000", ""]) {
     const ok = validateConfig(

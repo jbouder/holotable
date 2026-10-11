@@ -169,6 +169,15 @@ export const config = {
   sseReauthIntervalMs: num("SSE_REAUTH_INTERVAL_MS", 60_000),
 
   /**
+   * How many cycles in a row a dashboard stream may stay behind before it is
+   * closed with a `drop` frame (#489): a viewer, or a proxy in front of one,
+   * that has stopped reading would otherwise make the server buffer its
+   * frames without limit. The browser reconnects after a spread delay and
+   * resumes from its last event id. Default 3.
+   */
+  sseSlowTicks: num("SSE_SLOW_TICKS", 3),
+
+  /**
    * The longest a service-account API token may live, in days (#288). Every
    * token has an expiry, and this caps it, so a forgotten one runs out.
    * Documented default: 90.
@@ -628,6 +637,7 @@ const EnvSchema = z.object({
   GENERATION_LOG_RETENTION_DAYS: blank(nonNegativeInt),
   SHUTDOWN_GRACE_MS: blank(positiveInt),
   SSE_REAUTH_INTERVAL_MS: blank(positiveInt),
+  SSE_SLOW_TICKS: blank(positiveInt),
   API_TOKEN_MAX_DAYS: blank(positiveInt),
 
   // Not `blank()`: the empty string is a real declaration here ("no source

@@ -193,6 +193,12 @@ publishes a pass rate without gating anything. To add a case, write
 provider. When you change the generation prompt, re-record: replay says
 "stale recording" for answers given to an older prompt.
 
+`npm run load:stream` opens many viewers of one dashboard's stream against
+an instance in `AUTH_MODE=demo` (`npm run dev:demo`), some of them never
+reading, and prints the bytes per cycle and who was dropped. Flags:
+`--viewers`, `--slow`, `--seconds`, `--dashboard "<title>"`, `--base`. It is a
+manual tool for a change to the stream or the poller, not a CI job.
+
 Three notes on the less obvious ones:
 
 - `npm run lint` is [Biome](https://biomejs.dev) — linter *and* formatter in one

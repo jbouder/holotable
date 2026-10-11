@@ -135,6 +135,34 @@ instance. Multiple replicas would each run their own poller. See
 [Scaling and the poller](/architecture/scaling/).
 :::
 
+## Many viewers, slow viewers
+
+A stream is one subscriber of the shared poller, written by
+`subscriberStream` in `src/lib/sse-stream.ts` (#489):
+
+- **Serialized once.** `encodeEventFrame` (`src/lib/sse.ts`) keeps each
+  event object's bytes, and the poller hands every subscriber on the same
+  cursor the same delta object. A cycle on a dashboard a hundred people
+  watch is serialized once per distinct payload, not once per viewer.
+- **Backpressure.** Each stream buffers up to 1 MiB unread. A stream still
+  over that when `SSE_SLOW_TICKS` cycles in a row complete (default 3) is
+  sent a `drop` frame with a spread `retry:` hint and closed. A stalled
+  viewer, or a proxy in front of one, can no longer make the server buffer
+  without limit, and the other viewers are untouched. The drop is recorded
+  as a second `dashboard.stream` audit row with `outcome: failure` and
+  `detail.dropped`. The browser treats `drop` like a drain and reconnects,
+  resuming from its last event id.
+- **Headers.** Every stream response carries
+  `Cache-Control: no-cache, no-transform` and `X-Accel-Buffering: no`, so an
+  nginx-style proxy or ingress neither buffers nor compresses it.
+- **Resume.** A reconnect with a valid `Last-Event-ID` gets only what its
+  cursors are missing, and an unknown or stale id gets a full snapshot. A
+  reconnect at token expiry passes the id in the query and resumes the same
+  way.
+
+`npm run load:stream` opens many viewers against a demo instance, some of
+them stalled, to see this hold.
+
 ## Merge, never recreate
 
 Client side (`LiveDashboard.tsx` → `PanelView.tsx` → `EChart.tsx`):
