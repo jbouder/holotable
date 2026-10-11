@@ -25,7 +25,10 @@ designed set of colors that comes in both schemes, on `<html data-palette>`
 
 A spec never names a color, only a color token. `src/lib/panels/colors.ts`
 maps each one to a variable, for example `success` to `--success` and `teal`
-to `--chart-6`. Markup uses the variable, and a canvas reads its value
+to `--teal`. Holotable aliases `--orange`, `--purple` and `--teal` to
+`--chart-3`, `--chart-5` and `--chart-6`. A theme that orders its series
+differently points each one at the series of the same color family, so a
+spec's `teal` is teal in every theme. Markup uses the variable, and a canvas reads its value
 through `ChartTheme` (`src/lib/color/chart-theme.ts`), which converts the
 computed style off `<html>`.
 `test/color-literals.test.ts` keeps color literals out of `src/`, except in
@@ -42,6 +45,18 @@ computed style off `<html>`.
   same scheme.
 - Both attributes work on any element, so a preview card can show a theme
   inside a page drawn in another.
+
+## Shipped themes
+
+Holotable, Graphite, Fjord and Paper ship, each in both schemes. The
+[Themes](/guide/themes/) guide shows them and says what each is for. A
+theme sets every color token itself, so its intent does not depend on
+Holotable's values, and inherits only the aliases (`--chart-text`, the
+`--code-*` colors). Paper also sets `--radius`, the only theme that rounds.
+
+Adding a theme takes its two blocks in `globals.css` and an entry in
+`PALETTE_INFO`. `test/theme-quality.test.ts` checks that the two lists
+match, and that the new blocks clear the quality bar.
 
 ## Reaching first paint
 

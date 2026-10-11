@@ -48,11 +48,11 @@ The same information is available to scripts from `GET /api/me`.
 ### Appearance
 
 **Color scheme** is Light, Dark or System. **Theme** is the named set of
-colors the scheme comes in. It appears here and in the command palette once
-the app ships more than one, and until then every page is Holotable. Both are
-kept in this browser and apply before the page draws. An operator sets the
-theme a new browser starts with (`THEME_DEFAULT_PALETTE`). See
-[Theming](/architecture/theming/).
+colors the scheme comes in: Holotable, Graphite, Fjord or Paper. Both are also
+in the command palette. Both are kept in this browser and apply before the
+page draws. An operator sets the theme a new browser starts with
+(`THEME_DEFAULT_PALETTE`). [Themes](/guide/themes/) shows each one and what it
+is for.
 
 **Motion** has three choices. *Follow system* respects the operating system's
 reduced-motion setting. *Reduce* stops transitions, entrances and slides, the

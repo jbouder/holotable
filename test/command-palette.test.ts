@@ -113,12 +113,27 @@ test("a source the caller cannot manage is never offered a refresh", () => {
   );
 });
 
+/** The declared order, as an empty query shows it: each section capped. */
+function capped(commands: readonly Command[]): string[] {
+  const seen = new Map<string, number>();
+  return commands
+    .filter((c) => {
+      const n = (seen.get(c.kind) ?? 0) + 1;
+      seen.set(c.kind, n);
+      return n <= PER_SECTION;
+    })
+    .map((c) => c.id);
+}
+
 test("with nothing typed, recents lead and the rest keep their declared order", () => {
   const ranked = rankCommands(STATIC_COMMANDS, "", ["action:new-source"]);
   assert.equal(ranked[0].id, "action:new-source");
   assert.deepEqual(
-    ranked.slice(1).map((c) => c.id),
-    STATIC_COMMANDS.filter((c) => c.id !== "action:new-source").map((c) => c.id),
+    ranked.map((c) => c.id),
+    capped([
+      ...STATIC_COMMANDS.filter((c) => c.id === "action:new-source"),
+      ...STATIC_COMMANDS.filter((c) => c.id !== "action:new-source"),
+    ]),
   );
 });
 
@@ -126,7 +141,7 @@ test("a remembered id that names nothing is simply ignored", () => {
   const ranked = rankCommands(STATIC_COMMANDS, "", ["dashboard:deleted-long-ago"]);
   assert.deepEqual(
     ranked.map((c) => c.id),
-    STATIC_COMMANDS.map((c) => c.id),
+    capped(STATIC_COMMANDS),
   );
 });
 

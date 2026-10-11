@@ -53,17 +53,33 @@ export interface ThemeBlock {
   tokens: Record<string, Rgb>;
 }
 
-function blockTokens(css: string, at: number): Record<string, Rgb> {
+/** A block's custom properties, as written. */
+function blockDecls(css: string, at: number): Record<string, string> {
   const body = css.slice(at, css.indexOf("}", at));
-  const out: Record<string, Rgb> = {};
-  for (const decl of body.matchAll(/--([a-z0-9-]+):\s*(oklch\([^)]*\))/g)) {
-    const hex = resolveOklchToken(decl[2]);
-    if (hex) out[decl[1]] = hexToRgb(hex);
+  const out: Record<string, string> = {};
+  for (const decl of body.matchAll(/--([a-z0-9-]+):\s*([^;]+);/g)) {
+    out[decl[1]] = decl[2].trim();
   }
-  // An alias of another token in the same block (`--chart-text: var(--muted)`).
-  for (const decl of body.matchAll(/--([a-z0-9-]+):\s*var\(--([a-z0-9-]+)\)/g)) {
-    const target = out[decl[2]];
-    if (target) out[decl[1]] = target;
+  return out;
+}
+
+/**
+ * Declarations resolved to sRGB. An alias (`--chart-text: var(--muted)`)
+ * resolves against the merged set, as the cascade does on the element that
+ * carries both attributes: a palette that sets `--muted` but not
+ * `--chart-text` gets its own muted.
+ */
+function resolveDecls(decls: Record<string, string>): Record<string, Rgb> {
+  const out: Record<string, Rgb> = {};
+  for (const [name, value] of Object.entries(decls)) {
+    if (!value.startsWith("oklch(")) continue;
+    const hex = resolveOklchToken(value);
+    if (hex) out[name] = hexToRgb(hex);
+  }
+  for (const [name, value] of Object.entries(decls)) {
+    const alias = /^var\(--([a-z0-9-]+)\)$/.exec(value);
+    const target = alias && out[alias[1]];
+    if (target) out[name] = target;
   }
   return out;
 }
@@ -79,25 +95,26 @@ export function parseThemeBlocks(css: string): ThemeBlock[] {
     if (!m) throw new Error(`no theme block matching ${selector}`);
     return m.index + m[0].length;
   };
+  const base: Record<ThemeName, Record<string, string>> = {
+    dark: blockDecls(css, at(/:root,\s*\[data-theme="dark"\]\s*\{/)),
+    light: blockDecls(css, at(/(?:^|\n)\[data-theme="light"\]\s*\{/)),
+  };
   const blocks: ThemeBlock[] = [
-    {
-      palette: "holotable",
-      scheme: "dark",
-      tokens: blockTokens(css, at(/:root,\s*\[data-theme="dark"\]\s*\{/)),
-    },
-    {
-      palette: "holotable",
-      scheme: "light",
-      tokens: blockTokens(css, at(/(?:^|\n)\[data-theme="light"\]\s*\{/)),
-    },
+    { palette: "holotable", scheme: "dark", tokens: resolveDecls(base.dark) },
+    { palette: "holotable", scheme: "light", tokens: resolveDecls(base.light) },
   ];
   for (const m of css.matchAll(
     /\[data-palette="([a-z0-9-]+)"\]\[data-theme="(dark|light)"\]\s*\{/g,
   )) {
+    const scheme = m[2] as ThemeName;
     blocks.push({
       palette: m[1],
-      scheme: m[2] as ThemeName,
-      tokens: blockTokens(css, (m.index ?? 0) + m[0].length),
+      scheme,
+      // On top of Holotable's block for the same scheme, as the cascade puts it.
+      tokens: resolveDecls({
+        ...base[scheme],
+        ...blockDecls(css, (m.index ?? 0) + m[0].length),
+      }),
     });
   }
   return blocks;
@@ -226,12 +243,8 @@ export function contrastTable(css: string): string {
 export function measureContrast(css: string): MeasuredPair[] {
   const blocks = parseThemeBlocks(css);
   return blocks.flatMap(({ palette, scheme, tokens }) => {
-    // A palette's block sits on top of Holotable's for the same scheme, as
-    // the cascade puts it: a token it does not set is Holotable's.
-    const base =
-      blocks.find((b) => b.palette === "holotable" && b.scheme === scheme)?.tokens ?? {};
     const token = (name: string): Rgb => {
-      const rgb = tokens[name] ?? base[name];
+      const rgb = tokens[name];
       if (!rgb) throw new Error(`token --${name} is not defined in ${palette} ${scheme}`);
       return rgb;
     };

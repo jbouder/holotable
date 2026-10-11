@@ -61,6 +61,11 @@
   --chart-text: var(--muted);
   --chart-axis: var(--border);
   --chart-grid: var(--surface-2);
+  /* The spec's palette-only color tokens: a series each, by family. A theme
+     that orders its series differently points them elsewhere (#505). */
+  --orange: var(--chart-3);
+  --purple: var(--chart-5);
+  --teal: var(--chart-6);
   --code-keyword: var(--primary);
   --code-string: var(--success);
   --code-number: var(--warning);
@@ -104,10 +109,250 @@
   --chart-text: var(--muted);
   --chart-axis: var(--border);
   --chart-grid: var(--surface-2);
+  --orange: var(--chart-3);
+  --purple: var(--chart-5);
+  --teal: var(--chart-6);
   --code-keyword: var(--primary);
   --code-string: var(--success);
   --code-number: var(--warning);
   --code-comment: var(--muted);
+}
+
+/*
+ * Graphite (#505): a true neutral. Warm gray surfaces at almost no chroma, a
+ * violet accent well away from every status hue, statuses a little quieter so
+ * they sit in the page. For a wall of panels where the data is the only color.
+ */
+[data-palette="graphite"][data-theme="dark"] {
+  --background: oklch(0.17 0.004 70);
+  --surface: oklch(0.21 0.005 70);
+  --surface-2: oklch(0.255 0.005 70);
+  --surface-3: oklch(0.3 0.005 70);
+  --foreground: oklch(0.95 0.004 80);
+  --muted: oklch(0.71 0.006 75);
+  --border: oklch(0.35 0.005 70);
+  --border-strong: oklch(0.56 0.006 70);
+  --ring: oklch(0.99 0 0);
+  --selection: oklch(0.4 0.08 300);
+  --primary: oklch(0.72 0.15 300);
+  --primary-foreground: oklch(0.17 0.004 70);
+  --danger: oklch(0.72 0.16 22);
+  --warning: oklch(0.8 0.13 78);
+  --success: oklch(0.79 0.13 158);
+  --chart-1: oklch(0.75 0.14 300);
+  --chart-2: oklch(0.62 0.14 250);
+  --chart-3: oklch(0.76 0.11 190);
+  --chart-4: oklch(0.8 0.14 75);
+  --chart-5: oklch(0.68 0.17 22);
+  --chart-6: oklch(0.74 0.14 145);
+  --chart-7: oklch(0.66 0.18 345);
+  --chart-8: oklch(0.9 0.04 100);
+  --chart-seq-1: oklch(0.32 0.05 300);
+  --chart-seq-2: oklch(0.45 0.09 300);
+  --chart-seq-3: oklch(0.58 0.13 300);
+  --chart-seq-4: oklch(0.72 0.12 295);
+  --chart-seq-5: oklch(0.86 0.07 290);
+  --chart-div-low: oklch(0.68 0.14 250);
+  --chart-div-mid: oklch(0.36 0.005 70);
+  --chart-div-high: oklch(0.68 0.17 22);
+  --orange: var(--chart-4);
+  --purple: var(--chart-1);
+  --teal: var(--chart-3);
+}
+
+[data-palette="graphite"][data-theme="light"] {
+  --background: oklch(0.97 0.003 80);
+  --surface: oklch(0.995 0.002 80);
+  --surface-2: oklch(0.94 0.004 80);
+  --surface-3: oklch(0.9 0.005 80);
+  --foreground: oklch(0.2 0.005 70);
+  --muted: oklch(0.49 0.006 70);
+  --border: oklch(0.85 0.005 80);
+  --border-strong: oklch(0.56 0.006 70);
+  --ring: oklch(0.15 0.005 70);
+  --selection: oklch(0.9 0.05 300);
+  --primary: oklch(0.5 0.18 300);
+  --primary-foreground: oklch(0.98 0.003 80);
+  --danger: oklch(0.5 0.17 22);
+  --warning: oklch(0.45 0.11 75);
+  --success: oklch(0.46 0.11 158);
+  --chart-1: oklch(0.48 0.18 300);
+  --chart-2: oklch(0.6 0.13 245);
+  --chart-3: oklch(0.5 0.09 195);
+  --chart-4: oklch(0.5 0.11 70);
+  --chart-5: oklch(0.54 0.18 22);
+  --chart-6: oklch(0.5 0.12 145);
+  --chart-7: oklch(0.52 0.18 345);
+  --chart-8: oklch(0.34 0.06 90);
+  --chart-seq-1: oklch(0.93 0.03 300);
+  --chart-seq-2: oklch(0.8 0.07 300);
+  --chart-seq-3: oklch(0.66 0.12 300);
+  --chart-seq-4: oklch(0.52 0.16 300);
+  --chart-seq-5: oklch(0.38 0.13 300);
+  --chart-div-low: oklch(0.5 0.15 255);
+  --chart-div-mid: oklch(0.93 0.004 80);
+  --chart-div-high: oklch(0.54 0.18 22);
+  --orange: var(--chart-4);
+  --purple: var(--chart-1);
+  --teal: var(--chart-3);
+}
+
+/*
+ * Fjord (#505): cool and calm. Blue-green surfaces, a sea-teal accent, muted
+ * text a shade warmer than the page so it reads as ink rather than fog, and a
+ * chart palette from the sea side of the wheel with two warm series, amber
+ * second so the first two series never share a hue family. Success
+ * leans yellow-green to keep 60° from the accent. The light scheme is a pale
+ * mist, not white.
+ */
+[data-palette="fjord"][data-theme="dark"] {
+  --background: oklch(0.18 0.02 215);
+  --surface: oklch(0.225 0.022 212);
+  --surface-2: oklch(0.27 0.022 212);
+  --surface-3: oklch(0.315 0.022 212);
+  --foreground: oklch(0.93 0.012 200);
+  --muted: oklch(0.73 0.018 75);
+  --border: oklch(0.37 0.022 212);
+  --border-strong: oklch(0.58 0.02 212);
+  --ring: oklch(0.97 0.02 195);
+  --selection: oklch(0.4 0.07 205);
+  --primary: oklch(0.76 0.11 210);
+  --primary-foreground: oklch(0.18 0.02 215);
+  --danger: oklch(0.72 0.16 25);
+  --warning: oklch(0.88 0.13 88);
+  --success: oklch(0.78 0.15 145);
+  --chart-1: oklch(0.76 0.11 210);
+  --chart-2: oklch(0.88 0.13 88);
+  --chart-3: oklch(0.8 0.14 150);
+  --chart-4: oklch(0.68 0.14 255);
+  --chart-5: oklch(0.68 0.13 290);
+  --chart-6: oklch(0.7 0.16 30);
+  --chart-7: oklch(0.9 0.05 200);
+  --chart-8: oklch(0.66 0.12 180);
+  --chart-seq-1: oklch(0.32 0.04 212);
+  --chart-seq-2: oklch(0.45 0.07 210);
+  --chart-seq-3: oklch(0.58 0.09 205);
+  --chart-seq-4: oklch(0.72 0.1 200);
+  --chart-seq-5: oklch(0.86 0.07 190);
+  --chart-div-low: oklch(0.68 0.12 230);
+  --chart-div-mid: oklch(0.38 0.02 212);
+  --chart-div-high: oklch(0.7 0.16 30);
+  --orange: var(--chart-2);
+  --purple: var(--chart-5);
+  --teal: var(--chart-8);
+}
+
+[data-palette="fjord"][data-theme="light"] {
+  --background: oklch(0.945 0.012 215);
+  --surface: oklch(0.975 0.01 212);
+  --surface-2: oklch(0.92 0.014 212);
+  --surface-3: oklch(0.88 0.016 212);
+  --foreground: oklch(0.22 0.02 220);
+  --muted: oklch(0.47 0.02 70);
+  --border: oklch(0.81 0.016 212);
+  --border-strong: oklch(0.54 0.02 212);
+  --ring: oklch(0.16 0.03 220);
+  --selection: oklch(0.85 0.05 205);
+  --primary: oklch(0.46 0.1 215);
+  --primary-foreground: oklch(0.975 0.01 212);
+  --danger: oklch(0.49 0.17 25);
+  --warning: oklch(0.38 0.09 70);
+  --success: oklch(0.45 0.12 145);
+  --chart-1: oklch(0.5 0.1 210);
+  --chart-2: oklch(0.46 0.11 70);
+  --chart-3: oklch(0.6 0.14 145);
+  --chart-4: oklch(0.58 0.14 250);
+  --chart-5: oklch(0.45 0.15 295);
+  --chart-6: oklch(0.56 0.17 30);
+  --chart-7: oklch(0.3 0.06 230);
+  --chart-8: oklch(0.42 0.08 180);
+  --chart-seq-1: oklch(0.92 0.03 200);
+  --chart-seq-2: oklch(0.8 0.06 205);
+  --chart-seq-3: oklch(0.66 0.09 210);
+  --chart-seq-4: oklch(0.52 0.1 215);
+  --chart-seq-5: oklch(0.38 0.08 220);
+  --chart-div-low: oklch(0.48 0.12 230);
+  --chart-div-mid: oklch(0.92 0.014 212);
+  --chart-div-high: oklch(0.54 0.17 30);
+  --orange: var(--chart-2);
+  --purple: var(--chart-5);
+  --teal: var(--chart-8);
+}
+
+/*
+ * Paper (#505): light first. Ivory surfaces, near-black ink, a deep blue
+ * accent and an inked chart palette that holds on ivory; the one theme that
+ * rounds. Its dark scheme is a warm charcoal, not an inversion. For a
+ * projector, and for reading a dashboard like a report.
+ */
+[data-palette="paper"][data-theme="dark"] {
+  --background: oklch(0.19 0.008 70);
+  --surface: oklch(0.23 0.01 70);
+  --surface-2: oklch(0.275 0.01 70);
+  --surface-3: oklch(0.32 0.01 70);
+  --foreground: oklch(0.94 0.015 85);
+  --muted: oklch(0.73 0.012 80);
+  --border: oklch(0.38 0.01 70);
+  --border-strong: oklch(0.58 0.01 70);
+  --ring: oklch(0.98 0.012 85);
+  --selection: oklch(0.42 0.07 262);
+  --primary: oklch(0.73 0.12 262);
+  --primary-foreground: oklch(0.19 0.008 70);
+  --danger: oklch(0.73 0.15 25);
+  --warning: oklch(0.81 0.12 80);
+  --success: oklch(0.8 0.12 155);
+  --chart-1: oklch(0.73 0.12 262);
+  --chart-2: oklch(0.76 0.12 155);
+  --chart-3: oklch(0.8 0.12 75);
+  --chart-4: oklch(0.7 0.16 25);
+  --chart-5: oklch(0.7 0.14 305);
+  --chart-6: oklch(0.74 0.09 200);
+  --chart-7: oklch(0.68 0.16 345);
+  --chart-8: oklch(0.9 0.04 85);
+  --chart-seq-1: oklch(0.33 0.04 262);
+  --chart-seq-2: oklch(0.46 0.08 262);
+  --chart-seq-3: oklch(0.6 0.11 262);
+  --chart-seq-4: oklch(0.73 0.1 250);
+  --chart-seq-5: oklch(0.86 0.06 230);
+  --chart-div-low: oklch(0.7 0.11 262);
+  --chart-div-mid: oklch(0.38 0.01 70);
+  --chart-div-high: oklch(0.7 0.16 25);
+  --radius: 4px;
+}
+
+[data-palette="paper"][data-theme="light"] {
+  --background: oklch(0.965 0.012 85);
+  --surface: oklch(0.99 0.008 85);
+  --surface-2: oklch(0.945 0.012 85);
+  --surface-3: oklch(0.91 0.014 85);
+  --foreground: oklch(0.18 0.01 80);
+  --muted: oklch(0.47 0.012 80);
+  --border: oklch(0.85 0.015 85);
+  --border-strong: oklch(0.55 0.015 80);
+  --ring: oklch(0.15 0.02 262);
+  --selection: oklch(0.88 0.05 262);
+  --primary: oklch(0.45 0.15 262);
+  --primary-foreground: oklch(0.98 0.01 85);
+  --danger: oklch(0.5 0.18 25);
+  --warning: oklch(0.38 0.09 70);
+  --success: oklch(0.45 0.11 155);
+  --chart-1: oklch(0.45 0.15 262);
+  --chart-2: oklch(0.47 0.12 155);
+  --chart-3: oklch(0.52 0.12 65);
+  --chart-4: oklch(0.44 0.17 25);
+  --chart-5: oklch(0.45 0.15 305);
+  --chart-6: oklch(0.4 0.07 205);
+  --chart-7: oklch(0.5 0.17 345);
+  --chart-8: oklch(0.32 0.05 85);
+  --chart-seq-1: oklch(0.92 0.03 240);
+  --chart-seq-2: oklch(0.79 0.06 250);
+  --chart-seq-3: oklch(0.64 0.1 258);
+  --chart-seq-4: oklch(0.5 0.13 262);
+  --chart-seq-5: oklch(0.36 0.11 265);
+  --chart-div-low: oklch(0.47 0.13 262);
+  --chart-div-mid: oklch(0.92 0.012 85);
+  --chart-div-high: oklch(0.5 0.18 25);
+  --radius: 4px;
 }
 
 @theme inline {
@@ -134,6 +379,7 @@
   --color-warning: var(--warning);
   --color-success: var(--success);
   --radius-lg: var(--radius);
+  --radius-sm: calc(var(--radius) / 2);
   --font-sans:
     var(--font-chakra-petch), ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto,
     Helvetica, Arial, sans-serif;

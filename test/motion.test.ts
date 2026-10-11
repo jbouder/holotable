@@ -111,7 +111,7 @@ test("the bootstrap script puts a shipped palette on <html>, else the server's d
   assert.equal(palette("holotable"), "holotable");
   assert.equal(palette(null), "holotable");
   // A reserved name with no CSS, or anything else, is the default.
-  assert.equal(palette("graphite"), "holotable");
+  assert.equal(palette("high-contrast"), "holotable");
   assert.equal(palette('"><script>'), "holotable");
   assert.equal(palette(null, bootstrapScript("holotable")), "holotable");
 });

@@ -31,7 +31,7 @@ export function Dialog({
         <BaseDialog.Backdrop className="fixed inset-0 z-40 bg-black/60 transition-opacity duration-(--duration-base) ease-standard data-starting-style:opacity-0 data-ending-style:opacity-0" />
         <BaseDialog.Popup
           className={cn(
-            "fixed inset-x-4 top-1/2 z-50 mx-auto max-h-[calc(100vh-2rem)] w-auto max-w-3xl -translate-y-1/2 overflow-y-auto border border-border bg-surface p-4 pt-2 shadow-xl focus:outline-none sm:p-6 sm:pt-3",
+            "fixed inset-x-4 top-1/2 z-50 mx-auto max-h-[calc(100vh-2rem)] w-auto max-w-3xl -translate-y-1/2 overflow-y-auto rounded-lg border border-border bg-surface p-4 pt-2 shadow-xl focus:outline-none sm:p-6 sm:pt-3",
             "transition-[opacity,scale] duration-(--duration-base) ease-emphasized data-starting-style:opacity-0 data-starting-style:scale-[0.98] data-ending-style:opacity-0 data-ending-style:scale-[0.98]",
             className,
           )}

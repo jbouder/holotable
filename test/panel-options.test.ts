@@ -332,7 +332,7 @@ test("a stat's number takes the token's CSS variable, so it reads in both scheme
   const { tokenCss } = await import("@/lib/panels/colors");
   assert.equal(tokenCss("warning"), "var(--warning)");
   assert.equal(tokenCss("info"), "var(--primary)");
-  assert.equal(tokenCss("orange"), "var(--chart-3)");
+  assert.equal(tokenCss("orange"), "var(--orange)");
   const { renderToStaticMarkup } = await import("react-dom/server");
   const { createElement } = await import("react");
   const { StatView } = await import("@/components/panels/stat");

@@ -8,6 +8,7 @@ import {
   hexToRgb,
   measureContrast,
   over,
+  parseThemeBlocks,
   parseThemeTokens,
 } from "@/lib/color/contrast";
 
@@ -81,16 +82,25 @@ test("every text pairing meets AA in both themes", () => {
 });
 
 test("another palette's blocks are measured on top of Holotable's", () => {
-  // #503: a second theme is `[data-palette][data-theme]`, overriding what it
-  // sets; the table grows a section per theme.
+  // #503: a theme is `[data-palette][data-theme]`, overriding what it sets;
+  // the table grows a section per theme.
   const css = `${CSS}
-[data-palette="graphite"][data-theme="dark"] {
+[data-palette="probe"][data-theme="dark"] {
   --surface: oklch(0.2 0 0);
+  --muted: oklch(0.8 0 0);
 }
-[data-palette="graphite"][data-theme="light"] {
+[data-palette="probe"][data-theme="light"] {
   --surface: oklch(0.99 0 0);
 }`;
-  const graphite = measureContrast(css).filter((m) => m.palette === "graphite");
-  assert.equal(graphite.length, measureContrast(CSS).length);
-  assert.match(contrastTable(css), /### holotable[\s\S]*### graphite/);
+  const probe = measureContrast(css).filter((m) => m.palette === "probe");
+  const holotable = measureContrast(CSS).filter((m) => m.palette === "holotable");
+  assert.equal(probe.length, holotable.length);
+  assert.match(contrastTable(css), /### holotable[\s\S]*### probe/);
+  // #505: an alias Holotable declares resolves against the theme's own value,
+  // as the cascade does: the probe sets --muted, not --chart-text.
+  const dark = parseThemeBlocks(css).find(
+    (b) => b.palette === "probe" && b.scheme === "dark",
+  );
+  assert.deepEqual(dark?.tokens["chart-text"], dark?.tokens.muted);
+  assert.notDeepEqual(dark?.tokens.muted, parseThemeTokens(CSS).dark.muted);
 });

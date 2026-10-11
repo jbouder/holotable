@@ -9,7 +9,10 @@ import type { ChartTheme } from "@/lib/color/chart-theme";
  * theme and the token layer for as long as the spec lives, so the IR accepts
  * only these names. Each is a CSS variable in `globals.css`, so it is a
  * different color in each scheme (#502): the status colors are the page's
- * own, and the palette-only ones are chart series.
+ * own, and the palette-only ones (`--orange`, `--purple`, `--teal`) name a
+ * chart series: Holotable's chart-3, -5 and -6, and whichever series of the
+ * same family a theme that orders its series differently points them at
+ * (#505).
  */
 export const COLOR_TOKENS = {
   success: "--success",
@@ -17,9 +20,9 @@ export const COLOR_TOKENS = {
   danger: "--danger",
   info: "--primary",
   neutral: "--muted",
-  orange: "--chart-3",
-  purple: "--chart-5",
-  teal: "--chart-6",
+  orange: "--orange",
+  purple: "--purple",
+  teal: "--teal",
 } as const satisfies Record<string, `--${string}`>;
 
 export type ColorToken = keyof typeof COLOR_TOKENS;

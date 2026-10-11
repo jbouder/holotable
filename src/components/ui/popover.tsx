@@ -61,7 +61,7 @@ export function Popover({
             // (axe aria-dialog-name, found by the first scan of an open one).
             aria-label={label}
             className={cn(
-              "max-w-xs border border-border bg-surface p-3 text-xs leading-relaxed text-foreground shadow-xl focus:outline-none",
+              "max-w-xs rounded-lg border border-border bg-surface p-3 text-xs leading-relaxed text-foreground shadow-xl focus:outline-none",
               // Same enter/exit as `ui/menu.tsx`: fade plus a nudge from the anchor side (#235).
               "transition-[opacity,translate] duration-(--duration-fast) ease-standard data-starting-style:opacity-0 data-ending-style:opacity-0 data-[side=bottom]:data-starting-style:-translate-y-1 data-[side=bottom]:data-ending-style:-translate-y-1 data-[side=top]:data-starting-style:translate-y-1 data-[side=top]:data-ending-style:translate-y-1",
               panelClassName,
