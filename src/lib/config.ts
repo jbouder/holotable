@@ -77,6 +77,8 @@ export function cookieNames(base: string, secure: boolean) {
     oidcState: host("holotable_oidc_state"),
     oidcNonce: host("holotable_oidc_nonce"),
     oidcVerifier: host("holotable_oidc_verifier"),
+    oidcNext: host("holotable_oidc_next"),
+    signedOut: host("holotable_signed_out"),
   };
 }
 
@@ -335,6 +337,14 @@ export const config = {
   oidcNonceCookieName: COOKIES.oidcNonce,
   /** The sign-in's PKCE code verifier (#281). */
   oidcVerifierCookieName: COOKIES.oidcVerifier,
+  /** Where a sign-in returns to once the realm sends the browser back. */
+  oidcNextCookieName: COOKIES.oidcNext,
+  /**
+   * Set by sign-out: while present, a page request with no session shows the
+   * sign-in card instead of going straight to the realm, whose own session
+   * would otherwise sign the person straight back in.
+   */
+  signedOutCookieName: COOKIES.signedOut,
   /** Whether the session and sign-in cookies are `Secure`; see {@link cookieSecure}. */
   sessionCookieSecure: cookieSecure(process.env),
 

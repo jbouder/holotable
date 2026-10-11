@@ -94,6 +94,22 @@ OIDC_SCOPE=openid profile email groups
 - The login flow lives at `/api/auth/login` → Keycloak → `/api/auth/callback`,
   which verifies the token and mints a first-party session cookie.
 
+### Signing in and out
+
+There is no sign-in step in Holotable itself. A page opened without a session
+goes straight to `/api/auth/login?next=<that page>`: a session that has only
+expired is [renewed](#session-renewal) there without a trip to Keycloak;
+otherwise the browser goes to Keycloak and, once signed in, comes back to the
+page it asked for (a same-origin path only; anything else lands on `/`). With
+a live Keycloak session that is a redirect and nothing more.
+
+**Sign out** ends the Holotable session, not the Keycloak one, so the browser
+is kept on a short sign-in card afterwards rather than being signed straight
+back in. A `holotable_signed_out` cookie (`__Host-` prefixed over HTTPS) holds
+it there for 30 days or until the next sign-in, and **Sign in** on the card
+goes through Keycloak again. The card also shows when a session cookie is
+present but no longer valid.
+
 ## 4. Verify the claim
 
 Decode an issued token and confirm it contains:

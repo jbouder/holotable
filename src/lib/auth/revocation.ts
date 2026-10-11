@@ -15,7 +15,10 @@
  * `sessions` row it would renew from was deleted with the revocation.
  *
  * Two shapes of revocation, after the logout token:
- * - by `sid`: that realm session only. Tokens minted before session tokens
+ * - by `sid`: that realm session's tokens issued up to now. A later one is
+ *   good: a realm session Keycloak ended issues none, and one this app's
+ *   sign-out ended (the realm's goes on) must still sign the person back in,
+ *   with a token issued after it. Tokens minted before session tokens
  *   carried a `sid` cannot be matched to a realm session, so for those the
  *   subject's sid-less tokens are revoked too.
  * - by `sub` alone: every session of that person, issued up to now.
@@ -40,12 +43,18 @@ interface SubjectRevocation {
   forgetAt: number;
 }
 
-const sids = new Map<string, number>();
+interface SidRevocation {
+  /** Epoch ms: this session's tokens issued at or before this second are revoked. */
+  at: number;
+  forgetAt: number;
+}
+
+const sids = new Map<string, SidRevocation>();
 const subjects = new Map<string, SubjectRevocation>();
 const listeners = new Set<() => void>();
 
 function prune(now: number): void {
-  for (const [sid, forgetAt] of sids) if (forgetAt <= now) sids.delete(sid);
+  for (const [sid, r] of sids) if (r.forgetAt <= now) sids.delete(sid);
   for (const [sub, r] of subjects) if (r.forgetAt <= now) subjects.delete(sub);
 }
 
@@ -58,7 +67,7 @@ export function revoke(target: { sub?: string; sid?: string }, now = Date.now())
   if (!target.sub && !target.sid) return;
   prune(now);
   const forgetAt = now + REVOCATION_HOLD_MS;
-  if (target.sid) sids.set(target.sid, forgetAt);
+  if (target.sid) sids.set(target.sid, { at: now, forgetAt });
   if (target.sub) {
     const prior = subjects.get(target.sub);
     subjects.set(target.sub, {
@@ -79,16 +88,16 @@ export function revoke(target: { sub?: string; sid?: string }, now = Date.now())
 }
 
 export function isRevoked(ref: TokenRef, now = Date.now()): boolean {
+  // Whole seconds, because `iat` is: a token issued in the second of the
+  // revocation is revoked with it, which errs the safe way.
+  const issuedBy = (at: number) => ref.iat <= Math.floor(at / 1000);
   if (ref.sid !== null) {
-    const forgetAt = sids.get(ref.sid);
-    if (forgetAt !== undefined && forgetAt > now) return true;
+    const session = sids.get(ref.sid);
+    if (session && session.forgetAt > now && issuedBy(session.at)) return true;
   }
   const subject = subjects.get(ref.sub);
   if (!subject || subject.forgetAt <= now) return false;
-  // Whole seconds, because `iat` is: a token issued in the second of the
-  // revocation is revoked with it, which errs the safe way.
-  const at = ref.sid === null ? subject.sidlessAt : subject.allAt;
-  return ref.iat <= Math.floor(at / 1000);
+  return issuedBy(ref.sid === null ? subject.sidlessAt : subject.allAt);
 }
 
 /** Called after every revocation. Returns the unsubscribe. */

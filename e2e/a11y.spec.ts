@@ -204,8 +204,24 @@ for (const theme of THEMES) {
 }
 
 test("signed out: the sign-in card", async ({ browser }) => {
+  // A page without a session goes straight to the realm, unless its visitor
+  // just signed out: that is who sees the card (e2e/sign-in.spec.ts).
   const context = await browser.newContext({
-    storageState: { cookies: [], origins: [] },
+    storageState: {
+      cookies: [
+        {
+          name: "holotable_signed_out",
+          value: "1",
+          domain: "localhost",
+          path: "/",
+          expires: -1,
+          httpOnly: true,
+          secure: false,
+          sameSite: "Lax",
+        },
+      ],
+      origins: [],
+    },
   });
   const page = await context.newPage();
   for (const theme of THEMES) {

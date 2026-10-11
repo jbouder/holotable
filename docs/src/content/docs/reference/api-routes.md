@@ -154,10 +154,10 @@ A share link reaches none of them.
 
 | Route | Method | Notes |
 | --- | --- | --- |
-| `/api/auth/login` | GET | Begins the OIDC authorization-code flow |
-| `/api/auth/callback` | GET | Verifies the token, mints the session cookie |
+| `/api/auth/login` | GET | `?next=<path>`: renews a session that has only expired, as `refresh` does, else begins the OIDC authorization-code flow; either way the browser comes back to `next` (a same-origin path, else `/`). Page requests without a session are sent here. In demo mode, mints a demo session |
+| `/api/auth/callback` | GET | Verifies the token, mints the session cookie, clears the signed-out cookie and returns to the page the sign-in started from |
 | `/api/auth/refresh` | POST | Renews the session (#27). Authenticated by the `/api/auth`-scoped renewal cookie, not the session cookie, so it works after the token expired. Re-derives groups from the realm's fresh id_token. `200 { expiresAt }`; `401` when there is nothing to renew or the realm refused (both cookies cleared); `503` when the realm or database did not answer. A 404 in demo mode |
-| `/api/auth/logout` | POST | Clears both session cookies, deletes the stored refresh token, and revokes the session's token so a copy of the cookie stops working |
+| `/api/auth/logout` | POST | Clears both session cookies, deletes the stored refresh token, and revokes the session's token so a copy of the cookie stops working. With a realm, sets the signed-out cookie, which keeps pages on the sign-in card rather than going back to the realm |
 | `/api/auth/backchannel-logout` | POST | Called by Keycloak, not a browser (#28). Form body `logout_token`, verified against the realm JWKS for issuer, audience (`OIDC_CLIENT_ID`), age and the back-channel `events` claim. Revokes the named `sid` (or every session of a bare `sub`), closes its open streams, deletes its `sessions` rows. `200` empty, or `400 {"error":"invalid_request"}`. A 404 in demo mode or without OIDC |
 
 ## Operations

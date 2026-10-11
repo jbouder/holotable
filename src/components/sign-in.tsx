@@ -7,11 +7,13 @@ import { ResumeSession } from "@/components/resume-session";
 /**
  * Sign-in surface. Starts the Keycloak OIDC flow — the only way in, so the one
  * action here is a link to `/api/auth/login` and nothing else. In demo mode
- * (#251) the same link mints a demo session instead; a visitor normally never
- * sees this, because `src/proxy.ts` sends a cookie-less page request there
- * first, but an expired or invalid cookie still lands here. A Server Component
- * on purpose: the mode is read on the server, where `AUTH_MODE` exists. With
- * a realm, it first tries to renew a session that has only expired (#27).
+ * (#251) the same link mints a demo session instead. Few people see it:
+ * `src/proxy.ts` sends a page request with no session cookie to that route
+ * first, in either mode. What lands here is an expired or invalid cookie, and,
+ * with a realm, someone who just signed out, whom the realm's own session
+ * would otherwise sign straight back in. A Server Component on purpose: the
+ * mode is read on the server, where `AUTH_MODE` exists. With a realm, it first
+ * tries to renew a session that has only expired (#27).
  */
 export function SignIn() {
   const demo = config.authMode === "demo";

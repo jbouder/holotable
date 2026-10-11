@@ -593,10 +593,11 @@ Prefer additive, migration-safe changes.
 
 Keycloak OIDC is the **only** way to authenticate a real user. There is no
 local login, no password store, no dev-login bypass, and no seeded user —
-`src/app/api/auth/` has exactly five routes (`login`, `callback`, `logout`;
-`refresh`, which renews a session only from a fresh realm-issued id_token and
-never mints one on its own, #27; and `backchannel-logout`, which only ever
-ends sessions, #28).
+`src/app/api/auth/` has exactly five routes (`login`, which `src/proxy.ts`
+sends a page request without a session to, and which renews before it goes to
+the realm; `callback`, `logout`; `refresh`, which renews a session only from a
+fresh realm-issued id_token and never mints one on its own, #27; and
+`backchannel-logout`, which only ever ends sessions, #28).
 Do not add a development-only authentication path; make the local Keycloak
 work instead.
 

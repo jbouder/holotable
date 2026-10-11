@@ -28,12 +28,16 @@ import {
  * the same for every response, so `next.config.ts` attaches them to API and
  * asset responses as well.
  *
- * In demo mode (#251) a page request with no session cookie is sent to
- * `/api/auth/login?next=<path>` first, which mints a session and comes
- * straight back, so a visitor never sees a sign-in screen. Cookie *presence*
- * only: nothing is verified here, and a forged cookie is still refused by
- * `getIdentity()` on the page. `/api` is outside the matcher, so API routes
- * keep answering 401.
+ * A page request with no session cookie is sent to
+ * `/api/auth/login?next=<path>` first, so nobody stops at a sign-in card on
+ * the way in. With a realm, that route renews a session that has only
+ * expired, else goes to Keycloak, and comes back to `next`; in demo mode
+ * (#251) it mints a session and comes straight back. The card is still what
+ * an expired or invalid cookie gets, and what someone who just signed out
+ * gets (the signed-out cookie): the realm's own session would otherwise sign
+ * them straight back in. Cookie *presence* only: nothing is verified here,
+ * and a forged cookie is still refused by `getIdentity()` on the page. `/api`
+ * is outside the matcher, so API routes keep answering 401.
  */
 export async function proxy(request: NextRequest): Promise<NextResponse> {
   // A share link's embed page (#65) runs on its token, not a session, and may
@@ -41,7 +45,7 @@ export async function proxy(request: NextRequest): Promise<NextResponse> {
   // only to read those origins; the page itself checks the token against its
   // row, so a revoked one framed by an allowed origin still shows nothing.
   const embed = request.nextUrl.pathname.startsWith(EMBED_PATH_PREFIX);
-  if (!embed && appConfig.authMode === "demo" && needsDemoSession(request)) {
+  if (!embed && needsSession(request)) {
     const { pathname, search } = request.nextUrl;
     const login = new URL("/api/auth/login", requestOrigin(request));
     login.searchParams.set("next", `${pathname}${search}`);
@@ -93,19 +97,26 @@ function requestOrigin(request: NextRequest): string {
 }
 
 /**
- * A browser navigation with no session cookie.
+ * A browser navigation with no session cookie, from someone who has not just
+ * signed out (with a realm; a demo visitor has nothing to sign out of).
  *
  * Only a navigation is redirected: a browser keeps the cookie the login route
  * sets and comes straight back, while a cookie-less client (a health check,
  * a script, curl) would bounce between the page and the login route until it
  * gave up. Cloudflare's container start check fetches `/` exactly that way
- * (#254). Those clients get the page itself, which shows "Enter the demo". A
+ * (#254). Those clients get the page itself, which shows the sign-in card. A
  * prefetch is left alone too: it cannot follow a redirect that sets a cookie
  * on the visitor's behalf, and the navigation it precedes will redirect anyway.
  */
-function needsDemoSession(request: NextRequest): boolean {
+function needsSession(request: NextRequest): boolean {
   if (request.method !== "GET") return false;
   if (request.cookies.has(appConfig.sessionCookieName)) return false;
+  if (
+    appConfig.authMode !== "demo" &&
+    request.cookies.has(appConfig.signedOutCookieName)
+  ) {
+    return false;
+  }
   if (
     request.headers.get("next-router-prefetch") ||
     request.headers.get("purpose") === "prefetch"
@@ -132,7 +143,7 @@ export const config = {
    * API responses are JSON or an SSE stream, neither of which a document
    * policy applies to, and leaving `/api` out keeps the proxy off the stream
    * path entirely; `/.well-known` is JSON an MCP client reads with no cookie
-   * (#149), which the demo redirect must never answer for. Prefetches are
+   * (#149), which the sign-in redirect must never answer for. Prefetches are
    * deliberately *not* excluded: a nonce costs nothing, and a prefetched
    * document served without a policy would be a page without one.
    */

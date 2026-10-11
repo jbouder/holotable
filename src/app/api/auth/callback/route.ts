@@ -3,6 +3,7 @@ import { exchangeCode, OidcGrantRefused } from "@/lib/auth/oidc";
 import { identityFromPayload, realmJwks } from "@/lib/auth/session";
 import { completeSignIn, SignInRefused } from "@/lib/auth/sign-in";
 import { setSessionCookie, setSessionIdCookie } from "@/lib/auth/cookie";
+import { safeNextPath } from "@/lib/auth/next-path";
 import { startSession } from "@/lib/auth/renewal";
 import { renewalDeps } from "@/lib/auth/session-store";
 import { HttpError } from "@/lib/auth/authorize";
@@ -36,6 +37,9 @@ export const GET = route("auth.callback", async (req: Request) => {
   store.delete(config.oidcStateCookieName);
   store.delete(config.oidcNonceCookieName);
   store.delete(config.oidcVerifierCookieName);
+  // Where the sign-in started: checked again here, since a cookie is input.
+  const next = safeNextPath(store.get(config.oidcNextCookieName)?.value);
+  store.delete(config.oidcNextCookieName);
 
   let signIn: Awaited<ReturnType<typeof completeSignIn>>;
   try {
@@ -75,6 +79,8 @@ export const GET = route("auth.callback", async (req: Request) => {
   if (issued.renewal) {
     await setSessionIdCookie(issued.renewal.sessionId, issued.renewal.ttl);
   }
+  // Signed in again, so a page without a session goes back to the realm.
+  store.delete(config.signedOutCookieName);
   // A sign-in belongs to no one workspace, so its row has none (#30).
   audit({
     actor: identity,
@@ -89,7 +95,8 @@ export const GET = route("auth.callback", async (req: Request) => {
   // browser off the host the session cookie was just set on (localhost),
   // dropping the cookie and bouncing back to login.
   //
-  // `/` rather than `/dashboards`: the home route sends the new session to the
-  // person's chosen start page (#215), with the same fallbacks either way.
-  return new Response(null, { status: 302, headers: { Location: "/" } });
+  // `next` is the page the sign-in started from; with none it is `/`, where
+  // the home route sends the new session to the person's chosen start page
+  // (#215), with the same fallbacks either way.
+  return new Response(null, { status: 302, headers: { Location: next } });
 });
