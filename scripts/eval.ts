@@ -54,7 +54,8 @@ async function main(): Promise<number> {
   // Resolved only for a live run, so a replay never needs a model configured.
   // (The provider module itself is already loaded through the request path
   // the replay drives; what it must not need is `AI_MODEL`.)
-  const model = live ? (await import("@/lib/ai/provider")).getModel() : null;
+  // The server's default model (#440): AI_MODELS_FILE's, else AI_MODEL's.
+  const model = live ? await serverDefaultModel() : null;
 
   const results: CaseResult[] = [];
   for (const c of cases) {
@@ -185,3 +186,13 @@ main().then(
     process.exit(2);
   },
 );
+
+async function serverDefaultModel() {
+  const { serverDefault } = await import("@/lib/ai/server-model-list");
+  const chosen = serverDefault();
+  const resolved = chosen?.resolve();
+  if (!resolved?.ok) {
+    throw new Error(resolved?.problem ?? "no server model is configured");
+  }
+  return resolved.model;
+}

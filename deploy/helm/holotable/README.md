@@ -98,6 +98,8 @@ for anything real.
 rendered into a ConfigMap in clear text. The chart refuses to render if a key
 there is named like a credential (`DATABASE_URL`, `TIMESCALEDB_URL`, or
 anything ending in `_SECRET`, `_TOKEN`, `_PASSWORD`, `_API_KEY`, `_KEY`).
+`ai.models` is a ConfigMap too: an entry whose `credentials` holds anything
+but environment variable names fails the render.
 
 ## Probes, rollout, and shutdown
 
@@ -233,6 +235,8 @@ alongside the release, with `bearerTokenSecret` pointing at the same Secret key.
 | `secrets.values` | `{}` | Contents of that Secret. Only read when `create` is true. |
 | `sourceSecrets.secretName` | `""` | Secret of `<REF>_USERNAME`/`<REF>_PASSWORD` keys, mounted as files and read per connection. Sets `SOURCE_SECRETS_DIR`. |
 | `sourceSecrets.mountPath` | `/var/run/holotable/source-secrets` | Where it is mounted. |
+| `ai.models` | `[]` | The server's models, rendered into `models.json` in a ConfigMap and pointed at by `AI_MODELS_FILE`. Each entry's `credentials` names environment variables (from the Secret); a value that is not a variable name fails the render. See `examples/values-models.yaml`. |
+| `ai.modelsMountPath` | `/etc/holotable/models` | Where that ConfigMap is mounted. |
 
 ### Migrations
 

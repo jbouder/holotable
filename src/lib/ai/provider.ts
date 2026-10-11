@@ -4,7 +4,11 @@ import type { BaseUrlAllowlist } from "@/lib/ai/base-url";
 import type { Credentials, ModelSettings } from "@/lib/ai/providers/registry";
 import { environmentModel } from "@/lib/ai/providers/server/environment";
 import { OPENAI_PROVIDER_OPTIONS } from "@/lib/ai/providers/server/openai-compatible";
-import { buildModel, providerOptionsFor } from "@/lib/ai/providers/server/registry";
+import {
+  buildModel,
+  fetchFor,
+  providerOptionsFor,
+} from "@/lib/ai/providers/server/registry";
 import type { ProviderOptions } from "@/lib/ai/providers/server/types";
 import { config, type Environment } from "@/lib/config";
 
@@ -76,14 +80,23 @@ export function getModel(env: Environment = process.env): Model {
  * explicitly, so nothing is read from the server's environment, and every
  * request goes through the fetch `providers/server/registry.ts` picks for
  * the kind (the base URL guard for a typed endpoint, the vendor's origin
- * otherwise).
+ * otherwise). `operator` marks a server model from `AI_MODELS_FILE`, whose
+ * base URL the operator chose and the address rules do not hold.
  */
 export function configuredModel(
   settings: ModelSettings,
   credentials: Credentials,
   allowlist: BaseUrlAllowlist,
+  options: { operator?: boolean } = {},
 ): Model {
-  const model = resilient(buildModel(settings, credentials, allowlist));
+  const model = resilient(
+    buildModel(
+      settings,
+      credentials,
+      allowlist,
+      fetchFor(settings, allowlist, options.operator ?? false),
+    ),
+  );
   optionsByModel.set(model, providerOptionsFor(settings));
   return model;
 }

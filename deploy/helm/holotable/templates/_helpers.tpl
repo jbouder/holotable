@@ -184,3 +184,23 @@ in `.env.example`; the suffixes catch the per-source `secret_ref` families
 {{- end -}}
 {{- end -}}
 {{- end }}
+
+{{/*
+`ai.models` (#440) becomes a ConfigMap, clear text like `config`. Each entry's
+`credentials` must map a field to an environment variable's NAME; anything
+else is most likely the key itself, so refuse to render it.
+*/}}
+{{- define "holotable.assertModelCredentials" -}}
+{{- range $i, $model := .Values.ai.models -}}
+{{- range $field, $variable := ($model.credentials | default dict) -}}
+{{- if not (regexMatch "^[A-Z][A-Z0-9_]*$" (toString $variable)) -}}
+{{- fail (printf "ai.models[%d] (%s): credentials.%s must be the name of an environment variable (UPPER_SNAKE_CASE), not a value; `ai.models` is rendered into a ConfigMap in clear text. Put the value in the Secret and name its variable here." $i (toString ($model.name | default "unnamed")) $field) -}}
+{{- end -}}
+{{- end -}}
+{{- end -}}
+{{- end }}
+
+{{/* The models file's path inside the container. */}}
+{{- define "holotable.modelsFile" -}}
+{{ trimSuffix "/" .Values.ai.modelsMountPath }}/models.json
+{{- end }}

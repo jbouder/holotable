@@ -1,0 +1,12 @@
+{{- if .Values.ai.models }}
+{{- include "holotable.assertModelCredentials" . -}}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "holotable.fullname" . }}-models
+  labels:
+    {{- include "holotable.labels" . | nindent 4 }}
+data:
+  # AI_MODELS_FILE (#440): variable names only, never credentials.
+  models.json: {{ dict "models" .Values.ai.models | toJson | quote }}
+{{- end }}

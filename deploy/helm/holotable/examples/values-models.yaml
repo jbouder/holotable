@@ -1,0 +1,27 @@
+# Two server models from two vendors (#440), declared in `ai.models` and
+# rendered into the models file that AI_MODELS_FILE points at. The file holds
+# variable names only; the keys come from the Secret below, created
+# beforehand:
+#
+#   kubectl create secret generic holotable-env \
+#     --from-literal=SESSION_SECRET=... \
+#     --from-literal=DATABASE_URL=... \
+#     --from-literal=OIDC_CLIENT_SECRET=... \
+#     --from-literal=ANTHROPIC_API_KEY=... \
+#     --from-literal=OPENAI_API_KEY=...
+secrets:
+  existingSecret: holotable-env
+
+ai:
+  models:
+    - name: claude
+      provider: anthropic
+      model: claude-sonnet-5-5
+      credentials:
+        apiKey: ANTHROPIC_API_KEY
+      default: true
+    - name: gpt
+      provider: openai
+      model: gpt-5
+      credentials:
+        apiKey: OPENAI_API_KEY

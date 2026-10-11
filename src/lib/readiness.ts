@@ -1,5 +1,5 @@
 import type { Environment } from "@/lib/config";
-import { aiConfigProblem } from "@/lib/ai/configured";
+import { serverModelProblem } from "@/lib/ai/server-model-list";
 import { isDraining } from "@/lib/shutdown";
 
 /**
@@ -190,15 +190,9 @@ async function checkIdentityProvider(deps: ReadinessDeps): Promise<DependencyChe
  * failure worth finding before a user does.
  */
 function checkAiProvider(deps: ReadinessDeps): DependencyCheck {
-  const problem = aiConfigProblem(deps.env ?? process.env);
+  const problem = serverModelProblem(deps.env ?? process.env);
   if (!problem) return { status: "ok" };
-  return {
-    status: "failed",
-    reason:
-      problem === "AI_PROVIDER"
-        ? "AI_PROVIDER is not recognized"
-        : `${problem} is not set`,
-  };
+  return { status: "failed", reason: problem };
 }
 
 /* -------------------------------------------------------------------------- */

@@ -47,16 +47,19 @@ export function serverProviderKind(settings: ModelSettings): ServerProviderKind 
 
 /**
  * The `fetch` a configuration's requests go through: the base URL guard,
- * DNS included, for an endpoint a person typed; the vendor's own origin
- * otherwise; nothing at all for a kind that makes no requests.
+ * DNS included, for an endpoint a person typed in the app; the configured
+ * origin otherwise; nothing at all for a kind that makes no requests.
  */
 export function fetchFor(
   settings: ModelSettings,
   allowlist: BaseUrlAllowlist,
+  operator = false,
 ): typeof globalThis.fetch {
   const endpoint = endpointOf(settings);
   if (endpoint === null) return refusingFetch;
-  return kindOf(settings).userSetsEndpoint
+  // An operator's endpoint (AI_MODELS_FILE, #440) is not held to the address
+  // rules, as OPENAI_BASE_URL never was; it still reaches its origin only.
+  return kindOf(settings).userSetsEndpoint && !operator
     ? guardedFetch(endpoint, allowlist)
     : pinnedFetch(new URL(endpoint).origin);
 }
