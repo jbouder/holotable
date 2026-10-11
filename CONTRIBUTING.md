@@ -466,7 +466,9 @@ Match the surrounding code rather than importing conventions from elsewhere.
   browser APIs, or interactivity require it.
 - Tailwind v4 utilities and the existing design tokens in
   `src/app/globals.css`. Reuse the primitives in `src/components/ui/` before
-  adding new ones, and `cn()` from `src/lib/utils.ts` for composition.
+  adding new ones, and `cn()` from `src/lib/utils.ts` for composition. A
+  button whose own work is running takes `busy`, not `disabled`, so it keeps
+  keyboard focus.
 - No color literals. A chart reads its colors through `ChartTheme`
   (`src/lib/color/chart-theme.ts`), from the `--chart-*` tokens and the spec's
   color tokens; `test/color-literals.test.ts` fails on a literal outside

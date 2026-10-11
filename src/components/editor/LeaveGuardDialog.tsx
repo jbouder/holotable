@@ -45,7 +45,7 @@ export function LeaveGuardDialog({
         <Button variant="danger" onClick={onDiscard} disabled={saving}>
           Discard changes
         </Button>
-        <Button onClick={onSave} disabled={saving}>
+        <Button onClick={onSave} busy={saving}>
           {saving && <Loader2 className="h-4 w-4 animate-spin" />}
           Save and leave
         </Button>

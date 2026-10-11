@@ -332,7 +332,7 @@ function AddAnnotationDialog({
           <Button type="button" variant="ghost" onClick={() => onOpenChange(false)}>
             Cancel
           </Button>
-          <Button type="submit" disabled={busy}>
+          <Button type="submit" busy={busy}>
             {busy ? "Adding…" : "Add"}
           </Button>
         </div>

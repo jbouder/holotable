@@ -318,7 +318,8 @@ export default function DashboardChatPanel({
             size="icon"
             aria-label="Open in Explore"
             title="Open in Explore: continue this conversation on its own page"
-            disabled={busy || openingInChat}
+            busy={openingInChat}
+            disabled={busy}
             onClick={() => void openInChat()}
           >
             <ExternalLink className="h-4 w-4" />

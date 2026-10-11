@@ -163,7 +163,8 @@ export function useSaveAsTemplate({
           </Button>
           <Button
             onClick={() => void submit()}
-            disabled={saving || !snapshot || !name.trim()}
+            busy={saving}
+            disabled={!snapshot || !name.trim()}
           >
             {saving ? (
               <Loader2 className="h-4 w-4 animate-spin" />

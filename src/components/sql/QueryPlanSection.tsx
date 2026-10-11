@@ -40,7 +40,7 @@ export function QueryPlanSection({
       <div className="flex items-center justify-between gap-4">
         <span className="text-sm font-medium">What actually runs</span>
         {outcome === null && (
-          <Button disabled={busy} onClick={load} size="sm" variant="secondary">
+          <Button busy={busy} onClick={load} size="sm" variant="secondary">
             {busy ? (
               <Loader2 className="h-3.5 w-3.5 animate-spin" />
             ) : (

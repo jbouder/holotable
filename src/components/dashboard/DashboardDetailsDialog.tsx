@@ -213,7 +213,7 @@ export function DashboardDetailsDialog({
           <Button variant="ghost" onClick={() => onOpenChange(false)} disabled={saving}>
             Cancel
           </Button>
-          <Button onClick={save} disabled={saving || (allowRename && !title.trim())}>
+          <Button onClick={save} busy={saving} disabled={allowRename && !title.trim()}>
             {saving && <Loader2 className="h-4 w-4 animate-spin" />}
             Save details
           </Button>

@@ -290,7 +290,7 @@ export function WorkspacePromptCard({
 
         {canEdit && (
           <div className="flex flex-wrap items-center gap-3 border-t border-border px-4 py-3">
-            <Button type="submit" disabled={status.kind === "saving"}>
+            <Button type="submit" busy={status.kind === "saving"}>
               {status.kind === "saving" && <Loader2 className="h-4 w-4 animate-spin" />}
               Save context
             </Button>
@@ -371,7 +371,7 @@ function ComposedPrompt({
         <Button
           type="button"
           variant="secondary"
-          disabled={state.kind === "loading"}
+          busy={state.kind === "loading"}
           onClick={() => void show()}
         >
           {state.kind === "loading" && <Loader2 className="h-4 w-4 animate-spin" />}

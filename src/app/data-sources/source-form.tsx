@@ -475,7 +475,7 @@ export function SourceForm({
       {error && <ErrorDisplay error={error} />}
 
       <div className="flex gap-2">
-        <Button type="submit" disabled={saving}>
+        <Button type="submit" busy={saving}>
           {saving ? (
             <Loader2 className="h-4 w-4 animate-spin" />
           ) : mode === "create" ? (

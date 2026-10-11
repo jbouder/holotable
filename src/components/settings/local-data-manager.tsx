@@ -254,7 +254,7 @@ export function LocalDataManager({
           <Button variant="ghost" disabled={busy} onClick={() => setConfirming(false)}>
             Cancel
           </Button>
-          <Button variant="danger" disabled={busy} onClick={() => void clearEverything()}>
+          <Button variant="danger" busy={busy} onClick={() => void clearEverything()}>
             {busy && <Loader2 className="h-4 w-4 animate-spin" />}
             Clear everything
           </Button>

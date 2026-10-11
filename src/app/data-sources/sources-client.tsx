@@ -408,7 +408,7 @@ export function SourcesClient({
                         <Button
                           variant="ghost"
                           size="sm"
-                          disabled={busy === source.id}
+                          busy={busy === source.id}
                           onClick={() => test(source.id)}
                         >
                           <Plug className="h-4 w-4" /> Test
@@ -817,7 +817,8 @@ function NaturalLanguageDrafter({
           type="button"
           size="icon"
           onClick={draft}
-          disabled={isLoading || !description.trim()}
+          busy={isLoading}
+          disabled={!description.trim()}
           aria-label="Generate"
           title="Generate"
           className="absolute bottom-4 right-2"

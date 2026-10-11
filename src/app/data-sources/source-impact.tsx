@@ -190,7 +190,7 @@ export function DeleteSourceDialog({
           <Button variant="secondary" onClick={onCancel} disabled={busy}>
             Cancel
           </Button>
-          <Button variant="danger" onClick={onConfirm} disabled={busy}>
+          <Button variant="danger" onClick={onConfirm} busy={busy}>
             {busy && <Loader2 className="h-4 w-4 animate-spin" />}
             {tombstones ? "Delete and tombstone" : "Delete source"}
           </Button>

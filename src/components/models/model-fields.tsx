@@ -305,7 +305,8 @@ export function ModelFields({
               type="button"
               variant="secondary"
               size="sm"
-              disabled={disabled || listing.kind === "busy"}
+              busy={listing.kind === "busy"}
+              disabled={disabled}
               onClick={() => void runList()}
             >
               {listing.kind === "busy" && (
