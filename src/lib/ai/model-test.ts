@@ -31,6 +31,9 @@ export async function testModel(
       latencyMs: Date.now() - started,
     };
   } catch (error) {
+    // No usage to record: the reservation (#496) is released now rather than
+    // holding a slot until the deadline.
+    usage.release();
     return {
       ok: false,
       message: providerErrorMessage(error),

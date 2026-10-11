@@ -1,3 +1,4 @@
+import { LlmReservations, RESERVE_TOKENS_PER_CALL } from "@/lib/limits/reservations";
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import type { LanguageModelUsage } from "ai";
@@ -178,6 +179,7 @@ function harness(opts: {
   dailyTokenBudget?: number;
   overrides?: Record<string, WorkspaceLimits>;
   start?: string;
+  maxInFlight?: number;
 }) {
   const clock = { now: new Date(opts.start ?? "2026-09-20T10:00:00Z") };
   const budgetStore = new MemoryBudgetStore();
@@ -191,6 +193,9 @@ function harness(opts: {
     },
     now: () => clock.now,
     model: () => "test-model",
+    reservations: new LlmReservations(),
+    maxInFlight: opts.maxInFlight ?? 0,
+    reservationTtlMs: 60_000,
   };
   return { deps, clock, budgetStore };
 }
@@ -351,4 +356,71 @@ test("platform admins are rate limited like everyone else", async () => {
       enforceLlmLimits({ identity: admin, workspaceId: "ws", route: "generate" }, deps),
     /rate limit reached/,
   );
+});
+
+/* -------------------------------------------------------------------------- */
+/* Reservations and the global cap (#496)                                     */
+/* -------------------------------------------------------------------------- */
+
+test("concurrent calls reserve against the budget: a budget for three admits three", async () => {
+  const { deps } = harness({
+    dailyTokenBudget: 3 * RESERVE_TOKENS_PER_CALL,
+    ratePerMinute: 100,
+  });
+  // Ten callers, distinct people, none of whom has recorded usage yet.
+  const outcomes = await Promise.allSettled(
+    Array.from({ length: 10 }, (_, i) =>
+      enforceLlmLimits(
+        {
+          identity: parseGroups(`u${i}`, ["/workspaces/ws/editor"]),
+          workspaceId: "ws",
+          route: "chat",
+        },
+        deps,
+      ),
+    ),
+  );
+  const admitted = outcomes.flatMap((o) => (o.status === "fulfilled" ? [o.value] : []));
+  assert.equal(admitted.length, 3);
+  for (const o of outcomes) {
+    if (o.status === "rejected") assert.match(String(o.reason), /daily token budget/);
+  }
+  // Settling to a small real usage releases the rest of the reservation.
+  admitted[0].record(usage(100));
+  await enforceLlmLimits({ identity: alice, workspaceId: "ws", route: "chat" }, deps);
+  // An abandoned reservation expires at the deadline and frees its share.
+  const { deps: again, clock: later } = harness({
+    dailyTokenBudget: RESERVE_TOKENS_PER_CALL,
+  });
+  await enforceLlmLimits({ identity: alice, workspaceId: "ws", route: "chat" }, again);
+  await expect429(
+    () => enforceLlmLimits({ identity: bob, workspaceId: "ws", route: "chat" }, again),
+    /daily token budget/,
+  );
+  later.now = new Date(later.now.getTime() + 60_001);
+  await enforceLlmLimits({ identity: bob, workspaceId: "ws", route: "chat" }, again);
+});
+
+test("past LLM_MAX_IN_FLIGHT a call is refused as busy, and a settled one frees its slot", async () => {
+  const { deps } = harness({ maxInFlight: 16, ratePerMinute: 100 });
+  const running = [];
+  for (let i = 0; i < 16; i++) {
+    running.push(
+      await enforceLlmLimits(
+        {
+          identity: parseGroups(`v${i}`, ["/workspaces/ws/editor"]),
+          workspaceId: `ws-${i % 4}`,
+          route: "generate",
+        },
+        deps,
+      ),
+    );
+  }
+  const err = await expect429(
+    () => enforceLlmLimits({ identity: alice, workspaceId: "ws", route: "chat" }, deps),
+    /the model is busy: 16 requests are already running/,
+  );
+  assert.equal(err.headers["Retry-After"], "5");
+  running[0].release();
+  await enforceLlmLimits({ identity: alice, workspaceId: "ws", route: "chat" }, deps);
 });

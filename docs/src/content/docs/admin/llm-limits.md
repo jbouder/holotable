@@ -14,12 +14,13 @@ trips. Every one of those routes now passes through `enforceLlmLimits`
 (`src/lib/limits/llm.ts`) immediately after `assertAuthorized`, and a request
 over either ceiling is refused with **429** before the model is called.
 
-## Two ceilings
+## Three ceilings
 
 | Limit | Keyed by | Variable | Default |
 | --- | --- | --- | --- |
 | Rate | workspace **and** user | `LLM_RATE_PER_MINUTE` | `20` requests per minute |
 | Budget | workspace | `LLM_DAILY_TOKEN_BUDGET` | `2000000` tokens per UTC day |
+| In flight | the server | `LLM_MAX_IN_FLIGHT` | `16` calls at once |
 
 The **rate limit** is a token bucket (`src/lib/limits/rate.ts`): the bucket
 holds `LLM_RATE_PER_MINUTE` tokens and refills continuously at that many per
@@ -32,10 +33,25 @@ tokens, across every route and user in the workspace, for the current UTC day.
 Usage is taken from the AI SDK's `usage` report when each call finishes and
 written to the `llm_usage` table; the next request reads the day's total back
 before it is admitted. The check is a gate at admission, not a meter on the
-stream: a call already running when the budget runs out completes, so a day
-can overshoot by at most the calls in flight.
+stream: a call already running when the budget runs out completes.
 
-Setting either variable to `0` disables that limit. In production that is a
+Calls admitted together used to see the same headroom and could each spend
+it. Admission now **reserves** 8,000 tokens against the day (#496,
+`src/lib/limits/reservations.ts`), and the next admission counts the
+reservation as spent. The call's real usage settles it, and the difference
+goes back. A call that never settles, such as a crash or a client that went
+away, has its reservation expire at the model deadline
+(`AI_REQUEST_TIMEOUT_MS` plus 15 seconds). A day can still overshoot by what
+the running calls spend beyond their reservations.
+
+The **in-flight cap** counts calls admitted and not yet settled, across every
+workspace and model. Past it a call is refused as busy with a five-second
+`Retry-After`, the same way as a rate limit. A burst of chat turns therefore
+waits at this gate instead of reaching the provider at once and failing on
+the provider's own rate limit. `holotable_llm_in_flight` is the gauge, and
+refusals count as `holotable_llm_requests_total{outcome="busy"}`.
+
+Setting any of the three variables to `0` disables that limit. In production that is a
 [startup warning](/operations/startup-validation/) on every boot.
 
 ## The 429
@@ -46,6 +62,7 @@ carries a `Retry-After` header in seconds:
 ```
 429  {"error":"rate limit reached: 20 model requests per minute per user in this workspace; retry after 3s (at 2026-09-20T10:00:03.000Z)"}
 429  {"error":"daily token budget reached: 2,000,140 of 2,000,000 tokens used in this workspace today; resets at 2026-09-21T00:00:00.000Z"}
+429  {"error":"the model is busy: 16 requests are already running on this server; retry after 5s"}
 ```
 
 The limiter runs server-side, keyed by the validated identity and a workspace
@@ -94,8 +111,8 @@ SELECT day, route, model, input_tokens + output_tokens AS tokens, requests
 
 ## Single instance
 
-The rate limiter's buckets are in process memory: every instance counts on its
-own, so with N replicas the effective rate is N times the configured one. The
+The rate limiter's buckets, the reservations and the in-flight count are in
+process memory: every instance counts on its own, so with N replicas the effective rate is N times the configured one. The
 budget is in Postgres and is shared. The store behind the limiter is an
 interface (`RateLimitStore`) so a shared implementation can replace the
 in-memory one if the app ever goes horizontal; one instance is the supported

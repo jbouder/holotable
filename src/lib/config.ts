@@ -199,6 +199,15 @@ export const config = {
    * 45s.
    */
   aiRequestTimeoutMs: num("AI_REQUEST_TIMEOUT_MS", 45_000),
+
+  /**
+   * Most model calls in flight on this server, across every workspace and
+   * model (#496). Past it a call is refused with 429 and a short
+   * `Retry-After`, the same way the per-user rate limit is, rather than every
+   * call reaching the provider at once and failing on its rate limit. `0`
+   * turns the cap off. Documented default: 16.
+   */
+  llmMaxInFlight: num("LLM_MAX_IN_FLIGHT", 16),
   /**
    * How many times a model request is retried after a transient provider
    * failure (429, 5xx, a dropped connection), with jittered exponential
@@ -663,6 +672,7 @@ const EnvSchema = z.object({
   RETENTION_SWEEP_INTERVAL_MS: blank(nonNegativeInt),
   DASHBOARD_VERSIONS_KEEP: blank(nonNegativeInt),
   MAX_POLLERS: blank(nonNegativeInt),
+  LLM_MAX_IN_FLIGHT: blank(nonNegativeInt),
   SHUTDOWN_GRACE_MS: blank(positiveInt),
   SSE_REAUTH_INTERVAL_MS: blank(positiveInt),
   SSE_SLOW_TICKS: blank(positiveInt),
