@@ -225,7 +225,10 @@ Checked, not hoped for:
 - Every text/background token pairing meets WCAG AA in both themes;
   `test/contrast.test.ts` measures them (`src/lib/color/contrast.ts`) and
   the table in `docs/src/content/docs/architecture/accessibility.md`. A new
-  pairing goes in `CONTRAST_PAIRS`.
+  pairing goes in `CONTRAST_PAIRS`. Every theme also clears the quality bar
+  in `src/lib/color/quality.ts` (`test/theme-quality.test.ts`): borders,
+  the focus ring (`outline-ring`, never `outline-primary`), selection, code
+  colors, and statuses and series distinct under a color-vision deficiency.
 - A chart goes through `AccessibleChart`; a link styled as a button is
   `ButtonLink` (never `<Link><Button>`); an icon-only control has an
   `aria-label`; every input has a label; focus is visible and keyboard order
@@ -320,6 +323,7 @@ expected to pass. The other scripts, and when to reach for them:
 ```bash
 npm run dev:demo         # dev server in AUTH_MODE=demo, no Keycloak needed (not for auth work)
 npm run test:fuzz        # after any SQL or PromQL guard change (FUZZ_RUNS, FUZZ_SEED)
+npm run themes:check     # after a token change: every theme against the quality bar
 npm run test:integration # after a change to queries, repos or migrations (Docker, or MIGRATE_TEST_DATABASE_URL)
 npm run e2e              # after a UI or auth change: Playwright journeys and axe scans (Docker)
 npm run migrate:verify   # after adding a migration: round-trips every one on a scratch database

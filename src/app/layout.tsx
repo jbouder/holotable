@@ -122,7 +122,7 @@ export default async function RootLayout({
               */}
                 <a
                   href="#main"
-                  className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-3 focus:z-50 focus:bg-surface focus:px-3 focus:py-2 focus:text-sm focus:outline-2 focus:outline-primary"
+                  className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-3 focus:z-50 focus:bg-surface focus:px-3 focus:py-2 focus:text-sm focus:outline-2 focus:outline-ring"
                 >
                   Skip to content
                 </a>

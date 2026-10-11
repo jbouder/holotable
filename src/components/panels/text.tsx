@@ -17,7 +17,7 @@ export function TextView({ panel }: PanelBodyProps) {
       aria-label={`${panel.title}, text`}
       // biome-ignore lint/a11y/noNoninteractiveTabindex: a scroll container must be focusable to scroll by keyboard (WCAG 2.1.1)
       tabIndex={0}
-      className="h-full overflow-auto focus-visible:outline-2 focus-visible:outline-primary"
+      className="h-full overflow-auto focus-visible:outline-2 focus-visible:outline-ring"
     >
       <MarkdownView source={content} />
     </section>

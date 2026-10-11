@@ -43,7 +43,7 @@ const SEQUENTIAL_COUNT = 5;
  */
 export const DEFAULT_CHART_THEME: ChartTheme = {
   text: oklchToHex({ l: 0.7, c: 0.02, h: 265 }),
-  line: oklchToHex({ l: 0.32, c: 0.02, h: 265 }),
+  line: oklchToHex({ l: 0.35, c: 0.02, h: 265 }),
   grid: oklchToHex({ l: 0.26, c: 0.02, h: 265 }),
   foreground: oklchToHex({ l: 0.96, c: 0.01, h: 265 }),
   background: oklchToHex({ l: 0.21, c: 0.02, h: 265 }),
@@ -54,8 +54,8 @@ export const DEFAULT_CHART_THEME: ChartTheme = {
     { l: 0.68, c: 0.21, h: 20 },
     { l: 0.66, c: 0.2, h: 300 },
     { l: 0.72, c: 0.13, h: 195 },
-    { l: 0.7, c: 0.2, h: 340 },
-    { l: 0.74, c: 0.17, h: 120 },
+    { l: 0.66, c: 0.2, h: 340 },
+    { l: 0.9, c: 0.05, h: 330 },
   ].map(oklchToHex),
   sequential: [
     { l: 0.32, c: 0.06, h: 259 },
@@ -70,9 +70,9 @@ export const DEFAULT_CHART_THEME: ChartTheme = {
     oklchToHex({ l: 0.68, c: 0.21, h: 20 }),
   ],
   tokens: {
-    success: oklchToHex({ l: 0.7, c: 0.16, h: 160 }),
+    success: oklchToHex({ l: 0.78, c: 0.16, h: 160 }),
     warning: oklchToHex({ l: 0.78, c: 0.16, h: 75 }),
-    danger: oklchToHex({ l: 0.74, c: 0.19, h: 20 }),
+    danger: oklchToHex({ l: 0.72, c: 0.19, h: 20 }),
     info: oklchToHex({ l: 0.66, c: 0.19, h: 259 }),
     neutral: oklchToHex({ l: 0.7, c: 0.02, h: 265 }),
     orange: oklchToHex({ l: 0.74, c: 0.17, h: 70 }),

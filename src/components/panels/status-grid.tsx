@@ -25,7 +25,7 @@ export function StatusGridView({ panel, data }: PanelBodyProps) {
       aria-label={`${panel.title}, status grid`}
       // biome-ignore lint/a11y/noNoninteractiveTabindex: a scroll container must be focusable to scroll by keyboard (WCAG 2.1.1)
       tabIndex={0}
-      className="max-h-full overflow-auto focus-visible:outline-2 focus-visible:outline-primary"
+      className="max-h-full overflow-auto focus-visible:outline-2 focus-visible:outline-ring"
     >
       <ul
         className="grid gap-1.5"

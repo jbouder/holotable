@@ -428,7 +428,7 @@ function TableNode({
         aria-expanded={open}
         aria-controls={panelId}
         onClick={onToggleOpen}
-        className="flex w-full cursor-pointer items-start gap-2 px-3 py-2 text-left transition-colors duration-(--duration-fast) ease-standard hover:bg-surface-2 focus-visible:outline-2 focus-visible:outline-primary"
+        className="flex w-full cursor-pointer items-start gap-2 px-3 py-2 text-left transition-colors duration-(--duration-fast) ease-standard hover:bg-surface-2 focus-visible:outline-2 focus-visible:outline-ring"
       >
         <ChevronRight
           className={cn(

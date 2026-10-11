@@ -329,7 +329,7 @@ function PagerLink({
   return (
     <Link
       href={href}
-      className="border border-border px-3 py-1.5 text-foreground transition-colors hover:border-foreground/40 focus-visible:outline-2 focus-visible:outline-primary"
+      className="border border-border px-3 py-1.5 text-foreground transition-colors hover:border-foreground/40 focus-visible:outline-2 focus-visible:outline-ring"
     >
       {children}
     </Link>

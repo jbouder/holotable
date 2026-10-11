@@ -79,7 +79,7 @@ function Choice({
   return (
     <label
       className={cn(
-        "flex cursor-pointer flex-col gap-2 border p-3 text-sm has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-primary",
+        "flex cursor-pointer flex-col gap-2 border p-3 text-sm has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-ring",
         checked
           ? "border-primary bg-surface"
           : "border-border bg-surface hover:bg-surface-2",

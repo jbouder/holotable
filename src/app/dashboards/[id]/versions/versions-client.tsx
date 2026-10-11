@@ -156,7 +156,7 @@ export function VersionHistory({
                 onClick={() => select(v.version)}
                 aria-current={v.version === selected ? "true" : undefined}
                 className={cn(
-                  "w-full space-y-0.5 px-3 py-2 text-left transition-colors focus-visible:outline-2 focus-visible:outline-primary",
+                  "w-full space-y-0.5 px-3 py-2 text-left transition-colors focus-visible:outline-2 focus-visible:outline-ring",
                   v.version === selected
                     ? "bg-surface-2"
                     : "hover:bg-surface-2/60 text-muted hover:text-foreground",

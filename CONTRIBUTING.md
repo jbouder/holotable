@@ -478,8 +478,11 @@ Match the surrounding code rather than importing conventions from elsewhere.
   are the "Motion rules" section of `AGENTS.md`.
 - Accessibility is checked, not hoped for. Every text/background token pairing
   meets WCAG AA in both themes (`test/contrast.test.ts`, with the table in
-  [Accessibility](docs/src/content/docs/architecture/accessibility.md)); a
-  chart goes through `AccessibleChart`, a link styled as a button is
+  [Accessibility](docs/src/content/docs/architecture/accessibility.md)), and
+  every theme clears the quality bar (`test/theme-quality.test.ts`; run
+  `npm run themes:check` while tuning tokens, and see
+  [Theming](docs/src/content/docs/architecture/theming.md)); a chart goes
+  through `AccessibleChart`, a link styled as a button is
   `ButtonLink`, and an icon-only control has an `aria-label`.
 - This is Next.js 16 and React 19. Check the installed docs in
   `node_modules/next/dist/docs/` or the existing repository patterns before

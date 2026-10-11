@@ -61,7 +61,7 @@ export function SourceTestReport({
           type="button"
           onClick={onDismiss}
           aria-label="Dismiss test result"
-          className="inline-flex h-6 w-6 shrink-0 cursor-pointer items-center justify-center text-muted transition-colors hover:bg-surface-2 hover:text-foreground focus-visible:outline-2 focus-visible:outline-primary"
+          className="inline-flex h-6 w-6 shrink-0 cursor-pointer items-center justify-center text-muted transition-colors hover:bg-surface-2 hover:text-foreground focus-visible:outline-2 focus-visible:outline-ring"
         >
           <X className="h-4 w-4" />
         </button>

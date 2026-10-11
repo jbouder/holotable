@@ -14,8 +14,10 @@ designed set of colors that comes in both schemes, on `<html data-palette>`
 | Group | Tokens | Used for |
 | --- | --- | --- |
 | Surfaces | `--background`, `--surface`, `--surface-2`, `--surface-3` | The page, cards, insets, hover fills |
-| Text and lines | `--foreground`, `--muted`, `--border` | Body text, secondary text, borders |
-| Accent | `--primary`, `--primary-foreground` | Links, primary buttons, focus |
+| Text and lines | `--foreground`, `--muted`, `--border`, `--border-strong` | Body text, secondary text, card edges, control edges |
+| Accent | `--primary`, `--primary-foreground` | Links, primary buttons |
+| Focus and selection | `--ring`, `--selection` | The focus outline, selected text |
+| Code | `--code-keyword`, `--code-string`, `--code-number`, `--code-comment` | SQL and PromQL highlighting |
 | Status | `--success`, `--warning`, `--danger` | Badges, alerts, thresholds |
 | Chart series | `--chart-1` … `--chart-8` | Categorical series, each at least 3:1 on `--surface` |
 | Chart ramps | `--chart-seq-1` … `--chart-seq-5`, `--chart-div-low/mid/high` | Sequential and diverging scales |
@@ -60,3 +62,38 @@ re-read their colors when either attribute changes.
 Text is held to AA, and a chart series to the 3:1 non-text floor. The table
 on [Accessibility](/architecture/accessibility/) is generated from the same
 code, and `e2e/a11y.spec.ts` scans every shipped theme in both schemes.
+
+## Quality bar
+
+Contrast is the floor, not the bar. `src/lib/color/quality.ts` holds each
+theme, in each scheme, to rules that contrast alone does not cover, and
+`test/theme-quality.test.ts` fails on any of them. `npm run themes:check`
+prints every measurement as a table for whoever is tuning a theme
+(`-- --operator` for the operator tier).
+
+| Rule | Measures | Floor |
+| --- | --- | --- |
+| `surface-ladder` | Each surface's OKLab lightness step from the one below | ΔL 0.015 |
+| `foreground` | Body text on every surface | 7:1 built-in, 4.5:1 operator |
+| `muted` | Secondary text on every surface | 4.5:1 |
+| `border` | `--border` and `--border-strong` on every surface | 1.3:1 and 3:1 |
+| `primary` | The accent as text, as a fill, and its hue from each status | 4.5:1, 3:1, 60° |
+| `on-fill` | `--primary-foreground` on the primary and danger fills | 4.5:1 |
+| `status-distinct` | Success, warning and danger from each other, plainly and under protanopia, deuteranopia and tritanopia | ΔE 0.12, 0.05 |
+| `chart-series` | Each series on the surface, and the closest two, plainly and under each deficiency | 3:1, ΔE 0.08, 0.02 |
+| `chart-text` | Axis text on the surface | 4.5:1 |
+| `ring` | The focus ring on every surface | 3:1 |
+| `selection` | Body text on the selection | 4.5:1 |
+| `code` | Each syntax color on the surface | 4.5:1 |
+
+Distances are Euclidean in OKLab. Color-vision deficiencies are simulated
+with the Machado, Oliveira and Fernandes (2009) matrices at full severity
+(`src/lib/color/cvd.ts`).
+
+The ring is measured against the surfaces, not the fills. A filled button
+draws its outline 2px out (`outline-offset-2`), so a band of surface always
+sits between the ring and the fill. One ring color can then work on every
+fill without a contrast pair for each.
+
+The built-in themes are held to the stricter tier. A theme file an operator
+supplies is checked at the operator tier, which relaxes body text to AA.

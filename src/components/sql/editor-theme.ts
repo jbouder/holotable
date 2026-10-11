@@ -14,10 +14,10 @@ export const editorTheme = EditorView.theme({
     fontSize: "0.8125rem",
     color: "var(--foreground)",
     backgroundColor: "var(--surface)",
-    border: "1px solid var(--border)",
+    border: "1px solid var(--border-strong)",
     borderRadius: "var(--radius)",
   },
-  "&.cm-focused": { outline: "2px solid var(--primary)", outlineOffset: "-1px" },
+  "&.cm-focused": { outline: "2px solid var(--ring)", outlineOffset: "-1px" },
   ".cm-content": {
     fontFamily: "var(--font-mono)",
     padding: "0.5rem 0",
@@ -26,7 +26,7 @@ export const editorTheme = EditorView.theme({
   ".cm-line": { padding: "0 0.75rem" },
   ".cm-cursor, .cm-dropCursor": { borderLeftColor: "var(--foreground)" },
   "&.cm-focused .cm-selectionBackground, .cm-selectionBackground, .cm-content ::selection":
-    { backgroundColor: "var(--surface-2)" },
+    { backgroundColor: "var(--selection)" },
   ".cm-matchingBracket, &.cm-focused .cm-matchingBracket": {
     backgroundColor: "var(--surface-2)",
     outline: "1px solid var(--primary)",
@@ -51,17 +51,17 @@ export const editorTheme = EditorView.theme({
 });
 
 export const editorHighlight = HighlightStyle.define([
-  { tag: tags.keyword, color: "var(--primary)" },
-  { tag: [tags.string, tags.special(tags.string)], color: "var(--success)" },
-  { tag: [tags.number, tags.bool, tags.null], color: "var(--warning)" },
-  { tag: tags.comment, color: "var(--muted)", fontStyle: "italic" },
+  { tag: tags.keyword, color: "var(--code-keyword)" },
+  { tag: [tags.string, tags.special(tags.string)], color: "var(--code-string)" },
+  { tag: [tags.number, tags.bool, tags.null], color: "var(--code-number)" },
+  { tag: tags.comment, color: "var(--code-comment)", fontStyle: "italic" },
   { tag: [tags.operator, tags.punctuation, tags.separator], color: "var(--muted)" },
   { tag: tags.typeName, color: "var(--foreground)" },
   { tag: tags.function(tags.variableName), color: "var(--foreground)" },
   // PromQL's (#388): aggregations read as keywords, label names as properties.
   {
     tag: [tags.operatorKeyword, tags.modifier, tags.logicOperator],
-    color: "var(--primary)",
+    color: "var(--code-keyword)",
   },
   { tag: tags.labelName, color: "var(--foreground)", fontStyle: "italic" },
 ]);

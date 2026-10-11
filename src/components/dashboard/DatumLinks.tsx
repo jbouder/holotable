@@ -98,7 +98,7 @@ export function useDatumClick(
 }
 
 const ITEM =
-  "tap-target flex w-full cursor-pointer select-none items-center gap-2 px-2 py-1.5 text-left text-sm text-foreground outline-none hover:bg-surface-2 focus-visible:bg-surface-2 focus-visible:outline-2 focus-visible:outline-primary";
+  "tap-target flex w-full cursor-pointer select-none items-center gap-2 px-2 py-1.5 text-left text-sm text-foreground outline-none hover:bg-surface-2 focus-visible:bg-surface-2 focus-visible:outline-2 focus-visible:outline-ring";
 
 /** One link as a control: a real link to another dashboard, a button for a self link. */
 function LinkControl({
@@ -232,7 +232,7 @@ export function DatumLinksControl({ datum, label }: { datum: Datum; label: strin
         item={item}
         follow={links.follow}
         label={`${label}: ${item.title}`}
-        className="tap-target inline-flex h-7 w-7 items-center justify-center text-muted transition-colors hover:bg-surface-3 hover:text-foreground focus-visible:outline-2 focus-visible:outline-primary"
+        className="tap-target inline-flex h-7 w-7 items-center justify-center text-muted transition-colors hover:bg-surface-3 hover:text-foreground focus-visible:outline-2 focus-visible:outline-ring"
       >
         <ArrowUpRight className="h-4 w-4" aria-hidden />
       </LinkControl>
@@ -263,7 +263,7 @@ export function DatumLinksBody({
     links && datum ? links.itemsFor(datum).filter((i) => i.kind !== "unavailable") : [];
   if (!links || items.length === 0) return <>{children}</>;
   const body =
-    "block h-full w-full cursor-pointer focus-visible:outline-2 focus-visible:outline-primary";
+    "block h-full w-full cursor-pointer focus-visible:outline-2 focus-visible:outline-ring";
   if (items.length === 1) {
     const item = items[0] as MenuLinkItem;
     return (

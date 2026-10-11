@@ -59,6 +59,10 @@ Spinners freezing to a single frame under *Reduce* is intended.
 
 ## Contrast
 
+Contrast is the floor. The wider [theme quality bar](/architecture/theming/#quality-bar)
+also covers borders, the focus ring, selection, code colors, and whether
+statuses and chart series stay distinct under a color-vision deficiency.
+
 Every text-on-background pairing the interface uses meets AA (4.5:1) in both
 themes. The pairings are listed in `src/lib/color/contrast.ts`, measured from
 the OKLCH tokens in `src/app/globals.css` (resolved to sRGB, translucent tints
@@ -80,46 +84,46 @@ read as text on `surface-2` is too light to carry white at AA.
 | text-primary on bg-background | 6.06:1 | 5.38:1 |
 | text-primary on bg-surface | 5.53:1 | 5.71:1 |
 | text-primary on bg-surface-2 | 4.85:1 | 4.78:1 |
-| text-danger on bg-background | 7.25:1 | 6.71:1 |
-| text-danger on bg-surface | 6.63:1 | 7.12:1 |
-| text-danger on bg-surface-2 | 5.81:1 | 5.97:1 |
-| text-warning on bg-background | 9.48:1 | 5.78:1 |
-| text-warning on bg-surface | 8.65:1 | 6.13:1 |
-| text-warning on bg-surface-2 | 7.59:1 | 5.14:1 |
-| text-success on bg-background | 7.85:1 | 6.01:1 |
-| text-success on bg-surface | 7.16:1 | 6.38:1 |
-| text-success on bg-surface-2 | 6.28:1 | 5.34:1 |
+| text-danger on bg-background | 6.95:1 | 6.31:1 |
+| text-danger on bg-surface | 6.35:1 | 6.69:1 |
+| text-danger on bg-surface-2 | 5.57:1 | 5.61:1 |
+| text-warning on bg-background | 9.48:1 | 7.46:1 |
+| text-warning on bg-surface | 8.65:1 | 7.92:1 |
+| text-warning on bg-surface-2 | 7.59:1 | 6.64:1 |
+| text-success on bg-background | 10.38:1 | 6.01:1 |
+| text-success on bg-surface | 9.48:1 | 6.38:1 |
+| text-success on bg-surface-2 | 8.31:1 | 5.34:1 |
 | text-foreground on hover:bg-surface-3 | 11.77:1 | 13.44:1 |
-| text-danger on bg-danger/5 (badges, alerts) | 6.25:1 | 6.48:1 |
-| text-danger on bg-danger/10 (badges, alerts) | 5.77:1 | 5.92:1 |
-| text-danger on bg-danger/15 (badges, alerts) | 5.34:1 | 5.37:1 |
-| text-danger on bg-danger/20 (badges, alerts) | 4.85:1 | 4.85:1 |
-| text-warning on bg-warning/5 (badges, alerts) | 8.02:1 | 5.69:1 |
-| text-warning on bg-warning/10 (badges, alerts) | 7.33:1 | 5.32:1 |
-| text-warning on bg-warning/15 (badges, alerts) | 6.61:1 | 4.92:1 |
-| text-warning on bg-warning/20 (badges, alerts) | 5.92:1 | 4.58:1 |
-| text-success on bg-success/5 (badges, alerts) | 6.72:1 | 5.93:1 |
-| text-success on bg-success/10 (badges, alerts) | 6.22:1 | 5.51:1 |
-| text-success on bg-success/15 (badges, alerts) | 5.64:1 | 5.07:1 |
-| text-success on bg-success/20 (badges, alerts) | 5.12:1 | 4.69:1 |
+| text-danger on bg-danger/5 (badges, alerts) | 5.99:1 | 6.11:1 |
+| text-danger on bg-danger/10 (badges, alerts) | 5.58:1 | 5.58:1 |
+| text-danger on bg-danger/15 (badges, alerts) | 5.17:1 | 5.06:1 |
+| text-danger on bg-danger/20 (badges, alerts) | 4.73:1 | 4.57:1 |
+| text-warning on bg-warning/5 (badges, alerts) | 8.02:1 | 7.35:1 |
+| text-warning on bg-warning/10 (badges, alerts) | 7.33:1 | 6.76:1 |
+| text-warning on bg-warning/15 (badges, alerts) | 6.61:1 | 6.24:1 |
+| text-warning on bg-warning/20 (badges, alerts) | 5.92:1 | 5.71:1 |
+| text-success on bg-success/5 (badges, alerts) | 8.67:1 | 5.93:1 |
+| text-success on bg-success/10 (badges, alerts) | 7.89:1 | 5.51:1 |
+| text-success on bg-success/15 (badges, alerts) | 7.01:1 | 5.07:1 |
+| text-success on bg-success/20 (badges, alerts) | 6.24:1 | 4.69:1 |
 | text-primary on bg-primary/10 | 4.85:1 | 4.92:1 |
-| text-foreground on a success status tile | 9.91:1 | 11.37:1 |
-| text-foreground on a warning status tile | 9.33:1 | 11.52:1 |
-| text-foreground on a danger status tile | 10.12:1 | 10.45:1 |
+| text-foreground on a success status tile | 8.99:1 | 11.37:1 |
+| text-foreground on a warning status tile | 9.33:1 | 11.12:1 |
+| text-foreground on a danger status tile | 10.23:1 | 10.51:1 |
 | text-foreground on a info status tile | 10.34:1 | 11.41:1 |
 | text-foreground on a neutral status tile | 9.74:1 | 11.71:1 |
 | text-foreground on a orange status tile | 9.81:1 | 11.49:1 |
 | text-foreground on a purple status tile | 10.46:1 | 11.32:1 |
 | text-foreground on a teal status tile | 9.61:1 | 11.55:1 |
-| success as text on bg-background | 7.85:1 | 6.01:1 |
-| success as text on bg-surface | 7.16:1 | 6.38:1 |
-| success as text on bg-surface-2 | 6.28:1 | 5.34:1 |
-| warning as text on bg-background | 9.48:1 | 5.78:1 |
-| warning as text on bg-surface | 8.65:1 | 6.13:1 |
-| warning as text on bg-surface-2 | 7.59:1 | 5.14:1 |
-| danger as text on bg-background | 7.25:1 | 6.71:1 |
-| danger as text on bg-surface | 6.63:1 | 7.12:1 |
-| danger as text on bg-surface-2 | 5.81:1 | 5.97:1 |
+| success as text on bg-background | 10.38:1 | 6.01:1 |
+| success as text on bg-surface | 9.48:1 | 6.38:1 |
+| success as text on bg-surface-2 | 8.31:1 | 5.34:1 |
+| warning as text on bg-background | 9.48:1 | 7.46:1 |
+| warning as text on bg-surface | 8.65:1 | 7.92:1 |
+| warning as text on bg-surface-2 | 7.59:1 | 6.64:1 |
+| danger as text on bg-background | 6.95:1 | 6.31:1 |
+| danger as text on bg-surface | 6.35:1 | 6.69:1 |
+| danger as text on bg-surface-2 | 5.57:1 | 5.61:1 |
 | info as text on bg-background | 6.06:1 | 5.38:1 |
 | info as text on bg-surface | 5.53:1 | 5.71:1 |
 | info as text on bg-surface-2 | 4.85:1 | 4.78:1 |
@@ -144,10 +148,10 @@ read as text on `surface-2` is too light to carry white at AA.
 | chart series 4 on bg-surface | 5.57:1 | 5.67:1 |
 | chart series 5 on bg-surface | 5.26:1 | 6.65:1 |
 | chart series 6 on bg-surface | 7.62:1 | 5.83:1 |
-| chart series 7 on bg-surface | 6.02:1 | 6.16:1 |
-| chart series 8 on bg-surface | 7.95:1 | 5.22:1 |
+| chart series 7 on bg-surface | 5.15:1 | 6.16:1 |
+| chart series 8 on bg-surface | 12.95:1 | 11.90:1 |
 | primary button | 6.06:1 | 5.37:1 |
-| danger button | 7.25:1 | 6.70:1 |
+| danger button | 6.95:1 | 6.30:1 |
 
 ## Automated checks
 

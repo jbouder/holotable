@@ -71,7 +71,7 @@ export function RecentDashboards() {
           <Link
             key={d.id}
             href={`/dashboards/${d.id}`}
-            className="stagger-in border border-border bg-surface px-3 py-1.5 text-sm text-foreground transition-colors hover:border-foreground/40 focus-visible:outline-2 focus-visible:outline-primary"
+            className="stagger-in border border-border bg-surface px-3 py-1.5 text-sm text-foreground transition-colors hover:border-foreground/40 focus-visible:outline-2 focus-visible:outline-ring"
             style={{ "--i": i } as React.CSSProperties}
           >
             {d.title}

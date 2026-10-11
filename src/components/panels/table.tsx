@@ -49,7 +49,7 @@ export function TableView({ panel, data }: PanelBodyProps) {
       // No scroll anchoring (#499): the spacers above the window change size
       // as it moves, and the browser's anchoring would answer a long jump by
       // scrolling again, landing past it.
-      className="max-h-full overflow-auto [overflow-anchor:none] focus-visible:outline-2 focus-visible:outline-primary"
+      className="max-h-full overflow-auto [overflow-anchor:none] focus-visible:outline-2 focus-visible:outline-ring"
     >
       {/* The whole count, so a screen reader says how many rows there are
           when only some are in the DOM. */}

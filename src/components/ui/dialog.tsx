@@ -40,7 +40,7 @@ export function Dialog({
             <BaseDialog.Title className="text-lg font-semibold">{title}</BaseDialog.Title>
             <BaseDialog.Close
               aria-label="Close dialog"
-              className="inline-flex h-9 w-9 cursor-pointer items-center justify-center text-foreground transition-colors hover:bg-surface-2 focus-visible:outline-2 focus-visible:outline-primary"
+              className="inline-flex h-9 w-9 cursor-pointer items-center justify-center text-foreground transition-colors hover:bg-surface-2 focus-visible:outline-2 focus-visible:outline-ring"
             >
               <X className="h-4 w-4" />
             </BaseDialog.Close>

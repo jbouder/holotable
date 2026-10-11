@@ -427,7 +427,7 @@ export default function DashboardChatPanel({
                   setAbout(null);
                   inputRef.current?.focus();
                 }}
-                className="p-0.5 text-muted transition-colors hover:text-foreground focus-visible:outline-2 focus-visible:outline-primary"
+                className="p-0.5 text-muted transition-colors hover:text-foreground focus-visible:outline-2 focus-visible:outline-ring"
               >
                 <X className="h-3 w-3" />
               </button>
@@ -532,7 +532,7 @@ function Suggestions({
           key={prompt}
           type="button"
           onClick={() => onPick(prompt)}
-          className="stagger-in border border-border bg-surface-2 px-3 py-2 text-left text-xs text-foreground transition-colors hover:border-primary focus-visible:outline-2 focus-visible:outline-primary"
+          className="stagger-in border border-border bg-surface-2 px-3 py-2 text-left text-xs text-foreground transition-colors hover:border-primary focus-visible:outline-2 focus-visible:outline-ring"
           style={{ "--i": i } as React.CSSProperties}
         >
           {prompt}
