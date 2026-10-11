@@ -125,6 +125,7 @@ export default async function RootLayout({
         {operator && (
           <style
             nonce={nonce}
+            suppressHydrationWarning
             // biome-ignore lint/security/noDangerouslySetInnerHtml: generated from parsed numbers only
             dangerouslySetInnerHTML={{ __html: themeCss(operator) }}
           />

@@ -31,7 +31,7 @@ spec:
         # The models file is read once at boot, like the environment.
         checksum/models: {{ include (print $.Template.BasePath "/configmap-models.yaml") . | sha256sum }}
         {{- end }}
-        {{- if .Values.theme.file }}
+        {{- if (.Values.theme | default dict).file }}
         # The theme file is read once at boot too.
         checksum/theme: {{ include (print $.Template.BasePath "/configmap-theme.yaml") . | sha256sum }}
         {{- end }}
@@ -98,9 +98,9 @@ spec:
             - name: AI_MODELS_FILE
               value: {{ include "holotable.modelsFile" . | quote }}
             {{- end }}
-            {{- if .Values.theme.file }}
+            {{- if (.Values.theme | default dict).file }}
             - name: THEME_FILE
-              value: {{ printf "%s/theme.json" (trimSuffix "/" .Values.theme.mountPath) | quote }}
+              value: {{ printf "%s/theme.json" (trimSuffix "/" ((.Values.theme | default dict).mountPath | default "/etc/holotable/theme")) | quote }}
             {{- end }}
             {{- if .Values.sourceSecrets.secretName }}
             - name: SOURCE_SECRETS_DIR
@@ -152,9 +152,9 @@ spec:
               mountPath: {{ .Values.ai.modelsMountPath }}
               readOnly: true
             {{- end }}
-            {{- if .Values.theme.file }}
+            {{- if (.Values.theme | default dict).file }}
             - name: theme
-              mountPath: {{ .Values.theme.mountPath }}
+              mountPath: {{ ((.Values.theme | default dict).mountPath | default "/etc/holotable/theme") }}
               readOnly: true
             {{- end }}
             {{- if .Values.sourceSecrets.secretName }}
@@ -177,7 +177,7 @@ spec:
           configMap:
             name: {{ include "holotable.fullname" . }}-models
         {{- end }}
-        {{- if .Values.theme.file }}
+        {{- if (.Values.theme | default dict).file }}
         - name: theme
           configMap:
             name: {{ include "holotable.fullname" . }}-theme

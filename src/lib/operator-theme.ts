@@ -38,7 +38,14 @@ export function loadThemeFile(path: string): LoadedThemeFile {
   }
   const parsed = parseThemeFile(text);
   if (!parsed.theme) return { theme: null, problems: parsed.problems, unreadable: false };
-  const failures = checkThemeFile(parsed.theme);
+  let failures: string[];
+  try {
+    failures = checkThemeFile(parsed.theme);
+  } catch (err) {
+    // Whatever the check could not measure is the file's problem to report,
+    // never an error that takes the server down without naming THEME_FILE.
+    failures = [`could not be measured (${(err as Error).message})`];
+  }
   return failures.length > 0
     ? { theme: null, problems: failures, unreadable: false }
     : { theme: parsed.theme, problems: [], unreadable: false };

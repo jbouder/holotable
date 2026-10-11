@@ -1,13 +1,21 @@
 import { readFileSync } from "node:fs";
+import { pathToFileURL } from "node:url";
 import { parseThemeDecls } from "@/lib/color/contrast";
-import { THEME_FILE_TOKENS } from "@/lib/color/theme-file";
+import {
+  checkThemeFile,
+  parseThemeFile,
+  THEME_FILE_TOKENS,
+} from "@/lib/color/theme-file";
 import { PALETTE_INFO } from "@/lib/theme";
 
 /**
- * A built-in theme as a THEME_FILE (#508): `npm run themes:export graphite`
- * prints JSON an operator can start from. The file must not reuse a built-in
- * name, so it is written as `<name>-copy` unless `--as <name>` says otherwise.
- * `test/theme-file.test.ts` holds every export to the same checks as boot.
+ * A built-in theme as a THEME_FILE (#508):
+ * `npm run --silent themes:export graphite -- --as acme` prints JSON an
+ * operator can start from. The file must not reuse a built-in name, so it is
+ * written as `<name>-copy` unless `--as <name>` says otherwise. The output is
+ * held to the boot checks before it is printed, and `test/theme-file.test.ts`
+ * holds every exportable built-in to them too. High contrast is not
+ * exportable: its flat surfaces are below the operator tier on purpose (#506).
  */
 export function exportTheme(css: string, palette: string, as?: string) {
   const info = PALETTE_INFO.find((p) => p.name === palette);
@@ -37,10 +45,33 @@ export function exportTheme(css: string, palette: string, as?: string) {
   };
 }
 
-const [palette, flag, as] = process.argv.slice(2);
-if (palette && import.meta.url === `file://${process.argv[1]}`) {
-  const css = readFileSync("src/app/globals.css", "utf8");
-  process.stdout.write(
-    `${JSON.stringify(exportTheme(css, palette, flag === "--as" ? as : undefined), null, 2)}\n`,
+function main(argv: string[]): number {
+  const asAt = argv.indexOf("--as");
+  const as = asAt >= 0 ? argv[asAt + 1] : undefined;
+  const palette = argv.find(
+    (a, i) => !a.startsWith("--") && (asAt < 0 || i !== asAt + 1),
   );
+  if (!palette || (asAt >= 0 && !as)) {
+    process.stderr.write(
+      "usage: npm run --silent themes:export <theme> [-- --as <name>]\n",
+    );
+    return 2;
+  }
+  const css = readFileSync("src/app/globals.css", "utf8");
+  const file = exportTheme(css, palette, as);
+  // Held to the boot checks here, so a bad name or a theme below the bar
+  // fails now rather than when a server starts with it.
+  const parsed = parseThemeFile(JSON.stringify(file));
+  const problems = parsed.theme ? checkThemeFile(parsed.theme) : parsed.problems;
+  if (problems.length > 0) {
+    process.stderr.write(`"${palette}" does not export as a valid THEME_FILE:\n`);
+    for (const p of problems) process.stderr.write(`  ${p}\n`);
+    return 1;
+  }
+  process.stdout.write(`${JSON.stringify(file, null, 2)}\n`);
+  return 0;
+}
+
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+  process.exit(main(process.argv.slice(2)));
 }

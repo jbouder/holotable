@@ -60,6 +60,11 @@ test("a file is tokens in a closed shape: no built-in name, no stray key, no CSS
     );
   }
   assert.match(problems({ ...good, radius: "1rem" }), /radius/);
+  // A value too long to write back as plain decimal is refused, not crashed on.
+  assert.match(
+    problems({ ...good, dark: { ...good.dark, ring: "oklch(0.0000001 0 0)" } }),
+    /dark\.ring/,
+  );
   assert.match(parseThemeFile("{").problems.join(""), /not JSON/);
 });
 

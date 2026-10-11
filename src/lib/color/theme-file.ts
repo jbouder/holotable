@@ -51,7 +51,9 @@ export const THEME_FILE_TOKENS = [
   "code-comment",
 ] as const;
 
-const NUMBER = String.raw`(\d+(?:\.\d+)?)`;
+// Bounded, so every value written back is plain decimal: `Number` would turn
+// a long fraction into `1e-7`, which no CSS color parser here reads.
+const NUMBER = String.raw`(\d{1,3}(?:\.\d{1,6})?)`;
 const OKLCH = new RegExp(
   String.raw`^oklch\(\s*${NUMBER}(%?)\s+${NUMBER}\s+${NUMBER}\s*\)$`,
 );

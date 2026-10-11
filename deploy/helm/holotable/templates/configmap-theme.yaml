@@ -1,4 +1,4 @@
-{{- if .Values.theme.file }}
+{{- if (.Values.theme | default dict).file }}
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -7,5 +7,5 @@ metadata:
     {{- include "holotable.labels" . | nindent 4 }}
 data:
   # THEME_FILE (#508): token values only, checked by the server at boot.
-  theme.json: {{ .Values.theme.file | toJson | quote }}
+  theme.json: {{ (.Values.theme | default dict).file | toJson | quote }}
 {{- end }}
