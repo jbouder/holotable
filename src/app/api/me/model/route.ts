@@ -8,6 +8,7 @@ import {
   defaultModelDeps,
   prepareWrite,
 } from "@/lib/ai/model-resolution";
+import { endpointHost } from "@/lib/ai/providers/registry";
 import { json, readJson, route } from "@/lib/http";
 
 export const runtime = "nodejs";
@@ -48,9 +49,9 @@ export const PUT = route("me.model.update", async (req: Request) => {
     workspaceId: null,
     detail: {
       provider: body.settings.provider,
-      baseUrlHost: new URL(body.settings.baseUrl).host,
+      endpointHost: endpointHost(body.settings),
       model: body.settings.model,
-      keyChanged: body.apiKey !== undefined,
+      keyChanged: body.credentials !== undefined,
     },
   });
   return json({ config: configView(saved) });

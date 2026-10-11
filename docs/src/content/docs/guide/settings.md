@@ -123,9 +123,10 @@ show the composed system prompt for any of the workspace's sources. See
 
 ### Workspace model
 
-Point a workspace at its own OpenAI-compatible endpoint (base URL, model, API
-key, and the Responses or Chat Completions switch) instead of the server's
-model, and decide whether people may bring their own. "Test connection" makes
+Point a workspace at its own model instead of the server's: pick a provider
+(OpenAI, Anthropic, Google Gemini, the AI Gateway, Azure OpenAI, Amazon
+Bedrock, Mistral, xAI, or any OpenAI-compatible endpoint) and fill in what it
+asks for, and decide whether people may bring their own. "Test connection" makes
 one small model call with what is in the form. The key is encrypted at rest
 and never shown again: the page says only whether one is stored and its last
 four characters. The next generation in the workspace uses the change. See

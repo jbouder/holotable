@@ -31,9 +31,11 @@ type Status =
 export function PersonalModelCard({
   initial,
   workspaces,
+  allowStub = false,
 }: {
   initial: ModelConfigView | null;
   workspaces: Array<{ workspaceId: string; effective: EffectiveModel }>;
+  allowStub?: boolean;
 }) {
   const router = useRouter();
   const [view, setView] = React.useState(initial);
@@ -97,13 +99,14 @@ export function PersonalModelCard({
         <CardContent className="space-y-5 text-sm">
           <ModelConfigFields
             draft={draft}
-            onChange={(patch) => {
-              setDraft((d) => ({ ...d, ...patch }));
+            onChange={(next) => {
+              setDraft(next);
               setStatus({ kind: "idle" });
             }}
             storedKey={view?.key}
             testUrl={testWorkspace ? "/api/me/model/test" : null}
             testBody={(config) => ({ config, workspaceId: testWorkspace })}
+            allowStub={allowStub}
           />
           <div>
             <p className="mb-2 text-sm font-medium text-muted">Where it applies</p>

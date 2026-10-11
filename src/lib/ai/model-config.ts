@@ -1,4 +1,13 @@
 import { z } from "zod";
+import {
+  credentialFields,
+  ModelSettings,
+  PROVIDER_KINDS,
+  parseCredentials,
+  providerKind,
+  settingsFields,
+} from "@/lib/ai/providers/registry";
+import { PROVIDER_LIMITS, type ProviderKind } from "@/lib/ai/providers/types";
 
 /**
  * In-app model configuration (#331), the browser-safe half: what a workspace
@@ -11,55 +20,40 @@ import { z } from "zod";
  *   2. the **workspace** configuration, when one is set;
  *   3. the **environment** (`AI_PROVIDER`, `AI_MODEL`, …), unchanged.
  *
- * The server half (sealing the key, the base-URL guard, resolution) is
- * `src/lib/ai/model-resolution.ts`. Nothing here, and nothing any route
- * returns, carries an API key: a view has the key's last four characters at
- * most.
+ * What a configuration may be is the provider kind registry
+ * (`providers/registry.ts`, #438): its `settings` are the kind's browser-safe
+ * half, its credentials the sealed part. The server half (sealing, the base
+ * URL guard, resolution) is `src/lib/ai/model-resolution.ts`. Nothing here,
+ * and nothing any route returns, carries a credential: a view has the last
+ * four characters of one at most.
  */
+
+export { ModelSettings, type ModelProvider } from "@/lib/ai/providers/registry";
+export { OPENAI_APIS, type OpenAiApi } from "@/lib/ai/providers/types";
 
 /** Which level a generation's model came from. Recorded, never the key. */
 export const MODEL_SOURCES = ["personal", "workspace", "environment"] as const;
 export type ModelSource = (typeof MODEL_SOURCES)[number];
 
-/** Two OpenAI-compatible surfaces, the same switch as `OPENAI_API`. */
-export const OPENAI_APIS = ["responses", "chat"] as const;
-export type OpenAiApi = (typeof OPENAI_APIS)[number];
+export const MODEL_CONFIG_LIMITS = PROVIDER_LIMITS;
 
-export const MODEL_CONFIG_LIMITS = {
-  baseUrl: 2_048,
-  model: 200,
-  apiKey: 4_096,
-} as const;
+/** At most this many credential fields in a request; no kind has more than three. */
+const MAX_CREDENTIAL_FIELDS = 8;
 
 /**
- * The provider's own settings, keyed by `provider`. A discriminated union so
- * a native provider (Anthropic, Gemini, Azure, Bedrock) is a new member here
- * and not a migration: the row stores `provider` and these settings as JSON.
- */
-export const ModelSettings = z.discriminatedUnion("provider", [
-  z
-    .object({
-      provider: z.literal("openai-compatible"),
-      baseUrl: z
-        .url({ protocol: /^https?$/, error: "must be an http(s) URL" })
-        .max(MODEL_CONFIG_LIMITS.baseUrl),
-      model: z.string().trim().min(1, "name a model").max(MODEL_CONFIG_LIMITS.model),
-      api: z.enum(OPENAI_APIS).default("responses"),
-    })
-    .strict(),
-]);
-export type ModelSettings = z.infer<typeof ModelSettings>;
-export type ModelProvider = ModelSettings["provider"];
-
-/**
- * What a PUT carries. `apiKey` is write-only: omitted, the stored key is kept
- * (so the settings form can save a new model without the key being sent back
- * to it); an empty string clears it, for an endpoint that needs none.
+ * What a PUT carries. `credentials` is write-only: omitted, the stored ones
+ * are kept (so the settings form can save a new model without them being
+ * sent back to it); `null` clears them, for an endpoint that needs none; an
+ * object replaces them, and is held to the kind's shape on the server.
  */
 export const ModelConfigInput = z
   .object({
     settings: ModelSettings,
-    apiKey: z.string().max(MODEL_CONFIG_LIMITS.apiKey).optional(),
+    credentials: z
+      .record(z.string().max(64), z.string().max(PROVIDER_LIMITS.secret))
+      .refine((c) => Object.keys(c).length <= MAX_CREDENTIAL_FIELDS, "too many fields")
+      .nullable()
+      .optional(),
   })
   .strict();
 export type ModelConfigInput = z.infer<typeof ModelConfigInput>;
@@ -73,12 +67,12 @@ export const WorkspaceModelInput = z
   .strict();
 export type WorkspaceModelInput = z.infer<typeof WorkspaceModelInput>;
 
-/** How a stored key is shown: never the key. */
+/** How stored credentials are shown: never the credentials. */
 export type KeyState =
   | { state: "none" }
-  /** `hint` is the last four characters, or null for a key too short to hint at. */
+  /** `hint` is the last four characters of the first secret, or null for one too short to hint at. */
   | { state: "set"; hint: string | null }
-  /** Sealed under a `SESSION_SECRET` this server no longer has: enter it again. */
+  /** Sealed under a `SESSION_SECRET` this server no longer has: enter them again. */
   | { state: "unreadable" };
 
 /** A stored configuration as a settings page sees it. */
@@ -122,64 +116,112 @@ export const MODEL_SOURCE_LABELS: Record<ModelSource, string> = {
   environment: "Server default",
 };
 
-/** What the settings form edits. The key field starts empty: a stored key is never sent back. */
+/**
+ * What the settings form edits: the provider, and every field its kind
+ * draws, as strings. Credentials fields start empty: stored credentials are
+ * never sent back.
+ */
 export interface ModelConfigDraft {
-  baseUrl: string;
-  model: string;
-  api: OpenAiApi;
-  /** A new key, or "" to keep the stored one (unless `clearKey`). */
-  apiKey: string;
-  /** Remove the stored key, for an endpoint that needs none. */
-  clearKey: boolean;
+  provider: string;
+  settings: Record<string, string>;
+  /** New values, or "" to keep the stored ones (unless `clearCredentials`). */
+  credentials: Record<string, string>;
+  /** Remove the stored credentials, for an endpoint that needs none. */
+  clearCredentials: boolean;
 }
 
-export const EMPTY_MODEL_DRAFT: ModelConfigDraft = {
-  baseUrl: "",
-  model: "",
-  api: "responses",
-  apiKey: "",
-  clearKey: false,
-};
-
-export function draftFromView(view: ModelConfigView | null): ModelConfigDraft {
-  if (!view) return EMPTY_MODEL_DRAFT;
+/** An empty draft for a kind: every field blank, a select on its first option. */
+export function emptyDraft(provider = "openai-compatible"): ModelConfigDraft {
+  const kind =
+    providerKind(provider) ??
+    (PROVIDER_KINDS["openai-compatible"] as unknown as ProviderKind);
   return {
-    ...EMPTY_MODEL_DRAFT,
-    baseUrl: view.settings.baseUrl,
-    model: view.settings.model,
-    api: view.settings.api,
+    provider: kind.kind,
+    settings: Object.fromEntries(
+      settingsFields(kind).map((f) => [f.name, f.options?.[0]?.value ?? ""]),
+    ),
+    credentials: Object.fromEntries(credentialFields(kind).map((f) => [f.name, ""])),
+    clearCredentials: false,
   };
 }
 
+export const EMPTY_MODEL_DRAFT: ModelConfigDraft = emptyDraft();
+
+export function draftFromView(view: ModelConfigView | null): ModelConfigDraft {
+  if (!view) return emptyDraft();
+  const draft = emptyDraft(view.settings.provider);
+  const stored = view.settings as Record<string, unknown>;
+  for (const name of Object.keys(draft.settings)) {
+    const value = stored[name];
+    if (typeof value === "string") draft.settings[name] = value;
+  }
+  return draft;
+}
+
 /**
- * The PUT body for a draft, or the first problem with it. A blank key field
- * leaves `apiKey` out, which keeps the stored key; "clear" sends an empty one.
+ * The PUT body for a draft, or the first problem with it. Blank credentials
+ * fields leave `credentials` out, which keeps the stored ones; "clear" sends
+ * null. A kind with several credentials fields takes them all at once: one
+ * half of a key pair cannot be kept beside a new other half.
  */
 export function inputFromDraft(
   draft: ModelConfigDraft,
 ): { ok: true; input: ModelConfigInput } | { ok: false; message: string } {
-  const apiKey = draft.clearKey ? "" : draft.apiKey.trim() || undefined;
+  const kind = providerKind(draft.provider);
+  if (!kind) return { ok: false, message: "Provider: choose one" };
+
+  const settings: Record<string, string> = { provider: kind.kind };
+  for (const field of settingsFields(kind)) {
+    const value = (draft.settings[field.name] ?? "").trim();
+    if (value !== "" || !field.optional) settings[field.name] = value;
+  }
+  const parsedSettings = kind.settings.safeParse(settings);
+  if (!parsedSettings.success) {
+    const issue = parsedSettings.error.issues[0];
+    const field = kind.fields.find((f) => f.name === issue.path[0]);
+    return { ok: false, message: `${field?.label ?? "Settings"}: ${issue.message}` };
+  }
+
+  let credentials: ModelConfigInput["credentials"];
+  if (draft.clearCredentials) {
+    credentials = null;
+  } else {
+    const entered = Object.fromEntries(
+      credentialFields(kind)
+        .map((f) => [f.name, (draft.credentials[f.name] ?? "").trim()] as const)
+        .filter(([, value]) => value !== ""),
+    );
+    if (Object.keys(entered).length > 0) {
+      const checked = parseCredentials(kind, entered);
+      if (!checked.ok) return { ok: false, message: checked.message };
+      credentials = checked.credentials;
+    }
+  }
+
   const parsed = ModelConfigInput.safeParse({
-    settings: {
-      provider: "openai-compatible",
-      baseUrl: draft.baseUrl.trim(),
-      model: draft.model.trim(),
-      api: draft.api,
-    },
-    ...(apiKey === undefined ? {} : { apiKey }),
+    settings: parsedSettings.data,
+    ...(credentials === undefined ? {} : { credentials }),
   });
   if (parsed.success) return { ok: true, input: parsed.data };
-  const issue = parsed.error.issues[0];
-  const field = issue.path.at(-1);
-  const name = field === "baseUrl" ? "Base URL" : field === "model" ? "Model" : "API key";
-  return { ok: false, message: `${name}: ${issue.message}` };
+  return { ok: false, message: parsed.error.issues[0].message };
 }
 
-/** How a stored key is described next to the key field. */
-export function describeKey(key: KeyState | undefined): string {
-  if (!key || key.state === "none") return "No key stored.";
+/** What the credentials of a kind are called in a sentence: "key" for one field. */
+export function credentialsNoun(kind: ProviderKind | null): string {
+  return kind && credentialFields(kind).length > 1 ? "credentials" : "key";
+}
+
+/** How stored credentials are described next to their fields. */
+export function describeKey(key: KeyState | undefined, noun = "key"): string {
+  const plural = noun === "credentials";
+  if (!key || key.state === "none") return `No ${noun} stored.`;
   if (key.state === "unreadable") {
-    return "The stored key can no longer be read (the server's SESSION_SECRET changed). Enter it again.";
+    return `The stored ${noun} can no longer be read (the server's SESSION_SECRET changed). Enter ${plural ? "them" : "it"} again.`;
+  }
+  if (plural) {
+    return key.hint
+      ? `Credentials are stored (ending in ${key.hint}).`
+      : "Credentials are stored.";
   }
   return key.hint ? `A key ending in ${key.hint} is stored.` : "A key is stored.";
 }

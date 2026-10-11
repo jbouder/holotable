@@ -161,3 +161,45 @@ export function guardedFetch(baseUrl: string, allowlist: BaseUrlAllowlist): type
   };
   return guarded as typeof fetch;
 }
+
+/**
+ * The `fetch` a fixed-endpoint provider kind is given (#438): a vendor's own
+ * origin, which nobody typed, so the address rules do not apply (a vendor
+ * may well resolve to a private address through a private endpoint), but
+ * the rest does. A request for any other origin is refused before it is
+ * sent, whatever an SDK read from the environment (`ANTHROPIC_BASE_URL`,
+ * `AWS_ENDPOINT_URL` …), and a redirect is never followed.
+ */
+export function pinnedFetch(origin: string): typeof fetch {
+  const pinned = new URL(origin).origin;
+  const fetchPinned = async (input: string | URL | Request, init?: RequestInit) => {
+    const url = new URL(
+      typeof input === "string" ? input : input instanceof URL ? input.href : input.url,
+    );
+    if (url.origin !== pinned) {
+      throw new BaseUrlRefusedError(
+        `A request asked for ${url.origin}, not the provider's ${pinned}.`,
+      );
+    }
+    const response = await undiciFetch(url, {
+      ...(init as Parameters<typeof undiciFetch>[1]),
+      redirect: "manual",
+    });
+    if (response.status >= 300 && response.status < 400) {
+      throw new BaseUrlRefusedError(
+        `The provider answered with a redirect (${response.status}), which is not followed.`,
+      );
+    }
+    return response as unknown as Response;
+  };
+  return fetchPinned as typeof fetch;
+}
+
+/** The `fetch` of a kind that makes no requests (the stub): every one is refused. */
+export const refusingFetch: typeof fetch = async (input) => {
+  const url =
+    typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
+  throw new BaseUrlRefusedError(
+    `This model makes no requests, and ${new URL(url).origin} was asked for.`,
+  );
+};

@@ -1,6 +1,11 @@
 import { notFound } from "next/navigation";
 import { authorizedWorkspaces, getIdentity } from "@/lib/auth/authorize";
-import { configView, defaultModelDeps, effectiveModel } from "@/lib/ai/model-resolution";
+import {
+  configView,
+  defaultModelDeps,
+  effectiveModel,
+  stubAllowed,
+} from "@/lib/ai/model-resolution";
 import { sectionVisible, settingsSection } from "@/lib/settings";
 import { SignIn } from "@/components/sign-in";
 import { PersonalModelCard } from "@/components/settings/personal-model-card";
@@ -47,6 +52,7 @@ export default async function PersonalModelSettings() {
       <PersonalModelCard
         initial={stored ? configView(stored) : null}
         workspaces={workspaces}
+        allowStub={stubAllowed()}
       />
     </SettingsSectionPage>
   );

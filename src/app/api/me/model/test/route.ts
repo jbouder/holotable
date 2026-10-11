@@ -8,6 +8,7 @@ import {
   modelForTest,
 } from "@/lib/ai/model-resolution";
 import { testModel } from "@/lib/ai/model-test";
+import { endpointHost } from "@/lib/ai/providers/registry";
 import { json, readJson, route } from "@/lib/http";
 import { enforceLlmLimits } from "@/lib/limits/llm";
 import { WorkspaceId } from "@/lib/workspace-limits";
@@ -63,7 +64,7 @@ export const POST = route("me.model.test", async (req: Request) => {
     workspaceId,
     outcome: result.ok ? "success" : "failure",
     detail: {
-      baseUrlHost: new URL(body.config.settings.baseUrl).host,
+      endpointHost: endpointHost(body.config.settings),
       model: body.config.settings.model,
     },
   });
