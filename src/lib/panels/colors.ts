@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { type Oklch, OKLCH_PALETTE, oklchToHex } from "@/lib/color/oklch";
+import type { ChartTheme } from "@/lib/color/chart-theme";
 
 /**
  * The colors a spec may name: tokens, never raw colors (invariant 13).
@@ -7,19 +7,20 @@ import { type Oklch, OKLCH_PALETTE, oklchToHex } from "@/lib/color/oklch";
  * A gauge's threshold steps and a state timeline's state colors are authored
  * by a person or by the model, and stored. A stored `#ff0000` would ignore the
  * theme and the token layer for as long as the spec lives, so the IR accepts
- * only these names, and they are resolved through the same OKLCH values as
- * `--success`, `--warning`, `--danger` and the chart palette in `globals.css`.
+ * only these names. Each is a CSS variable in `globals.css`, so it is a
+ * different color in each scheme (#502): the status colors are the page's
+ * own, and the palette-only ones are chart series.
  */
 export const COLOR_TOKENS = {
-  success: { l: 0.7, c: 0.16, h: 160 },
-  warning: { l: 0.78, c: 0.16, h: 75 },
-  danger: { l: 0.65, c: 0.22, h: 20 },
-  info: OKLCH_PALETTE[0],
-  neutral: { l: 0.7, c: 0.02, h: 265 },
-  orange: OKLCH_PALETTE[2],
-  purple: OKLCH_PALETTE[4],
-  teal: OKLCH_PALETTE[5],
-} as const satisfies Record<string, Oklch>;
+  success: "--success",
+  warning: "--warning",
+  danger: "--danger",
+  info: "--primary",
+  neutral: "--muted",
+  orange: "--chart-3",
+  purple: "--chart-5",
+  teal: "--chart-6",
+} as const satisfies Record<string, `--${string}`>;
 
 export type ColorToken = keyof typeof COLOR_TOKENS;
 
@@ -27,9 +28,18 @@ export const ColorToken = z.enum(
   Object.keys(COLOR_TOKENS) as [ColorToken, ...ColorToken[]],
 );
 
-/** A token as a color ECharts can paint. */
-export function tokenHex(token: ColorToken): string {
-  return oklchToHex(COLOR_TOKENS[token]);
+/** A token as a canvas paints it, in the page's scheme (`ChartTheme`). */
+export function tokenHex(token: ColorToken, theme: ChartTheme): string {
+  return theme.tokens[token];
+}
+
+/**
+ * A token as a CSS color, for markup: `var(--success)`. It follows the
+ * scheme by itself, and every token is held to AA as text on the surfaces
+ * (`CONTRAST_PAIRS`), so it serves for text as well as a stripe or a fill.
+ */
+export function tokenCss(token: ColorToken): string {
+  return `var(${COLOR_TOKENS[token]})`;
 }
 
 /**
@@ -81,25 +91,4 @@ const SEMANTIC_STATES: Record<string, ColorToken> = {
 /** A state's color when the panel did not assign it one. */
 export function defaultStateToken(state: string): ColorToken {
   return SEMANTIC_STATES[state.toLowerCase()] ?? fallbackToken(state);
-}
-
-/**
- * A spec color as text on a surface, in the page's theme: the theme's own
- * status token where there is one, which `CONTRAST_PAIRS` holds to AA on
- * every surface in both themes. A `tokenHex` color is one value for both
- * themes and paints charts well, but `warning` as text on the light theme's
- * white is about 2:1. The palette-only colors (orange, purple, teal) have no
- * theme token, so they give no text color: the text stays the foreground,
- * and the color is shown some other way (a stat's sparkline).
- */
-const TEXT_TOKENS: Partial<Record<ColorToken, string>> = {
-  success: "var(--success)",
-  warning: "var(--warning)",
-  danger: "var(--danger)",
-  info: "var(--primary)",
-  neutral: "var(--muted)",
-};
-
-export function tokenTextColor(token: ColorToken): string | undefined {
-  return TEXT_TOKENS[token];
 }

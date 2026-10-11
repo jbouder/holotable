@@ -97,7 +97,7 @@ test("threshold colors come from the token layer", () => {
     CTX,
   );
   const series = (option.series as Record<string, { itemStyle: { color: string } }>[])[0];
-  assert.equal(series.progress.itemStyle.color, tokenHex("danger"));
+  assert.equal(series.progress.itemStyle.color, tokenHex("danger", DEFAULT_CHART_THEME));
 });
 
 test("bars: the latest row per label, largest first, capped", () => {
@@ -234,8 +234,8 @@ test("the same state always gets the same color, from the token layer", () => {
 
   const option = stateTimelineChart(plain, ROWS, CTX);
   const data = (option.series as { data: { itemStyle: { color: string } }[] }[])[0].data;
-  assert.equal(data[0].itemStyle.color, tokenHex("success"));
-  assert.equal(data[1].itemStyle.color, tokenHex("danger"));
+  assert.equal(data[0].itemStyle.color, tokenHex("success", DEFAULT_CHART_THEME));
+  assert.equal(data[1].itemStyle.color, tokenHex("danger", DEFAULT_CHART_THEME));
 });
 
 test("lanes past the cap are counted and reported, not silently dropped", () => {

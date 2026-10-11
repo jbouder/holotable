@@ -207,9 +207,9 @@ test("thresholds color series and stats through the tokens (invariant 13)", () =
   };
   assert.equal(option.visualMap.show, false);
   assert.deepEqual(option.visualMap.pieces.slice(1), [
-    { gte: 0, lt: 50, color: tokenHex("success") },
-    { gte: 50, lt: 90, color: tokenHex("warning") },
-    { gte: 90, color: tokenHex("danger") },
+    { gte: 0, lt: 50, color: tokenHex("success", DEFAULT_CHART_THEME) },
+    { gte: 50, lt: 90, color: tokenHex("warning", DEFAULT_CHART_THEME) },
+    { gte: 90, color: tokenHex("danger", DEFAULT_CHART_THEME) },
   ]);
   assert.deepEqual(Object.keys(option.visualMap.pieces[0]), ["lt", "color"]);
 
@@ -326,17 +326,13 @@ test("the model is told every shared option and every color token", () => {
   }
 });
 
-test("a stat's number takes the theme's status token, so it reads in both themes", async () => {
-  const { tokenTextColor } = await import("@/lib/panels/colors");
-  // The semantic three, and info and neutral, have a theme token held to AA
-  // by CONTRAST_PAIRS; a palette-only color gives none and the text stays
-  // the foreground.
-  assert.equal(tokenTextColor("warning"), "var(--warning)");
-  assert.equal(tokenTextColor("danger"), "var(--danger)");
-  assert.equal(tokenTextColor("success"), "var(--success)");
-  assert.equal(tokenTextColor("info"), "var(--primary)");
-  assert.equal(tokenTextColor("neutral"), "var(--muted)");
-  assert.equal(tokenTextColor("orange"), undefined);
+test("a stat's number takes the token's CSS variable, so it reads in both schemes", async () => {
+  // #502: every token is a CSS variable, each held to AA as text on every
+  // surface by CONTRAST_PAIRS, the palette-only ones included.
+  const { tokenCss } = await import("@/lib/panels/colors");
+  assert.equal(tokenCss("warning"), "var(--warning)");
+  assert.equal(tokenCss("info"), "var(--primary)");
+  assert.equal(tokenCss("orange"), "var(--chart-3)");
   const { renderToStaticMarkup } = await import("react-dom/server");
   const { createElement } = await import("react");
   const { StatView } = await import("@/components/panels/stat");

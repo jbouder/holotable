@@ -8,6 +8,9 @@ import {
   readChartTheme,
 } from "@/lib/color/chart-theme";
 import type { Panel } from "@/lib/ir";
+import { readFileSync } from "node:fs";
+import { parseThemeTokens } from "@/lib/color/contrast";
+import { COLOR_TOKENS } from "@/lib/panels/colors";
 import { LOCAL_TIME_DISPLAY } from "@/lib/time-display";
 
 /*
@@ -24,15 +27,35 @@ function style(vars: Record<string, string>) {
 test("the chart theme is the page's tokens, converted for a canvas", () => {
   const theme = readChartTheme(
     style({
-      "--muted": "oklch(0.5 0.02 265)",
-      "--border": "oklch(0.84 0.02 265)",
-      "--surface-2": " oklch(0.94 0.01 265) ",
+      "--chart-text": "oklch(0.5 0.02 265)",
+      "--chart-axis": "oklch(0.84 0.02 265)",
+      "--chart-grid": " oklch(0.94 0.01 265) ",
       "--foreground": "#202020",
+      "--chart-1": "oklch(0.52 0.19 259)",
+      "--success": "oklch(0.46 0.14 160)",
     }),
   );
-  for (const value of Object.values(theme)) assert.match(value, /^#[0-9a-f]{6}$/);
-  // The light theme's muted text is darker than the dark theme's.
+  const values = [
+    theme.text,
+    theme.line,
+    theme.grid,
+    theme.foreground,
+    theme.background,
+    ...theme.series,
+    ...theme.sequential,
+    ...theme.diverging,
+    ...Object.values(theme.tokens),
+  ];
+  for (const value of values) assert.match(value, /^#[0-9a-f]{6}$/);
+  // The light scheme's chart text is darker than the dark scheme's.
   assert.notEqual(theme.text, DEFAULT_CHART_THEME.text);
+  assert.notEqual(theme.series[0], DEFAULT_CHART_THEME.series[0]);
+  assert.notEqual(theme.tokens.success, DEFAULT_CHART_THEME.tokens.success);
+  assert.equal(
+    theme.series[1],
+    DEFAULT_CHART_THEME.series[1],
+    "an unset token keeps its default",
+  );
   assert.equal(theme.foreground, "#202020");
 });
 
@@ -40,15 +63,78 @@ test("a token the page does not set keeps the dark theme's value", () => {
   assert.deepEqual(readChartTheme(style({})), DEFAULT_CHART_THEME);
 });
 
-/** Nothing like any theme's real colors, so a leak of either is visible. */
+test("the defaults are the dark scheme's tokens in globals.css", () => {
+  // #502: a server render and a test draw what the dark page would.
+  const dark = parseThemeTokens(readFileSync("src/app/globals.css", "utf8")).dark;
+  const hex = (token: string) => {
+    const rgb = dark[token];
+    assert.ok(rgb, `--${token}`);
+    return `#${rgb.map((c) => c.toString(16).padStart(2, "0")).join("")}`;
+  };
+  const d = DEFAULT_CHART_THEME;
+  assert.equal(d.text, hex("chart-text"));
+  assert.equal(d.line, hex("chart-axis"));
+  assert.equal(d.grid, hex("chart-grid"));
+  assert.equal(d.foreground, hex("foreground"));
+  assert.equal(d.background, hex("surface"));
+  assert.deepEqual(
+    d.series,
+    d.series.map((_, i) => hex(`chart-${i + 1}`)),
+  );
+  assert.deepEqual(
+    d.sequential,
+    d.sequential.map((_, i) => hex(`chart-seq-${i + 1}`)),
+  );
+  assert.deepEqual(d.diverging, [
+    hex("chart-div-low"),
+    hex("chart-div-mid"),
+    hex("chart-div-high"),
+  ]);
+  for (const [token, variable] of Object.entries(COLOR_TOKENS)) {
+    assert.equal(d.tokens[token as keyof typeof d.tokens], hex(variable.slice(2)), token);
+  }
+});
+
+/** Nothing like any scheme's real colors, so a leak of a default is visible. */
 const DISTINCT: ChartTheme = {
   text: "#010101",
   line: "#020202",
   grid: "#030303",
   foreground: "#040404",
+  background: "#050505",
+  series: [
+    "#101010",
+    "#111111",
+    "#121212",
+    "#131313",
+    "#141414",
+    "#151515",
+    "#161616",
+    "#171717",
+  ],
+  sequential: ["#202020", "#212121", "#222222", "#232323", "#242424"],
+  diverging: ["#303030", "#313131", "#323232"],
+  tokens: {
+    success: "#404040",
+    warning: "#414141",
+    danger: "#424242",
+    info: "#434343",
+    neutral: "#444444",
+    orange: "#454545",
+    purple: "#464646",
+    teal: "#474747",
+  },
 };
 
-const DARK_LITERALS = Object.values(DEFAULT_CHART_THEME);
+const DARK_LITERALS = [
+  DEFAULT_CHART_THEME.text,
+  DEFAULT_CHART_THEME.line,
+  DEFAULT_CHART_THEME.grid,
+  DEFAULT_CHART_THEME.foreground,
+  ...DEFAULT_CHART_THEME.series,
+  ...DEFAULT_CHART_THEME.sequential,
+  ...Object.values(DEFAULT_CHART_THEME.tokens),
+];
 
 const DATA: PanelData = {
   columns: ["ts", "host", "v"],
@@ -58,7 +144,7 @@ const DATA: PanelData = {
   ],
 };
 
-test("every chart kind draws its chrome with the theme it is given", () => {
+test("every chart kind draws all its colors from the theme it is given", () => {
   const charts = Object.entries(PANEL_RENDERERS).flatMap(([viz, renderer]) =>
     renderer.type === "chart"
       ? [{ viz: viz as Panel["viz"], option: renderer.option }]

@@ -1,3 +1,4 @@
+import { DEFAULT_CHART_THEME } from "@/lib/color/chart-theme";
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { HttpError } from "@/lib/auth/authorize";
@@ -226,19 +227,22 @@ test("the IR holds a vega panel's options to the walk", () => {
 });
 
 test("color names are painted the way the other kinds paint them", () => {
-  assert.equal(vegaColor("danger"), tokenHex("danger"));
-  assert.match(vegaColor("palette-0"), /^#[0-9a-f]{6}$/);
-  assert.equal(vegaColor("transparent"), "transparent");
-  const painted = resolveVegaColors(BAND) as typeof BAND;
+  assert.equal(
+    vegaColor("danger", DEFAULT_CHART_THEME),
+    tokenHex("danger", DEFAULT_CHART_THEME),
+  );
+  assert.match(vegaColor("palette-0", DEFAULT_CHART_THEME), /^#[0-9a-f]{6}$/);
+  assert.equal(vegaColor("transparent", DEFAULT_CHART_THEME), "transparent");
+  const painted = resolveVegaColors(BAND, DEFAULT_CHART_THEME) as typeof BAND;
   const rule = painted.layer[2] as { encoding: { color: { value: string } } };
-  assert.equal(rule.encoding.color.value, tokenHex("danger"));
+  assert.equal(rule.encoding.color.value, tokenHex("danger", DEFAULT_CHART_THEME));
   const line = painted.layer[1] as {
     encoding: { color: { scale: { range: string[] } } };
   };
   assert.deepEqual(line.encoding.color.scale.range, [
-    tokenHex("info"),
-    tokenHex("teal"),
-    tokenHex("purple"),
+    tokenHex("info", DEFAULT_CHART_THEME),
+    tokenHex("teal", DEFAULT_CHART_THEME),
+    tokenHex("purple", DEFAULT_CHART_THEME),
   ]);
   // The stored spec keeps its names.
   assert.equal((BAND.layer[2] as typeof rule).encoding.color.value, "danger");

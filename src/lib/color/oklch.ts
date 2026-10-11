@@ -76,20 +76,3 @@ export function resolveOklchToken(value: string): string | null {
 export function resolveColor(value: string): string {
   return resolveOklchToken(value) ?? value;
 }
-
-/**
- * The chart palette, defined as OKLCH tokens and resolved to hex for canvas.
- * Keeping the source-of-truth in OKLCH matches the CSS theme.
- */
-export const OKLCH_PALETTE: Oklch[] = [
-  { l: 0.62, c: 0.19, h: 259 },
-  { l: 0.7, c: 0.16, h: 160 },
-  { l: 0.7, c: 0.18, h: 70 },
-  { l: 0.65, c: 0.22, h: 20 },
-  { l: 0.6, c: 0.2, h: 300 },
-  { l: 0.72, c: 0.15, h: 195 },
-];
-
-export function chartPalette(): string[] {
-  return OKLCH_PALETTE.map(oklchToHex);
-}

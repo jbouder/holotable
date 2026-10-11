@@ -1,8 +1,7 @@
 import { panelTimeField } from "@/lib/ir";
 import type { EChartsOption } from "echarts";
 import type { Panel } from "@/lib/ir";
-import type { ChartTheme } from "@/lib/color/chart-theme";
-import { chartPalette } from "@/lib/color/oklch";
+import { type ChartTheme, seriesColor, withAlpha } from "@/lib/color/chart-theme";
 import { ANNOTATION_COLORS, type Annotation } from "@/lib/annotations";
 import { formatValue } from "@/lib/format";
 import { tokenHex } from "@/lib/panels/colors";
@@ -29,8 +28,6 @@ export interface PanelData {
   /** Where this result was cut short, server or browser side (#486). */
   truncated?: Truncation;
 }
-
-const palette = chartPalette();
 
 const EMPTY: PanelData = { columns: [], rows: [] };
 
@@ -153,7 +150,7 @@ function base(theme: ChartTheme): EChartsOption {
     // A series this long does not animate, whatever the motion preference
     // allows; the preference still turns animation off below it (#491).
     animationThreshold: LARGE_SERIES_POINTS,
-    color: palette,
+    color: [...theme.series],
     grid: GRID,
     tooltip: TOOLTIP_AXIS,
     legend: legendAt(undefined, theme),
@@ -194,16 +191,19 @@ function gridFor(position: LegendPosition | undefined, axisTitle: boolean) {
  * area's fill and each bar take the color of the step their value is in. Below
  * the first step a value keeps the first series color.
  */
-function thresholdMap(steps: readonly ThresholdStep[]): EChartsOption["visualMap"] {
+function thresholdMap(
+  steps: readonly ThresholdStep[],
+  theme: ChartTheme,
+): EChartsOption["visualMap"] {
   const pieces = steps.map((step, i) => ({
     gte: step.value,
     ...(steps[i + 1] ? { lt: steps[i + 1].value } : {}),
-    color: tokenHex(step.color),
+    color: tokenHex(step.color, theme),
   }));
   return {
     show: false,
     type: "piecewise",
-    pieces: [{ lt: steps[0].value, color: palette[0] }, ...pieces],
+    pieces: [{ lt: steps[0].value, color: seriesColor(theme, 0) }, ...pieces],
   };
 }
 
@@ -277,7 +277,7 @@ function buildSeries(type: "line" | "bar", area: boolean): ChartOptionBuilder {
       grid: gridFor(o.legend, axis?.label !== undefined),
       legend: legendAt(o.legend, theme),
       tooltip: { ...TOOLTIP_AXIS, ...(number ? { valueFormatter: number } : {}) },
-      ...(o.thresholds?.length ? { visualMap: thresholdMap(o.thresholds) } : {}),
+      ...(o.thresholds?.length ? { visualMap: thresholdMap(o.thresholds, theme) } : {}),
       // A category axis, deliberately (#491): the brush maps its span to row
       // indices (`brushedRange`), the crosshair group moves its peers by
       // index, and a datum click reads the row at its index. A time axis
@@ -313,7 +313,7 @@ function buildSeries(type: "line" | "bar", area: boolean): ChartOptionBuilder {
         ...(o.stacked ? { stack: "total" } : {}),
         // The marks ride on the first series; one per chart is enough.
         ...(i === 0 && annotations && panelTimeField(panel) === x
-          ? annotationMarks(annotations, xValues, display)
+          ? annotationMarks(annotations, xValues, display, theme)
           : {}),
         data: data.rows.map((r) => toNumber(r[k])),
       })),
@@ -390,7 +390,7 @@ function buildPie(
         ? ["50%", "46%"]
         : ["50%", "56%"];
   return {
-    color: palette,
+    color: [...theme.series],
     backgroundColor: "transparent",
     tooltip: {
       trigger: "item",
@@ -428,6 +428,7 @@ export function annotationMarks(
   annotations: readonly Annotation[],
   xValues: readonly unknown[],
   display: TimeDisplay,
+  theme: ChartTheme,
 ): { markLine: Record<string, unknown>; markArea: Record<string, unknown> } {
   const times = xValues.map((v) => asInstant(v)?.getTime() ?? Number.NaN);
   const first = times.find(Number.isFinite);
@@ -437,7 +438,7 @@ export function annotationMarks(
   const areas: Record<string, unknown>[][] = [];
   if (first !== undefined && last !== undefined) {
     for (const a of annotations) {
-      const color = tokenHex(ANNOTATION_COLORS[a.kind]);
+      const color = tokenHex(ANNOTATION_COLORS[a.kind], theme);
       // A function, not a template string: a title is untrusted text, and
       // ECharts would read `{a}` in a template as a placeholder.
       // Its own time, not the row it is drawn at, on the viewer's clock.
@@ -486,12 +487,6 @@ export function annotationMarks(
   };
 }
 
-/** `#rrggbb` at an opacity. */
-function withAlpha(hex: string, alpha: number): string {
-  const n = Number.parseInt(hex.slice(1), 16);
-  return `rgba(${(n >> 16) & 255}, ${(n >> 8) & 255}, ${n & 255}, ${alpha})`;
-}
-
 /**
  * How a chart writes a value, once the panel was given number options (#115).
  * Without them a chart writes values as it always has, `panel.format` or not.
@@ -533,7 +528,7 @@ function buildHeatmap(
       orient: "horizontal",
       left: "center",
       bottom: 0,
-      inRange: { color: [palette[5], palette[0], palette[3]] },
+      inRange: { color: [...theme.sequential] },
       textStyle: { color: theme.text },
     },
     series: [{ type: "heatmap", data: values, progressive: 1000 }],

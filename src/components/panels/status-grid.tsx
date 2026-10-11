@@ -1,7 +1,7 @@
 import { DatumLinksBody } from "@/components/dashboard/DatumLinks";
 import type { PanelBodyProps } from "@/components/panels/types";
 import { STATUS_TILE_TINT } from "@/lib/color/contrast";
-import { tokenHex } from "@/lib/panels/colors";
+import { tokenCss } from "@/lib/panels/colors";
 import { StatusGridOptions } from "@/lib/panels/kinds/status-grid";
 import { readOptions } from "@/lib/panels/presentation";
 import { type StatusTile, statusGrid } from "@/lib/panel-reading";
@@ -62,7 +62,7 @@ function tileName(tile: StatusTile): string {
 }
 
 function Tile({ tile }: { tile: StatusTile }) {
-  const hex = tile.color ? tokenHex(tile.color) : undefined;
+  const hex = tile.color ? tokenCss(tile.color) : undefined;
   return (
     <div
       className="flex h-full flex-col gap-0.5 rounded-md border border-l-4 border-border bg-surface-2 px-2 py-1.5"

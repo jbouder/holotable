@@ -75,7 +75,7 @@ test("the accessibility docs carry the ratios the tokens actually produce", () =
 
 test("every text pairing meets AA in both themes", () => {
   const failing = measureContrast(CSS)
-    .filter((m) => m.ratio < AA_TEXT)
+    .filter((m) => m.ratio < (m.floor ?? AA_TEXT))
     .map((m) => `${m.theme}: ${m.where} is ${m.ratio.toFixed(2)}:1`);
   assert.deepEqual(failing, []);
 });

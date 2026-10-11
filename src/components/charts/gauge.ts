@@ -1,4 +1,4 @@
-import type { ChartTheme } from "@/lib/color/chart-theme";
+import { type ChartTheme, withAlpha } from "@/lib/color/chart-theme";
 import { panelTimeField } from "@/lib/ir";
 import type { EChartsOption } from "echarts";
 import {
@@ -122,12 +122,6 @@ export function gaugeReadings(panel: Panel, data: PanelData): GaugeReading[] {
     .slice(0, GAUGE_BAR_MAX);
 }
 
-/** `#rrggbb` at an opacity, for the faint threshold bands behind the dial. */
-function withAlpha(hex: string, alpha: number): string {
-  const n = Number.parseInt(hex.slice(1), 16);
-  return `rgba(${(n >> 16) & 255}, ${(n >> 8) & 255}, ${n & 255}, ${alpha})`;
-}
-
 /**
  * The dial's track: the threshold steps as bands, faint, so the value's own
  * color reads as where it is now and the bands as where the lines are.
@@ -146,7 +140,7 @@ function bands(
   for (const step of steps) {
     const at = (step.value - min) / (max - min);
     if (at > 0 && at < 1) stops.push([at, color]);
-    if (at < 1) color = withAlpha(tokenHex(step.color), 0.35);
+    if (at < 1) color = withAlpha(tokenHex(step.color, theme), 0.35);
   }
   stops.push([1, color]);
   return stops;
@@ -177,7 +171,7 @@ function radial(
         progress: {
           show: true,
           width: 14,
-          itemStyle: { color: tokenHex(reading?.color ?? DEFAULT_COLOR) },
+          itemStyle: { color: tokenHex(reading?.color ?? DEFAULT_COLOR, theme) },
         },
         axisLine: { lineStyle: { width: 14, color: bands(panel, min, max, theme) } },
         pointer: { show: false },
@@ -236,7 +230,7 @@ function bars(readings: GaugeReading[], theme: ChartTheme): EChartsOption {
         backgroundStyle: { color: theme.grid },
         data: readings.map((r) => ({
           value: r.fraction,
-          itemStyle: { color: tokenHex(r.color) },
+          itemStyle: { color: tokenHex(r.color, theme) },
         })),
         label: {
           show: true,

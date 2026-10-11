@@ -194,7 +194,10 @@ thing and match it.
 - Tailwind v4 utilities and the tokens in `src/app/globals.css` (surfaces,
   borders, muted text, the primary accent), composed with `cn()` from
   `src/lib/utils.ts`. No literal colors, no one-off spacing scales, no new
-  fonts. Check every change in **both** themes.
+  fonts. Check every change in **both** themes. A chart's colors are tokens
+  too (`--chart-*`, the spec's color tokens), read through `ChartTheme`
+  (`src/lib/color/chart-theme.ts`); `test/color-literals.test.ts` holds
+  `src/` free of color literals outside `src/lib/color/` and `globals.css`.
 - Use the primitives in `src/components/ui/` before writing markup:
   `Button` / `ButtonLink`, `Input`, `Select`, `Autocomplete`, `Checkbox`,
   `Menu`, `Popover`, `Dialog`, `ConfirmDialog`, `Card`, `Table`, `Badge`,

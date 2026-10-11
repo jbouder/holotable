@@ -178,7 +178,7 @@ export const histogramChart: ChartOptionBuilder = normalized((panel, data, { the
         data: bars.map((b) => ({
           // A log axis has no zero: an empty bucket is left out of it.
           value: o.log && b.count <= 0 ? null : b.count,
-          itemStyle: { color: tokenHex(b.color) },
+          itemStyle: { color: tokenHex(b.color, theme) },
         })),
       },
     ],

@@ -169,7 +169,7 @@ test("the body is a named, focusable list; a line with other columns is a disclo
   assert.match(html, /upstream timeout on \/checkout/);
   assert.match(html, /aria-expanded="false"/);
   // The stripe is the level's color; the text stays the foreground color.
-  assert.match(html, /border-left-color:#[0-9a-f]{6}/);
+  assert.match(html, /border-left-color:var\(--[a-z0-9-]+\)/);
 });
 
 test("an empty window says so", () => {

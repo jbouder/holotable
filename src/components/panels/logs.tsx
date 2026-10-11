@@ -6,7 +6,7 @@ import * as React from "react";
 import { DatumLinksControl, useDatumLinks } from "@/components/dashboard/DatumLinks";
 import type { PanelBodyProps } from "@/components/panels/types";
 import { useTimeDisplay } from "@/components/time-display";
-import { tokenHex } from "@/lib/panels/colors";
+import { tokenCss } from "@/lib/panels/colors";
 import { LogsOptions } from "@/lib/panels/kinds/logs";
 import { readOptions } from "@/lib/panels/presentation";
 import { type LogLine, logLines } from "@/lib/panel-reading";
@@ -125,7 +125,7 @@ function Line({
   wrap: boolean;
   showTime: boolean;
 }) {
-  const stripe = line.color ? { borderLeftColor: tokenHex(line.color) } : undefined;
+  const stripe = line.color ? { borderLeftColor: tokenCss(line.color) } : undefined;
   const text = (
     <>
       {showTime && line.time && (
