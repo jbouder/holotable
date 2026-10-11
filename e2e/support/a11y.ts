@@ -31,19 +31,28 @@ const ALWAYS_EXCLUDE = ["[data-echarts-canvas]"];
 export type Theme = "light" | "dark";
 
 /**
- * Open every page in `theme`, with motion reduced. Reduced because the page
+ * Open every page in `theme` (the color scheme) and `palette` (the named
+ * theme, #503), with motion reduced. Reduced because the page
  * entrance (src/app/template.tsx) fades in from transparent, and axe measuring
  * contrast halfway through that fade reports text that is fine once it lands.
  */
-export async function setAppearance(page: Page, theme: Theme): Promise<void> {
-  await page.addInitScript((t) => {
-    try {
-      window.localStorage.setItem("theme", t);
-      window.localStorage.setItem("motion", "reduce");
-    } catch {
-      // A page without storage just renders the default theme.
-    }
-  }, theme);
+export async function setAppearance(
+  page: Page,
+  theme: Theme,
+  palette: string = "holotable",
+): Promise<void> {
+  await page.addInitScript(
+    ([t, p]) => {
+      try {
+        window.localStorage.setItem("theme", t);
+        window.localStorage.setItem("palette", p);
+        window.localStorage.setItem("motion", "reduce");
+      } catch {
+        // A page without storage just renders the default theme.
+      }
+    },
+    [theme, palette] as const,
+  );
 }
 
 export async function expectNoA11yViolations(

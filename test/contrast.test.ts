@@ -79,3 +79,18 @@ test("every text pairing meets AA in both themes", () => {
     .map((m) => `${m.theme}: ${m.where} is ${m.ratio.toFixed(2)}:1`);
   assert.deepEqual(failing, []);
 });
+
+test("another palette's blocks are measured on top of Holotable's", () => {
+  // #503: a second theme is `[data-palette][data-theme]`, overriding what it
+  // sets; the table grows a section per theme.
+  const css = `${CSS}
+[data-palette="graphite"][data-theme="dark"] {
+  --surface: oklch(0.2 0 0);
+}
+[data-palette="graphite"][data-theme="light"] {
+  --surface: oklch(0.99 0 0);
+}`;
+  const graphite = measureContrast(css).filter((m) => m.palette === "graphite");
+  assert.equal(graphite.length, measureContrast(CSS).length);
+  assert.match(contrastTable(css), /### holotable[\s\S]*### graphite/);
+});

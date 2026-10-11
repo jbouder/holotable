@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import { PALETTE_INFO } from "../src/lib/theme";
 import { expectNoA11yViolations, type Theme, setAppearance } from "./support/a11y";
 import {
   askChat,
@@ -18,10 +19,20 @@ import {
 
 const THEMES: Theme[] = ["dark", "light"];
 
-for (const theme of THEMES) {
-  test.describe(`${theme} theme`, () => {
+// Every shipped named theme (#503) in both schemes. Holotable keeps the names
+// the suite always had.
+const APPEARANCES = PALETTE_INFO.flatMap((p) =>
+  THEMES.map((theme) => ({
+    theme,
+    palette: p.name,
+    name: p.name === "holotable" ? `${theme} theme` : `${p.label} ${theme}`,
+  })),
+);
+
+for (const { theme, palette, name } of APPEARANCES) {
+  test.describe(name, () => {
     test.beforeEach(async ({ page }) => {
-      await setAppearance(page, theme);
+      await setAppearance(page, theme, palette);
     });
 
     test("dashboard list", async ({ page }) => {
@@ -238,4 +249,10 @@ test("signed out: the sign-in card", async ({ browser }) => {
     await expectNoA11yViolations(page);
   }
   await context.close();
+});
+
+test("the named theme is on <html> before first paint", async ({ page }) => {
+  // #503: the bootstrap script writes it with the scheme, so nothing flashes.
+  await page.goto("/dashboards", { waitUntil: "domcontentloaded" });
+  await expect(page.locator("html")).toHaveAttribute("data-palette", "holotable");
 });

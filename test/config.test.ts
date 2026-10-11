@@ -1170,3 +1170,22 @@ test("the browser's window and the PromQL point cap are one budget", () => {
   const example = parseDotenv(readFileSync(".env.example", "utf8"));
   assert.equal(example.MAX_WINDOW_POINTS, example.PROMQL_MAX_POINTS);
 });
+
+test("THEME_DEFAULT_PALETTE must name a shipped theme", () => {
+  // #503
+  for (const value of ["holotable", ""]) {
+    const ok = validateConfig(
+      { ...VALID_PRODUCTION, THEME_DEFAULT_PALETTE: value },
+      { production: true },
+    );
+    assert.deepEqual(errors(ok), [], formatConfigProblems(ok));
+  }
+  // A reserved name with no CSS yet is refused like a typo.
+  for (const value of ["foo", "graphite", "Holotable"]) {
+    const bad = validateConfig(
+      { ...VALID_PRODUCTION, THEME_DEFAULT_PALETTE: value },
+      { production: true },
+    );
+    assert.deepEqual(variables(errors(bad)), ["THEME_DEFAULT_PALETTE"]);
+  }
+});

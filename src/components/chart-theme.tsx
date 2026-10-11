@@ -25,7 +25,10 @@ export function useChartTheme(): ChartTheme {
   React.useEffect(() => {
     const html = document.documentElement;
     const observer = new MutationObserver(() => setTheme(read()));
-    observer.observe(html, { attributes: true, attributeFilter: ["data-theme"] });
+    observer.observe(html, {
+      attributes: true,
+      attributeFilter: ["data-theme", "data-palette"],
+    });
     return () => observer.disconnect();
   }, []);
   return theme;

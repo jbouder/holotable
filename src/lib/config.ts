@@ -1,3 +1,4 @@
+import { DEFAULT_PALETTE, isPalette, PALETTE_INFO, type Palette } from "@/lib/theme";
 import { z } from "zod";
 import {
   CLAIM_NAME,
@@ -346,6 +347,15 @@ export const config = {
    */
   authMode: (process.env.AUTH_MODE === "demo" ? "demo" : "oidc") as AuthMode,
   /**
+   * The named theme a browser shows before its person picks one (#503).
+   * A name the app does not ship is refused at boot by `validateConfig`, and
+   * reads as `holotable` here. Server-only: the root layout renders it onto
+   * `<html>` and into the first-paint script.
+   */
+  themeDefaultPalette: (isPalette(process.env.THEME_DEFAULT_PALETTE)
+    ? process.env.THEME_DEFAULT_PALETTE
+    : DEFAULT_PALETTE) as Palette,
+  /**
    * The groups every demo visitor's session carries, in the same
    * `/workspaces/{id}/{role}` form as a Keycloak `groups` claim, parsed by the
    * same parser. Never source-admin, never platform admin: `validateConfig`
@@ -619,6 +629,11 @@ const EnvSchema = z.object({
     }),
   ),
   DEMO_GROUPS: blank(z.string()),
+  THEME_DEFAULT_PALETTE: blank(
+    z.string().refine(isPalette, {
+      message: `must be a theme the app ships: ${PALETTE_INFO.map((p) => p.name).join(", ")}`,
+    }),
+  ),
   ROW_FILTER_CLAIMS: blank(z.string()),
   ALLOWED_ORIGINS: blank(z.string()),
 

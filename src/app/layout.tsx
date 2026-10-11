@@ -17,7 +17,7 @@ import { HistoryPreferencesProvider } from "@/components/history-preferences";
 import { ChartPatternsProvider } from "@/components/chart-patterns";
 import { TimeDisplayProvider } from "@/components/time-display";
 import { EMBED_REQUEST_HEADER, NONCE_REQUEST_HEADER } from "@/lib/security-headers";
-import { BOOTSTRAP_SCRIPT } from "@/lib/bootstrap";
+import { bootstrapScript } from "@/lib/bootstrap";
 
 const fontSans = Chakra_Petch({
   subsets: ["latin"],
@@ -79,6 +79,7 @@ export default async function RootLayout({
       lang="en"
       className={`h-full antialiased ${embed ? "" : "scroll-pt-14"} ${fontSans.variable} ${fontMono.variable}`}
       data-theme="dark"
+      data-palette={config.themeDefaultPalette}
       suppressHydrationWarning
     >
       <head>
@@ -98,7 +99,9 @@ export default async function RootLayout({
           nonce={nonce}
           suppressHydrationWarning
           // biome-ignore lint/security/noDangerouslySetInnerHtml: constant script, must run before first paint
-          dangerouslySetInnerHTML={{ __html: BOOTSTRAP_SCRIPT }}
+          dangerouslySetInnerHTML={{
+            __html: bootstrapScript(config.themeDefaultPalette),
+          }}
         />
       </head>
       <body className="min-h-full flex flex-col">

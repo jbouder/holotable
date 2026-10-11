@@ -1,5 +1,5 @@
 import type { SourceRecord } from "@/lib/registry";
-import type { Theme } from "@/lib/theme";
+import { type Palette, PALETTE_INFO, type Theme } from "@/lib/theme";
 
 /**
  * What the command palette can offer and how it decides the order.
@@ -20,6 +20,7 @@ export type CommandKind = "dashboard" | "source" | "page" | "action";
 export type CommandAction =
   | { type: "navigate"; href: string }
   | { type: "theme"; theme: Theme }
+  | { type: "palette"; palette: Palette }
   | { type: "refresh-catalog"; sourceId: string; name: string };
 
 export interface Command {
@@ -104,24 +105,37 @@ export const STATIC_COMMANDS: Command[] = [
   {
     id: "action:theme-dark",
     kind: "action",
-    title: "Theme: dark",
+    title: "Color scheme: dark",
     keywords: "appearance colour color",
     action: { type: "theme", theme: "dark" },
   },
   {
     id: "action:theme-light",
     kind: "action",
-    title: "Theme: light",
+    title: "Color scheme: light",
     keywords: "appearance colour color",
     action: { type: "theme", theme: "light" },
   },
   {
     id: "action:theme-system",
     kind: "action",
-    title: "Theme: system",
+    title: "Color scheme: system",
     keywords: "appearance colour color auto",
     action: { type: "theme", theme: "system" },
   },
+  // A named theme each (#503), once there is more than one to choose.
+  ...(PALETTE_INFO.length > 1
+    ? PALETTE_INFO.map(
+        (p): Command => ({
+          id: `action:palette-${p.name}`,
+          kind: "action",
+          title: `Theme: ${p.label}`,
+          subtitle: p.description,
+          keywords: "appearance colour color palette",
+          action: { type: "palette", palette: p.name },
+        }),
+      )
+    : []),
 ];
 
 /** What `GET /api/search` answers with. Deliberately not a source record. */

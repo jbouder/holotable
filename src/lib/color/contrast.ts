@@ -46,32 +46,68 @@ export function over(top: Rgb, alpha: number, bottom: Rgb): Rgb {
   ];
 }
 
+/** One block of tokens: a palette (#503) in one scheme. */
+export interface ThemeBlock {
+  palette: string;
+  scheme: ThemeName;
+  tokens: Record<string, Rgb>;
+}
+
+function blockTokens(css: string, at: number): Record<string, Rgb> {
+  const body = css.slice(at, css.indexOf("}", at));
+  const out: Record<string, Rgb> = {};
+  for (const decl of body.matchAll(/--([a-z0-9-]+):\s*(oklch\([^)]*\))/g)) {
+    const hex = resolveOklchToken(decl[2]);
+    if (hex) out[decl[1]] = hexToRgb(hex);
+  }
+  // An alias of another token in the same block (`--chart-text: var(--muted)`).
+  for (const decl of body.matchAll(/--([a-z0-9-]+):\s*var\(--([a-z0-9-]+)\)/g)) {
+    const target = out[decl[2]];
+    if (target) out[decl[1]] = target;
+  }
+  return out;
+}
+
 /**
- * Every color token of one theme block in `globals.css`, resolved to sRGB.
- * `:root, [data-theme="dark"]` is the dark set and `[data-theme="light"]` the
- * light one.
+ * Every theme block in `globals.css`, resolved to sRGB. Holotable is the two
+ * unqualified blocks (`:root, [data-theme="dark"]` and `[data-theme="light"]`);
+ * any other palette is `[data-palette="<name>"][data-theme="dark|light"]`.
  */
-export function parseThemeTokens(css: string): Record<ThemeName, Record<string, Rgb>> {
-  const block = (selector: RegExp): Record<string, Rgb> => {
+export function parseThemeBlocks(css: string): ThemeBlock[] {
+  const at = (selector: RegExp): number => {
     const m = selector.exec(css);
     if (!m) throw new Error(`no theme block matching ${selector}`);
-    const body = css.slice(m.index + m[0].length, css.indexOf("}", m.index));
-    const out: Record<string, Rgb> = {};
-    for (const decl of body.matchAll(/--([a-z0-9-]+):\s*(oklch\([^)]*\))/g)) {
-      const hex = resolveOklchToken(decl[2]);
-      if (hex) out[decl[1]] = hexToRgb(hex);
-    }
-    // An alias of another token in the same block (`--chart-text: var(--muted)`).
-    for (const decl of body.matchAll(/--([a-z0-9-]+):\s*var\(--([a-z0-9-]+)\)/g)) {
-      const target = out[decl[2]];
-      if (target) out[decl[1]] = target;
-    }
-    return out;
+    return m.index + m[0].length;
   };
-  return {
-    dark: block(/:root,\s*\[data-theme="dark"\]\s*\{/),
-    light: block(/\[data-theme="light"\]\s*\{/),
-  };
+  const blocks: ThemeBlock[] = [
+    {
+      palette: "holotable",
+      scheme: "dark",
+      tokens: blockTokens(css, at(/:root,\s*\[data-theme="dark"\]\s*\{/)),
+    },
+    {
+      palette: "holotable",
+      scheme: "light",
+      tokens: blockTokens(css, at(/(?:^|\n)\[data-theme="light"\]\s*\{/)),
+    },
+  ];
+  for (const m of css.matchAll(
+    /\[data-palette="([a-z0-9-]+)"\]\[data-theme="(dark|light)"\]\s*\{/g,
+  )) {
+    blocks.push({
+      palette: m[1],
+      scheme: m[2] as ThemeName,
+      tokens: blockTokens(css, (m.index ?? 0) + m[0].length),
+    });
+  }
+  return blocks;
+}
+
+/** Holotable's two blocks, by scheme. */
+export function parseThemeTokens(css: string): Record<ThemeName, Record<string, Rgb>> {
+  const blocks = parseThemeBlocks(css).filter((b) => b.palette === "holotable");
+  const of = (scheme: ThemeName) => blocks.find((b) => b.scheme === scheme)?.tokens ?? {};
+  return { dark: of("dark"), light: of("light") };
 }
 
 /** One way the interface puts text on a background. */
@@ -160,6 +196,8 @@ export const CONTRAST_PAIRS: readonly ContrastPair[] = [
 export const AA_TEXT = 4.5;
 
 export interface MeasuredPair extends ContrastPair {
+  /** The palette (#503) and scheme measured. */
+  palette: string;
   theme: ThemeName;
   ratio: number;
 }
@@ -171,28 +209,42 @@ export interface MeasuredPair extends ContrastPair {
  */
 export function contrastTable(css: string): string {
   const measured = measureContrast(css);
-  const ratio = (theme: ThemeName, where: string) =>
-    `${measured.find((m) => m.theme === theme && m.where === where)?.ratio.toFixed(2)}:1`;
-  const rows = CONTRAST_PAIRS.map(
-    (p) => `| ${p.where} | ${ratio("dark", p.where)} | ${ratio("light", p.where)} |`,
-  );
-  return ["| Pairing | Dark | Light |", "| --- | --- | --- |", ...rows].join("\n");
+  const palettes = [...new Set(measured.map((m) => m.palette))];
+  const table = (palette: string) => {
+    const ratio = (theme: ThemeName, where: string) =>
+      `${measured.find((m) => m.palette === palette && m.theme === theme && m.where === where)?.ratio.toFixed(2)}:1`;
+    const rows = CONTRAST_PAIRS.map(
+      (p) => `| ${p.where} | ${ratio("dark", p.where)} | ${ratio("light", p.where)} |`,
+    );
+    return ["| Pairing | Dark | Light |", "| --- | --- | --- |", ...rows].join("\n");
+  };
+  // One theme is one table; more get a heading each (#503).
+  if (palettes.length === 1) return table(palettes[0]);
+  return palettes.map((p) => `### ${p}\n\n${table(p)}`).join("\n\n");
 }
 
 export function measureContrast(css: string): MeasuredPair[] {
-  const themes = parseThemeTokens(css);
-  return THEMES.flatMap((theme) => {
-    const t = themes[theme];
+  const blocks = parseThemeBlocks(css);
+  return blocks.flatMap(({ palette, scheme, tokens }) => {
+    // A palette's block sits on top of Holotable's for the same scheme, as
+    // the cascade puts it: a token it does not set is Holotable's.
+    const base =
+      blocks.find((b) => b.palette === "holotable" && b.scheme === scheme)?.tokens ?? {};
     const token = (name: string): Rgb => {
-      const rgb = t[name];
-      if (!rgb) throw new Error(`token --${name} is not defined in the ${theme} theme`);
+      const rgb = tokens[name] ?? base[name];
+      if (!rgb) throw new Error(`token --${name} is not defined in ${palette} ${scheme}`);
       return rgb;
     };
     return CONTRAST_PAIRS.map((pair) => {
       const base = token(pair.on);
       const tint = pair.tint;
       const bg = tint ? over(token(tint.token), tint.alpha, base) : base;
-      return { ...pair, theme, ratio: contrastRatio(token(pair.text), bg) };
+      return {
+        ...pair,
+        palette,
+        theme: scheme,
+        ratio: contrastRatio(token(pair.text), bg),
+      };
     });
   });
 }

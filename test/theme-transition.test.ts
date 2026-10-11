@@ -1,7 +1,18 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { THEME_EVENT, THEME_STORAGE_KEY } from "@/lib/theme";
-import { applyThemeWithTransition, setThemeWithTransition } from "@/lib/theme-transition";
+import {
+  isPalette,
+  PALETTE_EVENT,
+  PALETTE_STORAGE_KEY,
+  savedPalette,
+  THEME_EVENT,
+  THEME_STORAGE_KEY,
+} from "@/lib/theme";
+import {
+  applyThemeWithTransition,
+  setPaletteWithTransition,
+  setThemeWithTransition,
+} from "@/lib/theme-transition";
 // Installs a jsdom document; it has no View Transitions API, which is the
 // fallback being pinned here.
 import "./support/dom";
@@ -72,4 +83,30 @@ test("under Reduce the write is immediate even when the API exists", () => {
   } finally {
     delete (document as unknown as { startViewTransition?: unknown }).startViewTransition;
   }
+});
+
+test("a palette applies, stores and broadcasts like the scheme; only shipped ones are read back", () => {
+  // #503
+  reset();
+  let announced: string | null = null;
+  const onPalette = (e: Event) => {
+    announced = (e as CustomEvent<string>).detail;
+  };
+  window.addEventListener(PALETTE_EVENT, onPalette);
+  try {
+    setPaletteWithTransition("holotable");
+    assert.equal(document.documentElement.dataset.palette, "holotable");
+    assert.equal(window.localStorage.getItem(PALETTE_STORAGE_KEY), "holotable");
+    assert.equal(announced, "holotable");
+  } finally {
+    window.removeEventListener(PALETTE_EVENT, onPalette);
+  }
+  // A reserved name with no CSS, or junk, reads back as the fallback.
+  window.localStorage.setItem(PALETTE_STORAGE_KEY, "graphite");
+  assert.equal(savedPalette(), "holotable");
+  window.localStorage.setItem(PALETTE_STORAGE_KEY, "neon");
+  assert.equal(savedPalette("holotable"), "holotable");
+  assert.equal(isPalette("holotable"), true);
+  assert.equal(isPalette("graphite"), false, "reserved until it ships");
+  window.localStorage.removeItem(PALETTE_STORAGE_KEY);
 });
