@@ -202,11 +202,11 @@ export const config = {
 
   /**
    * The deadline for one model request, retries and backoff waits included
-   * (#22). Keep it below the generate and chat routes' 60s `maxDuration`, or
+   * (#22). Keep it below the model-backed routes' 120s `maxDuration`, or
    * the platform cuts the response first, with no error. Documented default:
-   * 45s.
+   * 90s, which a whole dashboard from a slower model needs.
    */
-  aiRequestTimeoutMs: num("AI_REQUEST_TIMEOUT_MS", 45_000),
+  aiRequestTimeoutMs: num("AI_REQUEST_TIMEOUT_MS", 90_000),
 
   /**
    * Most model calls in flight on this server, across every workspace and
@@ -488,11 +488,11 @@ const httpUrl = (what: string) =>
   });
 
 /**
- * The `maxDuration` of the model-backed routes (`/api/generate`,
- * `/api/sources/generate`, the dashboard chat), in milliseconds.
- * `test/config.test.ts` holds it to the routes.
+ * The `maxDuration` of every route that may call a model (generation, both
+ * chats, MCP, the model tests), in milliseconds. `test/config.test.ts` holds
+ * it to the routes.
  */
-export const AI_ROUTE_MAX_DURATION_MS = 60_000;
+export const AI_ROUTE_MAX_DURATION_MS = 120_000;
 
 const positiveInt = z.coerce
   .number({ error: "must be a positive integer" })
@@ -925,7 +925,7 @@ export function validateConfig(
   ) {
     warning(
       "AI_REQUEST_TIMEOUT_MS",
-      `is ${values.AI_REQUEST_TIMEOUT_MS}; the generate and chat routes end at ${AI_ROUTE_MAX_DURATION_MS}ms, so a hung model would be cut off without an error. Set it below that, e.g. 45000.`,
+      `is ${values.AI_REQUEST_TIMEOUT_MS}; the generate and chat routes end at ${AI_ROUTE_MAX_DURATION_MS}ms, so a hung model would be cut off without an error. Set it below that, e.g. 90000.`,
     );
   }
 

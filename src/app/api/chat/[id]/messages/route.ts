@@ -16,7 +16,7 @@ import { getDashboardById, getSourceById } from "@/lib/db/repo";
 import { readJson, route } from "@/lib/http";
 
 export const runtime = "nodejs";
-export const maxDuration = 60;
+export const maxDuration = 120;
 
 /**
  * One turn of a kept conversation (#416). The browser sends only the new

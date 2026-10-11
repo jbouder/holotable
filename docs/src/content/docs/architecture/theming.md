@@ -124,8 +124,9 @@ code, and `e2e/a11y.spec.ts` scans every shipped theme in both schemes.
 Contrast is the floor, not the bar. `src/lib/color/quality.ts` holds each
 theme, in each scheme, to rules that contrast alone does not cover, and
 `test/theme-quality.test.ts` fails on any of them. `npm run themes:check`
-prints every measurement as a table for whoever is tuning a theme
-(`-- --operator` for the operator tier).
+prints every measurement as a table for whoever is tuning a theme, each
+theme at the tier the test holds it to (`-- --operator` puts every theme at
+the operator tier).
 
 | Rule | Measures | Floor |
 | --- | --- | --- |

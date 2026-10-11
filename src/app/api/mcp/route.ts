@@ -16,7 +16,7 @@ import type { McpTool } from "@/lib/mcp/tool";
 export const runtime = "nodejs";
 
 /** The generation tools call the model, under the same deadline as `/api/generate`. */
-export const maxDuration = 60;
+export const maxDuration = 120;
 
 /**
  * The MCP endpoint (#149, #148).

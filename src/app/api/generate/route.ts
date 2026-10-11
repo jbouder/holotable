@@ -35,7 +35,7 @@ import { linkableIds } from "@/lib/ai/prompt";
 import { LINK_TARGETS_HEADER, linkTargetsHeader } from "@/lib/ai/link-targets";
 
 export const runtime = "nodejs";
-export const maxDuration = 60;
+export const maxDuration = 120;
 
 const GenerateBody = z.discriminatedUnion("mode", [
   z.object({

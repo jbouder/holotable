@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs";
 import { test } from "node:test";
 import { hexToRgb, parseThemeBlocks } from "@/lib/color/contrast";
 import { DEFICIENCIES, deltaE, MACHADO, simulate } from "@/lib/color/cvd";
-import { type QualityTier, qualityReport } from "@/lib/color/quality";
+import { type QualityTier, qualityReport, shippedTier } from "@/lib/color/quality";
 import { PALETTE_INFO } from "@/lib/theme";
 
 /*
@@ -16,16 +16,10 @@ import { PALETTE_INFO } from "@/lib/theme";
 const CSS = readFileSync(new URL("../src/app/globals.css", import.meta.url), "utf8");
 const BLOCKS = parseThemeBlocks(CSS);
 
-/** The tier a shipped theme is held to: high contrast its own, every other built in. */
-const tierOf = (palette: string) =>
-  PALETTE_INFO.find((p) => p.name === palette)?.highContrast
-    ? "high-contrast"
-    : "builtin";
-
 test("every shipped theme clears its quality bar in both schemes", () => {
   assert.ok(BLOCKS.length >= 2);
   const failures = BLOCKS.flatMap((b) =>
-    qualityReport(b.tokens, tierOf(b.palette))
+    qualityReport(b.tokens, shippedTier(b.palette))
       .filter((m) => !m.ok)
       .map(
         (m) =>
