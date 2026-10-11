@@ -9,6 +9,16 @@ import { Dialog } from "@/components/ui/dialog";
 import { ErrorDisplay } from "@/components/ui/error-display";
 import { Input, Label, Textarea } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
+import { ThemePreview } from "@/components/settings/theme-preview";
+import { withEmbedAppearance } from "@/lib/embed-appearance";
+import {
+  DEFAULT_PALETTE_ATTRIBUTE,
+  isPalette,
+  isTheme,
+  type Palette,
+  PALETTE_INFO,
+  THEMES,
+} from "@/lib/theme";
 import { type ApiError, apiErrorFromThrown, readApiError } from "@/lib/errors";
 import type { TimeRange } from "@/lib/ir";
 import { describeIssue } from "@/lib/panel-options";
@@ -20,10 +30,28 @@ const EXPIRY_OPTIONS = [1, 7, 30, SHARE_MAX_DAYS].map((d) => ({
   label: d === 1 ? "1 day" : `${d} days`,
 }));
 
+const SCHEME_LABELS = {
+  dark: "Dark",
+  light: "Light",
+  system: "The viewer's system",
+} as const;
+
+/**
+ * The server's default theme, which a link with no theme gets, for the
+ * preview of "Default". The root layout writes it on `<html>`; the page's own
+ * `data-palette` is this editor's choice, not what a viewer will see.
+ */
+function defaultPalette(): Palette {
+  if (typeof document === "undefined") return PALETTE_INFO[0].name;
+  const value = document.documentElement.getAttribute(DEFAULT_PALETTE_ATTRIBUTE);
+  return isPalette(value) ? value : PALETTE_INFO[0].name;
+}
+
 /**
  * Create, list and revoke a dashboard's read-only share links (#65). A new
  * link's URL is shown once, here: the server keeps only its hash.
  */
+
 export function ShareDialog({
   dashboardId,
   open,
@@ -38,6 +66,13 @@ export function ShareDialog({
 }) {
   const display = useTimeDisplay();
   const [shares, setShares] = React.useState<ShareView[] | null>(null);
+  // The theme the link carries (#509); "default" writes nothing into it.
+  const [linkPalette, setLinkPalette] = React.useState("default");
+  const [linkScheme, setLinkScheme] = React.useState("default");
+  const appearance = {
+    palette: isPalette(linkPalette) ? linkPalette : null,
+    scheme: isTheme(linkScheme) ? linkScheme : null,
+  };
   const [error, setError] = React.useState<ApiError | null>(null);
   const [label, setLabel] = React.useState("");
   const [days, setDays] = React.useState("30");
@@ -46,6 +81,7 @@ export function ShareDialog({
   const [problem, setProblem] = React.useState<string | null>(null);
   const [busy, setBusy] = React.useState(false);
   const [created, setCreated] = React.useState<string | null>(null);
+  const link = created ? withEmbedAppearance(created, appearance) : null;
   const [copied, setCopied] = React.useState(false);
   const base = `/api/dashboards/${encodeURIComponent(dashboardId)}/shares`;
 
@@ -140,14 +176,16 @@ export function ShareDialog({
             <div className="flex gap-2">
               <Input
                 readOnly
-                value={created}
+                value={link ?? ""}
                 aria-label="Share link"
                 className="font-mono text-xs"
               />
               <Button
                 variant="secondary"
                 onClick={() => {
-                  void navigator.clipboard.writeText(created).then(() => setCopied(true));
+                  void navigator.clipboard
+                    .writeText(link ?? created)
+                    .then(() => setCopied(true));
                 }}
               >
                 {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
@@ -198,6 +236,52 @@ export function ShareDialog({
             framed.
           </p>
         </div>
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <div>
+            <Label htmlFor="share-theme">Theme</Label>
+            <Select
+              id="share-theme"
+              className="w-full"
+              value={linkPalette}
+              onValueChange={(v) => {
+                setLinkPalette(v);
+                setCopied(false);
+              }}
+              aria-describedby="share-appearance-hint"
+              options={[
+                { value: "default", label: "Default" },
+                ...PALETTE_INFO.map((p) => ({ value: p.name, label: p.label })),
+              ]}
+            />
+          </div>
+          <div>
+            <Label htmlFor="share-scheme">Color scheme</Label>
+            <Select
+              id="share-scheme"
+              className="w-full"
+              value={linkScheme}
+              onValueChange={(v) => {
+                setLinkScheme(v);
+                setCopied(false);
+              }}
+              aria-describedby="share-appearance-hint"
+              options={[
+                { value: "default", label: "Default" },
+                ...THEMES.map((t) => ({ value: t, label: SCHEME_LABELS[t] })),
+              ]}
+            />
+          </div>
+        </div>
+        <span aria-hidden className="block w-56 max-w-full">
+          <ThemePreview
+            palette={appearance.palette ?? defaultPalette()}
+            scheme={appearance.scheme ?? "dark"}
+          />
+        </span>
+        <p id="share-appearance-hint" className="-mt-1 text-xs text-muted">
+          An embed cannot read the viewer&rsquo;s settings, so the link carries its look.
+          {created && " Changing these changes the link above."}
+        </p>
         <Checkbox
           checked={fixRange}
           label={`Always show ${describeRange(timeRange, new Date(), display)}`}

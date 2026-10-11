@@ -87,6 +87,12 @@ export type Palette = (typeof PALETTES)[number];
 
 export const PALETTE_STORAGE_KEY = "palette";
 
+/**
+ * Where the root layout writes the server's default palette, so a client
+ * component can show what a viewer with no choice of their own will see.
+ */
+export const DEFAULT_PALETTE_ATTRIBUTE = "data-default-palette";
+
 /** The palette when nothing chose one: the server's `THEME_DEFAULT_PALETTE` overrides it. */
 export const DEFAULT_PALETTE: Palette = "holotable";
 

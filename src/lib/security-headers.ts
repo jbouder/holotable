@@ -26,6 +26,12 @@ export const EMBED_PATH_PREFIX = "/embed/";
 /** The request header the proxy marks an embed render with, for the root layout. */
 export const EMBED_REQUEST_HEADER = "x-holotable-embed";
 
+/**
+ * An embed's validated theme and scheme from its link (#509), from the proxy
+ * to the root layout. Cleared on every request first, like the embed header.
+ */
+export const EMBED_APPEARANCE_HEADER = "x-holotable-embed-appearance";
+
 export interface SecurityHeader {
   key: string;
   value: string;

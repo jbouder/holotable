@@ -16,7 +16,13 @@ import { LOCAL_TIME_DISPLAY } from "@/lib/time-display";
 import { HistoryPreferencesProvider } from "@/components/history-preferences";
 import { ChartPatternsProvider } from "@/components/chart-patterns";
 import { TimeDisplayProvider } from "@/components/time-display";
-import { EMBED_REQUEST_HEADER, NONCE_REQUEST_HEADER } from "@/lib/security-headers";
+import {
+  EMBED_APPEARANCE_HEADER,
+  EMBED_REQUEST_HEADER,
+  NONCE_REQUEST_HEADER,
+} from "@/lib/security-headers";
+import { NO_EMBED_APPEARANCE, readEmbedAppearanceHeader } from "@/lib/embed-appearance";
+import { DEFAULT_PALETTE_ATTRIBUTE } from "@/lib/theme";
 import { bootstrapScript } from "@/lib/bootstrap";
 
 const fontSans = Chakra_Petch({
@@ -49,6 +55,10 @@ export default async function RootLayout({
   // palette, and no session read at all. The proxy sets this and strips it
   // from any request that sent it itself.
   const embed = requestHeaders.get(EMBED_REQUEST_HEADER) === "1";
+  // An embed's link may pin its theme and scheme (#509), read back validated.
+  const pinned = embed
+    ? readEmbedAppearanceHeader(requestHeaders.get(EMBED_APPEARANCE_HEADER))
+    : NO_EMBED_APPEARANCE;
   // The palette searches an authenticated endpoint, so it is not mounted for a
   // signed-out visitor: a Cmd+K that could only ever answer 401 is worse than
   // no Cmd+K.
@@ -78,8 +88,9 @@ export default async function RootLayout({
     <html
       lang="en"
       className={`h-full antialiased ${embed ? "" : "scroll-pt-14"} ${fontSans.variable} ${fontMono.variable}`}
-      data-theme="dark"
-      data-palette={config.themeDefaultPalette}
+      data-theme={pinned.scheme === "light" ? "light" : "dark"}
+      data-palette={pinned.palette ?? config.themeDefaultPalette}
+      {...{ [DEFAULT_PALETTE_ATTRIBUTE]: config.themeDefaultPalette }}
       suppressHydrationWarning
     >
       <head>
@@ -100,7 +111,7 @@ export default async function RootLayout({
           suppressHydrationWarning
           // biome-ignore lint/security/noDangerouslySetInnerHtml: constant script, must run before first paint
           dangerouslySetInnerHTML={{
-            __html: bootstrapScript(config.themeDefaultPalette),
+            __html: bootstrapScript(config.themeDefaultPalette, pinned),
           }}
         />
       </head>

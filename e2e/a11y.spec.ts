@@ -7,6 +7,7 @@ import {
   createDrilldownDashboards,
   createLinkedDashboards,
   createPromqlDashboard,
+  createShareLink,
   DEMO_DASHBOARD,
   dashboardId,
   waitForPanels,
@@ -301,4 +302,50 @@ test.describe("forced colors", () => {
     await expect(button).toHaveCSS("outline-style", "solid");
     await expect(button).toHaveCSS("outline-width", "2px");
   });
+});
+
+test("an embed is drawn in the theme its link names, and only a shipped one", async ({
+  browser,
+  request,
+}) => {
+  // #509: an embed's storage is empty or the host's, so the link carries the
+  // look. A fresh context has no storage at all.
+  const url = new URL(
+    await createShareLink(request, await dashboardId(request, DEMO_DASHBOARD)),
+  );
+  const path = `${url.pathname}${url.search}`;
+  // Reduced motion through the system setting, so storage stays empty and
+  // axe does not catch the panels mid-entrance.
+  const context = await browser.newContext({
+    storageState: { cookies: [], origins: [] },
+    reducedMotion: "reduce",
+  });
+  const page = await context.newPage();
+  await page.goto(`${path}&theme=paper&scheme=light`, { waitUntil: "domcontentloaded" });
+  await expect(page.locator("html")).toHaveAttribute("data-palette", "paper");
+  await expect(page.locator("html")).toHaveAttribute("data-theme", "light");
+  await waitForPanels(page);
+  await expectNoA11yViolations(page);
+  // Anything else is the default, and never written into the page as a
+  // value: a distinctive name, so an echo cannot hide behind encoding.
+  const hostile = await page.goto(`${path}&theme=zzhostile&scheme=zzscheme`);
+  const body = (await hostile?.text()) ?? "";
+  for (const value of ["zzhostile", "zzscheme"]) {
+    expect(body.match(new RegExp(`data-[a-z-]+="${value}"|"${value}"`))).toBeNull();
+  }
+  await expect(page.locator("html")).toHaveAttribute("data-palette", "holotable");
+  await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
+  await context.close();
+});
+
+test("the share dialog's theme choice", async ({ page, request }) => {
+  // #509: reachable and scanned, in the dialog that writes it into the link.
+  await setAppearance(page, "dark");
+  await page.goto(`/dashboards/${await dashboardId(request, DEMO_DASHBOARD)}`);
+  await waitForPanels(page);
+  await page.getByRole("button", { name: "More actions" }).click();
+  await page.getByRole("menuitem", { name: /Share read-only/ }).click();
+  const dialog = page.getByRole("dialog", { name: "Share read-only" });
+  await expect(dialog.getByRole("combobox", { name: "Theme" })).toBeVisible();
+  await expectNoA11yViolations(page);
 });

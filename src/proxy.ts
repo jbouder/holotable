@@ -1,9 +1,11 @@
 import { type NextRequest, NextResponse } from "next/server";
+import { embedAppearance, embedAppearanceHeader } from "@/lib/embed-appearance";
 import { publicOrigin } from "@/lib/auth/origin";
 import { config as appConfig } from "@/lib/config";
 import { shareFrameAncestors, verifyShareToken } from "@/lib/auth/share";
 import {
   contentSecurityPolicy,
+  EMBED_APPEARANCE_HEADER,
   EMBED_PATH_PREFIX,
   EMBED_REQUEST_HEADER,
   contentSecurityPolicyHeaderName,
@@ -77,7 +79,15 @@ export async function proxy(request: NextRequest): Promise<NextResponse> {
   // The root layout leaves out the app's chrome for an embed; set here so a
   // request cannot claim it, and cleared on every other path.
   requestHeaders.delete(EMBED_REQUEST_HEADER);
-  if (embed) requestHeaders.set(EMBED_REQUEST_HEADER, "1");
+  requestHeaders.delete(EMBED_APPEARANCE_HEADER);
+  if (embed) {
+    requestHeaders.set(EMBED_REQUEST_HEADER, "1");
+    // The link's theme and scheme (#509), validated; only shipped names pass.
+    requestHeaders.set(
+      EMBED_APPEARANCE_HEADER,
+      embedAppearanceHeader(embedAppearance(request.nextUrl.searchParams)),
+    );
+  }
 
   const response = NextResponse.next({ request: { headers: requestHeaders } });
   response.headers.set(header, policy);

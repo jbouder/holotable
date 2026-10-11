@@ -117,6 +117,36 @@ test("the bootstrap script puts a shipped palette on <html>, else the server's d
   assert.equal(palette(null, bootstrapScript("holotable")), "holotable");
 });
 
+test("an embed's link pins its theme and scheme over anything stored", () => {
+  // #509: an embed's storage belongs to the host's origin, if any; the link wins.
+  const run = (script: string, dark: boolean) => {
+    const dataset: Record<string, string> = {};
+    runInNewContext(script, {
+      document: { documentElement: { dataset, style: {} } },
+      localStorage: {
+        getItem: (key: string) => ({ theme: "dark", palette: "fjord" })[key] ?? null,
+      },
+      matchMedia: () => ({ matches: dark }),
+    });
+    return dataset;
+  };
+  const pinned = run(
+    bootstrapScript("holotable", { palette: "paper", scheme: "light" }),
+    true,
+  );
+  assert.equal(pinned.palette, "paper");
+  assert.equal(pinned.theme, "light");
+  // `system` is the host's own scheme, the one thing an iframe can read.
+  assert.equal(
+    run(bootstrapScript("holotable", { palette: null, scheme: "system" }), false).theme,
+    "light",
+  );
+  // Nothing pinned is today's behavior: storage, then the defaults.
+  const unpinned = run(bootstrapScript("holotable"), false);
+  assert.equal(unpinned.palette, "fjord");
+  assert.equal(unpinned.theme, "dark");
+});
+
 /* ---------- The helpers (#234) ---------- */
 
 test("isMotionActive reads the resolved attribute", () => {

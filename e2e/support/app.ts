@@ -221,3 +221,12 @@ export async function askChat(page: Page, question = "Which service is busiest?"
   await page.getByRole("textbox", { name: "Message" }).fill(question);
   await page.keyboard.press("Enter");
 }
+
+/** A fresh read-only share link to a dashboard, as its absolute embed URL. */
+export async function createShareLink(request: APIRequestContext, dashboard: string) {
+  const res = await request.post(`/api/dashboards/${dashboard}/shares`, {
+    data: { label: "e2e", expiresInDays: 1 },
+  });
+  expect(res.ok(), `POST shares answered ${res.status()}`).toBe(true);
+  return ((await res.json()) as { url: string }).url;
+}

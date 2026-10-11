@@ -15,6 +15,9 @@ An editor opens **More actions → Share read-only…** on a dashboard and choos
 - **Sites that may embed it:** exact origins such as `https://wiki.example.com`.
   With none, the link opens on its own page and cannot be framed.
 - **Always show** the dashboard's current window, or follow its own range.
+- **Theme** and **Color scheme:** how the link is drawn, with a preview.
+  An embed cannot read the viewer's settings, so the link carries them.
+  Changing either rewrites the link shown above the form, before you copy it.
 
 The URL, `/embed/dashboards/<id>?token=hts_…`, is shown **once**. The server
 keeps only the token's SHA-256, so it cannot be shown again. **Revoke** stops
@@ -58,6 +61,22 @@ proxy reads those origins from the token and sets `frame-ancestors` to exactly
 them; the embed path has no `X-Frame-Options`. Every other page keeps
 `frame-ancestors 'none'` and `X-Frame-Options: DENY`. The stream authenticates
 with the token in its URL, so it does not depend on third-party cookies.
+
+### The theme a link carries
+
+An embed sits in someone else's page, where Holotable's stored settings are
+not available. So the link names its look with two query parameters:
+
+| Parameter | Values | Without it |
+| --- | --- | --- |
+| `theme` | A shipped theme: `holotable`, `graphite`, `fjord`, `paper`, `high-contrast` | What the viewer's browser has stored for Holotable, else the server's `THEME_DEFAULT_PALETTE` |
+| `scheme` | `light`, `dark`, or `system`, the viewer's device setting when the embed loads | What the viewer's browser has stored, else dark |
+
+The proxy checks both against the shipped names. Anything else is treated as
+absent, and is never written into the page or a header. The parameters are
+applied before first paint and win over anything stored. They change nothing
+about what the link may show: that is decided by the token alone. A link
+without them behaves exactly as before.
 
 ## Treat a link as a credential
 
