@@ -125,3 +125,23 @@ test("in the editor, Delete on a focused panel tile removes it, and undo restore
     1,
   );
 });
+
+test("the theme gallery is a radio group: arrows move and choose, focus shows", async ({
+  page,
+}) => {
+  // #507: a ChoiceCard group. Tab reaches the chosen card, an arrow key moves
+  // to the next one and chooses it, and the page follows at once.
+  await page.goto("/settings/appearance");
+  const themes = page.getByRole("radiogroup", { name: "Theme" });
+  const holotable = themes.getByRole("radio", { name: "Holotable" });
+  await expect(holotable).toHaveAttribute("aria-checked", "true");
+  await holotable.focus();
+  await page.keyboard.press("ArrowRight");
+  const graphite = themes.getByRole("radio", { name: "Graphite" });
+  await expect(graphite).toBeFocused();
+  await expect(graphite).toHaveAttribute("aria-checked", "true");
+  await expect(page.locator("html")).toHaveAttribute("data-palette", "graphite");
+  expect((await focusIndicator(page)).visible).toBe(true);
+  // Every card is named by its label and described by its sentence.
+  await expect(graphite).toHaveAccessibleDescription(/violet accent/);
+});

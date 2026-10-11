@@ -9,8 +9,9 @@ import {
 } from "@/components/theme-toggle";
 import { useMotionPreference } from "@/components/motion-preference";
 import type { Motion } from "@/lib/motion";
+import { ThemePreview } from "@/components/settings/theme-preview";
+import { ChoiceCard, ChoiceCardGroup } from "@/components/ui/choice-card";
 import { type Palette, PALETTE_INFO, type Theme } from "@/lib/theme";
-import { cn } from "@/lib/utils";
 
 const MOTION_OPTIONS: { value: Motion; label: string; hint: string }[] = [
   {
@@ -43,58 +44,40 @@ function Swatch({ theme, palette }: { theme: "light" | "dark"; palette?: Palette
   );
 }
 
-function Preview({ theme }: { theme: Theme }) {
+function SchemePreview({ theme, palette }: { theme: Theme; palette: Palette }) {
   return (
-    <span aria-hidden className="flex h-14 w-full overflow-hidden border border-border">
+    <span className="flex h-14 w-full overflow-hidden rounded-lg border border-border">
       {theme === "system" ? (
         <>
-          <Swatch theme="light" />
-          <Swatch theme="dark" />
+          <Swatch theme="light" palette={palette} />
+          <Swatch theme="dark" palette={palette} />
         </>
       ) : (
-        <Swatch theme={theme} />
+        <Swatch theme={theme} palette={palette} />
       )}
     </span>
   );
 }
 
-/**
- * One native radio, visually a card. The `<input>` stays in the DOM (only
- * visually hidden) and the whole card is its `<label>`, so keyboard, screen
- * reader and form semantics are the browser's own.
- */
-function Choice({
-  name,
-  value,
-  checked,
-  onChange,
+/** A fieldset whose legend names the radio group inside it. */
+function Group({
+  legend,
+  hint,
   children,
 }: {
-  name: string;
-  value: string;
-  checked: boolean;
-  onChange: () => void;
-  children: React.ReactNode;
+  legend: string;
+  hint: string;
+  children: (labelledBy: string) => React.ReactNode;
 }) {
+  const id = React.useId();
   return (
-    <label
-      className={cn(
-        "flex cursor-pointer flex-col gap-2 border p-3 text-sm has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-ring",
-        checked
-          ? "border-primary bg-surface"
-          : "border-border bg-surface hover:bg-surface-2",
-      )}
-    >
-      <input
-        type="radio"
-        name={name}
-        value={value}
-        checked={checked}
-        onChange={onChange}
-        className="sr-only"
-      />
-      {children}
-    </label>
+    <fieldset>
+      <legend id={id} className="text-sm font-semibold">
+        {legend}
+      </legend>
+      <p className="mt-1 text-sm text-muted">{hint}</p>
+      <div className="mt-3">{children(id)}</div>
+    </fieldset>
   );
 }
 
@@ -106,6 +89,7 @@ function ChartPatternsSetting({ initial }: { initial: boolean }) {
   const apply = useSetChartPatterns();
   const [on, setOn] = React.useState(initial);
   const [error, setError] = React.useState<string | null>(null);
+  const id = React.useId();
 
   async function save(value: boolean) {
     const previous = on;
@@ -127,28 +111,26 @@ function ChartPatternsSetting({ initial }: { initial: boolean }) {
 
   return (
     <fieldset>
-      <legend className="text-sm font-semibold">Patterns in charts</legend>
+      <legend id={id} className="text-sm font-semibold">
+        Patterns in charts
+      </legend>
       <p className="mt-1 text-sm text-muted">
         Fill bars, slices and areas with patterns as well as colors, so series can be told
         apart without color.
       </p>
-      <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
-        {[
-          { value: false, label: "Off", hint: "Solid colors." },
-          { value: true, label: "On", hint: "Each series also gets a pattern." },
-        ].map((option) => (
-          <Choice
-            key={option.label}
-            name="chart-patterns"
-            value={String(option.value)}
-            checked={on === option.value}
-            onChange={() => void save(option.value)}
-          >
-            <span className="font-medium">{option.label}</span>
-            <span className="text-xs text-muted">{option.hint}</span>
-          </Choice>
-        ))}
-      </div>
+      <ChoiceCardGroup
+        value={String(on)}
+        onValueChange={(v) => void save(v === "true")}
+        labelledBy={id}
+        className="mt-3 sm:grid-cols-2"
+      >
+        <ChoiceCard value="false" label="Off" description="Solid colors." />
+        <ChoiceCard
+          value="true"
+          label="On"
+          description="Each series also gets a pattern."
+        />
+      </ChoiceCardGroup>
       {error && (
         <p role="alert" className="mt-2 text-sm text-danger">
           {error}
@@ -169,80 +151,76 @@ export function AppearanceSettings({ chartPatterns }: { chartPatterns: boolean }
 
   return (
     <>
-      {/* The named themes (#503), once there is more than one to choose. */}
-      {PALETTE_INFO.length > 1 && (
-        <fieldset>
-          <legend className="text-sm font-semibold">Theme</legend>
-          <p className="mt-1 text-sm text-muted">
-            The colors the app is drawn in, in light and dark.
-          </p>
-          <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-3">
-            {PALETTE_INFO.map((p) => (
-              <Choice
-                key={p.name}
-                name="palette"
-                value={p.name}
-                checked={palette === p.name}
-                onChange={() => setPalette(p.name)}
+      <Group
+        legend="Color scheme"
+        hint="Also in the account menu and the command palette."
+      >
+        {(labelledBy) => (
+          <ChoiceCardGroup
+            value={theme}
+            onValueChange={setTheme}
+            labelledBy={labelledBy}
+            className="sm:grid-cols-3"
+          >
+            {THEME_OPTIONS.map(({ value, label, Icon }) => (
+              <ChoiceCard
+                key={value}
+                value={value}
+                label={
+                  <>
+                    <Icon className="h-4 w-4" aria-hidden /> {label}
+                  </>
+                }
               >
-                <span
-                  aria-hidden
-                  className="flex h-14 w-full overflow-hidden border border-border"
-                >
-                  <Swatch theme="light" palette={p.name} />
-                  <Swatch theme="dark" palette={p.name} />
-                </span>
-                <span className="font-medium">{p.label}</span>
-                <span className="text-xs text-muted">{p.description}</span>
-              </Choice>
+                <SchemePreview theme={value} palette={palette} />
+              </ChoiceCard>
             ))}
-          </div>
-        </fieldset>
+          </ChoiceCardGroup>
+        )}
+      </Group>
+
+      {/* The named themes (#503), each drawn in the chosen scheme (#507). */}
+      {PALETTE_INFO.length > 1 && (
+        <Group
+          legend="Theme"
+          hint="The colors the app is drawn in. Each is shown in the color scheme above."
+        >
+          {(labelledBy) => (
+            <ChoiceCardGroup
+              value={palette}
+              onValueChange={setPalette}
+              labelledBy={labelledBy}
+              className="sm:grid-cols-2 lg:grid-cols-3"
+            >
+              {PALETTE_INFO.map((p) => (
+                <ChoiceCard
+                  key={p.name}
+                  value={p.name}
+                  label={p.label}
+                  description={p.description}
+                >
+                  <ThemePreview palette={p.name} scheme={theme} />
+                </ChoiceCard>
+              ))}
+            </ChoiceCardGroup>
+          )}
+        </Group>
       )}
 
-      <fieldset>
-        <legend className="text-sm font-semibold">Color scheme</legend>
-        <p className="mt-1 text-sm text-muted">
-          Also in the account menu and the command palette.
-        </p>
-        <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-3">
-          {THEME_OPTIONS.map(({ value, label, Icon }) => (
-            <Choice
-              key={value}
-              name="theme"
-              value={value}
-              checked={theme === value}
-              onChange={() => setTheme(value)}
-            >
-              <Preview theme={value} />
-              <span className="flex items-center gap-2">
-                <Icon className="h-4 w-4" aria-hidden /> {label}
-              </span>
-            </Choice>
-          ))}
-        </div>
-      </fieldset>
-
-      <fieldset>
-        <legend className="text-sm font-semibold">Motion</legend>
-        <p className="mt-1 text-sm text-muted">
-          Chart animation, transitions and loading shimmer.
-        </p>
-        <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-3">
-          {MOTION_OPTIONS.map(({ value, label, hint }) => (
-            <Choice
-              key={value}
-              name="motion"
-              value={value}
-              checked={motion === value}
-              onChange={() => setMotion(value)}
-            >
-              <span className="font-medium">{label}</span>
-              <span className="text-xs text-muted">{hint}</span>
-            </Choice>
-          ))}
-        </div>
-      </fieldset>
+      <Group legend="Motion" hint="Chart animation, transitions and loading shimmer.">
+        {(labelledBy) => (
+          <ChoiceCardGroup
+            value={motion}
+            onValueChange={setMotion}
+            labelledBy={labelledBy}
+            className="sm:grid-cols-3"
+          >
+            {MOTION_OPTIONS.map(({ value, label, hint }) => (
+              <ChoiceCard key={value} value={value} label={label} description={hint} />
+            ))}
+          </ChoiceCardGroup>
+        )}
+      </Group>
 
       <p className="text-xs text-muted">
         Theme, color scheme and motion are kept in this browser and apply before the page

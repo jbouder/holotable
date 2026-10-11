@@ -200,6 +200,7 @@ thing and match it.
   `src/` free of color literals outside `src/lib/color/` and `globals.css`.
 - Use the primitives in `src/components/ui/` before writing markup:
   `Button` / `ButtonLink`, `Input`, `Select`, `Autocomplete`, `Checkbox`,
+  `ChoiceCard` (two to five pictured options, one chosen),
   `Menu`, `Popover`, `Dialog`, `ConfirmDialog`, `Card`, `Table`, `Badge`,
   `PageHeader`, `EmptyState`, `Skeleton`, `ErrorDisplay`. A new kind of
   control becomes a primitive there, built on Base UI and styled like its

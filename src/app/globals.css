@@ -136,6 +136,12 @@
   --code-string: var(--success);
   --code-number: var(--warning);
   --code-comment: var(--muted);
+  /* Repeated from the dark block, so a light preview inside a page in
+     another theme (Settings, #507) does not inherit that theme's values. */
+  --tint-5: 5%;
+  --tint-10: 10%;
+  --tint-15: 15%;
+  --tint-20: 20%;
   --tint-danger: var(--danger);
   --tint-warning: var(--warning);
   --tint-success: var(--success);
@@ -145,6 +151,7 @@
   --tinted-danger: var(--danger);
   --tinted-warning: var(--warning);
   --tinted-success: var(--success);
+  --radius: 0;
 }
 
 /*
@@ -495,6 +502,7 @@
   --color-chart-6: var(--chart-6);
   --color-chart-7: var(--chart-7);
   --color-chart-8: var(--chart-8);
+  --color-chart-grid: var(--chart-grid);
   --color-background: var(--background);
   --color-surface: var(--surface);
   --color-surface-2: var(--surface-2);
