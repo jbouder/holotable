@@ -1,3 +1,4 @@
+import { countTruncation } from "@/lib/metrics";
 import { fitToWindow } from "@/lib/stream-merge";
 import type { UIMessage } from "ai";
 import { z } from "zod";
@@ -340,7 +341,7 @@ export async function runStoredPanel(input: {
     const range = resolveTimeRange(scope.timeRange);
     // Held to the dashboard's point budget (#486), so a panel reads the same
     // here as on a dashboard, badge included.
-    const fitted = fitToWindow(result, config.maxWindowPoints);
+    const fitted = countTruncation(fitToWindow(result, config.maxWindowPoints));
     return {
       ...fitted,
       window: { from: range.from.getTime(), to: range.to.getTime() },

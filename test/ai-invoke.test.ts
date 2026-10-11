@@ -13,6 +13,7 @@ import {
   withRetry,
 } from "@/lib/ai/invoke";
 import { stubModel } from "@/lib/ai/stub";
+import { renderMetrics } from "@/lib/metrics";
 
 /*
  * Model timeouts and backoff (#22). The retry and the deadline live in a model
@@ -368,4 +369,47 @@ test("the scan sees an onError the call sets, and not one nested in it", () => {
   const nested = "streamText({ ...modelSettings(), tools: { x: { onError: 1 } } })";
   assert.equal(setsOwnKey(objectAt(own, own.indexOf("{")), "onError"), true);
   assert.equal(setsOwnKey(objectAt(nested, nested.indexOf("{")), "onError"), false);
+});
+
+/** The `holotable_llm_in_flight` reading for the fake model (#490). */
+async function inFlight(): Promise<number> {
+  const m = /holotable_llm_in_flight\{model="fake"\} (\d+)/.exec(await renderMetrics());
+  return m ? Number(m[1]) : 0;
+}
+
+test("a model request counts as in flight until its stream ends, or its deadline", async () => {
+  const stub = stubModel();
+  let started = () => {};
+  const streaming = new Promise<void>((resolve) => {
+    started = resolve;
+  });
+  const fake = fakeModel(async (_, signal) => {
+    started();
+    return stub.doStream({ prompt: [], abortSignal: signal });
+  });
+  const result = streamText({
+    model: resilientModel(fake.model, { timeoutMs: 5_000, maxRetries: 0 }),
+    maxRetries: 0,
+    prompt: "hello",
+  });
+  const text = result.text;
+  await streaming;
+  assert.equal(await inFlight(), 1);
+  await text;
+  assert.equal(await inFlight(), 0);
+
+  const hung = fakeModel((_, signal) => hang(signal));
+  const errors: unknown[] = [];
+  await drain(
+    streamText({
+      model: resilientModel(hung.model, { timeoutMs: 50, maxRetries: 0 }),
+      maxRetries: 0,
+      prompt: "hello",
+      onError: ({ error }) => {
+        errors.push(error);
+      },
+    }),
+    errors,
+  );
+  assert.equal(await inFlight(), 0, "a timed-out request is no longer in flight");
 });

@@ -88,6 +88,43 @@ export function prometheusSelfMetrics(): PrometheusMetric[] {
       ["reason"],
       "Expressions the PromQL guard refused, by reason.",
     ),
+    // Capacity (#490).
+    ...histogram(
+      "holotable_pool_wait_seconds",
+      ["source"],
+      "Time a query waited for a pool connection, in seconds.",
+    ),
+    single(
+      "holotable_pool_in_use",
+      "gauge",
+      ["source"],
+      "Connections checked out of a source's pool.",
+    ),
+    single(
+      "holotable_poller_skips_total",
+      "counter",
+      ["reason"],
+      "Panel executions a poller skipped for a cycle, by why.",
+    ),
+    single(
+      "holotable_sse_bytes_total",
+      "counter",
+      [],
+      "Bytes written to dashboard streams.",
+    ),
+    single(
+      "holotable_sse_drops_total",
+      "counter",
+      ["reason"],
+      "Dashboard streams the server closed, by why.",
+    ),
+    single(
+      "holotable_result_truncations_total",
+      "counter",
+      ["stage"],
+      "Results cut short on the server, by stage.",
+    ),
+    single("holotable_llm_in_flight", "gauge", ["model"], "Model requests running now."),
     single(
       "holotable_process_resident_memory_bytes",
       "gauge",
@@ -197,6 +234,66 @@ function spec(): unknown {
           instant: true,
         },
         layout: { x: 6, y: 6, w: 6, h: 3 },
+      },
+      // Capacity (#490): what runs out first under load.
+      {
+        id: "pool-wait",
+        title: "Pool wait by source (ms)",
+        description:
+          "Mean time a query waited for a connection, per source. Near zero is healthy; a rising line means MAX_POOL_PER_SOURCE is the limit.",
+        viz: "line",
+        format: "ms",
+        query: {
+          sourceId,
+          promql:
+            "1000 * sum by (source) (rate(holotable_pool_wait_seconds_sum[5m])) / sum by (source) (rate(holotable_pool_wait_seconds_count[5m]))",
+        },
+        layout: { x: 0, y: 9, w: 6, h: 3 },
+      },
+      {
+        id: "poller-skips",
+        title: "Poller skips per 5 minutes",
+        description:
+          "Panels that waited out a cycle because their source was busy, by why. Zero is healthy.",
+        viz: "bar",
+        format: "number",
+        query: {
+          sourceId,
+          promql: "sum by (reason) (increase(holotable_poller_skips_total[5m]))",
+          minStep: "5m",
+        },
+        layout: { x: 6, y: 9, w: 6, h: 3 },
+      },
+      {
+        id: "sse-bytes",
+        title: "Stream bytes per minute",
+        description: "Bytes written to every dashboard stream on the instance.",
+        viz: "area",
+        format: "bytes",
+        query: { sourceId, promql: "60 * sum(rate(holotable_sse_bytes_total[5m]))" },
+        layout: { x: 0, y: 12, w: 6, h: 3 },
+      },
+      {
+        id: "capacity-events",
+        title: "Drops and truncations",
+        description:
+          "Streams closed for falling behind, and results cut short by stage. Zero is healthy; a steady count names the limit to raise or the query to narrow.",
+        viz: "table",
+        query: {
+          sourceId,
+          promql:
+            "sum by (reason, stage) (increase(holotable_sse_drops_total[1h]) or increase(holotable_result_truncations_total[1h]))",
+          instant: true,
+        },
+        layout: { x: 6, y: 12, w: 3, h: 3 },
+      },
+      {
+        id: "llm-in-flight",
+        title: "Model requests in flight",
+        viz: "stat",
+        format: "number",
+        query: { sourceId, promql: "sum(holotable_llm_in_flight)", instant: true },
+        layout: { x: 9, y: 12, w: 3, h: 3 },
       },
     ],
   };

@@ -31,6 +31,7 @@ import { pollerSourceSlots, type SourceSlots } from "@/lib/poller/source-slots";
 import {
   forgetDashboard,
   observePollerTick,
+  recordPollerSkip,
   setActivePollers,
   setSseSubscribers,
 } from "@/lib/metrics";
@@ -650,6 +651,7 @@ class DashboardPoller {
       this.intervalOf(panel) / 2,
     );
     if (!release) {
+      recordPollerSkip("in_flight_cap");
       this.notify(panel, { type: "panel-waiting", panelId: panel.id });
       return;
     }
@@ -673,6 +675,7 @@ class DashboardPoller {
       // Every connection was busy (#487): a wait, which the source being
       // slow to free one is not a failure of. Nothing is counted.
       if (err instanceof SourceBusyError) {
+        recordPollerSkip("pool_wait");
         this.notify(panel, { type: "panel-waiting", panelId: panel.id });
         return;
       }

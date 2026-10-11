@@ -5,7 +5,12 @@ import { config } from "@/lib/config";
 import { type ExecutablePlan, POSITION_COLUMN, TOTAL_COLUMN } from "@/lib/sql/safety";
 import { sourcePool } from "@/lib/timescaledb/pool";
 import { ResultCollector } from "@/lib/timescaledb/result-cap";
-import { observeQuery } from "@/lib/metrics";
+import {
+  observePoolWait,
+  observeQuery,
+  recordTruncation,
+  setPoolInUse,
+} from "@/lib/metrics";
 import { trackInFlight } from "@/lib/shutdown";
 import { isPlainIdentifier } from "@/lib/catalog/identifiers";
 import type { SourceTestResult, TestReadOnly, TestTable } from "@/lib/source-test";
@@ -147,6 +152,7 @@ function collectResult(
         );
       const rows = collector.rows;
       let truncated: Truncation | undefined;
+      // Counted where it happens (#490), whichever branch below cuts.
       if (plan.ranked) {
         if (total !== undefined && total > rows.length) {
           truncated = { stage: "rows", kept: rows.length, total };
@@ -156,6 +162,7 @@ function collectResult(
         rows.length = plan.maxRows;
         truncated = { stage: "rows", kept: rows.length };
       }
+      if (truncated) recordTruncation(truncated.stage);
       resolve({ columns, rows, ...(truncated ? { truncated } : {}) });
     });
     client.query(query);
@@ -200,6 +207,16 @@ export function executePlan(
 }
 
 /** `pg-pool`'s own message when a checkout outlasts `connectionTimeoutMillis`. */
+/** Checked out = opened and not idle. A fake pool in a test may have neither. */
+function reportPoolInUse(
+  sourceId: string,
+  pool: { totalCount?: number; idleCount?: number },
+) {
+  if (typeof pool.totalCount === "number" && typeof pool.idleCount === "number") {
+    setPoolInUse(sourceId, pool.totalCount - pool.idleCount);
+  }
+}
+
 export function isCheckoutTimeout(err: unknown): boolean {
   return (
     err instanceof Error && /timeout exceeded when trying to connect/i.test(err.message)
@@ -215,16 +232,22 @@ async function runPlan(
   // Whether the client may go back to the pool. Only a client known to be idle
   // outside any transaction is returned; anything in doubt is destroyed.
   let reusable = true;
+  let pool: ReturnType<typeof sourcePool> | undefined;
   try {
-    const pool = sourcePool(source);
+    pool = sourcePool(source);
     // Saturated before the checkout: a timeout from here on is a wait in the
     // pool's queue, not a source that would not answer (#487).
     const queued = pool.idleCount === 0 && pool.totalCount >= config.maxPoolPerSource;
+    const asked = performance.now();
     try {
       client = await pool.connect();
     } catch (err) {
       if (queued && isCheckoutTimeout(err)) throw new SourceBusyError(source.id);
       throw err;
+    } finally {
+      // Capacity (#490): the wait, success or not, and what the pool holds.
+      observePoolWait(source.id, (performance.now() - asked) / 1000);
+      reportPoolInUse(source.id, pool);
     }
     const [transaction, searchPath] = sessionStatements(source.config.schema);
     await client.query(transaction);
@@ -263,6 +286,7 @@ async function runPlan(
         });
       }
       client.release(!reusable);
+      if (pool) reportPoolInUse(source.id, pool);
     }
   }
 }

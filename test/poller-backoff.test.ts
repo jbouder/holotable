@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { afterEach, beforeEach, mock, test } from "node:test";
 import { config } from "@/lib/config";
+import { renderMetrics, resetMetricsForTests } from "@/lib/metrics";
 import { OPAQUE_MESSAGE } from "@/lib/errors";
 import type { Dashboard } from "@/lib/ir";
 import { createLogger, setLogger } from "@/lib/log";
@@ -21,6 +22,7 @@ import {
   setPollerJitterForTests,
 } from "@/lib/poller/registry";
 import { QueryExecutionError, SourceBusyError } from "@/lib/sources/execution";
+import { SourceSlots } from "@/lib/poller/source-slots";
 
 // Cycles land on the interval exactly: no spread of the second one (#487).
 setPollerJitterForTests(() => 0);
@@ -197,6 +199,7 @@ test("a source too busy to give a connection is a wait, never a failure", async 
       },
     ];
   };
+  resetMetricsForTests();
   const poller = new DashboardPoller("d-busy", 1, "ws", spec(), {}, executor, POLICY);
   const sub = subscribe(poller);
   await settle();
@@ -205,12 +208,44 @@ test("a source too busy to give a connection is a wait, never a failure", async 
   for (let i = 0; i < POLICY.threshold + 2; i++) await nextTick();
   assert.equal(state.calls, POLICY.threshold + 3, "run every cycle: nothing backs off");
   assert.ok(sub.events.slice(1).every((e) => e.type === "panel-waiting"));
+  assert.match(
+    await renderMetrics(),
+    new RegExp(
+      `holotable_poller_skips_total\\{reason="pool_wait"\\} ${POLICY.threshold + 2}\\b`,
+    ),
+  );
   const joiner = subscribe(poller);
   assert.equal(joiner.events[0]?.type, "panel", "a joiner gets the rows, not the wait");
   state.busy = false;
   await nextTick();
   assert.equal(sub.last()?.type, "panel");
   joiner.stop();
+  sub.stop();
+});
+
+test("no free slot on the source skips the cycle, counted, without running it", async () => {
+  resetMetricsForTests();
+  const { state, executor } = flaky();
+  const full = new SourceSlots(() => 0);
+  const poller = new DashboardPoller(
+    "d-full",
+    1,
+    "ws",
+    spec(),
+    {},
+    executor,
+    POLICY,
+    {},
+    full,
+  );
+  const sub = subscribe(poller);
+  await nextTick(INTERVAL / 2);
+  assert.equal(state.calls, 0, "never run without a slot");
+  assert.equal(sub.last()?.type, "panel-waiting");
+  assert.match(
+    await renderMetrics(),
+    /holotable_poller_skips_total\{reason="in_flight_cap"\} 1\b/,
+  );
   sub.stop();
 });
 

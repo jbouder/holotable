@@ -11,6 +11,7 @@ import {
 } from "@/lib/poller/registry";
 import { DROP_EVENT, serializationCount, STREAM_HEADERS } from "@/lib/sse";
 import { subscriberStream } from "@/lib/sse-stream";
+import { renderMetrics, resetMetricsForTests } from "@/lib/metrics";
 
 /*
  * The dashboard stream under load (#489): one serialization per distinct
@@ -96,6 +97,7 @@ test("a viewer who stops reading is dropped after the slow cycles; one reading i
       listeners.splice(listeners.indexOf(listener), 1);
     };
   };
+  resetMetricsForTests();
   const drops: string[] = [];
   const open = (who: string) =>
     subscriberStream({
@@ -132,6 +134,10 @@ test("a viewer who stops reading is dropped after the slow cycles; one reading i
     await settle();
   }
   assert.deepEqual(drops, ["stalled:slow"], "dropped once, after three cycles behind");
+  // Capacity (#490): the drop and the bytes are counted.
+  const scrape = await renderMetrics();
+  assert.match(scrape, /holotable_sse_drops_total\{reason="slow"\} 1\b/);
+  assert.match(scrape, /holotable_sse_bytes_total [1-9]/);
   assert.equal(
     listeners.length,
     1,

@@ -1,3 +1,4 @@
+import { recordSseBytes, recordSseDrop } from "@/lib/metrics";
 import type { Listener, PollerEvent } from "@/lib/poller/registry";
 import { dropFrame, encodeEventFrame, HEARTBEAT_FRAME, HEARTBEAT_MS } from "@/lib/sse";
 
@@ -55,7 +56,9 @@ export function subscriberStream(input: {
         const write = (frame: string | Uint8Array) => {
           if (closed) return;
           try {
-            controller.enqueue(typeof frame === "string" ? encoder.encode(frame) : frame);
+            const bytes = typeof frame === "string" ? encoder.encode(frame) : frame;
+            controller.enqueue(bytes);
+            recordSseBytes(bytes.byteLength);
           } catch {
             /* controller closed */
           }
@@ -85,6 +88,7 @@ export function subscriberStream(input: {
           behind = (controller.desiredSize ?? 0) < 0 ? behind + 1 : 0;
           if (behind >= input.slowTicks) {
             write(dropFrame());
+            recordSseDrop("slow");
             input.onDrop?.("slow");
             handle.close();
           }

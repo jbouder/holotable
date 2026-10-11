@@ -242,3 +242,25 @@ holotable_pollers_active 0
 
 # HELP holotable_sql_validation_rejections_total Statements refused by the SQL guard, by the kind of rule that refused them.
 # TYPE holotable_sql_validation_rejections_total counter
+
+# HELP holotable_pool_wait_seconds Time a query waited for a connection from its source's pool.
+# TYPE holotable_pool_wait_seconds histogram
+
+# HELP holotable_pool_in_use Connections checked out of a source's pool right now.
+# TYPE holotable_pool_in_use gauge
+
+# HELP holotable_poller_skips_total Panel executions a poller skipped for a cycle, by why: no free slot on the source (in_flight_cap) or a checkout that timed out in a full pool (pool_wait).
+# TYPE holotable_poller_skips_total counter
+
+# HELP holotable_sse_bytes_total Bytes written to dashboard streams.
+# TYPE holotable_sse_bytes_total counter
+holotable_sse_bytes_total 0
+
+# HELP holotable_sse_drops_total Dashboard streams closed by the server, by why.
+# TYPE holotable_sse_drops_total counter
+
+# HELP holotable_result_truncations_total Results cut short on the server, by stage: the row cap, the byte cap, the PromQL point cap, or a chat panel's window.
+# TYPE holotable_result_truncations_total counter
+
+# HELP holotable_llm_in_flight Model requests running right now, by model.
+# TYPE holotable_llm_in_flight gauge
