@@ -1,0 +1,80 @@
+---
+title: Themes
+description: The four built-in themes, what each is for, and how to choose one.
+sidebar:
+  order: 6
+---
+
+import { Image } from 'astro:assets';
+import holotableDark from '../../../../public/images/themes/holotable-dark.png';
+import holotableLight from '../../../../public/images/themes/holotable-light.png';
+import graphiteDark from '../../../../public/images/themes/graphite-dark.png';
+import graphiteLight from '../../../../public/images/themes/graphite-light.png';
+import fjordDark from '../../../../public/images/themes/fjord-dark.png';
+import fjordLight from '../../../../public/images/themes/fjord-light.png';
+import paperDark from '../../../../public/images/themes/paper-dark.png';
+import paperLight from '../../../../public/images/themes/paper-light.png';
+
+A theme is a named set of colors. Each comes in a light and a dark color
+scheme, and you choose the two separately in **Settings → Appearance** or from
+the command palette (type "Theme"). The choice is kept in this browser and
+applies before the page draws. An operator picks the theme a new browser
+starts with (`THEME_DEFAULT_PALETTE`).
+
+Every theme is held to the same bar: AA contrast for all text and AAA for body
+text, visible borders and focus, and status colors and chart series that stay
+apart for readers with a color-vision deficiency. The rules and how they are
+measured are on [Theming](/architecture/theming/#quality-bar).
+
+## How to choose
+
+- **Holotable** if you have no reason to change. It is the default.
+- **Graphite** if the blue feels cold, or a wall of panels should show only the
+  data in color.
+- **Fjord** for long sessions, when you want the page calm without losing
+  contrast.
+- **Paper** for a projector, a printout, or anyone who reads a dashboard like a
+  report.
+
+## Holotable
+
+Cool slate surfaces with a blue accent. Its statuses and eight chart series
+are the reference the other themes are measured against.
+
+<Image src={holotableDark} widths={[720, 1440]} sizes="(min-width: 72rem) 68rem, 100vw" alt="The demo dashboard in Holotable, dark scheme." />
+<Image src={holotableLight} widths={[720, 1440]} sizes="(min-width: 72rem) 68rem, 100vw" alt="The demo dashboard in Holotable, light scheme." />
+
+## Graphite
+
+A true neutral. The surfaces are warm grays with almost no color, so a chart
+is the only colorful thing on the page. The accent is violet, chosen because
+it is far from every status hue: a link or a selected tab is never mistaken
+for a warning. Statuses are a little quieter than Holotable's so they sit in a
+neutral page. The chart palette leads with the accent, then blue, teal and
+amber.
+
+<Image src={graphiteDark} widths={[720, 1440]} sizes="(min-width: 72rem) 68rem, 100vw" alt="The demo dashboard in Graphite, dark scheme." />
+<Image src={graphiteLight} widths={[720, 1440]} sizes="(min-width: 72rem) 68rem, 100vw" alt="The demo dashboard in Graphite, light scheme." />
+
+## Fjord
+
+Cool and calm without being low in contrast. The surfaces are tinted
+blue-green and the accent is a sea teal. Secondary text is a shade warmer
+than the surfaces, so it reads as ink rather than fog. The chart palette comes
+from the sea side of the color wheel, with an amber and a coral series for
+contrast. Amber comes second, so the first two series never share a hue
+family. Success leans yellow-green so it stays well apart from the teal
+accent. The light scheme is a pale mist, not white.
+
+<Image src={fjordDark} widths={[720, 1440]} sizes="(min-width: 72rem) 68rem, 100vw" alt="The demo dashboard in Fjord, dark scheme." />
+<Image src={fjordLight} widths={[720, 1440]} sizes="(min-width: 72rem) 68rem, 100vw" alt="The demo dashboard in Fjord, light scheme." />
+
+## Paper
+
+Light first. Ivory surfaces, near-black ink and a deep blue accent, with chart
+colors inked slightly darker than the other themes so thin lines hold on a
+light page. It is the one theme with rounded corners. Its dark scheme is a
+warm charcoal, not an inversion of the light one.
+
+<Image src={paperLight} widths={[720, 1440]} sizes="(min-width: 72rem) 68rem, 100vw" alt="The demo dashboard in Paper, light scheme." />
+<Image src={paperDark} widths={[720, 1440]} sizes="(min-width: 72rem) 68rem, 100vw" alt="The demo dashboard in Paper, dark scheme." />

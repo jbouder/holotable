@@ -111,6 +111,21 @@ export const PALETTE_INFO: readonly PaletteInfo[] = [
     label: "Holotable",
     description: "Cool slate surfaces with a blue accent.",
   },
+  {
+    name: "graphite",
+    label: "Graphite",
+    description: "Warm neutral grays and a violet accent, so the data is the only color.",
+  },
+  {
+    name: "fjord",
+    label: "Fjord",
+    description: "Calm blue-green surfaces with a sea-teal accent.",
+  },
+  {
+    name: "paper",
+    label: "Paper",
+    description: "Ivory and ink with a deep blue accent, for reading like a report.",
+  },
 ];
 
 export function isPalette(value: string | null | undefined): value is Palette {

@@ -56,13 +56,13 @@ export function Autocomplete({
       <BaseAutocomplete.Input
         {...inputProps}
         className={cn(
-          "h-10 w-full border border-border-strong bg-surface px-3 text-sm text-foreground placeholder:text-muted focus-visible:outline-2 focus-visible:outline-ring disabled:cursor-not-allowed disabled:opacity-50",
+          "h-10 w-full rounded-lg border border-border-strong bg-surface px-3 text-sm text-foreground placeholder:text-muted focus-visible:outline-2 focus-visible:outline-ring disabled:cursor-not-allowed disabled:opacity-50",
           className,
         )}
       />
       <BaseAutocomplete.Portal>
         <BaseAutocomplete.Positioner sideOffset={4} className="z-50">
-          <BaseAutocomplete.Popup className="w-(--anchor-width) max-w-(--available-width) origin-(--transform-origin) border border-border bg-surface-2 shadow-lg transition-[opacity,scale] duration-(--duration-fast) ease-standard data-starting-style:opacity-0 data-starting-style:scale-[0.98] data-ending-style:opacity-0 data-ending-style:scale-[0.98]">
+          <BaseAutocomplete.Popup className="w-(--anchor-width) max-w-(--available-width) origin-(--transform-origin) rounded-lg border border-border bg-surface-2 shadow-lg transition-[opacity,scale] duration-(--duration-fast) ease-standard data-starting-style:opacity-0 data-starting-style:scale-[0.98] data-ending-style:opacity-0 data-ending-style:scale-[0.98]">
             <BaseAutocomplete.Empty>
               <p className="px-3 py-2 text-sm text-muted">
                 No match listed. The text as typed is used.

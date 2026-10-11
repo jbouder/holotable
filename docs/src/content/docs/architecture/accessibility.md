@@ -73,6 +73,8 @@ not what the tokens produce.
 In the dark theme the primary button carries dark text: a blue light enough to
 read as text on `surface-2` is too light to carry white at AA.
 
+### holotable
+
 | Pairing | Dark | Light |
 | --- | --- | --- |
 | text-foreground on bg-background | 17.31:1 | 17.05:1 |
@@ -152,6 +154,252 @@ read as text on `surface-2` is too light to carry white at AA.
 | chart series 8 on bg-surface | 12.95:1 | 11.90:1 |
 | primary button | 6.06:1 | 5.37:1 |
 | danger button | 6.95:1 | 6.30:1 |
+
+### graphite
+
+| Pairing | Dark | Light |
+| --- | --- | --- |
+| text-foreground on bg-background | 16.51:1 | 16.56:1 |
+| text-foreground on bg-surface | 15.29:1 | 17.76:1 |
+| text-foreground on bg-surface-2 | 13.69:1 | 15.14:1 |
+| text-muted on bg-background | 7.43:1 | 5.73:1 |
+| text-muted on bg-surface | 6.88:1 | 6.15:1 |
+| text-muted on bg-surface-2 | 6.16:1 | 5.24:1 |
+| text-primary on bg-background | 7.33:1 | 6.01:1 |
+| text-primary on bg-surface | 6.79:1 | 6.45:1 |
+| text-primary on bg-surface-2 | 6.08:1 | 5.50:1 |
+| text-danger on bg-background | 7.17:1 | 6.04:1 |
+| text-danger on bg-surface | 6.64:1 | 6.48:1 |
+| text-danger on bg-surface-2 | 5.95:1 | 5.52:1 |
+| text-warning on bg-background | 10.11:1 | 6.94:1 |
+| text-warning on bg-surface | 9.36:1 | 7.44:1 |
+| text-warning on bg-surface-2 | 8.38:1 | 6.34:1 |
+| text-success on bg-background | 10.45:1 | 6.15:1 |
+| text-success on bg-surface | 9.68:1 | 6.60:1 |
+| text-success on bg-surface-2 | 8.67:1 | 5.62:1 |
+| text-foreground on hover:bg-surface-3 | 11.84:1 | 13.43:1 |
+| text-danger on bg-danger/5 (badges, alerts) | 6.20:1 | 5.97:1 |
+| text-danger on bg-danger/10 (badges, alerts) | 5.78:1 | 5.53:1 |
+| text-danger on bg-danger/15 (badges, alerts) | 5.29:1 | 5.07:1 |
+| text-danger on bg-danger/20 (badges, alerts) | 4.79:1 | 4.67:1 |
+| text-warning on bg-warning/5 (badges, alerts) | 8.57:1 | 6.89:1 |
+| text-warning on bg-warning/10 (badges, alerts) | 7.71:1 | 6.38:1 |
+| text-warning on bg-warning/15 (badges, alerts) | 6.94:1 | 5.88:1 |
+| text-warning on bg-warning/20 (badges, alerts) | 6.12:1 | 5.42:1 |
+| text-success on bg-success/5 (badges, alerts) | 8.90:1 | 6.13:1 |
+| text-success on bg-success/10 (badges, alerts) | 7.99:1 | 5.66:1 |
+| text-success on bg-success/15 (badges, alerts) | 7.15:1 | 5.24:1 |
+| text-success on bg-success/20 (badges, alerts) | 6.28:1 | 4.84:1 |
+| text-primary on bg-primary/10 | 5.83:1 | 5.55:1 |
+| text-foreground on a success status tile | 8.77:1 | 11.26:1 |
+| text-foreground on a warning status tile | 8.84:1 | 11.24:1 |
+| text-foreground on a danger status tile | 9.80:1 | 11.05:1 |
+| text-foreground on a info status tile | 9.70:1 | 11.35:1 |
+| text-foreground on a neutral status tile | 9.60:1 | 11.61:1 |
+| text-foreground on a orange status tile | 8.91:1 | 11.48:1 |
+| text-foreground on a purple status tile | 9.36:1 | 11.24:1 |
+| text-foreground on a teal status tile | 9.16:1 | 11.52:1 |
+| success as text on bg-background | 10.45:1 | 6.15:1 |
+| success as text on bg-surface | 9.68:1 | 6.60:1 |
+| success as text on bg-surface-2 | 8.67:1 | 5.62:1 |
+| warning as text on bg-background | 10.11:1 | 6.94:1 |
+| warning as text on bg-surface | 9.36:1 | 7.44:1 |
+| warning as text on bg-surface-2 | 8.38:1 | 6.34:1 |
+| danger as text on bg-background | 7.17:1 | 6.04:1 |
+| danger as text on bg-surface | 6.64:1 | 6.48:1 |
+| danger as text on bg-surface-2 | 5.95:1 | 5.52:1 |
+| info as text on bg-background | 7.33:1 | 6.01:1 |
+| info as text on bg-surface | 6.79:1 | 6.45:1 |
+| info as text on bg-surface-2 | 6.08:1 | 5.50:1 |
+| neutral as text on bg-background | 7.43:1 | 5.73:1 |
+| neutral as text on bg-surface | 6.88:1 | 6.15:1 |
+| neutral as text on bg-surface-2 | 6.16:1 | 5.24:1 |
+| orange as text on bg-background | 10.01:1 | 5.65:1 |
+| orange as text on bg-surface | 9.27:1 | 6.06:1 |
+| orange as text on bg-surface-2 | 8.30:1 | 5.16:1 |
+| purple as text on bg-background | 8.19:1 | 6.55:1 |
+| purple as text on bg-surface | 7.59:1 | 7.02:1 |
+| purple as text on bg-surface-2 | 6.79:1 | 5.98:1 |
+| teal as text on bg-background | 9.30:1 | 5.21:1 |
+| teal as text on bg-surface | 8.61:1 | 5.59:1 |
+| teal as text on bg-surface-2 | 7.71:1 | 4.76:1 |
+| chart text on bg-background | 7.43:1 | 5.73:1 |
+| chart text on bg-surface | 6.88:1 | 6.15:1 |
+| chart text on bg-surface-2 | 6.16:1 | 5.24:1 |
+| chart series 1 on bg-surface | 7.59:1 | 7.02:1 |
+| chart series 2 on bg-surface | 4.87:1 | 3.86:1 |
+| chart series 3 on bg-surface | 8.61:1 | 5.59:1 |
+| chart series 4 on bg-surface | 9.27:1 | 6.06:1 |
+| chart series 5 on bg-surface | 5.67:1 | 5.48:1 |
+| chart series 6 on bg-surface | 8.11:1 | 5.63:1 |
+| chart series 7 on bg-surface | 5.20:1 | 5.99:1 |
+| chart series 8 on bg-surface | 13.17:1 | 11.62:1 |
+| primary button | 7.33:1 | 6.17:1 |
+| danger button | 7.17:1 | 6.20:1 |
+
+### fjord
+
+| Pairing | Dark | Light |
+| --- | --- | --- |
+| text-foreground on bg-background | 15.25:1 | 14.70:1 |
+| text-foreground on bg-surface | 13.80:1 | 16.11:1 |
+| text-foreground on bg-surface-2 | 12.23:1 | 13.63:1 |
+| text-muted on bg-background | 7.81:1 | 5.86:1 |
+| text-muted on bg-surface | 7.07:1 | 6.42:1 |
+| text-muted on bg-surface-2 | 6.26:1 | 5.43:1 |
+| text-primary on bg-background | 9.07:1 | 5.70:1 |
+| text-primary on bg-surface | 8.21:1 | 6.24:1 |
+| text-primary on bg-surface-2 | 7.27:1 | 5.28:1 |
+| text-danger on bg-background | 7.04:1 | 5.85:1 |
+| text-danger on bg-surface | 6.37:1 | 6.41:1 |
+| text-danger on bg-surface-2 | 5.65:1 | 5.43:1 |
+| text-warning on bg-background | 12.96:1 | 8.69:1 |
+| text-warning on bg-surface | 11.73:1 | 9.52:1 |
+| text-warning on bg-surface-2 | 10.39:1 | 8.06:1 |
+| text-success on bg-background | 9.86:1 | 6.01:1 |
+| text-success on bg-surface | 8.92:1 | 6.59:1 |
+| text-success on bg-surface-2 | 7.90:1 | 5.57:1 |
+| text-foreground on hover:bg-surface-3 | 10.40:1 | 12.10:1 |
+| text-danger on bg-danger/5 (badges, alerts) | 6.01:1 | 5.91:1 |
+| text-danger on bg-danger/10 (badges, alerts) | 5.57:1 | 5.45:1 |
+| text-danger on bg-danger/15 (badges, alerts) | 5.15:1 | 5.00:1 |
+| text-danger on bg-danger/20 (badges, alerts) | 4.67:1 | 4.59:1 |
+| text-warning on bg-warning/5 (badges, alerts) | 10.55:1 | 8.75:1 |
+| text-warning on bg-warning/10 (badges, alerts) | 9.33:1 | 8.07:1 |
+| text-warning on bg-warning/15 (badges, alerts) | 8.17:1 | 7.36:1 |
+| text-warning on bg-warning/20 (badges, alerts) | 7.08:1 | 6.70:1 |
+| text-success on bg-success/5 (badges, alerts) | 8.12:1 | 6.14:1 |
+| text-success on bg-success/10 (badges, alerts) | 7.29:1 | 5.67:1 |
+| text-success on bg-success/15 (badges, alerts) | 6.50:1 | 5.27:1 |
+| text-success on bg-success/20 (badges, alerts) | 5.82:1 | 4.88:1 |
+| text-primary on bg-primary/10 | 6.76:1 | 5.38:1 |
+| text-foreground on a success status tile | 7.95:1 | 10.24:1 |
+| text-foreground on a warning status tile | 7.33:1 | 9.76:1 |
+| text-foreground on a danger status tile | 8.94:1 | 9.90:1 |
+| text-foreground on a info status tile | 8.10:1 | 10.25:1 |
+| text-foreground on a neutral status tile | 8.43:1 | 10.43:1 |
+| text-foreground on a orange status tile | 7.33:1 | 10.19:1 |
+| text-foreground on a purple status tile | 8.98:1 | 10.09:1 |
+| text-foreground on a teal status tile | 8.94:1 | 10.02:1 |
+| success as text on bg-background | 9.86:1 | 6.01:1 |
+| success as text on bg-surface | 8.92:1 | 6.59:1 |
+| success as text on bg-surface-2 | 7.90:1 | 5.57:1 |
+| warning as text on bg-background | 12.96:1 | 8.69:1 |
+| warning as text on bg-surface | 11.73:1 | 9.52:1 |
+| warning as text on bg-surface-2 | 10.39:1 | 8.06:1 |
+| danger as text on bg-background | 7.04:1 | 5.85:1 |
+| danger as text on bg-surface | 6.37:1 | 6.41:1 |
+| danger as text on bg-surface-2 | 5.65:1 | 5.43:1 |
+| info as text on bg-background | 9.07:1 | 5.70:1 |
+| info as text on bg-surface | 8.21:1 | 6.24:1 |
+| info as text on bg-surface-2 | 7.27:1 | 5.28:1 |
+| neutral as text on bg-background | 7.81:1 | 5.86:1 |
+| neutral as text on bg-surface | 7.07:1 | 6.42:1 |
+| neutral as text on bg-surface-2 | 6.26:1 | 5.43:1 |
+| orange as text on bg-background | 12.96:1 | 6.20:1 |
+| orange as text on bg-surface | 11.73:1 | 6.79:1 |
+| orange as text on bg-surface-2 | 10.39:1 | 5.75:1 |
+| purple as text on bg-background | 6.26:1 | 6.80:1 |
+| purple as text on bg-surface | 5.67:1 | 7.45:1 |
+| purple as text on bg-surface-2 | 5.02:1 | 6.31:1 |
+| teal as text on bg-background | 6.41:1 | 6.87:1 |
+| teal as text on bg-surface | 5.80:1 | 7.53:1 |
+| teal as text on bg-surface-2 | 5.14:1 | 6.37:1 |
+| chart text on bg-background | 7.81:1 | 5.86:1 |
+| chart text on bg-surface | 7.07:1 | 6.42:1 |
+| chart text on bg-surface-2 | 6.26:1 | 5.43:1 |
+| chart series 1 on bg-surface | 8.21:1 | 5.26:1 |
+| chart series 2 on bg-surface | 11.73:1 | 6.79:1 |
+| chart series 3 on bg-surface | 9.57:1 | 3.50:1 |
+| chart series 4 on bg-surface | 5.86:1 | 3.99:1 |
+| chart series 5 on bg-surface | 5.67:1 | 7.45:1 |
+| chart series 6 on bg-surface | 5.90:1 | 4.74:1 |
+| chart series 7 on bg-surface | 12.82:1 | 12.58:1 |
+| chart series 8 on bg-surface | 5.80:1 | 7.53:1 |
+| primary button | 9.07:1 | 6.24:1 |
+| danger button | 7.04:1 | 6.41:1 |
+
+### paper
+
+| Pairing | Dark | Light |
+| --- | --- | --- |
+| text-foreground on bg-background | 15.57:1 | 17.01:1 |
+| text-foreground on bg-surface | 14.24:1 | 18.23:1 |
+| text-foreground on bg-surface-2 | 12.47:1 | 15.97:1 |
+| text-muted on bg-background | 7.74:1 | 6.19:1 |
+| text-muted on bg-surface | 7.08:1 | 6.64:1 |
+| text-muted on bg-surface-2 | 6.20:1 | 5.82:1 |
+| text-primary on bg-background | 7.67:1 | 6.91:1 |
+| text-primary on bg-surface | 7.02:1 | 7.41:1 |
+| text-primary on bg-surface-2 | 6.15:1 | 6.49:1 |
+| text-danger on bg-background | 7.26:1 | 5.97:1 |
+| text-danger on bg-surface | 6.64:1 | 6.41:1 |
+| text-danger on bg-surface-2 | 5.82:1 | 5.61:1 |
+| text-warning on bg-background | 10.13:1 | 9.20:1 |
+| text-warning on bg-surface | 9.26:1 | 9.86:1 |
+| text-warning on bg-surface-2 | 8.11:1 | 8.64:1 |
+| text-success on bg-background | 10.42:1 | 6.40:1 |
+| text-success on bg-surface | 9.53:1 | 6.86:1 |
+| text-success on bg-surface-2 | 8.35:1 | 6.01:1 |
+| text-foreground on hover:bg-surface-3 | 10.70:1 | 14.41:1 |
+| text-danger on bg-danger/5 (badges, alerts) | 6.16:1 | 5.90:1 |
+| text-danger on bg-danger/10 (badges, alerts) | 5.66:1 | 5.43:1 |
+| text-danger on bg-danger/15 (badges, alerts) | 5.18:1 | 4.98:1 |
+| text-danger on bg-danger/20 (badges, alerts) | 4.69:1 | 4.59:1 |
+| text-warning on bg-warning/5 (badges, alerts) | 8.40:1 | 9.06:1 |
+| text-warning on bg-warning/10 (badges, alerts) | 7.53:1 | 8.35:1 |
+| text-warning on bg-warning/15 (badges, alerts) | 6.75:1 | 7.63:1 |
+| text-warning on bg-warning/20 (badges, alerts) | 5.96:1 | 6.95:1 |
+| text-success on bg-success/5 (badges, alerts) | 8.68:1 | 6.38:1 |
+| text-success on bg-success/10 (badges, alerts) | 7.74:1 | 5.88:1 |
+| text-success on bg-success/15 (badges, alerts) | 6.88:1 | 5.45:1 |
+| text-success on bg-success/20 (badges, alerts) | 6.10:1 | 5.00:1 |
+| text-primary on bg-primary/10 | 5.94:1 | 6.35:1 |
+| text-foreground on a success status tile | 7.93:1 | 11.80:1 |
+| text-foreground on a warning status tile | 7.97:1 | 11.39:1 |
+| text-foreground on a danger status tile | 8.87:1 | 11.60:1 |
+| text-foreground on a info status tile | 8.61:1 | 11.79:1 |
+| text-foreground on a neutral status tile | 8.52:1 | 12.12:1 |
+| text-foreground on a orange status tile | 8.06:1 | 12.20:1 |
+| text-foreground on a purple status tile | 9.00:1 | 11.69:1 |
+| text-foreground on a teal status tile | 8.49:1 | 11.48:1 |
+| success as text on bg-background | 10.42:1 | 6.40:1 |
+| success as text on bg-surface | 9.53:1 | 6.86:1 |
+| success as text on bg-surface-2 | 8.35:1 | 6.01:1 |
+| warning as text on bg-background | 10.13:1 | 9.20:1 |
+| warning as text on bg-surface | 9.26:1 | 9.86:1 |
+| warning as text on bg-surface-2 | 8.11:1 | 8.64:1 |
+| danger as text on bg-background | 7.26:1 | 5.97:1 |
+| danger as text on bg-surface | 6.64:1 | 6.41:1 |
+| danger as text on bg-surface-2 | 5.82:1 | 5.61:1 |
+| info as text on bg-background | 7.67:1 | 6.91:1 |
+| info as text on bg-surface | 7.02:1 | 7.41:1 |
+| info as text on bg-surface-2 | 6.15:1 | 6.49:1 |
+| neutral as text on bg-background | 7.74:1 | 6.19:1 |
+| neutral as text on bg-surface | 7.08:1 | 6.64:1 |
+| neutral as text on bg-surface-2 | 6.20:1 | 5.82:1 |
+| orange as text on bg-background | 9.75:1 | 5.11:1 |
+| orange as text on bg-surface | 8.92:1 | 5.48:1 |
+| orange as text on bg-surface-2 | 7.81:1 | 4.80:1 |
+| purple as text on bg-background | 6.56:1 | 7.22:1 |
+| purple as text on bg-surface | 6.00:1 | 7.75:1 |
+| purple as text on bg-surface-2 | 5.26:1 | 6.79:1 |
+| teal as text on bg-background | 8.31:1 | 8.06:1 |
+| teal as text on bg-surface | 7.60:1 | 8.64:1 |
+| teal as text on bg-surface-2 | 6.66:1 | 7.57:1 |
+| chart text on bg-background | 7.74:1 | 6.19:1 |
+| chart text on bg-surface | 7.08:1 | 6.64:1 |
+| chart text on bg-surface-2 | 6.20:1 | 5.82:1 |
+| chart series 1 on bg-surface | 7.02:1 | 7.41:1 |
+| chart series 2 on bg-surface | 8.31:1 | 6.18:1 |
+| chart series 3 on bg-surface | 8.92:1 | 5.48:1 |
+| chart series 4 on bg-surface | 5.92:1 | 8.21:1 |
+| chart series 5 on bg-surface | 6.00:1 | 7.75:1 |
+| chart series 6 on bg-surface | 7.60:1 | 8.64:1 |
+| chart series 7 on bg-surface | 5.43:1 | 6.42:1 |
+| chart series 8 on bg-surface | 12.58:1 | 12.26:1 |
+| primary button | 7.67:1 | 7.21:1 |
+| danger button | 7.26:1 | 6.23:1 |
 
 ## Automated checks
 

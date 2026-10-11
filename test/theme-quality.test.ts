@@ -4,6 +4,7 @@ import { test } from "node:test";
 import { hexToRgb, parseThemeBlocks } from "@/lib/color/contrast";
 import { DEFICIENCIES, deltaE, MACHADO, simulate } from "@/lib/color/cvd";
 import { qualityReport } from "@/lib/color/quality";
+import { PALETTE_INFO } from "@/lib/theme";
 
 /*
  * The theme quality bar (#504). Every theme in globals.css, in each scheme,
@@ -26,6 +27,17 @@ test("every shipped theme clears the built-in quality bar in both schemes", () =
       ),
   );
   assert.deepEqual(failures, []);
+});
+
+test("every offered theme has both schemes in globals.css, and nothing else does", () => {
+  // #505: a theme is offered (PALETTE_INFO) exactly when its blocks exist.
+  const blocks = (scheme: string) =>
+    BLOCKS.filter((b) => b.scheme === scheme)
+      .map((b) => b.palette)
+      .sort();
+  const offered = PALETTE_INFO.map((p) => p.name).sort();
+  assert.deepEqual(blocks("dark"), offered);
+  assert.deepEqual(blocks("light"), offered);
 });
 
 test("a broken token fails and names its rule", () => {

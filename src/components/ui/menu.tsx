@@ -45,7 +45,7 @@ export function Menu({
         <BaseMenu.Positioner side="bottom" align="end" sideOffset={4} className="z-50">
           <BaseMenu.Popup
             className={cn(
-              "min-w-44 border border-border bg-surface p-1 shadow-xl focus:outline-none",
+              "min-w-44 rounded-lg border border-border bg-surface p-1 shadow-xl focus:outline-none",
               // Fade with a 4px nudge from the anchor side (#235): the popup
               // starts and ends slightly towards its trigger. Base UI puts the
               // resolved side on the popup, so a flip to `top` nudges the other way.

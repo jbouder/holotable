@@ -104,6 +104,7 @@ export default defineConfig({
             { label: "Annotations", slug: "guide/annotations" },
             { label: "Drilldown", slug: "guide/drilldown" },
             { label: "Settings and your account", slug: "guide/settings" },
+            { label: "Themes", slug: "guide/themes" },
           ],
         },
         {
