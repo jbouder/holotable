@@ -295,6 +295,12 @@ Adding a kind is therefore:
 1. a module under `src/lib/panels/kinds/` and one line in `PANEL_KINDS`;
 2. its renderer (an option builder, or a component under
    `src/components/panels/`) and one line in `PANEL_RENDERERS`.
+3. if its option builder uses an ECharts series or component no other kind
+   does, one line in `src/components/charts/echarts.ts`. That module loads
+   `echarts/core` with only what the panels draw (#488), and it is the only
+   one that imports ECharts at runtime (`test/echarts-runtime.test.ts`). A
+   missing registration draws nothing in production and warns only in
+   development.
 
 Registration is an import. Nothing is loaded at runtime, so there is no way
 for a request to add a kind.

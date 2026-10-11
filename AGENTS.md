@@ -67,7 +67,10 @@ Three registries own their kinds. Add a kind by registering it; never
   and its click mapping one in `src/lib/drilldown-datum.ts`; neither
   compiles without them. `panel.query` is optional (a text panel runs none):
   filter with `hasQuery`. Read a panel's window and cadence through
-  `panelTimeRange` / `panelRefreshMs`.
+  `panelTimeRange` / `panelRefreshMs`. A chart kind that needs an ECharts
+  series or component not yet in `src/components/charts/echarts.ts` adds
+  one line there: it is the only module that imports ECharts at runtime
+  (`test/echarts-runtime.test.ts`).
 - **Source kinds**: `src/lib/sources/registry.ts` (browser half under
   `kinds/`, server half under `server/`). Ask `sourceKind()` /
   `serverKind()`; never import `src/lib/timescaledb/` from a route. Read a
