@@ -20,9 +20,9 @@ import { ProfileMenu, type ProfileMenuAccount } from "@/components/profile-menu"
 const LINKS = [
   { href: "/dashboards", label: "Dashboards", Icon: LayoutDashboard },
   { href: "/explore", label: "Explore", Icon: Compass },
+  { href: "/data-sources", label: "Data sources", Icon: Database },
   // Only for someone who may generate somewhere (#441); the page 404s otherwise.
   { href: "/models", label: "Models", Icon: Cpu, gated: true },
-  { href: "/data-sources", label: "Data sources", Icon: Database },
 ] as const;
 
 /** A link is current on its page and on every page under it (`/explore/<id>`). */
