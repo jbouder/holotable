@@ -58,6 +58,8 @@ function Scene({
     <span
       data-palette={palette}
       data-theme={scheme}
+      // A picture, hidden from assistive technology: its text is drawn at a
+      // miniature's size, not read (#507).
       className="flex min-w-0 flex-1 flex-col gap-1.5 bg-background p-2 text-[9px] leading-tight text-foreground"
     >
       {/* The page header. */}
@@ -128,20 +130,12 @@ function Scene({
       <span className="flex flex-wrap gap-1">
         {(
           [
-            ["success", "Live"],
-            ["warning", "Slow"],
-            ["danger", "Down"],
+            ["Live", "bg-tint-success/(--tint-20) text-success"],
+            ["Slow", "bg-tint-warning/(--tint-20) text-warning"],
+            ["Down", "bg-tint-danger/(--tint-20) text-danger"],
           ] as const
-        ).map(([status, word]) => (
-          <span
-            key={status}
-            className={cn(
-              "tinted rounded-lg px-1 font-medium",
-              status === "success" && "bg-tint-success/(--tint-20) text-success",
-              status === "warning" && "bg-tint-warning/(--tint-20) text-warning",
-              status === "danger" && "bg-tint-danger/(--tint-20) text-danger",
-            )}
-          >
+        ).map(([word, tint]) => (
+          <span key={word} className={cn("tinted rounded-lg px-1 font-medium", tint)}>
             {word}
           </span>
         ))}

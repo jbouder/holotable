@@ -48,12 +48,16 @@ export function useChartTheme(): ChartTheme {
       attributes: true,
       attributeFilter: ["data-theme", "data-palette"],
     });
-    const forced = window.matchMedia(FORCED_COLORS_QUERY);
-    const onForced = () => setTheme(read());
-    forced.addEventListener("change", onForced);
+    // Forced colors turning on or off, and, while on, a switch between the
+    // system's contrast themes, which changes its colors but not the match.
+    const queries = [FORCED_COLORS_QUERY, "(prefers-color-scheme: dark)"].map((q) =>
+      window.matchMedia(q),
+    );
+    const onChange = () => setTheme(read());
+    for (const q of queries) q.addEventListener("change", onChange);
     return () => {
       observer.disconnect();
-      forced.removeEventListener("change", onForced);
+      for (const q of queries) q.removeEventListener("change", onChange);
     };
   }, []);
   return theme;

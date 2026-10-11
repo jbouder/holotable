@@ -278,8 +278,10 @@ test.describe("forced colors", () => {
     await expect(pill).toHaveCSS("outline-style", "solid");
   });
 
-  test("focus is drawn in the system's Highlight", async ({ page }) => {
-    await page.goto("/settings/appearance");
+  test("focus is drawn in the system's Highlight, as a ring even on a filled button", async ({
+    page,
+  }) => {
+    await page.goto("/dashboards");
     await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
     const highlight = await page.evaluate(() => {
       const probe = document.createElement("span");
@@ -289,11 +291,16 @@ test.describe("forced colors", () => {
       probe.remove();
       return color;
     });
-    const button = page.getByRole("button").first();
+    // The primary action: a `bg-primary` fill, which forced colors outline.
+    const button = page.getByRole("link", { name: "Create New Dashboard" });
     await button.focus();
-    await page.keyboard.press("Tab");
     await page.keyboard.press("Shift+Tab");
+    await page.keyboard.press("Tab");
     await expect(button).toHaveCSS("outline-color", highlight);
+    // A real ring, not a color on no outline: the fill's 1px forced-colors
+    // edge must not replace it while focused.
+    await expect(button).toHaveCSS("outline-style", "solid");
+    await expect(button).toHaveCSS("outline-width", "2px");
   });
 });
 
