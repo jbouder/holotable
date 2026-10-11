@@ -78,6 +78,29 @@ rather than a rewrite.
 - **The public demo** sits behind a Worker with per-IP limits
   (`deploy/cloudflare/demo/`).
 
+## Drawing large series
+
+Past `LARGE_SERIES_POINTS` (500) points per series, `src/components/charts/options.ts`
+makes a series cheap to paint (#491). A line or area is sampled with
+largest-triangle-three-buckets and drawn straight. Bars and scatter use
+ECharts' large mode. `animationThreshold` stops a series that long from
+animating. The motion preference still turns animation off below it, because
+`EChart` applies it and the builders never turn animation on. At or under the
+threshold the option is unchanged. The accessible table beside a chart lists
+the panel's own rows, never the sampled ones.
+
+A click on a sampled series reports its index among the points ECharts kept.
+`EChart` maps it back to the series' raw index before the datum is read, so a
+drilldown resolves the row that was clicked.
+
+**The x axis stays a category axis.** Three things depend on it. The brush
+maps its span to row indices (`brushedRange`). The crosshair group moves its
+peers by index. A datum click reads the row at its index. Sampling keeps all
+three working, because the category axis still holds every row's label. A
+time axis would need each of them to work by timestamp instead. It would also
+change how a series with gaps is drawn. That is a separate change, if a panel
+ever needs it.
+
 ---
 
 *Last verified against the code at commit `00ea858` (2026-10-05).*

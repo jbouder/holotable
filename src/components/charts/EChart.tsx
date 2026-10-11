@@ -361,10 +361,41 @@ function attachDatum(
   const onClick = (params: unknown) => {
     if (isBrushClick(brush, Date.now())) return;
     const click = datumClick(params);
-    if (click) handler.current?.(click);
+    if (!click) return;
+    // A sampled series (#491) numbers its points among the ones it kept; the
+    // datum is read off the panel's rows, so the click names the raw index.
+    const raw = rawDataIndex(chart, params);
+    handler.current?.(raw === undefined ? click : { ...click, dataIndex: raw });
   };
   chart.on("click", onClick);
   return () => chart.off("click", onClick);
+}
+
+/**
+ * The clicked point's index in the series' own data, which differs from the
+ * event's `dataIndex` when ECharts sampled the series. Undefined when it
+ * cannot be read, and the event's index stands.
+ */
+function rawDataIndex(chart: echarts.ECharts, params: unknown): number | undefined {
+  const p = params as { seriesIndex?: unknown; dataIndex?: unknown } | null;
+  if (typeof p?.seriesIndex !== "number" || typeof p.dataIndex !== "number") {
+    return undefined;
+  }
+  try {
+    const model = (
+      chart as unknown as {
+        getModel(): {
+          getSeriesByIndex(
+            i: number,
+          ): { getData(): { getRawIndex(i: number): number } } | undefined;
+        };
+      }
+    ).getModel();
+    const raw = model.getSeriesByIndex(p.seriesIndex)?.getData().getRawIndex(p.dataIndex);
+    return typeof raw === "number" && raw >= 0 ? raw : undefined;
+  } catch {
+    return undefined;
+  }
 }
 
 /** The fields of an ECharts click a datum needs, read defensively. */

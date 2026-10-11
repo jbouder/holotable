@@ -132,8 +132,27 @@ const TOOLTIP_AXIS = { trigger: "axis", borderRadius: 0 } as const;
 const GRID = { left: 44, right: 16, top: 24, bottom: 28 };
 
 /** What every cartesian chart starts from. */
+/**
+ * Past this many points a series is large (#491): a line is sampled
+ * (largest-triangle-three-buckets) and drawn straight, bars and scatter use
+ * ECharts' large mode, and no series animates. Below it nothing changes. The
+ * accessible table beside the chart always lists the panel's own rows,
+ * never the sampled ones.
+ */
+export const LARGE_SERIES_POINTS = 500;
+
+/** The series fields that make a large series cheap to paint; none for a small one. */
+export function largeSeries(type: "line" | "bar" | "scatter", points: number) {
+  if (points <= LARGE_SERIES_POINTS) return {};
+  if (type === "line") return { sampling: "lttb" as const, smooth: false };
+  return { large: true, largeThreshold: LARGE_SERIES_POINTS };
+}
+
 function base(theme: ChartTheme): EChartsOption {
   return {
+    // A series this long does not animate, whatever the motion preference
+    // allows; the preference still turns animation off below it (#491).
+    animationThreshold: LARGE_SERIES_POINTS,
     color: palette,
     grid: GRID,
     tooltip: TOOLTIP_AXIS,
@@ -259,6 +278,10 @@ function buildSeries(type: "line" | "bar", area: boolean): ChartOptionBuilder {
       legend: legendAt(o.legend, theme),
       tooltip: { ...TOOLTIP_AXIS, ...(number ? { valueFormatter: number } : {}) },
       ...(o.thresholds?.length ? { visualMap: thresholdMap(o.thresholds) } : {}),
+      // A category axis, deliberately (#491): the brush maps its span to row
+      // indices (`brushedRange`), the crosshair group moves its peers by
+      // index, and a datum click reads the row at its index. A time axis
+      // would need all three to work by timestamp. See architecture/scaling.
       xAxis: {
         type: "category",
         data: categories,
@@ -286,6 +309,7 @@ function buildSeries(type: "line" | "bar", area: boolean): ChartOptionBuilder {
         showSymbol: false,
         smooth: type === "line",
         areaStyle: area ? {} : undefined,
+        ...largeSeries(type, data.rows.length),
         ...(o.stacked ? { stack: "total" } : {}),
         // The marks ride on the first series; one per chart is enough.
         ...(i === 0 && annotations && panelTimeField(panel) === x
@@ -335,6 +359,7 @@ function buildScatter(data: PanelData, theme: ChartTheme): EChartsOption {
       name: key,
       type: "scatter",
       symbolSize: 8,
+      ...largeSeries("scatter", data.rows.length),
       data: data.rows.map((row) => [toNumber(row[x]), toNumber(row[key])]),
     })),
   };
