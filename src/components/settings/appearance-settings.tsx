@@ -213,7 +213,7 @@ export function AppearanceSettings({
                   label={p.label}
                   description={p.description}
                 >
-                  <ThemePreview palette={p.name} scheme={theme} />
+                  <ThemePreview palette={p.name} scheme="chosen" />
                 </ChoiceCard>
               ))}
             </ChoiceCardGroup>
@@ -238,7 +238,8 @@ export function AppearanceSettings({
 
       <p className="text-xs text-muted">
         Theme, color scheme and motion are kept in this browser and apply before the page
-        draws.
+        draws. Until you choose a theme, you get your organization&rsquo;s default, and
+        follow it if it changes.
       </p>
 
       <ChartPatternsSetting initial={chartPatterns} />

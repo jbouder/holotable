@@ -104,6 +104,7 @@ const DISTINCT: ChartTheme = {
   line: "#020202",
   grid: "#030303",
   track: "#060606",
+  faint: 0.35,
   foreground: "#040404",
   background: "#050505",
   series: [

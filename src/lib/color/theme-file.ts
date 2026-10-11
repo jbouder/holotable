@@ -6,7 +6,7 @@ import {
   type ThemeName,
 } from "@/lib/color/contrast";
 import { qualityReport } from "@/lib/color/quality";
-import { PALETTE_NAME, PALETTES, type PaletteInfo } from "@/lib/theme";
+import { PALETTE_NAME, PALETTES, type Palette, type PaletteInfo } from "@/lib/theme";
 
 /**
  * An operator's own theme (#508): `THEME_FILE`, a JSON file of token values
@@ -132,7 +132,8 @@ export function parseThemeFile(
 /** How the controls list it. */
 export function themeFileInfo(theme: ThemeFile): PaletteInfo {
   return {
-    name: theme.name,
+    // ThemeFileSchema held the name to PALETTE_NAME, and off the built-ins.
+    name: theme.name as Palette,
     label: theme.label,
     description: theme.description ?? "Your organization's theme.",
   };

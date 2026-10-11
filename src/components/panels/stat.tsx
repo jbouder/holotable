@@ -64,7 +64,7 @@ function Sparkline({ values, color }: { values: number[]; color?: string }) {
       viewBox="0 -4 100 108"
       preserveAspectRatio="none"
       aria-hidden
-      className="absolute inset-x-0 bottom-0 h-1/2 w-full text-primary opacity-30"
+      className="absolute inset-x-0 bottom-0 h-1/2 w-full text-primary opacity-(--chart-faint)"
       style={color ? { color } : undefined}
     >
       <polygon points={`0,104 ${points} 100,104`} fill="currentColor" opacity={0.25} />

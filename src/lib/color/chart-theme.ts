@@ -24,6 +24,12 @@ export interface ChartTheme {
    * label must still read on the track.
    */
   track: string;
+  /**
+   * How strongly a mark behind a value is drawn, 0 to 1: a gauge's threshold
+   * bands, a stat's sparkline. `--chart-faint`; high contrast draws them
+   * stronger (#549).
+   */
+  faint: number;
   /** The one value a gauge writes large: `--foreground`. */
   foreground: string;
   /** What a chart sits on, for an exported image: `--surface`. */
@@ -52,6 +58,7 @@ export const DEFAULT_CHART_THEME: ChartTheme = {
   line: oklchToHex({ l: 0.35, c: 0.02, h: 265 }),
   grid: oklchToHex({ l: 0.26, c: 0.02, h: 265 }),
   track: oklchToHex({ l: 0.26, c: 0.02, h: 265 }),
+  faint: 0.35,
   foreground: oklchToHex({ l: 0.96, c: 0.01, h: 265 }),
   background: oklchToHex({ l: 0.21, c: 0.02, h: 265 }),
   series: [
@@ -108,6 +115,7 @@ export function readChartTheme(
     line: read("--chart-axis", d.line),
     grid: read("--chart-grid", d.grid),
     track: read("--chart-track", d.track),
+    faint: readFraction(style.getPropertyValue("--chart-faint"), d.faint),
     foreground: read("--foreground", d.foreground),
     background: read("--surface", d.background),
     series: Array.from({ length: SERIES_COUNT }, (_, i) =>
@@ -159,6 +167,8 @@ export function forcedColorsTheme(system: (keyword: string) => string): ChartThe
     line: text,
     grid: gray,
     track: system("Canvas"),
+    // The bands stay faint: in forced colors every token is the same ink.
+    faint: 0.35,
     foreground: text,
     background: system("Canvas"),
     series: [highlight, link, text, visited, gray, highlight, link, text],
@@ -193,3 +203,9 @@ export function inkOn(fill: string): string {
 
 /** A block's edge, drawn over any fill: black at a third. */
 export const BLOCK_EDGE = withAlpha(INK.dark, 0.35);
+
+/** A 0–1 number from a custom property, or `fallback` when it is not one. */
+function readFraction(value: string, fallback: number): number {
+  const n = Number.parseFloat(value);
+  return Number.isFinite(n) && n >= 0 && n <= 1 ? n : fallback;
+}

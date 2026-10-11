@@ -35,7 +35,7 @@ export function bootstrapScript(
   const palette = pinned.palette
     ? `var q=${JSON.stringify(pinned.palette)};`
     : `var q=localStorage.getItem(${JSON.stringify(PALETTE_STORAGE_KEY)});`;
-  return `(function(){var d=document.documentElement;try{${scheme}if(p!=="dark"&&p!=="light"&&p!=="system")p=${JSON.stringify(DEFAULT_THEME)};var t=p==="system"?(matchMedia("(prefers-color-scheme: dark)").matches?"dark":"light"):p;d.dataset.theme=t;d.style.colorScheme=t}catch(e){}try{${palette}if(${shipped}.indexOf(q)<0)q=${JSON.stringify(defaultPalette)};d.dataset.palette=q}catch(e){}try{var m=localStorage.getItem(${JSON.stringify(MOTION_STORAGE_KEY)});if(m!=="system"&&m!=="reduce"&&m!=="allow")m=${JSON.stringify(DEFAULT_MOTION)};d.dataset.motion=m==="system"?(matchMedia(${JSON.stringify(REDUCED_MOTION_QUERY)}).matches?"reduce":"allow"):m}catch(e){}})()`;
+  return `(function(){var d=document.documentElement;try{${scheme}if(p!=="dark"&&p!=="light"&&p!=="system")p=${JSON.stringify(DEFAULT_THEME)};var t=p==="system"?(matchMedia("(prefers-color-scheme: dark)").matches?"dark":"light"):p;d.dataset.theme=t;d.dataset.themeChoice=p;d.style.colorScheme=t}catch(e){}try{${palette}if(${shipped}.indexOf(q)<0)q=${JSON.stringify(defaultPalette)};d.dataset.palette=q}catch(e){}try{var m=localStorage.getItem(${JSON.stringify(MOTION_STORAGE_KEY)});if(m!=="system"&&m!=="reduce"&&m!=="allow")m=${JSON.stringify(DEFAULT_MOTION)};d.dataset.motion=m==="system"?(matchMedia(${JSON.stringify(REDUCED_MOTION_QUERY)}).matches?"reduce":"allow"):m}catch(e){}})()`;
 }
 
 /** The script with the built-in default palette, for a test. */
