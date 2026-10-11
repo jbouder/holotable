@@ -30,6 +30,7 @@ import { promptDashboards } from "@/lib/ai/prompt-dashboards";
 import { recordLlmRepair } from "@/lib/metrics";
 import { grantedRefs } from "@/lib/secret-refs";
 import { serverKind } from "@/lib/sources/server/registry";
+import { SERVER_MODEL_NAME } from "@/lib/ai/server-models";
 
 /**
  * The generation flows, as tools. Each is the route it mirrors —
@@ -60,6 +61,28 @@ const Prompt = z
   .min(1)
   .max(4000)
   .describe("What the dashboard or panel should show, in plain English.");
+
+/**
+ * The model to generate with (#442): a catalog id from list_models, or a
+ * server model's name. The catalog must grant it to the caller in the
+ * workspace, else the call fails; without it, the caller's default there.
+ */
+const ModelArg = z
+  .string()
+  .min(1)
+  .max(64)
+  .optional()
+  .describe(
+    "The model to use: an id from list_models, or a server model's name. Without it, the caller's default in the workspace.",
+  );
+
+/** A model argument as a catalog id: a server model's bare name becomes `env:<name>`. */
+export function modelIdOf(model: string | undefined): string | undefined {
+  if (!model) return undefined;
+  return SERVER_MODEL_NAME.test(model) && !/^[0-9a-f-]{36}$/i.test(model)
+    ? `env:${model}`
+    : model;
+}
 
 /** What the stream functions return, as far as this module reads it. */
 interface StreamResult<T> {
@@ -94,11 +117,14 @@ interface Generation<T> {
   sourceId: string | null;
   prompt: string;
   catalog: string | null;
-  /** The audit row for one attempt, with which level's model answered (#331). */
+  /** The model the client named (#442), or none for the caller's default. */
+  modelId?: string;
+  /** The audit row for one attempt, with which model answered (#331, #442). */
   auditAttempt: (
     event: GenerationFinish,
     attempt: number,
     modelConfig: ModelSource,
+    modelId: string,
   ) => void;
   /** Start one model call. */
   start: (opts: {
@@ -113,7 +139,11 @@ async function generate<T>(deps: McpDeps, input: Generation<T>): Promise<T> {
   const { identity, workspaceId, route, mode } = input;
   // Resolved once, before anything is admitted: a workspace whose model
   // cannot be called should not spend its rate allowance to be told so.
-  const resolved = await deps.requireModel({ identity, workspaceId });
+  const resolved = await deps.requireModel({
+    identity,
+    workspaceId,
+    modelId: input.modelId,
+  });
   let repair: Failure | undefined;
   for (let attempt = 1; ; attempt++) {
     // Every call is admitted on its own, the repair included.
@@ -146,7 +176,7 @@ async function generate<T>(deps: McpDeps, input: Generation<T>): Promise<T> {
           attempts: attempt,
           error: event.error,
         });
-        input.auditAttempt(event, attempt, resolved.source);
+        input.auditAttempt(event, attempt, resolved.source, resolved.id);
       },
     });
     try {
@@ -182,6 +212,7 @@ export function generationTools(deps: McpDeps): McpTool[] {
           "Other sources in the same workspace the dashboard may draw on.",
         ),
         prompt: Prompt,
+        model: ModelArg,
       }),
       annotations: GENERATES,
       async run(args, { identity }) {
@@ -210,6 +241,7 @@ export function generationTools(deps: McpDeps): McpTool[] {
           load: deps.listLinkableDashboards,
         });
         const generated = await generate(deps, {
+          modelId: modelIdOf(args.model),
           identity,
           workspaceId: source.workspaceId,
           route: "generate",
@@ -217,7 +249,7 @@ export function generationTools(deps: McpDeps): McpTool[] {
           sourceId: source.id,
           prompt: args.prompt,
           catalog,
-          auditAttempt: (event, attempt, modelConfig) =>
+          auditAttempt: (event, attempt, modelConfig, modelId) =>
             audit({
               actor: identity,
               action: "dashboard.generate",
@@ -229,6 +261,7 @@ export function generationTools(deps: McpDeps): McpTool[] {
                 prompt: args.prompt,
                 model: event.modelId,
                 modelConfig,
+                modelId,
                 via: "mcp",
                 ...(additional.length > 0 ? { sourceIds: sources.map((s) => s.id) } : {}),
                 ...(attempt > 1 ? { attempt } : {}),
@@ -261,6 +294,7 @@ export function generationTools(deps: McpDeps): McpTool[] {
       input: z.object({
         sourceId: z.string().min(1).describe("The source, from list_sources."),
         prompt: Prompt,
+        model: ModelArg,
       }),
       annotations: GENERATES,
       async run(args, { identity }) {
@@ -279,6 +313,7 @@ export function generationTools(deps: McpDeps): McpTool[] {
             return null;
           });
         const panel = await generate(deps, {
+          modelId: modelIdOf(args.model),
           identity,
           workspaceId: source.workspaceId,
           route: "generate",
@@ -286,7 +321,7 @@ export function generationTools(deps: McpDeps): McpTool[] {
           sourceId: source.id,
           prompt: args.prompt,
           catalog: serverKind(source).catalogPrompt(source),
-          auditAttempt: (event, attempt, modelConfig) =>
+          auditAttempt: (event, attempt, modelConfig, modelId) =>
             audit({
               actor: identity,
               action: "dashboard.generate",
@@ -298,6 +333,7 @@ export function generationTools(deps: McpDeps): McpTool[] {
                 prompt: args.prompt,
                 model: event.modelId,
                 modelConfig,
+                modelId,
                 via: "mcp",
                 ...(attempt > 1 ? { attempt } : {}),
               },
@@ -334,11 +370,13 @@ export function generationTools(deps: McpDeps): McpTool[] {
           .min(1)
           .max(4000)
           .describe("The database and what it holds, in plain English."),
+        model: ModelArg,
       }),
       annotations: GENERATES,
       async run(args, { identity }) {
         assertAuthorized(identity, "source:manage", { workspaceId: args.workspaceId });
         const draft = await generate(deps, {
+          modelId: modelIdOf(args.model),
           identity,
           workspaceId: args.workspaceId,
           route: "source-draft",
@@ -346,7 +384,7 @@ export function generationTools(deps: McpDeps): McpTool[] {
           sourceId: null,
           prompt: args.prompt,
           catalog: null,
-          auditAttempt: (event, attempt, modelConfig) =>
+          auditAttempt: (event, attempt, modelConfig, modelId) =>
             audit({
               actor: identity,
               action: "source.draft",
@@ -356,6 +394,7 @@ export function generationTools(deps: McpDeps): McpTool[] {
                 prompt: args.prompt,
                 model: event.modelId,
                 modelConfig,
+                modelId,
                 via: "mcp",
                 ...(attempt > 1 ? { attempt } : {}),
               },

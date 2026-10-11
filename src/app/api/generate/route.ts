@@ -13,6 +13,7 @@ import {
 } from "@/lib/ai/generate";
 import { AdditionalSourceIds, resolveGenerationSources } from "@/lib/generation-sources";
 import { recordGeneration } from "@/lib/ai/log";
+import { ModelId } from "@/lib/ai/model-config";
 import { requireModel } from "@/lib/ai/models";
 import { textResponseOnceStarted } from "@/lib/ai/provider-error";
 import {
@@ -43,6 +44,7 @@ const GenerateBody = z.discriminatedUnion("mode", [
     // The dashboard's other sources (#104), in the same workspace.
     additionalSourceIds: AdditionalSourceIds.optional(),
     prompt: z.string().min(1).max(4000),
+    modelId: ModelId.optional(),
   }),
   z.object({
     mode: z.literal("dashboard-refine"),
@@ -54,6 +56,7 @@ const GenerateBody = z.discriminatedUnion("mode", [
     // The saved dashboard being refined, if it is one: marks it in the
     // DASHBOARDS list (#375) so a link to it is written as a self link.
     dashboardId: z.uuid().optional(),
+    modelId: ModelId.optional(),
   }),
   z.object({
     mode: z.literal("panel"),
@@ -62,11 +65,13 @@ const GenerateBody = z.discriminatedUnion("mode", [
     current: Panel,
     // The dashboard the panel is on (#375); see dashboard-refine.
     dashboardId: z.uuid().optional(),
+    modelId: ModelId.optional(),
   }),
   z.object({
     mode: z.literal("explore"),
     sourceId: z.string().min(1),
     prompt: z.string().min(1).max(4000),
+    modelId: ModelId.optional(),
   }),
 ]);
 type GenerateBody = z.infer<typeof GenerateBody>;
@@ -129,7 +134,14 @@ export const POST = route("generate", async (req: Request) => {
 
   // Before the limits: a workspace whose model cannot be called should not
   // spend its rate allowance to be told so (#331).
-  const resolved = await requireModel({ identity, workspaceId: source.workspaceId });
+  // The model the caller picked (#442), which the catalog must grant here,
+  // else theirs or the workspace's default. A repair replays the stored
+  // request, so it runs on the same model.
+  const resolved = await requireModel({
+    identity,
+    workspaceId: source.workspaceId,
+    modelId: body.modelId,
+  });
 
   const usage = await enforceLlmLimits({
     identity,
@@ -204,6 +216,7 @@ export const POST = route("generate", async (req: Request) => {
         prompt: body.prompt,
         model: event.modelId,
         modelConfig: resolved.source,
+        modelId: resolved.id,
         ...(additional.length > 0 ? { sourceIds: sources.map((s) => s.id) } : {}),
         ...(repair ? { attempt: 2 } : {}),
       },

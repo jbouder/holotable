@@ -50,6 +50,7 @@ const conversation: Conversation = {
   title: "",
   timeRange: { from: "2026-07-11T11:00:00.000Z", to: "2026-07-11T12:00:00.000Z" },
   variables: null,
+  modelId: null,
   createdAt: "2026-07-11T12:00:00.000Z",
   updatedAt: "2026-07-11T12:00:00.000Z",
 };

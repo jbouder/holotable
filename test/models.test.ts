@@ -444,3 +444,60 @@ test("every workspace model route checks source:manage, every personal one refus
     );
   }
 });
+
+/* --- The pick (#442) ------------------------------------------------------- */
+
+function picks(seed: Record<string, string> = {}) {
+  const store = new Map(Object.entries(seed));
+  const remembered: Array<[string, string, string]> = [];
+  return {
+    remembered,
+    picks: {
+      get: async (sub: string, workspaceId: string) =>
+        store.get(`${sub}/${workspaceId}`) ?? null,
+      remember: async (sub: string, workspaceId: string, modelId: string) => {
+        remembered.push([sub, workspaceId, modelId]);
+        store.set(`${sub}/${workspaceId}`, modelId);
+      },
+    },
+  };
+}
+
+test("without a pick: the conversation's model, then the last pick, while each is usable", async () => {
+  const { picks: remembered } = picks({ "alice/w": strong.id });
+  const d = { ...deps({ defaultModel: wsModel.id }), picks: remembered };
+  const input = { identity: alice, workspaceId: "w" };
+  assert.equal((await resolveModel(input, d)).id, strong.id, "the last pick");
+  assert.equal(
+    (await resolveModel({ ...input, preferred: "env:default" }, d)).id,
+    "env:default",
+    "the conversation's own model",
+  );
+  // A stored id that is no longer usable is passed over, never refused.
+  assert.equal(
+    (await resolveModel({ ...input, preferred: foreign.id }, d)).id,
+    strong.id,
+  );
+  const gone = {
+    ...deps({ defaultModel: wsModel.id }),
+    picks: picks({ "alice/w": foreign.id }).picks,
+  };
+  assert.equal((await resolveModel(input, gone)).id, wsModel.id);
+  // The listing's default says the same.
+  assert.equal((await usableModels(alice, "w", d)).defaultModel, strong.id);
+});
+
+test("a named model is remembered for the person and the workspace, never for a token", async () => {
+  const { picks: store, remembered } = picks();
+  const d = { ...deps(), picks: store };
+  await requireModel({ identity: alice, workspaceId: "w", modelId: strong.id }, d);
+  await requireModel({ identity: alice, workspaceId: "w" }, d);
+  await requireModel({ identity: robot, workspaceId: "w", modelId: strong.id }, d);
+  await new Promise((r) => setImmediate(r));
+  assert.deepEqual(remembered, [["alice", "w", strong.id]]);
+  // A refused id remembers nothing.
+  await assert.rejects(
+    requireModel({ identity: alice, workspaceId: "w", modelId: foreign.id }, d),
+  );
+  assert.equal(remembered.length, 1);
+});

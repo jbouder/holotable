@@ -4,7 +4,7 @@ import type {
   streamSourceDraft,
 } from "@/lib/ai/generate";
 import type { recordGeneration } from "@/lib/ai/log";
-import type { requireModel } from "@/lib/ai/models";
+import type { requireModel, usableModels } from "@/lib/ai/models";
 import type {
   createDashboard,
   getDashboardById,
@@ -39,6 +39,8 @@ export interface McpDeps {
   enforceLlmLimits: typeof enforceLlmLimits;
   /** The caller's model in the workspace (#331): personal, workspace or environment. */
   requireModel: typeof requireModel;
+  /** What the caller may name as `model` in a workspace (#442). */
+  usableModels: typeof usableModels;
   workspacePromptFor: typeof workspacePromptFor;
   /** The dashboards a generated link may lead to (#375). */
   listLinkableDashboards: typeof listLinkableDashboards;

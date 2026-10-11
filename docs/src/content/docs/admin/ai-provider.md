@@ -35,7 +35,8 @@ entries in one **catalog**: a workspace may hold several named models and a
 person several of their own (`llm_models`, migration 022), and a
 workspace's default is one of its models or a server model.
 `GET /api/models?workspace=<id>` lists what the caller may use there, and a
-request that names a model by id gets exactly that one; an id the catalog
+request that names a model by id (the [model chip](/guide/models/#picking-a-model))
+gets exactly that one; an id the catalog
 does not grant the caller in that workspace (another workspace's, another
 person's, a deleted one, a personal one where they are not allowed) is a
 `400` that names nothing.

@@ -7,6 +7,7 @@ import {
   chatPreferencesOf,
   historyOf,
   historyTurnedOff,
+  MAX_REMEMBERED_MODELS,
   parsePreferences,
   parsePreferencesPatch,
   startDashboardId,
@@ -251,4 +252,23 @@ test("Explore's stored defaults are read as Chat's, and an Explore start page la
   );
   const patch = parsePreferencesPatch({ startPage: "explore" });
   assert.deepEqual(patch, { ok: true, patch: { startPage: "chat" } });
+});
+
+test("the model picked in each workspace is kept, bounded, and an invalid entry is dropped (#442)", () => {
+  assert.deepEqual(parsePreferences({}).modelByWorkspace, {});
+  const picks = {
+    ops: "9b1e4f5a-1c2d-4e3f-8a9b-0c1d2e3f4a5b",
+    platform: "env:claude",
+  };
+  assert.deepEqual(parsePreferences({ modelByWorkspace: picks }).modelByWorkspace, picks);
+  // Not a model id: the field falls back to empty, the others survive.
+  const bad = parsePreferences({ modelByWorkspace: { ops: "drop table" }, clock: "24h" });
+  assert.deepEqual(bad.modelByWorkspace, {});
+  assert.equal(bad.clock, "24h");
+  const many = Object.fromEntries(
+    Array.from({ length: MAX_REMEMBERED_MODELS + 1 }, (_, i) => [`ws-${i}`, "env:a"]),
+  );
+  assert.deepEqual(parsePreferences({ modelByWorkspace: many }).modelByWorkspace, {});
+  const patch = parsePreferencesPatch({ modelByWorkspace: { ops: "not an id" } });
+  assert.equal(patch.ok, false);
 });

@@ -64,6 +64,7 @@ export default async function ConversationPage({
             ? context.sources.map((s) => s.id)
             : conversation.sourceIds,
           timeRange: conversation.timeRange,
+          modelId: conversation.modelId,
         },
         messages: stored.map(readStoredChatMessage).filter((m) => m !== null),
         unavailableSourceIds: context.unavailable,

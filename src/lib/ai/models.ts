@@ -11,6 +11,7 @@ import {
 } from "@/lib/ai/model-resolution";
 import type { Environment } from "@/lib/config";
 import type { StoredModel } from "@/lib/db/models";
+import { log } from "@/lib/log";
 
 /**
  * The model catalog (#437, #439): which models a caller may use in a
@@ -77,6 +78,8 @@ interface Catalog {
   workspace: Entry[];
   personal: Entry[];
   defaultModel: string | null;
+  /** The caller's last pick here (#442), or null. */
+  remembered: string | null;
 }
 
 /**
@@ -90,8 +93,19 @@ async function catalog(
   deps: ModelResolutionDeps,
 ): Promise<Catalog> {
   const server = serverModels(deps.env);
+  const remembered =
+    deps.picks && !identity.serviceAccount
+      ? await deps.picks.get(identity.sub, workspaceId).catch(() => null)
+      : null;
   if (deps.demo) {
-    return { entries: server, server, workspace: [], personal: [], defaultModel: null };
+    return {
+      entries: server,
+      server,
+      workspace: [],
+      personal: [],
+      defaultModel: null,
+      remembered,
+    };
   }
   const settings = await deps.store.workspace(workspaceId);
   const allowPersonal = Boolean(settings?.allowPersonalKeys) && !identity.serviceAccount;
@@ -109,24 +123,35 @@ async function catalog(
     workspace,
     personal,
     defaultModel: settings?.defaultModel ?? null,
+    remembered,
   };
 }
 
 /**
  * The entry a request without a model gets:
  *
- * 1. the caller's first personal model, where the workspace allows them
- *    (#331's rule; Phase 5 replaces it with the person's remembered pick);
- * 2. the workspace's default, when it is still in the usable set;
- * 3. the server's default.
+ * 1. `preferred`, the model a conversation is talking to, while usable;
+ * 2. the caller's last pick in this workspace (#442), while usable;
+ * 3. the caller's first personal model, where the workspace allows them
+ *    (#331's rule, so someone who set one up keeps using it until they pick);
+ * 4. the workspace's default, while usable;
+ * 5. the server's default.
+ *
+ * A stored id that is no longer usable (a deleted model, a workspace that
+ * stopped allowing personal ones) is passed over, never refused: only an id
+ * the request itself names is a 400.
  */
-function defaultEntry(found: Catalog): Entry | null {
+function defaultEntry(found: Catalog, preferred?: string | null): Entry | null {
+  const usable = (id: string | null | undefined) =>
+    id ? found.entries.find((e) => e.listing.id === id) : undefined;
+  const chosen = usable(preferred) ?? usable(found.remembered);
+  if (chosen) return chosen;
   if (found.personal.length > 0) return found.personal[0];
   if (found.defaultModel) {
-    const chosen = [...found.server, ...found.workspace].find(
+    const fallback = [...found.server, ...found.workspace].find(
       (e) => e.listing.id === found.defaultModel,
     );
-    if (chosen) return chosen;
+    if (fallback) return fallback;
   }
   return found.server[0] ?? null;
 }
@@ -136,13 +161,24 @@ export async function usableModels(
   identity: Identity,
   workspaceId: string,
   deps: ModelResolutionDeps = defaultModelDeps(),
+  preferred?: string | null,
 ): Promise<ModelsResponse> {
   const found = await catalog(identity, workspaceId, deps);
   return {
     workspaceId,
     models: found.entries.map((e) => e.listing),
-    defaultModel: defaultEntry(found)?.listing.id ?? null,
+    defaultModel: defaultEntry(found, preferred)?.listing.id ?? null,
   };
+}
+
+/** What a model-taking request may carry: a pick, and the conversation's own model. */
+export interface ModelRequest {
+  identity: Identity;
+  workspaceId: string;
+  /** Named by the request: must be usable here, else a 400. */
+  modelId?: string | null;
+  /** Stored by a conversation: used while usable, else passed over. */
+  preferred?: string | null;
 }
 
 /**
@@ -152,7 +188,7 @@ export async function usableModels(
  * never replaced by another, which may be billed to someone else.
  */
 export async function resolveModel(
-  input: { identity: Identity; workspaceId: string; modelId?: string | null },
+  input: ModelRequest,
   deps: ModelResolutionDeps = defaultModelDeps(),
 ): Promise<ResolvedModel> {
   const found = await catalog(input.identity, input.workspaceId, deps);
@@ -161,7 +197,7 @@ export async function resolveModel(
     if (!chosen) throw new HttpError(400, NOT_AVAILABLE);
     return chosen.resolve();
   }
-  const chosen = defaultEntry(found);
+  const chosen = defaultEntry(found, input.preferred);
   if (chosen) return chosen.resolve();
   return {
     ok: false,
@@ -173,11 +209,19 @@ export async function resolveModel(
 
 /** {@link resolveModel}, or a 503 that says what to configure. For the generation routes. */
 export async function requireModel(
-  input: { identity: Identity; workspaceId: string; modelId?: string | null },
-  deps?: ModelResolutionDeps,
+  input: ModelRequest,
+  deps: ModelResolutionDeps = defaultModelDeps(),
 ): Promise<Extract<ResolvedModel, { ok: true }>> {
   const resolved = await resolveModel(input, deps);
   if (!resolved.ok) throw new HttpError(503, resolved.problem);
+  // A pick the request named is the one a new dashboard or conversation in
+  // this workspace starts on next time (#442). Best effort: a failed write
+  // never fails the generation.
+  if (input.modelId && deps.picks && !input.identity.serviceAccount) {
+    void deps.picks
+      .remember(input.identity.sub, input.workspaceId, resolved.id)
+      .catch((error: unknown) => log.warn("model_pick.remember_failed", { error }));
+  }
   return resolved;
 }
 

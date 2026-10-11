@@ -1317,3 +1317,29 @@ export async function mergeUserPreferences(
   );
   return rows[0]?.prefs ?? patch;
 }
+
+/**
+ * Remember the model a person picked in a workspace (#442): one key of
+ * `prefs.modelByWorkspace`, set in one statement so a pick in one workspace
+ * never overwrites a pick made in another at the same moment.
+ */
+export async function rememberModelPick(
+  sub: string,
+  workspaceId: string,
+  modelId: string,
+): Promise<void> {
+  await query(
+    `INSERT INTO user_preferences (sub, prefs)
+     VALUES ($1, jsonb_build_object('modelByWorkspace', jsonb_build_object($2::text, $3::text)))
+     ON CONFLICT (sub) DO UPDATE SET
+       prefs = jsonb_set(
+         user_preferences.prefs,
+         '{modelByWorkspace}',
+         (CASE WHEN jsonb_typeof(user_preferences.prefs->'modelByWorkspace') = 'object'
+               THEN user_preferences.prefs->'modelByWorkspace' ELSE '{}'::jsonb END)
+           || jsonb_build_object($2::text, $3::text)
+       ),
+       updated_at = now()`,
+    [sub, workspaceId, modelId],
+  );
+}

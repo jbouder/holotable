@@ -24,6 +24,7 @@ import {
 import { resolveTimeRange } from "@/lib/time";
 import { rowScopeFor } from "@/lib/row-scope";
 import { checkedSelection, variableSourceIds } from "@/lib/variables";
+import { ModelId } from "@/lib/ai/model-config";
 import { requireModel } from "@/lib/ai/models";
 import { enforceLlmLimits } from "@/lib/limits/llm";
 import { messagesToPersist } from "@/lib/chat-history";
@@ -49,6 +50,8 @@ const Body = z.object({
     .refine((v) => Object.keys(v).length <= 20, "at most 20 variables")
     .optional(),
   panelId: Panel.shape.id.optional(),
+  // The model the reader picked (#442); the catalog must grant it here.
+  modelId: ModelId.optional(),
 });
 
 type RouteParams = { params: Promise<{ id: string }> };
@@ -109,7 +112,7 @@ export const GET = route(
   async (_req: Request, ctx: RouteParams) => {
     const { identity, id } = await authorizedDashboard(ctx);
     const conversation = await storedConversation(identity, id);
-    if (!conversation) return json({ messages: [], conversationId: null });
+    if (!conversation) return json({ messages: [], conversationId: null, modelId: null });
     const rows = await pgConversationStore.messages(
       conversation.id,
       identity.sub,
@@ -119,6 +122,8 @@ export const GET = route(
       messages: rows.map(readStoredChatMessage).filter((m) => m !== null),
       // So the widget can open the same conversation in Explore.
       conversationId: conversation.id,
+      // The model its turns use (#442), for the chip.
+      modelId: conversation.modelId,
     });
   },
 );
@@ -158,7 +163,15 @@ export const POST = route("dashboards.chat", async (req: Request, ctx: RoutePara
   const { identity, id, dashboard } = await authorizedDashboard(ctx);
   const body = await readJson(req, Body);
 
-  const resolved = await requireModel({ identity, workspaceId: dashboard.workspaceId });
+  // The reader's conversation here remembers its model (#442): a pick in
+  // the request wins and is kept; without one, the stored model while usable.
+  const kept = await storedConversation(identity, id);
+  const resolved = await requireModel({
+    identity,
+    workspaceId: dashboard.workspaceId,
+    modelId: body.modelId,
+    preferred: kept?.modelId,
+  });
 
   const usage = await enforceLlmLimits({
     identity,
@@ -202,7 +215,6 @@ export const POST = route("dashboards.chat", async (req: Request, ctx: RoutePara
   const incoming = body.messages as UIMessage[];
   // What is already on disk, so `onEnd` — which hands back the whole
   // conversation — only writes the tail this turn produced.
-  const kept = await storedConversation(identity, id);
   const stored = kept
     ? await pgConversationStore.messages(kept.id, identity.sub, retention())
     : [];
@@ -226,6 +238,7 @@ export const POST = route("dashboards.chat", async (req: Request, ctx: RoutePara
     detail: {
       messageCount: incoming.length,
       modelConfig: resolved.source,
+      modelId: resolved.id,
       timeRange: viewed.timeRange,
       variables: view.variables,
       panelId: view.focusPanelId,
@@ -284,6 +297,11 @@ export const POST = route("dashboards.chat", async (req: Request, ctx: RoutePara
             max: config.chatConversationsMax,
             retentionDays: config.chatHistoryRetentionDays,
           }));
+        if (body.modelId && conversation.modelId !== resolved.id) {
+          await pgConversationStore.update(conversation.id, identity.sub, {
+            modelId: resolved.id,
+          });
+        }
         const question = incoming.findLast((m) => m.role === "user");
         await pgConversationStore.append({
           conversationId: conversation.id,

@@ -31,6 +31,11 @@ import {
  * anyway. Drafts, recents and dismissed hints are per browser for the reasons
  * their own modules give.
  *
+ * The model last picked in each workspace (`modelByWorkspace`, #442) syncs
+ * too: a person who settled on a model for their dashboards in one workspace
+ * expects a new dashboard there to start on it, on any device. It is written
+ * by the server when a generation names a model, not by the settings form.
+ *
  * Chart patterns (`chartPatterns`) sync too, though they look like an
  * appearance setting: they are an accessibility need of the person (telling
  * series apart without color), and they apply when a chart draws, after
@@ -81,6 +86,31 @@ const TimeZoneSchema = z.string().refine((v) => v === "local" || isValidTimeZone
  * that no longer parses falls back to its default without taking the others
  * with it.
  */
+/** At most this many remembered picks; a person generates in a handful of workspaces. */
+export const MAX_REMEMBERED_MODELS = 50;
+
+/**
+ * The model a person last picked in each workspace (#442), so a new
+ * dashboard or conversation there starts on it. Written by the server when a
+ * request names a model, and read only to choose a default: a pick that is
+ * no longer usable (deleted, or a workspace that stopped allowing personal
+ * models) is ignored, never refused.
+ */
+const ModelByWorkspaceSchema = z
+  .record(
+    z.string().max(64),
+    z
+      .string()
+      .max(64)
+      .regex(
+        /^(?:[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}|env:[a-z0-9][a-z0-9-]{0,39})$/i,
+        "must be a model id",
+      ),
+  )
+  .refine((r) => Object.keys(r).length <= MAX_REMEMBERED_MODELS, {
+    message: `must name at most ${MAX_REMEMBERED_MODELS} workspaces`,
+  });
+
 export const PREFERENCE_FIELDS = {
   timeZone: TimeZoneSchema,
   clock: z.enum(CLOCKS, { error: `must be one of ${CLOCKS.join(", ")}` }),
@@ -101,6 +131,7 @@ export const PREFERENCE_FIELDS = {
   }),
   chatShowQueries: z.boolean({ error: "must be true or false" }),
   rememberChats: z.boolean({ error: "must be true or false" }),
+  modelByWorkspace: ModelByWorkspaceSchema,
 } as const;
 
 export interface Preferences {
@@ -132,6 +163,8 @@ export interface Preferences {
    * stored one.
    */
   rememberChats: boolean;
+  /** The model last picked in each workspace (#442), by workspace id. */
+  modelByWorkspace: Record<string, string>;
 }
 
 export type PreferenceKey = keyof Preferences;
@@ -150,6 +183,7 @@ export const DEFAULT_PREFERENCES: Preferences = {
   chatRefreshMs: 0,
   chatShowQueries: false,
   rememberChats: true,
+  modelByWorkspace: {},
 };
 
 const KEYS = Object.keys(PREFERENCE_FIELDS) as PreferenceKey[];

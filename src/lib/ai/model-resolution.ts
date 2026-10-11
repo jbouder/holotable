@@ -29,7 +29,9 @@ import {
   pgModelStore,
   type StoredModel,
 } from "@/lib/db/models";
+import { getUserPreferences, rememberModelPick } from "@/lib/db/repo";
 import { rememberSecret } from "@/lib/log";
+import { parsePreferences } from "@/lib/preferences";
 import { openSecret, sealSecret } from "@/lib/secrets/seal";
 
 /**
@@ -117,8 +119,29 @@ export function stubAllowed(env: Environment = process.env): boolean {
 /** What a stored model is built from: its kind, its settings, its sealed credentials. */
 export type StoredConfig = Pick<StoredModel, "provider" | "settings" | "credentials">;
 
+/**
+ * The model a person last picked in each workspace (#442), kept in their
+ * preferences. Read to choose a default; written when a request names one.
+ */
+export interface ModelPicks {
+  get(sub: string, workspaceId: string): Promise<string | null>;
+  remember(sub: string, workspaceId: string, modelId: string): Promise<void>;
+}
+
+export const pgModelPicks: ModelPicks = {
+  async get(sub, workspaceId) {
+    const prefs = parsePreferences(await getUserPreferences(sub));
+    return prefs.modelByWorkspace[workspaceId] ?? null;
+  },
+  async remember(sub, workspaceId, modelId) {
+    await rememberModelPick(sub, workspaceId, modelId);
+  },
+};
+
 export interface ModelResolutionDeps {
   store: ModelStore;
+  /** Absent: nothing is remembered (tests, scripts). */
+  picks?: ModelPicks;
   /** `AUTH_MODE=demo` turns both in-app levels off. */
   demo: boolean;
   env: Environment;
@@ -131,6 +154,7 @@ export function defaultModelDeps(): ModelResolutionDeps {
   defaultAllowlist ??= parseBaseUrlAllowlist(config.aiBaseUrlAllowlist);
   return {
     store: pgModelStore,
+    picks: pgModelPicks,
     demo: config.authMode === "demo",
     env: process.env,
     allowlist: defaultAllowlist,

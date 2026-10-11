@@ -3,6 +3,7 @@
 import * as React from "react";
 import { useChat } from "@ai-sdk/react";
 import { DefaultChatTransport } from "ai";
+import { ModelChip, useModelChoice } from "@/components/model-chip";
 import type { UIMessage } from "ai";
 import {
   Database,
@@ -73,12 +74,15 @@ export type ChatPanel = Pick<Panel, "id" | "title" | "viz" | "query">;
  */
 export function DashboardChat({
   dashboardId,
+  workspaceId,
   dashboardTitle,
   panels,
   suggestions,
-  aiUnavailable,
+  aiUnavailable: renderedUnavailable,
 }: {
   dashboardId: string;
+  /** The dashboard's workspace: whose models the chip lists (#442). */
+  workspaceId: string;
   dashboardTitle: string;
   /**
    * The dashboard's panels, for citations. Already client-visible — this is the
@@ -106,12 +110,21 @@ export function DashboardChat({
   const returnFocus = React.useRef(false);
   const firstBox = React.useRef<DOMRect | null>(null);
   const reduced = useReducedMotion();
+  // The model chip (#442), read once the widget opens, like the history:
+  // seeded with the conversation's model, and a pick goes with the next turn.
+  const [storedModel, setStoredModel] = React.useState<string | null>(null);
+  const choice = useModelChoice(open ? workspaceId : null, storedModel);
+  const aiUnavailable = choice.current ? choice.current.unavailable : renderedUnavailable;
 
-  // The transport reads this when it sends, so it is a ref, not state.
+  // The transport reads these when it sends, so they are refs, not state.
   const aboutRef = React.useRef(about);
   React.useEffect(() => {
     aboutRef.current = about;
   }, [about]);
+  const modelRef = React.useRef(choice.modelId);
+  React.useEffect(() => {
+    modelRef.current = choice.modelId;
+  }, [choice.modelId]);
 
   const [transport] = React.useState(
     () =>
@@ -121,6 +134,7 @@ export function DashboardChat({
         body: () => ({
           ...chatViewFromSearch(window.location.search),
           ...(aboutRef.current ? { panelId: aboutRef.current } : {}),
+          ...(modelRef.current ? { modelId: modelRef.current } : {}),
         }),
       }),
   );
@@ -181,9 +195,14 @@ export function DashboardChat({
     setLoadedHistory(true);
     const controller = new AbortController();
     void fetch(`/api/dashboards/${dashboardId}/chat`, { signal: controller.signal })
-      .then((r) => (r.ok ? (r.json() as Promise<{ messages: UIMessage[] }>) : null))
+      .then((r) =>
+        r.ok
+          ? (r.json() as Promise<{ messages: UIMessage[]; modelId?: string | null }>)
+          : null,
+      )
       .then((body) => {
         if (body?.messages?.length) setMessages(body.messages);
+        if (body?.modelId) setStoredModel(body.modelId);
       })
       .catch(() => {});
     return () => controller.abort();
@@ -407,6 +426,9 @@ export function DashboardChat({
 
       <div className="border-t border-border p-3">
         {aiUnavailable && <AiUnavailable message={aiUnavailable} className="mb-2" />}
+        <div className="mb-2 flex">
+          <ModelChip choice={choice} disabled={busy} className="h-8 px-2.5" />
+        </div>
         {aboutPanel && (
           <div className="mb-2 flex">
             <span className="inline-flex min-w-0 items-center gap-1 border border-border bg-surface-2 py-0.5 pl-2 pr-0.5 text-xs">

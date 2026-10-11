@@ -45,6 +45,7 @@ import { RepointPanelsDialog } from "@/components/dashboard/RepointPanelsDialog"
 import { ErrorDisplay } from "@/components/ui/error-display";
 import { RepairingNote } from "@/components/repairing-note";
 import { useRepairingObject } from "@/components/use-repairing-object";
+import { ModelChip, useModelChoice } from "@/components/model-chip";
 import { type ApiError, apiErrorFromThrown, readApiError } from "@/lib/errors";
 import { appendTemplate, type Template } from "@/lib/templates";
 import { useSaveAsTemplate } from "@/components/templates/SaveAsTemplate";
@@ -107,8 +108,8 @@ export function EditDashboardClient({
   sources,
   metadata,
   tagSuggestions = [],
-  model,
-  aiUnavailable,
+  model: renderedModel,
+  aiUnavailable: renderedUnavailable,
 }: {
   dashboardId: string;
   /** The dashboard's own workspace: where a template is saved and read from. */
@@ -141,6 +142,11 @@ export function EditDashboardClient({
 }) {
   const router = useRouter();
   const mac = useIsMac();
+  // The model chip (#442): the editor's pick for a panel edit, else the
+  // default the server resolves; until the listing loads, what was rendered.
+  const choice = useModelChoice(workspaceId);
+  const model = choice.current?.model ?? renderedModel;
+  const aiUnavailable = choice.current ? choice.current.unavailable : renderedUnavailable;
   // Every spec mutation goes through `history.set`, which is what makes an
   // accidental delete or a mistaken Arrange recoverable (#81).
   const history = useHistory<Dashboard>(initialSpec);
@@ -473,6 +479,7 @@ export function EditDashboardClient({
       current: base,
       // So a link back to this dashboard is written as a self link (#375).
       dashboardId,
+      ...(choice.modelId ? { modelId: choice.modelId } : {}),
     });
   }
 
@@ -727,12 +734,14 @@ export function EditDashboardClient({
           )}
         </Button>
       </form>
-      {model && !aiUnavailable && (
-        <p className="text-xs text-muted">
-          Runs <span className="text-foreground">{model}</span> once and shows the change
-          to accept or reject.
-        </p>
-      )}
+      <div className="flex flex-wrap items-center gap-2">
+        <ModelChip choice={choice} disabled={isLoading} />
+        {!aiUnavailable && (
+          <p className="text-xs text-muted">
+            Runs once and shows the change to accept or reject.
+          </p>
+        )}
+      </div>
       <RepairingNote show={repairing} />
       {genError && (
         <ErrorDisplay

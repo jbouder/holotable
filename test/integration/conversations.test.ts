@@ -121,6 +121,24 @@ test(
   },
 );
 
+test(
+  "a conversation keeps the model it was last asked with (#442)",
+  needsDb,
+  async () => {
+    const mine = await create(ALICE);
+    assert.equal(mine.modelId, null);
+    const picked = await store.update(mine.id, ALICE, { modelId: "env:claude" });
+    assert.equal(picked?.modelId, "env:claude");
+    // Another change leaves it; another person cannot set it.
+    assert.equal(
+      (await store.update(mine.id, ALICE, { title: "renamed" }))?.modelId,
+      "env:claude",
+    );
+    assert.equal(await store.update(mine.id, BOB, { modelId: "env:other" }), null);
+    assert.equal((await store.get(mine.id, ALICE, 30))?.modelId, "env:claude");
+  },
+);
+
 test("messages are capped per conversation, newest kept", needsDb, async () => {
   const c = await create(ALICE);
   for (let i = 0; i < 5; i++) {
