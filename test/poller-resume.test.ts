@@ -407,3 +407,65 @@ test("a panel with its own row limit is sent whole every cycle, never appended",
     assert.ok(f.type === "panel" && f.mode === "replace" && f.rows.length === 2);
   }
 });
+
+test("a newest-first panel's appends land on top, and the window keeps the top", async () => {
+  // #531: without a row limit a newest-first table is appended to, and the
+  // browser put each cycle's new rows at the bottom.
+  mock.timers.enable({ apis: ["setTimeout"] });
+  const log: Dashboard = {
+    ...spec(),
+    panels: [
+      {
+        id: "log",
+        title: "log",
+        viz: "table",
+        query: {
+          sourceId: "s1",
+          sql: "SELECT ts, v FROM m ORDER BY ts DESC",
+          timeField: "ts",
+        },
+        layout: { x: 0, y: 0, w: 6, h: 4 },
+      },
+    ],
+  };
+  let cycle = 0;
+  const executor: PanelExecutor = async (panel) => {
+    cycle++;
+    const rows = Array.from({ length: cycle + 1 }, (_, i) => ({
+      ts: ts(cycle - i),
+      v: cycle - i,
+    }));
+    return [
+      { type: "panel", panelId: panel.id, mode: "replace", columns: ["ts", "v"], rows },
+    ];
+  };
+  const frames: Extract<PollerEvent, { type: "panel" }>[] = [];
+  const stop = getPoller(
+    `newest-first-${Date.now()}`,
+    1,
+    "ws",
+    log,
+    {},
+    executor,
+  ).subscribe((e) => {
+    if (e.type === "panel") frames.push(e);
+  });
+  for (let i = 0; i < 3; i++) {
+    await new Promise((r) => setImmediate(r));
+    mock.timers.tick(INTERVAL);
+  }
+  await new Promise((r) => setImmediate(r));
+  stop();
+  assert.ok(frames.length >= 3);
+  assert.ok(frames.every((f) => f.newestFirst === true));
+  assert.equal(frames[1].mode, "append");
+
+  let held: PanelData | undefined;
+  for (const f of frames) held = mergePanelRows(held, f, 3);
+  const newest = frames.length;
+  assert.deepEqual(
+    held?.rows.map((r) => r.v),
+    [newest, newest - 1, newest - 2],
+  );
+  assert.equal(held?.truncated?.stage, "window");
+});

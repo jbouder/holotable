@@ -282,7 +282,9 @@ joins or resumes is caught up from the last results without another query.
 ## 11. Charts merge, never recreate
 
 `EChart` initializes once and applies `setOption(..., { notMerge: false })`; the
-browser keeps a bounded rolling window (`MAX_WINDOW_POINTS`).
+browser keeps a bounded rolling window (`MAX_WINDOW_POINTS`). A query ordered
+newest first (`ORDER BY ts DESC`), which the poller reads off each whole result,
+gets its appends on top and keeps its first rows when the window is full.
 
 ## 12. SSE is cookie-authenticated
 

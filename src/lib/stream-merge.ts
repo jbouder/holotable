@@ -13,7 +13,10 @@ import { readTruncation, type Truncation } from "@/lib/truncation";
  *   while it fills; this is what makes that an update rather than a
  *   duplicate, and what makes a resumed stream's overlap harmless (#43).
  *
- * Either way the window keeps the last `maxWindowPoints` rows, and says so in
+ * A frame that says `newestFirst` (#531) runs the other way: an append goes on
+ * top, and the window keeps the first rows rather than the last.
+ *
+ * Either way the window keeps the newest `maxWindowPoints` rows, and says so in
  * `truncated` when that dropped any, as it carries a cut the server made
  * (#486).
  *
@@ -41,6 +44,7 @@ export function mergePanelRows(
     const fitted = fitToWindow(
       { columns, rows: event.rows, truncated: server },
       maxWindowPoints,
+      event.newestFirst,
     );
     return finish(fitted.rows, fitted.truncated);
   }
@@ -49,11 +53,11 @@ export function mergePanelRows(
     since !== undefined && timeField
       ? prev.rows.filter((r) => String(r[timeField]) < since)
       : prev.rows;
-  const rows = [...kept, ...event.rows];
+  const rows = event.newestFirst ? [...event.rows, ...kept] : [...kept, ...event.rows];
   if (rows.length <= maxWindowPoints) return finish(rows, server);
   // The window is full and rolling: what it drops is the oldest. The total is
   // the one the last full result counted, which a rolling window keeps close to.
-  return finish(rows.slice(-maxWindowPoints), {
+  return finish(newest(rows, maxWindowPoints, event.newestFirst), {
     stage: "window",
     kept: maxWindowPoints,
     ...(prev.truncated?.total !== undefined ? { total: prev.truncated.total } : {}),
@@ -69,6 +73,7 @@ export function mergePanelRows(
 export function fitToWindow(
   result: { columns: string[]; rows: Record<string, unknown>[]; truncated?: Truncation },
   maxWindowPoints: number,
+  newestFirst = false,
 ): { columns: string[]; rows: Record<string, unknown>[]; truncated?: Truncation } {
   const { rows } = result;
   const server = readTruncation(result.truncated);
@@ -79,11 +84,16 @@ export function fitToWindow(
   const total = server ? server.total : rows.length;
   return {
     columns: result.columns,
-    rows: rows.slice(-maxWindowPoints),
+    rows: newest(rows, maxWindowPoints, newestFirst),
     truncated: {
       stage: "window",
       kept: maxWindowPoints,
       ...(total !== undefined ? { total } : {}),
     },
   };
+}
+
+/** The newest `n` rows: the last of an oldest-first list, the first of a newest-first one. */
+function newest<T>(rows: T[], n: number, newestFirst = false): T[] {
+  return newestFirst ? rows.slice(0, n) : rows.slice(-n);
 }

@@ -83,6 +83,12 @@ export type PollerEvent =
       since?: string;
       timeField?: string;
       /**
+       * The query orders newest first (`ORDER BY ts DESC`), read off this
+       * cycle's whole result: an append goes on top, and a cut keeps the top
+       * (#531). Absent, the rows run oldest first.
+       */
+      newestFirst?: true;
+      /**
        * The window these rows were selected over (epoch ms). The tick's
        * window is the dashboard's; a panel with its own (#114) ends here.
        */
@@ -168,6 +174,19 @@ export function computeDelta(
     return acc === undefined || v > acc ? v : acc;
   }, prevCursor);
   return { fresh, cursor, mode: prevCursor ? "append" : "replace" };
+}
+
+/**
+ * Does a result run newest first? Its first timestamp is later than its last.
+ * Read off the whole result every cycle, not a delta, which may hold one
+ * timestamp. Exported for unit testing.
+ */
+export function isNewestFirst(
+  rows: Record<string, unknown>[],
+  timeField: string,
+): boolean {
+  if (rows.length < 2) return false;
+  return String(rows[0][timeField]) > String(rows[rows.length - 1][timeField]);
 }
 
 /**
@@ -520,12 +539,15 @@ class DashboardPoller {
     let cut = shared.get(key);
     if (!cut) {
       const delta = computeDelta(event.rows, timeField, since);
+      const order = isNewestFirst(event.rows, timeField)
+        ? { newestFirst: true as const }
+        : {};
       cut = {
         cursor: delta.cursor,
         event:
           delta.mode === "append"
-            ? { ...event, mode: "append", rows: delta.fresh, since, timeField }
-            : { ...event, mode: "replace", rows: delta.fresh },
+            ? { ...event, ...order, mode: "append", rows: delta.fresh, since, timeField }
+            : { ...event, ...order, mode: "replace", rows: delta.fresh },
       };
       shared.set(key, cut);
     }
