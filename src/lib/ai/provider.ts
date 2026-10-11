@@ -6,7 +6,7 @@ import { environmentModel } from "@/lib/ai/providers/server/environment";
 import { OPENAI_PROVIDER_OPTIONS } from "@/lib/ai/providers/server/openai-compatible";
 import { buildModel, providerOptionsFor } from "@/lib/ai/providers/server/registry";
 import type { ProviderOptions } from "@/lib/ai/providers/server/types";
-import { config } from "@/lib/config";
+import { config, type Environment } from "@/lib/config";
 
 /**
  * Provider-agnostic model selection.
@@ -65,8 +65,8 @@ function resilient(model: Parameters<typeof resilientModel>[0]) {
  * The environment's model: the last level of the resolution in
  * `model-resolution.ts` (#331), and the only one a script or a demo uses.
  */
-export function getModel(): Model {
-  return resilient(environmentModel());
+export function getModel(env: Environment = process.env): Model {
+  return resilient(environmentModel(env));
 }
 
 /**

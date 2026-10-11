@@ -13,7 +13,7 @@ import {
   inputFromDraft,
   MODEL_SOURCE_LABELS,
   type ModelConfigDraft,
-  type ModelConfigView,
+  type ModelView,
 } from "@/lib/ai/model-config";
 
 type Status =
@@ -24,16 +24,17 @@ type Status =
   | { kind: "error"; message: string };
 
 /**
- * The signed-in person's own model (#331). It applies only in the workspaces
- * listed, the ones that allow personal keys; each row says what a generation
- * of theirs there will use, as of the last page load.
+ * The signed-in person's own model (#331): their first personal model in the
+ * catalog (#439), until the Models page (#441) lists every one. It applies
+ * only in the workspaces listed, the ones that allow personal keys; each row
+ * says what a generation of theirs there will use, as of the last page load.
  */
 export function PersonalModelCard({
   initial,
   workspaces,
   allowStub = false,
 }: {
-  initial: ModelConfigView | null;
+  initial: ModelView | null;
   workspaces: Array<{ workspaceId: string; effective: EffectiveModel }>;
   allowStub?: boolean;
 }) {
@@ -48,8 +49,12 @@ export function PersonalModelCard({
   async function send(method: "PUT" | "DELETE", body?: unknown) {
     setStatus({ kind: "saving" });
     try {
-      const res = await fetch("/api/me/model", {
-        method,
+      // A first save adds the model; later ones replace it.
+      const url = view
+        ? `/api/me/models/${encodeURIComponent(view.id)}`
+        : "/api/me/models";
+      const res = await fetch(url, {
+        method: view || method === "DELETE" ? method : "POST",
         headers: body ? { "Content-Type": "application/json" } : undefined,
         body: body ? JSON.stringify(body) : undefined,
       });
@@ -64,7 +69,7 @@ export function PersonalModelCard({
         router.refresh();
         return;
       }
-      const next = ((await res.json()) as { config: ModelConfigView | null }).config;
+      const next = (await res.json()) as ModelView;
       setView(next);
       setDraft(draftFromView(next));
       setStatus({ kind: "saved" });
@@ -82,7 +87,7 @@ export function PersonalModelCard({
       setStatus({ kind: "error", message: built.message });
       return;
     }
-    void send("PUT", built.input);
+    void send("PUT", { ...built.input, name: view?.name ?? "Personal model" });
   }
 
   return (
@@ -104,8 +109,12 @@ export function PersonalModelCard({
               setStatus({ kind: "idle" });
             }}
             storedKey={view?.key}
-            testUrl={testWorkspace ? "/api/me/model/test" : null}
-            testBody={(config) => ({ config, workspaceId: testWorkspace })}
+            testUrl={testWorkspace ? "/api/me/models/test" : null}
+            testBody={(config) => ({
+              config,
+              workspaceId: testWorkspace,
+              ...(view ? { modelId: view.id } : {}),
+            })}
             allowStub={allowStub}
           />
           <div>

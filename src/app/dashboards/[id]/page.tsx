@@ -18,7 +18,7 @@ import { ButtonLabel, ButtonLink } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
 import { dashboardListHref, EMPTY_QUERY } from "@/lib/dashboard-list";
 import { chatSuggestions } from "@/lib/chat-history";
-import { effectiveModel } from "@/lib/ai/model-resolution";
+import { effectiveModel } from "@/lib/ai/models";
 import { rangeFromParams } from "@/lib/time-range";
 import { DEMO_IDLE_PAUSE_MS } from "@/lib/stream-idle";
 import { resolveLinkTargets } from "@/lib/drilldown-targets";

@@ -13,7 +13,7 @@ import {
 } from "@/lib/ai/generate";
 import { AdditionalSourceIds, resolveGenerationSources } from "@/lib/generation-sources";
 import { recordGeneration } from "@/lib/ai/log";
-import { requireModel } from "@/lib/ai/model-resolution";
+import { requireModel } from "@/lib/ai/models";
 import { textResponseOnceStarted } from "@/lib/ai/provider-error";
 import {
   type Failure,

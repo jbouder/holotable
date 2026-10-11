@@ -1,5 +1,5 @@
 import type { EffectiveModel } from "@/lib/ai/model-config";
-import { effectiveModels } from "@/lib/ai/model-resolution";
+import { effectiveModels } from "@/lib/ai/models";
 import { authorizedWorkspaces, can } from "@/lib/auth/authorize";
 import { accessibleWorkspaces, type Identity } from "@/lib/auth/claims";
 import { type CatalogHealth, catalogHealth } from "@/lib/catalog/health";

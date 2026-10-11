@@ -4,7 +4,7 @@ import { accessibleWorkspaces, hasWorkspaceRole } from "@/lib/auth/claims";
 import { listSources } from "@/lib/db/repo";
 import { catalogHealth } from "@/lib/catalog/health";
 import { buildStarters } from "@/lib/prompts/starters";
-import { effectiveModels } from "@/lib/ai/model-resolution";
+import { effectiveModels } from "@/lib/ai/models";
 import { SignIn } from "@/components/sign-in";
 import { NewDashboardClient } from "./new-client";
 

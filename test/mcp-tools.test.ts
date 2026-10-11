@@ -249,6 +249,7 @@ function fakeDeps(
     },
     requireModel: async () => ({
       ok: true,
+      id: "9b1e4f5a-1c2d-4e3f-8a9b-0c1d2e3f4a5b",
       source: "workspace",
       modelId: "ws-model",
       model: {} as Model,

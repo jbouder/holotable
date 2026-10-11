@@ -1,7 +1,7 @@
 import { notFound } from "next/navigation";
 import { isSqlSource, sourceKind } from "@/lib/sources/registry";
 import { getIdentity, can } from "@/lib/auth/authorize";
-import { effectiveModel } from "@/lib/ai/model-resolution";
+import { effectiveModel } from "@/lib/ai/models";
 import { getDashboardById, listDashboardTags, listSources } from "@/lib/db/repo";
 import { SignIn } from "@/components/sign-in";
 import { EditDashboardClient } from "./edit-client";

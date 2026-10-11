@@ -24,10 +24,21 @@ resolves its model per request, and the first level that is configured wins:
 
 1. **Personal**: the caller's own model, under Settings → Personal model,
    when they have one **and** the workspace allows personal keys.
-2. **Workspace**: the workspace's model, under Settings → Workspace model,
-   which a source-admin sets.
-3. **Environment**: `AI_PROVIDER`, `AI_MODEL` and the rest, below. With
-   neither level set, nothing changes.
+2. **Workspace**: the workspace's default model, which a source-admin sets
+   under Settings → Workspace model.
+3. **Server**: `AI_PROVIDER`, `AI_MODEL` and the rest, below, listed as the
+   server model `default` (id `env:default`). With neither level set,
+   nothing changes.
+
+Since [#439](https://github.com/jbouder/holotable/issues/439) these are
+entries in one **catalog**: a workspace may hold several named models and a
+person several of their own (`llm_models`, migration 022), and a
+workspace's default is one of its models or a server model.
+`GET /api/models?workspace=<id>` lists what the caller may use there, and a
+request that names a model by id gets exactly that one; an id the catalog
+does not grant the caller in that workspace (another workspace's, another
+person's, a deleted one, a personal one where they are not allowed) is a
+`400` that names nothing.
 
 A level that is configured but broken (its key can no longer be read, see
 [rotation](#rotating-session_secret)) is reported as such and generation

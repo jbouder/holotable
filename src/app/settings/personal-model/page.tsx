@@ -1,11 +1,7 @@
 import { notFound } from "next/navigation";
 import { authorizedWorkspaces, getIdentity } from "@/lib/auth/authorize";
-import {
-  configView,
-  defaultModelDeps,
-  effectiveModel,
-  stubAllowed,
-} from "@/lib/ai/model-resolution";
+import { defaultModelDeps, modelView, stubAllowed } from "@/lib/ai/model-resolution";
+import { effectiveModel } from "@/lib/ai/models";
 import { sectionVisible, settingsSection } from "@/lib/settings";
 import { SignIn } from "@/components/sign-in";
 import { PersonalModelCard } from "@/components/settings/personal-model-card";
@@ -25,7 +21,9 @@ export default async function PersonalModelSettings() {
   if (!sectionVisible(section, identity)) notFound();
 
   const deps = defaultModelDeps();
-  const stored = await deps.store.user(identity.sub);
+  const [stored] = identity.serviceAccount
+    ? []
+    : await deps.store.list({ scope: "personal", sub: identity.sub });
   const ids = authorizedWorkspaces(identity, "dashboard:generate");
   const rows = await Promise.all(
     ids.map(async (workspaceId) => ({
@@ -50,7 +48,7 @@ export default async function PersonalModelSettings() {
         source-admins allow it. The key is encrypted at rest and never shown again.
       </p>
       <PersonalModelCard
-        initial={stored ? configView(stored) : null}
+        initial={stored ? modelView(stored) : null}
         workspaces={workspaces}
         allowStub={stubAllowed()}
       />

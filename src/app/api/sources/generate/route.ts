@@ -5,7 +5,7 @@ import { readJson, route } from "@/lib/http";
 import { audit } from "@/lib/audit";
 import { type OnGenerationFinish, streamSourceDraft } from "@/lib/ai/generate";
 import { recordGeneration } from "@/lib/ai/log";
-import { requireModel } from "@/lib/ai/model-resolution";
+import { requireModel } from "@/lib/ai/models";
 import { textResponseOnceStarted } from "@/lib/ai/provider-error";
 import {
   type Failure,
