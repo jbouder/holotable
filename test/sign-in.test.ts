@@ -232,3 +232,21 @@ test("the callback deletes every handshake cookie before it checks anything", ()
     assert.ok(deleted < checked, `${name} is deleted only after the checks`);
   }
 });
+
+test("the exchange's moment is taken before the exchange, so a revocation during it wins", async () => {
+  // #542: `exchangedAt` bounds the id_token's issue time from below. A
+  // sign-out that lands while the realm is minting must still reach it.
+  const { revoke, resetRevocations } = await import("@/lib/auth/revocation");
+  const { identityFromPayload } = await import("@/lib/auth/session");
+  resetRevocations();
+  const { deps } = await realmReturning(idToken({ nonce: "n-1", sid: "kc-9" }));
+  const exchange = deps.exchange;
+  deps.exchange = async (code, verifier) => {
+    await new Promise((r) => setTimeout(r, 5));
+    revoke({ sid: "kc-9" });
+    return exchange(code, verifier);
+  };
+  const { claims, exchangedAt } = await completeSignIn(params, HANDSHAKE, deps);
+  assert.equal(identityFromPayload(claims, exchangedAt), null);
+  resetRevocations();
+});

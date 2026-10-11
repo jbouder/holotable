@@ -281,15 +281,22 @@ function attachCrosshair(chart: echarts.ECharts, group: string | undefined): () 
   };
 }
 
-/** The category the pointer is over, or null off the grid / on a non-cartesian chart. */
-function categoryIndexAt(
-  chart: echarts.ECharts,
+/**
+ * The category the pointer is over, or null off the grid / on a
+ * non-cartesian chart. Exported for unit testing.
+ *
+ * Converted through the grid, not the x axis: an axis finder takes one
+ * coordinate and answers `NaN` for a point, which is how the crosshair never
+ * reached its peers (#517).
+ */
+export function categoryIndexAt(
+  chart: Pick<echarts.ECharts, "containPixel" | "convertFromPixel">,
   x: number | undefined,
   y: number | undefined,
 ): number | null {
   if (x === undefined || y === undefined) return null;
   if (!chart.containPixel({ gridIndex: 0 }, [x, y])) return null;
-  const converted = chart.convertFromPixel({ xAxisIndex: 0 }, [x, y]);
+  const converted = chart.convertFromPixel({ gridIndex: 0 }, [x, y]);
   const index = Array.isArray(converted) ? converted[0] : converted;
   return typeof index === "number" && Number.isFinite(index) ? Math.round(index) : null;
 }

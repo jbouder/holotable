@@ -209,6 +209,20 @@ sessions. Signing out in Holotable revokes that one session the same way, so a
 copy of the cookie stops working too, without signing the person out of their
 other devices.
 
+A revocation reaches the tokens issued up to its moment. The realm's own
+tokens state their issue time in whole seconds, so in general the whole
+second of a revocation counts as before it. Signing straight back in after a
+sign-out reuses the same realm session and can land in that second, so two
+issue times are known exactly instead. The id_token the sign-in callback
+receives cannot be older than the code exchange the server just made. The
+session token Holotable signs carries its issue time to the millisecond
+(`iat_ms`, honored only from Holotable's issuer), and that time is when the
+realm last vouched for the person: the moment before the sign-in's code
+exchange, or before a renewal's refresh, not when Holotable signed it. A
+revocation that lands while a token is being minted still reaches it. A token minted after the
+sign-out is therefore good, and a copy minted before it is not, even in the
+same second.
+
 The list lives in the process, which is the supported topology (one instance).
 A restart forgets it: a revoked token then verifies again until it expires,
 which is at most one session-token lifetime, and it cannot be renewed because
