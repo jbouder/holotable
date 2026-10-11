@@ -207,6 +207,19 @@ ai:
   # -- Where the models file's ConfigMap is mounted.
   modelsMountPath: /etc/holotable/models
 
+# An operator's own theme (#508). `theme.file` is the THEME_FILE's contents
+# (`name`, `label`, `description`, `radius`, `light`, `dark`), rendered into
+# `theme.json` in a ConfigMap, mounted at `theme.mountPath`, with THEME_FILE
+# pointing at it. Token values only: the server checks them against the
+# operator quality bar at boot and refuses to start below it. Set
+# `config.THEME_DEFAULT_PALETTE` to its `name` to make it the default.
+# `npm run --silent themes:export graphite -- --as acme` writes a valid start.
+theme:
+  # -- The theme file, as an object; empty renders nothing.
+  file: {}
+  # -- Where the theme file's ConfigMap is mounted.
+  mountPath: /etc/holotable/theme
+
 # -- Extra volumes on the app pod, for a Vault Agent or CSI secret mount.
 extraVolumes: []
 # -- Extra volume mounts on the app container.

@@ -100,3 +100,11 @@ test("a theme below the bar fails, naming the pairing, the scheme and the number
     failures.join("\n"),
   );
 });
+
+test("the docs' example is what the export writes, so it always loads", () => {
+  const doc = readFileSync(
+    new URL("../docs/src/content/docs/admin/themes.md", import.meta.url),
+    "utf8",
+  );
+  assert.ok(doc.includes(JSON.stringify(exportTheme(CSS, "graphite", "acme"), null, 2)));
+});

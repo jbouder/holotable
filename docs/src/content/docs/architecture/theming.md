@@ -88,7 +88,14 @@ theme sets every color token itself, so its intent does not depend on
 Holotable's values, and inherits only the aliases (`--chart-text`, the
 `--code-*` colors). Paper also sets `--radius`, the only theme that rounds.
 
-Adding a theme takes its two blocks in `globals.css` and an entry in
+An operator can add one more without a pull request: `THEME_FILE`, a JSON
+file of token values held to the operator tier at boot. The root layout
+renders its two blocks from the parsed numbers in a `<style>` under the CSP
+nonce, and `paletteInfo()` lists it beside the built-ins, on the server and,
+through `<html data-operator-palette>`, in the browser. See
+[Your own theme](/admin/themes/).
+
+Adding a built-in theme takes its two blocks in `globals.css` and an entry in
 `PALETTE_INFO`. `test/theme-quality.test.ts` checks that the two lists
 match, and that the new blocks clear the quality bar.
 

@@ -242,6 +242,8 @@ alongside the release, with `bearerTokenSecret` pointing at the same Secret key.
 | `sourceSecrets.mountPath` | `/var/run/holotable/source-secrets` | Where it is mounted. |
 | `ai.models` | `[]` | The server's models, rendered into `models.json` in a ConfigMap and pointed at by `AI_MODELS_FILE`. Each entry's `credentials` names environment variables (from the Secret); a value that is not a variable name fails the render. See `examples/values-models.yaml`. |
 | `ai.modelsMountPath` | `/etc/holotable/models` | Where that ConfigMap is mounted. |
+| `theme.file` | `{}` | An operator's theme (`THEME_FILE`), as an object: token values in both schemes, checked at boot. See the docs' Themes page under Administration. |
+| `theme.mountPath` | `/etc/holotable/theme` | Where that ConfigMap is mounted. |
 
 ### Migrations
 

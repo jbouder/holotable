@@ -26,7 +26,10 @@ export function exportTheme(css: string, palette: string, as?: string) {
   const radius = blocks.find((b) => b.scheme === "dark")?.decls.radius;
   return {
     name: as ?? `${palette}-copy`,
-    label: as ? info.label : `${info.label} (copy)`,
+    // A new name gets a label from it, so the controls never show two Graphites.
+    label: as
+      ? as.replace(/(^|-)([a-z])/g, (_, d, c) => `${d ? " " : ""}${c.toUpperCase()}`)
+      : `${info.label} (copy)`,
     description: info.description,
     ...(radius && radius !== "0" ? { radius } : {}),
     light: scheme("light"),

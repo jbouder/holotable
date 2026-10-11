@@ -230,6 +230,9 @@ Checked, not hoped for:
   in `src/lib/color/quality.ts` (`test/theme-quality.test.ts`): borders,
   the focus ring (`outline-ring`, never `outline-primary`), selection, code
   colors, and statuses and series distinct under a color-vision deficiency.
+  A new color token goes in `THEME_FILE_TOKENS` (`src/lib/color/theme-file.ts`)
+  too, since an operator's `THEME_FILE` (#508) sets every token and is the
+  only way to add a theme without a pull request.
   A status tint is `tinted bg-tint-<status>/(--tint-<n>)`, never a bare
   `bg-<status>/<n>`, and no component asks which theme is on
   (`test/color-literals.test.ts`).
@@ -328,6 +331,7 @@ expected to pass. The other scripts, and when to reach for them:
 npm run dev:demo         # dev server in AUTH_MODE=demo, no Keycloak needed (not for auth work)
 npm run test:fuzz        # after any SQL or PromQL guard change (FUZZ_RUNS, FUZZ_SEED)
 npm run themes:check     # after a token change: every theme against the quality bar
+npm run themes:export    # a built-in theme as a THEME_FILE (`--silent ... graphite -- --as acme`)
 npm run test:integration # after a change to queries, repos or migrations (Docker, or MIGRATE_TEST_DATABASE_URL)
 npm run e2e              # after a UI or auth change: Playwright journeys and axe scans (Docker)
 npm run migrate:verify   # after adding a migration: round-trips every one on a scratch database
