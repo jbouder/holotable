@@ -32,7 +32,7 @@ import { config } from "@/lib/config";
 import { log } from "@/lib/log";
 
 export const runtime = "nodejs";
-export const maxDuration = 60;
+export const maxDuration = 120;
 
 // UIMessage has a rich, evolving shape owned by the AI SDK; we validate the
 // envelope (a bounded, non-empty array) and let convertToModelMessages enforce

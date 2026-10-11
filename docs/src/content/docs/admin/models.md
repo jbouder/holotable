@@ -322,7 +322,7 @@ edit, source draft, dashboard chat), goes through the same model middleware
 
 | Variable | Default | What it does |
 |---|---|---|
-| `AI_REQUEST_TIMEOUT_MS` | `45000` | The deadline for one model request, **retries and waits included**. A provider that hangs, before its first byte or partway through a stream, is cut off here with "The model did not finish within …ms" instead of at the route's 60s `maxDuration`, where the platform would end the response with no error. A value of 60000 or more is a startup warning. |
+| `AI_REQUEST_TIMEOUT_MS` | `90000` | The deadline for one model request, **retries and waits included**. A provider that hangs, before its first byte or partway through a stream, is cut off here with "The model did not finish within …ms" instead of at the route's 120s `maxDuration`, where the platform would end the response with no error. A value of 120000 or more is a startup warning. |
 | `AI_MAX_RETRIES` | `2` | Retries after a transient failure, `0` to `10`. `0` turns retrying off. |
 
 - **What is retried**: whatever the provider marks transient, which is a 408,
