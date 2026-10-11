@@ -1,0 +1,132 @@
+# A release: what a `v*` tag adds beyond the images.
+#
+# The images are published by ci.yml's `publish` jobs on the same tag push
+# (`<version>`, `latest`, and the `-migrate` / `-quickstart` variants), gated
+# on every required check. This workflow does the rest:
+#
+# 1. refuses a tag that disagrees with `package.json` or the chart's
+#    `appVersion`, since the chart's default image tag is its `appVersion`
+#    and a mismatch would install an image that does not exist;
+# 2. pushes the Helm chart to ghcr.io as an OCI artifact, unless that chart
+#    version is already there (the chart is versioned on its own, and a
+#    published version is never overwritten);
+# 3. creates the GitHub Release, with notes generated from the pull requests
+#    merged since the previous tag, and the packaged chart attached.
+#
+# Cutting one is in CONTRIBUTING.md ("Releasing").
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  CHART_DIR: deploy/helm/holotable
+  CHART_REPO: oci://ghcr.io/${{ github.repository_owner }}/charts
+
+jobs:
+  verify:
+    name: Versions agree
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.versions.outputs.version }}
+      chart: ${{ steps.versions.outputs.chart }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - id: versions
+        name: Compare the tag, package.json and Chart.yaml
+        run: |
+          tag="${GITHUB_REF_NAME#v}"
+          pkg="$(jq -r .version package.json)"
+          app="$(sed -n 's/^appVersion: *"\{0,1\}\([^"]*\)"\{0,1\}$/\1/p' "$CHART_DIR/Chart.yaml")"
+          chart="$(sed -n 's/^version: *//p' "$CHART_DIR/Chart.yaml")"
+          echo "tag=$tag package.json=$pkg appVersion=$app chart=$chart"
+          if [ "$tag" != "$pkg" ] || [ "$tag" != "$app" ]; then
+            echo "::error::Tag v$tag does not match package.json ($pkg) and Chart.yaml appVersion ($app). Bump both in a pull request, merge it, and tag that commit."
+            exit 1
+          fi
+          echo "version=$tag" >> "$GITHUB_OUTPUT"
+          echo "chart=$chart" >> "$GITHUB_OUTPUT"
+
+  chart:
+    name: Publish the Helm chart
+    needs: verify
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: azure/setup-helm@9bc31f4ebc9c6b171d7bfbaa5d006ae7abdb4310 # v5.0.1
+        with:
+          version: v3.16.4
+
+      - name: Sign in to ghcr.io
+        run: echo "${{ secrets.GITHUB_TOKEN }}" | helm registry login ghcr.io --username "${{ github.actor }}" --password-stdin
+
+      - name: Package
+        run: helm package "$CHART_DIR" --destination dist
+
+      - name: Push, unless this chart version is already published
+        env:
+          CHART_VERSION: ${{ needs.verify.outputs.chart }}
+        run: |
+          if helm show chart "$CHART_REPO/holotable" --version "$CHART_VERSION" >/dev/null 2>&1; then
+            echo "Chart $CHART_VERSION is already published; the chart did not change in this release."
+          else
+            helm push "dist/holotable-$CHART_VERSION.tgz" "$CHART_REPO"
+          fi
+
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: chart
+          path: dist/*.tgz
+
+  release:
+    name: GitHub Release
+    needs: [verify, chart]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: chart
+          path: dist
+
+      - name: Create the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ needs.verify.outputs.version }}
+          CHART_VERSION: ${{ needs.verify.outputs.chart }}
+          IMAGE: ghcr.io/${{ github.repository }}
+        run: |
+          cat > notes.md <<EOF
+          ## Install
+
+          \`\`\`bash
+          docker run -p 3000:3000 $IMAGE:$VERSION-quickstart
+          helm install holotable $CHART_REPO/holotable --version $CHART_VERSION
+          \`\`\`
+
+          Images: \`$IMAGE:$VERSION\` and \`$IMAGE:$VERSION-migrate\` (linux/amd64, linux/arm64), published by CI on this tag.
+          EOF
+          # A pre-release version (1.2.0-rc.1) is marked as one; 0.x is not.
+          prerelease=""
+          case "$VERSION" in *-*) prerelease="--prerelease" ;; esac
+          gh release create "$GITHUB_REF_NAME" dist/*.tgz \
+            --repo "$GITHUB_REPOSITORY" \
+            --verify-tag \
+            --title "Holotable $VERSION" \
+            --notes-file notes.md \
+            --generate-notes \
+            $prerelease

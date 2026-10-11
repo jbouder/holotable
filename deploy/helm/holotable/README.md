@@ -9,9 +9,14 @@ It does **not** deploy PostgreSQL/TimescaleDB or Keycloak. Both are external
 dependencies, and the chart expects to be told where they are.
 
 ```bash
-helm install holotable deploy/helm/holotable \
-  -f deploy/helm/holotable/examples/values-kubernetes-secret.yaml
+helm install holotable oci://ghcr.io/jbouder/charts/holotable --version <chart version> \
+  -f my-values.yaml
 ```
+
+Each release publishes the chart there (its version is on the release page);
+from a checkout, `deploy/helm/holotable` works the same way, and
+`examples/values-kubernetes-secret.yaml` is a starting point for
+`my-values.yaml`.
 
 ## Before you install
 
