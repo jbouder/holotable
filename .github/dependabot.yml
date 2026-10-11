@@ -7,14 +7,16 @@
 # auto-merges, and CI's required checks (static checks, test, build) gate
 # every update the same way they gate a hand-written change.
 #
-# Minor and patch updates arrive grouped, one pull request per ecosystem and
-# dependency type per month. A major is never in a group, so it arrives as its
-# own pull request: a `next` or `react` major is a framework migration (see the
-# framework warning in AGENTS.md), not a version bump.
+# Minor and patch updates arrive grouped, one pull request per directory per
+# month, production and development dependencies together. A major is never in
+# a group, so it arrives as its own pull request: a `next` or `react` major is a
+# framework migration (see the framework warning in AGENTS.md), not a version
+# bump. Each Dockerfile's base images move together.
 #
 # Security updates are separate from these version updates. GitHub opens them
-# as soon as an advisory lands, and `open-pull-requests-limit` does not hold
-# them back.
+# as soon as an advisory lands, whatever the schedule, and
+# `open-pull-requests-limit` does not hold them back; each npm directory's
+# arrive together in its `security` group rather than one package at a time.
 #
 # Node 25 and later are ignored everywhere (the `node` base images and
 # `@types/node`): Holotable tracks Node's long-term-support line, so 24 may be
@@ -56,12 +58,15 @@ updates:
       prefix: chore
       include: scope
     groups:
-      production:
-        dependency-type: production
+      # Every minor and patch update in this directory, production and
+      # development alike, in one pull request a month.
+      minor-and-patch:
+        applies-to: version-updates
         update-types: [minor, patch]
-      development:
-        dependency-type: development
-        update-types: [minor, patch]
+      # Security updates in this directory together, whenever they land.
+      security:
+        applies-to: security-updates
+        patterns: ["*"]
 
   # The docs site: its own package.json and lockfile, so without this entry it
   # is never updated.
@@ -74,12 +79,15 @@ updates:
       prefix: chore
       include: scope
     groups:
-      production:
-        dependency-type: production
+      # Every minor and patch update in this directory, production and
+      # development alike, in one pull request a month.
+      minor-and-patch:
+        applies-to: version-updates
         update-types: [minor, patch]
-      development:
-        dependency-type: development
-        update-types: [minor, patch]
+      # Security updates in this directory together, whenever they land.
+      security:
+        applies-to: security-updates
+        patterns: ["*"]
 
   # The hosted demo's Worker (deploy/cloudflare/demo): its own package.json
   # and lockfile, checked by .github/workflows/demo.yml. Its Dockerfile is a
@@ -98,12 +106,15 @@ updates:
       prefix: chore
       include: scope
     groups:
-      production:
-        dependency-type: production
+      # Every minor and patch update in this directory, production and
+      # development alike, in one pull request a month.
+      minor-and-patch:
+        applies-to: version-updates
         update-types: [minor, patch]
-      development:
-        dependency-type: development
-        update-types: [minor, patch]
+      # Security updates in this directory together, whenever they land.
+      security:
+        applies-to: security-updates
+        patterns: ["*"]
 
   # The repository Dockerfile's digest-pinned base. Digest pinning (#36) is
   # what makes this necessary: a pinned digest never moves on its own.
@@ -119,6 +130,11 @@ updates:
     commit-message:
       prefix: chore
       include: scope
+    groups:
+      # A base image moves by digest, which has no semver level; one group
+      # takes every update to this Dockerfile's bases together.
+      images:
+        patterns: ["*"]
 
   # The all-in-one quick-start image: a digest-pinned Node base for its build
   # stages and a digest-pinned TimescaleDB base it runs on. A TimescaleDB
@@ -136,6 +152,11 @@ updates:
     commit-message:
       prefix: chore
       include: scope
+    groups:
+      # A base image moves by digest, which has no semver level; one group
+      # takes every update to this Dockerfile's bases together.
+      images:
+        patterns: ["*"]
 
   # The actions in .github/workflows/. Each is pinned to a commit SHA with
   # its version in a trailing `# vX.Y.Z` comment (test/workflow-pins.test.ts
