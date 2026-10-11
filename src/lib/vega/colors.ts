@@ -1,4 +1,4 @@
-import { chartPalette } from "@/lib/color/oklch";
+import { type ChartTheme, seriesColor } from "@/lib/color/chart-theme";
 import { COLOR_TOKENS, type ColorToken, tokenHex } from "@/lib/panels/colors";
 
 /**
@@ -16,21 +16,20 @@ import { COLOR_TOKENS, type ColorToken, tokenHex } from "@/lib/panels/colors";
  * or a scale's `range`.
  */
 
-const PALETTE = chartPalette();
 const COLOR_KEYS = new Set(["color", "fill", "stroke", "background"]);
 const isColorKey = (key: string) => COLOR_KEYS.has(key) || /[a-z]Color$/.test(key);
 
 /** A color name as paint, or the input when it is not one. */
-export function vegaColor(name: string): string {
-  if (name in COLOR_TOKENS) return tokenHex(name as ColorToken);
+export function vegaColor(name: string, theme: ChartTheme): string {
+  if (name in COLOR_TOKENS) return tokenHex(name as ColorToken, theme);
   const palette = /^palette-(\d+)$/.exec(name);
-  if (palette) return PALETTE[Number(palette[1]) % PALETTE.length] ?? name;
+  if (palette) return seriesColor(theme, Number(palette[1]));
   return name;
 }
 
 /** A copy of the spec with every color name resolved. */
-export function resolveVegaColors(spec: unknown): unknown {
-  const paint = (v: unknown) => (typeof v === "string" ? vegaColor(v) : v);
+export function resolveVegaColors(spec: unknown, theme: ChartTheme): unknown {
+  const paint = (v: unknown) => (typeof v === "string" ? vegaColor(v, theme) : v);
   const walk = (node: unknown, inColor: boolean): unknown => {
     if (Array.isArray(node)) return node.map((item) => walk(item, inColor));
     if (typeof node !== "object" || node === null) return node;

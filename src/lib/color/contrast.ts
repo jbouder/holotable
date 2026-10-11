@@ -1,5 +1,5 @@
 import { resolveOklchToken } from "@/lib/color/oklch";
-import { COLOR_TOKENS, type ColorToken, tokenHex } from "@/lib/panels/colors";
+import { COLOR_TOKENS, type ColorToken } from "@/lib/panels/colors";
 
 /**
  * WCAG contrast for the design tokens (#77).
@@ -61,6 +61,11 @@ export function parseThemeTokens(css: string): Record<ThemeName, Record<string, 
       const hex = resolveOklchToken(decl[2]);
       if (hex) out[decl[1]] = hexToRgb(hex);
     }
+    // An alias of another token in the same block (`--chart-text: var(--muted)`).
+    for (const decl of body.matchAll(/--([a-z0-9-]+):\s*var\(--([a-z0-9-]+)\)/g)) {
+      const target = out[decl[2]];
+      if (target) out[decl[1]] = target;
+    }
     return out;
   };
   return {
@@ -74,15 +79,19 @@ export interface ContrastPair {
   text: string;
   /** The background token, opaque. */
   on: string;
+  /** A tint of `tint` at this opacity over `on`, as `bg-<tint>/<n>` draws it. */
+  tint?: { token: string; alpha: number };
   /**
-   * A tint of `tint` at this opacity over `on`, as `bg-<tint>/<n>` draws it.
-   * With `spec`, the token is a spec color (`ColorToken`), which is one color
-   * in both themes, rather than a CSS variable.
+   * The ratio required, when it is not AA for text: a chart series is a
+   * graphic, held to the 3:1 of WCAG 1.4.11 (#502).
    */
-  tint?: { token: string; alpha: number; spec?: true };
+  floor?: number;
   /** Where it is used, so a failure says what to look at. */
   where: string;
 }
+
+/** WCAG 2.1 non-text contrast (1.4.11): a series line, bar or slice. */
+export const GRAPHIC = 3;
 
 /**
  * What text sits on. `surface-3` is not here: it is only ever a hover fill
@@ -124,8 +133,24 @@ export const CONTRAST_PAIRS: readonly ContrastPair[] = [
   ...(Object.keys(COLOR_TOKENS) as ColorToken[]).map((color) => ({
     text: "foreground",
     on: "surface-2",
-    tint: { token: color, alpha: STATUS_TILE_TINT, spec: true as const },
+    tint: { token: COLOR_TOKENS[color].slice(2), alpha: STATUS_TILE_TINT },
     where: `text-foreground on a ${color} status tile`,
+  })),
+  // A spec color as text (a stat's number, #502), on every surface.
+  ...(Object.keys(COLOR_TOKENS) as ColorToken[]).flatMap((color) =>
+    SURFACES.map((on) => ({
+      text: COLOR_TOKENS[color].slice(2),
+      on,
+      where: `${color} as text on bg-${on}`,
+    })),
+  ),
+  // The chart's own (#502): its text at AA, each series as a graphic at 3:1.
+  ...SURFACES.map((on) => ({ text: "chart-text", on, where: `chart text on bg-${on}` })),
+  ...Array.from({ length: 8 }, (_, i) => ({
+    text: `chart-${i + 1}`,
+    on: "surface",
+    floor: GRAPHIC,
+    where: `chart series ${i + 1} on bg-surface`,
   })),
   { text: "primary-foreground", on: "primary", where: "primary button" },
   { text: "primary-foreground", on: "danger", where: "danger button" },
@@ -166,13 +191,7 @@ export function measureContrast(css: string): MeasuredPair[] {
     return CONTRAST_PAIRS.map((pair) => {
       const base = token(pair.on);
       const tint = pair.tint;
-      const bg = tint
-        ? over(
-            tint.spec ? hexToRgb(tokenHex(tint.token as ColorToken)) : token(tint.token),
-            tint.alpha,
-            base,
-          )
-        : base;
+      const bg = tint ? over(token(tint.token), tint.alpha, base) : base;
       return { ...pair, theme, ratio: contrastRatio(token(pair.text), bg) };
     });
   });

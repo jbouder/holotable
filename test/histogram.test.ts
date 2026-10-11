@@ -97,7 +97,7 @@ test("thresholds color a bar from its bucket's lower bound", () => {
   );
   const option = histogramChart(histogram({ thresholds: steps }), PER_MINUTE, CTX);
   const series = (option.series as { data: { itemStyle: { color: string } }[] }[])[0];
-  assert.equal(series?.data[2]?.itemStyle.color, tokenHex("danger"));
+  assert.equal(series?.data[2]?.itemStyle.color, tokenHex("danger", DEFAULT_CHART_THEME));
 });
 
 /** `sum by (le) (increase(x_bucket[1h]))` as an instant query answers it. */

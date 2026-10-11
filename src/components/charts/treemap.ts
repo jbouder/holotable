@@ -7,8 +7,7 @@ import {
   toNumber,
   toText,
 } from "@/components/charts/options";
-import { contrastRatio, hexToRgb } from "@/lib/color/contrast";
-import { chartPalette } from "@/lib/color/oklch";
+import { BLOCK_EDGE, inkOn, seriesColor } from "@/lib/color/chart-theme";
 import { formatValue } from "@/lib/format";
 import { type Panel, panelTimeField } from "@/lib/ir";
 import { TREEMAP_DEPTH_MAX, TreemapOptions } from "@/lib/panels/kinds/treemap";
@@ -21,24 +20,17 @@ import { numberDisplay, readOptions } from "@/lib/panels/presentation";
  * Each row is a leaf at the end of its path; rows with the same path are
  * summed, and a parent is the sum of its children. Every node takes its
  * top-level ancestor's chart color, so a branch reads as one thing, and its
- * label is whichever of {@link TREEMAP_LABELS} reads better on that color:
- * `test/treemap.test.ts` holds every chart color to AA against its label.
+ * label is whichever ink reads better on that color (`inkOn`):
+ * `test/treemap.test.ts` holds every series color, in both schemes, to AA
+ * against its label.
  *
  * A click is a datum (#373), so it does not also zoom: there is no drill-in
  * and no breadcrumb, and the whole tree is always drawn.
  */
 
-/** The label colors a node may take; the chart colors are one set in both themes. */
-export const TREEMAP_LABELS = ["#000000", "#ffffff"] as const;
-
 /** The label that reads better on a node's color. */
-export function treemapLabel(color: string): string {
-  const [dark, light] = TREEMAP_LABELS;
-  const on = hexToRgb(color);
-  return contrastRatio(hexToRgb(dark), on) >= contrastRatio(hexToRgb(light), on)
-    ? dark
-    : light;
-}
+export const treemapLabel = inkOn;
+
 /** The most leaves drawn; the smallest are left out past it. */
 export const TREEMAP_LEAVES_MAX = 500;
 /** Joins a path into a node's id; a character no label contains. */
@@ -142,9 +134,7 @@ export function treemapShape(panel: Panel): string {
   return JSON.stringify(panel.options ?? {});
 }
 
-const palette = chartPalette();
-
-export const treemapChart: ChartOptionBuilder = normalized((panel, data) => {
+export const treemapChart: ChartOptionBuilder = normalized((panel, data, { theme }) => {
   const tree = treemapTree(panel, data);
   const o = readOptions(TreemapOptions, panel.options);
   const display = numberDisplay(o);
@@ -165,9 +155,7 @@ export const treemapChart: ChartOptionBuilder = normalized((panel, data) => {
       ? { children: node.children.map((c) => toItem(c, color)) }
       : {}),
   });
-  const items = tree.roots.map((root, i) =>
-    toItem(root, palette[i % palette.length] ?? "#888888"),
-  );
+  const items = tree.roots.map((root, i) => toItem(root, seriesColor(theme, i)));
   const label = { fontSize: 11 };
   const tooltip = {
     trigger: "item" as const,
@@ -197,7 +185,7 @@ export const treemapChart: ChartOptionBuilder = normalized((panel, data) => {
           nodeClick: false,
           data: items,
           label: { ...label, rotate: "radial", minAngle: 8 },
-          itemStyle: { borderColor: "rgba(0,0,0,0.35)", borderWidth: 1 },
+          itemStyle: { borderColor: BLOCK_EDGE, borderWidth: 1 },
         },
       ],
     } satisfies EChartsOption;
@@ -218,7 +206,7 @@ export const treemapChart: ChartOptionBuilder = normalized((panel, data) => {
         data: items,
         label: { ...label, show: true, formatter: "{b}" },
         upperLabel: { show: tree.pathKeys.length > 1, height: 18 },
-        itemStyle: { borderColor: "rgba(0,0,0,0.35)", borderWidth: 1, gapWidth: 1 },
+        itemStyle: { borderColor: BLOCK_EDGE, borderWidth: 1, gapWidth: 1 },
         // The first level is ECharts' own root: no border and no header band.
         levels: [
           { upperLabel: { show: false }, itemStyle: { borderWidth: 0, gapWidth: 2 } },

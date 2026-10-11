@@ -1,20 +1,21 @@
 import { DatumLinksBody } from "@/components/dashboard/DatumLinks";
 import type { PanelBodyProps } from "@/components/panels/types";
 import { datumOf } from "@/lib/drilldown-datum";
-import { tokenHex, tokenTextColor } from "@/lib/panels/colors";
+import { tokenCss } from "@/lib/panels/colors";
 import { statReading } from "@/lib/panel-reading";
 
 /**
  * One formatted number: the named value column, or the last row's first
  * numeric column that is not the time field. Thresholds color it, and a
- * sparkline of the column can sit behind it (#115). The number takes the
- * theme's status token so it reads in both themes; the sparkline, a graphic,
- * keeps the chart color.
+ * sparkline of the column can sit behind it (#115). Both take the token's
+ * color in the page's scheme (#502).
  */
 export function StatView({ panel, data }: PanelBodyProps) {
   const reading = statReading(panel, data);
-  const color = reading.color ? tokenHex(reading.color) : undefined;
-  const text = reading.color ? tokenTextColor(reading.color) : undefined;
+  // A token is a CSS variable (#502): it is the scheme's own color, held to
+  // AA as text, so the number and the sparkline take the same one.
+  const color = reading.color ? tokenCss(reading.color) : undefined;
+  const text = color;
   // The whole number is the datum (#373): with a datum link, the body is one control.
   return (
     <DatumLinksBody datum={datumOf(panel, data, {})} label={panel.title}>
@@ -29,9 +30,9 @@ function StatBody({
   text,
 }: {
   reading: ReturnType<typeof statReading>;
-  /** The sparkline's color: the chart color. */
+  /** The sparkline's color: the token, as a CSS color. */
   color?: string;
-  /** The number's color: the theme's status token, or none. */
+  /** The number's color: the same token, or none. */
   text?: string;
 }) {
   return (

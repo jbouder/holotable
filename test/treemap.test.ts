@@ -9,8 +9,8 @@ import {
   treemapShape,
   treemapTree,
 } from "@/components/charts/treemap";
-import { AA_TEXT, contrastRatio, hexToRgb } from "@/lib/color/contrast";
-import { chartPalette } from "@/lib/color/oklch";
+import { AA_TEXT, contrastRatio, hexToRgb, parseThemeTokens } from "@/lib/color/contrast";
+import { readFileSync } from "node:fs";
 import { Panel } from "@/lib/ir";
 import { DEFAULT_CHART_THEME } from "@/lib/color/chart-theme";
 import { LOCAL_TIME_DISPLAY } from "@/lib/time-display";
@@ -123,10 +123,16 @@ test("each branch takes one chart color, and its labels read on it", () => {
   assert.equal(eu.children[0]?.id, "eu\u001fa");
   for (const child of eu.children)
     assert.equal(child.itemStyle.color, eu.itemStyle.color);
-  // The palette is one set in both themes; each color's label meets AA on it.
-  for (const color of chartPalette()) {
-    const ratio = contrastRatio(hexToRgb(treemapLabel(color)), hexToRgb(color));
-    assert.ok(ratio >= AA_TEXT, `${color}: ${ratio.toFixed(2)}:1`);
+  // Every series color, in both schemes (#502): its label meets AA on it.
+  const themes = parseThemeTokens(readFileSync("src/app/globals.css", "utf8"));
+  for (const [scheme, tokens] of Object.entries(themes)) {
+    for (let i = 1; i <= 8; i++) {
+      const rgb = tokens[`chart-${i}`];
+      assert.ok(rgb, `${scheme}: --chart-${i}`);
+      const hex = `#${rgb.map((c) => c.toString(16).padStart(2, "0")).join("")}`;
+      const ratio = contrastRatio(hexToRgb(treemapLabel(hex)), rgb);
+      assert.ok(ratio >= AA_TEXT, `${scheme} chart-${i}: ${ratio.toFixed(2)}:1`);
+    }
   }
   const label = (eu as unknown as { label: { color: string } }).label.color;
   assert.equal(label, treemapLabel(eu.itemStyle.color));

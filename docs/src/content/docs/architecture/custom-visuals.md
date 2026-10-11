@@ -104,6 +104,13 @@ chart is. The kind says so with `image: true` and leaves `canvas` (which means
 resolves the spec's color names, sets its size from the panel for a single
 view, compiles it and builds the view, then merges each poll's rows into it.
 
+Its colors are the page's chart tokens, in the current scheme (#502): a token
+name (`danger`) becomes `--danger`, and `palette-0` to `palette-7` become
+`--chart-1` to `--chart-8`. Vega's own config ranges are the same tokens:
+`category` is the eight series, `ramp`, `ordinal` and `heatmap` are
+`--chart-seq-1` to `--chart-seq-5`, and `diverging` is `--chart-div-low`,
+`-mid` and `-high`. A scheme change rebuilds the view.
+
 ## Generation
 
 The model is offered the kind like any other, through its hint, which says to

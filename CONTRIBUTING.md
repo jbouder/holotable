@@ -467,6 +467,10 @@ Match the surrounding code rather than importing conventions from elsewhere.
 - Tailwind v4 utilities and the existing design tokens in
   `src/app/globals.css`. Reuse the primitives in `src/components/ui/` before
   adding new ones, and `cn()` from `src/lib/utils.ts` for composition.
+- No color literals. A chart reads its colors through `ChartTheme`
+  (`src/lib/color/chart-theme.ts`), from the `--chart-*` tokens and the spec's
+  color tokens; `test/color-literals.test.ts` fails on a literal outside
+  `src/lib/color/` and `globals.css`.
 - Domain logic belongs in `src/lib/`, not inside page components.
 - Motion is platform-only (View Transitions, WAAPI, `@starting-style`, FLIP)
   and keys off `<html data-motion>`, never the OS media query directly.

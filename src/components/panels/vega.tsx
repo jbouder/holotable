@@ -7,7 +7,8 @@ import { PanelSkeleton } from "@/components/dashboard/PanelSkeleton";
 import type { PanelViewProps } from "@/components/panels/types";
 import { useTimeDisplay } from "@/components/time-display";
 import { ErrorDisplay } from "@/components/ui/error-display";
-import { chartPalette, resolveColor } from "@/lib/color/oklch";
+import { type ChartTheme, seriesColor } from "@/lib/color/chart-theme";
+import { useChartTheme } from "@/components/chart-theme";
 import { VegaOptions } from "@/lib/panels/kinds/vega";
 import { readOptions } from "@/lib/panels/presentation";
 import { chartDescription, chartTable } from "@/lib/panel-reading";
@@ -33,27 +34,8 @@ import { resolveVegaColors } from "@/lib/vega/colors";
  * rows in a visually hidden table beside it.
  */
 
-export interface VegaTheme {
-  font: string;
-  /** Axis, legend and header text. */
-  text: string;
-  /** Axis lines, ticks and grid. */
-  line: string;
-}
-
-/** The theme as the page has it now: tokens read off `<html>` and converted. */
-function pageTheme(el: HTMLElement): VegaTheme {
-  const root = getComputedStyle(document.documentElement);
-  const token = (name: string, fallback: string) =>
-    resolveColor(root.getPropertyValue(name).trim() || fallback);
-  return {
-    font: getComputedStyle(el).fontFamily,
-    text: token("--muted", "#9aa0aa"),
-    line: token("--border", "#3a3f4b"),
-  };
-}
-
-export function vegaConfig({ font, text, line }: VegaTheme): Config {
+export function vegaConfig(font: string, theme: ChartTheme): Config {
+  const { text, line } = theme;
   const axis = {
     labelColor: text,
     titleColor: text,
@@ -72,8 +54,14 @@ export function vegaConfig({ font, text, line }: VegaTheme): Config {
     legend: { labelColor: text, titleColor: text, labelFont: font, titleFont: font },
     title: { color: text, font },
     header: { labelColor: text, titleColor: text, labelFont: font, titleFont: font },
-    range: { category: chartPalette() },
-    mark: { color: chartPalette()[0] },
+    range: {
+      category: [...theme.series],
+      ordinal: [...theme.sequential],
+      ramp: [...theme.sequential],
+      diverging: [...theme.diverging],
+      heatmap: [...theme.sequential],
+    },
+    mark: { color: seriesColor(theme, 0) },
     autosize: { type: "fit", contains: "padding" },
   } as Config;
 }
@@ -97,18 +85,11 @@ export function VegaView({ panel, data, handle }: PanelViewProps) {
   const [drawn, setDrawn] = React.useState(false);
   const display = useTimeDisplay();
   // The theme lives on <html data-theme>; a change rebuilds the view in it.
-  const [theme, setTheme] = React.useState<string | null>(null);
-  React.useEffect(() => {
-    const html = document.documentElement;
-    const read = () => setTheme(html.getAttribute("data-theme"));
-    read();
-    const observer = new MutationObserver(read);
-    observer.observe(html, { attributes: true, attributeFilter: ["data-theme"] });
-    return () => observer.disconnect();
-  }, []);
+  // The page's chart colors (#502), read again when the scheme changes,
+  // which rebuilds the view below.
+  const theme = useChartTheme();
 
   // Build the view when the spec or the theme changes; tear it down when it goes.
-  // biome-ignore lint/correctness/useExhaustiveDependencies: `theme` is read through the page's computed style
   React.useEffect(() => {
     const el = container.current;
     const parsed = JSON.parse(key) as Record<string, unknown> | null;
@@ -127,8 +108,8 @@ export function VegaView({ panel, data, handle }: PanelViewProps) {
           ? { ...parsed, width: el.clientWidth, height: el.clientHeight }
           : parsed;
         const compiled = await compileVegaLite(
-          resolveVegaColors(sized),
-          vegaConfig(pageTheme(el)),
+          resolveVegaColors(sized, theme),
+          vegaConfig(getComputedStyle(el).fontFamily, theme),
         );
         if (!compiled.ok) throw new Error(compiled.error);
         built = await createVegaView(compiled.spec, rows.current, {

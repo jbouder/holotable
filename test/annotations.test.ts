@@ -183,6 +183,7 @@ test("a point is placed at the first row at or after it, a range is clipped, and
     ],
     rows.rows.map((r) => r.ts),
     LOCAL_TIME_DISPLAY,
+    DEFAULT_CHART_THEME,
   );
   const lines = marks.markLine.data as {
     name: string;
@@ -193,7 +194,7 @@ test("a point is placed at the first row at or after it, a range is clipped, and
     lines.map((l) => [l.name, l.xAxis]),
     [["deploy", 2]],
   );
-  assert.equal(lines[0].lineStyle.color, tokenHex("info"));
+  assert.equal(lines[0].lineStyle.color, tokenHex("info", DEFAULT_CHART_THEME));
   const areas = marks.markArea.data as [
     { name: string; xAxis: number },
     { xAxis: number },
@@ -219,6 +220,7 @@ test("a range between two rows still covers its span", () => {
     ],
     rows.rows.map((r) => r.ts),
     LOCAL_TIME_DISPLAY,
+    DEFAULT_CHART_THEME,
   );
   const [[start, end]] = marks.markArea.data as [{ xAxis: number }, { xAxis: number }][];
   assert.deepEqual([start.xAxis, end.xAxis], [1, 2]);

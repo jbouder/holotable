@@ -11,6 +11,7 @@ import {
 } from "@/components/charts/options";
 import type { Panel } from "@/lib/ir";
 import { type ColorToken, defaultStateToken, tokenHex } from "@/lib/panels/colors";
+import { inkOn } from "@/lib/color/chart-theme";
 import { StateTimelineOptions } from "@/lib/panels/kinds/state-timeline";
 import { formatDateTime, type TimeDisplay } from "@/lib/time-display";
 
@@ -263,7 +264,7 @@ function renderSpan(timeline: StateTimeline): CustomSeriesRenderItem {
             x: shape.x + 6,
             y: shape.y + shape.height / 2,
             verticalAlign: "middle",
-            fill: "#0b0d12",
+            fill: inkOn(String(api.visual("color"))),
             fontSize: 11,
             width: shape.width - 12,
             overflow: "truncate",
@@ -335,7 +336,7 @@ export const stateTimelineChart: ChartOptionBuilder = normalized((panel, data, c
         encode: { x: [1, 2], y: 0 },
         data: timeline.spans.map((s) => ({
           value: [s.lane, s.start, s.end],
-          itemStyle: { color: tokenHex(stateColor(s.state, panel)) },
+          itemStyle: { color: tokenHex(stateColor(s.state, panel), ctx.theme) },
         })),
       },
     ],

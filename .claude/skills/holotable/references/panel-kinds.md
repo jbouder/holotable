@@ -211,7 +211,7 @@ anywhere in it: `url`, `href`, an `image` mark, `datasets`, inline `values`,
 `config`, `usermeta`, a `scheme`, a parameter bound to an `element`, and a
 `projection`. Every color is a token name (`success`, `warning`, `danger`,
 `info`, `neutral`, `orange`, `purple`, `teal`), a chart color by index
-(`palette-0` to `palette-5`) or `transparent`, never a literal. Marks are
+(`palette-0` to `palette-7`) or `transparent`, never a literal. Marks are
 `arc`, `area`, `bar`, `boxplot`, `circle`, `errorband`, `errorbar`, `line`,
 `point`, `rect`, `rule`, `square`, `text`, `tick` and `trail`; field types
 are `quantitative`, `temporal`, `ordinal` and `nominal`. The spec is at most

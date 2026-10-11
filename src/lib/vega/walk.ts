@@ -1,4 +1,4 @@
-import { OKLCH_PALETTE } from "@/lib/color/oklch";
+import { SERIES_COUNT } from "@/lib/color/chart-theme";
 import { COLOR_TOKENS } from "@/lib/panels/colors";
 
 /**
@@ -73,7 +73,7 @@ const VEGA_LITE_SCHEMA =
 /** The color names a spec may use: tokens, chart colors by index, transparent. */
 export const VEGA_COLOR_NAMES: ReadonlySet<string> = new Set([
   ...Object.keys(COLOR_TOKENS),
-  ...OKLCH_PALETTE.map((_, i) => `palette-${i}`),
+  ...Array.from({ length: SERIES_COUNT }, (_, i) => `palette-${i}`),
   "transparent",
 ]);
 

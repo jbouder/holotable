@@ -21,7 +21,7 @@ import {
   exportFilename,
   toCsv,
 } from "@/lib/panel-export";
-import { resolveColor } from "@/lib/color/oklch";
+import { readChartTheme } from "@/lib/color/chart-theme";
 import type { MenuLinkItem } from "@/lib/drilldown";
 import type { Selection } from "@/lib/variable-selection";
 
@@ -184,20 +184,9 @@ function download(href: string, filename: string): void {
   link.remove();
 }
 
-/**
- * The themed card background, resolved to something a canvas accepts.
- *
- * The token is authored in OKLCH, which `getDataURL` hands straight to the
- * canvas; `resolveColor` is the same conversion the chart palette already goes
- * through. The fallback is the dark theme's surface rather than white, because
- * a wrong guess should still be a readable picture.
- */
+/** The themed card background, as a color the exported image can paint. */
 function surfaceColor(): string {
-  const style = getComputedStyle(document.documentElement);
-  // `--surface` is the token the light theme overrides on the same element, so
-  // reading it here follows the theme; `--color-surface` is the Tailwind alias.
-  const computed = (
-    style.getPropertyValue("--surface") || style.getPropertyValue("--color-surface")
-  ).trim();
-  return computed ? resolveColor(computed) : "#111318";
+  // The chart theme's background is `--surface`, read the way every chart
+  // reads its colors, with the dark surface as the fallback (#502).
+  return readChartTheme(getComputedStyle(document.documentElement)).background;
 }
