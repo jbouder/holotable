@@ -12,6 +12,7 @@ import {
   HISTORY_CELLS,
   STATE_LANES_MAX,
   stateColor,
+  clipRect,
   stateTimelineChart,
 } from "@/components/charts/state-timeline";
 import { Panel } from "@/lib/ir";
@@ -274,4 +275,23 @@ test("named columns win over the guess", () => {
   const t = buildStateTimeline(timeline({ entity: "region", state: "phase" }), data);
   assert.deepEqual(t.lanes, ["eu"]);
   assert.equal(t.spans[0].state, "build");
+});
+
+test("a span is cut to the plot, and one wholly outside it draws nothing", () => {
+  // #497: what ECharts' clipRectByRect did, without loading ECharts for it.
+  const plot = { x: 10, y: 10, width: 100, height: 50 };
+  assert.deepEqual(clipRect({ x: 0, y: 20, width: 50, height: 10 }, plot), {
+    x: 10,
+    y: 20,
+    width: 40,
+    height: 10,
+  });
+  assert.deepEqual(clipRect({ x: 20, y: 20, width: 10, height: 10 }, plot), {
+    x: 20,
+    y: 20,
+    width: 10,
+    height: 10,
+  });
+  assert.equal(clipRect({ x: 120, y: 20, width: 10, height: 10 }, plot), null);
+  assert.equal(clipRect({ x: 20, y: 60, width: 10, height: 10 }, plot), null);
 });

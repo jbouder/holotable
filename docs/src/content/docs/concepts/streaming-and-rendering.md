@@ -330,6 +330,13 @@ Adding a kind is therefore:
    missing registration draws nothing in production and warns only in
    development.
 
+The chart itself loads with the first panel that draws one (#497).
+`PanelView` reaches `AccessibleChart`, and through it ECharts, with
+`React.lazy`, and shows the panel's skeleton until the chunk arrives. A
+dashboard of stats, tables and text, or an embed of one, never fetches the
+library. `test/client-bundle.test.ts` holds the dashboard and embed routes to
+that.
+
 Registration is an import. Nothing is loaded at runtime, so there is no way
 for a request to add a kind.
 

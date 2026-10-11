@@ -125,3 +125,14 @@ test("a dashboard view loads no AI SDK until its chat is opened", () => {
   );
   assert.deepEqual(chains, []);
 });
+
+test("ECharts loads with the first chart, not with the dashboard or the embed", () => {
+  // #497: a dashboard of stats or text, or an embed of one, never needs it;
+  // `PanelView` loads the chart with `React.lazy`, which is a chunk of its own.
+  for (const [route, entries] of Object.entries({
+    "/dashboards/[id]": [...ROOT_LAYOUT, "src/app/dashboards/[id]/page.tsx"],
+    "/embed/dashboards/[id]": [...ROOT_LAYOUT, "src/app/embed/dashboards/[id]/page.tsx"],
+  })) {
+    assert.deepEqual(clientChains(entries, /^echarts(\/|$)/), [], `ECharts on ${route}`);
+  }
+});
