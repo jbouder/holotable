@@ -3,7 +3,6 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
-  Bot,
   Building2,
   Cpu,
   HardDrive,
@@ -25,8 +24,6 @@ const ICONS: Record<SettingsSectionId, LucideIcon> = {
   shortcuts: Keyboard,
   workspaces: Building2,
   "ai-context": Sparkles,
-  model: Cpu,
-  "personal-model": Bot,
   tokens: KeyRound,
 };
 

@@ -292,3 +292,55 @@ export function describeKey(key: KeyState | undefined, noun = "key"): string {
   }
   return key.hint ? `A key ending in ${key.hint} is stored.` : "A key is stored.";
 }
+
+/* -------------------------------------------------------------------------- */
+/* The Models page (#441)                                                     */
+/* -------------------------------------------------------------------------- */
+
+/** A server model as the Models page shows it: read-only, with where its credentials come from. */
+export interface ServerModelRow {
+  id: string;
+  name: string;
+  provider: string;
+  model: string;
+  /** The variables its credentials come from, by field; never their values. */
+  credentialVars: Record<string, string>;
+  unavailable: string | null;
+  isDefault: boolean;
+}
+
+/**
+ * A workspace or personal model as the Models page lists it. `view` (its
+ * settings and the credentials' state) is present only for someone who may
+ * edit it: a workspace's source-admins, or the model's owner.
+ */
+export interface CatalogModelRow {
+  id: string;
+  name: string;
+  provider: string;
+  model: string;
+  unavailable: string | null;
+  view: ModelView | null;
+}
+
+export interface WorkspaceModelsSection {
+  workspaceId: string;
+  /** Holds `source:manage` here: may add, edit, test, delete and set the default. */
+  canManage: boolean;
+  /** What a generation here uses when nobody picks, as stored: a model id, or null for the server's default. */
+  defaultModel: string | null;
+  allowPersonalKeys: boolean;
+  models: CatalogModelRow[];
+}
+
+/** Everything the Models page draws, read on the server. */
+export interface ModelsPageData {
+  server: ServerModelRow[];
+  workspaces: WorkspaceModelsSection[];
+  /** The caller's own models, or null where they may have none (demo mode). */
+  personal: CatalogModelRow[] | null;
+  /** The workspaces that allow personal models, among those the caller generates in. */
+  personalAppliesIn: string[];
+  demo: boolean;
+  allowStub: boolean;
+}

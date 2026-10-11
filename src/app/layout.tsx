@@ -8,6 +8,7 @@ import { DemoBanner } from "@/components/demo-banner";
 import { SessionKeepalive } from "@/components/session-keepalive";
 import { config } from "@/lib/config";
 import { getIdentity } from "@/lib/auth/authorize";
+import { modelsPageVisible } from "@/lib/ai/models-page";
 import { tokenExpiry } from "@/lib/auth/session";
 import { historyOf, KEEP_ALL_HISTORY, timeDisplayOf } from "@/lib/preferences";
 import { requestPreferences } from "@/lib/preferences-server";
@@ -122,7 +123,10 @@ export default async function RootLayout({
                 >
                   Skip to content
                 </a>
-                <NavBar account={account} />
+                <NavBar
+                  account={account}
+                  showModels={identity !== null && modelsPageVisible(identity)}
+                />
                 {config.authMode === "demo" && <DemoBanner />}
                 {sessionExpiresAt !== null && (
                   <SessionKeepalive expiresAt={sessionExpiresAt} />

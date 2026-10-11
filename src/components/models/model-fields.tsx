@@ -28,14 +28,14 @@ type TestStatus =
 
 /**
  * The fields of one model configuration (#331, #438), shared by the
- * workspace and personal settings pages, with "Test connection": a provider
+ * Models page's Add and Edit dialog (#441), with "Test connection": a provider
  * select over the registry's kinds, then the fields the chosen kind draws.
  * Credentials fields are write-only: they start empty whatever is stored,
  * and blank keeps the stored ones. `testBody` wraps the input in what the
  * page's test route expects. `allowStub` lists the recorded model, which the
  * server accepts only outside production or for the end-to-end suite.
  */
-export function ModelConfigFields({
+export function ModelFields({
   draft,
   onChange,
   storedKey,

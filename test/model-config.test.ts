@@ -440,7 +440,7 @@ test("a key that can no longer be read is reported, never replaced by the next l
     }),
   );
   assert.equal(mine.source, "personal");
-  assert.match(!mine.ok ? mine.problem : "", /Personal model/);
+  assert.match(!mine.ok ? mine.problem : "", /Your personal model .* on the Models page/);
 });
 
 test("a stored configuration that no longer parses is reported, not thrown", async () => {

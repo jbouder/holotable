@@ -4,7 +4,14 @@ import * as React from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Collapsible } from "@base-ui/react/collapsible";
-import { LayoutDashboard, Database, Menu as MenuIcon, Compass, X } from "lucide-react";
+import {
+  LayoutDashboard,
+  Database,
+  Menu as MenuIcon,
+  Compass,
+  Cpu,
+  X,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { NavSlot } from "@/components/nav-slot";
@@ -13,6 +20,8 @@ import { ProfileMenu, type ProfileMenuAccount } from "@/components/profile-menu"
 const LINKS = [
   { href: "/dashboards", label: "Dashboards", Icon: LayoutDashboard },
   { href: "/explore", label: "Explore", Icon: Compass },
+  // Only for someone who may generate somewhere (#441); the page 404s otherwise.
+  { href: "/models", label: "Models", Icon: Cpu, gated: true },
   { href: "/data-sources", label: "Data sources", Icon: Database },
 ] as const;
 
@@ -22,7 +31,7 @@ function isCurrent(pathname: string, href: string): boolean {
 }
 
 /**
- * The top bar. Three links inline on a wide screen; behind a disclosure below
+ * The top bar. Its links inline on a wide screen; behind a disclosure below
  * `md`, where they would otherwise wrap the header onto two lines and push the
  * dashboard off the top of a phone (#78).
  *
@@ -39,8 +48,16 @@ function isCurrent(pathname: string, href: string): boolean {
  * in the bar at every width, and carries Sign out, Settings and the theme. `account` is null for a signed-out visitor,
  * who gets no menu: every item in it needs a session.
  */
-export function NavBar({ account }: { account: ProfileMenuAccount | null }) {
+export function NavBar({
+  account,
+  showModels = false,
+}: {
+  account: ProfileMenuAccount | null;
+  /** Whether the identity may see the Models page (`modelsPageVisible`). */
+  showModels?: boolean;
+}) {
   const pathname = usePathname();
+  const links = LINKS.filter((link) => !("gated" in link) || showModels);
   const [open, setOpen] = React.useState(false);
 
   // A tap on a link navigates without unmounting the bar, so the panel has to
@@ -76,7 +93,7 @@ export function NavBar({ account }: { account: ProfileMenuAccount | null }) {
             Holotable
           </Link>
           <div className="hidden items-center gap-6 md:flex">
-            {LINKS.map(({ href, label, Icon }) => (
+            {links.map(({ href, label, Icon }) => (
               <Link
                 key={href}
                 href={href}
@@ -121,7 +138,7 @@ export function NavBar({ account }: { account: ProfileMenuAccount | null }) {
         className="h-(--collapsible-panel-height) overflow-hidden transition-[height,opacity] duration-(--duration-base) ease-emphasized data-starting-style:h-0 data-starting-style:opacity-0 data-ending-style:h-0 data-ending-style:opacity-0 md:hidden"
       >
         <div className="flex flex-col border-t border-border px-2 py-1">
-          {LINKS.map(({ href, label, Icon }) => (
+          {links.map(({ href, label, Icon }) => (
             <Link
               key={href}
               href={href}

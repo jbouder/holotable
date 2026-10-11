@@ -98,6 +98,7 @@ export default defineConfig({
             { label: "Viewing a dashboard", slug: "guide/viewing-a-dashboard" },
             { label: "Editing a dashboard", slug: "guide/editing-a-dashboard" },
             { label: "Explore", slug: "guide/explore" },
+            { label: "Models", slug: "guide/models" },
             { label: "Dashboard variables", slug: "guide/variables" },
             { label: "Annotations", slug: "guide/annotations" },
             { label: "Drilldown", slug: "guide/drilldown" },

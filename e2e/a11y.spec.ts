@@ -30,6 +30,15 @@ for (const theme of THEMES) {
       await expectNoA11yViolations(page);
     });
 
+    test("models, and the Add model dialog", async ({ page }) => {
+      await page.goto("/models");
+      await expect(page.getByRole("heading", { level: 1, name: "Models" })).toBeVisible();
+      await expectNoA11yViolations(page);
+      await page.getByRole("button", { name: "Add model to demo" }).click();
+      await expect(page.getByRole("dialog", { name: "Add model" })).toBeVisible();
+      await expectNoA11yViolations(page);
+    });
+
     test("new dashboard", async ({ page }) => {
       await page.goto("/dashboards/new");
       await expect(page.getByRole("heading", { level: 1 })).toBeVisible();

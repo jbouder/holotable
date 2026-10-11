@@ -22,10 +22,10 @@ place of the environment's for their generations; see
 (dashboard, refine, panel edit, source draft, Explore and dashboard chat)
 resolves its model per request, and the first level that is configured wins:
 
-1. **Personal**: the caller's own model, under Settings → Personal model,
+1. **Personal**: the caller's own model, on the [Models page](/guide/models/),
    when they have one **and** the workspace allows personal keys.
 2. **Workspace**: the workspace's default model, which a source-admin sets
-   under Settings → Workspace model.
+   on the Models page.
 3. **Server**: `AI_PROVIDER`, `AI_MODEL` and the rest, below, listed as the
    server model `default` (id `env:default`). With neither level set,
    nothing changes.
@@ -80,8 +80,8 @@ Which level answered is recorded on every generation log row
 (`modelConfig`) and on the `dashboard.generate`, `source.draft` and
 `dashboard.chat` audit rows, never the key. Rate limits and the
 per-workspace budget apply whichever level is used. Both levels are off in
-[demo mode](/admin/demo-mode/): the settings sections are not listed and
-the routes refuse.
+[demo mode](/admin/demo-mode/): the Models page lists the server's models
+only and the routes refuse every write.
 
 ### Credentials
 
