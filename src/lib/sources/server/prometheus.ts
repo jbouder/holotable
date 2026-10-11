@@ -1,7 +1,7 @@
 import { fenceUntrustedBlock, sanitizePromptField } from "@/lib/ai/untrusted";
 import { config } from "@/lib/config";
 import { isPromqlQuery, VARIABLE_VALUES_MAX } from "@/lib/ir";
-import { observeQuery } from "@/lib/metrics";
+import { observeQuery, recordTruncation } from "@/lib/metrics";
 import { checkBaseUrl } from "@/lib/ai/guarded-fetch";
 import {
   logUnavailable,
@@ -153,6 +153,7 @@ const kind: ServerSourceKind = {
         const finest = plan.plan.instant ? undefined : plan.plan.finestPoints;
         if (finest !== undefined && result.rows.length > 0) {
           result.truncated = { stage: "points", kept: result.rows.length, total: finest };
+          recordTruncation("points");
         }
         observeQuery({
           sourceId: prom.id,

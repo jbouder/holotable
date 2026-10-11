@@ -62,6 +62,13 @@ export const COLLECTED_FAMILIES: ReadonlySet<string> = new Set([
   "holotable_process_resident_memory_bytes",
   "holotable_nodejs_heap_size_used_bytes",
   "holotable_nodejs_eventloop_lag_p99_seconds",
+  // Capacity (#490).
+  "holotable_pool_wait_seconds",
+  "holotable_poller_skips_total",
+  "holotable_sse_bytes_total",
+  "holotable_sse_drops_total",
+  "holotable_result_truncations_total",
+  "holotable_llm_in_flight",
 ]);
 
 /** One row of `metrics.holotable_self`. Column order matches {@link ROW_COLUMNS}. */

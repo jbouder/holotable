@@ -17,6 +17,7 @@ import {
   setActivePollers,
   setSseSubscribers,
   recordChatPanel,
+  countTruncation,
 } from "@/lib/metrics";
 
 /**
@@ -400,4 +401,20 @@ describe("GET /api/metrics", () => {
   it("is never prerendered", () => {
     assert.equal(dynamic, "force-dynamic");
   });
+});
+
+it("a chat panel cut to the window counts as a window truncation (#490)", async () => {
+  resetMetricsForTests();
+  countTruncation({ truncated: { stage: "window" } });
+  countTruncation({ truncated: { stage: "rows" } });
+  countTruncation({});
+  assert.match(
+    await renderMetrics(),
+    /holotable_result_truncations_total\{stage="window"\} 1\b/,
+  );
+  assert.doesNotMatch(
+    await renderMetrics(),
+    /stage="rows"/,
+    "the executor counts the server's own",
+  );
 });

@@ -3,6 +3,7 @@ import { EventEmitter } from "node:events";
 import { test } from "node:test";
 import type { Pool, PoolConfig } from "pg";
 import { config as appConfig } from "@/lib/config";
+import { renderMetrics, resetMetricsForTests } from "@/lib/metrics";
 import {
   type SqlSourceRecord,
   type SqlSourceConfig,
@@ -378,11 +379,34 @@ test("a checkout that timed out in a full pool is a wait; at a free one it is a 
     };
     pool.idleCount = 0;
     pool.totalCount = appConfig.maxPoolPerSource;
+    resetMetricsForTests();
     await assert.rejects(executePlan(source(), plan), SourceBusyError);
+    // Capacity (#490): the wait is observed, failed or not, and the pool's use.
+    const scrape = await renderMetrics();
+    assert.match(scrape, /holotable_pool_wait_seconds_count\{source="src-pool"\} 1\b/);
+    assert.match(
+      scrape,
+      new RegExp(
+        `holotable_pool_in_use\\{source="src-pool"\\} ${appConfig.maxPoolPerSource}\\b`,
+      ),
+    );
     pool.totalCount = 0;
     await assert.rejects(
       executePlan(source(), plan),
       (err) => !(err instanceof SourceBusyError) && /timeout exceeded/.test(String(err)),
+    );
+  });
+});
+
+test("a result over the row cap is counted as a truncation", async () => {
+  await withFakePools(async () => {
+    resetMetricsForTests();
+    // The fake returns one row; a cap of none cuts it.
+    const capped = await executePlan(source(), { ...plan, maxRows: 0 });
+    assert.deepEqual(capped.truncated, { stage: "rows", kept: 0 });
+    assert.match(
+      await renderMetrics(),
+      /holotable_result_truncations_total\{stage="rows"\} 1\b/,
     );
   });
 });

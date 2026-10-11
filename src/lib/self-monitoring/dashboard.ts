@@ -129,6 +129,12 @@ export const PANEL_METRIC_FAMILIES: readonly string[] = [
   "holotable_llm_tokens_total",
   "holotable_sql_validation_rejections_total",
   "holotable_process_resident_memory_bytes",
+  "holotable_pool_wait_seconds",
+  "holotable_poller_skips_total",
+  "holotable_sse_bytes_total",
+  "holotable_sse_drops_total",
+  "holotable_result_truncations_total",
+  "holotable_llm_in_flight",
 ];
 
 /**
@@ -312,6 +318,122 @@ GROUP BY reason
 ORDER BY rejections DESC`,
         },
         layout: { x: 6, y: 6, w: 6, h: 3 },
+      },
+      // Capacity (#490): what runs out first under load.
+      {
+        id: "pool-wait",
+        title: "Pool wait by source (ms)",
+        description:
+          "Mean time a query waited for a connection, per minute and source. Near zero is healthy; a rising line means MAX_POOL_PER_SOURCE is the limit.",
+        viz: "line",
+        format: "ms",
+        query: {
+          sourceId: SELF_SOURCE_ID,
+          timeField: "minute",
+          sql: `WITH scraped AS (
+  SELECT ts, source,
+         sum(value) FILTER (WHERE metric = 'holotable_pool_wait_seconds_sum') AS seconds,
+         sum(value) FILTER (WHERE metric = 'holotable_pool_wait_seconds_count') AS waits
+  FROM holotable_self
+  WHERE metric IN ('holotable_pool_wait_seconds_sum', 'holotable_pool_wait_seconds_count')
+  GROUP BY ts, source
+)
+SELECT time_bucket('1 minute', ts) AS minute, source,
+       1000.0 * (max(seconds) - min(seconds))
+         / NULLIF(max(waits) - min(waits), 0) AS avg_ms
+FROM scraped
+GROUP BY minute, source
+ORDER BY minute`,
+        },
+        layout: { x: 0, y: 9, w: 6, h: 3 },
+      },
+      {
+        id: "poller-skips",
+        title: "Poller skips per 5 minutes",
+        description:
+          "Panels that waited out a cycle because their source was busy, by why. Zero is healthy.",
+        viz: "bar",
+        format: "number",
+        query: {
+          sourceId: SELF_SOURCE_ID,
+          timeField: "minute",
+          sql: `WITH scraped AS (
+  SELECT ts, reason, sum(value) AS cumulative
+  FROM holotable_self
+  WHERE metric = 'holotable_poller_skips_total'
+  GROUP BY ts, reason
+)
+SELECT time_bucket('5 minutes', ts) AS minute, reason,
+       max(cumulative) - min(cumulative) AS skips
+FROM scraped
+GROUP BY minute, reason
+ORDER BY minute`,
+        },
+        layout: { x: 6, y: 9, w: 6, h: 3 },
+      },
+      {
+        id: "sse-bytes",
+        title: "Stream bytes per minute",
+        description: "Bytes written to every dashboard stream on the instance.",
+        viz: "area",
+        format: "bytes",
+        query: {
+          sourceId: SELF_SOURCE_ID,
+          timeField: "minute",
+          sql: `WITH scraped AS (
+  SELECT ts, sum(value) AS cumulative
+  FROM holotable_self
+  WHERE metric = 'holotable_sse_bytes_total'
+  GROUP BY ts
+)
+SELECT time_bucket('1 minute', ts) AS minute, max(cumulative) - min(cumulative) AS bytes
+FROM scraped
+GROUP BY minute
+ORDER BY minute`,
+        },
+        layout: { x: 0, y: 12, w: 6, h: 3 },
+      },
+      {
+        id: "capacity-events",
+        title: "Drops and truncations",
+        description:
+          "Streams closed for falling behind, and results cut short by stage, over everything the collector retains. Zero is healthy; a steady count names the limit to raise or the query to narrow.",
+        viz: "table",
+        query: {
+          sourceId: SELF_SOURCE_ID,
+          sql: `WITH scraped AS (
+  SELECT ts, metric, labels, sum(value) AS cumulative
+  FROM holotable_self
+  WHERE metric IN ('holotable_sse_drops_total', 'holotable_result_truncations_total')
+  GROUP BY ts, metric, labels
+)
+SELECT metric, labels, max(cumulative) - min(cumulative) AS events
+FROM scraped
+GROUP BY metric, labels
+ORDER BY events DESC`,
+        },
+        layout: { x: 6, y: 12, w: 3, h: 3 },
+      },
+      {
+        id: "llm-in-flight",
+        title: "Model requests in flight",
+        viz: "stat",
+        format: "number",
+        query: {
+          sourceId: SELF_SOURCE_ID,
+          timeField: "minute",
+          sql: `WITH scraped AS (
+  SELECT ts, sum(value) AS running
+  FROM holotable_self
+  WHERE metric = 'holotable_llm_in_flight'
+  GROUP BY ts
+)
+SELECT time_bucket('1 minute', ts) AS minute, max(running) AS running
+FROM scraped
+GROUP BY minute
+ORDER BY minute`,
+        },
+        layout: { x: 9, y: 12, w: 3, h: 3 },
       },
     ],
   };

@@ -1,3 +1,4 @@
+import { trackLlmInFlight } from "@/lib/metrics";
 import { baseUrlRefusal } from "@/lib/ai/guarded-fetch";
 import { APICallError, type LanguageModelMiddleware, wrapLanguageModel } from "ai";
 import { log } from "@/lib/log";
@@ -64,7 +65,11 @@ export function resilience(options: ResilienceOptions): LanguageModelMiddleware 
   return {
     specificationVersion: "v4",
     wrapGenerate: async ({ params, model }) => {
-      const deadline = startDeadline(params.abortSignal, options.timeoutMs);
+      const deadline = startDeadline(
+        params.abortSignal,
+        options.timeoutMs,
+        trackLlmInFlight(model.modelId),
+      );
       try {
         return await withRetry(
           () => model.doGenerate({ ...params, abortSignal: deadline.signal }),
@@ -78,7 +83,13 @@ export function resilience(options: ResilienceOptions): LanguageModelMiddleware 
       }
     },
     wrapStream: async ({ params, model }) => {
-      const deadline = startDeadline(params.abortSignal, options.timeoutMs);
+      // In flight until the stream ends, errors, is cancelled or times out:
+      // every one of those settles the deadline (#490).
+      const deadline = startDeadline(
+        params.abortSignal,
+        options.timeoutMs,
+        trackLlmInFlight(model.modelId),
+      );
       try {
         const result = await withRetry(
           () => model.doStream({ ...params, abortSignal: deadline.signal }),
@@ -113,12 +124,17 @@ interface Deadline {
  * hold the event loop open, and an explicit `clear` so a finished request
  * does not leave one armed.
  */
-function startDeadline(caller: AbortSignal | undefined, timeoutMs: number): Deadline {
+function startDeadline(
+  caller: AbortSignal | undefined,
+  timeoutMs: number,
+  settled: () => void = () => {},
+): Deadline {
   const controller = new AbortController();
   const listeners: Array<() => void> = [];
   let expired = false;
   const timer = setTimeout(() => {
     expired = true;
+    settled();
     log.warn("model request timed out", { timeoutMs });
     controller.abort(new ModelTimeoutError(timeoutMs));
     for (const fn of listeners) fn();
@@ -128,7 +144,10 @@ function startDeadline(caller: AbortSignal | undefined, timeoutMs: number): Dead
     get expired() {
       return expired;
     },
-    clear: () => clearTimeout(timer),
+    clear: () => {
+      clearTimeout(timer);
+      settled();
+    },
     explain: (error) =>
       expired && !caller?.aborted ? new ModelTimeoutError(timeoutMs) : error,
     onExpire: (fn) => {

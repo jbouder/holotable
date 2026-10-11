@@ -1,3 +1,4 @@
+import { countTruncation } from "@/lib/metrics";
 import { fitToWindow } from "@/lib/stream-merge";
 import { config } from "@/lib/config";
 import {
@@ -434,7 +435,7 @@ export function showPanelTool(input: {
       const range = resolveTimeRange(scope.timeRange);
       // The dashboard's point budget (#486): the same query shows the same
       // rows, and the same badge, in Chat as on a dashboard.
-      const fitted = fitToWindow(ran.result, config.maxWindowPoints);
+      const fitted = countTruncation(fitToWindow(ran.result, config.maxWindowPoints));
       return {
         ok: true,
         panelId,

@@ -91,6 +91,13 @@ interface Instruments {
   sqlRejections: Counter<"reason">;
   promqlRejections: Counter<"reason">;
   auditWriteFailures: Counter<string>;
+  poolWait: Histogram<"source">;
+  poolInUse: Gauge<"source">;
+  pollerSkips: Counter<"reason">;
+  sseBytes: Counter<string>;
+  sseDrops: Counter<"reason">;
+  resultTruncations: Counter<"stage">;
+  llmInFlight: Gauge<"model">;
   /** One set of seen values per bounded label, keyed `metric/label`. */
   seenLabelValues: Map<string, Set<string>>;
 }
@@ -176,6 +183,49 @@ function build(): Instruments {
       help: "Audit log rows that could not be built or written, and so are missing from audit_log.",
       registers: [registry],
     }),
+    // Capacity (#490): what runs out first under load.
+    poolWait: new Histogram({
+      name: "holotable_pool_wait_seconds",
+      help: "Time a query waited for a connection from its source's pool.",
+      labelNames: ["source"],
+      buckets: [0.001, 0.01, 0.05, 0.1, 0.5, 1, 5, 10, 30],
+      registers: [registry],
+    }),
+    poolInUse: new Gauge({
+      name: "holotable_pool_in_use",
+      help: "Connections checked out of a source's pool right now.",
+      labelNames: ["source"],
+      registers: [registry],
+    }),
+    pollerSkips: new Counter({
+      name: "holotable_poller_skips_total",
+      help: "Panel executions a poller skipped for a cycle, by why: no free slot on the source (in_flight_cap) or a checkout that timed out in a full pool (pool_wait).",
+      labelNames: ["reason"],
+      registers: [registry],
+    }),
+    sseBytes: new Counter({
+      name: "holotable_sse_bytes_total",
+      help: "Bytes written to dashboard streams.",
+      registers: [registry],
+    }),
+    sseDrops: new Counter({
+      name: "holotable_sse_drops_total",
+      help: "Dashboard streams closed by the server, by why.",
+      labelNames: ["reason"],
+      registers: [registry],
+    }),
+    resultTruncations: new Counter({
+      name: "holotable_result_truncations_total",
+      help: "Results cut short on the server, by stage: the row cap, the byte cap, the PromQL point cap, or a chat panel's window.",
+      labelNames: ["stage"],
+      registers: [registry],
+    }),
+    llmInFlight: new Gauge({
+      name: "holotable_llm_in_flight",
+      help: "Model requests running right now, by model.",
+      labelNames: ["model"],
+      registers: [registry],
+    }),
     seenLabelValues: new Map(),
   };
 }
@@ -244,6 +294,67 @@ export function observeQuery(input: {
 export function setSseSubscribers(dashboardId: string, count: number): void {
   const m = instruments();
   m.sseSubscribers.set({ dashboard: bounded("sse", "dashboard", dashboardId) }, count);
+}
+
+/** Record how long a query waited for a pool connection, and the pool's use after (#490). */
+export function observePoolWait(sourceId: string, seconds: number): void {
+  instruments().poolWait.observe(
+    { source: bounded("pool", "source", sourceId) },
+    seconds,
+  );
+}
+
+/** Report how many of a source's pool connections are checked out. */
+export function setPoolInUse(sourceId: string, inUse: number): void {
+  instruments().poolInUse.set({ source: bounded("pool", "source", sourceId) }, inUse);
+}
+
+/** Why a poller skipped a panel for a cycle (#487). A fixed enum. */
+export type PollerSkipReason = "pool_wait" | "in_flight_cap";
+
+export function recordPollerSkip(reason: PollerSkipReason): void {
+  instruments().pollerSkips.inc({ reason });
+}
+
+/** Bytes written to a dashboard stream. */
+export function recordSseBytes(bytes: number): void {
+  instruments().sseBytes.inc(bytes);
+}
+
+/** Why the server closed a dashboard stream (#489). A fixed enum. */
+export type SseDropReason = "slow";
+
+export function recordSseDrop(reason: SseDropReason): void {
+  instruments().sseDrops.inc({ reason });
+}
+
+/** A result cut short on the server (#486), by its stage. */
+export function recordTruncation(stage: "rows" | "bytes" | "points" | "window"): void {
+  instruments().resultTruncations.inc({ stage });
+}
+
+/** Count a fitted result's window cut, and hand the result back. */
+export function countTruncation<T extends { truncated?: { stage: string } }>(
+  result: T,
+): T {
+  if (result.truncated?.stage === "window") recordTruncation("window");
+  return result;
+}
+
+/**
+ * One model request started; returns its end, which is safe to call more
+ * than once. The model label is the catalog id the provider was asked for.
+ */
+export function trackLlmInFlight(modelId: string): () => void {
+  const m = instruments();
+  const model = bounded("llm_in_flight", "model", modelId);
+  m.llmInFlight.inc({ model });
+  let ended = false;
+  return () => {
+    if (ended) return;
+    ended = true;
+    m.llmInFlight.dec({ model });
+  };
 }
 
 /** Report how many pollers are running on this instance. */
