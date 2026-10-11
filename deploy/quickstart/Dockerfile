@@ -29,7 +29,7 @@ COPY . .
 RUN npm run build
 
 # ---- quickstart ----
-FROM timescale/timescaledb:2.17.2-pg16@sha256:4e459e217f00cbb09920c34d245501e63427e6767a495de57ce76823ff280f12 AS quickstart
+FROM timescale/timescaledb:2.30.2-pg16@sha256:6f139d56042989bd35f50ba5986e492cd32e35cc6778c50be2659add298dc09f AS quickstart
 
 # Node 22 from the same Alpine release the build stage used. `--upgrade` with
 # sqlite-libs because Alpine's node links SQLite's session extension, which the
