@@ -35,6 +35,13 @@ function num(name: string, fallback: number): number {
   return Number.isFinite(parsed) ? parsed : fallback;
 }
 
+/**
+ * A DuckDB memory size, as `DUCKDB_MEMORY_LIMIT` takes one: `512MB`, `2GB`,
+ * `1.5GiB`. Interpolated into a `SET` statement, so the client checks it
+ * against this again before it is used.
+ */
+export const DUCKDB_MEMORY = /^\d+(?:\.\d+)?(?:KB|MB|GB|TB|KiB|MiB|GiB|TiB)$/;
+
 /** A single-unit duration, as `PROMQL_MAX_RANGE` takes one: `7d`, `12h`. */
 const DURATION = /^(\d+)(ms|s|m|h|d|w)$/;
 
@@ -272,6 +279,24 @@ export const config = {
    * refused as the author's to narrow (#562), as `PROMETHEUS_MAX_SERIES` is.
    */
   lokiMaxSeries: num("LOKI_MAX_SERIES", 100),
+
+  /**
+   * The directory DuckDB sources (#572) may read: an absolute path, under
+   * which each source names a directory of Parquet and CSV files or a
+   * `.duckdb` file. A path that resolves outside it, symlinks included, is
+   * refused. Empty (the default) refuses every DuckDB source, so the kind is
+   * closed until an operator chooses what it may read.
+   */
+  duckdbSourcesDir: str("DUCKDB_SOURCES_DIR", ""),
+  /**
+   * The most memory one DuckDB source's engine may use, in DuckDB's own
+   * units (`512MB`, `2GB`). Each source has its own engine, so the server's
+   * worst case is this times the DuckDB sources in use. A query that needs
+   * more fails with DuckDB's out-of-memory error, not the process's.
+   */
+  duckdbMemoryLimit: str("DUCKDB_MEMORY_LIMIT", "512MB"),
+  /** The threads one DuckDB source's engine may run a query on. */
+  duckdbThreads: num("DUCKDB_THREADS", 2),
 
   /**
    * Model requests per minute allowed per user in a workspace, on every
@@ -648,6 +673,15 @@ const EnvSchema = z.object({
   PROMETHEUS_MAX_SERIES: blank(positiveInt),
   LOKI_MAX_ENTRIES: blank(positiveInt),
   LOKI_MAX_SERIES: blank(positiveInt),
+  DUCKDB_SOURCES_DIR: blank(
+    z
+      .string()
+      .startsWith("/", "must be an absolute path: the directory DuckDB sources may read"),
+  ),
+  DUCKDB_MEMORY_LIMIT: blank(
+    z.string().regex(DUCKDB_MEMORY, "must be a size such as 512MB or 2GB"),
+  ),
+  DUCKDB_THREADS: blank(positiveInt),
   LLM_RATE_PER_MINUTE: blank(nonNegativeInt),
   LLM_DAILY_TOKEN_BUDGET: blank(nonNegativeInt),
 
@@ -891,6 +925,21 @@ export function validateConfig(
       "METRICS_TOKEN",
       `is ${metricsToken.length} characters; a scrape token should be at least ${MIN_METRICS_TOKEN_LENGTH}. Generate one with \`openssl rand -hex 32\`.`,
     );
+  }
+
+  // --- DuckDB sources (#572) ---------------------------------------------
+  // Closed by default, like `/api/metrics`: an unset directory is not a
+  // problem, it refuses every DuckDB source with a message naming it. What
+  // is worth saying is a bound set for an engine that can never open.
+  if (!values.DUCKDB_SOURCES_DIR) {
+    for (const variable of ["DUCKDB_MEMORY_LIMIT", "DUCKDB_THREADS"] as const) {
+      if (env[variable]) {
+        warning(
+          variable,
+          "is set but ignored: DUCKDB_SOURCES_DIR is not set, so no DuckDB source can be opened.",
+        );
+      }
+    }
   }
 
   // --- AI provider --------------------------------------------------------
