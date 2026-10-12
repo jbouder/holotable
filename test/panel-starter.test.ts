@@ -7,10 +7,12 @@ import {
   PLACEHOLDER_PROMQL,
   panelStarter,
   PLACEHOLDER_SQL,
+  logqlStarter,
   promqlStarter,
   starterPanel,
   starterQuery,
 } from "@/lib/panel-starter";
+import { validateLogql } from "@/lib/logql/safety";
 import { validatePromql } from "@/lib/promql/safety";
 import type { PrometheusCatalog } from "@/lib/sources/kinds/prometheus";
 import type { CatalogTable, SqlSourceConfig } from "@/lib/registry";
@@ -280,4 +282,61 @@ test("a PromQL starter counts as untouched for the delete confirmation; an edit 
     isStarterQuery({ sourceId: "ts", sql: PLACEHOLDER_SQL }, { tables: [HTTP_REQUESTS] }),
     true,
   );
+});
+
+/* LogQL (#565) */
+
+const LOKI = {
+  labels: [
+    { name: "pod", values: [] },
+    { name: "job", values: ["api", "web"] },
+  ],
+};
+
+test("a LogQL starter is one listed stream, as lines for a logs panel and a count for a chart", () => {
+  assert.deepEqual(starterQuery("loki", LOKI).query, {
+    sourceId: "loki",
+    logql: '{job="api"}',
+  });
+  assert.equal(starterQuery("loki", LOKI).viz, "logs");
+  assert.equal(
+    logqlStarter(LOKI, "line").logql,
+    'sum(count_over_time({job="api"} [5m]))',
+  );
+  // A kind that draws one value is an instant metric query, never an instant log query.
+  assert.deepEqual(starterQuery("loki", LOKI, "stat").query, {
+    sourceId: "loki",
+    logql: 'sum(count_over_time({job="api"} [5m]))',
+    instant: true,
+  });
+  assert.equal(logqlStarter(LOKI, "table").instant, undefined);
+});
+
+test("every LogQL starter passes the real guard against its catalog", () => {
+  // A Loki source lists at least one label (`LokiConfig`); one with no known
+  // value still gets an anchored selector, on a value that matches nothing.
+  const catalogs = [LOKI, { labels: [{ name: "job", values: [] }] }];
+  for (const catalog of catalogs) {
+    for (const viz of ["logs", "table", "line", "stat"] as const) {
+      const { logql } = logqlStarter(catalog, viz);
+      const result = validateLogql(logql, catalog);
+      assert.equal(result.ok, true, `${logql}: ${result.error}`);
+    }
+  }
+});
+
+test("a LogQL starter counts as untouched for the delete confirmation; an edit does not", () => {
+  for (const viz of ["logs", "line", "stat"] as const) {
+    const { query } = starterQuery("loki", LOKI, viz);
+    assert.equal(isStarterQuery(query, LOKI), true, viz);
+  }
+  const panel = starterPanel("p", "loki", LOKI, LAYOUT);
+  assert.ok(Panel.safeParse(panel).success);
+  assert.ok(panel.query && isStarterQuery(panel.query, LOKI));
+  assert.equal(
+    isStarterQuery({ sourceId: "loki", logql: '{job="api"} |= "error"' }, LOKI),
+    false,
+  );
+  // The same text on a catalog of another kind is not this source's starter.
+  assert.equal(isStarterQuery({ sourceId: "loki", logql: '{job="api"}' }, PROM), false);
 });
