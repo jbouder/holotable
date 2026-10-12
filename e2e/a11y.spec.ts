@@ -246,6 +246,27 @@ for (const { theme, palette, name } of APPEARANCES) {
       await expectNoA11yViolations(page);
     });
 
+    test("an open menu taller than the viewport scrolls inside itself", async ({
+      page,
+    }) => {
+      // The account menu in a window too short for it stands in for a
+      // workspace with many sources (#585).
+      await page.setViewportSize({ width: 1280, height: 240 });
+      await page.goto("/dashboards");
+      await page.getByRole("button", { name: /account menu/i }).click();
+      const menu = page.getByRole("menu");
+      await expect(menu).toBeVisible();
+      const box = await menu.boundingBox();
+      expect(box && box.y + box.height).toBeLessThanOrEqual(240);
+      expect(await menu.evaluate((el) => el.scrollHeight > el.clientHeight)).toBe(true);
+      // The first item is reachable, and the keyboard brings the last into view.
+      await expect(page.getByRole("menuitem").first()).toBeInViewport();
+      await page.keyboard.press("End");
+      await expect(page.getByRole("menuitem").last()).toBeFocused();
+      await expect(page.getByRole("menuitem").last()).toBeInViewport();
+      await expectNoA11yViolations(page);
+    });
+
     test("the dashboard chat panel", async ({ page, request }) => {
       await page.goto(`/dashboards/${await dashboardId(request, DEMO_DASHBOARD)}`);
       await waitForPanels(page);
