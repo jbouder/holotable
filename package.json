@@ -14,7 +14,7 @@
     "format:check": "biome format",
     "typecheck": "next typegen && tsc --noEmit",
     "test": "LOG_LEVEL=silent node --test --import tsx \"test/**/*.test.ts\" \"test/**/*.test.tsx\"",
-    "test:fuzz": "LOG_LEVEL=silent node --test --import tsx test/sql-safety.fuzz.test.ts test/promql-safety.fuzz.test.ts",
+    "test:fuzz": "LOG_LEVEL=silent node --test --import tsx test/sql-safety.fuzz.test.ts test/promql-safety.fuzz.test.ts test/logql-safety.fuzz.test.ts",
     "test:integration": "tsx scripts/test-integration.ts",
     "config:check": "tsx scripts/config-check.ts",
     "migrate": "tsx scripts/migrate.ts",
