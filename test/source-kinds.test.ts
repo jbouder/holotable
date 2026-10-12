@@ -69,6 +69,34 @@ test("no code outside src/lib/sources/ switches on a source's kind", () => {
   assert.deepEqual(offenders, [], "ask sourceKind() or serverKind() instead");
 });
 
+/**
+ * A narrowing to the TimescaleDB kind (#570): a comparison with its name, a
+ * `case` on it, or a type that pins a source's or config's `kind` to it.
+ */
+const TIMESCALEDB_NARROWINGS: RegExp[] = [
+  /case\s+["']timescaledb["']/,
+  /[!=]==?\s*["']timescaledb["']/,
+  /["']timescaledb["']\s*[!=]==?/,
+  /\bkind:\s*["']timescaledb["']\s*[;}]/,
+  /\bExtract<[^>]*["']timescaledb["']/,
+];
+
+test("outside the kind and its implementation, the SQL path asks for the language, never TimescaleDB (#570)", () => {
+  // A source is SQL because its kind's language is (`isSqlSource`,
+  // `SqlSourceRecord`), so a second SQL kind is a registration, not a hunt
+  // through the modules that assumed the first.
+  const offenders = APP_FILES.filter(
+    ({ path }) => !inSources(path) && !path.startsWith("src/lib/timescaledb/"),
+  ).flatMap(({ path, text }) =>
+    text
+      .split("\n")
+      .map((line, i) => ({ line, at: `${path}:${i + 1}` }))
+      .filter(({ line }) => TIMESCALEDB_NARROWINGS.some((re) => re.test(line)))
+      .map(({ at, line }) => `${at}: ${line.trim()}`),
+  );
+  assert.deepEqual(offenders, [], 'ask sourceKind(source).language === "sql" instead');
+});
+
 test("the TimescaleDB implementation is reached only through its kind", () => {
   // `src/lib/timescaledb/` is the implementation behind the kind's server
   // half; a route that imports it by name has stepped around the registry.
