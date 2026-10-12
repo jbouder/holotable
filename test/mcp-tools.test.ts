@@ -924,7 +924,7 @@ test("exactly one language per call, and the options of the other are refused", 
     promql: "up",
   });
   assert.equal(both.ok, false);
-  assert.match(both.text, /exactly one of sql and promql/);
+  assert.match(both.text, /exactly one of sql, promql and logql/);
   const neither = await call(tools, "validate_sql", { sourceId: "src-prom" });
   assert.equal(neither.ok, false);
   const instantSql = await call(tools, "run_query", {
@@ -933,7 +933,7 @@ test("exactly one language per call, and the options of the other are refused", 
     instant: true,
   });
   assert.equal(instantSql.ok, false);
-  assert.match(instantSql.text, /for promql only/);
+  assert.match(instantSql.text, /for promql and logql only/);
   const timeFieldPromql = await call(tools, "run_query", {
     sourceId: "src-prom",
     promql: "up",

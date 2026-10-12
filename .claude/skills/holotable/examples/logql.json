@@ -1,0 +1,110 @@
+{
+  "catalog": "loki-catalog.json",
+  "accepted": [
+    {
+      "rule": "A log query: a selector anchored on a listed label, then its filters",
+      "logql": "{app=\"api\", env=\"prod\"} |= \"error\""
+    },
+    {
+      "rule": "Parse a line before filtering or formatting on its fields",
+      "logql": "{app=\"api\"} | json | status >= 500 | line_format \"{{.method}} {{.path}}\""
+    },
+    {
+      "rule": "A metric query counts lines over a range, aggregated to the series you want",
+      "logql": "sum by (route) (count_over_time({app=\"api\"} | json [5m]))"
+    },
+    {
+      "rule": "A rate of matching lines, the top five routes",
+      "logql": "topk(5, sum by (route) (rate({app=\"api\"} |= \"timeout\" [5m])))"
+    },
+    {
+      "rule": "A percentile of a field, unwrapped from the line",
+      "logql": "quantile_over_time(0.95, {app=\"api\"} | json | unwrap duration(latency) [5m]) by (route)"
+    },
+    {
+      "rule": "A declared variable is a matcher's whole value, or a |= or != line filter's string",
+      "variables": ["env", "needle"],
+      "logql": "{app=\"api\", env=\":env\"} |= \":needle\""
+    },
+    {
+      "rule": "A declared variable as a label filter's value, after a parser",
+      "variables": ["level"],
+      "logql": "{app=\"api\"} | logfmt | level=\":level\""
+    },
+    {
+      "rule": "An offset within the server's range is fine",
+      "logql": "sum(count_over_time({app=\"api\"} [5m] offset 1d))"
+    }
+  ],
+  "rejected": [
+    {
+      "rule": "A selector of regex matchers alone",
+      "logql": "{app=~\"api|web\"}",
+      "error": "every stream selector needs an \"=\" matcher with a value on a label this source lists"
+    },
+    {
+      "rule": "A selector on a label the source does not list",
+      "logql": "{pod=\"api-7f9c\"}",
+      "error": "every stream selector needs an \"=\" matcher with a value on a label this source lists"
+    },
+    {
+      "rule": "An empty selector",
+      "logql": "{}",
+      "error": "LogQL does not parse at character"
+    },
+    {
+      "rule": "No comments",
+      "logql": "{app=\"api\"} # recent errors",
+      "error": "comments are not allowed"
+    },
+    {
+      "rule": "A log query beside an operator",
+      "logql": "{app=\"api\"} / 2",
+      "error": "a log query cannot be an operand of a binary operator"
+    },
+    {
+      "rule": "A range longer than the server allows",
+      "logql": "count_over_time({app=\"api\"} [8d])",
+      "error": "is longer than the 7d this server allows"
+    },
+    {
+      "rule": "An offset longer than the server allows",
+      "logql": "count_over_time({app=\"api\"} [5m] offset 30d)",
+      "error": "is longer than the 7d this server allows"
+    },
+    {
+      "rule": "An offset into the future",
+      "logql": "count_over_time({app=\"api\"} [5m] offset -1h)",
+      "error": "a negative offset reads past the end of the window"
+    },
+    {
+      "rule": "A variable inside a regex matcher",
+      "variables": ["app"],
+      "logql": "{app=~\":app\"}",
+      "error": "cannot be used inside a regex or a pattern"
+    },
+    {
+      "rule": "A variable inside a regex line filter",
+      "variables": ["needle"],
+      "logql": "{app=\"api\"} |~ \":needle\"",
+      "error": "cannot be used inside a regex or a pattern"
+    },
+    {
+      "rule": "A variable as any other string",
+      "variables": ["fmt"],
+      "logql": "{app=\"api\"} | line_format \":fmt\"",
+      "error": "may appear only as a matcher's whole value"
+    },
+    {
+      "rule": "A variable as a label name or a field",
+      "variables": ["field"],
+      "logql": "{app=\"api\"} | json | :field=\"x\"",
+      "error": "a variable may appear only as a value, not as a label name or a field"
+    },
+    {
+      "rule": "A variable the dashboard does not declare",
+      "logql": "{app=\":app\"}",
+      "error": "variable :app is not declared on this dashboard"
+    }
+  ]
+}

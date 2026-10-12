@@ -46,7 +46,7 @@ const Statement = {
     .max(8000)
     .optional()
     .describe(
-      "For a SQL source (kind timescaledb): one SELECT or WITH statement, following the SQL rules. Send exactly one of sql and promql.",
+      "For a SQL source (kind timescaledb): one SELECT or WITH statement, following the SQL rules. Send exactly one of sql, promql and logql.",
     ),
   promql: z
     .string()
@@ -54,7 +54,15 @@ const Statement = {
     .max(8000)
     .optional()
     .describe(
-      "For a Prometheus source (kind prometheus): one PromQL expression over the source's listed metrics, with no @ modifier and no time of its own. Send exactly one of sql and promql.",
+      "For a Prometheus source (kind prometheus): one PromQL expression over the source's listed metrics, with no @ modifier and no time of its own. Send exactly one of sql, promql and logql.",
+    ),
+  logql: z
+    .string()
+    .min(1)
+    .max(8000)
+    .optional()
+    .describe(
+      'For a Loki source (kind loki): one LogQL expression whose every stream selector has an = matcher on a listed label, such as {app="api"}, with no offset or time of its own. A log query ({app="api"} |= "error") returns lines; a metric query (sum(count_over_time({app="api"}[5m]))) returns series. Send exactly one of sql, promql and logql.',
     ),
 };
 
@@ -63,35 +71,45 @@ const EvaluatedAs = {
     .boolean()
     .optional()
     .describe(
-      "PromQL only: one sample per series at the window's end, as a stat, gauge, pie or table draws it, instead of a range.",
+      "PromQL, or a LogQL metric query, only: one sample per series at the window's end, as a stat, gauge, pie or table draws it, instead of a range. A LogQL log query is never instant.",
     ),
   minStep: Duration.optional().describe(
-    "PromQL only: a floor on the step, such as 1m. The server picks the step and only ever raises it to this.",
+    "PromQL or LogQL only: a floor on the step, such as 1m. The server picks the step and only ever raises it to this.",
   ),
 };
 
-/** Exactly one language, and the PromQL options only with PromQL. */
+/** Exactly one language, and the PromQL and LogQL options never with SQL. */
 function oneLanguage<T extends z.ZodObject>(schema: T) {
   return schema.superRefine((value, ctx) => {
     const v = value as {
       sql?: string;
       promql?: string;
+      logql?: string;
       instant?: boolean;
       minStep?: string;
     };
-    if ((v.sql === undefined) === (v.promql === undefined)) {
-      ctx.addIssue({ code: "custom", message: "send exactly one of sql and promql" });
+    const sent = [v.sql, v.promql, v.logql].filter((q) => q !== undefined).length;
+    if (sent !== 1) {
+      ctx.addIssue({
+        code: "custom",
+        message: "send exactly one of sql, promql and logql",
+      });
     }
     if (v.sql !== undefined && (v.instant !== undefined || v.minStep !== undefined)) {
       ctx.addIssue({
         code: "custom",
-        message: "instant and minStep are for promql only",
+        message: "instant and minStep are for promql and logql only",
       });
     }
-    if ("timeField" in v && v.timeField !== undefined && v.promql !== undefined) {
+    if (
+      "timeField" in v &&
+      v.timeField !== undefined &&
+      (v.promql !== undefined || v.logql !== undefined)
+    ) {
       ctx.addIssue({
         code: "custom",
-        message: "timeField is for sql only; a PromQL range is always keyed by time",
+        message:
+          "timeField is for sql only; a PromQL or LogQL range is always keyed by time",
       });
     }
   }) as unknown as z.ZodType<z.output<T>>;
@@ -103,11 +121,20 @@ function queryOf(
   args: {
     sql?: string;
     promql?: string;
+    logql?: string;
     instant?: boolean;
     minStep?: string;
     timeField?: string;
   },
 ): PanelQuery {
+  if (args.logql !== undefined) {
+    return {
+      sourceId,
+      logql: args.logql,
+      ...(args.instant !== undefined ? { instant: args.instant } : {}),
+      ...(args.minStep !== undefined ? { minStep: args.minStep } : {}),
+    };
+  }
   if (args.promql !== undefined) {
     return {
       sourceId,
@@ -129,7 +156,7 @@ export function sqlTools(deps: McpDeps): McpTool[] {
       name: "validate_sql",
       title: "Validate a query against the guard",
       description:
-        "Run a query through its source's guard without executing it. SQL (sql, for a timescaledb source): one SELECT built from allowed constructs, only that source's tables and columns, no denied functions. PromQL (promql, for a prometheus source): one expression over the listed metrics, nothing that names a time of its own. Returns ok, with the guard's hints for PromQL (an unlisted label, rate() over a gauge, a counter drawn raw), or the exact error the server would give, so a query can be fixed before it is run or put in a panel. A query in the wrong language for its source is refused by name.",
+        "Run a query through its source's guard without executing it. SQL (sql, for a timescaledb source): one SELECT built from allowed constructs, only that source's tables and columns, no denied functions. PromQL (promql, for a prometheus source): one expression over the listed metrics, nothing that names a time of its own. LogQL (logql, for a loki source): one expression whose every stream selector has an = matcher on a listed label, built from allowlisted stages and functions, no offset beyond the server's range, variables only as matcher values or line-filter strings. Returns ok, with the guard's hints for PromQL and LogQL (an unlisted label, rate() over a gauge, a counter drawn raw), or the exact error the server would give, so a query can be fixed before it is run or put in a panel. A query in the wrong language for its source is refused by name.",
       input: z.object({
         sourceId: z.string().min(1),
         ...Statement,
@@ -139,7 +166,7 @@ export function sqlTools(deps: McpDeps): McpTool[] {
           .max(10)
           .optional()
           .describe(
-            'Dashboard variables the query may reference: :name in SQL, a matcher value ":name" in PromQL.',
+            'Dashboard variables the query may reference: :name in SQL, a matcher value ":name" in PromQL, a matcher value or a |= / != line-filter string ":name" in LogQL.',
           ),
       }),
       output: z.object({
@@ -179,7 +206,7 @@ export function sqlTools(deps: McpDeps): McpTool[] {
     defineTool({
       name: "run_query",
       title: "Run a query",
-      description: `Execute one guarded query against a source and return the rows, read-only, with the server's limits: a SELECT (sql) for a timescaledb source, a PromQL expression (promql) for a prometheus source. The server resolves the time range (relative expressions such as now-6h). For SQL, when timeField names the statement's time column, it injects the window; for PromQL it picks start, end and step itself, and a range answers a time column plus one column per series (an instant query: one row per series, a column per label, then value). Do not add a time filter yourself. At most ${MAX_TOOL_ROWS} rows come back; aggregate rather than page.`,
+      description: `Execute one guarded query against a source and return the rows, read-only, with the server's limits: a SELECT (sql) for a timescaledb source, a PromQL expression (promql) for a prometheus source, a LogQL expression (logql) for a loki source. The server resolves the time range (relative expressions such as now-6h). For SQL, when timeField names the statement's time column, it injects the window; for PromQL and a LogQL metric query it picks start, end and step itself, and a range answers a time column plus one column per series (an instant query: one row per series, a column per label, then value). A LogQL log query answers the newest lines first, one row per line: its time, its text as message and its labels, up to the server's line limit. Do not add a time filter yourself. At most ${MAX_TOOL_ROWS} rows come back; aggregate rather than page.`,
       input: z.object({
         sourceId: z.string().min(1),
         ...Statement,

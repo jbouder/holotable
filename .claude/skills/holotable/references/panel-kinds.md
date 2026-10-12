@@ -16,6 +16,10 @@ Shared option fragments, used below:
   strictly ascending order of `value`. A value takes the color of the last step
   at or below it; below the first step it keeps the kind's default color.
 
+On a Loki source (LogQL), `logs` takes a log query; every other kind takes a
+metric query, which answers exactly as PromQL does, so its "With PromQL:" line
+holds (`references/logql-rules.md`).
+
 ### `line`
 
 A numeric trend over time, one line per numeric column. Requires a time
@@ -179,6 +183,8 @@ column; default one named `level` or `severity`), `levels` (up to 20 `{ state, c
 `"oldest"`), `showTime` (default `true`), `limit` (1–5,000).
 
 With PromQL: not for a Prometheus source; a PromQL result has no lines. Use `table` for an instant query's series.
+
+With LogQL: a log query, never instant, `{app="api", env="prod"} |= "error"`, with `options.limit` for how many lines and `options.level: "level"` when the catalog lists a level label.
 
 ### `treemap`
 

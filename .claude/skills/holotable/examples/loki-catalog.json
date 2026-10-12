@@ -1,0 +1,10 @@
+{
+  "sourceId": "loki-apps",
+  "kind": "loki",
+  "labels": [
+    { "name": "app", "values": ["api", "web", "worker"] },
+    { "name": "env", "values": ["prod", "staging"] },
+    { "name": "level", "values": ["debug", "info", "warn", "error"] },
+    { "name": "namespace", "values": ["default", "payments"] }
+  ]
+}

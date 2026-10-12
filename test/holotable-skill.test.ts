@@ -17,8 +17,15 @@ import {
   LogqlQuery,
   LabelValuesQuery,
   isSqlQuery,
+  isLogqlQuery,
 } from "@/lib/ir";
+import {
+  type LogqlCatalog,
+  validateLogql,
+  validateLogqlLabelValues,
+} from "@/lib/logql/safety";
 import { validatePromql, validatePromqlLabelValues } from "@/lib/promql/safety";
+import { LokiLabel } from "@/lib/sources/kinds/loki";
 import { PrometheusMetric } from "@/lib/sources/kinds/prometheus";
 import { COLOR_TOKENS } from "@/lib/panels/colors";
 import { PANEL_KIND_NAMES, PANEL_KINDS } from "@/lib/panels/registry";
@@ -78,11 +85,25 @@ function prometheusSource(): {
   };
 }
 
+/** The example Loki catalog (#566), as the LogQL guard reads it. */
+function lokiSource(): { sourceId: string; catalog: LogqlCatalog } {
+  const catalog = readJson(join(EXAMPLES, "loki-catalog.json")) as {
+    sourceId: string;
+    labels: unknown[];
+  };
+  return {
+    sourceId: catalog.sourceId,
+    catalog: { labels: catalog.labels.map((l) => LokiLabel.parse(l)) },
+  };
+}
+
 const NOT_DASHBOARDS = [
   "catalog.json",
   "prometheus-catalog.json",
+  "loki-catalog.json",
   "sql.json",
   "promql.json",
+  "logql.json",
 ];
 
 const DASHBOARD_FILES = readdirSync(EXAMPLES).filter(
@@ -103,9 +124,30 @@ for (const file of DASHBOARD_FILES) {
     const { spec } = parsed.data;
     const { sourceId, config } = exampleSource();
     const prom = prometheusSource();
+    const loki = lokiSource();
     const declared = declaredVariables(spec);
 
     for (const panel of spec.panels.filter(hasQuery)) {
+      if (isLogqlQuery(panel.query)) {
+        // LogQL, against the Loki catalog (#566): accepted with no hint, a
+        // logs panel a log query and never instant, every other kind a
+        // metric query.
+        assert.equal(
+          panel.query.sourceId,
+          loki.sourceId,
+          `${file} ${panel.id}: sourceId`,
+        );
+        const check = validateLogql(panel.query.logql, loki.catalog, declared);
+        assert.ok(check.ok, `${file} ${panel.id}: ${check.ok ? "" : check.error}`);
+        assert.deepEqual(check.hints ?? [], [], `${file} ${panel.id}: hints`);
+        assert.equal(
+          check.kind,
+          panel.viz === "logs" ? "log" : "metric",
+          `${file} ${panel.id}: a logs panel is a log query, any other a metric query`,
+        );
+        if (check.kind === "log") assert.ok(!panel.query.instant, `${file} ${panel.id}`);
+        continue;
+      }
       if (!isSqlQuery(panel.query)) {
         // PromQL, against the Prometheus catalog: accepted, and with no hint,
         // because an example should not teach what the guard warns about.
@@ -139,6 +181,14 @@ for (const file of DASHBOARD_FILES) {
     }
     for (const variable of spec.variables ?? []) {
       if (!variable.query) continue;
+      if ("label" in variable.query && variable.query.sourceId === loki.sourceId) {
+        const check = validateLogqlLabelValues(variable.query, loki.catalog);
+        assert.ok(
+          check.ok,
+          `${file} variable ${variable.name}: ${check.ok ? "" : check.error}`,
+        );
+        continue;
+      }
       if ("label" in variable.query) {
         const check = validatePromqlLabelValues(variable.query, prom.catalog);
         assert.ok(
@@ -260,6 +310,76 @@ test("every error in the PromQL rules table is one the guard gives for an exampl
       `promql-rules.md says "${row}", which no rejected example in promql.json produces`,
     );
   }
+});
+
+interface LogqlExample {
+  rule: string;
+  logql: string;
+  variables?: string[];
+  error?: string;
+}
+
+const LOGQL = readJson(join(EXAMPLES, "logql.json")) as {
+  accepted: LogqlExample[];
+  rejected: LogqlExample[];
+};
+
+test("every accepted LogQL example passes the guard, with no hint (#566)", () => {
+  const { catalog } = lokiSource();
+  for (const ex of LOGQL.accepted) {
+    const check = validateLogql(ex.logql, catalog, new Set(ex.variables ?? []));
+    assert.ok(check.ok, `${ex.rule}: ${check.ok ? "" : check.error}`);
+    assert.deepEqual(check.hints ?? [], [], `${ex.rule}: hints`);
+  }
+});
+
+/** What the guard says about each rejected LogQL example. */
+function logqlRejections(): string[] {
+  const { catalog } = lokiSource();
+  return LOGQL.rejected.map((ex) => {
+    const check = validateLogql(ex.logql, catalog, new Set(ex.variables ?? []));
+    assert.equal(check.ok, false, `${ex.rule}: accepted ${ex.logql}`);
+    assert.ok(ex.error, `${ex.rule}: name the expected error`);
+    const error = check.ok ? "" : (check.error ?? "");
+    assert.ok(
+      error.includes(ex.error),
+      `${ex.rule}: expected an error containing "${ex.error}", got "${error}"`,
+    );
+    return error;
+  });
+}
+
+test("every error in the LogQL rules table is one the guard gives for an example (#566)", () => {
+  const errors = logqlRejections();
+  const rows = read("references/logql-rules.md")
+    .split("\n")
+    .filter((l) => l.startsWith("| ") && !l.startsWith("| Rule"))
+    .map(
+      (l) =>
+        l
+          .split(" | ")
+          .at(-1)
+          ?.replace(/^`|` \|$/g, "") ?? "",
+    );
+  assert.ok(rows.length >= 8, rows.join("\n"));
+  for (const row of rows) {
+    assert.ok(
+      errors.some((e) => e.includes(row)),
+      `logql-rules.md says "${row}", which no rejected example in logql.json produces`,
+    );
+  }
+});
+
+test("the logs kind's LogQL example is a log query the guard accepts (#566)", () => {
+  const text = read("references/panel-kinds.md");
+  const section = text.split("### `logs`")[1]?.split("\n### ")[0] ?? "";
+  const line = section.split("\n").find((l) => l.startsWith("With LogQL:"));
+  assert.ok(line, 'logs: add a "With LogQL:" line');
+  const logql = line.match(/`(\{[^`]+)`/)?.[1];
+  assert.ok(logql, "logs: the With LogQL line shows a query");
+  const check = validateLogql(logql, lokiSource().catalog);
+  assert.ok(check.ok, check.ok ? "" : check.error);
+  assert.equal(check.kind, "log");
 });
 
 test("each kind that runs a query says what it is with PromQL", () => {

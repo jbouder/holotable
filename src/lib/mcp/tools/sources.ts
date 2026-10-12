@@ -50,7 +50,7 @@ export function sourceTools(deps: McpDeps): McpTool[] {
       name: "list_sources",
       title: "List data sources",
       description:
-        "The data sources the caller may query, across every workspace they can reach, or in one workspace. Each has an id (the only way a panel refers to a source), a name, its kind and the language its queries are written in (timescaledb: SQL; prometheus: PromQL), how many tables or metrics it allowlists, and the state of its catalog. Call describe_source for the tables and columns, or the metrics and labels.",
+        "The data sources the caller may query, across every workspace they can reach, or in one workspace. Each has an id (the only way a panel refers to a source), a name, its kind and the language its queries are written in (timescaledb: SQL; prometheus: PromQL; loki: LogQL), how many tables, metrics or stream labels it allowlists, and the state of its catalog. Call describe_source for the tables and columns, the metrics and labels, or the stream labels.",
       input: z.object({
         workspaceId: z
           .string()
@@ -98,7 +98,7 @@ export function sourceTools(deps: McpDeps): McpTool[] {
       name: "describe_source",
       title: "Describe a data source",
       description:
-        "One source's catalog and the catalog's health. A SQL source (kind timescaledb) lists every table and column a query may use, with types; only these pass the SQL guard, and hidden columns are not listed and cannot be used. A Prometheus source (kind prometheus) lists the metrics a PromQL expression may select, each with its type (counter, gauge, histogram, summary), help and the labels its series carry; a selector of any other metric is refused. Never where the source lives or how it authenticates.",
+        "One source's catalog and the catalog's health. A SQL source (kind timescaledb) lists every table and column a query may use, with types; only these pass the SQL guard, and hidden columns are not listed and cannot be used. A Prometheus source (kind prometheus) lists the metrics a PromQL expression may select, each with its type (counter, gauge, histogram, summary), help and the labels its series carry; a selector of any other metric is refused. A Loki source (kind loki) lists the stream labels a LogQL selector may anchor on, each with some of the values seen; every selector needs an = matcher on one of them. Never where the source lives or how it authenticates.",
       input: z.object({
         sourceId: z.string().min(1).describe("A source id from list_sources."),
       }),
@@ -114,7 +114,7 @@ export function sourceTools(deps: McpDeps): McpTool[] {
         const source = live;
         // Never the admin view: a hidden column stays hidden to an agent, and
         // the view carries no connection detail either way. Each kind's own
-        // view (#389): tables and columns, or metrics and labels.
+        // view (#389): tables and columns, metrics and labels, or stream labels.
         const { canManage: _, ...view } = serverKind(source).catalogView(
           source,
           catalogHealth(source),
