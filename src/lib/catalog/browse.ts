@@ -1,4 +1,4 @@
-import { timescaledb } from "@/lib/sources/kinds/timescaledb";
+import { timescaleDbEngine, timescaledb } from "@/lib/sources/kinds/timescaledb";
 import { z } from "zod";
 import type { CatalogHealth } from "@/lib/catalog/health";
 import { type ApiError, apiErrorFromThrown, readApiError } from "@/lib/errors";
@@ -25,6 +25,8 @@ import { ImpactDashboard, impactCounts } from "@/lib/source-impact";
 
 export interface CatalogView {
   schema: string;
+  /** "PostgreSQL" or "TimescaleDB 2.17.2" (#557); null until a Test or Refresh. */
+  engine: string | null;
   /** Every column for a source admin, exposed columns only for anyone else. */
   tables: CatalogTable[];
   /** Allowlisted tables the last refresh could not find. */
@@ -55,13 +57,14 @@ export function isMetricCatalogView(view: AnyCatalogView): view is MetricCatalog
 
 /** Build the view for one caller. Server-side; `canManage` comes from `can()`. */
 export function catalogView(
-  source: Pick<SqlSourceRecord, "config" | "catalogMissingTables">,
+  source: Pick<SqlSourceRecord, "config" | "catalogMissingTables" | "catalogFacts">,
   catalogHealth: CatalogHealth,
   canManage: boolean,
 ): CatalogView {
   const projected = canManage ? source.config : timescaledb.catalog(source.config);
   return {
     schema: projected.schema,
+    engine: timescaleDbEngine(source.catalogFacts),
     tables: projected.tables,
     missingTables: [...source.catalogMissingTables],
     catalogHealth,

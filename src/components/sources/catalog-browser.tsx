@@ -313,6 +313,9 @@ function Freshness({
             )}
           </span>
           {"schema" in view && <span className="text-muted">schema {view.schema}</span>}
+          {"engine" in view && view.engine && (
+            <span className="text-muted">{view.engine}</span>
+          )}
         </div>
         {health.state !== "ok" && (
           <p className="text-xs text-muted">{describeCatalogHealth(source, health)}</p>
