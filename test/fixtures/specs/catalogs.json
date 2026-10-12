@@ -433,5 +433,24 @@
         ]
       }
     ]
+  },
+  "loki-fixture": {
+    "labels": [
+      {
+        "name": "app",
+        "values": ["api", "web"]
+      },
+      {
+        "name": "env",
+        "values": ["prod", "staging"]
+      },
+      {
+        "name": "tenant"
+      }
+    ],
+    "rowFilter": {
+      "label": "tenant",
+      "claim": "tenant"
+    }
   }
 }

@@ -1,0 +1,81 @@
+{
+  "specVersion": 1,
+  "title": "API logs (LogQL)",
+  "timeRange": {
+    "from": "now-1h",
+    "to": "now"
+  },
+  "refreshIntervalMs": 10000,
+  "variables": [
+    {
+      "name": "env",
+      "label": "Environment",
+      "type": "enum",
+      "values": ["prod", "staging"],
+      "default": "prod"
+    },
+    {
+      "name": "app",
+      "label": "App",
+      "type": "query",
+      "query": {
+        "sourceId": "loki-fixture",
+        "label": "app",
+        "match": "{env=\"prod\"}"
+      }
+    }
+  ],
+  "panels": [
+    {
+      "id": "lines",
+      "title": "API errors",
+      "viz": "logs",
+      "query": {
+        "sourceId": "loki-fixture",
+        "logql": "{app=\"api\", env=\":env\"} |= \"error\" | json | level=\"error\""
+      },
+      "options": {
+        "limit": 200,
+        "level": "level"
+      },
+      "layout": {
+        "x": 0,
+        "y": 0,
+        "w": 12,
+        "h": 6
+      }
+    },
+    {
+      "id": "rate",
+      "title": "Errors per route",
+      "viz": "line",
+      "query": {
+        "sourceId": "loki-fixture",
+        "logql": "sum by (route) (rate({app=\"api\"} |= \"error\" | json [5m]))",
+        "minStep": "30s"
+      },
+      "layout": {
+        "x": 0,
+        "y": 6,
+        "w": 8,
+        "h": 4
+      }
+    },
+    {
+      "id": "total",
+      "title": "Errors in the last 5m",
+      "viz": "stat",
+      "query": {
+        "sourceId": "loki-fixture",
+        "logql": "sum(count_over_time({app=\"api\"} |= \"error\" [5m]))",
+        "instant": true
+      },
+      "layout": {
+        "x": 8,
+        "y": 6,
+        "w": 4,
+        "h": 4
+      }
+    }
+  ]
+}

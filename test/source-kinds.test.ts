@@ -50,9 +50,9 @@ const inSources = (path: string) => path.startsWith("src/lib/sources/");
 
 /** A decision made by comparing a kind, rather than by asking the kind. */
 const KIND_COMPARISONS: RegExp[] = [
-  /case\s+["'](?:timescaledb|prometheus)["']/,
-  /[!=]==\s*["'](?:timescaledb|prometheus)["']/,
-  /["'](?:timescaledb|prometheus)["']\s*[!=]==/,
+  /case\s+["'](?:timescaledb|prometheus|loki)["']/,
+  /[!=]==\s*["'](?:timescaledb|prometheus|loki)["']/,
+  /["'](?:timescaledb|prometheus|loki)["']\s*[!=]==/,
   /\b(?:source|record|src|s)\.(?:config\.)?kind\s*[!=]==/,
   /[!=]==\s*(?:source|record|src|s)\.(?:config\.)?kind\b/,
 ];
@@ -140,17 +140,20 @@ test("a stored row is refused when its kind is unknown or disagrees with its con
     tables: [{ name: "m", columns: [{ name: "v", type: "double precision" }] }],
   };
   assert.equal(parseStoredSource("timescaledb", config).kind, "timescaledb");
-  assert.throws(() => parseStoredSource("loki", config), /unknown source kind "loki"/);
+  assert.throws(
+    () => parseStoredSource("clickhouse", config),
+    /unknown source kind "clickhouse"/,
+  );
   assert.throws(
     () => parseStoredSource("timescaledb", { ...config, kind: "prometheus" }),
     /says kind "prometheus"/,
   );
   assert.throws(
-    () => sourceKind({ kind: "loki" as "timescaledb" }),
+    () => sourceKind({ kind: "clickhouse" as "timescaledb" }),
     /unknown source kind/,
   );
   assert.throws(
-    () => serverKind({ kind: "loki" as "timescaledb" }),
+    () => serverKind({ kind: "clickhouse" as "timescaledb" }),
     /unknown source kind/,
   );
 });
@@ -280,4 +283,68 @@ test("nothing a browser sends sets a source's catalog facts (#557)", () => {
     "src/app/api/sources/[id]/refresh/route.ts",
     "src/app/api/sources/[id]/test/route.ts",
   ]);
+});
+
+function lokiRecord(): SourceRecord {
+  const config = SourceConfig.parse({
+    kind: "loki",
+    url: "https://logs.internal.example/tenant-7",
+    auth: "bearer",
+    rowFilter: { label: "tenant", claim: "tenant" },
+    labels: [
+      { name: "app", values: ["api"] },
+      { name: "tenant", values: [] },
+    ],
+  });
+  return { ...record(), id: "logs", kind: "loki", config, secretRef: "LOKI_PROD" };
+}
+
+test("a Loki listing and catalog name their fields, never the URL, auth or secret_ref (#562)", () => {
+  const source = lokiRecord();
+  const listing = sourceListing(source);
+  assert.deepEqual(Object.keys(listing).sort(), [
+    "id",
+    "kind",
+    "labelCount",
+    "name",
+    "tombstonedAt",
+    "workspaceId",
+  ]);
+  assert.equal("labelCount" in listing && listing.labelCount, 2);
+  const catalog = sourceKind(source).catalog(source.config);
+  assert.deepEqual(catalog, {
+    labels: [
+      { name: "app", values: ["api"] },
+      { name: "tenant", values: [] },
+    ],
+  });
+  for (const text of [JSON.stringify(listing), JSON.stringify(catalog)]) {
+    for (const secret of ["logs.internal.example", "tenant-7", "bearer", "LOKI_PROD"]) {
+      assert.ok(!text.includes(secret), `it carries ${secret}`);
+    }
+  }
+  assert.deepEqual(sourceKind(source).rowFilter(source.config), {
+    target: "tenant",
+    claim: "tenant",
+  });
+});
+
+test("a Loki config says its kind: no default, and no URL with credentials in it (#562)", () => {
+  const base = { url: "https://logs.example", auth: "none", labels: [{ name: "app" }] };
+  assert.equal(SourceConfig.safeParse({ ...base, kind: "loki" }).success, true);
+  assert.equal(SourceConfig.safeParse(base).success, false);
+  assert.equal(
+    SourceConfig.safeParse({ ...base, kind: "loki", url: "https://u:p@logs.example" })
+      .success,
+    false,
+  );
+  assert.equal(
+    SourceConfig.safeParse({ ...base, kind: "loki", labels: [] }).success,
+    false,
+  );
+  assert.equal(
+    SourceConfig.safeParse({ ...base, kind: "loki", labels: [{ name: "__name__" }] })
+      .success,
+    false,
+  );
 });

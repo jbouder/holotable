@@ -62,6 +62,35 @@ function spec(title: string, panels = 1): Dashboard {
 }
 
 test(
+  "a Loki source stores and loads through its kind, with no secret_ref for auth none (#562)",
+  needsDb,
+  async () => {
+    const config = SourceConfig.parse({
+      kind: "loki",
+      url: "https://logs.example.com",
+      auth: "none",
+      labels: [{ name: "app", values: ["api"] }],
+      rowFilter: { label: "app", claim: "tenant" },
+    });
+    const id = unique("src-loki");
+    const created = await createSource({
+      id,
+      workspaceId: WORKSPACE,
+      name: "Loki",
+      config,
+      secretRef: null,
+      createdBy: "integration",
+    });
+    assert.equal(created.kind, "loki");
+    assert.equal(created.secretRef, null);
+    assert.deepEqual(created.config, config);
+    assert.deepEqual(await getSourceById(id), created);
+    // Nothing references it, so it goes rather than tombstones.
+    assert.equal(await deleteSource(WORKSPACE, id), "deleted");
+  },
+);
+
+test(
   "a Prometheus source with no auth stores no secret_ref, and one can be set and cleared (#385)",
   needsDb,
   async () => {

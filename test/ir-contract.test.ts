@@ -1,3 +1,5 @@
+import { buildLogqlLabelValuesPlan, buildLogqlPlan } from "@/lib/logql/plan";
+import { validateLogql, validateLogqlLabelValues } from "@/lib/logql/safety";
 import { buildPromqlPlan, buildLabelValuesPlan } from "@/lib/promql/plan";
 import { validatePromql, validatePromqlLabelValues } from "@/lib/promql/safety";
 import assert from "node:assert/strict";
@@ -21,7 +23,7 @@ import {
   isPromqlQuery,
 } from "@/lib/ir";
 import { StoredDashboard } from "@/lib/ir/upgrade";
-import { PANEL_KIND_NAMES } from "@/lib/panels/registry";
+import { PANEL_KIND_NAMES, panelRowLimit } from "@/lib/panels/registry";
 import { type SqlSourceConfig, TimescaleDbConfig } from "@/lib/registry";
 import { bindRowFilter } from "@/lib/sql/row-filter";
 import { buildExecutablePlan, validateSql } from "@/lib/sql/safety";
@@ -154,7 +156,7 @@ test("no catalog carries a connection or a credential", () => {
   for (const [id, catalog] of Object.entries(library.catalogs)) {
     assert.deepEqual(
       Object.keys(catalog).filter(
-        (k) => !["schema", "tables", "metrics", "rowFilter"].includes(k),
+        (k) => !["schema", "tables", "metrics", "labels", "rowFilter"].includes(k),
       ),
       [],
       id,
@@ -184,27 +186,51 @@ for (const { fixture, result } of parsed) {
   });
 }
 
-/** A LogQL fixture needs the LogQL guard to hold it, which phase 2 of #559 adds (#561). */
-const NO_LOGQL_FIXTURE = (file: string, panelId: string) =>
-  `${file} panel ${panelId}: a LogQL fixture waits for the LogQL guard (#561)`;
+/** A LogQL source's catalog (#562): its stream label allowlist and tenant label. */
+function logqlCatalog(catalogs: Catalogs, sourceId: string, file: string) {
+  const catalog = catalogOf(catalogs, sourceId, file);
+  assert.ok(
+    "labels" in catalog,
+    `${file} reads "${sourceId}" with LogQL, but it is not a Loki catalog`,
+  );
+  return catalog;
+}
+
+/** The fixture tenant, bound as a viewer's claim would bind it. */
+function fixtureTenant(catalog: { rowFilter?: { label: string } }) {
+  return catalog.rowFilter
+    ? { label: catalog.rowFilter.label, value: "fixture-tenant" }
+    : null;
+}
+
+/** Whether a variable's label-values query reads a Loki source. */
+function readsLoki(sourceId: string): boolean {
+  const catalog = library.catalogs[sourceId];
+  return catalog !== undefined && "labels" in catalog;
+}
 
 test("every panel's SQL passes the guard against its fixture catalog", async () => {
   for (const { file, spec } of loaded) {
     const declared = declaredVariables(spec);
     for (const panel of spec.panels.filter(hasQuery)) {
       const { sourceId } = panel.query;
-      if (isLogqlQuery(panel.query)) assert.fail(NO_LOGQL_FIXTURE(file, panel.id));
-      const result = isSqlQuery(panel.query)
-        ? await validateSql(
-            panel.query.sql,
-            sourceConfig(library.catalogs, sourceId, file),
+      const result = isLogqlQuery(panel.query)
+        ? validateLogql(
+            panel.query.logql,
+            logqlCatalog(library.catalogs, sourceId, file),
             declared,
           )
-        : validatePromql(
-            queryText(panel.query),
-            promqlCatalog(library.catalogs, sourceId, file),
-            declared,
-          );
+        : isSqlQuery(panel.query)
+          ? await validateSql(
+              panel.query.sql,
+              sourceConfig(library.catalogs, sourceId, file),
+              declared,
+            )
+          : validatePromql(
+              queryText(panel.query),
+              promqlCatalog(library.catalogs, sourceId, file),
+              declared,
+            );
       assert.ok(result.ok, `${file} panel ${panel.id}: ${result.error}`);
     }
     for (const v of spec.variables ?? []) {
@@ -212,10 +238,15 @@ test("every panel's SQL passes the guard against its fixture catalog", async () 
       const { sourceId } = v.query;
       const result = isSqlQuery(v.query)
         ? await validateSql(v.query.sql, sourceConfig(library.catalogs, sourceId, file))
-        : validatePromqlLabelValues(
-            v.query,
-            promqlCatalog(library.catalogs, sourceId, file),
-          );
+        : readsLoki(sourceId)
+          ? validateLogqlLabelValues(
+              v.query,
+              logqlCatalog(library.catalogs, sourceId, file),
+            )
+          : validatePromqlLabelValues(
+              v.query,
+              promqlCatalog(library.catalogs, sourceId, file),
+            );
       assert.ok(result.ok, `${file} variable ${v.name}: ${result.error}`);
     }
   }
@@ -232,7 +263,22 @@ test("every panel's executable plan matches its snapshot", async () => {
     const variables = defaultValues(spec.variables);
     for (const panel of spec.panels.filter(hasQuery) as QueryPanel[]) {
       const query = panel.query;
-      if (isLogqlQuery(query)) assert.fail(NO_LOGQL_FIXTURE(file, panel.id));
+      if (isLogqlQuery(query)) {
+        // LogQL (#562): the rewritten expression and the server's start, end,
+        // and step, or limit and direction.
+        const catalog = logqlCatalog(library.catalogs, query.sourceId, file);
+        plans[`${file}#${panel.id}`] = buildLogqlPlan({
+          logql: query.logql,
+          instant: query.instant,
+          minStep: query.minStep,
+          ...window,
+          catalog: { labels: catalog.labels },
+          rowFilter: fixtureTenant(catalog),
+          variables,
+          maxEntries: panelRowLimit(panel),
+        });
+        continue;
+      }
       if (!isSqlQuery(query)) {
         // PromQL (#384): the plan is the rewritten expression and the
         // server's start, end and step. Only entries for PromQL fixtures.
@@ -263,6 +309,16 @@ test("every panel's executable plan matches its snapshot", async () => {
     }
     for (const v of spec.variables ?? []) {
       if (!v.query || isSqlQuery(v.query)) continue;
+      if (readsLoki(v.query.sourceId)) {
+        const catalog = logqlCatalog(library.catalogs, v.query.sourceId, file);
+        plans[`${file}#variable:${v.name}`] = buildLogqlLabelValuesPlan({
+          label: v.query.label,
+          match: v.query.match,
+          catalog: { labels: catalog.labels },
+          rowFilter: fixtureTenant(catalog),
+        });
+        continue;
+      }
       const catalog = promqlCatalog(library.catalogs, v.query.sourceId, file);
       plans[`${file}#variable:${v.name}`] = buildLabelValuesPlan({
         label: v.query.label,
