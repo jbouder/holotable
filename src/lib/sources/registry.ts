@@ -14,7 +14,7 @@ import { type LokiCatalog, loki } from "@/lib/sources/kinds/loki";
 import { type DuckDbFacts, duckdb } from "@/lib/sources/kinds/duckdb";
 import { type PrometheusCatalog, prometheus } from "@/lib/sources/kinds/prometheus";
 import { type TimescaleDbFacts, timescaledb } from "@/lib/sources/kinds/timescaledb";
-import type { RowFilterTarget } from "@/lib/sources/types";
+import type { KindAvailability, RowFilterTarget } from "@/lib/sources/types";
 
 /**
  * The source kinds (#382): what a source may be, as `src/lib/panels/registry.ts`
@@ -226,4 +226,16 @@ export function isSqlSource(
   source: SourceRecord,
 ): source is SourceRecord & SqlSourceRecord {
   return sourceKind(source).language === "sql";
+}
+
+/**
+ * Whether the server said it can hold a source of `kind` (#573), from the
+ * availability the data-sources page loads with. A kind it did not mention
+ * is not offered.
+ */
+export function isKindAvailable(
+  kinds: readonly KindAvailability[],
+  kind: SourceKindName,
+): boolean {
+  return kinds.some((k) => k.kind === kind && k.available);
 }

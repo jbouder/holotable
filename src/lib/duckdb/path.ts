@@ -1,4 +1,4 @@
-import { realpath, stat } from "node:fs/promises";
+import { readdir, realpath, stat } from "node:fs/promises";
 import { isAbsolute, join, relative, sep } from "node:path";
 import { config } from "@/lib/config";
 import { duckdbLayout, duckdbPathProblem } from "@/lib/sources/kinds/duckdb";
@@ -93,4 +93,60 @@ export async function resolveSourcePath(
     throw new DuckDbPathError("the source path ends in .duckdb but is not a file.");
   }
   return { root: resolvedRoot, absolute, layout };
+}
+
+/** The most entries the path picker is offered; a root with more is cut, sorted. */
+export const MAX_LISTED_PATHS = 500;
+
+/** One thing directly under the root a source could name: a name, never a path. */
+export interface ListedSourcePath {
+  /** The entry's name, which is also the relative path a source stores. */
+  name: string;
+  layout: "directory" | "database";
+}
+
+/**
+ * What a source admin may pick from (#573): the directories and `.duckdb`
+ * files directly under `DUCKDB_SOURCES_DIR`, by name. No recursion, no
+ * absolute path, nothing hidden (a leading `.`), and nothing the path guard
+ * would refuse: a symlink counts only when it resolves inside the root, and
+ * an entry only when its name says what it is (a directory not ending in
+ * `.duckdb`, a regular file that does). A listing is a menu; saving still runs
+ * {@link resolveSourcePath}.
+ *
+ * Throws a {@link DuckDbPathError}, naming the variable and never a path, when
+ * the root is unset or unreadable. `root` is for tests.
+ */
+export async function listSourcePaths(
+  root: string = config.duckdbSourcesDir,
+): Promise<ListedSourcePath[]> {
+  if (!root) throw new DuckDbPathError(SOURCES_DIR_UNSET);
+  let resolvedRoot: string;
+  let names: string[];
+  try {
+    resolvedRoot = await realpath(root);
+    names = await readdir(resolvedRoot);
+  } catch {
+    throw new DuckDbPathError(
+      "DUCKDB_SOURCES_DIR does not exist or cannot be read on this server.",
+    );
+  }
+  const listed: ListedSourcePath[] = [];
+  for (const name of names.sort()) {
+    if (listed.length >= MAX_LISTED_PATHS) break;
+    if (name.startsWith(".") || duckdbPathProblem(name)) continue;
+    let absolute: string;
+    try {
+      absolute = await realpath(join(resolvedRoot, name));
+    } catch {
+      continue;
+    }
+    if (!isInside(resolvedRoot, absolute) || absolute === resolvedRoot) continue;
+    const info = await stat(absolute).catch(() => null);
+    const layout = duckdbLayout(name);
+    if (layout === "directory" ? info?.isDirectory() : info?.isFile()) {
+      listed.push({ name, layout });
+    }
+  }
+  return listed;
 }

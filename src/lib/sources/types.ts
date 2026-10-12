@@ -63,3 +63,15 @@ export interface RowFilterTarget {
   target: string;
   claim: string;
 }
+
+/**
+ * Whether this server can hold a source of a kind (#573), as the Add source
+ * dialog is told on load: a kind that needs something the operator has not
+ * set up (DuckDB's `DUCKDB_SOURCES_DIR`, its native binding) is not offered,
+ * and `reason` says why. The save route checks again either way.
+ */
+export interface KindAvailability {
+  kind: string;
+  available: boolean;
+  reason?: string;
+}

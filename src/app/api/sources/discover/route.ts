@@ -8,10 +8,12 @@ import { requireGrantedSecretRef } from "@/lib/secrets/http";
 import { HttpSourceAuth } from "@/lib/sources/http-config";
 import { LokiLabel } from "@/lib/sources/kinds/loki";
 import {
+  duckdbDiscovery,
   lokiDiscovery,
   prometheusDiscovery,
   sqlDiscovery,
 } from "@/lib/sources/server/registry";
+import { DuckDbConfig, duckdbLayout } from "@/lib/sources/kinds/duckdb";
 import {
   MAX_METRICS,
   PrometheusMetric,
@@ -87,7 +89,20 @@ const LokiBody = z
   .strict()
   .superRefine(secretRefMatchesAuth);
 
-const Body = z.union([SqlBody, PrometheusBody, LokiBody]);
+/**
+ * A DuckDB source being drafted (#573): its path, relative to
+ * `DUCKDB_SOURCES_DIR`, checked by the config's own lexical rules here and
+ * resolved by the path guard before anything is opened. No `secret_ref`.
+ */
+const DuckDbBody = z
+  .object({
+    kind: z.literal("duckdb"),
+    workspaceId: z.string().min(1).max(128),
+    path: DuckDbConfig.shape.path,
+  })
+  .strict();
+
+const Body = z.union([SqlBody, PrometheusBody, LokiBody, DuckDbBody]);
 type Body = z.infer<typeof Body>;
 
 /** What one kind's discovery answers, beside `ok: true`. */
@@ -124,6 +139,7 @@ const DISCOVER: { [K in Body["kind"]]: Discover<Extract<Body, { kind: K }>> } = 
       ? { values: await discovery.values(body.valuesFor) }
       : { labels: await discovery.labels() };
   },
+  duckdb: async (body) => ({ tables: await duckdbDiscovery(body.path).tables() }),
 };
 
 /**
@@ -151,7 +167,7 @@ export const POST = route("sources.discover", async (req: Request) => {
   const body = await readJson(req, Body);
 
   assertAuthorized(identity, "source:manage", { workspaceId: body.workspaceId });
-  if (body.secretRef !== undefined)
+  if ("secretRef" in body && body.secretRef !== undefined)
     requireGrantedSecretRef(body.secretRef, body.workspaceId);
 
   // Discovery connects to a server the author named before any source
@@ -163,14 +179,17 @@ export const POST = route("sources.discover", async (req: Request) => {
       workspaceId: body.workspaceId,
       outcome,
       detail:
-        "url" in body
-          ? { url: body.url, auth: body.auth, secretRef: body.secretRef }
-          : {
-              host: body.connection.host,
-              port: body.connection.port,
-              database: body.connection.database,
-              secretRef: body.secretRef,
-            },
+        "path" in body
+          ? // Which kind of thing it opened, never where: no path in a row.
+            { kind: "duckdb", layout: duckdbLayout(body.path) }
+          : "url" in body
+            ? { url: body.url, auth: body.auth, secretRef: body.secretRef }
+            : {
+                host: body.connection.host,
+                port: body.connection.port,
+                database: body.connection.database,
+                secretRef: body.secretRef,
+              },
     });
 
   try {

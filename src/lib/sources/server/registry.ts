@@ -11,6 +11,9 @@ import { discoverLabels, discoverMetrics } from "@/lib/prometheus/catalog";
 import { discoverLokiLabels, discoverLokiLabelValues } from "@/lib/loki/catalog";
 import { sourceUrlAllowlist } from "@/lib/prometheus/client";
 import type { ServerSourceKind } from "@/lib/sources/server/types";
+import type { KindAvailability } from "@/lib/sources/types";
+import { discoverDuckDbTables } from "@/lib/duckdb/catalog";
+import { DuckDbPathError, listSourcePaths } from "@/lib/duckdb/path";
 
 export type { ServerSourceKind } from "@/lib/sources/server/types";
 
@@ -96,6 +99,48 @@ export function lokiDiscovery(input: {
     labels: () => discoverLokiLabels(target),
     values: (label: string) => discoverLokiLabelValues(target, label),
   };
+}
+
+/**
+ * Discovery for a DuckDB source about to be created (#573): the tables and
+ * columns under a path relative to `DUCKDB_SOURCES_DIR`, read on a freshly
+ * opened, locked engine after the path guard. Errors name no path.
+ */
+export function duckdbDiscovery(path: string) {
+  return { tables: () => discoverDuckDbTables(path) };
+}
+
+/**
+ * What a DuckDB source may name (#573): the directories and `.duckdb` files
+ * directly under `DUCKDB_SOURCES_DIR`, by name, or why there is nothing to
+ * list. Never an absolute path, in either answer.
+ */
+export async function duckdbPathMenu(): Promise<
+  | { ok: true; paths: { name: string; layout: "directory" | "database" }[] }
+  | { ok: false; error: string }
+> {
+  try {
+    return { ok: true, paths: await listSourcePaths() };
+  } catch (err) {
+    if (err instanceof DuckDbPathError) return { ok: false, error: err.message };
+    throw err;
+  }
+}
+
+/**
+ * Which kinds this server can hold a source of (#573), in registry order:
+ * what the Add source dialog offers. A kind with no `availability` is always
+ * available.
+ */
+export async function sourceKindAvailability(): Promise<KindAvailability[]> {
+  return Promise.all(
+    Object.values(SERVER_KINDS).map(async (server) => {
+      const reason = (await server.availability?.()) ?? null;
+      return reason === null
+        ? { kind: server.kind, available: true }
+        : { kind: server.kind, available: false, reason };
+    }),
+  );
 }
 
 /** Close everything every kind holds open, for a graceful shutdown (#47). */

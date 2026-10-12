@@ -33,7 +33,7 @@ import {
   sessionStatements,
   testDuckDbSource,
 } from "@/lib/duckdb/client";
-import { DuckDbPathError, resolveSourcePath } from "@/lib/duckdb/path";
+import { DuckDbPathError, resolveSourcePath, SOURCES_DIR_UNSET } from "@/lib/duckdb/path";
 
 /**
  * The server half of the DuckDB kind (#572): the same SQL guard and planner
@@ -81,6 +81,18 @@ export async function duckdbConfigProblem(cfg: DuckDbConfig): Promise<string | n
     if (err instanceof DuckDbPathError) return err.message;
     throw err;
   }
+  if (!(await duckdbBinding())) return DUCKDB_UNAVAILABLE;
+  return null;
+}
+
+/**
+ * Why no DuckDB source can be added on this server, or null (#573): the kind
+ * is off (`DUCKDB_SOURCES_DIR` unset) or the binding did not load. The Add
+ * source dialog hides the kind's card for either; `duckdbConfigProblem`
+ * still runs on every save.
+ */
+export async function duckdbAvailability(): Promise<string | null> {
+  if (!config.duckdbSourcesDir) return SOURCES_DIR_UNSET;
   if (!(await duckdbBinding())) return DUCKDB_UNAVAILABLE;
   return null;
 }
@@ -156,6 +168,7 @@ const kind: ServerSourceKind = {
   },
 
   checkConfig: async (cfg) => (cfg.kind === "duckdb" ? duckdbConfigProblem(cfg) : null),
+  availability: duckdbAvailability,
   refresh: (source) => refreshDuckDbCatalog(duckSource(source)),
   refreshDiff: (source, refresh) =>
     diffCatalog(duckSource(source), {
@@ -187,6 +200,7 @@ const kind: ServerSourceKind = {
         : "the engine opened but its configuration is not locked",
       latency: { connectMs: facts.openMs, queryMs: facts.queryMs },
       server: { version: `DuckDB ${facts.version}`, timescaledb: null },
+      layout: duckdbLayout(duck.config.path),
       lock: {
         holds: facts.locked,
         detail: facts.locked

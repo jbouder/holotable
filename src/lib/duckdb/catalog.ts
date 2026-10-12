@@ -1,7 +1,7 @@
 import { fenceUntrustedBlock, sanitizePromptField } from "@/lib/ai/untrusted";
 import { exposedCatalogTables } from "@/lib/catalog/health";
 import { refreshedColumns } from "@/lib/catalog/introspection";
-import { CatalogColumn, CatalogTable } from "@/lib/registry";
+import { CatalogColumn, CatalogTable, MAX_COLUMNS, MAX_TABLES } from "@/lib/registry";
 import { introspect } from "@/lib/duckdb/client";
 import {
   DUCKDB_SCHEMA,
@@ -61,14 +61,19 @@ export function renderDuckDbCatalog(source: DuckDbSourceRecord): string {
 }
 
 /**
- * Said after a DuckDB source's catalog: fixed text, outside the fence. The
- * guard's grammar is PostgreSQL's, which DuckDB's parser shares; these are
- * the functions that bucket time on both.
+ * Said after a DuckDB source's catalog: fixed text, outside the fence (#573).
+ * The guard's grammar is PostgreSQL's, which DuckDB's parser shares, so what
+ * differs is said here: all three ways of bucketing time exist, the guard
+ * holds column names to the catalog's spelling (an unquoted name folds to
+ * lowercase), and the engine's clock is UTC with no zone to cast to.
  */
 export const DUCKDB_PROMPT =
   "This source is DuckDB, queried with the same SELECT-only SQL as PostgreSQL. " +
-  "Bucket time with `time_bucket(INTERVAL '5 minutes', ts)`, `date_trunc('minute', ts)` " +
-  "or `date_bin(INTERVAL '5 minutes', ts, TIMESTAMP '2000-01-01')`. Table functions " +
+  "`time_bucket`, `date_trunc` and `date_bin` all exist: bucket time with " +
+  "`time_bucket(INTERVAL '5 minutes', ts)`, `date_trunc('minute', ts)` or " +
+  "`date_bin(INTERVAL '5 minutes', ts, TIMESTAMP '2000-01-01')`. Column names are " +
+  'case-sensitive as listed: double-quote any name that is not all lowercase (`"Value"`). ' +
+  "Do not cast to `::timestamptz`: use the time column as it is. Table functions " +
   "such as `read_parquet` or `read_csv` are refused: query the tables listed.";
 
 /** The catalog block of the generation prompt, fenced as untrusted data. */
@@ -113,4 +118,29 @@ export async function refreshDuckDbCatalog(
     missingTables,
     facts: { duckdb: found.version },
   };
+}
+
+/**
+ * The tables and columns under a path, for a source that does not exist yet
+ * (#573): what **Discover tables** offers as a menu, capped as an allowlist
+ * is so the menu can never exceed what a config could hold. A name too long
+ * for the catalog is left out and a type too long is cut, rather than failing
+ * the whole menu. The path goes through the same guard an execution's does.
+ */
+export async function discoverDuckDbTables(path: string): Promise<CatalogTable[]> {
+  const found = await introspect({ config: { path } });
+  const tables: CatalogTable[] = [];
+  for (const table of found.tables) {
+    if (tables.length >= MAX_TABLES) break;
+    if (table.name.length > MAX.table) continue;
+    const columns = table.columns
+      .filter((c) => c.column_name.length > 0 && c.column_name.length <= MAX.column)
+      .slice(0, MAX_COLUMNS)
+      .map((c) => ({
+        name: c.column_name,
+        type: c.data_type.slice(0, MAX.columnType) || "unknown",
+      }));
+    if (columns.length > 0) tables.push({ name: table.name, columns });
+  }
+  return tables;
 }
