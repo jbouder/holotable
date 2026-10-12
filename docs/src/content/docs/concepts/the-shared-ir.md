@@ -30,6 +30,12 @@ Panel = {
         promql: string,       // UNTRUSTED PromQL, for a Prometheus source
         instant?: boolean,    // one sample per series instead of a range
         minStep?: Duration,   // a floor on the step the SERVER picks ("15s")
+      }
+    | {
+        sourceId: string,
+        logql: string,        // UNTRUSTED LogQL, for a Loki source
+        instant?: boolean,    // one answer at the window's end instead of a range
+        minStep?: Duration,   // a floor on a metric query's step
       },
   options?: object,           // the kind's own; see Reference → Panel options
   format?: "number" | "bytes" | "percent" | "ms",
@@ -70,17 +76,21 @@ the `from`/`to` bounds. Time authority never leaves the server.
 
 ## A query's language follows its source
 
-A panel's query is SQL or PromQL, decided by which of `sql` and `promql` it
-carries ([#383](https://github.com/jbouder/holotable/issues/383)). Both shapes
-are strict and each has a field the other lacks, so every spec saved before
-PromQL existed parses exactly as it did, with no `specVersion` bump, and a query
-carrying both is refused.
+A panel's query is SQL, PromQL or LogQL, decided by which of `sql`, `promql`
+and `logql` it carries ([#383](https://github.com/jbouder/holotable/issues/383),
+[#560](https://github.com/jbouder/holotable/issues/560)). Every shape is strict
+and has a field the others lack, so every spec saved before PromQL or LogQL
+existed parses exactly as it did, with no `specVersion` bump, and a query
+carrying two is refused.
 
 Which language a panel may use is not the panel's choice. It is a property of
 its source's kind ([Source kinds](/architecture/data-model/#source-kinds)): a
-TimescaleDB source answers SQL, a Prometheus source answers PromQL, and a query
-in the other language is refused on save and at execution like a table the
-source does not have.
+TimescaleDB source answers SQL, a Prometheus source answers PromQL, a Loki
+source answers LogQL, and a query in another language is refused on save and at
+execution like a table the source does not have. Loki sources are being built
+in phases ([#559](https://github.com/jbouder/holotable/issues/559)): the IR
+accepts a LogQL query today, and until a Loki source can be added every one is
+refused when it runs.
 
 A PromQL query carries no time either. The server picks `start`, `end` and
 `step` for the window it resolved, and `minStep` can only raise the step. A
@@ -88,12 +98,19 @@ range query's rows always carry their time in a column called `time`. An
 `instant` query has one sample per series and no time column, so a kind that
 needs time, such as a state timeline, needs a range query.
 
+A LogQL query is the same shape under its own field, and carries no time and no
+limit: the server picks `start`, `end`, `step`, `limit` and `direction`. A range
+query's rows carry `time` whether they are log lines or metric samples, which
+is what lets a log query feed the logs panel; how many lines that panel asks
+for is its `options.limit`, never the query's.
+
 Code never reads a query's fields to decide what it is. It asks the helpers
 beside `hasQuery` in `src/lib/ir.ts`: `isSqlQuery`, `queryLanguage`,
-`queryTimeField` (the declared column for SQL, `time` for a PromQL range query,
-nothing for an instant one) and `queryText` (the statement, for display, digests
-and diffs). A `query` variable has the same two shapes: a SELECT, or
-`{ sourceId, label, match? }`, the values of a Prometheus label.
+`queryTimeField` (the declared column for SQL, `time` for a PromQL or LogQL
+range query, nothing for an instant one) and `queryText` (the statement, for
+display, digests and diffs). A `query` variable has two shapes: a SELECT, or
+`{ sourceId, label, match? }`, the values of a label, which a Prometheus source
+answers and a Loki source will too.
 
 ## One definition, no drift
 
