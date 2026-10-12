@@ -167,7 +167,7 @@ in-process engine, which is locked before any statement a panel wrote can run
 | `autoinstall_known_extensions=false`, `autoload_known_extensions=false` | install or load an extension, such as `httpfs` |
 | a `.duckdb` file opened `READ_ONLY` | write to the database |
 | `memory_limit` (`DUCKDB_MEMORY_LIMIT`), `threads` (`DUCKDB_THREADS`) | take more memory or cores than the operator allowed |
-| `TimeZone=UTC` | read time in the server's local zone |
+| `TimeZone='UTC'` (`SET GLOBAL`, before the lock) | read time in the server's local zone |
 | `lock_configuration=true` | change any of the above with `SET` |
 
 Each is tested against the real engine with the guard bypassed. On top of

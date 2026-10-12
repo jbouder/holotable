@@ -13,7 +13,7 @@ import { join } from "node:path";
 import { DuckDBInstance } from "@duckdb/node-api";
 import { config } from "@/lib/config";
 import { DUCKDB_UNAVAILABLE, setDuckDbLoaderForTests } from "@/lib/duckdb/binding";
-import { openEngine } from "@/lib/duckdb/client";
+import { lockStatements, openEngine } from "@/lib/duckdb/client";
 import { listSourcePaths, resolveSourcePath, SOURCES_DIR_UNSET } from "@/lib/duckdb/path";
 import { parseGroups } from "@/lib/auth/claims";
 import { can } from "@/lib/auth/authorize";
@@ -286,6 +286,32 @@ test("a directory of files answers a panel, windowed in UTC against TIMESTAMP an
       ["2026-01-01T00:25:00.000Z", 5],
     ],
   );
+});
+
+test("the engine's zone is set by a statement before the lock, never an option (#574)", async () => {
+  // TimeZone is ICU's setting, and the Linux bindings load ICU only after an
+  // instance's options are applied: as an option it failed every open in the
+  // images, unless DuckDB could download ICU into a writable home first.
+  const statements = lockStatements(["/x/a.parquet"]);
+  assert.equal(statements[0], "SET GLOBAL TimeZone='UTC'");
+  assert.equal(statements.at(-1), "SET lock_configuration=true");
+  const source = readFileSync(join(__dirname, "../src/lib/duckdb/client.ts"), "utf8");
+  assert.doesNotMatch(source, /TimeZone:\s*"/, "no TimeZone instance option");
+  // And it reaches a later connection: the instance's, not the first one's.
+  const { instance } = await openEngine(
+    await import("@duckdb/node-api"),
+    await resolveSourcePath("lake", root),
+  );
+  const connection = await instance.connect();
+  try {
+    const reader = await connection.runAndReadAll(
+      "SELECT current_setting('TimeZone') AS tz",
+    );
+    assert.equal(reader.getRowObjectsJS()[0]?.tz, "UTC");
+  } finally {
+    connection.closeSync();
+    instance.closeSync();
+  }
 });
 
 test("the guard runs first: a table function, an unlisted file, a hidden column", async () => {

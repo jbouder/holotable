@@ -48,6 +48,7 @@ Each DuckDB source gets its own in-process engine. Before any statement a
 panel wrote can run, the engine is locked:
 
 ```sql
+SET GLOBAL TimeZone='UTC'
 SET allowed_paths=['<each file of the source>']
 SET enable_external_access=false
 SET autoinstall_known_extensions=false
@@ -57,7 +58,9 @@ SET threads=2
 SET lock_configuration=true
 ```
 
-The engine's `TimeZone` is fixed to UTC when it is created. **Test** reads
+The zone is a statement rather than an option to the engine, because it is
+ICU's setting and the Linux bindings load ICU only after an engine's options
+are applied. **Test** reads
 the lock back on a live connection and reports it as *Locked*. A lock that
 does not hold is shown as a danger-toned finding, not passed over.
 
