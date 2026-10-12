@@ -47,7 +47,7 @@ export type HealthSubject = Pick<
   "id" | "name" | "config" | "catalogRefreshedAt" | "catalogMissingTables"
 >;
 
-/** How many allowlist entries are still true: a table with columns, or a metric. */
+/** How many allowlist entries are still true: a table with columns, a metric or a label. */
 function liveEntryCount(source: HealthSubject): number {
   const missing = new Set(source.catalogMissingTables);
   if ("tables" in source.config) {
@@ -80,17 +80,50 @@ export interface CatalogHealth {
   ageDays: number | null;
   /**
    * What the allowlist holds, for the wording (#386): `metric` for a
-   * Prometheus source. Absent for SQL, whose entries are tables, so every
-   * health judged before there was a second kind reads as it did.
+   * Prometheus source, `label` for a Loki one (#563). Absent for SQL, whose
+   * entries are tables, so every health judged before there was a second
+   * kind reads as it did.
    */
-  entries?: "metric";
+  entries?: "metric" | "label";
 }
 
 /** The words a health message uses for a source's allowlist and where it lives. */
-function words(health: CatalogHealth): { entry: string; home: string; query: string } {
-  return health.entries === "metric"
-    ? { entry: "metric", home: "endpoint", query: "PromQL" }
-    : { entry: "table", home: "database", query: "SQL" };
+function words(health: CatalogHealth): {
+  entry: string;
+  home: string;
+  query: string;
+  parts: string;
+} {
+  switch (health.entries) {
+    case "metric":
+      return {
+        entry: "metric",
+        home: "endpoint",
+        query: "PromQL",
+        parts: "metrics and labels",
+      };
+    case "label":
+      return {
+        entry: "label",
+        home: "endpoint",
+        query: "LogQL",
+        parts: "labels and values",
+      };
+    default:
+      return {
+        entry: "table",
+        home: "database",
+        query: "SQL",
+        parts: "tables and columns",
+      };
+  }
+}
+
+/** What a config's allowlist holds, for {@link words}. */
+function entriesOf(cfg: HealthSubject["config"]): CatalogHealth["entries"] {
+  if ("metrics" in cfg) return "metric";
+  if ("labels" in cfg) return "label";
+  return undefined;
 }
 
 const MS_PER_DAY = 86_400_000;
@@ -137,6 +170,7 @@ export function catalogHealth(
   const now = (opts.now ?? new Date()).getTime();
 
   const live = liveEntryCount(source);
+  const entries = entriesOf(source.config);
   const missingTables = [...source.catalogMissingTables];
 
   // An unparseable timestamp is treated as no timestamp: "never refreshed" is
@@ -161,7 +195,7 @@ export function catalogHealth(
     blocked: state === "empty" || state === "never_refreshed",
     missingTables,
     liveTableCount: live,
-    ...("metrics" in source.config ? { entries: "metric" as const } : {}),
+    ...(entries ? { entries } : {}),
     refreshedAt,
     ageDays,
   };
@@ -195,8 +229,7 @@ export function describeCatalogHealth(
   health: CatalogHealth,
 ): string {
   const fix = `Refresh the catalog for source ${source.id}`;
-  const { entry, home, query } = words(health);
-  const parts = entry === "table" ? "tables and columns" : "metrics and labels";
+  const { entry, home, query, parts } = words(health);
   switch (health.state) {
     case "ok":
       return `The catalog for "${source.name}" matched the ${home} at the last refresh.`;

@@ -188,7 +188,7 @@ export type AnyCatalogViewResult =
   | { ok: true; view: AnyCatalogView }
   | { ok: false; error: ApiError };
 
-/** A source's catalog as this caller may see it: tables for SQL, metrics for PromQL. */
+/** A source's catalog as this caller may see it: tables for SQL, metrics for PromQL, labels for LogQL. */
 export async function fetchCatalogView(sourceId: string): Promise<AnyCatalogViewResult> {
   const res = await fetch(catalogUrl(sourceId), { cache: "no-store" });
   if (!res.ok) return { ok: false, error: await readApiError(res) };
@@ -209,6 +209,24 @@ export function searchMetrics(
       (m.help ?? "").toLowerCase().includes(q) ||
       m.labels.some((l) => l.toLowerCase().includes(q)),
   );
+}
+
+/**
+ * The Loki labels whose name or a value contains the query (#563). A label
+ * found by its name keeps every value; one found by a value keeps only the
+ * values that match, since a label can carry a hundred.
+ */
+export function searchLabels(
+  labels: LabelCatalogView["labels"],
+  query: string,
+): LabelCatalogView["labels"] {
+  const q = query.trim().toLowerCase();
+  if (q === "") return labels;
+  return labels.flatMap((l) => {
+    if (l.name.toLowerCase().includes(q)) return [l];
+    const values = l.values.filter((v) => v.toLowerCase().includes(q));
+    return values.length > 0 ? [{ name: l.name, values }] : [];
+  });
 }
 
 /** Hide or expose one column. The answer is the catalog as it now stands. */

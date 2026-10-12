@@ -8,6 +8,7 @@ import {
   readOnlyTone,
   shortVersion,
   type SourceTestResult,
+  summarizeLabels,
   summarizeMetrics,
   summarizeTables,
   writeSurfaceHeadline,
@@ -133,6 +134,22 @@ export function SourceTestReport({
                 <li key={m.metric} className="text-xs text-danger">
                   <span className="font-medium">{m.metric}</span>
                   {m.error ? ` — ${m.error}` : ""}
+                </li>
+              ))}
+          </ul>
+        </div>
+      )}
+
+      {result.labels && result.labels.length > 0 && (
+        <div className="mt-2">
+          <p className="text-xs text-muted">{summarizeLabels(result.labels)}</p>
+          <ul className="mt-1 space-y-0.5">
+            {result.labels
+              .filter((l) => !l.reachable)
+              .map((l) => (
+                <li key={l.label} className="text-xs text-danger">
+                  <span className="font-medium">{l.label}</span>
+                  {l.error ? ` — ${l.error}` : ""}
                 </li>
               ))}
           </ul>
