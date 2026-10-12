@@ -202,6 +202,61 @@ export async function createPromqlDashboard(request: APIRequestContext) {
 }
 
 /**
+ * A Loki source and a dashboard with one LogQL logs panel on it (#565), for
+ * the editor in LogQL mode. Like the PromQL one, nothing needs the URL to
+ * answer: the editor's completion and guard run against the label catalog.
+ */
+export async function createLogqlDashboard(request: APIRequestContext) {
+  const stamp = Date.now().toString(36);
+  // One source for every theme's run: each is another entry in the demo
+  // workspace's source menus, which the chat journeys open.
+  const sourceId = "e2e-logql";
+  const listed = await request.get("/api/sources?workspaceId=demo");
+  expect(listed.ok(), await listed.text()).toBe(true);
+  const { sources } = (await listed.json()) as { sources: { id: string }[] };
+  if (!sources.some((s) => s.id === sourceId)) {
+    const source = await request.post("/api/sources", {
+      data: {
+        workspaceId: "demo",
+        id: sourceId,
+        name: "LogQL e2e",
+        config: {
+          kind: "loki",
+          url: "https://93.184.216.34",
+          auth: "none",
+          labels: [
+            { name: "job", values: ["api", "web"] },
+            { name: "level", values: ["info", "error"] },
+          ],
+        },
+      },
+    });
+    expect(source.status(), await source.text()).toBe(201);
+  }
+  const res = await request.post("/api/dashboards", {
+    data: {
+      spec: {
+        specVersion: 1,
+        title: `LogQL editor ${stamp}`,
+        timeRange: { from: "now-1h", to: "now" },
+        refreshIntervalMs: 30_000,
+        panels: [
+          {
+            id: "lines",
+            title: "API lines",
+            viz: "logs",
+            query: { sourceId, logql: '{job="api"} |= "error"' },
+            layout: { x: 0, y: 0, w: 12, h: 6 },
+          },
+        ],
+      },
+    },
+  });
+  expect(res.ok(), await res.text()).toBe(true);
+  return ((await res.json()) as { dashboard: { id: string } }).dashboard.id;
+}
+
+/**
  * Ask Explore (#416, #431) one question over the demo TimescaleDB source. The stub
  * draws the recorded "Requests by service" panel, whose SQL runs on the
  * server against the seeded rows, then answers with its recorded reply.

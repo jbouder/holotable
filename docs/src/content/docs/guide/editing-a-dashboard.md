@@ -24,7 +24,9 @@ beside the canvas then edits that panel, top to bottom:
 - **Data**: the source, the query with its preview, and the panel's own window
   and refresh. For a SQL source that is the SQL and its time field; for a
   Prometheus source it is the PromQL, **Instant** and **Min step** (see
-  [Writing the query](/concepts/executing-a-panel/#a-promql-panel)). Choosing a
+  [Writing the query](/concepts/executing-a-panel/#a-promql-panel)); for a
+  Loki source it is the LogQL, with the same two fields for a metric query
+  (see [A LogQL panel](/concepts/executing-a-panel/#a-logql-panel)). Choosing a
   source of the other kind restarts the query from that source's starter
   rather than keeping one its source cannot run. A text panel shows its
   Markdown here.
