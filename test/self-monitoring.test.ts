@@ -1,4 +1,4 @@
-import { queryTimeField } from "@/lib/ir";
+import { isLogqlQuery, queryTimeField } from "@/lib/ir";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { test } from "node:test";
@@ -23,7 +23,14 @@ import {
 } from "@/lib/self-monitoring/exposition";
 import { type SqlSourceConfig, TimescaleDbConfig } from "@/lib/registry";
 import { renderMetrics, resetMetricsForTests } from "@/lib/metrics";
+import { validateLogql } from "@/lib/logql/safety";
 import { validatePromql } from "@/lib/promql/safety";
+import {
+  LOKI_SELF_SOURCE_ID,
+  lokiSelfConfig,
+  lokiSelfMonitoringSpec,
+} from "@/lib/self-monitoring/loki";
+import { loki } from "@/lib/sources/kinds/loki";
 import {
   PROMETHEUS_SELF_SOURCE_ID,
   prometheusSelfConfig,
@@ -394,6 +401,50 @@ test("the PromQL source and dashboard carry no credential", () => {
   const cfg = prometheusSelfConfig();
   assert.equal(cfg.auth, "none");
   const serialized = JSON.stringify(prometheusSelfMonitoringSpec());
+  for (const forbidden of ["http://", "password", "secretRef", "Bearer"]) {
+    assert.equal(serialized.includes(forbidden), false, forbidden);
+  }
+});
+
+// --- the LogQL dashboard (#567) ----------------------------------------------
+
+/**
+ * The third self-monitoring dashboard reads the app's own JSON log lines from
+ * the compose stack's Loki. Every panel goes through the real LogQL guard
+ * against the committed label allowlist with no hint, reads only `loki-self`,
+ * and filters only on fields `src/lib/log.ts` writes.
+ */
+test("every LogQL panel passes the guard against the committed labels, with no hint", () => {
+  const catalog = loki.catalog(lokiSelfConfig());
+  const spec = lokiSelfMonitoringSpec();
+  assert.ok(spec.panels.length > 0);
+  for (const panel of spec.panels) {
+    const query = panel.query;
+    assert.ok(query && isLogqlQuery(query), panel.id);
+    assert.equal(query.sourceId, LOKI_SELF_SOURCE_ID, panel.id);
+    const check = validateLogql(query.logql, catalog);
+    assert.ok(check.ok, `${panel.id}: ${check.ok ? "" : check.error}`);
+    assert.deepEqual(check.hints ?? [], [], `${panel.id}: hints`);
+  }
+});
+
+test("the LogQL panels read only messages the app logs", () => {
+  const source = [
+    readFileSync(new URL("../src/lib/http.ts", import.meta.url), "utf8"),
+    readFileSync(new URL("../src/lib/metrics.ts", import.meta.url), "utf8"),
+  ].join("\n");
+  for (const panel of lokiSelfMonitoringSpec().panels) {
+    const query = panel.query;
+    if (!query || !isLogqlQuery(query)) continue;
+    for (const m of query.logql.matchAll(/msg="([^"]+)"/g)) {
+      assert.ok(source.includes(`"${m[1]}"`), `${panel.id}: nothing logs ${m[1]}`);
+    }
+  }
+});
+
+test("the LogQL source and dashboard carry no credential", () => {
+  assert.equal(lokiSelfConfig().auth, "none");
+  const serialized = JSON.stringify(lokiSelfMonitoringSpec());
   for (const forbidden of ["http://", "password", "secretRef", "Bearer"]) {
     assert.equal(serialized.includes(forbidden), false, forbidden);
   }

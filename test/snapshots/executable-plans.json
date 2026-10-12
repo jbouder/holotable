@@ -517,6 +517,60 @@
     "maxRows": 5000,
     "ranked": false
   },
+  "v1-seeded-loki-self-monitoring.json#lines-by-level": {
+    "kind": "metric",
+    "instant": false,
+    "expr": "sum by (level) (count_over_time({app=\"app\"} | json | __error__=\"\" [1m]))",
+    "start": "2026-01-01T00:00:00.000Z",
+    "end": "2026-01-01T01:00:00.000Z",
+    "stepSeconds": 60,
+    "timeoutMs": 20000
+  },
+  "v1-seeded-loki-self-monitoring.json#errors-by-route": {
+    "kind": "metric",
+    "instant": false,
+    "expr": "sum by (route) (count_over_time({app=\"app\"} | json | level=~\"error|warn\" [1m]))",
+    "start": "2026-01-01T00:00:00.000Z",
+    "end": "2026-01-01T01:00:00.000Z",
+    "stepSeconds": 60,
+    "timeoutMs": 20000
+  },
+  "v1-seeded-loki-self-monitoring.json#request-p95": {
+    "kind": "metric",
+    "instant": false,
+    "expr": "quantile_over_time(0.95, {app=\"app\"} | json | msg=\"request.completed\" | unwrap durationMs [5m]) by (route)",
+    "start": "2026-01-01T00:00:00.000Z",
+    "end": "2026-01-01T01:00:00.000Z",
+    "stepSeconds": 15,
+    "timeoutMs": 20000
+  },
+  "v1-seeded-loki-self-monitoring.json#guard-refusals": {
+    "kind": "metric",
+    "instant": true,
+    "expr": "sum by (language, reason) (count_over_time({app=\"app\"} | json | msg=\"guard.refused\" [1h]))",
+    "time": "2026-01-01T01:00:00.000Z",
+    "timeoutMs": 20000
+  },
+  "v1-seeded-loki-self-monitoring.json#request-log": {
+    "kind": "log",
+    "instant": false,
+    "expr": "{app=\"app\"} | json | msg=~\"request\\\\.(completed|rejected|failed)\" | line_format \"{{.method}} {{.route}} {{.status}} {{.durationMs}}ms\"",
+    "start": "2026-01-01T00:00:00.000Z",
+    "end": "2026-01-01T01:00:00.000Z",
+    "limit": 200,
+    "direction": "backward",
+    "timeoutMs": 20000
+  },
+  "v1-seeded-loki-self-monitoring.json#error-lines": {
+    "kind": "log",
+    "instant": false,
+    "expr": "{app=\"app\"} | json | level=\"error\" | line_format \"{{.msg}}\"",
+    "start": "2026-01-01T00:00:00.000Z",
+    "end": "2026-01-01T01:00:00.000Z",
+    "limit": 100,
+    "direction": "backward",
+    "timeoutMs": 20000
+  },
   "v1-seeded-prometheus-self-monitoring.json#tick-p95": {
     "instant": false,
     "expr": "histogram_quantile(0.95, sum by (le) (rate(holotable_poller_tick_duration_seconds_bucket[5m])))",

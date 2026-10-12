@@ -452,5 +452,30 @@
       "label": "tenant",
       "claim": "tenant"
     }
+  },
+  "loki-self": {
+    "labels": [
+      {
+        "name": "app",
+        "values": [
+          "alloy",
+          "app",
+          "keycloak",
+          "loki",
+          "postgres",
+          "prometheus",
+          "seed",
+          "self-metrics"
+        ]
+      },
+      {
+        "name": "container",
+        "values": []
+      },
+      {
+        "name": "env",
+        "values": ["dev"]
+      }
+    ]
   }
 }
