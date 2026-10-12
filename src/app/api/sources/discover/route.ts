@@ -6,7 +6,12 @@ import { SourceConnection } from "@/lib/registry";
 import { SECRET_REF_MESSAGE, SECRET_REF_PATTERN } from "@/lib/secret-refs";
 import { requireGrantedSecretRef } from "@/lib/secrets/http";
 import { HttpSourceAuth } from "@/lib/sources/http-config";
-import { prometheusDiscovery, sqlDiscovery } from "@/lib/sources/server/registry";
+import { LokiLabel } from "@/lib/sources/kinds/loki";
+import {
+  lokiDiscovery,
+  prometheusDiscovery,
+  sqlDiscovery,
+} from "@/lib/sources/server/registry";
 import {
   MAX_METRICS,
   PrometheusMetric,
@@ -32,6 +37,23 @@ const SqlBody = z.object({
   connection: SourceConnection,
 });
 
+/** An HTTP source names a `secret_ref` exactly when its auth needs one. */
+function secretRefMatchesAuth(
+  b: { auth: "none" | "basic" | "bearer"; secretRef?: string },
+  ctx: z.RefinementCtx,
+): void {
+  if ((b.auth === "none") !== (b.secretRef === undefined)) {
+    ctx.addIssue({
+      code: "custom",
+      path: ["secretRef"],
+      message:
+        b.auth === "none"
+          ? 'a source with auth "none" names no secretRef'
+          : "secretRef is required: it names where the credentials come from",
+    });
+  }
+}
+
 /**
  * A Prometheus source being drafted (#386): its URL and auth, and the
  * `secret_ref` exactly when the auth needs one. Without `labelsFor` the answer
@@ -46,20 +68,63 @@ const PrometheusBody = z
     secretRef: z.string().regex(SECRET_REF_PATTERN, SECRET_REF_MESSAGE).optional(),
     labelsFor: z.array(PrometheusMetric.shape.name).max(MAX_METRICS).optional(),
   })
-  .superRefine((b, ctx) => {
-    if ((b.auth === "none") !== (b.secretRef === undefined)) {
-      ctx.addIssue({
-        code: "custom",
-        path: ["secretRef"],
-        message:
-          b.auth === "none"
-            ? 'a source with auth "none" names no secretRef'
-            : "secretRef is required: it names where the credentials come from",
-      });
-    }
-  });
+  .superRefine(secretRefMatchesAuth);
 
-const Body = z.union([SqlBody, PrometheusBody]);
+/**
+ * A Loki source being drafted (#563), as a Prometheus one is. Without
+ * `valuesFor` the answer is the stream label names; with it, that label's
+ * values, as hints. The window is the server's, never the body's.
+ */
+const LokiBody = z
+  .object({
+    kind: z.literal("loki"),
+    workspaceId: z.string().min(1).max(128),
+    url: PrometheusUrl,
+    auth: HttpSourceAuth,
+    secretRef: z.string().regex(SECRET_REF_PATTERN, SECRET_REF_MESSAGE).optional(),
+    valuesFor: LokiLabel.shape.name.optional(),
+  })
+  .strict()
+  .superRefine(secretRefMatchesAuth);
+
+const Body = z.union([SqlBody, PrometheusBody, LokiBody]);
+type Body = z.infer<typeof Body>;
+
+/** What one kind's discovery answers, beside `ok: true`. */
+type Discover<B> = (body: B) => Promise<Record<string, unknown>>;
+
+/** Each kind's discovery, looked up by the body's kind, never compared with it. */
+const DISCOVER: { [K in Body["kind"]]: Discover<Extract<Body, { kind: K }>> } = {
+  timescaledb: async (body) => ({
+    tables: await sqlDiscovery(body.connection, body.secretRef, body.workspaceId),
+  }),
+  prometheus: async (body) => {
+    const discovery = prometheusDiscovery({
+      workspaceId: body.workspaceId,
+      url: body.url,
+      auth: body.auth,
+      secretRef: body.secretRef ?? null,
+    });
+    const refused = await discovery.checkUrl();
+    if (refused) throw new Error(refused);
+    return body.labelsFor
+      ? { labels: await discovery.labels(body.labelsFor) }
+      : { metrics: await discovery.metrics() };
+  },
+  loki: async (body) => {
+    const discovery = lokiDiscovery({
+      workspaceId: body.workspaceId,
+      url: body.url,
+      auth: body.auth,
+      secretRef: body.secretRef ?? null,
+    });
+    const refused = await discovery.checkUrl();
+    if (refused) throw new Error(refused);
+    return body.valuesFor !== undefined
+      ? { values: await discovery.values(body.valuesFor) }
+      : { labels: await discovery.labels() };
+  },
+};
 
 /**
  * List the tables and columns a prospective source's read-only user can see,
@@ -109,24 +174,9 @@ export const POST = route("sources.discover", async (req: Request) => {
     });
 
   try {
-    if ("url" in body) {
-      const discovery = prometheusDiscovery({
-        workspaceId: body.workspaceId,
-        url: body.url,
-        auth: body.auth,
-        secretRef: body.secretRef ?? null,
-      });
-      const refused = await discovery.checkUrl();
-      if (refused) throw new Error(refused);
-      const answer = body.labelsFor
-        ? { labels: await discovery.labels(body.labelsFor) }
-        : { metrics: await discovery.metrics() };
-      record("success");
-      return json({ ok: true, ...answer });
-    }
-    const tables = await sqlDiscovery(body.connection, body.secretRef, body.workspaceId);
+    const answer = await (DISCOVER[body.kind] as Discover<Body>)(body);
     record("success");
-    return json({ ok: true, tables });
+    return json({ ok: true, ...answer });
   } catch (err) {
     record("failure");
     return json({

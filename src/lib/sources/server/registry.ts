@@ -8,6 +8,7 @@ import {
 } from "@/lib/sources/server/timescaledb";
 import { checkBaseUrl } from "@/lib/ai/guarded-fetch";
 import { discoverLabels, discoverMetrics } from "@/lib/prometheus/catalog";
+import { discoverLokiLabels, discoverLokiLabelValues } from "@/lib/loki/catalog";
 import { sourceUrlAllowlist } from "@/lib/prometheus/client";
 import type { ServerSourceKind } from "@/lib/sources/server/types";
 
@@ -69,6 +70,31 @@ export function prometheusDiscovery(input: {
     checkUrl: () => checkBaseUrl(input.url, sourceUrlAllowlist()),
     metrics: () => discoverMetrics(target),
     labels: (metrics: string[]) => discoverLabels(target, metrics),
+  };
+}
+
+/**
+ * Discovery for a Loki source about to be created (#563): its URL checked
+ * against `SOURCE_URL_ALLOWLIST`, then the stream label names, or one label's
+ * values, read with the source's own credential over the server's discovery
+ * window, never a window the browser picks.
+ */
+export function lokiDiscovery(input: {
+  workspaceId: string;
+  url: string;
+  auth: "none" | "basic" | "bearer";
+  secretRef: string | null;
+}) {
+  const target = {
+    id: "discovery",
+    workspaceId: input.workspaceId,
+    secretRef: input.secretRef,
+    config: { url: input.url, auth: input.auth },
+  };
+  return {
+    checkUrl: () => checkBaseUrl(input.url, sourceUrlAllowlist()),
+    labels: () => discoverLokiLabels(target),
+    values: (label: string) => discoverLokiLabelValues(target, label),
   };
 }
 
