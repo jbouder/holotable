@@ -9,7 +9,7 @@ import {
   exposedTable,
   SourceConfig,
   type SqlSourceConfig,
-  type SqlSourceRecord,
+  type TimescaleDbSourceRecord,
   sqlCatalog,
   TimescaleDbConfig,
 } from "@/lib/registry";
@@ -55,7 +55,7 @@ const config = TimescaleDbConfig.parse({
   ],
 });
 
-const source: SqlSourceRecord = {
+const source: TimescaleDbSourceRecord = {
   id: "src-requests",
   workspaceId: "ws-1",
   name: "Requests",

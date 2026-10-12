@@ -3,14 +3,13 @@ import { isSqlQuery } from "@/lib/ir";
 import { buildQueryPlanView } from "@/lib/query-plan";
 import { catalogView } from "@/lib/catalog/browse";
 import { diffCatalog } from "@/lib/catalog/refresh";
-import type {
-  SourceConfig,
-  SourceRecord,
-  SqlSourceConfig,
-  SqlSourceRecord,
-} from "@/lib/registry";
+import type { SourceConfig, SourceRecord } from "@/lib/registry";
 import { QueryExecutionError } from "@/lib/sources/execution";
-import { timescaleDbFacts } from "@/lib/sources/kinds/timescaledb";
+import {
+  type TimescaleDbConfig,
+  type TimescaleDbSourceRecord,
+  timescaleDbFacts,
+} from "@/lib/sources/kinds/timescaledb";
 import { wrongLanguage } from "@/lib/sources/registry";
 import type {
   QueryCheck,
@@ -18,7 +17,7 @@ import type {
   SourcePlan,
 } from "@/lib/sources/server/types";
 import { rowFilterProblem } from "@/lib/sql/row-filter";
-import { buildExecutablePlan, validateSql } from "@/lib/sql/safety";
+import { buildExecutablePlan, type SqlDialect, validateSql } from "@/lib/sql/safety";
 import {
   buildCatalogPrompt,
   discoverTables,
@@ -39,15 +38,28 @@ import { closeSourcePools, dropSourcePool } from "@/lib/timescaledb/pool";
  * the functions this names call on every connection.
  */
 
-/** This kind only ever receives its own sources; anything else is a bug. */
-function sqlSource(source: SourceRecord): SqlSourceRecord {
+/**
+ * This kind only ever receives its own sources, which always name their
+ * credentials (`checkSecretRef`); anything else is a bug.
+ */
+function sqlSource(source: SourceRecord): TimescaleDbSourceRecord {
   if (source.config.kind !== "timescaledb") {
     throw new Error(`${source.id} is not a TimescaleDB source`);
   }
-  return source as SqlSourceRecord;
+  if (source.secretRef === null) {
+    throw new Error(`${source.id} names no secret_ref`);
+  }
+  return source as TimescaleDbSourceRecord;
 }
 
-function sqlConfig(cfg: SourceConfig): SqlSourceConfig {
+/**
+ * How PostgreSQL spells what the plan's wrapper adds (#570): the time bounds
+ * are cast to `timestamptz`. The row cap, the row filter and variables are
+ * the same in every dialect.
+ */
+const dialect: SqlDialect = { timestampCast: "timestamptz" };
+
+function sqlConfig(cfg: SourceConfig): TimescaleDbConfig {
   if (cfg.kind !== "timescaledb")
     throw new Error("a TimescaleDB refresh holds a SQL config");
   return cfg;
@@ -82,15 +94,18 @@ const kind: ServerSourceKind = {
     }
     return {
       language: "sql",
-      plan: buildExecutablePlan({
-        sql: query.sql,
-        timeField: query.timeField,
-        from: input.from,
-        to: input.to,
-        rowFilter: input.rowFilter,
-        variables: input.variables,
-        maxRows: input.maxRows,
-      }),
+      plan: buildExecutablePlan(
+        {
+          sql: query.sql,
+          timeField: query.timeField,
+          from: input.from,
+          to: input.to,
+          rowFilter: input.rowFilter,
+          variables: input.variables,
+          maxRows: input.maxRows,
+        },
+        { dialect },
+      ),
     };
   },
 
@@ -155,7 +170,7 @@ const kind: ServerSourceKind = {
  */
 export const timescaledbManagement = {
   discover: discoverTables,
-  refresh: (source: SqlSourceRecord) => refreshCatalog(source),
+  refresh: (source: SourceRecord) => refreshCatalog(sqlSource(source)),
   refreshDigest,
 };
 

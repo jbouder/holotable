@@ -1,4 +1,5 @@
 import { notFound } from "next/navigation";
+import { needsSecretRef } from "@/lib/registry";
 import { isSqlSource, sourceKind } from "@/lib/sources/registry";
 import { getIdentity, can } from "@/lib/auth/authorize";
 import { effectiveModel } from "@/lib/ai/models";
@@ -32,10 +33,10 @@ export default async function EditDashboardPage({
   // leaves the host, port, database and `secret_ref` on this side of the wire.
   // Every kind's (#388): a SQL source's tables and columns, a Prometheus
   // source's metrics and labels, each through its kind's own projection, so
-  // no URL, host or credential crosses. A SQL source without its credential
-  // reference cannot run, and is not offered.
+  // no URL, host or credential crosses. A SQL source that needs a credential
+  // reference and has none cannot run, and is not offered.
   const sources = (await listSources(dashboard.workspaceId))
-    .filter((s) => sourceKind(s.config).language !== "sql" || isSqlSource(s))
+    .filter((s) => !isSqlSource(s) || !needsSecretRef(s.config) || s.secretRef !== null)
     .map((s) => ({
       id: s.id,
       name: s.name,

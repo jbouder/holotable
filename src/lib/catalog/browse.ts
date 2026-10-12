@@ -1,4 +1,3 @@
-import { timescaleDbEngine, timescaledb } from "@/lib/sources/kinds/timescaledb";
 import { z } from "zod";
 import type { CatalogHealth } from "@/lib/catalog/health";
 import { type ApiError, apiErrorFromThrown, readApiError } from "@/lib/errors";
@@ -8,7 +7,9 @@ import {
   type SqlSourceConfig,
   type SqlSourceRecord,
   sourceCatalog,
+  sqlCatalog,
 } from "@/lib/registry";
+import { sourceKind } from "@/lib/sources/registry";
 import { ImpactDashboard, impactCounts } from "@/lib/source-impact";
 
 /**
@@ -57,15 +58,18 @@ export function isMetricCatalogView(view: AnyCatalogView): view is MetricCatalog
 
 /** Build the view for one caller. Server-side; `canManage` comes from `can()`. */
 export function catalogView(
-  source: Pick<SqlSourceRecord, "config" | "catalogMissingTables" | "catalogFacts">,
+  source: Pick<
+    SqlSourceRecord,
+    "kind" | "config" | "catalogMissingTables" | "catalogFacts"
+  >,
   catalogHealth: CatalogHealth,
   canManage: boolean,
 ): CatalogView {
-  const projected = canManage ? source.config : timescaledb.catalog(source.config);
+  const catalog = sqlCatalog(source.config);
   return {
-    schema: projected.schema,
-    engine: timescaleDbEngine(source.catalogFacts),
-    tables: projected.tables,
+    schema: catalog.schema,
+    engine: sourceKind(source).engine?.(source.catalogFacts) ?? null,
+    tables: canManage ? source.config.tables : catalog.tables,
     missingTables: [...source.catalogMissingTables],
     catalogHealth,
     canManage,

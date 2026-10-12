@@ -1,6 +1,6 @@
 import { z } from "zod";
 import type { SourceRecord } from "@/lib/registry";
-import type { TimescaleDbListing } from "@/lib/source-listing";
+import type { ListingBase } from "@/lib/source-listing";
 import {
   CatalogTable,
   MAX_TABLES,
@@ -88,12 +88,38 @@ export function timescaleDbEngine(
   return facts.timescaledb === null ? "PostgreSQL" : `TimescaleDB ${facts.timescaledb}`;
 }
 
+/** A TimescaleDB source as someone who may use but not manage it sees it. */
+export interface TimescaleDbListing extends ListingBase {
+  kind: "timescaledb";
+  schema: string;
+  tableCount: number;
+  /** "PostgreSQL" or "TimescaleDB 2.17.2" (#557); null until a Test or Refresh. */
+  engine: string | null;
+}
+
+/**
+ * A TimescaleDB source, as the code that connects to it holds it (#570): its
+ * own config, and the `secret_ref` it always names. Narrowed to inside the
+ * kind's server half (`src/lib/sources/server/timescaledb.ts`) and the
+ * implementation behind it (`src/lib/timescaledb/`); the SQL path outside them
+ * holds a `SqlSourceRecord`, which is any SQL kind's.
+ */
+export type TimescaleDbSourceRecord = Omit<
+  SourceRecord,
+  "kind" | "config" | "secretRef"
+> & {
+  kind: "timescaledb";
+  config: TimescaleDbConfig;
+  secretRef: string;
+};
+
 export const timescaledb = {
   kind: "timescaledb",
   label: "TimescaleDB",
   language: "sql",
   config: TimescaleDbConfig,
   facts: TimescaleDbFacts,
+  engine: timescaleDbEngine,
 
   /** The connection half of a stored config, for a reconnect or a rediscovery. */
   connection(cfg: TimescaleDbConfig): SourceConnection {

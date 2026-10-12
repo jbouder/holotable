@@ -1,7 +1,7 @@
 import { randomBytes } from "node:crypto";
 import { Client } from "pg";
 import {
-  type SqlSourceRecord,
+  type TimescaleDbSourceRecord,
   type SqlSourceConfig,
   TimescaleDbConfig,
 } from "@/lib/registry";
@@ -92,7 +92,7 @@ export function metricsSource(input: {
   id: string;
   workspaceId: string;
   secretRef: string;
-}): SqlSourceRecord {
+}): TimescaleDbSourceRecord {
   return {
     id: input.id,
     workspaceId: input.workspaceId,

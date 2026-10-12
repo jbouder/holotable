@@ -1,5 +1,9 @@
 import type { SourceRecord } from "@/lib/registry";
+import type { PrometheusListing } from "@/lib/sources/kinds/prometheus";
+import type { TimescaleDbListing } from "@/lib/sources/kinds/timescaledb";
 import { sourceKind } from "@/lib/sources/registry";
+
+export type { PrometheusListing, TimescaleDbListing };
 
 /**
  * What a source looks like to someone who may use it but not manage it.
@@ -11,29 +15,16 @@ import { sourceKind } from "@/lib/sources/registry";
  * admin hid. A viewer needs none of that to see which sources exist and
  * whether they work. This is a named allowlist rather than a spread with
  * deletions, so a field added to `SourceRecord` later does not reach a viewer
- * by default.
+ * by default. Each kind declares its own listing, beside its config.
  */
 export type SourceListing = TimescaleDbListing | PrometheusListing;
 
-interface ListingBase {
+/** What every kind's listing carries. */
+export interface ListingBase {
   id: string;
   workspaceId: string;
   name: string;
   tombstonedAt: string | null;
-}
-
-export interface TimescaleDbListing extends ListingBase {
-  kind: "timescaledb";
-  schema: string;
-  tableCount: number;
-  /** "PostgreSQL" or "TimescaleDB 2.17.2" (#557); null until a Test or Refresh. */
-  engine: string | null;
-}
-
-/** A Prometheus source (#385): never its URL or its auth mode. */
-export interface PrometheusListing extends ListingBase {
-  kind: "prometheus";
-  metricCount: number;
 }
 
 /** Projected by the source's kind, which names each field it lets through. */

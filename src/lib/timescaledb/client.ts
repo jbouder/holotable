@@ -1,5 +1,5 @@
 import { Client, type ClientBase, type PoolClient, Query } from "pg";
-import type { SqlSourceRecord } from "@/lib/registry";
+import type { TimescaleDbSourceRecord } from "@/lib/sources/kinds/timescaledb";
 import { resolveCredentials } from "@/lib/secrets/credentials";
 import { config } from "@/lib/config";
 import { type ExecutablePlan, POSITION_COLUMN, TOTAL_COLUMN } from "@/lib/sql/safety";
@@ -27,7 +27,7 @@ import type { Truncation } from "@/lib/truncation";
  * like, neither of which a reused pooled client could answer. Queries go
  * through {@link sourcePool}.
  */
-function testClient(source: SqlSourceRecord): Client {
+function testClient(source: TimescaleDbSourceRecord): Client {
   // Re-authorized on every connection: the ref must still be granted to the
   // workspace this source belongs to, whatever it was granted when saved.
   const credentials = resolveCredentials(source.secretRef, source.workspaceId);
@@ -181,7 +181,7 @@ function collectResult(
  * label; the statement and the error message never become one.
  */
 export function executePlan(
-  source: SqlSourceRecord,
+  source: TimescaleDbSourceRecord,
   plan: ExecutablePlan,
 ): Promise<QueryResult> {
   return trackInFlight(async () => {
@@ -224,7 +224,7 @@ export function isCheckoutTimeout(err: unknown): boolean {
 }
 
 async function runPlan(
-  source: SqlSourceRecord,
+  source: TimescaleDbSourceRecord,
   plan: ExecutablePlan,
 ): Promise<QueryResult> {
   let client: PoolClient | undefined;
@@ -305,7 +305,7 @@ async function runPlan(
  * would make every later check report the same "current transaction is
  * aborted" instead of its own answer.
  */
-export function testSource(source: SqlSourceRecord): Promise<SourceTestResult> {
+export function testSource(source: TimescaleDbSourceRecord): Promise<SourceTestResult> {
   return trackInFlight(() => runSourceTest(source));
 }
 
@@ -345,7 +345,7 @@ async function inSavepoint<T>(
   }
 }
 
-async function runSourceTest(source: SqlSourceRecord): Promise<SourceTestResult> {
+async function runSourceTest(source: TimescaleDbSourceRecord): Promise<SourceTestResult> {
   const client = testClient(source);
   let connected = false;
   try {
@@ -442,7 +442,7 @@ async function proveReadOnly(client: Client): Promise<TestReadOnly> {
  */
 async function checkTables(
   client: Client,
-  source: SqlSourceRecord,
+  source: TimescaleDbSourceRecord,
 ): Promise<TestTable[]> {
   const results: TestTable[] = [];
   for (const [index, table] of source.config.tables.entries()) {

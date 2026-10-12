@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
-import type { SqlSourceRecord } from "@/lib/registry";
+import type { TimescaleDbSourceRecord } from "@/lib/registry";
 import {
   GrantedSecretRef,
   SECRET_REF_PATTERN,
@@ -240,7 +240,7 @@ test("a SOURCE_SECRETS_DIR that is not a directory is reported, not fatal", () =
 
 /* --- Every place credentials are used ------------------------------------ */
 
-function sourceIn(workspaceId: string, secretRef: string): SqlSourceRecord {
+function sourceIn(workspaceId: string, secretRef: string): TimescaleDbSourceRecord {
   return {
     id: "src",
     workspaceId,
