@@ -15,6 +15,7 @@ Metrics **data** never lives here — only configuration and validated specs.
 ### `sources`
 
 The registry: `kind`, safe `config` (jsonb), `secret_ref`, `workspace_id`,
+`catalog_refreshed_at`, `catalog_missing_tables`, `catalog_facts`,
 `tombstoned_at`. Credentials are never stored; `secret_ref` names an environment
 variable family from which they are resolved at execution time.
 
@@ -62,6 +63,16 @@ shown, while these two are what the last introspection found. They are what
 the apply step of `POST /api/sources/[id]/refresh` writes them. A refresh is
 previewed as a diff first, and applied only if a second introspection still
 matches the digest the preview handed out.
+
+`catalog_facts` (migration 026, #557) sits there for the same reason: it is
+what the server *is*, not what the author allowed. Its shape is the kind's;
+for `timescaledb` it is `{ "timescaledb": "2.17.2" }`, or
+`{ "timescaledb": null }` for plain PostgreSQL. **Test**
+(`POST /api/sources/[id]/test`) and an applied refresh write it from what the
+server answered; no request body sets it, it is not part of `config`, and a
+value that no longer parses reads as `null`, never recorded, which keeps the
+behavior from before the column. See
+[PostgreSQL without TimescaleDB](/concepts/executing-a-panel/#postgresql-without-timescaledb).
 
 ### `dashboards`
 

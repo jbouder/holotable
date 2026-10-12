@@ -273,6 +273,32 @@ ORDER BY _holo_kept._holo_pos
   keeping them the moment the cap is crossed, so a wide-row result fails with
   an actionable message naming the limit instead of being buffered whole.
 
+## PostgreSQL without TimescaleDB
+
+The TimescaleDB kind runs against plain PostgreSQL too: Neon, Supabase, RDS,
+Aurora, or a `postgres:16` of your own. The driver, the guard, the server's
+time window, the limits and read-only execution above are the same, because
+none of them uses the extension.
+
+What differs is bucketing. `time_bucket` is TimescaleDB's, and on plain
+PostgreSQL it does not exist; the equivalents are `date_trunc('minute', ts)`
+for a calendar unit and `date_bin('5 minutes', ts, TIMESTAMP '2000-01-01')`
+for a fixed interval. Both pass the guard (a constant origin is not a time
+word), and the starters and built-in templates already use `date_trunc`, so
+they work on either.
+
+There is nothing to set. **Test** and **Refresh** read `pg_extension` and
+record what they found on the source (`catalog_facts`, see the
+[data model](/architecture/data-model/)). The data sources page and the
+catalog browser then say **PostgreSQL** or **TimescaleDB 2.17.2**. When the
+extension is missing, the generation prompt's catalog block ends with one
+fixed paragraph telling the model that `time_bucket` does not exist and what
+to use instead, so the first answer works rather than the repair loop
+learning it from an error. The paragraph is constant text: the version
+string is shown to people, never sent to the model. A source that has not
+been tested since this was added is prompted as before, until its next Test
+or Refresh.
+
 ## Read-only execution
 
 `executePlan` (`src/lib/timescaledb/client.ts`) runs the plan in a **read-only

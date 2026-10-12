@@ -78,7 +78,7 @@ export class ResultCollector {
       `result exceeds the MAX_RESULT_BYTES limit of ${formatBytes(this.maxBytes)}: ` +
       `the first ${kept} row${kept === 1 ? "" : "s"} already serialize to ` +
       `${formatBytes(this.bytes)} and the query returned more. ` +
-      `Narrow the time range, aggregate with time_bucket(), or select fewer columns.`
+      `Narrow the time range, aggregate with time_bucket() (date_trunc() on plain PostgreSQL), or select fewer columns.`
     );
   }
 }

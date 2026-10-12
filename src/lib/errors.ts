@@ -115,7 +115,7 @@ export function hintFor(kind: ErrorKind, message: string): string | undefined {
         return "Check the name against the source's catalog — only allowlisted tables and columns resolve.";
       }
       if (STATEMENT_TIMEOUT.test(message)) {
-        return "Narrow the time range or aggregate with time_bucket, then run it again.";
+        return "Narrow the time range or aggregate with time_bucket (date_trunc on plain PostgreSQL), then run it again.";
       }
       return "Edit the query and run it again.";
     case "validation":
