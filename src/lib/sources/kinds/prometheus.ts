@@ -2,6 +2,7 @@ import { z } from "zod";
 import { CLAIM_NAME } from "@/lib/auth/claims";
 import type { SourceRecord } from "@/lib/registry";
 import type { ListingBase } from "@/lib/source-listing";
+import { HttpSourceAuth, HttpSourceUrl, LabelName } from "@/lib/sources/http-config";
 import type { SourceKind } from "@/lib/sources/types";
 
 /**
@@ -18,11 +19,6 @@ import type { SourceKind } from "@/lib/sources/types";
 /** The allowlist cap, the `MAX_TABLES` of this kind. */
 export const MAX_METRICS = 200;
 export const MAX_LABELS = 64;
-
-const LabelName = z
-  .string()
-  .max(128)
-  .regex(/^[A-Za-z_][A-Za-z0-9_]*$/, "must be a label name");
 
 export const PrometheusMetric = z
   .object({
@@ -49,29 +45,8 @@ export const PrometheusMetric = z
   .strict();
 export type PrometheusMetric = z.infer<typeof PrometheusMetric>;
 
-/**
- * The endpoint's address: http(s), no credentials, no query or fragment. A
- * path is a prefix, for an API not at the root
- * (`https://vm.example/select/0/prometheus`). Whether the host may be reached
- * at all is the server's to say, against `SOURCE_URL_ALLOWLIST`.
- */
-export const PrometheusUrl = z
-  .string()
-  .max(2048)
-  .refine((raw) => {
-    try {
-      const url = new URL(raw);
-      return (
-        (url.protocol === "https:" || url.protocol === "http:") &&
-        !url.username &&
-        !url.password &&
-        !url.search &&
-        !url.hash
-      );
-    } catch {
-      return false;
-    }
-  }, "must be an http(s) URL with no credentials, query or fragment");
+/** The endpoint's address, shared with every HTTP kind (`http-config.ts`). */
+export const PrometheusUrl = HttpSourceUrl;
 
 /** A tenant label (#31): every selector is narrowed to `label="<claim value>"`. */
 export const PrometheusRowFilter = z
@@ -85,12 +60,8 @@ export const PrometheusConfig = z
   .object({
     kind: z.literal("prometheus"),
     url: PrometheusUrl,
-    /**
-     * `none` is for an endpoint with no authentication, typically in the
-     * cluster; such a source names no `secret_ref`. `basic` resolves
-     * `<REF>_USERNAME`/`<REF>_PASSWORD`, `bearer` resolves `<REF>_TOKEN`.
-     */
-    auth: z.enum(["none", "basic", "bearer"]),
+    /** `none`, `basic` or `bearer`; see `HttpSourceAuth`. */
+    auth: HttpSourceAuth,
     /** The metric allowlist. Only these metrics may be named by any PromQL. */
     metrics: z.array(PrometheusMetric).min(1).max(MAX_METRICS),
     rowFilter: PrometheusRowFilter.optional(),
