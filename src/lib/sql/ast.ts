@@ -8,6 +8,7 @@ import {
   type ParseResult,
   parse,
   parseSync,
+  type RangeFunction,
   type RangeVar,
   type SQLValueFunction,
   scan,
@@ -80,6 +81,8 @@ const ALLOWED_NODES: ReadonlySet<NodeTag> = new Set<NodeTag>([
   // Things a FROM clause may contain.
   "RangeVar",
   "RangeSubselect",
+  // Parses, and is reported as `tableFunctions`; `safety.ts` refuses it unless
+  // the function is on `ALLOWED_TABLE_FUNCTIONS`.
   "RangeFunction",
   "JoinExpr",
   "RangeTableSample",
@@ -202,6 +205,15 @@ export interface SelectAnalysis {
   joins: JoinUse[];
   functions: FunctionRef[];
   /**
+   * Every table function a FROM clause calls (a `RangeFunction`:
+   * `FROM read_parquet(…)`, `FROM generate_series(…)`, each function in
+   * `ROWS FROM (…)`), by its unqualified, lowercased name. The same calls are
+   * in {@link functions} too. A FROM item the grammar accepts in that position
+   * that is not a plain call (`FROM coalesce(…)`, `FROM CAST(…)`) is reported
+   * by its node tag, so it can be named and refused rather than missed.
+   */
+  tableFunctions: string[];
+  /**
    * Parenless SQL value keywords — `current_timestamp`, `current_user`,
    * `session_user` and the rest of that family — which the grammar represents
    * as `SQLValueFunction` rather than as a function call.
@@ -299,6 +311,9 @@ function visitNode(
       return;
     case "JoinExpr":
       visitJoin(node as JoinExpr, ctx, out);
+      break;
+    case "RangeFunction":
+      visitRangeFunction(node as RangeFunction, out);
       break;
     case "FuncCall":
       visitFuncCall(node as FuncCall, out);
@@ -472,7 +487,28 @@ function visitJoin(join: JoinExpr, ctx: Context, out: SelectAnalysis): void {
   });
 }
 
-function visitFuncCall(fn: FuncCall, out: SelectAnalysis): void {
+/**
+ * Report the table functions a FROM item calls. Each entry of `functions` is a
+ * two-element list, the call and its optional column definition list; the call
+ * is walked (and its name checked against the denylists) with the rest of the
+ * node.
+ */
+function visitRangeFunction(rf: RangeFunction, out: SelectAnalysis): void {
+  const entries = rf.functions ?? [];
+  if (entries.length === 0) reject("invalid table function");
+  for (const entry of entries) {
+    const list = asWrappedNode(entry);
+    const items = list?.[0] === "List" ? list[1].items : undefined;
+    const call = asWrappedNode(Array.isArray(items) ? items[0] : undefined);
+    if (!call) reject("invalid table function");
+    const [tag, node] = call;
+    out.tableFunctions.push(
+      tag === "FuncCall" ? (funcPath(node as FuncCall).at(-1) ?? tag) : tag,
+    );
+  }
+}
+
+function funcPath(fn: FuncCall): string[] {
   const path = (fn.funcname ?? []).map((part) => {
     const wrapped = asWrappedNode(part);
     const sval = wrapped?.[1].sval;
@@ -482,6 +518,11 @@ function visitFuncCall(fn: FuncCall, out: SelectAnalysis): void {
     return sval.toLowerCase();
   });
   if (path.length === 0) reject("invalid function reference");
+  return path;
+}
+
+function visitFuncCall(fn: FuncCall, out: SelectAnalysis): void {
+  const path = funcPath(fn);
   out.functions.push({ path, name: path[path.length - 1] });
 }
 
@@ -562,6 +603,7 @@ function analyzeParsed(parsed: ParseResult, params: boolean): AnalyzeResult {
     relations: [],
     joins: [],
     functions: [],
+    tableFunctions: [],
     keywords: [],
     strings: [],
   };

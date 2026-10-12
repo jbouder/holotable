@@ -86,6 +86,11 @@
       "error": "pg_sleep"
     },
     {
+      "rule": "No function used as a table in FROM",
+      "sql": "SELECT n FROM generate_series(1, 10) AS g(n)",
+      "error": "table functions are not allowed in FROM: generate_series()"
+    },
+    {
       "rule": "Only tables in the source's catalog",
       "sql": "SELECT * FROM pg_catalog.pg_user",
       "error": "not in catalog allowlist"

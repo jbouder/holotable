@@ -26,8 +26,8 @@ import { CORPUS } from "./fixtures/sql-fuzz-corpus";
  *      through (it is "poisoned", and the generator says why) is rejected.
  *   2. Everything the guard accepts satisfies an independent oracle: it parses
  *      as exactly one SELECT with no other statement type, locking clause,
- *      parameter, INTO, value keyword, comment or time word anywhere in the
- *      tree, and every relation it reads is allowlisted or a CTE it defines.
+ *      parameter, INTO, value keyword, comment, time word or table function
+ *      in FROM anywhere in the tree, and every relation it reads is allowlisted or a CTE it defines.
  *      The oracle walks the raw parse tree itself; it shares the parser with
  *      the guard but none of the walk in `src/lib/sql/ast.ts`.
  *   3. Every generated statement with nothing poisoned in it is accepted, so an
@@ -310,6 +310,14 @@ const FORBIDDEN_CALLS: Array<[string, string]> = [
   ["lo_import", "('/etc/passwd')"],
   ["pg_notify", "('c', 'p')"],
   ["pg_advisory_lock", "(1)"],
+  // DuckDB: files, the network, query strings, the environment (#571).
+  ["read_csv", "('/etc/passwd')"],
+  ["read_parquet", "('s3://bucket/x.parquet')"],
+  ["glob", "('/*')"],
+  ["query", "('SELECT * FROM secret')"],
+  ["getenv", "('HOME')"],
+  ["duckdb_secrets", "()"],
+  ["load", "('httpfs')"],
   // Time and non-determinism.
   ["now", "()"],
   ["clock_timestamp", "()"],
@@ -319,6 +327,7 @@ const FORBIDDEN_CALLS: Array<[string, string]> = [
   ["random", "()"],
   ["gen_random_uuid", "()"],
   ["age", "(ts)"],
+  ["get_current_timestamp", "()"],
 ];
 
 /** What the oracle looks for. Must cover every name in FORBIDDEN_CALLS. */
@@ -551,17 +560,25 @@ function fromItemArb(depth: number, ctx: Ctx): fc.Arbitrary<Frag> {
     { arbitrary: tup("ONLY", rel), weight: 1 },
     { arbitrary: tup(rel, "*"), weight: 1 },
     { arbitrary: tup(rel, "TABLESAMPLE SYSTEM (10)"), weight: 1 },
-    {
-      arbitrary: pick(
-        ok("generate_series(1, 3)", "g(n)"),
-        ok("unnest(ARRAY[1, 2])", "WITH ORDINALITY"),
-        ok("ROWS FROM (generate_series(1, 2), generate_series(3, 4))", "AS r(a, b)"),
-      ),
-      weight: 2,
-    },
   ];
   if (ctx.hostile) {
     items.push(
+      // A table function in FROM is refused whatever it is (#571): the
+      // allowlist of table functions is empty.
+      {
+        arbitrary: pick(
+          bad("table function in FROM", "generate_series(1, 3)", "g(n)"),
+          bad("table function in FROM", "unnest(ARRAY[1, 2])", "WITH ORDINALITY"),
+          bad(
+            "table function in FROM",
+            "ROWS FROM (generate_series(1, 2), generate_series(3, 4))",
+            "AS r(a, b)",
+          ),
+          bad("table function in FROM", "coalesce(1, 2)", "c"),
+          bad("table function in FROM", "LATERAL", "unnest(ARRAY[ts])", "u"),
+        ),
+        weight: 2,
+      },
       { arbitrary: tup(forbiddenCall, alias), weight: 2 },
       { arbitrary: tup("LATERAL", forbiddenCall, "f"), weight: 1 },
     );
@@ -951,6 +968,7 @@ async function oracle(
       if (key === "LockingClause") problems.push("locking clause");
       if (key === "SQLValueFunction") problems.push("value keyword");
       if (key === "ParamRef") params += 1;
+      if (key === "RangeFunction") problems.push("table function in FROM");
       if (key === "RangeVar") {
         const rv = field as {
           catalogname?: string;
@@ -1310,6 +1328,7 @@ async function narrowingProblems(sql: string, column: string): Promise<string[]>
         if (name) ctes.add(name);
       }
       if (key === "ParamRef") params += 1;
+      if (key === "RangeFunction") problems.push("table function in FROM");
       if (key === "SelectStmt") {
         const rv = isNarrowing(field as Record<string, unknown>);
         if (rv) {

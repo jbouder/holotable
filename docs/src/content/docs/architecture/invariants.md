@@ -102,18 +102,40 @@ allowlist, every function it calls against a denylist, and time and
 non-deterministic functions, keywords and literals are banned. See
 [Executing a panel](/concepts/executing-a-panel/).
 
-The function denylist spans dialects on purpose. Entries in ClickHouse vocabulary cost
-nothing against a PostgreSQL target and mean a future driver inherits them, but
-the PostgreSQL entries are the ones doing work today. A future driver is a
-registered source kind, with its own guard behind the same seam
-([Source kinds](/architecture/data-model/#source-kinds)). Two groups matter most:
+The function denylist spans dialects on purpose: one list, read by every SQL
+kind. PostgreSQL is the first dialect it covers and DuckDB (#569) the second.
+DuckDB parses with a fork of the same `libpg_query` grammar, so the guard reads
+its SQL unchanged; what the list adds for it is the functions that reach
+outside the database: the file readers (`read_csv`, `read_parquet`,
+`read_json`, `read_text`, `glob`, …), which httpfs also points at `s3://` and
+`https://`, the scanners of other engines, the environment (`getenv`,
+`current_setting`, `duckdb_settings`, `duckdb_secrets`), extensions (`load`,
+`install`) and catalog introspection (`duckdb_tables`, …). DuckDB has no roles,
+so the guard and the engine's locked configuration are the only two belts.
+Entries in ClickHouse vocabulary cost nothing against either and mean a future
+driver inherits them. A future driver is a registered source kind, with its
+own guard behind the same seam
+([Source kinds](/architecture/data-model/#source-kinds)). Three groups matter
+most:
 
 - **Functions that take a query string and execute it** — `query_to_xml` and
-  the rest of the `*_to_xml` family. The catalog allowlist never sees the
-  tables these reach, and the application's read-only role holds `SELECT` on
-  the whole metrics schema rather than only the catalog tables, so this is an
-  allowlist bypass rather than an information leak.
+  the rest of the `*_to_xml` family, and DuckDB's `query` and `query_table`.
+  The catalog allowlist never sees the tables these reach, and the
+  application's read-only role holds `SELECT` on the whole metrics schema
+  rather than only the catalog tables, so this is an allowlist bypass rather
+  than an information leak.
+- **Table functions in `FROM`** — `FROM read_parquet(…)`, `FROM
+  generate_series(…)`, `LATERAL unnest(…)`, each function in `ROWS FROM (…)`.
+  A table function is how DuckDB reads a file, and every extension adds more,
+  so these are refused by an allowlist, not a denylist: every one is refused
+  by name unless it is on `ALLOWED_TABLE_FUNCTIONS`, which is empty.
 - **Every synonym for the current time**, not just `now()` — see invariant 8.
+
+Statements that are not a `SELECT` are refused whatever the dialect, DuckDB's
+`ATTACH`, `DETACH`, `COPY`, `EXPORT`, `IMPORT`, `INSTALL`, `LOAD`, `SET`,
+`PRAGMA` and `CALL` among them; several are not PostgreSQL grammar at all and
+fail to parse, which is a refusal too. `test/sql-safety-duckdb.test.ts` names
+a refusal for each, and for every DuckDB function on the list.
 
 Relation names are compared against the catalog exactly, character for
 character, as the parser reports them: an unquoted identifier is already

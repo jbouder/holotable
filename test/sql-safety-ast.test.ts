@@ -239,11 +239,29 @@ test("a semicolon or comment marker inside a literal is not a statement boundary
 });
 
 // --- Set-returning functions in FROM ------------------------------------------
+//
+// A table function in FROM is refused by name unless it is on
+// ALLOWED_TABLE_FUNCTIONS, which is empty (#571). The DuckDB-specific cases
+// are in test/sql-safety-duckdb.test.ts.
 
-test("a set-returning function in FROM is allowed when the function is", async () => {
-  await accepts("SELECT * FROM generate_series(1, 3) g");
-  await accepts("SELECT * FROM http_requests h, generate_series(1, 2) g(n)");
-  await accepts("SELECT * FROM unnest(ARRAY[1, 2]) WITH ORDINALITY");
+test("a set-returning function in FROM is refused, and the refusal names it", async () => {
+  await rejects(
+    "SELECT * FROM generate_series(1, 3) g",
+    /table functions are not allowed in FROM: generate_series\(\)/,
+  );
+  await rejects(
+    "SELECT * FROM http_requests h, generate_series(1, 2) g(n)",
+    /not allowed in FROM: generate_series\(\)/,
+  );
+  await rejects(
+    "SELECT * FROM unnest(ARRAY[1, 2]) WITH ORDINALITY",
+    /not allowed in FROM: unnest\(\)/,
+  );
+});
+
+test("a set-returning function in the select list is still an ordinary call", async () => {
+  await accepts("SELECT generate_series(1, 3) FROM http_requests");
+  await accepts("SELECT unnest(ARRAY[status]) FROM http_requests");
 });
 
 test("a forbidden function is caught in FROM, qualified or not", async () => {

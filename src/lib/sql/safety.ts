@@ -23,6 +23,7 @@ import {
   type TableRef,
 } from "@/lib/sql/ast";
 import {
+  ALLOWED_TABLE_FUNCTIONS,
   FORBIDDEN_FUNCTION_SET,
   FORBIDDEN_FUNCTIONS,
   FORBIDDEN_TIME_FUNCTION_SET,
@@ -44,6 +45,10 @@ import {
  *   - No dangerous functions: file/url/remote exfiltration, functions that
  *     execute a query string, server-side sleeps, session state, and server
  *     identity. Checked by name on every call the parser found, in any position.
+ *   - No table function in FROM (`FROM read_parquet(…)`, `FROM
+ *     generate_series(…)`) unless it is on `ALLOWED_TABLE_FUNCTIONS`, which is
+ *     empty: a table function is how DuckDB reads a file, and a denylist only
+ *     blocks the names it has been told about.
  *   - No time / non-deterministic functions, keywords or literals: the model
  *     must NOT filter time, and a spec must produce the same query on every tick.
  *   - Every relation the statement reads must be in the catalog allowlist of the
@@ -211,7 +216,7 @@ export async function checkSql(
   if (await containsComment(trimmed)) {
     return reject("comment", "comments are not allowed");
   }
-  const { tables, functions, keywords, strings } = analyzed.analysis;
+  const { tables, functions, tableFunctions, keywords, strings } = analyzed.analysis;
 
   // Every parenless value keyword the grammar knows is either a clock reading
   // (`current_timestamp`, `localtime`, …) or server identity (`current_user`,
@@ -249,6 +254,20 @@ export async function checkSql(
 
   const columns = checkColumns(analyzed.analysis, source);
   if (columns) return reject("column", columns);
+
+  // A table function in FROM is refused by name unless it is allowlisted,
+  // after the denylists and the catalog, so a denylisted one is reported as
+  // that and a whole-row read through one (`LATERAL row_to_json(u)`) as a
+  // column. Allowlist, not denylist: DuckDB's readers and every extension's
+  // scanners are table functions, and the next one would otherwise pass until
+  // somebody listed it.
+  for (const name of tableFunctions) {
+    if (!ALLOWED_TABLE_FUNCTIONS.has(name)) {
+      // A call's name is lowercased; anything else is reported by its node tag.
+      const what = /^[A-Z]/.test(name) ? name : `${name}()`;
+      return reject("function", `table functions are not allowed in FROM: ${what}`);
+    }
+  }
 
   // Second layer: the same function denylists over the raw text, independent
   // of the parser.
