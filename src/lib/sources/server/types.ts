@@ -7,7 +7,7 @@ import type { AnyPlanView } from "@/lib/query-plan";
 import type { SourceConfig, SourceRecord } from "@/lib/registry";
 import type { SourceTestResult } from "@/lib/source-test";
 import type { QueryResult } from "@/lib/sources/execution";
-import type { SourceKindName } from "@/lib/sources/registry";
+import type { CatalogFacts, SourceKindName } from "@/lib/sources/registry";
 import type { RowFilterBinding } from "@/lib/sql/row-filter";
 import type { ExecutablePlan } from "@/lib/sql/safety";
 import type { VariableValues } from "@/lib/sql/variables";
@@ -24,6 +24,12 @@ import type { VariableValues } from "@/lib/sql/variables";
 export interface CatalogRefresh {
   config: SourceConfig;
   missingTables: string[];
+  /**
+   * What the refresh found the server to be (#557), for a kind that records
+   * it. Written on apply; not part of the digest, which covers what the
+   * author reviews.
+   */
+  facts?: CatalogFacts;
 }
 
 /** A guard's verdict, in the shape `validateSql` has always returned. */
@@ -106,6 +112,12 @@ export interface ServerSourceKind {
   ): AnyCatalogView;
   /** Connectivity and the catalog's tables or metrics. */
   test(source: SourceRecord): Promise<SourceTestResult>;
+  /**
+   * What a Test found the server to be (#557), to record on the source, or
+   * undefined when the kind records nothing or the Test did not get that far.
+   * Read from the result the server produced, never from a request.
+   */
+  testFacts(result: SourceTestResult): CatalogFacts | undefined;
   /** The catalog as the chat model is shown it. */
   renderCatalog(source: SourceRecord): string;
   /** The catalog block of the generation prompt. */

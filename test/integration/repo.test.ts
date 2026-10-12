@@ -10,6 +10,7 @@ import {
   getSourceById,
   listDashboardVersions,
   listSources,
+  recordCatalogFacts,
   saveDashboardVersion,
   sourceImpact,
   updateSource,
@@ -19,7 +20,9 @@ import { type Dashboard, SPEC_VERSION } from "@/lib/ir";
 import { upgradeSpec } from "@/lib/ir/upgrade";
 import { SourceConfig } from "@/lib/registry";
 import { loadFixtureLibrary } from "../../scripts/lib/spec-fixtures";
-import { connection, HTTP_REQUESTS, needsDb, unique } from "./support";
+import { serverKind } from "@/lib/sources/server/registry";
+import { closeSourcePools } from "@/lib/timescaledb/pool";
+import { connection, grantRef, HTTP_REQUESTS, needsDb, unique } from "./support";
 
 /*
  * The repository against the real config store (#87): what goes into the
@@ -176,6 +179,67 @@ test("a source round-trips, updates and tombstones", needsDb, async () => {
   assert.equal(await getSourceById(loose), null);
   assert.deepEqual(await listSources(WORKSPACE), []);
 });
+
+test(
+  "Test and Refresh record what the server is, and nothing else does (#557)",
+  needsDb,
+  async () => {
+    grantRef("HT_IT_FACTS", WORKSPACE, "readonly");
+    const id = unique("src-facts");
+    const created = await createSource({
+      id,
+      workspaceId: WORKSPACE,
+      name: "Facts",
+      config: SourceConfig.parse({
+        ...connection(),
+        schema: "metrics",
+        tables: [HTTP_REQUESTS],
+      }),
+      secretRef: "HT_IT_FACTS",
+      createdBy: "integration",
+    });
+    // Never tested: nothing recorded, which prompts as before.
+    assert.equal(created.catalogFacts, null);
+
+    // Test reads pg_extension; the integration database has TimescaleDB.
+    const kind = serverKind(created);
+    const result = await kind.test(created);
+    assert.equal(result.ok, true, result.message);
+    const facts = kind.testFacts(result);
+    assert.ok(facts && typeof facts.timescaledb === "string");
+    await recordCatalogFacts(WORKSPACE, id, facts);
+    const tested = await getSourceById(id);
+    assert.deepEqual(tested?.catalogFacts, facts);
+    // A Test is not an edit.
+    assert.deepEqual(tested?.updatedAt, created.updatedAt);
+    // Scoped to the workspace from the record.
+    await recordCatalogFacts(unique("ws-other"), id, { timescaledb: null });
+    assert.deepEqual((await getSourceById(id))?.catalogFacts, facts);
+
+    // An applied refresh writes them from its own introspection.
+    await recordCatalogFacts(WORKSPACE, id, { timescaledb: null });
+    const refresh = await kind.refresh((await getSourceById(id)) ?? created);
+    assert.deepEqual(refresh.facts, facts);
+    const refreshed = await updateSource(WORKSPACE, id, {
+      config: refresh.config,
+      catalogRefreshedAt: new Date(),
+      catalogMissingTables: refresh.missingTables,
+      catalogFacts: refresh.facts,
+    });
+    assert.deepEqual(refreshed?.catalogFacts, facts);
+    // An edit leaves them alone.
+    const renamed = await updateSource(WORKSPACE, id, { name: "Renamed" });
+    assert.deepEqual(renamed?.catalogFacts, facts);
+
+    // A value that no longer parses reads as never recorded.
+    await query(`UPDATE sources SET catalog_facts = '{"timescaledb": 7}' WHERE id = $1`, [
+      id,
+    ]);
+    assert.equal((await getSourceById(id))?.catalogFacts, null);
+    await deleteSource(WORKSPACE, id);
+    await closeSourcePools();
+  },
+);
 
 test("dashboard versions are immutable and numbered in order", needsDb, async () => {
   const created = await createDashboard({

@@ -101,7 +101,13 @@ export const PUT = route(
       const unreachable = await serverKind(source).checkConfig(patch.config);
       if (unreachable) throw new HttpError(400, unreachable, {}, "validation");
     }
-    const updated = await updateSource(source.workspaceId, id, patch);
+    // Named, never the parsed body passed on: what introspection recorded
+    // (the freshness facts, `catalog_facts`, #557) is the server's to write.
+    const updated = await updateSource(source.workspaceId, id, {
+      name: patch.name,
+      config: patch.config,
+      secretRef: patch.secretRef,
+    });
     if (!updated) throw new HttpError(409, "source is tombstoned and cannot be edited");
     audit({
       actor: identity,

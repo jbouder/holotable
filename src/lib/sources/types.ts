@@ -34,6 +34,11 @@ export interface SourceKind<
   language: QueryLanguage;
   /** The strict config schema, catalog and row filter included. */
   config: Config;
+  /**
+   * The shape of what introspection records about the server
+   * (`sources.catalog_facts`, #557), for a kind that records anything.
+   */
+  facts?: z.ZodType;
   /** How to reach the source, without the catalog. */
   connection(cfg: z.infer<Config>): unknown;
   /** What the editor may see of the catalog: no connection detail, no hidden column. */

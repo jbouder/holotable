@@ -22,6 +22,8 @@ import { Dashboard, DashboardGenerationSchema, type Panel, SPEC_VERSION } from "
 import { validatePromql } from "@/lib/promql/safety";
 import { SourceConfig, type SourceRecord } from "@/lib/registry";
 import { serverKind } from "@/lib/sources/server/registry";
+import { createHash } from "node:crypto";
+import { PLAIN_POSTGRES_PROMPT } from "@/lib/timescaledb/catalog";
 import { loadSource } from "../scripts/lib/eval";
 
 /**
@@ -51,6 +53,43 @@ test("a SQL generation's prompt is what it was before PromQL existed", () => {
     z.toJSONSchema(dashboardRequest({ source: sql, prompt: "x" }).schema as z.ZodType),
     z.toJSONSchema(DashboardGenerationSchema),
   );
+});
+
+/** The catalog block with its per-call fence token held still, digested. */
+function catalogDigest(source: SourceRecord): string {
+  const block = serverKind(source)
+    .catalogPrompt(source)
+    .replace(/(===== (?:BEGIN|END) [A-Z_]+ )[0-9a-f]{32}( =====)/g, "$1<token>$2");
+  return createHash("sha256").update(block).digest("hex");
+}
+
+test("a TimescaleDB source's prompt is what it was before plain PostgreSQL was told apart (#557)", () => {
+  const tested = { ...sql, catalogFacts: { timescaledb: "2.17.2" } };
+  const never = { ...sql, catalogFacts: null };
+  // The catalog block, byte for byte as it was before #557.
+  const before = "1559b25d675ae1149ebb68a58855ee13942054a6d39fe8f8f40252e6e82eb345";
+  for (const source of [sql, never, tested]) assert.equal(catalogDigest(source), before);
+  // So the whole request is too: no version string reaches the model.
+  assert.equal(
+    baseSystem(tested).replace(/[0-9a-f]{32}/g, ""),
+    baseSystem(sql).replace(/[0-9a-f]{32}/g, ""),
+  );
+  assert.ok(!baseSystem(tested).includes("2.17.2"));
+  assert.ok(!baseSystem(tested).includes(PLAIN_POSTGRES_PROMPT));
+});
+
+test("a plain PostgreSQL source is told, after its catalog, that time_bucket does not exist (#557)", () => {
+  assert.equal(
+    PLAIN_POSTGRES_PROMPT,
+    "This server is PostgreSQL without the TimescaleDB extension: `time_bucket` does not exist. Bucket time with `date_trunc('minute', ts)` for a calendar unit, or `date_bin('5 minutes', ts, TIMESTAMP '2000-01-01')` for a fixed interval.",
+  );
+  const plain = { ...sql, catalogFacts: { timescaledb: null } };
+  const block = serverKind(plain).catalogPrompt(plain);
+  // Outside the fence, as an instruction, and only the once.
+  assert.ok(block.endsWith(`=====\n\n${PLAIN_POSTGRES_PROMPT}`));
+  assert.equal(baseSystem(plain).split(PLAIN_POSTGRES_PROMPT).length, 2);
+  // The rules themselves are unchanged; the paragraph overrides their example.
+  assert.ok(baseSystem(plain).includes(SQL_RULES));
 });
 
 test("a Prometheus generation is told the PromQL rules, the kinds' PromQL hints and label variables", () => {

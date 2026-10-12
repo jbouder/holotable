@@ -10,6 +10,7 @@ import type {
   SqlSourceRecord,
 } from "@/lib/registry";
 import { QueryExecutionError } from "@/lib/sources/execution";
+import { timescaleDbFacts } from "@/lib/sources/kinds/timescaledb";
 import { wrongLanguage } from "@/lib/sources/registry";
 import type {
   QueryCheck,
@@ -138,6 +139,8 @@ const kind: ServerSourceKind = {
   catalogView: (source, health, canManage) =>
     catalogView(sqlSource(source), health, canManage),
   test: (source) => testSource(sqlSource(source)),
+  testFacts: (result) =>
+    result.ok && result.server ? timescaleDbFacts(result.server.timescaledb) : undefined,
   renderCatalog: (source) => renderCatalog(sqlSource(source)),
   catalogPrompt: (source) => buildCatalogPrompt(sqlSource(source)),
   rowFilterProblem: (cfg) => (cfg.kind === "timescaledb" ? rowFilterProblem(cfg) : null),

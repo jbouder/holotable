@@ -32,7 +32,8 @@ const Body = z
  * Apply is the only writer of the two freshness facts, and it writes both
  * every time: the timestamp that stops the source being reported as never
  * refreshed, and the list of allowlisted tables the database no longer has,
- * which is emptied on the run that finds them again.
+ * which is emptied on the run that finds them again. It also records what
+ * the server is (`catalog_facts`, #557), as a Test does.
  */
 export const POST = route(
   "sources.refresh",
@@ -77,6 +78,7 @@ export const POST = route(
       config: refresh.config,
       catalogRefreshedAt: new Date(),
       catalogMissingTables: refresh.missingTables,
+      catalogFacts: refresh.facts,
     });
     if (!updated) throw new HttpError(409, "source is tombstoned");
     // Only an applied refresh changes anything; a preview is a read.

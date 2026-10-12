@@ -12,7 +12,11 @@ import {
   type SqlSourceRecord,
 } from "@/lib/registry";
 import { resolveCredentials } from "@/lib/secrets/credentials";
-import { TimescaleDbConfig } from "@/lib/sources/kinds/timescaledb";
+import {
+  TimescaleDbConfig,
+  type TimescaleDbFacts,
+  timescaleDbFacts,
+} from "@/lib/sources/kinds/timescaledb";
 
 // The clamp for each catalog field in a prompt is the registry schema's own
 // maximum, read from the schema so the two cannot drift apart.
@@ -81,8 +85,24 @@ export function renderCatalog(source: SqlSourceRecord): string {
  * between markers that carry a random per-call token.
  */
 export function buildCatalogPrompt(source: SqlSourceRecord): string {
-  return fenceUntrustedBlock("CATALOG", renderCatalog(source));
+  const catalog = fenceUntrustedBlock("CATALOG", renderCatalog(source));
+  return source.catalogFacts?.timescaledb === null
+    ? `${catalog}\n\n${PLAIN_POSTGRES_PROMPT}`
+    : catalog;
 }
+
+/**
+ * Said after the catalog of a source whose last Test or Refresh found no
+ * TimescaleDB extension (#557), so the first answer buckets time with what
+ * the server has instead of learning it from a failed `time_bucket`. Fixed
+ * text, outside the fence: nothing the server replied is interpolated, and
+ * the version string is never sent to the model. A source never tested, or
+ * one with the extension, is shown the catalog alone, as it always was.
+ */
+export const PLAIN_POSTGRES_PROMPT =
+  "This server is PostgreSQL without the TimescaleDB extension: `time_bucket` does not exist. " +
+  "Bucket time with `date_trunc('minute', ts)` for a calendar unit, or " +
+  "`date_bin('5 minutes', ts, TIMESTAMP '2000-01-01')` for a fixed interval.";
 
 /** A client for introspection only: no statement timeout, no query path. */
 function catalogClient(
@@ -193,6 +213,8 @@ export interface CatalogRefresh {
    * renamed, or no longer readable by the source's read-only role.
    */
   missingTables: string[];
+  /** What the server is (#557), read on the same connection. */
+  facts: TimescaleDbFacts;
 }
 
 /**
@@ -234,9 +256,14 @@ export async function refreshCatalog(source: SqlSourceRecord): Promise<CatalogRe
             : existing.columns,
       });
     }
+    const extension = await client.query<{ timescaledb: string | null }>(
+      `SELECT (SELECT extversion FROM pg_extension WHERE extname = 'timescaledb')
+                AS timescaledb`,
+    );
     return {
       config: TimescaleDbConfig.parse({ ...source.config, tables }),
       missingTables,
+      facts: timescaleDbFacts(extension.rows[0]?.timescaledb ?? null),
     };
   } finally {
     await client.end();
@@ -251,7 +278,9 @@ export async function refreshCatalog(source: SqlSourceRecord): Promise<CatalogRe
  * An exposure toggle between the two steps also changes it, because the
  * refreshed config carries the flags forward.
  */
-export function refreshDigest(refresh: CatalogRefresh): string {
+export function refreshDigest(
+  refresh: Pick<CatalogRefresh, "config" | "missingTables">,
+): string {
   return createHash("sha256")
     .update(
       JSON.stringify({ config: refresh.config, missingTables: refresh.missingTables }),
