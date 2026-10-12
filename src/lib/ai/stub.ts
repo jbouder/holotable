@@ -133,6 +133,73 @@ export function recordedPromqlExplorePanel(sourceId: string) {
   };
 }
 
+/**
+ * The stream selector the LogQL recordings (#564) read: the first label the
+ * catalog lists with a value, at its first value, as a new panel's starter
+ * picks one. The stub knows no Loki's labels; the prompt's catalog does.
+ */
+export interface LogqlStream {
+  label: string;
+  value: string;
+}
+
+/** `{label="value"}`, the value quoted as LogQL quotes a string. */
+function selector(stream: LogqlStream): string {
+  return `{${stream.label}=${JSON.stringify(stream.value)}}`;
+}
+
+/**
+ * The recorded dashboard for a Loki source (#564): the stream's error lines,
+ * and their rate per route, parsed from JSON lines as Holotable writes its
+ * own (`src/lib/log.ts`).
+ */
+export function recordedLogqlDashboard(sourceId: string, stream: LogqlStream) {
+  return {
+    title: "Errors",
+    timeRange: { from: "now-1h", to: "now" },
+    refreshIntervalMs: 15000,
+    panels: [
+      recordedLogqlLogsPanel(sourceId, stream, { x: 0, y: 0, w: 12, h: 5 }),
+      {
+        id: "error-rate",
+        title: "Error rate by route",
+        description: "Per-second rate of error lines over 5 minutes, per route.",
+        viz: "line",
+        query: {
+          sourceId,
+          logql: `sum by (route) (rate(${selector(stream)} | json | level="error" [5m]))`,
+        },
+        layout: { x: 0, y: 5, w: 12, h: 4 },
+      },
+    ],
+  };
+}
+
+/** The recorded logs panel for a Loki source (#564): its error lines, newest first. */
+function recordedLogqlLogsPanel(
+  sourceId: string,
+  stream: LogqlStream,
+  layout: { x: number; y: number; w: number; h: number },
+) {
+  return {
+    id: "errors",
+    title: "Error lines",
+    description: "The stream's lines whose parsed level is error, newest first.",
+    viz: "logs",
+    query: { sourceId, logql: `${selector(stream)} | json | level="error"` },
+    options: { level: "level", limit: 200 },
+    layout,
+  };
+}
+
+/** The recorded Explore answer for a Loki source (#564): a logs panel. */
+export function recordedLogqlExplorePanel(sourceId: string, stream: LogqlStream) {
+  return {
+    ...recordedLogqlLogsPanel(sourceId, stream, { x: 0, y: 0, w: 12, h: 4 }),
+    id: "explore",
+  };
+}
+
 /** The recorded Explore answer. */
 export function recordedExplorePanel(sourceId: string) {
   return {
@@ -231,13 +298,36 @@ function currentSpecAfter(text: string, marker: string): Record<string, unknown>
   return null;
 }
 
+/**
+ * The stream a Loki source's recordings read, from its catalog in the prompt
+ * (`- <label> -- values seen: <value>, …`); null for a source of another kind.
+ */
+export function logqlStreamOf(system: string, sourceId: string): LogqlStream | null {
+  if (!system.includes(`(id: ${sourceId}, kind: loki)`)) return null;
+  const listed = /^- ([A-Za-z_][A-Za-z0-9_]*) -- values seen: ([^,\n]+)/m.exec(system);
+  return listed
+    ? { label: listed[1], value: listed[2].trim() }
+    : { label: "app", value: "app" };
+}
+
+/** The recorded panel answer for a source, by its kind. */
+function recordedPanelFor(system: string, sourceId: string) {
+  const stream = logqlStreamOf(system, sourceId);
+  if (stream) return recordedLogqlExplorePanel(sourceId, stream);
+  return system.includes(`(id: ${sourceId}, kind: prometheus)`)
+    ? recordedPromqlExplorePanel(sourceId)
+    : recordedExplorePanel(sourceId);
+}
+
 /** The answer to one call, as the text a model would have streamed. */
 export function stubAnswer(options: CallOptions): string {
   const { system, user } = textOf(options);
   const sourceId = /^sourceId: (\S+)$/m.exec(system)?.[1] ?? "unknown-source";
   // A request against a Prometheus source (its catalog line says so) gets the
-  // PromQL recordings (#387).
+  // PromQL recordings (#387), and one against a Loki source the LogQL ones
+  // (#564).
   const promql = system.includes(`(id: ${sourceId}, kind: prometheus)`);
+  const stream = logqlStreamOf(system, sourceId);
   const format = options.responseFormat;
   if (format?.type !== "json") return STUB_CHAT_REPLY;
 
@@ -251,7 +341,11 @@ export function stubAnswer(options: CallOptions): string {
         });
       }
       return JSON.stringify(
-        promql ? recordedPromqlDashboard(sourceId) : recordedDashboard(sourceId),
+        stream
+          ? recordedLogqlDashboard(sourceId, stream)
+          : promql
+            ? recordedPromqlDashboard(sourceId)
+            : recordedDashboard(sourceId),
       );
     }
     case "Panel": {
@@ -262,9 +356,7 @@ export function stubAnswer(options: CallOptions): string {
           title: `${String(current.title)}${STUB_PANEL_EDIT_SUFFIX}`,
         });
       }
-      return JSON.stringify(
-        promql ? recordedPromqlExplorePanel(sourceId) : recordedExplorePanel(sourceId),
-      );
+      return JSON.stringify(recordedPanelFor(system, sourceId));
     }
     case "SourceDraft": {
       const granted = /MUST be one of: "([^"]+)"/.exec(system)?.[1] ?? "TS_METRICS";
@@ -295,12 +387,7 @@ export function stubToolCall(
   if (!offered || options.prompt.at(-1)?.role === "tool") return null;
   const { system } = textOf(options);
   const sourceId = /^sourceId: (\S+)$/m.exec(system)?.[1] ?? "unknown-source";
-  const promql = system.includes(`(id: ${sourceId}, kind: prometheus)`);
-  const {
-    id: _id,
-    layout: _layout,
-    ...panel
-  } = promql ? recordedPromqlExplorePanel(sourceId) : recordedExplorePanel(sourceId);
+  const { id: _id, layout: _layout, ...panel } = recordedPanelFor(system, sourceId);
   return { toolName: "showPanel", input: JSON.stringify(panel) };
 }
 
