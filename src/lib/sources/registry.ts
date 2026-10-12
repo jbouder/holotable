@@ -34,6 +34,15 @@ export type SourceKindName = keyof typeof SOURCE_KINDS;
 export const SOURCE_KIND_NAMES = Object.keys(SOURCE_KINDS) as SourceKindName[];
 
 /**
+ * The kinds whose panels carry SQL (#570): today TimescaleDB alone. The SQL
+ * path (the guard, the planner, the catalog browser, the starters) is keyed
+ * on this, the language, never on one kind's name.
+ */
+export type SqlKindName = {
+  [K in SourceKindName]: (typeof SOURCE_KINDS)[K]["language"] extends "sql" ? K : never;
+}[SourceKindName];
+
+/**
  * A source's config: the union of every kind's config on its `kind` field.
  *
  * The TimescaleDB branch defaults its discriminator, so a config stored before
@@ -125,6 +134,8 @@ export interface AnySourceKind {
   language: (typeof SOURCE_KINDS)[SourceKindName]["language"];
   /** The shape of the kind's `catalog_facts`, when it records any. */
   facts?: z.ZodType<CatalogFacts>;
+  /** How the server its facts describe is named to a person, for a kind that records any. */
+  engine?(facts: CatalogFacts | null | undefined): string | null;
   connection(cfg: SourceConfig): unknown;
   catalog(cfg: SourceConfig): EditorCatalog;
   listing(source: SourceRecord): SourceListing;
@@ -199,12 +210,14 @@ export function cannotRun(
 }
 
 /**
- * Whether a source runs SQL, narrowed to the record the SQL path reads. For
- * the code that is SQL by nature (the catalog browser, the starters, the SQL
- * editor's catalog); anything that runs a query asks `serverKind` instead.
+ * Whether a source's kind answers SQL, narrowed to the record the SQL path
+ * reads (#570). For the code that is SQL by nature (the catalog browser, the
+ * starters, the SQL editor's catalog); anything that runs a query asks
+ * `serverKind` instead, and anything that needs a connection narrows to its
+ * own kind inside that kind's server half.
  */
 export function isSqlSource(
   source: SourceRecord,
 ): source is SourceRecord & SqlSourceRecord {
-  return source.config.kind === "timescaledb" && source.secretRef !== null;
+  return sourceKind(source).language === "sql";
 }

@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { CLAIM_NAME } from "@/lib/auth/claims";
 import type { SourceRecord } from "@/lib/registry";
-import type { PrometheusListing } from "@/lib/source-listing";
+import type { ListingBase } from "@/lib/source-listing";
 import type { SourceKind } from "@/lib/sources/types";
 
 /**
@@ -113,6 +113,12 @@ function configOf(source: SourceRecord): PrometheusConfig {
   if (cfg.kind !== "prometheus")
     throw new Error(`${source.id} is not a Prometheus source`);
   return cfg;
+}
+
+/** A Prometheus source (#385): never its URL or its auth mode. */
+export interface PrometheusListing extends ListingBase {
+  kind: "prometheus";
+  metricCount: number;
 }
 
 export const prometheus = {

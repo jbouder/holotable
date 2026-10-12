@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { SECRET_REF_MESSAGE, SECRET_REF_PATTERN } from "@/lib/secret-refs";
-import { TimescaleDbConfig, timescaledb } from "@/lib/sources/kinds/timescaledb";
+import { TimescaleDbConfig } from "@/lib/sources/kinds/timescaledb";
 import { PrometheusConfig } from "@/lib/sources/kinds/prometheus";
 import type { SourceCatalog } from "@/lib/sources/catalog";
 import {
@@ -8,6 +8,7 @@ import {
   type EditorCatalog,
   SourceConfig,
   type SourceKindName,
+  type SqlKindName,
   sourceKind,
 } from "@/lib/sources/registry";
 
@@ -35,8 +36,16 @@ export {
   isExposed,
   unexposedColumns,
 } from "@/lib/sources/catalog";
-export { SourceConnection, TimescaleDbConfig } from "@/lib/sources/kinds/timescaledb";
-export { SourceConfig, type SourceKindName } from "@/lib/sources/registry";
+export {
+  SourceConnection,
+  TimescaleDbConfig,
+  type TimescaleDbSourceRecord,
+} from "@/lib/sources/kinds/timescaledb";
+export {
+  SourceConfig,
+  type SourceKindName,
+  type SqlKindName,
+} from "@/lib/sources/registry";
 
 /** The connection half of a stored config, for a reconnect or a rediscovery. */
 export function sourceConnection(cfg: SourceConfig) {
@@ -130,20 +139,31 @@ export function sourceCatalog(cfg: SourceConfig): EditorCatalog {
   return sourceKind(cfg).catalog(cfg);
 }
 
-/** A SQL source's catalog, as the SQL editor and hints read it. */
+/**
+ * A SQL source's catalog, as the SQL editor, the hints and the catalog
+ * browser read it: projected by the source's kind, so it holds for any kind
+ * whose language is SQL.
+ */
 export function sqlCatalog(cfg: SqlSourceConfig): SourceCatalog {
-  return timescaledb.catalog(cfg);
+  return sourceKind(cfg).catalog(cfg) as SourceCatalog;
 }
 
-/** A SQL source's config: what the SQL guard, planner and executor read. */
-export type SqlSourceConfig = TimescaleDbConfig;
+/**
+ * A SQL source's config (#570): the config of any kind whose language is SQL.
+ * Each has a `tables` allowlist, which is what the SQL guard, planner and
+ * catalog read; anything else in it is its kind's own.
+ */
+export type SqlSourceConfig = Extract<SourceConfig, { kind: SqlKindName }>;
 
-/** A source the SQL path may run: narrowed by `isSqlSource` (`src/lib/sources/registry.ts`). */
-export type SqlSourceRecord = Omit<SourceRecord, "kind" | "config" | "secretRef"> & {
-  kind: "timescaledb";
-  config: TimescaleDbConfig;
-  /** A SQL source always names its credentials. */
-  secretRef: string;
+/**
+ * A source the SQL path may run: one whose kind's language is SQL, narrowed by
+ * `isSqlSource` (`src/lib/sources/registry.ts`). It may name no credentials;
+ * a kind that needs them (TimescaleDB) narrows to its own record, with the
+ * `secret_ref` required, inside its server half.
+ */
+export type SqlSourceRecord = Omit<SourceRecord, "kind" | "config"> & {
+  kind: SqlKindName;
+  config: SqlSourceConfig;
 };
 
 export interface SourceRecord {

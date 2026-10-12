@@ -5,7 +5,7 @@ import type { Pool, PoolConfig } from "pg";
 import { config as appConfig } from "@/lib/config";
 import { renderMetrics, resetMetricsForTests } from "@/lib/metrics";
 import {
-  type SqlSourceRecord,
+  type TimescaleDbSourceRecord,
   type SqlSourceConfig,
   TimescaleDbConfig,
 } from "@/lib/registry";
@@ -44,7 +44,7 @@ function grant(password = "first") {
 function source(
   overrides: Partial<SqlSourceConfig> = {},
   id = "src-pool",
-): SqlSourceRecord {
+): TimescaleDbSourceRecord {
   return {
     id,
     workspaceId: WORKSPACE,

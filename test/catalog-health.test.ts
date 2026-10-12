@@ -9,7 +9,7 @@ import {
 } from "@/lib/catalog/health";
 import {
   type SqlSourceConfig,
-  type SqlSourceRecord,
+  type TimescaleDbSourceRecord,
   TimescaleDbConfig,
 } from "@/lib/registry";
 import { renderCatalog } from "@/lib/timescaledb/catalog";
@@ -23,7 +23,7 @@ import { renderCatalog } from "@/lib/timescaledb/catalog";
 
 const NOW = new Date("2026-09-22T12:00:00.000Z");
 
-function source(patch: Partial<SqlSourceRecord> = {}): SqlSourceRecord {
+function source(patch: Partial<TimescaleDbSourceRecord> = {}): TimescaleDbSourceRecord {
   return {
     id: "ts-metrics",
     workspaceId: "demo",
@@ -51,7 +51,7 @@ function source(patch: Partial<SqlSourceRecord> = {}): SqlSourceRecord {
   };
 }
 
-const health = (s: SqlSourceRecord, staleAfterDays = 30) =>
+const health = (s: TimescaleDbSourceRecord, staleAfterDays = 30) =>
   catalogHealth(s, { now: NOW, staleAfterDays });
 
 test("a freshly refreshed catalog is ok and does not block", () => {

@@ -3,14 +3,13 @@ import { isSqlQuery } from "@/lib/ir";
 import { buildQueryPlanView } from "@/lib/query-plan";
 import { catalogView } from "@/lib/catalog/browse";
 import { diffCatalog } from "@/lib/catalog/refresh";
-import type {
-  SourceConfig,
-  SourceRecord,
-  SqlSourceConfig,
-  SqlSourceRecord,
-} from "@/lib/registry";
+import type { SourceConfig, SourceRecord } from "@/lib/registry";
 import { QueryExecutionError } from "@/lib/sources/execution";
-import { timescaleDbFacts } from "@/lib/sources/kinds/timescaledb";
+import {
+  type TimescaleDbConfig,
+  type TimescaleDbSourceRecord,
+  timescaleDbFacts,
+} from "@/lib/sources/kinds/timescaledb";
 import { wrongLanguage } from "@/lib/sources/registry";
 import type {
   QueryCheck,
@@ -39,15 +38,21 @@ import { closeSourcePools, dropSourcePool } from "@/lib/timescaledb/pool";
  * the functions this names call on every connection.
  */
 
-/** This kind only ever receives its own sources; anything else is a bug. */
-function sqlSource(source: SourceRecord): SqlSourceRecord {
+/**
+ * This kind only ever receives its own sources, which always name their
+ * credentials (`checkSecretRef`); anything else is a bug.
+ */
+function sqlSource(source: SourceRecord): TimescaleDbSourceRecord {
   if (source.config.kind !== "timescaledb") {
     throw new Error(`${source.id} is not a TimescaleDB source`);
   }
-  return source as SqlSourceRecord;
+  if (source.secretRef === null) {
+    throw new Error(`${source.id} names no secret_ref`);
+  }
+  return source as TimescaleDbSourceRecord;
 }
 
-function sqlConfig(cfg: SourceConfig): SqlSourceConfig {
+function sqlConfig(cfg: SourceConfig): TimescaleDbConfig {
   if (cfg.kind !== "timescaledb")
     throw new Error("a TimescaleDB refresh holds a SQL config");
   return cfg;
@@ -155,7 +160,7 @@ const kind: ServerSourceKind = {
  */
 export const timescaledbManagement = {
   discover: discoverTables,
-  refresh: (source: SqlSourceRecord) => refreshCatalog(source),
+  refresh: (source: SourceRecord) => refreshCatalog(sqlSource(source)),
   refreshDigest,
 };
 

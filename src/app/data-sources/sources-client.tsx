@@ -533,7 +533,7 @@ export function SourcesClient({
             secretRefs={secretRefs}
             initial={{
               name: sourceBeingEdited.name,
-              secretRef: sourceBeingEdited.secretRef,
+              secretRef: sourceBeingEdited.secretRef ?? undefined,
               config: sourceBeingEdited.config,
             }}
             submitLabel="Save changes"

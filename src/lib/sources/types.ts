@@ -39,6 +39,12 @@ export interface SourceKind<
    * (`sources.catalog_facts`, #557), for a kind that records anything.
    */
   facts?: z.ZodType;
+  /**
+   * How the server the facts describe is named to a person ("TimescaleDB
+   * 2.17.2"), or null before anything was recorded. For a kind that records
+   * facts; it takes its own `facts` shape, which `AnySourceKind` names.
+   */
+  engine?(facts: never): string | null;
   /** How to reach the source, without the catalog. */
   connection(cfg: z.infer<Config>): unknown;
   /** What the editor may see of the catalog: no connection detail, no hidden column. */

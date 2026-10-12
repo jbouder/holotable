@@ -5,7 +5,7 @@ import { catalogHealth } from "@/lib/catalog/health";
 import {
   SourceConfig,
   type SqlSourceConfig,
-  type SqlSourceRecord,
+  type TimescaleDbSourceRecord,
   TimescaleDbConfig,
 } from "@/lib/registry";
 import { sourceListing } from "@/lib/source-listing";
@@ -45,7 +45,7 @@ const config = TimescaleDbConfig.parse({
   ],
 });
 
-const source: SqlSourceRecord = {
+const source: TimescaleDbSourceRecord = {
   id: "src-metrics",
   workspaceId: "ws-1",
   name: "Metrics",

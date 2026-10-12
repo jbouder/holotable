@@ -4,7 +4,7 @@ import { loadModule } from "libpg-query";
 import { config } from "@/lib/config";
 import type { QueryPanel } from "@/lib/ir";
 import { makePanelExecutor } from "@/lib/poller/registry";
-import type { SqlSourceRecord } from "@/lib/registry";
+import type { TimescaleDbSourceRecord } from "@/lib/registry";
 import { buildExecutablePlan, type ExecutablePlan, validateSql } from "@/lib/sql/safety";
 import { QueryExecutionError } from "@/lib/sources/execution";
 import { executePlan } from "@/lib/timescaledb/client";
@@ -22,7 +22,7 @@ import { grantRef, metricsSource, needsDb, unique } from "./support";
 const WORKSPACE = unique("ws-exec");
 
 /** A source as configured in production: the read-only role on `metrics`. */
-function readOnlySource(): SqlSourceRecord {
+function readOnlySource(): TimescaleDbSourceRecord {
   grantRef("HT_IT_EXEC", WORKSPACE, "readonly");
   return metricsSource({
     id: unique("src-exec"),
@@ -32,7 +32,7 @@ function readOnlySource(): SqlSourceRecord {
 }
 
 /** The same source logged in as the database owner, a role that may write. */
-function ownerSource(): SqlSourceRecord {
+function ownerSource(): TimescaleDbSourceRecord {
   grantRef("HT_IT_OWNER", WORKSPACE, "owner");
   return metricsSource({
     id: unique("src-owner"),
@@ -153,7 +153,7 @@ test(
 
     // Nothing listens on port 1: a socket error, never shown to a viewer as
     // though it were the author's SQL.
-    const unreachable: SqlSourceRecord = {
+    const unreachable: TimescaleDbSourceRecord = {
       ...source,
       id: unique("src-down"),
       config: { ...source.config, host: "127.0.0.1", port: 1 },
