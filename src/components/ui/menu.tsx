@@ -46,6 +46,11 @@ export function Menu({
           <BaseMenu.Popup
             className={cn(
               "min-w-44 rounded-lg border border-border bg-surface p-1 shadow-xl focus:outline-none",
+              // A long menu (a workspace's sources, #585) scrolls inside itself
+              // rather than running off the screen: Base UI measures the room
+              // between the anchor and the viewport edge onto the positioner.
+              // Items take DOM focus, so arrow keys scroll the focused one in.
+              "max-h-(--available-height) overflow-y-auto overscroll-contain",
               // Fade with a 4px nudge from the anchor side (#235): the popup
               // starts and ends slightly towards its trigger. Base UI puts the
               // resolved side on the popup, so a flip to `top` nudges the other way.
