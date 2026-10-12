@@ -29,15 +29,17 @@ const SourceSummary = z.object({
   id: z.string(),
   workspaceId: z.string(),
   name: z.string(),
-  /** `timescaledb` (SQL) or `prometheus` (PromQL, #385). */
+  /** `timescaledb` (SQL), `prometheus` (PromQL, #385) or `loki` (LogQL, #562). */
   kind: z.string(),
-  /** What its queries are written in: `sql` or `promql`. */
+  /** What its queries are written in: `sql`, `promql` or `logql`. */
   language: z.string(),
   /** A SQL source's schema and allowlisted table count. */
   schema: z.string().optional(),
   tableCount: z.int().optional(),
   /** A Prometheus source's allowlisted metric count. */
   metricCount: z.int().optional(),
+  /** A Loki source's allowlisted stream label count (#562). */
+  labelCount: z.int().optional(),
   /** `ok`, `empty`, `never_refreshed`, `stale` or `drifted`; only `ok` and `stale` generate. */
   catalog: z.string(),
 });
@@ -79,7 +81,9 @@ export function sourceTools(deps: McpDeps): McpTool[] {
               language: sourceKind(source.config).language,
               ...("schema" in listing
                 ? { schema: listing.schema, tableCount: listing.tableCount }
-                : { metricCount: listing.metricCount }),
+                : "metricCount" in listing
+                  ? { metricCount: listing.metricCount }
+                  : { labelCount: listing.labelCount }),
               catalog: catalogHealth(source).state,
             });
           }

@@ -10,6 +10,7 @@ import {
 import type { SourceRecord, SqlSourceRecord } from "@/lib/registry";
 import type { SourceListing } from "@/lib/source-listing";
 import type { SourceCatalog } from "@/lib/sources/catalog";
+import { type LokiCatalog, loki } from "@/lib/sources/kinds/loki";
 import { type PrometheusCatalog, prometheus } from "@/lib/sources/kinds/prometheus";
 import { type TimescaleDbFacts, timescaledb } from "@/lib/sources/kinds/timescaledb";
 import type { RowFilterTarget } from "@/lib/sources/types";
@@ -27,7 +28,7 @@ import type { RowFilterTarget } from "@/lib/sources/types";
  * `src/lib/sources/`, and on an import of `src/lib/timescaledb/` that does not
  * go through the server half.
  */
-export const SOURCE_KINDS = { timescaledb, prometheus } as const;
+export const SOURCE_KINDS = { timescaledb, prometheus, loki } as const;
 
 export type SourceKindName = keyof typeof SOURCE_KINDS;
 
@@ -53,6 +54,7 @@ export type SqlKindName = {
 export const SourceConfig = z.discriminatedUnion("kind", [
   timescaledb.config,
   prometheus.config,
+  loki.config,
 ]);
 export type SourceConfig = z.infer<typeof SourceConfig>;
 
@@ -120,7 +122,7 @@ export function parseCatalogFacts(
 }
 
 /** What the editor may see of any source's catalog. */
-export type EditorCatalog = SourceCatalog | PrometheusCatalog;
+export type EditorCatalog = SourceCatalog | PrometheusCatalog | LokiCatalog;
 
 /**
  * A kind as code that holds any source sees it. Each kind's functions take
@@ -196,8 +198,10 @@ export function wrongLanguage(
 }
 
 /**
- * The refusal for a query no source this server knows can run yet: LogQL,
- * until the Loki kind is registered (#562).
+ * The refusal for a query a source cannot run: it is in another language
+ * than the source's kind answers. Every language has a kind that runs it
+ * (LogQL since #562), so this is {@link wrongLanguage}'s refusal, with a
+ * fallback for a caller that already knows the query cannot run here.
  */
 export function cannotRun(
   source: { id: string; kind: SourceKindName },
@@ -205,7 +209,7 @@ export function cannotRun(
 ): string {
   return (
     wrongLanguage(source, query) ??
-    `${LANGUAGE_NAMES[writtenIn(query)]} query cannot run on this server yet`
+    `source "${source.id}" cannot run this ${LANGUAGE_NAMES[writtenIn(query)]} query`
   );
 }
 

@@ -22,14 +22,15 @@ import type { VariableValues } from "@/lib/sql/variables";
  * none.
  *
  * A **log** query is a `query_range` over the window, newest lines first,
- * at most `MAX_QUERY_ROWS` of them: the row cap, which keeps the newest
- * rows. A **metric** query is a `query_range` at a step, with the same step
+ * at most `LOKI_MAX_ENTRIES` of them (and never more than `MAX_QUERY_ROWS`,
+ * or the panel's own limit when it asks for fewer), so the cap keeps the
+ * newest lines. A **metric** query is a `query_range` at a step, with the same step
  * arithmetic, point budget and alignment as PromQL (`promql/plan.ts`), or a
  * `query` at the end of the window when the panel is instant. Loki runs a
  * log query only over a range, so an instant log query is refused here.
  *
- * Built only from an expression `validateLogql` accepted. Phase 3 (#562)
- * sends it.
+ * Built only from an expression `validateLogql` accepted; the Loki client
+ * (`src/lib/loki/client.ts`) sends it.
  */
 export type LogqlPlan =
   | {
@@ -81,6 +82,11 @@ export function buildLogqlPlan(input: {
   rowFilter: LogqlRowFilterBinding | null;
   /** Values already checked against what the dashboard allows (#67). */
   variables?: VariableValues;
+  /**
+   * The lines the panel asks for (#499), from its options; clamped to the
+   * server's cap. Absent asks for the cap.
+   */
+  maxEntries?: number;
   limits?: LogqlLimits;
 }): LogqlPlan {
   const limits = input.limits ?? defaultLogqlLimits();
@@ -107,7 +113,7 @@ export function buildLogqlPlan(input: {
       expr,
       start: input.from,
       end: input.to < input.from ? input.from : input.to,
-      limit: config.maxQueryRows,
+      limit: entryLimit(input.maxEntries),
       direction: "backward",
       timeoutMs,
     };
@@ -127,6 +133,18 @@ export function buildLogqlPlan(input: {
     timeoutMs,
     ...(finestPoints !== undefined ? { finestPoints } : {}),
   };
+}
+
+/**
+ * A log query's `limit`: `LOKI_MAX_ENTRIES`, inside `MAX_QUERY_ROWS`, and
+ * fewer when the panel asks for fewer. Never a value the spec chose above the
+ * cap, and never below one line.
+ */
+export function entryLimit(asked?: number): number {
+  const cap = Math.max(1, Math.min(config.lokiMaxEntries, config.maxQueryRows));
+  return asked !== undefined && Number.isInteger(asked) && asked > 0
+    ? Math.min(asked, cap)
+    : cap;
 }
 
 /**

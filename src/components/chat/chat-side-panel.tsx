@@ -137,7 +137,9 @@ function SourcesSection({
                     ? "not ready"
                     : s.language === "promql"
                       ? "PromQL"
-                      : "SQL"}
+                      : s.language === "logql"
+                        ? "LogQL"
+                        : "SQL"}
                 </span>
               </div>
             );

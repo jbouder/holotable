@@ -1,4 +1,5 @@
 import { parseSourceKindName, type SourceKindName } from "@/lib/sources/registry";
+import { lokiServer } from "@/lib/sources/server/loki";
 import { prometheusServer } from "@/lib/sources/server/prometheus";
 import {
   timescaledbManagement,
@@ -25,6 +26,7 @@ const SERVER_KINDS: { [K in SourceKindName]: ServerSourceKind } = {
   // Each entry's own `kind` is held to its key by test/source-kinds.test.ts.
   timescaledb: timescaledbServer,
   prometheus: prometheusServer,
+  loki: lokiServer,
 };
 
 /** The server half of a source's kind, or of a kind by name. */

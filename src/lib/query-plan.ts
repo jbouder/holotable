@@ -124,8 +124,36 @@ export interface PromqlPlanView {
   variables: { name: string; value: string; from: string }[];
 }
 
-/** Either language's plan view; the field that holds the statement says which. */
-export type AnyPlanView = QueryPlanView | PromqlPlanView;
+/**
+ * What a Loki endpoint would be asked for a LogQL panel (#562): the
+ * expression after the server's rewrites, and every parameter with what the
+ * server resolved it from — `start`, `end`, and `limit` and `direction` for a
+ * log query or `step` for a metric one, or `time` — and the tenant matcher.
+ * An explicit field list: no URL, no auth mode, no header.
+ */
+export interface LogqlPlanView {
+  /** The expression as the panel holds it. */
+  logql: string;
+  /** What the server sends: variables bound, the tenant matcher spliced in. */
+  executedLogql: string;
+  /** `query` (one instant) or `query_range`, under `/loki/api/v1/`. */
+  endpoint: "query" | "query_range";
+  /** Whether the expression returns log lines or samples. */
+  queryKind: "log" | "metric";
+  params: { name: string; value: string; from: string }[];
+  timeoutMs: number;
+  maxResultBytes: number;
+  /** The most lines a log query asks for. */
+  maxEntries: number;
+  /** The most series a metric query's result may hold. */
+  maxSeries: number;
+  /** The most points per series a metric range query is stepped to. */
+  maxPoints: number;
+  variables: { name: string; value: string; from: string }[];
+}
+
+/** Any language's plan view; the field that holds the statement says which. */
+export type AnyPlanView = QueryPlanView | PromqlPlanView | LogqlPlanView;
 
 /** Assemble the PromQL view from the plan and the pieces it was built from. */
 export function buildPromqlPlanView(input: {
@@ -205,6 +233,101 @@ export function buildPromqlPlanView(input: {
   };
 }
 
+/** Assemble the LogQL view from the plan and the pieces it was built from. */
+export function buildLogqlPlanView(input: {
+  logql: string;
+  minStep?: string;
+  timeRange: TimeRange;
+  plan:
+    | {
+        kind: "log";
+        instant: false;
+        expr: string;
+        start: Date;
+        end: Date;
+        limit: number;
+        direction: "backward";
+        timeoutMs: number;
+      }
+    | {
+        kind: "metric";
+        instant: false;
+        expr: string;
+        start: Date;
+        end: Date;
+        stepSeconds: number;
+        timeoutMs: number;
+      }
+    | { kind: "metric"; instant: true; expr: string; time: Date; timeoutMs: number };
+  /** The claim the source's tenant label binds, when it has one (#31). */
+  rowFilterClaim?: string;
+  variables?: { name: string; value: string | readonly string[] }[];
+  limits: {
+    maxResultBytes: number;
+    maxEntries: number;
+    maxSeries: number;
+    maxPoints: number;
+    minStepMs: number;
+  };
+}): LogqlPlanView {
+  const { plan, limits } = input;
+  let params: { name: string; value: string; from: string }[];
+  if (plan.instant) {
+    params = [{ name: "time", value: plan.time.toISOString(), from: input.timeRange.to }];
+  } else if (plan.kind === "log") {
+    params = [
+      { name: "start", value: plan.start.toISOString(), from: input.timeRange.from },
+      { name: "end", value: plan.end.toISOString(), from: input.timeRange.to },
+      {
+        name: "limit",
+        value: String(plan.limit),
+        from: "LOKI_MAX_ENTRIES, or the panel's own limit when it asks for fewer",
+      },
+      {
+        name: "direction",
+        value: plan.direction,
+        from: "the server: newest lines first, so the limit keeps the newest",
+      },
+    ];
+  } else {
+    // The step is PromQL's arithmetic (`promql/plan.ts`), so it reads the same.
+    const step = buildPromqlPlanView({
+      promql: input.logql,
+      minStep: input.minStep,
+      timeRange: input.timeRange,
+      plan,
+      limits,
+    }).params;
+    params = step;
+  }
+  return {
+    logql: input.logql,
+    executedLogql: plan.expr,
+    endpoint: plan.instant ? "query" : "query_range",
+    queryKind: plan.kind,
+    params: input.rowFilterClaim
+      ? [
+          ...params,
+          {
+            name: "tenant",
+            value: "(your value)",
+            from: `your "${input.rowFilterClaim}" claim`,
+          },
+        ]
+      : params,
+    timeoutMs: plan.timeoutMs,
+    maxResultBytes: limits.maxResultBytes,
+    maxEntries: limits.maxEntries,
+    maxSeries: limits.maxSeries,
+    maxPoints: limits.maxPoints,
+    variables: (input.variables ?? []).map(({ name, value }) => ({
+      name,
+      value: instant(value),
+      from: `the :${name} selection`,
+    })),
+  };
+}
+
 /** "15 s", "1.5 s", "2 min": a duration the dialog states, from milliseconds. */
 function seconds(ms: number): string {
   if (ms >= 60_000 && ms % 60_000 === 0) return `${ms / 60_000} min`;
@@ -261,11 +384,31 @@ export function isPromqlPlanView(plan: AnyPlanView): plan is PromqlPlanView {
   return "promql" in plan;
 }
 
+/** Whether a plan view is LogQL's: the field that holds the statement says. */
+export function isLogqlPlanView(plan: AnyPlanView): plan is LogqlPlanView {
+  return "logql" in plan;
+}
+
 /**
  * "4,000 rows · 30 s · 4.0 MiB" under a SQL plan; "1,000 points · 30 s ·
  * 4.0 MiB · 100 series" under a PromQL one.
  */
 export function summarizeLimits(plan: AnyPlanView): string {
+  if (isLogqlPlanView(plan)) {
+    const size = [
+      `${Math.round(plan.timeoutMs / 1000)} s`,
+      `${(plan.maxResultBytes / (1024 * 1024)).toFixed(1)} MiB`,
+    ];
+    return (
+      plan.queryKind === "log"
+        ? [`${plan.maxEntries.toLocaleString("en-US")} lines`, ...size]
+        : [
+            `${plan.maxPoints.toLocaleString("en-US")} points`,
+            ...size,
+            `${plan.maxSeries.toLocaleString("en-US")} series`,
+          ]
+    ).join(" · ");
+  }
   if (isPromqlPlanView(plan)) {
     return [
       `${plan.maxPoints.toLocaleString("en-US")} points`,

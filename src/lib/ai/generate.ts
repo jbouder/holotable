@@ -22,6 +22,7 @@ import {
   GeneratedPanel,
   type Panel,
   generationSchemas,
+  type QueryLanguage,
 } from "@/lib/ir";
 import { config } from "@/lib/config";
 import { PANEL_KINDS } from "@/lib/panels/registry";
@@ -194,7 +195,7 @@ export const PROMQL_RULES = `PromQL rules (STRICT) — for a source whose catalo
 ${PROMQL_SINGLE_SOURCE_RULE}`;
 
 /** Which languages a generation's sources answer. */
-export function sourceLanguages(sources: readonly SourceRecord[]): Set<"sql" | "promql"> {
+export function sourceLanguages(sources: readonly SourceRecord[]): Set<QueryLanguage> {
   return new Set(sources.map((s) => sourceKind(s).language));
 }
 
@@ -225,7 +226,7 @@ ${promql}
  * gets {@link VIZ_GUIDE} exactly; PromQL takes each kind's `promqlHint` where
  * it has one, and a mix gives both.
  */
-export function vizGuide(languages: ReadonlySet<"sql" | "promql">): string {
+export function vizGuide(languages: ReadonlySet<QueryLanguage>): string {
   if (!languages.has("promql")) return VIZ_GUIDE;
   return PANEL_KINDS.map((k) => {
     if (!k.promqlHint) return `- '${k.kind}': ${k.promptHint}`;

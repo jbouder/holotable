@@ -226,7 +226,7 @@ export function SourcesClient({
   const sourceBeingEdited =
     editedRecord && isSqlSource(editedRecord) ? editedRecord : undefined;
   const promBeingEdited =
-    editedRecord && "url" in editedRecord.config
+    editedRecord && "metrics" in editedRecord.config
       ? { record: editedRecord, config: editedRecord.config }
       : undefined;
   const sourceShowingImpact = sources?.find((source) => source.id === showingImpact);
@@ -366,7 +366,11 @@ export function SourcesClient({
                 )}
                 <TableCell>{"schema" in source ? source.schema : "—"}</TableCell>
                 <TableCell>
-                  {"tableCount" in source ? source.tableCount : source.metricCount}
+                  {"tableCount" in source
+                    ? source.tableCount
+                    : "metricCount" in source
+                      ? source.metricCount
+                      : source.labelCount}
                 </TableCell>
                 <TableCell>
                   <CatalogHealthBadge source={source} health={catalog[source.id]} />
@@ -751,7 +755,7 @@ function NaturalLanguageDrafter({
         onDraft({
           sql: { ...object, config: object.config, secretRef: object.secretRef },
         });
-      } else if ("url" in object.config) {
+      } else if ("metrics" in object.config) {
         onDraft({
           prometheus: {
             id: object.id,

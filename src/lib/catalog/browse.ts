@@ -50,10 +50,27 @@ export interface MetricCatalogView {
   canManage: boolean;
 }
 
-export type AnyCatalogView = CatalogView | MetricCatalogView;
+/**
+ * A Loki source's catalog (#562): its allowlisted stream labels with the
+ * values discovery found. The same for every caller, and never the URL or
+ * the auth mode.
+ */
+export interface LabelCatalogView {
+  labels: { name: string; values: string[] }[];
+  /** Allowlisted labels the last refresh found no streams for. */
+  missingLabels: string[];
+  catalogHealth: CatalogHealth;
+  canManage: boolean;
+}
+
+export type AnyCatalogView = CatalogView | MetricCatalogView | LabelCatalogView;
 
 export function isMetricCatalogView(view: AnyCatalogView): view is MetricCatalogView {
   return "metrics" in view;
+}
+
+export function isLabelCatalogView(view: AnyCatalogView): view is LabelCatalogView {
+  return "labels" in view;
 }
 
 /** Build the view for one caller. Server-side; `canManage` comes from `can()`. */

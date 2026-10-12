@@ -77,7 +77,37 @@ export const PromqlFixtureCatalog = z
   })
   .strict();
 
-export const FixtureCatalog = z.union([SqlFixtureCatalog, PromqlFixtureCatalog]);
+/**
+ * What a fixture's LogQL is validated against (#562): a Loki source's stream
+ * label allowlist and its tenant label, minus the endpoint.
+ */
+export const LogqlFixtureCatalog = z
+  .object({
+    labels: z
+      .array(
+        z
+          .object({
+            name: z.string().regex(/^[A-Za-z_][A-Za-z0-9_]*$/),
+            values: z.array(z.string()).optional(),
+          })
+          .strict(),
+      )
+      .min(1),
+    rowFilter: z
+      .object({
+        label: z.string().regex(/^[A-Za-z_][A-Za-z0-9_]*$/),
+        claim: z.string().min(1),
+      })
+      .strict()
+      .optional(),
+  })
+  .strict();
+
+export const FixtureCatalog = z.union([
+  SqlFixtureCatalog,
+  PromqlFixtureCatalog,
+  LogqlFixtureCatalog,
+]);
 export type FixtureCatalog = z.infer<typeof FixtureCatalog>;
 
 export const FixtureEntry = z
