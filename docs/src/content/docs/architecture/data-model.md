@@ -27,6 +27,7 @@ when it is read:
 | --- | --- | --- |
 | `timescaledb` | `host`, `port`, `database`, `schema`, `ssl`, `tables` (each with its `columns` and `timeField`), optional `rowFilter` `{ column, claim }` | SQL |
 | `prometheus` | `url`, `auth` (`none`, `bearer` or `basic`), `metrics` (each with its `type`, `help` and `labels`), optional `rowFilter` `{ label, claim }` | PromQL |
+| `loki` | `url`, `auth` (`none`, `bearer` or `basic`), `labels` (each stream label with the `values` discovery found), optional `rowFilter` `{ label, claim }` | LogQL |
 
 #### Source kinds
 
@@ -48,9 +49,21 @@ discriminator. The language belongs to the kind, not the panel: a line chart
 can be drawn from SQL or from PromQL, and what decides is what its source can
 answer. A source's kind cannot change on edit.
 
-`secret_ref` is nullable (migration 018) for a Prometheus source with
+A Loki source (#562) is the third kind, and the Prometheus kind's twin: the
+same `url` and `auth` (one schema, `src/lib/sources/http-config.ts`), reached
+through the same guarded exchange (`src/lib/sources/server/endpoint.ts`) under
+`SOURCE_URL_ALLOWLIST`. Its allowlist is stream `labels`, at most 200, each
+with up to 100 discovered `values` that are hints for the author and the model,
+never compared by the guard. Every LogQL stream selector must carry an `=`
+matcher on one of them. Its listing carries `labelCount`, never the URL or the
+auth mode, and its `rowFilter` label is the tenant matcher spliced into every
+selector. A log query's answer becomes one row per line (`time`, `message`,
+then a column per stream or parsed label); a metric query's becomes the rows a
+Prometheus answer does.
+
+`secret_ref` is nullable (migration 018) for a Prometheus or Loki source with
 `auth: none`, which needs no credential; a TimescaleDB source and an
-authenticated Prometheus source always name one.
+authenticated HTTP source always name one.
 
 Referenced sources are **tombstoned** rather than deleted, so dashboards
 referencing them keep resolving to a tombstone marker instead of breaking

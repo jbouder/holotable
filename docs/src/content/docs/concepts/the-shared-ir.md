@@ -88,9 +88,9 @@ its source's kind ([Source kinds](/architecture/data-model/#source-kinds)): a
 TimescaleDB source answers SQL, a Prometheus source answers PromQL, a Loki
 source answers LogQL, and a query in another language is refused on save and at
 execution like a table the source does not have. Loki sources are being built
-in phases ([#559](https://github.com/jbouder/holotable/issues/559)): the IR
-accepts a LogQL query today, and until a Loki source can be added every one is
-refused when it runs.
+in phases ([#559](https://github.com/jbouder/holotable/issues/559)): a LogQL
+panel runs against a registered Loki source (#562), and the source form and
+generation follow.
 
 A PromQL query carries no time either. The server picks `start`, `end` and
 `step` for the window it resolved, and `minStep` can only raise the step. A
@@ -110,7 +110,7 @@ beside `hasQuery` in `src/lib/ir.ts`: `isSqlQuery`, `queryLanguage`,
 range query, nothing for an instant one) and `queryText` (the statement, for
 display, digests and diffs). A `query` variable has two shapes: a SELECT, or
 `{ sourceId, label, match? }`, the values of a label, which a Prometheus source
-answers and a Loki source will too.
+answers and a Loki source does too.
 
 ## One definition, no drift
 

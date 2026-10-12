@@ -83,7 +83,7 @@ process and Node.js collectors (`holotable_process_cpu_seconds_total`,
 | `holotable_poller_skips_total` | counter | `reason` | Panel executions a poller skipped for one cycle: `in_flight_cap` (no free poller slot on the source, `MAX_POOL_PER_SOURCE - 1`) or `pool_wait` (a checkout timed out in a full pool). Healthy: zero. Steady: the source cannot keep up with the dashboards' refresh |
 | `holotable_sse_bytes_total` | counter | — | Bytes written to dashboard streams. Its rate is the stream's share of egress; a jump means a panel started sending full results |
 | `holotable_sse_drops_total` | counter | `reason` | Streams the server closed: `slow` (behind for `SSE_SLOW_TICKS` cycles). Healthy: zero or rare. Steady: a proxy is buffering, or clients cannot keep up |
-| `holotable_result_truncations_total` | counter | `stage` | Results cut short on the server: `rows` (`MAX_QUERY_ROWS`), `points` (a PromQL step `PROMQL_MAX_POINTS` widened), `window` (a Chat panel held to `MAX_WINDOW_POINTS`). Each is also a badge on the panel. Steady: a query to narrow or a cap to raise |
+| `holotable_result_truncations_total` | counter | `stage` | Results cut short on the server: `rows` (`MAX_QUERY_ROWS`), `points` (a PromQL step `PROMQL_MAX_POINTS` widened), `entries` (a Loki log query that returned its whole `limit`), `window` (a Chat panel held to `MAX_WINDOW_POINTS`). Each is also a badge on the panel. Steady: a query to narrow or a cap to raise |
 | `holotable_llm_in_flight` | gauge | `model` | Model requests running now. Predicts the model concurrency limit (#496) |
 
 `reason` comes from a fixed enum, not the error message: `empty`, `structure`,

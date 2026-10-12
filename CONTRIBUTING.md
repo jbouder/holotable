@@ -419,6 +419,7 @@ request:
 | `src/lib/logql/` (the LogQL guard, its rewrites, the plan) | `concepts/executing-a-panel.md` ("The LogQL guard"), `operations/metrics.md` |
 | `src/lib/sources/` (a source kind, its config or its server half) | `concepts/prometheus-sources.md`, `architecture/data-model.md` (`sources`, "Source kinds") |
 | `src/lib/prometheus/` (the client, discovery, the connection test) | `admin/prometheus.md`, `concepts/prometheus-sources.md` |
+| `src/lib/loki/` (the client, the rows, refresh and the connection test) | `architecture/data-model.md` (`sources`), "The LogQL guard" in `concepts/executing-a-panel.md` |
 | `src/lib/sql/row-filter.ts`, `src/lib/row-scope.ts` | `admin/row-level-filters.md`, invariant 8a |
 | `src/lib/sql/variables.ts`, `src/lib/variables.ts`, `variable-selection.ts` | `guide/variables.md` |
 | `src/lib/drilldown.ts`, `drilldown-targets.ts`, `drilldown-datum.ts`, `panel.links` in `ir.ts` | `guide/drilldown.md` |
