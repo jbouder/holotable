@@ -1,6 +1,6 @@
 import "./lib/env";
 import { getDashboardById, getSourceById, listDashboards } from "@/lib/db/repo";
-import { hasQuery, parseDashboard, type QueryPanel } from "@/lib/ir";
+import { hasQuery, panelTimeRange, parseDashboard, type QueryPanel } from "@/lib/ir";
 import { panelKind } from "@/lib/panels/registry";
 import type { Dashboard } from "@/lib/ir";
 import {
@@ -165,7 +165,10 @@ async function waitForData(target: Target, deadline: number) {
       const outcomes = await Promise.all(
         dashboard.spec.panels
           .filter(hasQuery)
-          .map((panel) => runPanel(panel, dashboard.spec.timeRange)),
+          // A panel's own window when it has one (#114), as the poller runs it.
+          .map((panel) =>
+            runPanel(panel, panelTimeRange(panel, dashboard.spec.timeRange)),
+          ),
       );
       const refused = outcomes.filter((o) => o.error);
       // A refusal is a real failure, not something more waiting would fix.
