@@ -296,7 +296,9 @@ that spec goes through the same schema, SQL guard and server-side execution as
 a real model's. A request against a Prometheus source gets a recorded PromQL
 dashboard or panel over Holotable's own metrics
 (`holotable_query_duration_seconds_*`, `holotable_pollers_active`), which the
-compose stack's Prometheus scrapes. It needs no `AI_MODEL` or key. Because it would otherwise let
+compose stack's Prometheus scrapes. A request against a Loki source gets a
+recorded `logs` panel of error lines and an error-rate-by-route panel, both on
+the first label the catalog lists at its first value. It needs no `AI_MODEL` or key. Because it would otherwise let
 a deployment that forgot to configure a model boot green, it is a startup
 error in production unless `AI_STUB_IN_PRODUCTION=true` is also set; the e2e
 suite sets both.
@@ -387,13 +389,14 @@ generate route makes, and grades each answer
 ([#24](https://github.com/jbouder/holotable/issues/24)):
 
 1. it parses against the IR the route binds it to;
-2. every panel's query passes its source's guard, SQL or PromQL, as a save
+2. every panel's query passes its source's guard, SQL, PromQL or LogQL, as a save
    would re-check it;
 3. every SQL `timeField` is a column its query returns, and every PromQL
    `rate()`, `irate()` or `increase()` is over a counter;
 4. the case's own expectations hold: which viz kinds are plausible or
    required, which tables or metrics must be read, whether panels are time
-   series, and how many panels there are.
+   series, whether every `logs` panel names `options.level`, and how many
+   panels there are.
 
 A `chat` case (#416) asks one [Explore](/guide/explore/) question instead. Its
 recording is the turn's steps, each one's text and tool calls, and replay plays
@@ -405,7 +408,9 @@ whether the turn fetched rows in words through `runQuery`.
 The prompt is per kind (#387). A case against `evals/catalogs/prometheus-demo.json`,
 a Prometheus catalog of Holotable's own metrics, runs the PromQL prompt and is
 graded by the PromQL guard; a case against a TimescaleDB catalog runs the SQL
-prompt, which is unchanged by PromQL.
+prompt, which is unchanged by PromQL. A case against `evals/catalogs/loki-demo.json`,
+a Loki catalog of stream labels, runs the LogQL prompt (#564) and is graded by
+the LogQL guard.
 
 | Command | What it does |
 |---|---|

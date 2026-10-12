@@ -230,6 +230,42 @@ Explore and the dashboard chat work the same way. On a dashboard with a
 Prometheus source, the chat's `runQuery` tool takes `promql` (and `instant`)
 beside `sql`, and the source's kind refuses the other language by name.
 
+## Against a Loki source: the LogQL rules
+
+A Loki source's panels are written in LogQL
+([#564](https://github.com/jbouder/holotable/issues/564)). The single-source SQL
+and PromQL prompts are unchanged byte for byte (a test holds their digests).
+When a Loki source is among the sources:
+
+- The catalog block lists the source's stream labels, each with up to 20 of the
+  values discovery found, fenced as untrusted data: a label value is whatever
+  the streams carry, so it is a prompt-injection surface like a column name.
+  It never includes the URL or the auth mode.
+- `LOGQL_RULES` sits beside the other languages' rules. It covers:
+  - one expression per panel, in `query.logql`;
+  - every stream selector carrying an `=` matcher on a listed label;
+  - no time of the model's own: no `offset`, no absolute time;
+  - a `logs` panel is a log query, with `options.limit` for how many lines,
+    never a `LIMIT`;
+  - every other kind draws a metric query (`count_over_time`, `rate`,
+    `sum by (…)`), which answers in PromQL's shape, so those kinds' PromQL
+    hints apply;
+  - `| json` or `| logfmt` before filtering or grouping on a field in the line;
+  - `"instant": true` only on a metric query, since the kind refuses an
+    instant log query;
+  - `options.message` left out (the message is the line), and a `level` label
+    or parsed field named in `options.level`;
+  - a variable only as a whole `=`/`!=` matcher value or a line-filter string,
+    never in a regex and never a multi variable.
+- The `logs` kind's hint has a LogQL form (`logqlHint`).
+- A `query` variable can list a stream label's values:
+  `{"sourceId": …, "label": "app", "match": "{env=\"prod\"}"}`.
+
+The schema holds a panel on a Loki source to `query.logql` the same way, and
+the [LogQL guard](/concepts/executing-a-panel/#the-logql-guard) is the enforcement. In chat,
+`runQuery` takes `logql` beside `sql` and `promql` when a Loki source is in the
+conversation, and `showPanel` can draw a `logs` panel from it.
+
 ## Every panel says what it computes
 
 Alongside `SQL_RULES`, the shared system prompt carries `DESCRIPTION_RULE`:
