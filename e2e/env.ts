@@ -20,6 +20,10 @@ export const PROM_PORT = Number(process.env.E2E_PROM_PORT || 19190);
 export const SCRAPE_TOKEN = "e2e-scrape-token-0123456789";
 /** Where the app and the seeder reach that Prometheus. */
 export const PROM_URL = `http://localhost:${PROM_PORT}`;
+/** The stack's Loki (#567), which e2e/prepare.ts fills with labeled lines. */
+export const LOKI_PORT = Number(process.env.E2E_LOKI_PORT || 13100);
+/** Where the app and the setup reach that Loki. */
+export const LOKI_URL = `http://localhost:${LOKI_PORT}`;
 
 export const BASE_URL = `http://localhost:${APP_PORT}`;
 export const ISSUER = `http://localhost:${KC_PORT}/realms/holotable`;
@@ -96,7 +100,8 @@ export const APP_ENV: Record<string, string> = {
   // The stack's Prometheus scrapes the app (#390), so the gate is open to it.
   METRICS_TOKEN: SCRAPE_TOKEN,
   METRICS_ALLOWED_CIDRS: "",
-  // And a Prometheus source may reach it: loopback, so it has to be named.
+  // And a Prometheus or Loki source may reach the stack: loopback, so it has
+  // to be named.
   SOURCE_URL_ALLOWLIST: "localhost",
   // DuckDB sources (#573) may read the generated files, and nothing else.
   DUCKDB_SOURCES_DIR: DUCKDB_DIR,

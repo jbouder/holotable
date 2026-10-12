@@ -4,6 +4,7 @@ import {
   type Locator,
   type Page,
 } from "@playwright/test";
+import { LOKI_URL } from "../env";
 
 /** Helpers shared by the specs. Nothing here signs in; the setup project did. */
 
@@ -291,39 +292,31 @@ export async function createShareLink(request: APIRequestContext, dashboard: str
   return ((await res.json()) as { url: string }).url;
 }
 
-/** The labels and values `openLokiForm` has discovery answer with. */
-export const LOKI_LABELS = ["app", "env", "level", "namespace"];
+/**
+ * The `app` values e2e/prepare.ts pushes to the stack's Loki (#567), which is
+ * what discovery answers with for that label.
+ */
 export const LOKI_APP_VALUES = ["api", "web", "worker"];
 
 /**
- * Open the Add source dialog on the Loki form, with the endpoint filled in.
- * The stack has no Loki yet (#567), so the discover route's answer is canned
- * here: what is under test is what the form draws and saves, not the
- * endpoint. Everything else (the save, its checks, the audit) is the server's.
+ * Open the Add source dialog on the Loki form, with the stack's Loki filled
+ * in (#567). Discovery asks that Loki for real: the labels and values are the
+ * ones e2e/prepare.ts pushed.
  */
 export async function openLokiForm(page: Page) {
-  await page.route("**/api/sources/discover", async (route) => {
-    const body = route.request().postDataJSON() as { valuesFor?: string };
-    await route.fulfill({
-      json: body.valuesFor
-        ? { ok: true, values: body.valuesFor === "app" ? LOKI_APP_VALUES : ["prod"] }
-        : { ok: true, labels: LOKI_LABELS },
-    });
-  });
   await page.goto("/data-sources");
   await page.getByRole("button", { name: "Add source" }).first().click();
   const dialog = page.getByRole("dialog", { name: "Add source" });
   await dialog.getByRole("button", { name: "or enter configuration manually" }).click();
   await dialog.getByRole("radio", { name: "Loki (LogQL)" }).click();
-  // A public address literal: the save checks it against SOURCE_URL_ALLOWLIST
-  // without resolving anything, and nothing here contacts it.
-  await dialog.getByLabel("URL").fill("https://93.184.216.34");
+  // Loopback, which the app's SOURCE_URL_ALLOWLIST names (e2e/env.ts).
+  await dialog.getByLabel("URL").fill(LOKI_URL);
   await dialog.getByRole("combobox", { name: "Authentication" }).click();
   await page.getByRole("option", { name: "None (in-cluster endpoint)" }).click();
   return dialog;
 }
 
-/** Discover the canned labels and tick `app`, which fetches its values. */
+/** Discover the endpoint's labels and tick `app`, which fetches its values. */
 export async function discoverLokiLabels(dialog: Locator) {
   await dialog.getByRole("button", { name: "Discover labels" }).click();
   const search = dialog.getByLabel("Search the discovered labels");

@@ -1,7 +1,7 @@
 import { expect, test } from "@playwright/test";
 import { STUB_CHAT_REPLY } from "../src/lib/ai/stub";
 import { SPEC_VERSION } from "../src/lib/ir";
-import { PG_PORT, storageStatePath } from "./env";
+import { LOKI_URL, PG_PORT, storageStatePath } from "./env";
 import {
   askChat,
   clickChart,
@@ -333,8 +333,8 @@ test("a source admin registers a Loki source through the form (#563)", async ({
   await expect(dialog).toBeHidden();
   const row = page.locator(`#source-${id}`);
   await expect(row).toBeVisible();
-  await expect(row).toContainText("https://93.184.216.34");
-  // Never checked against the endpoint, so the health says so.
+  await expect(row).toContainText(LOKI_URL);
+  // Discovered, never refreshed: the health says so.
   await expect(row).toContainText("Never refreshed");
 
   // Saved as ticked, with the values discovery found as hints.
@@ -350,7 +350,7 @@ test("a source admin registers a Loki source through the form (#563)", async ({
   // Its kind is fixed: editing opens the Loki form, as saved.
   await page.getByRole("button", { name: `Edit ${name}` }).click();
   const edit = page.getByRole("dialog", { name: `Edit ${name}` });
-  await expect(edit.getByLabel("URL")).toHaveValue("https://93.184.216.34");
+  await expect(edit.getByLabel("URL")).toHaveValue(LOKI_URL);
   await expect(edit.getByText(LOKI_APP_VALUES.join(", "))).toBeVisible();
   await edit.getByRole("button", { name: "Cancel" }).click();
 
