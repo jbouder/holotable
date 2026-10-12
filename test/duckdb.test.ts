@@ -1,13 +1,22 @@
 import { after, before, test } from "node:test";
 import assert from "node:assert/strict";
-import { mkdirSync, mkdtempSync, realpathSync, writeFileSync } from "node:fs";
+import {
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  realpathSync,
+  symlinkSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { DuckDBInstance } from "@duckdb/node-api";
 import { config } from "@/lib/config";
 import { DUCKDB_UNAVAILABLE, setDuckDbLoaderForTests } from "@/lib/duckdb/binding";
 import { openEngine } from "@/lib/duckdb/client";
-import { resolveSourcePath } from "@/lib/duckdb/path";
+import { listSourcePaths, resolveSourcePath, SOURCES_DIR_UNSET } from "@/lib/duckdb/path";
+import { parseGroups } from "@/lib/auth/claims";
+import { can } from "@/lib/auth/authorize";
 import { Panel, PanelQuery } from "@/lib/ir";
 import { createLogger, setLogger } from "@/lib/log";
 import { makePanelExecutor } from "@/lib/poller/registry";
@@ -15,7 +24,12 @@ import { needsSecretRef, type SourceRecord, SourceDraft } from "@/lib/registry";
 import { sourceListing } from "@/lib/source-listing";
 import { QueryExecutionError } from "@/lib/sources/execution";
 import { DuckDbConfig } from "@/lib/sources/kinds/duckdb";
-import { serverKind } from "@/lib/sources/server/registry";
+import {
+  duckdbDiscovery,
+  duckdbPathMenu,
+  serverKind,
+  sourceKindAvailability,
+} from "@/lib/sources/server/registry";
 import type { SourcePlan } from "@/lib/sources/server/types";
 
 /**
@@ -384,6 +398,7 @@ test("Test opens, checks each table and reads the lock; refresh reports and neve
     assertNoPath(result);
     assert.equal(result.ok, true, result.message);
     assert.deepEqual(result.lock?.holds, true);
+    assert.equal(result.layout, source.id === "lake" ? "directory" : "database");
     assert.match(result.server?.version ?? "", /^DuckDB \d+\.\d+/);
     const facts = kind.testFacts(result);
     assert.ok(facts && "duckdb" in facts);
@@ -472,6 +487,138 @@ test("a panel runs through the poller's executor, and the plan view names no pat
     "session" in view && view.session.includes("SET lock_configuration=true"),
     JSON.stringify(view),
   );
+});
+
+test("the path picker lists names directly under the root, and nothing the guard would refuse (#573)", async () => {
+  // Beside the fixtures: a hidden directory, a file that is neither, a
+  // directory whose name says database, a nested directory, and a symlink
+  // that leads out of the root. None of them is offered.
+  mkdirSync(join(root, ".cache"), { recursive: true });
+  mkdirSync(join(root, "weird.duckdb"), { recursive: true });
+  mkdirSync(join(root, "other", "nested"), { recursive: true });
+  writeFileSync(join(root, "notes.txt"), "not a source\n");
+  symlinkSync(base, join(root, "escape"));
+  symlinkSync(join(root, "lake"), join(root, "lake-link"));
+
+  const listed = await listSourcePaths();
+  assert.deepEqual(listed, [
+    { name: "app.duckdb", layout: "database" },
+    { name: "lake", layout: "directory" },
+    // A symlink that stays inside the root is what it points at.
+    { name: "lake-link", layout: "directory" },
+    { name: "other", layout: "directory" },
+  ]);
+  for (const entry of listed) {
+    assert.deepEqual(Object.keys(entry).sort(), ["layout", "name"]);
+    assert.ok(!entry.name.includes("/"), "one level, names only");
+  }
+
+  // The route's answer is that list, or a refusal naming the variable.
+  const menu = await duckdbPathMenu();
+  assert.deepEqual(menu, { ok: true, paths: listed });
+  assertNoPath(menu);
+  writable.duckdbSourcesDir = "";
+  try {
+    assert.deepEqual(await duckdbPathMenu(), { ok: false, error: SOURCES_DIR_UNSET });
+    writable.duckdbSourcesDir = join(base, "missing");
+    const missing = await duckdbPathMenu();
+    assert.equal(missing.ok, false);
+    assert.match(!missing.ok ? missing.error : "", /DUCKDB_SOURCES_DIR/);
+    assertNoPath(missing);
+  } finally {
+    writable.duckdbSourcesDir = root;
+  }
+});
+
+test("the path route is source-admin only, rate limited, and answers the menu alone (#573)", () => {
+  const route = readFileSync(
+    new URL("../src/app/api/sources/duckdb/paths/route.ts", import.meta.url),
+    "utf8",
+  );
+  const authorized = route.indexOf('assertAuthorized(identity, "source:manage"');
+  assert.ok(authorized > 0, "authorized on source:manage");
+  assert.ok(authorized < route.indexOf("duckdbPathMenu()"), "before anything is read");
+  assert.match(route, /requireIdentity\(\)/);
+  assert.match(route, /rateStore\.take/);
+  assert.match(route, /json\(await duckdbPathMenu\(\)/);
+  // Who that is: a source admin of the workspace, never a viewer of it.
+  const admin = parseGroups("sam", ["/workspaces/ops/source-admin"]);
+  const viewer = parseGroups("vic", ["/workspaces/ops/viewer"]);
+  assert.equal(can(admin, "source:manage", { workspaceId: "ops" }), true);
+  assert.equal(can(viewer, "source:manage", { workspaceId: "ops" }), false);
+  assert.equal(can(admin, "source:manage", { workspaceId: "fin" }), false);
+});
+
+test("discovery reads a path's tables and columns into the allowlist menu, naming no path (#573)", async () => {
+  const lake = await duckdbDiscovery("lake").tables();
+  assert.deepEqual(
+    lake.map((t) => [t.name, t.columns.map((c) => c.name)]),
+    [
+      ["hosts", ["host", "rack"]],
+      ["metrics", ["ts", "tz", "host", "v"]],
+    ],
+  );
+  assert.equal(lake.find((t) => t.name === "metrics")?.columns[0]?.type, "TIMESTAMP");
+  const app = await duckdbDiscovery("app.duckdb").tables();
+  assert.deepEqual(
+    app.map((t) => t.name),
+    ["requests"],
+  );
+  // A file that is not a database fails in the engine's open, whose message
+  // names the file: scrubbed like every other.
+  writeFileSync(join(root, "broken.duckdb"), "not a database\n");
+  for (const path of [
+    "missing",
+    "notes.txt",
+    "escape",
+    "../root/lake",
+    "broken.duckdb",
+  ]) {
+    await assert.rejects(duckdbDiscovery(path).tables(), (err: Error) => {
+      assertNoPath(err.message);
+      return true;
+    });
+  }
+  // The route records which kind of thing it opened, never where.
+  const routeText = readFileSync(
+    new URL("../src/app/api/sources/discover/route.ts", import.meta.url),
+    "utf8",
+  );
+  assert.match(routeText, /\{ kind: "duckdb", layout: duckdbLayout\(body\.path\) \}/);
+});
+
+test("the Add source dialog offers DuckDB only when the server can hold one (#573)", async () => {
+  const offered = async () =>
+    Object.fromEntries((await sourceKindAvailability()).map((k) => [k.kind, k]));
+  // Set up: offered, with no reason.
+  assert.deepEqual((await offered()).duckdb, { kind: "duckdb", available: true });
+  // The other kinds need nothing of the server.
+  assert.equal((await offered()).timescaledb?.available, true);
+  assert.equal((await offered()).prometheus?.available, true);
+
+  writable.duckdbSourcesDir = "";
+  try {
+    assert.deepEqual((await offered()).duckdb, {
+      kind: "duckdb",
+      available: false,
+      reason: SOURCES_DIR_UNSET,
+    });
+  } finally {
+    writable.duckdbSourcesDir = root;
+  }
+
+  setDuckDbLoaderForTests(() =>
+    Promise.reject(Object.assign(new Error("no binding"), { code: "MODULE_NOT_FOUND" })),
+  );
+  try {
+    assert.deepEqual((await offered()).duckdb, {
+      kind: "duckdb",
+      available: false,
+      reason: DUCKDB_UNAVAILABLE,
+    });
+  } finally {
+    setDuckDbLoaderForTests(null);
+  }
 });
 
 test("no log line carries a path", () => {

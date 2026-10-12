@@ -31,6 +31,7 @@ import { COLOR_TOKENS } from "@/lib/panels/colors";
 import { PANEL_KIND_NAMES, PANEL_KINDS } from "@/lib/panels/registry";
 import { CatalogTable, type SqlSourceConfig, TimescaleDbConfig } from "@/lib/registry";
 import { checkSql } from "@/lib/sql/safety";
+import { DUCKDB_PROMPT } from "@/lib/duckdb/catalog";
 
 /*
  * The /holotable Claude Code skill (#147) teaches people and Claude to write
@@ -439,6 +440,31 @@ test("the reference documents every field of every query language (#383, #560)",
       );
     }
   }
+});
+
+test("the SQL rules' DuckDB note says what the model is told about DuckDB (#573)", () => {
+  const rules = read("references/sql-rules.md");
+  const note = rules.slice(
+    rules.indexOf("## DuckDB"),
+    rules.indexOf("\n## ", rules.indexOf("## DuckDB") + 1),
+  );
+  assert.ok(note.startsWith("## DuckDB"), "sql-rules.md has a DuckDB section");
+  // Every function, cast and reader the prompt names, the note names too.
+  for (const name of [
+    "time_bucket",
+    "date_trunc",
+    "date_bin",
+    "::timestamptz",
+    "read_parquet",
+    "read_csv",
+  ]) {
+    assert.ok(DUCKDB_PROMPT.includes(`\`${name}`), `the prompt names ${name}`);
+    assert.ok(note.includes(`\`${name}`), `the DuckDB note names ${name}`);
+  }
+  assert.match(note, /case-sensitive/);
+  assert.match(note, /`"Value"`/);
+  // The path is the operator's; the skill never names one.
+  assert.doesNotMatch(note, /DUCKDB_SOURCES_DIR|"path"\s*:/);
 });
 
 test("the skill carries no connection details, credentials or route calls", () => {

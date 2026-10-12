@@ -17,7 +17,15 @@ import {
 } from "@/lib/ai/generate";
 import { describeFailure } from "@/lib/ai/repair";
 import { wrongLanguages } from "@/lib/ai/source-languages";
-import { recordedPromqlDashboard, recordedPromqlExplorePanel } from "@/lib/ai/stub";
+import {
+  recordedDuckDbDashboard,
+  recordedExplorePanel,
+  recordedPromqlDashboard,
+  recordedPromqlExplorePanel,
+  stubAnswer,
+} from "@/lib/ai/stub";
+import { DUCKDB_PROMPT } from "@/lib/duckdb/catalog";
+import { validateSql } from "@/lib/sql/safety";
 import type { Identity } from "@/lib/auth/claims";
 import { Dashboard, DashboardGenerationSchema, type Panel, SPEC_VERSION } from "@/lib/ir";
 import { validatePromql } from "@/lib/promql/safety";
@@ -136,6 +144,65 @@ test("a plain PostgreSQL source is told, after its catalog, that time_bucket doe
   assert.equal(baseSystem(plain).split(PLAIN_POSTGRES_PROMPT).length, 2);
   // The rules themselves are unchanged; the paragraph overrides their example.
   assert.ok(baseSystem(plain).includes(SQL_RULES));
+});
+
+/** The demo source's catalog as a DuckDB directory source (#573). */
+const duck: SourceRecord = {
+  ...sql,
+  id: "eval-duckdb-demo",
+  name: "eval-duckdb-demo",
+  kind: "duckdb",
+  secretRef: null,
+  catalogFacts: { duckdb: "1.5.6" },
+  config: SourceConfig.parse({
+    kind: "duckdb",
+    path: "zz-operator-dir",
+    tables: "tables" in sql.config ? sql.config.tables : [],
+  }),
+};
+
+test("a DuckDB source is told its dialect after its catalog; a TimescaleDB prompt is not (#573)", () => {
+  assert.equal(
+    DUCKDB_PROMPT,
+    "This source is DuckDB, queried with the same SELECT-only SQL as PostgreSQL. `time_bucket`, `date_trunc` and `date_bin` all exist: bucket time with `time_bucket(INTERVAL '5 minutes', ts)`, `date_trunc('minute', ts)` or `date_bin(INTERVAL '5 minutes', ts, TIMESTAMP '2000-01-01')`. Column names are case-sensitive as listed: double-quote any name that is not all lowercase (`\"Value\"`). Do not cast to `::timestamptz`: use the time column as it is. Table functions such as `read_parquet` or `read_csv` are refused: query the tables listed.",
+  );
+  const block = serverKind(duck).catalogPrompt(duck);
+  // Outside the fence, as an instruction, once.
+  assert.ok(block.endsWith(`=====\n\n${DUCKDB_PROMPT}`));
+  const system = baseSystem(duck);
+  assert.equal(system.split(DUCKDB_PROMPT).length, 2);
+  assert.ok(system.includes(SQL_RULES));
+  assert.match(system, /\(id: eval-duckdb-demo, kind: duckdb\)/);
+  // The path is the operator's: never the model's to see.
+  assert.ok(!system.includes("zz-operator-dir"));
+  // And no TimescaleDB source is told any of it: its digest is the one above.
+  assert.ok(!baseSystem(sql).includes(DUCKDB_PROMPT));
+  assert.ok(!baseSystem(sql).includes("DuckDB"));
+  assert.equal(
+    catalogDigest(sql),
+    "1559b25d675ae1149ebb68a58855ee13942054a6d39fe8f8f40252e6e82eb345",
+  );
+});
+
+test("the stub answers a DuckDB source with SQL in its spelling, which the guard accepts (#573)", async () => {
+  const ask = (name: string) =>
+    JSON.parse(
+      stubAnswer({
+        prompt: [{ role: "system", content: baseSystem(duck) }],
+        responseFormat: { type: "json", name },
+      } as unknown as Parameters<typeof stubAnswer>[0]),
+    );
+  const dashboard = ask("Dashboard");
+  assert.deepEqual(dashboard, recordedDuckDbDashboard(duck.id));
+  assert.match(dashboard.panels[0].query.sql, /time_bucket\(INTERVAL '1 minute', ts\)/);
+  assert.deepEqual(ask("Panel"), recordedExplorePanel(duck.id));
+  const config = duck.config;
+  assert.ok(config.kind === "duckdb");
+  for (const panel of [...dashboard.panels, recordedExplorePanel(duck.id)]) {
+    const result = await validateSql(panel.query.sql, config);
+    assert.ok(result.ok, `${panel.id}: ${result.error}`);
+  }
+  assert.ok(Dashboard.safeParse({ ...dashboard, specVersion: SPEC_VERSION }).success);
 });
 
 test("a Prometheus generation is told the PromQL rules, the kinds' PromQL hints and label variables", () => {
