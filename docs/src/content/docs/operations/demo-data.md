@@ -6,7 +6,8 @@ sidebar:
 ---
 
 `npm run seed` (`scripts/seed.ts`) is a long-running seeder that gives a fresh
-install something to show. It does three things.
+install something to show. It does three things, and a fourth when there is a
+Loki to ask.
 
 ## 1. Bootstrap, once
 
@@ -15,7 +16,8 @@ workspace, if they do not already exist (the fifth only when
 `PROMETHEUS_SELF_URL` is set). Four are TimescaleDB sources that point
 at the `metrics` schema and share the read-only `TS_METRICS` secret reference;
 they differ only in the tables they expose. The fifth is a Prometheus source:
-the compose stack's own Prometheus, which scrapes the app.
+the compose stack's own Prometheus, which scrapes the app. A sixth, the
+`logs` profile's Loki, is registered by the loop once it answers (below).
 
 | Source id | Table | Demo dashboard |
 | --- | --- | --- |
@@ -24,6 +26,7 @@ the compose stack's own Prometheus, which scrapes the app.
 | `ts-logs` | `metrics.app_logs` — gateway log lines | The logs on **Demo service health** and **Demo host detail** |
 | `holotable-self` | `metrics.holotable_self` — the app's own instruments | **Holotable self-monitoring**, below |
 | `prometheus-self` | Prometheus at `PROMETHEUS_SELF_URL` — the same instruments, scraped | **Holotable self-monitoring (Prometheus)**, below |
+| `loki-self` | Loki at `LOKI_SELF_URL` — the stack's container log lines, the app's among them | **Holotable logs**, below |
 
 Three demo dashboards each answer one question, and between them use every
 panel kind:
@@ -98,6 +101,12 @@ tables so the live dashboards stream. It connects with the privileged metrics
 user and ensures the demo hypertables exist first, so it also works against a
 database whose volume predates a table.
 
+With `LOKI_SELF_URL` set, the loop also asks that Loki's `/ready` every ten
+seconds until it answers, then registers the `loki-self` source and the
+**Holotable logs** dashboard, once. A stack without the `logs` profile has no
+Loki, so it never gets either, and a profile brought up later gets both within
+seconds. See [The logs profile](#the-logs-profile).
+
 ## Running it
 
 ```bash
@@ -121,6 +130,7 @@ database.
 | `TS_METRICS_HOST` / `TS_METRICS_PORT` | `localhost` / `5432` | Host and port written into the seeded source configs. |
 | `POSTGRES_DB` | `holotable` | Database name written into the seeded source configs. |
 | `PROMETHEUS_SELF_URL` | — | Where the seeded `prometheus-self` source asks: `http://prometheus:9090` in compose, `http://localhost:9090` in `.env.example`. Unset, the Prometheus source and its dashboard are not seeded, as in the quick-start image. The app reaches it only if `SOURCE_URL_ALLOWLIST` names its host. |
+| `LOKI_SELF_URL` | — | Where the seeded `loki-self` source asks, once it answers: `http://loki:3100` in compose, `http://localhost:3100` in `.env.example`. Unset, the Loki source and the Holotable logs dashboard are not seeded, as in the quick-start image. Smoke test too: set, it checks the Holotable logs dashboard; empty, it skips it. |
 | `SELF_METRICS_INTERVAL_MS` | `15000` | Collector only: delay between scrapes of `/api/metrics`. |
 | `METRICS_URL` | `http://app:3000/api/metrics` | Collector only: what to scrape. |
 | `SMOKE_TIMEOUT_MS` | `180000` | Smoke test only: how long to wait for the first panel with rows. |
@@ -186,6 +196,45 @@ app  ◀──scrape──  prometheus  ◀──query_range──  prometheus-s
  browser  ◀──SSE──  poller  ◀──guarded PromQL───────────┘
 ```
 
+### The logs profile
+
+The SQL and PromQL dashboards read what the app counts. The third reads what
+it says. `docker compose --profile logs up` adds two services:
+
+- **Loki** (`grafana/loki`, single binary, no volume), published on `3100`.
+- **Grafana Alloy** (`grafana/alloy`), which lists this compose project's
+  containers through the Docker socket, read-only, and pushes their log lines
+  to Loki labeled `app` (the compose service), `env` (`dev`) and `container`.
+
+The seeder registers that Loki as `loki-self`, a [Loki
+source](/concepts/loki-sources/) with `auth: none` at `LOKI_SELF_URL`, its
+allowlist `app`, `container` and `env` with the values the live Loki has. The
+app reaches it because `SOURCE_URL_ALLOWLIST` names `loki`.
+
+The app's log lines are one JSON object each (`src/lib/log.ts`), so
+**Holotable logs** (`src/lib/self-monitoring/loki.ts`) reads `{app="app"}`,
+parses with `| json` and filters on the fields the server writes:
+
+- log lines by level per minute, and errors and warnings by route;
+- the p95 of `durationMs` per route, from `request.completed` lines, with
+  `unwrap`;
+- guard refusals by language and reason, from the `guard.refused` line every
+  refusal writes beside its counter;
+- a request log (method, route, status and duration, through `line_format`)
+  and the error lines, as `logs` panels.
+
+```
+app  ──stdout──▶  alloy  ──push──▶  loki  ◀──query_range──  loki-self source
+                                                                  │
+ browser  ◀──SSE──  poller  ◀──guarded LogQL───────────────────────┘
+```
+
+An idle stack has lines from boot (the configuration report) and few after:
+`/api/health` and `/api/metrics` log at `debug`. Open a dashboard, or ask for
+something that fails, and the request panels fill. The [quick-start
+image](/getting-started/quick-start/) stays TimescaleDB-only and has none of
+this, as it has no Prometheus.
+
 ### The table
 
 | Column | Meaning |
@@ -212,9 +261,12 @@ panel queries is one the collector keeps.
 The dashboard specs live in `src/lib/self-monitoring/`, not inline in the
 seeder, which is what lets `npm test` hold them to the contract:
 
-- each parses against the current IR, and both are fixtures in the IR library;
-- every SQL panel passes the real SQL guard against the committed catalog, and
-  every PromQL panel passes the real PromQL guard with no hint;
+- each parses against the current IR, and all three are fixtures in the IR
+  library;
+- every SQL panel passes the real SQL guard against the committed catalog,
+  every PromQL panel passes the real PromQL guard with no hint, and every LogQL
+  panel passes the real LogQL guard against the committed labels with no hint
+  and filters only on messages the app logs;
 - the PromQL catalog lists only metrics the app's registry really exports, and
   both dashboards read the same metric families;
 - every panel builds an executable plan with the server's time parameters bound;
@@ -227,11 +279,16 @@ seeder, which is what lets `npm test` hold them to the contract:
 docker compose --profile smoke run --rm smoke
 ```
 
-`scripts/smoke.ts` waits for the seeder, the collector and Prometheus, then runs
-every panel of both dashboards through the source kind's check, plan and
-execute: the same functions in the same order as `POST /api/query`. It fails
-unless at least one panel of each comes back with rows, which can only happen
-if the collector, and Prometheus, really scraped the running app.
+`scripts/smoke.ts` waits for the seeder, the collector, Prometheus and Loki,
+then runs every panel of the three self-monitoring dashboards and **Demo
+service health** through the source kind's check, plan and execute: the same
+functions in the same order as `POST /api/query`. It fails unless at least one
+panel of each comes back with rows, which can only happen if the collector and
+Prometheus really scraped the running app, and Alloy really shipped its lines
+to Loki. The Holotable logs dashboard is checked while `LOKI_SELF_URL` is set,
+which compose does by default, so bring the stack up with `--profile logs`
+first (`LOKI_SELF_URL= docker compose --profile smoke run --rm smoke` smokes a
+stack without it).
 
 It asserts "at least one" because an idle stack has nobody viewing a dashboard,
 so there are no pollers, no live viewers, and no model calls; resident memory is

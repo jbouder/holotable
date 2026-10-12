@@ -70,7 +70,10 @@ real data the app produced. It needs `METRICS_TOKEN` set to the same value the
 app has, or the scrape is refused with a 404. Under `docker compose` it runs on
 its own and the token has a local default;
 `docker compose --profile smoke run --rm smoke` then checks the whole path end
-to end.
+to end. `docker compose --profile logs up` adds a Loki and a Grafana Alloy that
+ships the stack's container logs to it, and the seeder then registers the
+**Holotable logs** dashboard over the app's own JSON log lines (#567); the
+smoke checks that one too while `LOKI_SELF_URL` is set.
 
 Authentication is OIDC-only for real users — there is no local or dev login
 path — so you need the Keycloak from `docker compose` (or your own realm) when
@@ -416,11 +419,11 @@ request:
 | `src/lib/panels/` (a panel kind or its options) | `reference/panel-options.md`, "Panel kinds" in `concepts/streaming-and-rendering.md`. The visualization list is generated |
 | `src/lib/sql/safety.ts`, `ast.ts`, `denylist.ts` (the guard) | `concepts/executing-a-panel.md`, invariants 7 and 8, the trust model in `SECURITY.md` |
 | `src/lib/promql/` (the PromQL guard, its rewrites, the plan) | `concepts/executing-a-panel.md` ("The PromQL guard"), `concepts/prometheus-sources.md`, invariants 7 and 8, the trust model in `SECURITY.md`, the skill's `references/promql-rules.md` |
-| `src/lib/logql/` (the LogQL guard, its rewrites, the plan) | `concepts/executing-a-panel.md` ("The LogQL guard"), `operations/metrics.md` |
-| `src/lib/sources/` (a source kind, its config or its server half) | `concepts/prometheus-sources.md`, `architecture/data-model.md` (`sources`, "Source kinds") |
+| `src/lib/logql/` (the LogQL guard, its rewrites, the plan) | `concepts/executing-a-panel.md` ("The LogQL guard"), `concepts/loki-sources.md`, `operations/metrics.md` |
+| `src/lib/sources/` (a source kind, its config or its server half) | `concepts/prometheus-sources.md`, `concepts/loki-sources.md`, `architecture/data-model.md` (`sources`, "Source kinds") |
 | `src/lib/duckdb/` (the DuckDB path guard, engine and lock) | `architecture/data-model.md` ("DuckDB") |
 | `src/lib/prometheus/` (the client, discovery, the connection test) | `admin/prometheus.md`, `concepts/prometheus-sources.md` |
-| `src/lib/loki/` (the client, the rows, refresh and the connection test) | `architecture/data-model.md` (`sources`), "The LogQL guard" in `concepts/executing-a-panel.md` |
+| `src/lib/loki/` (the client, the rows, refresh and the connection test) | `admin/loki.md`, `concepts/loki-sources.md`, `architecture/data-model.md` (`sources`), "The LogQL guard" in `concepts/executing-a-panel.md` |
 | `src/app/data-sources/`, `src/components/sources/`, `src/lib/prometheus-form.ts`, `src/lib/loki-form.ts` (the source forms, discovery, the test report, refresh and the catalog browser) | Steps 1 and 2 of `getting-started/your-first-dashboard.md`, the `/api/sources` rows in `reference/api-routes.md` |
 | `src/lib/sql/row-filter.ts`, `src/lib/row-scope.ts` | `admin/row-level-filters.md`, invariant 8a |
 | `src/lib/sql/variables.ts`, `src/lib/variables.ts`, `variable-selection.ts` | `guide/variables.md` |
@@ -446,7 +449,7 @@ request:
 | `src/lib/ai/providers/` (a provider kind, including `stub`), `src/lib/ai/server-models.ts` | `admin/models.md` |
 | `src/app/models/`, `src/components/models/`, `src/components/model-chip.tsx` | `guide/models.md` |
 | `src/lib/ir.ts`, a panel kind, a color token, or a guard rule in `src/lib/sql/` or `src/lib/promql/` | The skill's `.claude/skills/holotable/references/` and `examples/` (`test/holotable-skill.test.ts` holds its examples and lists to the code) |
-| `docker-compose.yml`, `deploy/quickstart/` | `getting-started/quick-start.md`, the quick start in `README.md` |
+| `docker-compose.yml`, `deploy/quickstart/` | `getting-started/quick-start.md`, the quick start in `README.md`; the `logs` profile's Loki and Alloy also `operations/demo-data.md` and the Alloy example in `admin/loki.md` |
 | `deploy/helm/holotable/` | `operations/kubernetes.md`, the chart's own `README.md` |
 | `scripts/seed.ts`, `scripts/self-metrics.ts`, `scripts/smoke.ts`, `src/lib/self-monitoring/` | `operations/demo-data.md` |
 | A `package.json` script | `getting-started/quick-start.md` (Scripts), `AGENTS.md` (Checks) |
