@@ -17,6 +17,7 @@ import {
   type FieldErrors,
   type SourceFormState,
   type TableMenu,
+  type TableRow as TableRowData,
   emptyFormState,
   emptyMenu,
   applyDiscovery,
@@ -405,70 +406,28 @@ export function SourceForm({
             </div>
           </div>
 
-          <div className="space-y-2 border-t border-border pt-4">
-            <div className="flex items-center justify-between gap-3">
-              <div>
-                <h3 className="text-sm font-medium">Tables</h3>
-                <p className="text-xs text-muted">
-                  The allowlist: only the tables ticked here may be referenced by any
-                  query.
-                </p>
-              </div>
-              <Button
-                type="button"
-                variant="secondary"
-                size="sm"
-                onClick={() => void discover()}
-                disabled={discovering}
-              >
-                {discovering ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                ) : (
-                  <Database className="h-4 w-4" />
-                )}
-                Discover tables
-              </Button>
-            </div>
-            {errors.tables && <p className="text-xs text-danger">{errors.tables}</p>}
-            {unticked.length > 0 && (
-              <p className="text-xs text-warning">
-                Unticked {unticked.join(", ")}: not found in schema {form.schema}. Tick{" "}
-                {unticked.length === 1 ? "it" : "them"} again to keep{" "}
-                {unticked.length === 1 ? "it" : "them"} anyway.
-              </p>
-            )}
-
-            {rows.length === 0 ? (
-              <p className="border border-dashed border-border px-3 py-6 text-center text-sm text-muted">
-                {menu.ran
-                  ? `No tables visible to ${secretRef} in schema ${form.schema}.`
-                  : "Fill in the connection, then discover the tables this source may read."}
-              </p>
-            ) : (
-              <ul className="space-y-2">
-                {rows.map((row, index) => (
-                  <TableRowItem
-                    key={row.table.name}
-                    row={row}
-                    error={errors[tableFieldKey(index, "name")]}
-                    onToggle={() => {
-                      // Remembered first: unticking must not take the row —
-                      // and its column list — off the screen.
-                      setMenu((current) => rememberTable(current, row.table));
-                      setForm(toggleTable(form, row.table));
-                      // A table ticked back is no longer news.
-                      setUnticked((current) =>
-                        current.filter((name) => name !== row.table.name),
-                      );
-                    }}
-                    onChange={(patch) =>
-                      setForm(updateTable(form, row.table.name, patch))
-                    }
-                  />
-                ))}
-              </ul>
-            )}
-          </div>
+          <TableAllowlist
+            rows={rows}
+            errors={errors}
+            unticked={unticked}
+            where={`in schema ${form.schema}`}
+            empty={
+              menu.ran
+                ? `No tables visible to ${secretRef} in schema ${form.schema}.`
+                : "Fill in the connection, then discover the tables this source may read."
+            }
+            discovering={discovering}
+            onDiscover={() => void discover()}
+            onToggle={(table) => {
+              // Remembered first: unticking must not take the row — and its
+              // column list — off the screen.
+              setMenu((current) => rememberTable(current, table));
+              setForm(toggleTable(form, table));
+              // A table ticked back is no longer news.
+              setUnticked((current) => current.filter((name) => name !== table.name));
+            }}
+            onChange={(name, patch) => setForm(updateTable(form, name, patch))}
+          />
         </>
       )}
 
@@ -532,6 +491,90 @@ export function Field({
       ) : hint ? (
         <p className="mt-1 text-xs text-muted">{hint}</p>
       ) : null}
+    </div>
+  );
+}
+
+/**
+ * The table allowlist: the discovered menu, ticked into the config, with each
+ * ticked table's time column and note. Shared by every SQL kind's form (the
+ * DuckDB form's tables are `CatalogTable`s too, #573); the state it edits is
+ * the caller's, through `@/lib/source-form`.
+ */
+export function TableAllowlist({
+  rows,
+  errors,
+  unticked,
+  where,
+  empty,
+  discovering,
+  onDiscover,
+  onToggle,
+  onChange,
+}: {
+  rows: TableRowData[];
+  errors: FieldErrors;
+  /** Allowlisted tables the last discovery did not find, now unticked. */
+  unticked: string[];
+  /** Where discovery looked, for the unticked warning: "in schema public". */
+  where: string;
+  /** What the empty list says: why it is empty, or what to do first. */
+  empty: string;
+  discovering: boolean;
+  onDiscover: () => void;
+  onToggle: (table: CatalogTable) => void;
+  onChange: (name: string, patch: Partial<CatalogTable>) => void;
+}) {
+  return (
+    <div className="space-y-2 border-t border-border pt-4">
+      <div className="flex items-center justify-between gap-3">
+        <div>
+          <h3 className="text-sm font-medium">Tables</h3>
+          <p className="text-xs text-muted">
+            The allowlist: only the tables ticked here may be referenced by any query.
+          </p>
+        </div>
+        <Button
+          type="button"
+          variant="secondary"
+          size="sm"
+          onClick={onDiscover}
+          disabled={discovering}
+        >
+          {discovering ? (
+            <Loader2 className="h-4 w-4 animate-spin" />
+          ) : (
+            <Database className="h-4 w-4" />
+          )}
+          Discover tables
+        </Button>
+      </div>
+      {errors.tables && <p className="text-xs text-danger">{errors.tables}</p>}
+      {unticked.length > 0 && (
+        <p className="text-xs text-warning">
+          Unticked {unticked.join(", ")}: not found {where}. Tick{" "}
+          {unticked.length === 1 ? "it" : "them"} again to keep{" "}
+          {unticked.length === 1 ? "it" : "them"} anyway.
+        </p>
+      )}
+
+      {rows.length === 0 ? (
+        <p className="border border-dashed border-border px-3 py-6 text-center text-sm text-muted">
+          {empty}
+        </p>
+      ) : (
+        <ul className="space-y-2">
+          {rows.map((row, index) => (
+            <TableRowItem
+              key={row.table.name}
+              row={row}
+              error={errors[tableFieldKey(index, "name")]}
+              onToggle={() => onToggle(row.table)}
+              onChange={(patch) => onChange(row.table.name, patch)}
+            />
+          ))}
+        </ul>
+      )}
     </div>
   );
 }

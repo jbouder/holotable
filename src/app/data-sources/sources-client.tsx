@@ -14,6 +14,7 @@ import {
   ListTree,
   Activity,
   ScrollText,
+  FolderOpen,
 } from "lucide-react";
 import { SourceDraft, type SourceRecord, type SqlSourceDraft } from "@/lib/registry";
 import { type SourceListing, sourceListing } from "@/lib/source-listing";
@@ -45,7 +46,7 @@ import { ModelChip, useModelChoice } from "@/components/model-chip";
 import { FIRST_DASHBOARD_DOCS_URL } from "@/lib/onboarding";
 import { apiErrorFromThrown, readApiError } from "@/lib/errors";
 import { buildSourceDescriptionStarters } from "@/lib/prompts/starters";
-import { isSqlSource } from "@/lib/sources/registry";
+import { isKindAvailable, isSqlSource } from "@/lib/sources/registry";
 import { SourceForm } from "./source-form";
 import {
   PrometheusSourceForm,
@@ -53,6 +54,8 @@ import {
 } from "./prometheus-source-form";
 import { ChoiceCard, ChoiceCardGroup } from "@/components/ui/choice-card";
 import { LokiSourceForm, type LokiSourceFormInitial } from "./loki-source-form";
+import { DuckDbSourceForm } from "./duckdb-source-form";
+import type { KindAvailability } from "@/lib/sources/types";
 import { type GrantedSecretRefsState, readinessIn } from "@/lib/secret-refs";
 import { Notice } from "@/components/notice";
 import { useReducedMotion } from "@/components/motion-preference";
@@ -75,6 +78,7 @@ export function SourcesClient({
   workspaces,
   manageable,
   startCreating = false,
+  kinds = [],
 }: {
   /** Every workspace the identity may see, the manageable ones first. */
   workspaces: string[];
@@ -86,6 +90,8 @@ export function SourcesClient({
    * form rather than on a page with a button to find.
    */
   startCreating?: boolean;
+  /** Which kinds this server can hold (#573): a kind it cannot is not offered. */
+  kinds?: KindAvailability[];
 }) {
   // Workspace switching is hidden for now; pin to the first accessible workspace.
   const [workspaceId] = React.useState<string | null>(workspaces[0] ?? null);
@@ -233,6 +239,10 @@ export function SourcesClient({
       : undefined;
   const promBeingEdited =
     editedRecord && "metrics" in editedRecord.config
+      ? { record: editedRecord, config: editedRecord.config }
+      : undefined;
+  const duckBeingEdited =
+    editedRecord && "path" in editedRecord.config
       ? { record: editedRecord, config: editedRecord.config }
       : undefined;
   const lokiBeingEdited =
@@ -525,6 +535,7 @@ export function SourcesClient({
             workspaceId={workspaceId}
             existing={(sources ?? []).flatMap((row) => (row.record ? [row.record] : []))}
             secretRefs={secretRefs}
+            duckdbAvailable={isKindAvailable(kinds, "duckdb")}
             onCreated={() => {
               setCreating(false);
               setNotice("source created");
@@ -639,12 +650,49 @@ export function SourcesClient({
           />
         </Dialog>
       )}
+
+      {duckBeingEdited && (
+        <Dialog
+          open
+          onOpenChange={(open) => {
+            if (!open) setEditing(null);
+          }}
+          title={`Edit ${duckBeingEdited.record.name}`}
+        >
+          <DuckDbSourceForm
+            mode="edit"
+            workspaceId={duckBeingEdited.record.workspaceId}
+            initial={{
+              name: duckBeingEdited.record.name,
+              config: duckBeingEdited.config,
+            }}
+            submitLabel="Save changes"
+            onSubmit={async ({ name, config }) => {
+              const res = await fetch(`/api/sources/${duckBeingEdited.record.id}`, {
+                method: "PUT",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ name, config }),
+              });
+              if (!res.ok) return readApiError(res);
+              setEditing(null);
+              setNotice(`${duckBeingEdited.record.id}: updated`);
+              if (workspaceId) void load(workspaceId);
+              return null;
+            }}
+            onCancel={() => setEditing(null)}
+          />
+        </Dialog>
+      )}
     </div>
   );
 }
 
-/** What the manual form creates, by the language its panels are written in. */
-type FormLanguage = "sql" | "promql" | "logql";
+/**
+ * What the manual form creates, by the language its panels are written in,
+ * and `files` for DuckDB (#573): SQL too, but its own form, a path in place
+ * of a connection.
+ */
+type FormLanguage = "sql" | "promql" | "logql" | "files";
 
 /**
  * The kind picker's cards: one per kind the form can create, each pictured
@@ -678,6 +726,13 @@ const KIND_CHOICES: {
     Icon: ScrollText,
     sample: '{app="api"} |= "error"',
   },
+  {
+    value: "files",
+    label: "DuckDB (files)",
+    description: "Parquet and CSV files, or a .duckdb file, on the server.",
+    Icon: FolderOpen,
+    sample: "SELECT time_bucket(INTERVAL '1m', ts) …",
+  },
 ];
 
 /**
@@ -689,6 +744,7 @@ function CreateSourcePanel({
   workspaceId,
   existing,
   secretRefs,
+  duckdbAvailable = false,
   onCreated,
   onCancel,
 }: {
@@ -697,6 +753,8 @@ function CreateSourcePanel({
   existing: SourceRecord[];
   /** The refs the workspace may use, for the form's picker. */
   secretRefs: GrantedSecretRefsState;
+  /** Offer DuckDB (#573): the server has the binding and `DUCKDB_SOURCES_DIR`. */
+  duckdbAvailable?: boolean;
   onCreated: () => void;
   onCancel: () => void;
 }) {
@@ -705,6 +763,9 @@ function CreateSourcePanel({
   const [lokiSeed, setLokiSeed] = React.useState<LokiSourceFormInitial>();
   // Which kind of source the manual form creates; a draft decides it too.
   const [chosen, setChosen] = React.useState<FormLanguage>("sql");
+  // DuckDB is offered only where the server can hold it, and never drafted:
+  // its path is the operator's to pick (#573).
+  const choices = KIND_CHOICES.filter((c) => c.value !== "files" || duckdbAvailable);
   // Bumped on each draft so the form remounts and re-seeds from the new values.
   const [seedSeq, setSeedSeq] = React.useState(0);
   // The configuration form stays hidden until the drafter returns a result;
@@ -749,9 +810,9 @@ function CreateSourcePanel({
               onValueChange={setChosen}
               labelledBy="s-kind"
               describedBy="s-kind-hint"
-              className="sm:grid-cols-3"
+              className={choices.length > 3 ? "sm:grid-cols-2" : "sm:grid-cols-3"}
             >
-              {KIND_CHOICES.map(({ value, label, description, Icon, sample }) => (
+              {choices.map(({ value, label, description, Icon, sample }) => (
                 <ChoiceCard
                   key={value}
                   value={value}
@@ -769,7 +830,24 @@ function CreateSourcePanel({
               ))}
             </ChoiceCardGroup>
           </div>
-          {chosen === "logql" ? (
+          {chosen === "files" ? (
+            <DuckDbSourceForm
+              mode="create"
+              workspaceId={workspaceId}
+              submitLabel="Create source"
+              onSubmit={async ({ id, name, config }) => {
+                const res = await fetch("/api/sources", {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({ workspaceId, id, name, config }),
+                });
+                if (!res.ok) return readApiError(res);
+                onCreated();
+                return null;
+              }}
+              onCancel={onCancel}
+            />
+          ) : chosen === "logql" ? (
             <LokiSourceForm
               key={`l${seedSeq}`}
               mode="create"

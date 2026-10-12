@@ -4,6 +4,9 @@ import { AlertTriangle, CheckCircle2, ShieldAlert, ShieldCheck, X } from "lucide
 import {
   formatLatency,
   hasFinding,
+  layoutLabel,
+  lockHeadline,
+  lockTone,
   readOnlyHeadline,
   readOnlyTone,
   shortVersion,
@@ -77,6 +80,14 @@ export function SourceTestReport({
         />
       )}
 
+      {result.lock && (
+        <VerdictRow
+          tone={lockTone(result.lock)}
+          headline={lockHeadline(result.lock)}
+          detail={result.lock.detail}
+        />
+      )}
+
       <dl className="grid grid-cols-1 gap-x-6 gap-y-1 text-xs text-muted sm:grid-cols-2">
         {result.latency && (
           <Fact label="Latency">
@@ -85,15 +96,18 @@ export function SourceTestReport({
           </Fact>
         )}
         {result.server && (
-          <Fact label="Server">
+          <Fact label={result.layout ? "Engine" : "Server"}>
             <span title={result.server.version}>
               {shortVersion(result.server.version)}
             </span>
-            {result.server.timescaledb
-              ? ` · TimescaleDB ${result.server.timescaledb}`
-              : " · no TimescaleDB extension"}
+            {result.layout
+              ? ""
+              : result.server.timescaledb
+                ? ` · TimescaleDB ${result.server.timescaledb}`
+                : " · no TimescaleDB extension"}
           </Fact>
         )}
+        {result.layout && <Fact label="Reads">{layoutLabel(result.layout)}</Fact>}
         {result.role && (
           <Fact label="Role">
             {result.role.currentUser}
