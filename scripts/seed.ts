@@ -35,6 +35,14 @@ import {
   hostDetailSpec,
   RETIRED_DEMO_DASHBOARDS,
 } from "./lib/demo-dashboards";
+import {
+  DEMO_FILES_REFRESH_MS,
+  DEMO_FILES_SOURCE_ID,
+  DEMO_FILES_SOURCE_NAME,
+  demoFilesConfig,
+  demoFilesSpec,
+  writeDemoFiles,
+} from "./lib/demo-files";
 
 /**
  * Looping seeder.
@@ -49,6 +57,10 @@ import {
  * 4. (loop, with LOKI_SELF_URL) registers the `loki-self` source and the
  *    Holotable logs dashboard once that Loki answers (#567), which it does
  *    only when the compose `logs` profile is up.
+ *
+ * With `DUCKDB_SOURCES_DIR` set, it also writes the files demo's Parquet and
+ * CSV files under `<dir>/demo/` before anything else, and rewrites them every
+ * minute (#574, `scripts/lib/demo-files.ts`).
  *
  * Uses the privileged TimescaleDB connection for inserts — distinct
  * from the app's read-only query user.
@@ -212,6 +224,21 @@ async function ensureDemo() {
       });
     }
 
+    // The files demo (#574): a DuckDB source over the Parquet and CSV files
+    // the loop writes under DUCKDB_SOURCES_DIR. Only where that is set:
+    // compose sets it, and the quick-start image, which ships no files,
+    // does not. No secret_ref: a DuckDB source has nothing to log in to.
+    if (process.env.DUCKDB_SOURCES_DIR) {
+      const filesConfig = demoFilesConfig();
+      await upsertSource(pg, {
+        id: DEMO_FILES_SOURCE_ID,
+        name: DEMO_FILES_SOURCE_NAME,
+        kind: filesConfig.kind,
+        config: filesConfig,
+        secretRef: null,
+      });
+    }
+
     await ensureDashboard(pg, demoSpec());
     // Link targets first: a link names its target by id (#371).
     const targets = { hostDetail: await ensureDashboard(pg, hostDetailSpec()) };
@@ -219,6 +246,7 @@ async function ensureDemo() {
     for (const title of RETIRED_DEMO_DASHBOARDS) await retireDashboard(pg, title);
     await ensureDashboard(pg, selfMonitoringSpec());
     if (promUrl) await ensureDashboard(pg, prometheusSelfMonitoringSpec());
+    if (process.env.DUCKDB_SOURCES_DIR) await ensureDashboard(pg, demoFilesSpec());
   } finally {
     await pg.end();
   }
@@ -527,6 +555,24 @@ async function ensureMetricsTables(client: Client) {
   );
 }
 
+/**
+ * Rewrite the files demo under `DUCKDB_SOURCES_DIR` (#574), so its newest
+ * minute is the last one. A no-op when the variable is unset. A failure is
+ * logged and the loop carries on: the database demo does not depend on it.
+ */
+async function refreshDemoFiles(): Promise<void> {
+  const root = process.env.DUCKDB_SOURCES_DIR;
+  if (!root) return;
+  try {
+    const dir = await writeDemoFiles(root);
+    if (!demoFilesWritten) console.log(`files demo: wrote ${dir}`);
+    demoFilesWritten = true;
+  } catch (err) {
+    console.warn("files demo skipped:", err instanceof Error ? err.message : err);
+  }
+}
+let demoFilesWritten = false;
+
 async function main() {
   // Checked before anything is written, so a typo fails fast and loudly
   // instead of quietly seeding no history.
@@ -538,6 +584,8 @@ async function main() {
     process.exit(1);
   }
 
+  // The files first, so a source registered below has something to open.
+  await refreshDemoFiles();
   await ensureDemo().catch((e) => console.warn("demo seed skipped:", e.message));
 
   const intervalMs = Number(process.env.SEED_INTERVAL_MS || 2000);
@@ -560,7 +608,12 @@ async function main() {
       : undefined;
   let lokiPending = Boolean(lokiUrl);
   let lokiAskedAt = 0;
+  let filesAt = Date.now();
   for (;;) {
+    if (Date.now() - filesAt >= DEMO_FILES_REFRESH_MS) {
+      filesAt = Date.now();
+      await refreshDemoFiles();
+    }
     if (lokiUrl && lokiPending && Date.now() - lokiAskedAt >= 10_000) {
       lokiAskedAt = Date.now();
       try {

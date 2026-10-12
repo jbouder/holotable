@@ -109,8 +109,11 @@ this server". The quick-start image stays on Alpine: the pinned binding ships
 musl builds for `linux-x64` and `linux-arm64` beside the glibc ones, and the
 binding was checked loading and answering on the image's base
 (`timescale/timescaledb:2.17.2-pg16` with Alpine's Node 22) on both. The
-production image (`node:24-bookworm-slim`) is glibc. The image ships no
-sample files (#574).
+production image (`node:24-bookworm-slim`) is glibc. The quick-start image
+ships no sample files (#574); the Compose stack has a
+[files demo](/operations/demo-data/#the-files-demo). What a DuckDB source is
+to a source admin is in [DuckDB sources](/concepts/duckdb-sources/), and what
+an operator sets up in [DuckDB files](/admin/duckdb/).
 
 Referenced sources are **tombstoned** rather than deleted, so dashboards
 referencing them keep resolving to a tombstone marker instead of breaking

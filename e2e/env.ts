@@ -119,4 +119,7 @@ export const SEED_ENV: Record<string, string> = {
   SEED_BACKFILL: "30m",
   // The seeded `prometheus-self` source (#390) asks the stack's Prometheus.
   PROMETHEUS_SELF_URL: PROM_URL,
+  // The files demo (#574): the seeder writes `demo/` beside `prepare.ts`'s
+  // `requests/` and seeds the "Demo files" source and dashboard over it.
+  DUCKDB_SOURCES_DIR: DUCKDB_DIR,
 };

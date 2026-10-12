@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test";
 import { expectNoA11yViolations, setAppearance } from "./support/a11y";
-import { waitForPanels } from "./support/app";
+import { dashboardId, waitForPanels } from "./support/app";
 
 /*
  * A DuckDB source end to end (#573), against the Parquet file `prepare.ts`
@@ -10,6 +10,9 @@ import { waitForPanels } from "./support/app";
  * dashboard with the recorded model and watch a panel render from the file.
  * The axe scans cover the form, the picker and the test report; the form and
  * picker are also scanned in every theme by a11y.spec.ts.
+ *
+ * The seeder also writes the files demo under the same root (#574) and seeds
+ * the "Demo files" dashboard over it, which the last test opens.
  */
 
 test.beforeEach(async ({ page }) => {
@@ -129,4 +132,25 @@ test("a DuckDB source: path picker, discovery, test, generate, render", async ({
   if (id) await request.delete(`/api/dashboards/${id}`);
   const removed = await request.delete(`/api/sources/${sourceId}`);
   expect(removed.ok(), await removed.text()).toBe(true);
+});
+
+test("the seeded Demo files dashboard renders from its Parquet and CSV files", async ({
+  page,
+  request,
+}) => {
+  await page.goto(`/dashboards/${await dashboardId(request, "Demo files")}`);
+  await waitForPanels(page);
+  // A panel per file: requests by minute (time_bucket), revenue by day
+  // (date_trunc), and the requests file joined to the CSV inventory.
+  for (const id of ["rpm", "traffic", "revenue-daily", "requests-by-region"]) {
+    await expect(page.locator(`[data-panel-id="${id}"]`)).toHaveAttribute(
+      "data-status",
+      "live",
+      { timeout: 30_000 },
+    );
+  }
+  const table = page.locator('[data-panel-id="revenue-by-region"]');
+  await expect(table.getByRole("cell", { name: "us-east" })).toBeVisible();
+  await expect(page.locator('[data-panel-id][data-status="error"]')).toHaveCount(0);
+  await expectNoA11yViolations(page);
 });

@@ -140,6 +140,13 @@ export async function listDirectoryFiles(dir: string): Promise<DirectoryFile[]> 
  * `allowed_paths` cannot be set once external access is off, and nothing can
  * be set once the configuration is locked.
  *
+ * `TimeZone` comes first, `GLOBAL` so it is every later connection's zone:
+ * the plan binds its window as UTC `TIMESTAMP`s, and a `TIMESTAMPTZ` column
+ * compares to one in this zone. It is a statement rather than an instance
+ * option because the setting belongs to ICU, which the Linux bindings load
+ * only after the options are applied: as an option it failed every open on
+ * Linux, in every image (#574).
+ *
  * `allowed_paths` names the directory's files one by one, the views' and no
  * other, rather than `allowed_directories` naming the directory: DuckDB
  * allows a write wherever it allows a read, and a directory prefix would let
@@ -148,6 +155,7 @@ export async function listDirectoryFiles(dir: string): Promise<DirectoryFile[]> 
  */
 export function lockStatements(files: readonly string[]): string[] {
   return [
+    "SET GLOBAL TimeZone='UTC'",
     ...(files.length === 0
       ? []
       : [`SET allowed_paths=[${files.map(literal).join(", ")}]`]),
@@ -177,11 +185,8 @@ export async function openEngine(
   binding: DuckDbBinding,
   resolved: ResolvedSourcePath,
 ): Promise<{ instance: DuckDBInstance; views: string[] }> {
-  // TimeZone is the instance's default for every connection, and only an
-  // option can set it before the lock: the plan binds its window as UTC
-  // `TIMESTAMP`s, and a `TIMESTAMPTZ` column compares to one in this zone.
+  // The zone is set by the first lock statement, not here (lockStatements).
   const options: Record<string, string> = {
-    TimeZone: "UTC",
     threads: String(threads()),
     memory_limit: memoryLimit(),
   };

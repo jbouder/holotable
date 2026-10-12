@@ -1,0 +1,318 @@
+import { rename, mkdir } from "node:fs/promises";
+import { join } from "node:path";
+import { SPEC_VERSION } from "@/lib/ir";
+
+/**
+ * The files demo (#574): a small directory of Parquet and CSV files the
+ * seeder writes under `DUCKDB_SOURCES_DIR`, the DuckDB source it registers
+ * over them, and the **Demo files** dashboard that reads them.
+ *
+ * Kept apart from `scripts/seed.ts`, which connects to a database when it is
+ * loaded, so `test/demo-dashboards.test.ts` can hold the spec to the IR and
+ * the SQL guard against this catalog. The binding is imported only when the
+ * files are written, so loading this module never loads a native module.
+ *
+ * The files are generated, never committed. Every value is a function of its
+ * minute (or day) and DuckDB's `hash()`, so a rewrite gives the past the same
+ * values it had, and the seeder can rewrite them every minute to move the
+ * live edge forward without a dashboard's history changing under it.
+ */
+
+export const DEMO_FILES_SOURCE_ID = "duckdb-demo";
+export const DEMO_FILES_SOURCE_NAME = "Demo files";
+export const DEMO_FILES_DASHBOARD_TITLE = "Demo files";
+/** The directory under `DUCKDB_SOURCES_DIR`, and the source's `path`. */
+export const DEMO_FILES_PATH = "demo";
+
+/** How much request history `http_requests.parquet` holds. */
+export const DEMO_REQUEST_DAYS = 7;
+/** How many days `daily_revenue.parquet` holds, ending yesterday. */
+export const DEMO_REVENUE_DAYS = 90;
+/** How often the seeder rewrites the files, so the newest minute is recent. */
+export const DEMO_FILES_REFRESH_MS = 60_000;
+
+/** The source's allowlist: what Discover tables finds in the directory. */
+export const DEMO_FILES_TABLES = [
+  {
+    name: "http_requests",
+    description: "per-request events, the last seven days (http_requests.parquet)",
+    timeField: "ts",
+    columns: [
+      { name: "ts", type: "TIMESTAMP" },
+      { name: "service", type: "VARCHAR" },
+      { name: "route", type: "VARCHAR" },
+      { name: "host", type: "VARCHAR" },
+      { name: "status", type: "SMALLINT" },
+      { name: "duration_ms", type: "DOUBLE" },
+      { name: "bytes", type: "BIGINT" },
+    ],
+  },
+  {
+    name: "hosts",
+    description: "the host inventory, one row per host (hosts.csv)",
+    columns: [
+      { name: "host", type: "VARCHAR" },
+      { name: "region", type: "VARCHAR" },
+      { name: "role", type: "VARCHAR" },
+      { name: "cores", type: "BIGINT" },
+    ],
+  },
+  {
+    name: "daily_revenue",
+    description:
+      "orders and revenue per region per day, the last 90 days (daily_revenue.parquet)",
+    timeField: "day",
+    columns: [
+      { name: "day", type: "TIMESTAMP", description: "midnight UTC of the day" },
+      { name: "region", type: "VARCHAR" },
+      { name: "orders", type: "INTEGER" },
+      { name: "revenue", type: "DOUBLE", description: "in dollars" },
+    ],
+  },
+];
+
+/** The seeded source's config: a path, never an absolute one, and the allowlist. */
+export function demoFilesConfig() {
+  return { kind: "duckdb" as const, path: DEMO_FILES_PATH, tables: DEMO_FILES_TABLES };
+}
+
+const HOSTS: [string, string, string, number][] = [
+  ["host-01", "us-east", "api", 8],
+  ["host-02", "us-west", "api", 8],
+  ["host-03", "eu-central", "web", 4],
+  ["host-04", "us-east", "worker", 16],
+];
+
+const MINUTE_US = 60_000_000;
+const DAY_MS = 86_400_000;
+
+/** A SQL string literal. Only ever given a path the seeder built. */
+const literal = (value: string) => `'${value.replaceAll("'", "''")}'`;
+
+/**
+ * The `SELECT` behind each file, as of `now`: the files' whole content, a
+ * function of `now` alone.
+ */
+export function demoFileQueries(now: number): Record<string, string> {
+  const toMinute = Math.floor(now / 60_000);
+  const fromMinute = toMinute - DEMO_REQUEST_DAYS * 1440;
+  const today = Math.floor(now / DAY_MS);
+  const hosts = HOSTS.map(
+    ([host, region, role, cores]) => `('${host}', '${region}', '${role}', ${cores})`,
+  ).join(", ");
+  return {
+    // Three to six requests a minute, busier in the (UTC) afternoon. About
+    // one in fifty fails with a 500 and waits on a timeout first; /search is
+    // slow.
+    "http_requests.parquet": `
+      SELECT make_timestamp((m * ${MINUTE_US} + (h % 60000000))::BIGINT) AS ts,
+             ['api', 'web', 'worker'][1 + ((h >> 8) % 3)::INTEGER] AS service,
+             ['/login', '/checkout', '/search', '/profile', '/health'][1 + ((h >> 16) % 5)::INTEGER] AS route,
+             ['host-01', 'host-02', 'host-03', 'host-04'][1 + ((h >> 24) % 4)::INTEGER] AS host,
+             (CASE WHEN (h >> 32) % 100 < 2 THEN 500 WHEN (h >> 32) % 100 < 6 THEN 404 ELSE 200 END)::SMALLINT AS status,
+             round(20 + pow(((h >> 40) % 1000) / 1000.0, 2) * 180
+                   + CASE WHEN route = '/search' THEN 150 + ((h >> 44) % 250) ELSE 0 END
+                   + CASE WHEN status = 500 THEN 300 ELSE 0 END, 1)::DOUBLE AS duration_ms,
+             (200 + (h >> 48) % 5000)::BIGINT AS bytes
+        FROM (SELECT m, k, hash(m * 16 + k) AS h
+                FROM range(${fromMinute}, ${toMinute}) r(m), range(0, 8) s(k)
+               WHERE k < 3 + floor(3 * (1 + sin(2 * pi() * ((m % 1440) - 600) / 1440.0)) / 2)) t
+       ORDER BY ts`,
+    "hosts.csv": `SELECT * FROM (VALUES ${hosts}) v(host, region, role, cores) ORDER BY host`,
+    // A weekly shape (weekends quieter), a region's size, and some noise.
+    "daily_revenue.parquet": `
+      SELECT make_timestamp((d * ${DAY_MS * 1000})::BIGINT) AS day,
+             region,
+             orders,
+             round(orders * (38 + (h >> 20) % 2000 / 100.0), 2)::DOUBLE AS revenue
+        FROM (SELECT d, region,
+                     hash(d * 4 + ri) AS h,
+                     (weight * (CASE WHEN (d + 4) % 7 IN (5, 6) THEN 0.7 ELSE 1.0 END)
+                       * (0.9 + (hash(d * 4 + ri) % 200) / 1000.0))::INTEGER AS orders
+                FROM range(${today - DEMO_REVENUE_DAYS}, ${today}) r(d),
+                     (VALUES (0, 'us-east', 900), (1, 'us-west', 600), (2, 'eu-central', 450)) g(ri, region, weight)) t
+       ORDER BY day, region`,
+  };
+}
+
+/**
+ * Write the files demo into `<root>/demo/`, as of `now`. Each file is written
+ * beside its final name as a hidden `.tmp` (which neither the picker nor a
+ * directory source reads) and renamed over it, so an engine reading the
+ * directory sees the old file or the new one, never half of one.
+ */
+export async function writeDemoFiles(root: string, now = Date.now()): Promise<string> {
+  const dir = join(root, DEMO_FILES_PATH);
+  await mkdir(dir, { recursive: true });
+  const { DuckDBInstance } = await import("@duckdb/node-api");
+  const instance = await DuckDBInstance.create(":memory:");
+  const connection = await instance.connect();
+  try {
+    for (const [file, select] of Object.entries(demoFileQueries(now))) {
+      const temporary = join(dir, `.${file}.tmp`);
+      const format = file.endsWith(".csv") ? "csv, HEADER" : "parquet";
+      await connection.run(
+        `COPY (${select}) TO ${literal(temporary)} (FORMAT ${format})`,
+      );
+      await rename(temporary, join(dir, file));
+    }
+  } finally {
+    connection.closeSync();
+    instance.closeSync();
+  }
+  return dir;
+}
+
+/** One row per minute of the requests file, the window applied through `minute`. */
+const perMinute = (select: string) =>
+  `SELECT time_bucket(INTERVAL '1 minute', ts) AS minute, ${select} FROM http_requests GROUP BY minute ORDER BY minute`;
+
+/** One row per day of the revenue file, the window applied through `day`. */
+const perDay = (select: string) =>
+  `SELECT date_trunc('day', day) AS day, ${select} FROM daily_revenue GROUP BY date_trunc('day', day) ORDER BY day`;
+
+const REGIONS = ["us-east", "us-west", "eu-central"];
+
+/** What the files say: traffic from one file, money from another, joined to a CSV. */
+export function demoFilesSpec() {
+  return {
+    specVersion: SPEC_VERSION,
+    title: DEMO_FILES_DASHBOARD_TITLE,
+    timeRange: { from: "now-6h", to: "now" },
+    refreshIntervalMs: 60000,
+    panels: [
+      {
+        id: "about",
+        title: "About this dashboard",
+        viz: "text",
+        options: {
+          content: [
+            "## Files, not a database",
+            "",
+            "Every panel here reads a file through the **Demo files** DuckDB source: `http_requests.parquet`, `hosts.csv` and `daily_revenue.parquet`, which the seeder writes under `DUCKDB_SOURCES_DIR` and rewrites every minute. The same SQL guard and server-owned window as a database source, run in process.",
+          ].join("\n"),
+        },
+        layout: { x: 0, y: 0, w: 12, h: 3 },
+      },
+      {
+        id: "rpm",
+        title: "Requests per minute",
+        viz: "stat",
+        query: {
+          sourceId: DEMO_FILES_SOURCE_ID,
+          timeField: "minute",
+          sql: perMinute("count(*) AS requests"),
+        },
+        format: "number",
+        options: { sparkline: true, decimals: 0 },
+        layout: { x: 0, y: 3, w: 4, h: 3 },
+      },
+      {
+        id: "error-rate",
+        title: "5xx error rate",
+        viz: "stat",
+        query: {
+          sourceId: DEMO_FILES_SOURCE_ID,
+          timeField: "minute",
+          sql: perMinute(
+            "100.0 * count(*) FILTER (WHERE status >= 500) / count(*) AS error_pct",
+          ),
+        },
+        format: "percent",
+        options: {
+          sparkline: true,
+          decimals: 1,
+          thresholds: [
+            { value: 0, color: "success" },
+            { value: 2, color: "warning" },
+            { value: 5, color: "danger" },
+          ],
+        },
+        layout: { x: 4, y: 3, w: 4, h: 3 },
+      },
+      {
+        id: "revenue-yesterday",
+        title: "Revenue, latest day",
+        description: "All regions, by day over the last 30 days.",
+        viz: "stat",
+        timeRange: { from: "now-30d", to: "now" },
+        query: {
+          sourceId: DEMO_FILES_SOURCE_ID,
+          timeField: "day",
+          sql: perDay("sum(revenue) AS revenue"),
+        },
+        format: "number",
+        options: { sparkline: true, compact: true },
+        layout: { x: 8, y: 3, w: 4, h: 3 },
+      },
+      {
+        id: "traffic",
+        title: "Requests per minute, by service",
+        viz: "line",
+        query: {
+          sourceId: DEMO_FILES_SOURCE_ID,
+          timeField: "minute",
+          sql: perMinute(
+            ["api", "web", "worker"]
+              .map((s) => `count(*) FILTER (WHERE service = '${s}') AS ${s}`)
+              .join(", "),
+          ),
+        },
+        format: "number",
+        options: { legend: "top" },
+        layout: { x: 0, y: 6, w: 8, h: 4 },
+      },
+      {
+        id: "requests-by-region",
+        title: "Requests by region",
+        description:
+          "The requests file joined to the host inventory (a CSV), over the whole file.",
+        viz: "bar",
+        query: {
+          sourceId: DEMO_FILES_SOURCE_ID,
+          sql: "SELECT h.region, count(*) AS requests FROM http_requests r JOIN hosts h ON h.host = r.host GROUP BY h.region ORDER BY requests DESC",
+        },
+        format: "number",
+        options: { legend: "none" },
+        layout: { x: 8, y: 6, w: 4, h: 4 },
+      },
+      {
+        id: "revenue-daily",
+        title: "Daily revenue by region",
+        viz: "line",
+        timeRange: { from: "now-30d", to: "now" },
+        query: {
+          sourceId: DEMO_FILES_SOURCE_ID,
+          timeField: "day",
+          sql: perDay(
+            REGIONS.map(
+              (r) => `sum(revenue) FILTER (WHERE region = '${r}') AS "${r}"`,
+            ).join(", "),
+          ),
+        },
+        format: "number",
+        options: { legend: "top" },
+        layout: { x: 0, y: 10, w: 7, h: 4 },
+      },
+      {
+        id: "revenue-by-region",
+        title: "Revenue by region",
+        description: "Over the whole file: the last 90 days.",
+        viz: "table",
+        query: {
+          sourceId: DEMO_FILES_SOURCE_ID,
+          sql: "SELECT region, sum(orders) AS orders, sum(revenue) AS revenue, sum(revenue) / sum(orders) AS per_order FROM daily_revenue GROUP BY region ORDER BY revenue DESC",
+        },
+        options: {
+          columns: [
+            { name: "region", label: "Region" },
+            { name: "orders", label: "Orders", compact: true, align: "right" },
+            { name: "revenue", label: "Revenue", compact: true, align: "right" },
+            { name: "per_order", label: "Per order", decimals: 2, align: "right" },
+          ],
+        },
+        layout: { x: 7, y: 10, w: 5, h: 4 },
+      },
+    ],
+  };
+}
