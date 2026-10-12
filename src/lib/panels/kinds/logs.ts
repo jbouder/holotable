@@ -57,6 +57,8 @@ export const logs = definePanelKind({
     "raw events to read (log lines, audit entries, recent errors): return the raw time column (set as 'query.timeField', no bucketing), a message column and optionally a level column, ORDER BY time DESC; set options.limit (for example 200) to how many lines to show rather than writing LIMIT in the SQL; name the columns in options.message and options.level. Other columns are shown when a line is expanded.",
   promqlHint:
     "not for a Prometheus source: a PromQL result has no lines to read. Use 'table' for an instant query's series.",
+  logqlHint:
+    'a LogQL log query (a stream selector and its filters, never a metric query and never \'instant\'): \'{app="api"} |= "error"\'. Each row is a line\'s time, its text as "message" and its labels, so leave options.message out; name a level label or parsed field in options.level; set options.limit (for example 200) to how many lines to show.',
   canvas: false,
   timeBrush: false,
   skeleton: "lines",

@@ -473,11 +473,12 @@ const kindsWhere = (query: "required" | "none") =>
   ];
 
 /**
- * The query languages generation may write. LogQL is accepted in a stored
- * spec (#560) but not offered to the model until a Loki source can run it
- * (#564), so no generation is asked for a query that would be refused.
+ * The query languages generation may write: every language a registered
+ * source kind answers (#564), so the model is offered a query only where some
+ * source can run it. Which one a panel may use is still its source's, held by
+ * the generation schema (`src/lib/ai/source-languages.ts`) and the guard.
  */
-const GeneratedAnyQuery = z.union([SqlQuery, PromqlQuery]);
+const GeneratedAnyQuery = z.union([SqlQuery, PromqlQuery, LogqlQuery]);
 
 /**
  * A generated panel of a kind that runs a query: `query` is required. A
@@ -490,7 +491,7 @@ const GeneratedQueryPanel = PanelFields.extend({
   query: SqlQuery,
 });
 
-/** As {@link GeneratedQueryPanel}, in either language. */
+/** As {@link GeneratedQueryPanel}, in any language. */
 const GeneratedAnyQueryPanel = PanelFields.extend({
   viz: z.enum(kindsWhere("required")),
   query: GeneratedAnyQuery,
@@ -523,12 +524,12 @@ export const ExplorePanel = GeneratedQueryPanel.omit({ links: true }).superRefin
   fitsItsKind,
 );
 
-/** {@link GeneratedPanel} in either query language (#387). */
+/** {@link GeneratedPanel} in any query language (#387, #564). */
 export const GeneratedPanelAnyLanguage: z.ZodType<Panel> = z
   .discriminatedUnion("viz", [GeneratedAnyQueryPanel, GeneratedQuerylessPanel])
   .superRefine(fitsItsKind);
 
-/** {@link ExplorePanel} in either query language (#387). */
+/** {@link ExplorePanel} in any query language (#387, #564). */
 export const ExplorePanelAnyLanguage = GeneratedAnyQueryPanel.omit({
   links: true,
 }).superRefine(fitsItsKind);
@@ -549,7 +550,7 @@ export const ChatPanel = GeneratedQueryPanel.omit({
 }).superRefine(fitsItsKind);
 export type ChatPanel = z.infer<typeof ChatPanel>;
 
-/** {@link ChatPanel} in either query language. */
+/** {@link ChatPanel} in any query language. */
 export const ChatPanelAnyLanguage = GeneratedAnyQueryPanel.omit({
   links: true,
   id: true,
@@ -869,9 +870,10 @@ export const DashboardGenerationSchema = z
   .strict()
   .superRefine(dashboardRules);
 /**
- * {@link DashboardGenerationSchema} in either query language (#387): what a
- * generation with a Prometheus source is bound to, and what a client parses
- * any generated dashboard with, since it accepts everything the SQL one does.
+ * {@link DashboardGenerationSchema} in any query language (#387, #564): what
+ * a generation with a Prometheus or Loki source is bound to, and what a client
+ * parses any generated dashboard with, since it accepts everything the SQL one
+ * does.
  */
 export const DashboardGenerationSchemaAnyLanguage = z
   .object({
@@ -884,11 +886,11 @@ export type GeneratedDashboard = z.infer<typeof DashboardGenerationSchemaAnyLang
 
 /**
  * The schemas a generation is bound to: SQL only unless one of its sources
- * answers PromQL, so a generation over SQL sources is asked for exactly what
- * it was before PromQL existed.
+ * answers another language (PromQL, LogQL), so a generation over SQL sources
+ * is asked for exactly what it was before PromQL existed.
  */
-export function generationSchemas(promql: boolean) {
-  return promql
+export function generationSchemas(anyLanguage: boolean) {
+  return anyLanguage
     ? {
         dashboard: DashboardGenerationSchemaAnyLanguage,
         panel: GeneratedPanelAnyLanguage,

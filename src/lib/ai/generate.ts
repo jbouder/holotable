@@ -105,13 +105,13 @@ function finish(onFinish: OnGenerationFinish | undefined, schema: z.ZodType) {
 
 /**
  * The schemas a generation over `sources` is bound to: SQL only unless one
- * of them answers PromQL (#387), so a SQL generation is asked for exactly
- * what it always was.
+ * of them answers another language (PromQL #387, LogQL #564), so a SQL
+ * generation is asked for exactly what it always was.
  */
 function schemasFor(sources: readonly SourceRecord[]) {
-  const promql = sourceLanguages(sources).has("promql");
-  const schemas = generationSchemas(promql);
-  if (!promql) return schemas;
+  const anyLanguage = !onlySql(sourceLanguages(sources));
+  const schemas = generationSchemas(anyLanguage);
+  if (!anyLanguage) return schemas;
   // A panel in the other language fails the schema, so the repair names the
   // field to write; a SQL generation is bound exactly as it was.
   const languages = Object.fromEntries(
@@ -194,44 +194,132 @@ export const PROMQL_RULES = `PromQL rules (STRICT) — for a source whose catalo
   or {host=~":host"} for a multi variable. Never anywhere else.
 ${PROMQL_SINGLE_SOURCE_RULE}`;
 
+const LOGQL_SINGLE_SOURCE_RULE =
+  "- Every panel's query.sourceId MUST equal the provided sourceId.";
+
+const LOGQL_MULTI_SOURCE_RULE = `- Every panel's query.sourceId MUST be one of the provided sourceIds, and its
+  LogQL may match ONLY labels from the catalog block of THAT source.`;
+
+/**
+ * The LogQL rules (#564), in the voice of {@link PROMQL_RULES}, for a source
+ * whose catalog says `kind: loki`. They are the LogQL guard's rules said
+ * forward (`src/lib/logql/safety.ts`), the kind's refusal of an instant log
+ * query, and what makes a logs panel worth reading.
+ */
+export const LOGQL_RULES = `LogQL rules (STRICT) — for a source whose catalog says kind: loki:
+- Write the panel's query as 'query.logql': ONE LogQL expression, no comments.
+  Never 'query.sql', 'query.promql' or 'query.timeField' for this source.
+- Every stream selector MUST carry an = matcher, with a value, on a label listed
+  in that source's catalog: {app="api"}. Never {}, and never a selector of
+  regex or != matchers alone.
+- NEVER write a time of your own: no offset, no absolute time. The server sets
+  start, end, step and how many lines come back. Keep [ranges] within 7d.
+- A 'logs' panel is a LOG query, a selector and then its filters and parsers:
+  {app="api"} |= "error". Never write a LIMIT; set the panel's options.limit
+  (for example 200) to how many lines to show.
+- Every other kind draws a METRIC query over a log query. It answers in
+  PromQL's shape, so a kind's hint said for PromQL or a Prometheus source holds
+  for it too, written in LogQL:
+  sum by (route) (count_over_time({app="api"} | json [5m])), or rate(...).
+- Filter or group on a field inside the line only after parsing it with
+  | json or | logfmt: {app="api"} | json | status >= 500.
+- Set "instant": true only on a metric query, for a stat, gauge, pie, donut,
+  status-grid, histogram, treemap or table panel. A log query is NEVER instant:
+  it is refused.
+- A log query's rows are each line's time, its text as "message" and its labels,
+  so leave options.message out. When the catalog lists a level label, or the
+  lines carry a level field you parse, name it in options.level.
+- A dashboard variable appears ONLY as a whole matcher value with = or !=
+  ({env=":env"}, | level=":level") or as the string of a |= or != line filter
+  (|= ":needle"). Never in a regex (=~, !~, |~), and never a multi variable.
+${LOGQL_SINGLE_SOURCE_RULE}`;
+
 /** Which languages a generation's sources answer. */
 export function sourceLanguages(sources: readonly SourceRecord[]): Set<QueryLanguage> {
   return new Set(sources.map((s) => sourceKind(s).language));
 }
 
+/** Whether every source answers SQL, so the prompt is the SQL one exactly. */
+function onlySql(languages: ReadonlySet<QueryLanguage>): boolean {
+  return !languages.has("promql") && !languages.has("logql");
+}
+
+/** How the prompt's first lines name the query a panel carries. */
+function queryNoun(languages: ReadonlySet<QueryLanguage>): string {
+  if (languages.has("logql")) return "a SQL, PromQL or LogQL query";
+  return languages.has("promql") ? "a SQL or PromQL query" : "SQL";
+}
+
+/** The field each language is written in, and the catalog kind that says so. */
+const LANGUAGE_FIELDS: readonly [QueryLanguage, string, string][] = [
+  ["sql", "sql", "timescaledb"],
+  ["promql", "promql", "prometheus"],
+  ["logql", "logql", "loki"],
+];
+
 /**
  * The query rules for a generation over `sources`. Sources that all answer
  * SQL get {@link sqlRules} exactly, so a SQL prompt is unchanged by #387. A
- * Prometheus source adds {@link PROMQL_RULES}, and a mix of the two adds the
- * rule that a panel's language is its source's.
+ * Prometheus source adds {@link PROMQL_RULES}, a Loki source
+ * {@link LOGQL_RULES} (#564), and a mix adds the rule that a panel's language
+ * is its source's.
  */
 export function queryRules(sources: readonly SourceRecord[]): string {
   const languages = sourceLanguages(sources);
-  if (!languages.has("promql")) return sqlRules(sources.length);
-  const promql =
-    sources.length > 1
-      ? PROMQL_RULES.replace(PROMQL_SINGLE_SOURCE_RULE, PROMQL_MULTI_SOURCE_RULE)
-      : PROMQL_RULES;
-  if (!languages.has("sql")) return promql;
-  return `${sqlRules(sources.length)}
+  if (onlySql(languages)) return sqlRules(sources.length);
+  const many = sources.length > 1;
+  const rules: string[] = [];
+  if (languages.has("sql")) rules.push(sqlRules(sources.length));
+  if (languages.has("promql")) {
+    rules.push(
+      many
+        ? PROMQL_RULES.replace(PROMQL_SINGLE_SOURCE_RULE, PROMQL_MULTI_SOURCE_RULE)
+        : PROMQL_RULES,
+    );
+  }
+  if (languages.has("logql")) {
+    rules.push(
+      many
+        ? LOGQL_RULES.replace(LOGQL_SINGLE_SOURCE_RULE, LOGQL_MULTI_SOURCE_RULE)
+        : LOGQL_RULES,
+    );
+  }
+  if (rules.length === 1) return rules[0];
+  // Worded for SQL and PromQL exactly as it was before LogQL (#387).
+  const fields = LANGUAGE_FIELDS.filter(([l]) => languages.has(l))
+    .map(([, field, kind], i) =>
+      i === 0
+        ? `'query.${field}' for a source whose\n  catalog says kind: ${kind}`
+        : `'query.${field}' for kind: ${kind}`,
+    )
+    .join(", ");
+  return `${rules.join("\n\n")}
 
-${promql}
-
-- Each panel's query language is its source's: 'query.sql' for a source whose
-  catalog says kind: timescaledb, 'query.promql' for kind: prometheus.`;
+- Each panel's query language is its source's: ${fields}.`;
 }
 
 /**
  * The kinds a panel can be, for a generation over these languages. SQL alone
  * gets {@link VIZ_GUIDE} exactly; PromQL takes each kind's `promqlHint` where
- * it has one, and a mix gives both.
+ * it has one, LogQL its `logqlHint` or else its PromQL one (a metric query
+ * answers in PromQL's shape), and a mix gives each that differs.
  */
 export function vizGuide(languages: ReadonlySet<QueryLanguage>): string {
-  if (!languages.has("promql")) return VIZ_GUIDE;
+  if (onlySql(languages)) return VIZ_GUIDE;
   return PANEL_KINDS.map((k) => {
-    if (!k.promqlHint) return `- '${k.kind}': ${k.promptHint}`;
-    if (!languages.has("sql")) return `- '${k.kind}': ${k.promqlHint}`;
-    return `- '${k.kind}': ${k.promptHint} With PromQL: ${k.promqlHint}`;
+    const hints: [string, string][] = [];
+    if (languages.has("sql")) hints.push(["SQL", k.promptHint]);
+    if (languages.has("promql")) hints.push(["PromQL", k.promqlHint ?? k.promptHint]);
+    if (languages.has("logql")) {
+      hints.push(["LogQL", k.logqlHint ?? k.promqlHint ?? k.promptHint]);
+    }
+    const said: string[] = [];
+    const parts = hints.flatMap(([name, hint]) => {
+      if (said.includes(hint)) return [];
+      said.push(hint);
+      return [said.length === 1 ? hint : `With ${name}: ${hint}`];
+    });
+    return `- '${k.kind}': ${parts.join(" ")}`;
   }).join("\n");
 }
 
@@ -239,6 +327,11 @@ export function vizGuide(languages: ReadonlySet<QueryLanguage>): string {
 const PROMQL_VARIABLES_GUIDE = `- For a Prometheus source, a 'query' variable lists a label's values:
   {"name":"host","type":"query","query":{"sourceId":"<this source>","label":"instance","match":"up{job="api"}"}}.
   'match' is ONE selector of a listed metric, or omit it.`;
+
+/** How a LogQL dashboard declares a variable (#564): the values of a stream label. */
+const LOGQL_VARIABLES_GUIDE = `- For a Loki source, a 'query' variable lists a stream label's values:
+  {"name":"app","type":"query","query":{"sourceId":"<this source>","label":"app","match":"{env=\\"prod\\"}"}}.
+  'match' is ONE stream selector on listed labels, or omit it.`;
 
 /**
  * Every panel carries its own one-sentence explanation.
@@ -358,8 +451,9 @@ export function baseSystem(
   const hasTargets = linkableIds(dashboards ?? []).length > 0;
   const languages = sourceLanguages(sources);
   const promql = languages.has("promql");
+  const logql = languages.has("logql");
   return `You design monitoring dashboards as a strict JSON spec.
-You NEVER return data rows — only a viz specification (${promql ? "a SQL or PromQL query" : "SQL"} + layout).
+You NEVER return data rows — only a viz specification (${queryNoun(languages)} + layout).
 
 ${sourcesSection(sources)}
 ${workspace ? `\n${workspace}\n` : ""}${targets ? `\n${targets}\n` : ""}
@@ -378,7 +472,7 @@ Use 'format' (number|bytes|percent|ms) where meaningful.
 
 ${PRESENTATION_GUIDE}
 
-${VARIABLES_GUIDE}${promql ? `\n${PROMQL_VARIABLES_GUIDE}` : ""}${dashboards === undefined ? "" : `\n\n${linksGuide(hasTargets)}`}`;
+${VARIABLES_GUIDE}${promql ? `\n${PROMQL_VARIABLES_GUIDE}` : ""}${logql ? `\n${LOGQL_VARIABLES_GUIDE}` : ""}${dashboards === undefined ? "" : `\n\n${linksGuide(hasTargets)}`}`;
 }
 
 /**
