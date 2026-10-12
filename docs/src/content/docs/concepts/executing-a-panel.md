@@ -277,6 +277,32 @@ new source's starter for its kind (`src/lib/panel-starter.ts`): a counter's
 rate, as a range for a line and an instant for a stat. Undo brings the old one
 back.
 
+### A LogQL panel
+
+A panel on a Loki source gets a LogQL editor
+(`src/components/logql/LogqlEditor.tsx`, #565), built like the PromQL one:
+loaded on demand, a textarea until then, the same keys. It highlights with
+the grammar the guard parses with (`@grafana/lezer-logql`), and its catalog is
+the source's label allowlist with the values discovery found for each.
+
+- **Completion** offers the listed labels inside a stream selector's braces,
+  in a `by (…)` and after a `|`; a listed label's values inside a matcher's
+  quotes, escaped for the string (and for the regex, after `=~`); the
+  pipeline stages after a `|`; and the range functions and aggregations the
+  guard allows where an expression can start (`src/lib/logql/completion.ts`).
+  `test/logql-completion.test.ts` holds every function and stage it offers to
+  the guard.
+- **Hints** are the guard's own, as for PromQL: a refusal as an error where
+  it points, and a label the allowlist does not list as a warning on it.
+- **Instant** and **Min step** are for a metric query. A log query has no
+  say in how it runs: the server picks the range, the `limit` (the panel's
+  own when it asks for fewer lines) and the `direction`, and the guard
+  refuses an instant log query.
+
+A new panel on a Loki source starts from the first listed label at its first
+known value, `{job="api"}`, as lines for a logs panel and as
+`sum(count_over_time({job="api"} [5m]))` for a chart.
+
 One operational detail: the page's Content-Security-Policy has no
 `'unsafe-inline'` for styles, and CodeMirror builds its stylesheet at runtime.
 The editor reads this document's nonce back out of the DOM
@@ -431,6 +457,15 @@ For a PromQL panel the same route answers with the PromQL plan:
 - the limits, as "1,000 points · 20 s · 4.0 MiB · 100 series".
 
 The endpoint's URL and auth mode have no field in the view.
+
+A LogQL panel's plan has the same layout: the expression sent to
+`/loki/api/v1/query_range` (or `/loki/api/v1/query` for an instant metric
+query) with the tenant matcher and the variables in it; `start` and `end`,
+and for a log query `limit` (from `LOKI_MAX_ENTRIES`, or the panel's own
+limit when it asks for fewer) and `direction` (`backward`, so the limit keeps
+the newest lines), or for a metric query `step`, worked out as PromQL's is;
+the tenant matcher's claim; each bound variable; and the limits, as
+"1,000 lines · 20 s · 4.0 MiB" for a log query.
 
 ## Actionable errors versus opaque ones
 

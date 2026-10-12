@@ -12,6 +12,7 @@ import {
   formFromLink,
   type LinkForm,
   type LinkSetRow,
+  labelPickNames,
   linkFromForm,
   moveLink,
   type PickSource,
@@ -100,8 +101,8 @@ export function LinksEditor({
       {links.length === 0 && !editing && (
         <p className="text-xs text-muted">
           A link leads from this panel to another dashboard in the workspace, or sets a
-          variable on this one. A link that reads a column, the series or a series label
-          is followed by clicking the data.
+          variable on this one. A link that reads a column, the series, or a label of a
+          series or a log line is followed by clicking the data.
         </p>
       )}
       {links.length > 0 && (
@@ -184,6 +185,7 @@ export function LinksEditor({
           dashboardId={dashboardId}
           ownVariables={ownVariables}
           resultColumns={resultColumns}
+          labelNames={labelPickNames(panel, resultColumns)}
           otherTitles={links.filter((_, j) => j !== editing.index).map((l) => l.title)}
           onCancel={() => setEditing(null)}
           onSave={(link) => {
@@ -251,7 +253,7 @@ const SOURCE_OPTIONS: { value: PickSource; label: string }[] = [
   { value: "value", label: "a value" },
   { value: "column", label: "a column of the clicked row" },
   { value: "series", label: "the clicked series" },
-  { value: "label", label: "a label of the clicked series (PromQL)" },
+  { value: "label", label: "a label of the clicked series or log line" },
 ];
 
 function LinkFormFields({
@@ -260,6 +262,7 @@ function LinkFormFields({
   dashboardId,
   ownVariables,
   resultColumns,
+  labelNames,
   otherTitles,
   onCancel,
   onSave,
@@ -269,6 +272,8 @@ function LinkFormFields({
   dashboardId: string;
   ownVariables: string[];
   resultColumns: string[];
+  /** The labels a label pick may name, where the preview lists them (a log query's). */
+  labelNames: string[];
   otherTitles: string[];
   onCancel: () => void;
   onSave: (link: PanelLink) => void;
@@ -380,16 +385,28 @@ function LinkFormFields({
                 onChange={(e) => editRow(i, { text: e.target.value })}
               />
             )}
-            {row.source === "label" && (
-              <Input
-                aria-label={`Pick ${i + 1} label`}
-                placeholder="label, such as instance"
-                value={row.text}
-                maxLength={128}
-                spellCheck={false}
-                onChange={(e) => editRow(i, { text: e.target.value })}
-              />
-            )}
+            {row.source === "label" &&
+              (labelNames.length > 0 ? (
+                <Select
+                  aria-label={`Pick ${i + 1} label`}
+                  value={row.text || null}
+                  placeholder="label"
+                  options={[
+                    ...labelNames,
+                    ...(row.text && !labelNames.includes(row.text) ? [row.text] : []),
+                  ].map((c) => ({ value: c, label: c }))}
+                  onValueChange={(text) => editRow(i, { text })}
+                />
+              ) : (
+                <Input
+                  aria-label={`Pick ${i + 1} label`}
+                  placeholder="label, such as instance"
+                  value={row.text}
+                  maxLength={128}
+                  spellCheck={false}
+                  onChange={(e) => editRow(i, { text: e.target.value })}
+                />
+              ))}
             {row.source === "column" &&
               (resultColumns.length > 0 ? (
                 <Select

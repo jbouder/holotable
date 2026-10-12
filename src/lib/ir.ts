@@ -179,6 +179,9 @@ export function queryTimeField(query: PanelQuery): string | undefined {
 /** The column a PromQL or LogQL range query's rows carry their time in. */
 export const PROMQL_TIME_FIELD = "time";
 
+/** The column a LogQL log query's rows carry their line in; every other column but `time` is a label. */
+export const LOGQL_MESSAGE_FIELD = "message";
+
 /**
  * The statement, for the places that only display, digest or diff it. Never
  * for running it: execution goes through the source's kind, which knows what

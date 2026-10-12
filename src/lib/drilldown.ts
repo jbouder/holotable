@@ -54,6 +54,12 @@ export function linkTargetIds(spec: Pick<Dashboard, "panels">): string[] {
 export interface Datum {
   row: Record<string, unknown>;
   series?: string;
+  /**
+   * The labels of what was clicked, by name, where the kind reads them off
+   * the row rather than a series name: a log line's stream labels and parsed
+   * fields (#565). A `label` pick reads here first.
+   */
+  labels?: Readonly<Record<string, string>>;
 }
 
 /** The most a pick may be, as `VariableText` allows. */
@@ -103,6 +109,15 @@ export function seriesLabel(
 }
 
 /**
+ * One label of what was clicked: the kind's own reading of the row's labels
+ * when it has one (a log line, #565), else the PromQL series name's.
+ */
+function datumLabel(datum: Datum, label: string): string | undefined {
+  if (datum.labels && Object.hasOwn(datum.labels, label)) return datum.labels[label];
+  return seriesLabel(datum.series, label);
+}
+
+/**
  * The picks a link makes: its literals, and, given what was clicked, its
  * `column` and `series` entries read from it. A column the row lacks, or a
  * series the click did not name, leaves that variable unset, so the target
@@ -121,7 +136,7 @@ export function linkPicks(link: PanelLink, datum?: Datum): Selection {
                 ? pickText(datum.row[v.column])
                 : undefined
               : "label" in v
-                ? pickText(seriesLabel(datum.series, v.label))
+                ? pickText(datumLabel(datum, v.label))
                 : pickText(datum.series);
       return text === undefined ? [] : [[name, [text]]];
     }),

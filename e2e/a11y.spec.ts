@@ -6,6 +6,7 @@ import {
   clickChart,
   createDrilldownDashboards,
   createLinkedDashboards,
+  createLogqlDashboard,
   createPromqlDashboard,
   createShareLink,
   DEMO_DASHBOARD,
@@ -104,6 +105,28 @@ for (const { theme, palette, name } of APPEARANCES) {
       await expect(page.getByRole("textbox", { name: "Panel PromQL" })).toBeVisible();
       await expect(page.getByLabel("Min step")).toBeVisible();
       await expectNoA11yViolations(page);
+    });
+
+    test("dashboard editor, a LogQL panel in the inspector (#565)", async ({
+      page,
+      request,
+    }) => {
+      await page.goto(`/dashboards/${await createLogqlDashboard(request)}/edit`);
+      await page
+        .getByRole("button", { name: /^API lines/ })
+        .first()
+        .click();
+      // The CodeMirror editor replaces the textarea once its chunk loads.
+      const editor = page.getByRole("textbox", { name: "Panel LogQL" });
+      await expect(editor).toBeVisible();
+      await expectNoA11yViolations(page);
+      // A listed label's values are offered inside a matcher's quotes.
+      await editor.click();
+      await page.keyboard.press("ControlOrMeta+End");
+      await page.keyboard.type(' | level="');
+      await expect(page.getByRole("option", { name: /^error/ })).toBeVisible();
+      await expectNoA11yViolations(page);
+      await page.keyboard.press("Escape");
     });
 
     test("explore, empty", async ({ page }) => {

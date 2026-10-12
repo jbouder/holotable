@@ -57,7 +57,7 @@ header, and each link is an item in the panel's ⋯ menu:
 ## Clicking a datum
 
 A link whose `set` reads a `column` (`{ "column": "host" }`), the series
-(`{ "series": true }`) or one label of the series (`{ "label": "instance" }`)
+(`{ "series": true }`) or one label of the series or log line (`{ "label": "instance" }`)
 is a **datum link**. It needs to know what was clicked,
 so it is not in the panel's menu. Instead the panel's data is clickable:
 
@@ -88,6 +88,19 @@ name. A `label` pick reads one label out of it (`seriesLabel` in
 `src/lib/drilldown.ts`), so "click a host's line, land on the host dashboard"
 needs no parsing in the link: `{ "host": { "label": "instance" } }` sets `host`
 to `web-01:9100`. A series without that label leaves the pick unset.
+
+On a LogQL logs panel (#565), each line's row is its `time`, its `message`
+and every label it carries: its stream labels, its structured metadata and
+the fields a parser stage (`| json`, `| logfmt`) extracted. A `label` pick
+reads one of those from the clicked line (`lineDatum` in
+`src/lib/drilldown-datum.ts`), so `{ "pod": { "label": "pod" } }` carries the
+clicked line's pod into a pod dashboard. The time and the message are never
+labels; a label Loki returned as `time` or `message` is the column
+`time_label` or `message_label`, and is picked by that name. A line without
+the label, or with it empty, leaves the pick unset. In the editor's link
+form, a label pick on a LogQL panel lists the labels the last preview
+returned. A LogQL metric query's series are named as PromQL's are, and a
+`label` pick reads them the same way.
 
 A **self datum link** filters in place: clicking a host's slice sets `host` on
 this dashboard, the picker and the URL follow, and the picker puts it back.

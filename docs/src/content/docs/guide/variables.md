@@ -42,7 +42,7 @@ panels for another host is a different pick, not a second dashboard.
 | --- | --- |
 | `name` | Lowercase letters, digits and `_`, starting with a letter, at most 32. Panel SQL writes it as `:name`. |
 | `label` | What the picker says; the name by default. |
-| `type` | `enum`: the values are listed in `values`. `query`: the values are the first column of `query.sql` against `query.sourceId`, or, for a Prometheus source, the values of one label (`query.label`, optionally narrowed by a series selector in `query.match`). |
+| `type` | `enum`: the values are listed in `values`. `query`: the values are the first column of `query.sql` against `query.sourceId`, or, for a Prometheus or Loki source, the values of one label (`query.label`, optionally narrowed by a series or stream selector in `query.match`). |
 | `multi` | Several values at once, bound as an array: write `col = ANY(:name)`. |
 | `default` | The selection before a viewer picks. One of `values` for an `enum`; a list for a `multi` variable. Without one, the first value. |
 
@@ -83,8 +83,14 @@ values the page computed for this viewer, and keeps the picks in the URL, so a
 selection is a link. The editor's **Variables** card declares them. A query
 variable is written in its source's terms: a SELECT for a SQL source, and
 **Label values of** a label, with an optional **From series** selector, for a
-Prometheus source. Pointing the variable at a source of the other kind
-switches the fields. The panel
+Prometheus source. A Loki source takes the same fields, with **From streams**
+for one stream selector (`{app="api"}`); its values are listed by Loki over
+the last `LOGQL_MAX_RANGE`, narrowed to the viewer's tenant when the source
+has a row filter, and LogQL binds one value at a time, so **Several values**
+is off for it. In a LogQL panel a variable is a matcher's value
+(`{env=":env"}`, `| level=":level"`) or a line filter's string
+(`|= ":needle"`), never part of a regex or pattern. Pointing the variable at a
+source of another kind switches the fields. The panel
 preview, the "What runs" view and the dashboard preview bind each variable's
 default, or its first value; a `query` variable's values come from
 `POST /api/variables/options`, which runs its guarded query as the author and is

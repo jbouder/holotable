@@ -149,8 +149,11 @@ function ExpressionPlan({
       </dl>
 
       <p className="text-xs text-muted">
-        Nothing was executed to produce this. The window, the step and the limits are the
-        server&rsquo;s on every run.
+        Nothing was executed to produce this.{" "}
+        {logql && plan.queryKind === "log"
+          ? "The window, the line limit and the direction are"
+          : "The window, the step and the limits are"}{" "}
+        the server&rsquo;s on every run.
         {stale && " The panel has been edited since this was built."}
       </p>
     </div>

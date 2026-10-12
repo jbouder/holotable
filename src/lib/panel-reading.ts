@@ -193,6 +193,12 @@ export interface LogLine {
   message: string;
   /** The row's other columns, as name and text, shown when the line is expanded. */
   details: [string, string][];
+  /**
+   * Every column but its time and its message, by name, as text: a log
+   * line's stream labels, structured metadata and parsed fields, its level
+   * among them (#565). What a link's `label` pick reads.
+   */
+  labels: Record<string, string>;
   row: Record<string, unknown>;
 }
 
@@ -229,9 +235,8 @@ export function logLines(
       (best, c) => (best === undefined || length(c) > length(best) ? c : best),
       undefined,
     );
-  const detailKeys = data.columns.filter(
-    (c) => c !== timeKey && c !== levelKey && c !== messageKey,
-  );
+  const labelKeys = data.columns.filter((c) => c !== timeKey && c !== messageKey);
+  const detailKeys = labelKeys.filter((c) => c !== levelKey);
   const colors = new Map((o.levels ?? []).map((l) => [l.state, l.color]));
 
   const at = (r: Record<string, unknown>) =>
@@ -269,6 +274,11 @@ export function logLines(
       details: detailKeys
         .filter((c) => row[c] !== null && row[c] !== undefined && row[c] !== "")
         .map((c) => [c, toText(row[c])]),
+      labels: Object.fromEntries(
+        labelKeys
+          .filter((c) => row[c] !== null && row[c] !== undefined && row[c] !== "")
+          .map((c) => [c, toText(row[c])]),
+      ),
       row,
     };
   });
