@@ -1,10 +1,11 @@
 import type { SourceRecord } from "@/lib/registry";
 import type { LokiListing } from "@/lib/sources/kinds/loki";
+import type { DuckDbListing } from "@/lib/sources/kinds/duckdb";
 import type { PrometheusListing } from "@/lib/sources/kinds/prometheus";
 import type { TimescaleDbListing } from "@/lib/sources/kinds/timescaledb";
 import { sourceKind } from "@/lib/sources/registry";
 
-export type { LokiListing, PrometheusListing, TimescaleDbListing };
+export type { DuckDbListing, LokiListing, PrometheusListing, TimescaleDbListing };
 
 /**
  * What a source looks like to someone who may use it but not manage it.
@@ -18,7 +19,11 @@ export type { LokiListing, PrometheusListing, TimescaleDbListing };
  * deletions, so a field added to `SourceRecord` later does not reach a viewer
  * by default. Each kind declares its own listing, beside its config.
  */
-export type SourceListing = TimescaleDbListing | PrometheusListing | LokiListing;
+export type SourceListing =
+  | TimescaleDbListing
+  | PrometheusListing
+  | LokiListing
+  | DuckDbListing;
 
 /** What every kind's listing carries. */
 export interface ListingBase {

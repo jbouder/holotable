@@ -28,6 +28,7 @@ when it is read:
 | `timescaledb` | `host`, `port`, `database`, `schema`, `ssl`, `tables` (each with its `columns` and `timeField`), optional `rowFilter` `{ column, claim }` | SQL |
 | `prometheus` | `url`, `auth` (`none`, `bearer` or `basic`), `metrics` (each with its `type`, `help` and `labels`), optional `rowFilter` `{ label, claim }` | PromQL |
 | `loki` | `url`, `auth` (`none`, `bearer` or `basic`), `labels` (each stream label with the `values` discovery found), optional `rowFilter` `{ label, claim }` | LogQL |
+| `duckdb` | `path` (relative to `DUCKDB_SOURCES_DIR`: a directory, or a file ending `.duckdb`), `tables` as for `timescaledb`, optional `rowFilter` `{ column, claim }` | SQL |
 
 #### Source kinds
 
@@ -39,7 +40,8 @@ source, and the `language` a panel against it carries. Its server half, under
 refresh, the connection test, validation, planning and execution — and a kind
 without one is a compile error. Registering a kind is an import, never a lookup
 by a string a request supplied, and `test/source-kinds.test.ts` fails on a kind
-comparison or a `src/lib/timescaledb/` import outside `src/lib/sources/`.
+comparison or a `src/lib/timescaledb/` or `src/lib/duckdb/` import outside
+`src/lib/sources/`.
 
 The discriminator was defaulted rather than migrated: the TimescaleDB branch
 reads a missing `config.kind` as `timescaledb`, so every config stored before
@@ -62,8 +64,51 @@ then a column per stream or parsed label); a metric query's becomes the rows a
 Prometheus answer does.
 
 `secret_ref` is nullable (migration 018) for a Prometheus or Loki source with
-`auth: none`, which needs no credential; a TimescaleDB source and an
-authenticated HTTP source always name one.
+`auth: none`, which needs no credential, and for a DuckDB source, which never
+names one; a TimescaleDB source and an authenticated HTTP source always name
+one.
+
+#### DuckDB
+
+A `duckdb` source (#572) is the second SQL kind: its panels carry the same
+`query.sql`, checked by the same guard, planned by the same
+`buildExecutablePlan` with the kind's dialect (the window bound as UTC
+`TIMESTAMP`s). What differs is where the rows come from. `path` names a
+directory of Parquet and CSV files (one view per file directly under it,
+named by its stem, not recursive) or a `.duckdb` file, opened `READ_ONLY`. It
+is resolved by the path guard (`src/lib/duckdb/path.ts`) against
+`DUCKDB_SOURCES_DIR`, both through `realpath`, and refused unless it lands
+inside the root; unset, the variable refuses every DuckDB config, so the kind
+is closed until an operator chooses what it may read. The guard runs when a
+source is saved and again on every open. Each source gets one in-process
+engine that is locked before anything a panel wrote can run: external access
+off except for the source's own files (`allowed_paths`, file by file, rather
+than `allowed_directories`, because DuckDB lets a statement write wherever it
+may read, and a directory prefix would let a statement the SQL guard missed
+create files beside the source's own), no extension installed or autoloaded,
+`memory_limit` and `threads` from `DUCKDB_MEMORY_LIMIT` and `DUCKDB_THREADS`,
+the engine's `TimeZone` set to UTC, and `lock_configuration`, after which no
+statement can change any of it. A query is interrupted at
+`QUERY_TIMEOUT_SECONDS`, and rows stream through the same row and byte caps,
+every cut reported as `truncated`. An engine's error messages name files, so
+each is scrubbed of paths before it reaches a panel, a Test report or the log;
+a listing shows the table count and whether the source is a directory or a
+database, never its path. A source's own files stay writable by the engine
+(DuckDB allows a write wherever it allows a read): the SQL guard, which
+refuses everything but one `SELECT`, is what stops that, and mounting
+`DUCKDB_SOURCES_DIR` read-only is the belt behind it.
+
+**The binding and the image.** `@duckdb/node-api` is a native module with a
+prebuilt binding per platform. It is loaded lazily, the first time a DuckDB
+source needs it (`src/lib/duckdb/binding.ts`), never at import, so a server
+whose platform has no binding boots and serves every other kind; there the
+kind's save check, Test and every execution say "DuckDB is not available on
+this server". The quick-start image stays on Alpine: the pinned binding ships
+musl builds for `linux-x64` and `linux-arm64` beside the glibc ones, and the
+binding was checked loading and answering on the image's base
+(`timescale/timescaledb:2.17.2-pg16` with Alpine's Node 22) on both. The
+production image (`node:24-bookworm-slim`) is glibc. The image ships no
+sample files (#574).
 
 Referenced sources are **tombstoned** rather than deleted, so dashboards
 referencing them keep resolving to a tombstone marker instead of breaking
@@ -80,7 +125,8 @@ matches the digest the preview handed out.
 `catalog_facts` (migration 026, #557) sits there for the same reason: it is
 what the server *is*, not what the author allowed. Its shape is the kind's;
 for `timescaledb` it is `{ "timescaledb": "2.17.2" }`, or
-`{ "timescaledb": null }` for plain PostgreSQL. **Test**
+`{ "timescaledb": null }` for plain PostgreSQL; for `duckdb` it is the
+engine's version, `{ "duckdb": "1.5.6" }`. **Test**
 (`POST /api/sources/[id]/test`) and an applied refresh write it from what the
 server answered; no request body sets it, it is not part of `config`, and a
 value that no longer parses reads as `null`, never recorded, which keeps the

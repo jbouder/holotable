@@ -228,6 +228,8 @@ export function buildSourceDescriptionStarters(
   for (const source of sources) {
     if (out.length >= limit) break;
     const cfg = source.config;
+    // A database reached by host and port; a file-backed kind has none to copy.
+    if (!("host" in cfg)) continue;
     const table = cfg.tables.find(usableTable);
     if (!table || !isHostLike(cfg.host) || !isPlainIdentifier(cfg.database)) continue;
     if (!isPlainIdentifier(cfg.schema)) continue;

@@ -65,6 +65,10 @@
 /src/lib/ai/base-url.ts         @jbouder
 /src/lib/ai/guarded-fetch.ts    @jbouder
 
+# The DuckDB path guard (#572): which files on this server a source may make
+# the engine read. Loosening it is a path traversal.
+/src/lib/duckdb/path.ts         @jbouder
+
 # The /api/metrics gate. A scrape names dashboards and sources, per-workspace
 # model spend, and what the SQL guard is rejecting, and it sits outside the
 # session cookie — so loosening this file is a disclosure, not a config change.

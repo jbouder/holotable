@@ -81,9 +81,11 @@ export function sourceTools(deps: McpDeps): McpTool[] {
               language: sourceKind(source.config).language,
               ...("schema" in listing
                 ? { schema: listing.schema, tableCount: listing.tableCount }
-                : "metricCount" in listing
-                  ? { metricCount: listing.metricCount }
-                  : { labelCount: listing.labelCount }),
+                : "tableCount" in listing
+                  ? { tableCount: listing.tableCount }
+                  : "metricCount" in listing
+                    ? { metricCount: listing.metricCount }
+                    : { labelCount: listing.labelCount }),
               catalog: catalogHealth(source).state,
             });
           }

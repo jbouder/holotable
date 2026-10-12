@@ -670,6 +670,51 @@ test("SOURCE_SECRETS_DIR must be an absolute path", () => {
   assert.deepEqual(variables(errors(problems)), ["SOURCE_SECRETS_DIR"]);
 });
 
+test("DuckDB sources are closed until DUCKDB_SOURCES_DIR is set, and its bounds are checked (#572)", () => {
+  // Unset is the default, not a problem: every DuckDB config is refused by
+  // the kind, naming the variable, the way /api/metrics stays closed.
+  for (const production of [true, false]) {
+    const base = production ? VALID_PRODUCTION : {};
+    const quiet = validateConfig(base, { production }).filter((p) =>
+      p.variable.startsWith("DUCKDB_"),
+    );
+    assert.deepEqual(quiet, []);
+  }
+  assert.deepEqual(
+    validateConfig(
+      {
+        ...VALID_PRODUCTION,
+        DUCKDB_SOURCES_DIR: "/srv/holotable/files",
+        DUCKDB_MEMORY_LIMIT: "1.5GiB",
+        DUCKDB_THREADS: "4",
+      },
+      { production: true },
+    ).filter((p) => p.variable.startsWith("DUCKDB_")),
+    [],
+  );
+  const bad = validateConfig(
+    {
+      ...VALID_PRODUCTION,
+      DUCKDB_SOURCES_DIR: "files",
+      DUCKDB_MEMORY_LIMIT: "512MB'; SET lock_configuration=false; --",
+      DUCKDB_THREADS: "0",
+    },
+    { production: true },
+  );
+  assert.deepEqual(variables(errors(bad)).sort(), [
+    "DUCKDB_MEMORY_LIMIT",
+    "DUCKDB_SOURCES_DIR",
+    "DUCKDB_THREADS",
+  ]);
+  // A bound for an engine that can never open is said, not fatal.
+  const ignored = validateConfig(
+    { ...VALID_PRODUCTION, DUCKDB_MEMORY_LIMIT: "1GB" },
+    { production: true },
+  );
+  assert.deepEqual(variables(warnings(ignored)).includes("DUCKDB_MEMORY_LIMIT"), true);
+  assert.equal(variables(errors(ignored)).includes("DUCKDB_MEMORY_LIMIT"), false);
+});
+
 test("the report lists every problem, errors first, with a verdict", () => {
   const report = formatConfigProblems([
     { variable: "TS_METRICS_USERNAME", message: "is not set.", severity: "warning" },

@@ -3,7 +3,7 @@ import { execFileSync } from "node:child_process";
 import { Client } from "pg";
 import { hasQuery } from "@/lib/ir";
 import { StoredDashboard } from "@/lib/ir/upgrade";
-import { SourceConfig } from "@/lib/registry";
+import { SourceConfig, sqlCatalog } from "@/lib/registry";
 import {
   addFixture,
   type Catalogs,
@@ -135,7 +135,7 @@ async function main(): Promise<void> {
       catalogs[args.renames.get(id) ?? id] =
         "tables" in config
           ? {
-              schema: config.schema,
+              schema: sqlCatalog(config).schema,
               tables: config.tables,
               ...(config.rowFilter ? { rowFilter: config.rowFilter } : {}),
             }

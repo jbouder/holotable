@@ -61,8 +61,8 @@ export function sourceConnection(cfg: SourceConfig) {
  * credentials; those are resolved from the environment via `secretRef`.
  *
  * `secretRef` is required exactly when the source needs credentials: always
- * for SQL, and for Prometheus unless `auth` is `"none"` (#385), where it must
- * be absent — a reference that names no credentials would be a grant with
+ * for TimescaleDB, never for DuckDB (#572), and for Prometheus unless `auth`
+ * is `"none"` (#385), where it must be absent — a reference that names no credentials would be a grant with
  * nothing behind it.
  */
 export const SourceDraftFields = z
@@ -80,6 +80,8 @@ export const SourceDraftFields = z
 
 /** Whether a config needs credentials, and so a `secret_ref`. */
 export function needsSecretRef(cfg: SourceConfig): boolean {
+  // A file-backed source (DuckDB, #572) has nothing to log in to.
+  if ("path" in cfg) return false;
   return !("auth" in cfg) || cfg.auth !== "none";
 }
 
@@ -100,7 +102,10 @@ export function checkSecretRef(
     ctx.addIssue({
       code: "custom",
       path: ["secretRef"],
-      message: 'a source with auth "none" names no secretRef',
+      message:
+        "path" in draft.config
+          ? "a DuckDB source names no secretRef: it reads files, with no credentials"
+          : 'a source with auth "none" names no secretRef',
     });
   }
 }

@@ -235,7 +235,7 @@ test(
     const result = await kind.test(created);
     assert.equal(result.ok, true, result.message);
     const facts = kind.testFacts(result);
-    assert.ok(facts && typeof facts.timescaledb === "string");
+    assert.ok(facts && "timescaledb" in facts && typeof facts.timescaledb === "string");
     await recordCatalogFacts(WORKSPACE, id, facts);
     const tested = await getSourceById(id);
     assert.deepEqual(tested?.catalogFacts, facts);

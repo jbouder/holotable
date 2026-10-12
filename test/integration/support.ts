@@ -1,10 +1,6 @@
 import { randomBytes } from "node:crypto";
 import { Client } from "pg";
-import {
-  type TimescaleDbSourceRecord,
-  type SqlSourceConfig,
-  TimescaleDbConfig,
-} from "@/lib/registry";
+import { type TimescaleDbSourceRecord, TimescaleDbConfig } from "@/lib/registry";
 import { secretRefEnvVars } from "@/lib/secret-refs";
 
 /**
@@ -65,7 +61,7 @@ export function grantRef(
 }
 
 /** The connection half of a source on the integration database. */
-export function connection(): Pick<SqlSourceConfig, "host" | "port" | "database"> {
+export function connection(): Pick<TimescaleDbConfig, "host" | "port" | "database"> {
   const url = new URL(dbUrl as string);
   return {
     host: url.hostname,

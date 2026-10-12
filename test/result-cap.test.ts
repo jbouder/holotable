@@ -1,10 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import {
-  ResultCollector,
-  formatBytes,
-  serializedRowBytes,
-} from "@/lib/timescaledb/result-cap";
+import { ResultCollector, formatBytes, serializedRowBytes } from "@/lib/sql/result-cap";
 
 /** A row whose JSON is `n` bytes wide, give or take the framing. */
 function wideRow(n: number, i = 0): Record<string, unknown> {

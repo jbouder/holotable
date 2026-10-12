@@ -117,7 +117,7 @@ dropped kind) is breaking:
 
 The paths in `.github/CODEOWNERS` (the SQL and PromQL guards, `auth/`,
 `secrets/`, the IR, time, row scope, variables, the base-URL guard,
-`metrics-access.ts`) are where a quiet regression is a vulnerability. A
+`metrics-access.ts`, the DuckDB path guard) are where a quiet regression is a vulnerability. A
 change there needs a test.
 
 - **Guards.** Run `npm run test:fuzz` after any SQL, PromQL or LogQL guard
