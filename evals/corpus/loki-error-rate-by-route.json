@@ -1,0 +1,11 @@
+{
+  "name": "loki-error-rate-by-route",
+  "mode": "dashboard",
+  "catalog": "loki-demo",
+  "prompt": "Error rate by route.",
+  "expect": {
+    "plausibleViz": ["line", "area", "bar", "table", "logs", "stat"],
+    "logsLevel": "required",
+    "minPanels": 1
+  }
+}

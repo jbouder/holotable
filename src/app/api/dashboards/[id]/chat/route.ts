@@ -14,6 +14,7 @@ import { requestPreferences } from "@/lib/preferences-server";
 import { workspacePromptFor } from "@/lib/workspace-prompt-service";
 import { randomUUID } from "node:crypto";
 import { resolveChatSources, resolveChatView, streamDashboardChat } from "@/lib/ai/chat";
+import { outcomeStatement } from "@/lib/ai/data-chat";
 import {
   Panel,
   TimeRange,
@@ -266,7 +267,7 @@ export const POST = route("dashboards.chat", async (req: Request, ctx: RoutePara
         detail: {
           via: "chat",
           dashboardId: id,
-          ...(q.promql !== undefined ? { promql: q.promql } : { sql: q.sql }),
+          ...outcomeStatement(q),
           stage: q.stage,
         },
       }),

@@ -44,6 +44,7 @@ import {
   ChatPanel,
   ChatPanelAnyLanguage,
   type PanelQuery,
+  type QueryLanguage,
   queryStatement,
   type Dashboard,
   type TimeRange,
@@ -88,14 +89,16 @@ export const MAX_STEPS = 6;
 
 /**
  * What the model asks `runQuery` to run: SQL for a SQL source, PromQL for a
- * Prometheus one (#387). The tool offers `promql` only when a Prometheus
- * source is in the set.
+ * Prometheus one (#387), LogQL for a Loki one (#564). The tool offers
+ * `promql` only when a Prometheus source is in the set, and `logql` only when
+ * a Loki one is.
  */
 export type ChatQueryArgs = {
   sourceId: string;
   sql?: string;
   timeField?: string;
   promql?: string;
+  logql?: string;
   instant?: boolean;
 };
 
@@ -177,25 +180,59 @@ export async function planChatQuery(
 export function chatQueryOf(
   args: ChatQueryArgs,
 ): { ok: true; query: PanelQuery } | { ok: false; error: string } {
-  // Exactly one statement, in either language.
-  if ((args.sql === undefined) === (args.promql === undefined)) {
-    return { ok: false, error: "give exactly one of sql or promql" };
+  // Exactly one statement, in any language.
+  const given = [args.sql, args.promql, args.logql].filter((s) => s !== undefined);
+  if (given.length !== 1) {
+    return {
+      ok: false,
+      error:
+        args.logql === undefined
+          ? "give exactly one of sql or promql"
+          : "give exactly one of sql, promql or logql",
+    };
+  }
+  const instant = args.instant ? { instant: true } : {};
+  if (args.promql !== undefined) {
+    return {
+      ok: true,
+      query: { sourceId: args.sourceId, promql: args.promql, ...instant },
+    };
+  }
+  if (args.logql !== undefined) {
+    return {
+      ok: true,
+      query: { sourceId: args.sourceId, logql: args.logql, ...instant },
+    };
   }
   return {
     ok: true,
-    query:
-      args.promql !== undefined
-        ? {
-            sourceId: args.sourceId,
-            promql: args.promql,
-            ...(args.instant ? { instant: true } : {}),
-          }
-        : {
-            sourceId: args.sourceId,
-            sql: args.sql ?? "",
-            ...(args.timeField ? { timeField: args.timeField } : {}),
-          },
+    query: {
+      sourceId: args.sourceId,
+      sql: args.sql ?? "",
+      ...(args.timeField ? { timeField: args.timeField } : {}),
+    },
   };
+}
+
+/** The statement `runQuery` was given, under its language's name, for the audit log. */
+function statementOf(
+  args: ChatQueryArgs,
+): Pick<ChatQueryOutcome, "sql" | "promql" | "logql"> {
+  if (args.promql !== undefined) return { promql: args.promql };
+  if (args.logql !== undefined) return { logql: args.logql };
+  return { sql: args.sql };
+}
+
+/**
+ * A statement the model ran, as an audit row's detail records it: under its
+ * language's name, which the log reduces to a digest.
+ */
+export function outcomeStatement(
+  outcome: ChatQueryOutcome,
+): { sql?: string } | { promql: string } | { logql: string } {
+  if (outcome.promql !== undefined) return { promql: outcome.promql };
+  if (outcome.logql !== undefined) return { logql: outcome.logql };
+  return { sql: outcome.sql };
 }
 
 /** One statement the model asked to run, as the audit log records it. */
@@ -204,6 +241,7 @@ export interface ChatQueryOutcome {
   /** The statement, under its language's name. */
   sql?: string;
   promql?: string;
+  logql?: string;
   outcome: "success" | "failure";
   /** Where a failure happened: refused by the guard, or failed on the source. */
   stage?: string;
@@ -283,9 +321,56 @@ const PROMQL_TOOL_INPUT = z.object({
     .describe("For PromQL: true for one value per series at the end of the window."),
 });
 
+/**
+ * The tool's input when a Loki source is in the set (#564): `logql`, beside
+ * `sql` and `promql` only where a source answers them.
+ */
+function logqlToolInput(languages: ReadonlySet<QueryLanguage>) {
+  return z.object({
+    sourceId: z.string().describe("One of the source ids you were given."),
+    ...(languages.has("sql")
+      ? {
+          sql: SQL_TOOL_INPUT.shape.sql
+            .optional()
+            .describe(
+              "For a SQL source: a single SELECT/WITH statement following the SQL rules.",
+            ),
+          timeField: PROMQL_TOOL_INPUT.shape.timeField,
+        }
+      : {}),
+    ...(languages.has("promql") ? { promql: PROMQL_TOOL_INPUT.shape.promql } : {}),
+    logql: z
+      .string()
+      .max(8000)
+      .optional()
+      .describe("For a Loki source: one LogQL expression following the LogQL rules."),
+    instant: z
+      .boolean()
+      .optional()
+      .describe(
+        "For a PromQL or LogQL metric query: true for one value per series at the end of the window. Never for a LogQL log query.",
+      ),
+  });
+}
+
 /** Whether any source in the set answers PromQL. */
 function hasPromql(sources: readonly SourceRecord[]): boolean {
   return sources.some((s) => sourceKind(s).language === "promql");
+}
+
+/** Whether any source in the set answers a language other than SQL. */
+function hasOtherLanguage(sources: readonly SourceRecord[]): boolean {
+  return sources.some((s) => sourceKind(s).language !== "sql");
+}
+
+/** The tool's description, naming the field each source's language is written in. */
+function runQueryDescription(noun: string, languages: ReadonlySet<QueryLanguage>) {
+  const fields = [
+    languages.has("sql") ? "'sql' (a SELECT) for a SQL source" : null,
+    languages.has("promql") ? "'promql' for a Prometheus one" : null,
+    "'logql' for a Loki one",
+  ].filter((f): f is string => f !== null);
+  return `Run one read-only query against one of ${noun} data sources to fetch fresh data: ${fields.join(", ")}. The server injects the time range automatically; do not add a time filter. Returns columns and rows.`;
 }
 
 /**
@@ -300,23 +385,30 @@ export function runQueryTool(input: {
 }) {
   const { scope, noun, onQuery } = input;
   const execute = input.execute ?? executeOnSource;
-  // The tool learns PromQL only when a Prometheus source is in the set, so a
-  // SQL chat is asked exactly what it always was (#387).
+  // The tool learns PromQL only when a Prometheus source is in the set, and
+  // LogQL only when a Loki one is, so a SQL chat is asked exactly what it
+  // always was (#387), and a PromQL one too (#564).
   const promql = hasPromql(scope.sources);
+  const languages = sourceLanguages(scope.sources);
+  const logql = languages.has("logql");
   return tool({
-    description: promql
-      ? `Run one read-only query against one of ${noun} data sources to fetch fresh data: 'sql' (a SELECT) for a SQL source, 'promql' for a Prometheus one. The server injects the time range automatically; do not add a time filter. Returns columns and rows.`
-      : `Run a read-only SQL SELECT against one of ${noun} data sources to fetch fresh data. The server injects the time range automatically; do not add a time filter. Returns columns and rows.`,
-    // The SQL schema's input is a case of the PromQL one's, so the tool is
-    // typed by the wider; a SQL chat is still shown only the SQL one.
-    inputSchema: (promql
-      ? PROMQL_TOOL_INPUT
-      : SQL_TOOL_INPUT) as typeof PROMQL_TOOL_INPUT,
+    description: logql
+      ? runQueryDescription(noun, languages)
+      : promql
+        ? `Run one read-only query against one of ${noun} data sources to fetch fresh data: 'sql' (a SELECT) for a SQL source, 'promql' for a Prometheus one. The server injects the time range automatically; do not add a time filter. Returns columns and rows.`
+        : `Run a read-only SQL SELECT against one of ${noun} data sources to fetch fresh data. The server injects the time range automatically; do not add a time filter. Returns columns and rows.`,
+    // Each narrower input is a case of the widest one's, so the tool is typed
+    // by that; a SQL chat is still shown only the SQL one.
+    inputSchema: (logql
+      ? logqlToolInput(languages)
+      : promql
+        ? PROMQL_TOOL_INPUT
+        : SQL_TOOL_INPUT) as unknown as z.ZodType<ChatQueryArgs>,
     execute: async (args) => {
       const report = (outcome: ChatQueryOutcome["outcome"], stage?: string) =>
         onQuery?.({
           sourceId: args.sourceId,
-          ...(args.promql !== undefined ? { promql: args.promql } : { sql: args.sql }),
+          ...statementOf(args),
           outcome,
           stage,
         });
@@ -365,11 +457,12 @@ export interface ChatPanelOutcome {
 
 /**
  * The schema `showPanel` is bound to over these sources: SQL only unless one
- * answers PromQL, held to each source's language, and with a custom visual
- * that must compile (#405), so the one repair can name any of those.
+ * answers another language (PromQL, LogQL), held to each source's language,
+ * and with a custom visual that must compile (#405), so the one repair can
+ * name any of those.
  */
 export function chatPanelSchema(sources: readonly SourceRecord[]) {
-  if (!hasPromql(sources)) return withCompiledCustomVisuals(ChatPanel);
+  if (!hasOtherLanguage(sources)) return withCompiledCustomVisuals(ChatPanel);
   const languages = Object.fromEntries(
     sources.map((s) => [s.id, sourceKind(s).language]),
   );

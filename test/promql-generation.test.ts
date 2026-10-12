@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { NoObjectGeneratedError } from "ai";
 import { z } from "zod";
 import { buildChatQueryPlan, buildSystemPrompt } from "@/lib/ai/chat";
+import { buildDataChatPrompt } from "@/lib/ai/data-chat";
 import {
   baseSystem,
   dashboardRequest,
@@ -76,6 +77,51 @@ test("a TimescaleDB source's prompt is what it was before plain PostgreSQL was t
   );
   assert.ok(!baseSystem(tested).includes("2.17.2"));
   assert.ok(!baseSystem(tested).includes(PLAIN_POSTGRES_PROMPT));
+});
+
+/** A prompt with its per-call fence tokens held still, digested. */
+function promptDigest(prompt: string): string {
+  const stable = prompt.replace(
+    /(===== (?:BEGIN|END) [A-Z_]+ )[0-9a-f]{32}( =====)/g,
+    "$1<token>$2",
+  );
+  return createHash("sha256").update(stable).digest("hex");
+}
+
+test("a single-source SQL or PromQL prompt is what it was before LogQL existed (#564)", () => {
+  const range = { from: "now-1h", to: "now" };
+  const board = (sourceId: string) =>
+    Dashboard.parse({
+      specVersion: SPEC_VERSION,
+      title: "D",
+      timeRange: range,
+      refreshIntervalMs: 15000,
+      panels: [
+        {
+          id: "p",
+          title: "P",
+          viz: "table",
+          query: { sourceId, sql: "SELECT 1" },
+          layout: { x: 0, y: 0, w: 6, h: 4 },
+        } satisfies Panel,
+      ],
+    });
+  const digests = (source: SourceRecord) => ({
+    generation: promptDigest(baseSystem(source)),
+    chat: promptDigest(buildDataChatPrompt({ sources: [source], timeRange: range })),
+    dashboardChat: promptDigest(buildSystemPrompt(board(source.id), [source])),
+  });
+  // Byte for byte as they were on the commit before #564.
+  assert.deepEqual(digests(sql), {
+    generation: "a12a519ef269c88c09700408d260de1a05d843702b5b30c0d0429977682ee913",
+    chat: "3efa092f11c7f0a110625efc0c32e8ac13ea5ad6b068224935c8596a7bfaf6e2",
+    dashboardChat: "479960869c34a70a899dc471b2e471cc05f3218ab49b17f50eb9f4e99d25b8ae",
+  });
+  assert.deepEqual(digests(prom), {
+    generation: "95d76083e037077c1851a014551853f8ca7be7deaadbe3cd4535d2b9c8d80be8",
+    chat: "1ed52d415fa92147f427cf227b1a92e25a64fe30275f1b66a8c3b7016aab2898",
+    dashboardChat: "dfd9754262b3481dfccd5f4f6ea828c4435674c1e5ed767d6e4742cd34d254cc",
+  });
 });
 
 test("a plain PostgreSQL source is told, after its catalog, that time_bucket does not exist (#557)", () => {

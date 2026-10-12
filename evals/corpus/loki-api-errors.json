@@ -1,0 +1,12 @@
+{
+  "name": "loki-api-errors",
+  "mode": "dashboard",
+  "catalog": "loki-demo",
+  "prompt": "Errors from the API in the last hour.",
+  "expect": {
+    "requiredViz": ["logs"],
+    "plausibleViz": ["logs", "line", "area", "bar", "stat", "table"],
+    "logsLevel": "required",
+    "minPanels": 1
+  }
+}

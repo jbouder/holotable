@@ -1,7 +1,7 @@
 import type { LanguageModelUsage, UIMessage } from "ai";
 import type { Model } from "@/lib/ai/provider";
 import { fenceUntrustedBlock, sanitizePromptField } from "@/lib/ai/untrusted";
-import { PROMQL_RULES, SQL_RULES } from "@/lib/ai/generate";
+import { LOGQL_RULES, PROMQL_RULES, SQL_RULES } from "@/lib/ai/generate";
 import {
   type ChatView,
   chatVariableValues,
@@ -233,6 +233,13 @@ ${SQL_RULES}${
 - For a source whose catalog says kind: prometheus, pass 'promql' instead of
   'sql', following these rules:
 ${PROMQL_RULES}`
+    : ""
+}${
+  sources.some((s) => sourceKind(s).language === "logql")
+    ? `
+- For a source whose catalog says kind: loki, pass 'logql' instead of
+  'sql', following these rules:
+${LOGQL_RULES}`
     : ""
 }
 

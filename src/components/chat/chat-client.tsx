@@ -799,7 +799,7 @@ function Message({
 
 interface ToolPart {
   state: string;
-  input?: { sourceId?: string; sql?: string; promql?: string };
+  input?: { sourceId?: string; sql?: string; promql?: string; logql?: string };
 }
 
 /** A `runQuery` the answer rests on: running, then "Ran this query". */
@@ -807,7 +807,7 @@ function QueryCitation({ part, open }: { part: ToolPart; open: boolean }) {
   if (part.state === "input-streaming" || part.state === "input-available") {
     return <WorkingStatus className="text-xs">Querying data…</WorkingStatus>;
   }
-  const statement = part.input?.sql ?? part.input?.promql;
+  const statement = part.input?.sql ?? part.input?.promql ?? part.input?.logql;
   if (!statement) return null;
   return (
     <details

@@ -25,7 +25,10 @@ every later turn.
 The answer is read-only. Explore can query the sources you picked and draw panels
 from them; it cannot change a source or a dashboard. Everything it runs goes
 through the same guard a dashboard panel does, over the conversation's time
-range, and only over the rows you are allowed to see.
+range, and only over the rows you are allowed to see. Each source is queried in
+its own language: SQL for a TimescaleDB source, PromQL for a Prometheus one,
+LogQL for a Loki one, where a question about log lines is answered with a
+`logs` panel.
 
 ## A panel in an answer
 

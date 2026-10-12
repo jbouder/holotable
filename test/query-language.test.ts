@@ -14,6 +14,7 @@ import {
   queryLanguage,
   queryStatement,
   queryText,
+  type QueryLanguage,
   queryTimeField,
   Variable,
 } from "@/lib/ir";
@@ -21,7 +22,7 @@ import { panelDetails } from "@/lib/panel-details";
 import { makePanelExecutor } from "@/lib/poller/registry";
 import type { SourceRecord } from "@/lib/registry";
 import { sharedSpec } from "@/lib/share-view";
-import { cannotRun, wrongLanguage } from "@/lib/sources/registry";
+import { cannotRun, SOURCE_KINDS, wrongLanguage } from "@/lib/sources/registry";
 
 /**
  * A panel's query is SQL, PromQL (#383) or LogQL (#560), keyed on which of
@@ -147,14 +148,26 @@ test("a query variable is a SELECT or the values of a label", () => {
   );
 });
 
-test("generation is still asked for SQL only, and never for LogQL", () => {
-  const generated = ExplorePanel.safeParse({
-    ...(panel("line", RANGE) as object),
-  });
-  assert.equal(generated.success, false);
-  // Not even where PromQL is offered: the model writes LogQL from #564.
-  assert.equal(ExplorePanelAnyLanguage.safeParse(panel("line", RANGE)).success, true);
-  assert.equal(ExplorePanelAnyLanguage.safeParse(panel("logs", LOGS)).success, false);
+test("generation offers exactly the languages the registered kinds answer (#564)", () => {
+  // A SQL generation is still asked for SQL alone.
+  assert.equal(ExplorePanel.safeParse(panel("line", RANGE)).success, false);
+  assert.equal(ExplorePanel.safeParse(panel("logs", LOGS)).success, false);
+  // The schema for any other is offered a language exactly when some
+  // registered source kind runs it: never a query nothing could run.
+  const answered = new Set(Object.values(SOURCE_KINDS).map((k) => k.language));
+  const samples: Record<QueryLanguage, unknown> = {
+    sql: panel("table", SQL),
+    promql: panel("line", RANGE),
+    logql: panel("logs", LOGS),
+  };
+  for (const [language, sample] of Object.entries(samples)) {
+    assert.equal(
+      ExplorePanelAnyLanguage.safeParse(sample).success,
+      answered.has(language as QueryLanguage),
+      language,
+    );
+  }
+  assert.deepEqual([...answered].sort(), Object.keys(samples).sort());
 });
 
 test("details and a share carry the statement by its language's name, and nothing else", () => {

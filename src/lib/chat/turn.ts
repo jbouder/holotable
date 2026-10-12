@@ -1,5 +1,9 @@
 import { APICallError, createIdGenerator, type UIMessage } from "ai";
-import { buildDataChatPrompt, streamDataChat } from "@/lib/ai/data-chat";
+import {
+  buildDataChatPrompt,
+  outcomeStatement,
+  streamDataChat,
+} from "@/lib/ai/data-chat";
 import { ModelTimeoutError } from "@/lib/ai/invoke";
 import { recordGeneration } from "@/lib/ai/log";
 import { requireModel } from "@/lib/ai/models";
@@ -125,7 +129,7 @@ export async function chatTurnResponse(input: {
           via: "chat",
           ...where,
           ...(q.panelId ? { panelId: q.panelId } : {}),
-          ...(q.promql !== undefined ? { promql: q.promql } : { sql: q.sql }),
+          ...outcomeStatement(q),
           stage: q.stage,
         },
       }),

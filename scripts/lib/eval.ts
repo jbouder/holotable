@@ -90,6 +90,11 @@ export const EvalCase = z
         tables: z.array(z.string()).min(1).optional(),
         /** Each metric must be named by at least one PromQL panel (#387). */
         metrics: z.array(z.string()).min(1).optional(),
+        /**
+         * Every logs panel names its level column in `options.level` (#564):
+         * a Loki line's level is a label or a parsed field, never found by name.
+         */
+        logsLevel: z.literal("required").optional(),
         /** Every query panel sets `query.timeField` (`required`) or none does (`absent`). */
         timeField: z.enum(["required", "absent"]).optional(),
         minPanels: z.number().int().nonnegative().optional(),
@@ -543,6 +548,14 @@ export async function grade(
         failures.push(`panel "${panel.id}" has no timeField`);
       } else if (expect.timeField === "absent" && field !== undefined) {
         failures.push(`panel "${panel.id}" sets timeField "${field}"`);
+      }
+    }
+  }
+  if (expect.logsLevel === "required") {
+    for (const panel of panels) {
+      const level = (panel.options as { level?: unknown } | undefined)?.level;
+      if (panel.viz === "logs" && typeof level !== "string") {
+        failures.push(`logs panel "${panel.id}" names no options.level`);
       }
     }
   }

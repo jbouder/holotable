@@ -73,6 +73,13 @@ export interface PanelKind<K extends string = string> {
    * column per series), so the shape a kind asks for is said differently.
    */
   readonly promqlHint?: string;
+  /**
+   * The hint for a panel against a Loki source (#564), where it differs from
+   * `promqlHint`: a LogQL metric query answers in PromQL's shape, so a kind
+   * without one is told the PromQL hint; only a kind that reads log lines
+   * says something of its own.
+   */
+  readonly logqlHint?: string;
   /** The kind cannot be drawn without `query.timeField` (#201). */
   readonly requiresTimeField?: boolean;
   /**
