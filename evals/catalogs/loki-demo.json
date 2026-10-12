@@ -1,0 +1,14 @@
+{
+  "kind": "loki",
+  "url": "http://loki:3100",
+  "auth": "none",
+  "labels": [
+    { "name": "app", "values": ["api", "web", "worker", "postgres"] },
+    { "name": "env", "values": ["prod", "staging"] },
+    { "name": "level", "values": ["debug", "info", "warn", "error"] },
+    {
+      "name": "container",
+      "values": ["api-1", "api-2", "web-1", "worker-1", "postgres-1"]
+    }
+  ]
+}

@@ -1,0 +1,13 @@
+{
+  "name": "chat-loki-api-errors",
+  "mode": "chat",
+  "catalog": "loki-demo",
+  "prompt": "Show me the errors from the API in the last hour.",
+  "expect": {
+    "plausibleViz": ["logs", "table"],
+    "requiredViz": ["logs"],
+    "logsLevel": "required",
+    "minPanels": 1,
+    "maxPanels": 1
+  }
+}
