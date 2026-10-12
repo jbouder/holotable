@@ -261,6 +261,17 @@ export const config = {
    * the author's to narrow (#385). Each series becomes a column.
    */
   prometheusMaxSeries: num("PROMETHEUS_MAX_SERIES", 100),
+  /**
+   * The most log lines one Loki query asks for and keeps (#562): the
+   * `limit` the server sends on every log query, newest first, inside
+   * `MAX_QUERY_ROWS` and a logs panel's own limit. A cut is said on the panel.
+   */
+  lokiMaxEntries: num("LOKI_MAX_ENTRIES", 1_000),
+  /**
+   * The most series one Loki metric query's result may hold before it is
+   * refused as the author's to narrow (#562), as `PROMETHEUS_MAX_SERIES` is.
+   */
+  lokiMaxSeries: num("LOKI_MAX_SERIES", 100),
 
   /**
    * Model requests per minute allowed per user in a workspace, on every
@@ -635,6 +646,8 @@ const EnvSchema = z.object({
   PROMETHEUS_MIN_STEP_MS: blank(positiveInt),
   PROMQL_MAX_POINTS: blank(positiveInt),
   PROMETHEUS_MAX_SERIES: blank(positiveInt),
+  LOKI_MAX_ENTRIES: blank(positiveInt),
+  LOKI_MAX_SERIES: blank(positiveInt),
   LLM_RATE_PER_MINUTE: blank(nonNegativeInt),
   LLM_DAILY_TOKEN_BUDGET: blank(nonNegativeInt),
 
