@@ -46,10 +46,16 @@ against allowlisted tables:
 - **No comments.** The lexer decides, so `'--'` inside a string literal is fine.
 - **Forbidden functions**: anything that could exfiltrate data or bypass the
   allowlist — `file`, `url`, `remote`, `s3`, `dblink`, `pg_read_file`, the
-  `*_to_xml` family that executes a query string — plus server-side sleeps,
-  session state, server identity, advisory locks and backend signals. Matched
-  by unqualified name against every call in the tree, in any position, so
-  `pg_catalog.pg_sleep(1)` is caught.
+  `*_to_xml` family that executes a query string, DuckDB's file readers
+  (`read_csv`, `read_parquet`, `glob`, …), `query`, `getenv` and extension
+  loading — plus server-side sleeps, session state, server identity, advisory
+  locks and backend signals. Matched by unqualified name against every call in
+  the tree, in any position, so `pg_catalog.pg_sleep(1)` is caught.
+- **No table functions in `FROM`**: `FROM generate_series(…)`, `LATERAL
+  unnest(…)`, `ROWS FROM (…)` and any other function used as a table is
+  refused by name unless it is on an allowlist, which is empty. A table
+  function is how DuckDB reads a file, and a denylist only blocks the names it
+  has been told about.
 - **Forbidden time and non-deterministic values**: `now()` and every synonym,
   `random()`, the parenless keywords (`current_timestamp`, `current_user`, …)
   and the date/time input words (`'now'`, `'today'`, `'yesterday'`) that
