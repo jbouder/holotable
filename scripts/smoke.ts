@@ -20,13 +20,15 @@ import type { SourcePlan } from "@/lib/sources/server/types";
 import { resolveTimeRange } from "@/lib/time";
 import { serverKind } from "@/lib/sources/server/registry";
 import { demoSpec } from "./lib/demo-dashboards";
+import { DEMO_FILES_DASHBOARD_TITLE, demoFilesSpec } from "./lib/demo-files";
 
 /**
  * End-to-end smoke test for the self-monitoring demo (#54), its PromQL twin
  * (#390), which asks the compose stack's Prometheus the same questions, the
  * Holotable logs dashboard (#567), which reads the app's own log lines from
- * the `logs` profile's Loki while LOKI_SELF_URL is set, and the service health
- * demo, whose custom visual (#405) must also compile.
+ * the `logs` profile's Loki while LOKI_SELF_URL is set, the service health
+ * demo, whose custom visual (#405) must also compile, and the files demo
+ * (#574), which reads Parquet and CSV files through DuckDB.
  *
  * Brings no stack up of its own — `docker compose` does that — and instead
  * asserts that what compose produced actually works:
@@ -94,6 +96,14 @@ const TARGETS: Target[] = [
     title: "Demo service health",
     committed: () => parseDashboard(demoSpec()),
     feeds: "the seeder writes demo rows every few seconds",
+  },
+  {
+    // The files demo (#574): a DuckDB source over the Parquet and CSV files
+    // the seeder writes under DUCKDB_SOURCES_DIR, which compose mounts here
+    // read-only, as it does for the app.
+    title: DEMO_FILES_DASHBOARD_TITLE,
+    committed: () => parseDashboard(demoFilesSpec()),
+    feeds: "the seeder writes the files under DUCKDB_SOURCES_DIR first",
   },
 ];
 

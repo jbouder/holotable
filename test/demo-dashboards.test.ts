@@ -19,6 +19,11 @@ import {
   hostDetailSpec,
   RETIRED_DEMO_DASHBOARDS,
 } from "../scripts/lib/demo-dashboards";
+import {
+  DEMO_FILES_SOURCE_ID,
+  demoFilesConfig,
+  demoFilesSpec,
+} from "../scripts/lib/demo-files";
 import { queryOf } from "./support/panels";
 
 /**
@@ -87,6 +92,9 @@ const SOURCES: Record<string, SqlSourceConfig> = {
   "ts-metrics": source(HTTP_REQUESTS),
   "ts-system": source(SYSTEM_METRICS),
   "ts-logs": source(APP_LOGS),
+  // The files demo (#574): the catalog the seeder registers, which is what
+  // Discover tables finds in the files it writes.
+  [DEMO_FILES_SOURCE_ID]: demoFilesConfig(),
 };
 
 const TARGETS: DemoLinkTargets = { hostDetail: "00000000-0000-4000-8000-000000000001" };
@@ -95,6 +103,7 @@ const SPECS: Record<string, Dashboard> = {
   demo: parseDashboard(demoSpec()),
   fleet: parseDashboard(fleetSpec(TARGETS)),
   hostDetail: parseDashboard(hostDetailSpec()),
+  files: parseDashboard(demoFilesSpec()),
 };
 
 for (const [name, spec] of Object.entries(SPECS)) {
