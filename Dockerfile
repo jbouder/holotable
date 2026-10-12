@@ -16,6 +16,11 @@ ENV NEXT_TELEMETRY_DISABLED=1
 # The unprivileged user both publishable targets run as.
 RUN groupadd --system --gid 1001 nodejs \
   && useradd --system --uid 1001 --gid nodejs nextjs
+# Where compose mounts the files demo's volume (#574): the seeder writes it,
+# the app and the smoke test read it. Owned by that user here so a fresh named
+# volume, which takes the ownership of the directory it is first mounted on,
+# is writable by the seeder whichever container mounts it first.
+RUN mkdir -p /data/duckdb && chown nextjs:nodejs /data/duckdb
 
 # ---- deps ----
 FROM base AS deps

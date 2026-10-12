@@ -108,6 +108,12 @@ services:
       # Prometheus scrape gate. /api/metrics answers 404 until one is set.
       METRICS_TOKEN: *metrics-token
       METRICS_ALLOWED_CIDRS: ${METRICS_ALLOWED_CIDRS:-}
+      # The files demo (#574): DuckDB sources may read what is under here and
+      # nothing else. The seeder writes it; the app's mount is read-only, the
+      # belt behind the SQL guard (admin/duckdb.md).
+      DUCKDB_SOURCES_DIR: /data/duckdb
+    volumes:
+      - duckdb-files:/data/duckdb:ro
     ports:
       - "3000:3000"
     # `docker compose stop` sends SIGTERM and waits this long before SIGKILL.
@@ -158,6 +164,11 @@ services:
       LOKI_SELF_URL: ${LOKI_SELF_URL-http://loki:3100}
       # History to write before streaming (#252), e.g. 6h. Empty writes none.
       SEED_BACKFILL: ${SEED_BACKFILL:-}
+      # Where the seeder writes the files demo's Parquet and CSV files (#574)
+      # and registers the `duckdb-demo` source over them. The only writer.
+      DUCKDB_SOURCES_DIR: /data/duckdb
+    volumes:
+      - duckdb-files:/data/duckdb
     depends_on:
       postgres:
         condition: service_healthy
@@ -215,6 +226,10 @@ services:
       LOKI_SELF_URL: ${LOKI_SELF_URL-http://loki:3100}
       SMOKE_TIMEOUT_MS: ${SMOKE_TIMEOUT_MS:-180000}
       LOG_LEVEL: ${LOG_LEVEL:-warn}
+      # The files demo (#574), read-only, as the app reads it.
+      DUCKDB_SOURCES_DIR: /data/duckdb
+    volumes:
+      - duckdb-files:/data/duckdb:ro
     depends_on:
       postgres:
         condition: service_healthy
@@ -367,3 +382,5 @@ configs:
 
 volumes:
   pgdata:
+  # The files demo's Parquet and CSV files (#574), written by `seed`.
+  duckdb-files:
