@@ -39,8 +39,7 @@ test("a Prometheus source: form, discovery, test, generate, render, brush, plan"
     await page.getByRole("button", { name: "Add source" }).first().click();
     const dialog = page.getByRole("dialog", { name: "Add source" });
     await dialog.getByRole("button", { name: "or enter configuration manually" }).click();
-    await dialog.getByRole("combobox", { name: "Kind" }).click();
-    await page.getByRole("option", { name: "Prometheus (PromQL)" }).click();
+    await dialog.getByRole("radio", { name: "Prometheus (PromQL)" }).click();
     await dialog.getByLabel("Source id").fill(sourceId);
     await dialog.getByLabel("Name").fill(sourceName);
     await dialog.getByLabel("URL").fill(PROM_URL);

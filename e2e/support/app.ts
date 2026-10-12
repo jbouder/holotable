@@ -1,4 +1,9 @@
-import { expect, type APIRequestContext, type Page } from "@playwright/test";
+import {
+  expect,
+  type APIRequestContext,
+  type Locator,
+  type Page,
+} from "@playwright/test";
 
 /** Helpers shared by the specs. Nothing here signs in; the setup project did. */
 
@@ -229,4 +234,46 @@ export async function createShareLink(request: APIRequestContext, dashboard: str
   });
   expect(res.ok(), `POST shares answered ${res.status()}`).toBe(true);
   return ((await res.json()) as { url: string }).url;
+}
+
+/** The labels and values `openLokiForm` has discovery answer with. */
+export const LOKI_LABELS = ["app", "env", "level", "namespace"];
+export const LOKI_APP_VALUES = ["api", "web", "worker"];
+
+/**
+ * Open the Add source dialog on the Loki form, with the endpoint filled in.
+ * The stack has no Loki yet (#567), so the discover route's answer is canned
+ * here: what is under test is what the form draws and saves, not the
+ * endpoint. Everything else (the save, its checks, the audit) is the server's.
+ */
+export async function openLokiForm(page: Page) {
+  await page.route("**/api/sources/discover", async (route) => {
+    const body = route.request().postDataJSON() as { valuesFor?: string };
+    await route.fulfill({
+      json: body.valuesFor
+        ? { ok: true, values: body.valuesFor === "app" ? LOKI_APP_VALUES : ["prod"] }
+        : { ok: true, labels: LOKI_LABELS },
+    });
+  });
+  await page.goto("/data-sources");
+  await page.getByRole("button", { name: "Add source" }).first().click();
+  const dialog = page.getByRole("dialog", { name: "Add source" });
+  await dialog.getByRole("button", { name: "or enter configuration manually" }).click();
+  await dialog.getByRole("radio", { name: "Loki (LogQL)" }).click();
+  // A public address literal: the save checks it against SOURCE_URL_ALLOWLIST
+  // without resolving anything, and nothing here contacts it.
+  await dialog.getByLabel("URL").fill("https://93.184.216.34");
+  await dialog.getByRole("combobox", { name: "Authentication" }).click();
+  await page.getByRole("option", { name: "None (in-cluster endpoint)" }).click();
+  return dialog;
+}
+
+/** Discover the canned labels and tick `app`, which fetches its values. */
+export async function discoverLokiLabels(dialog: Locator) {
+  await dialog.getByRole("button", { name: "Discover labels" }).click();
+  const search = dialog.getByLabel("Search the discovered labels");
+  await search.fill("ap");
+  await dialog.getByRole("checkbox", { name: "app", exact: true }).check();
+  await expect(dialog.getByText(LOKI_APP_VALUES.join(", "))).toBeVisible();
+  await search.fill("");
 }

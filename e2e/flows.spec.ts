@@ -9,6 +9,9 @@ import {
   createLinkedDashboards,
   DEMO_DASHBOARD,
   dashboardId,
+  discoverLokiLabels,
+  LOKI_APP_VALUES,
+  openLokiForm,
   waitForPanels,
 } from "./support/app";
 
@@ -278,8 +281,7 @@ test("a source admin registers a Prometheus source through the form (#386)", asy
   await page.getByRole("button", { name: "Add source" }).first().click();
   const dialog = page.getByRole("dialog", { name: "Add source" });
   await dialog.getByRole("button", { name: "or enter configuration manually" }).click();
-  await dialog.getByRole("combobox", { name: "Kind" }).click();
-  await page.getByRole("option", { name: "Prometheus (PromQL)" }).click();
+  await dialog.getByRole("radio", { name: "Prometheus (PromQL)" }).click();
   await dialog.getByLabel("Source id").fill(id);
   await dialog.getByLabel("Name").fill(name);
   // A public address literal: the save checks it against SOURCE_URL_ALLOWLIST
@@ -311,6 +313,45 @@ test("a source admin registers a Prometheus source through the form (#386)", asy
   const edit = page.getByRole("dialog", { name: `Edit ${name}` });
   await expect(edit.getByLabel("URL")).toHaveValue("https://93.184.216.34");
   await expect(edit.getByText("job, instance")).toBeVisible();
+  await edit.getByRole("button", { name: "Cancel" }).click();
+
+  const removed = await request.delete(`/api/sources/${id}`);
+  expect(removed.ok(), await removed.text()).toBe(true);
+});
+
+test("a source admin registers a Loki source through the form (#563)", async ({
+  page,
+  request,
+}) => {
+  const id = `e2e-loki-${Date.now().toString(36)}`;
+  const name = `Loki ${id}`;
+  const dialog = await openLokiForm(page);
+  await dialog.getByLabel("Source id").fill(id);
+  await dialog.getByLabel("Name").fill(name);
+  await discoverLokiLabels(dialog);
+  await dialog.getByRole("button", { name: "Create source" }).click();
+  await expect(dialog).toBeHidden();
+  const row = page.locator(`#source-${id}`);
+  await expect(row).toBeVisible();
+  await expect(row).toContainText("https://93.184.216.34");
+  // Never checked against the endpoint, so the health says so.
+  await expect(row).toContainText("Never refreshed");
+
+  // Saved as ticked, with the values discovery found as hints.
+  const saved = await request.get(`/api/sources/${id}`);
+  expect(saved.ok(), await saved.text()).toBe(true);
+  const body = (await saved.json()) as { source: { config: unknown } };
+  expect(body.source.config).toMatchObject({
+    kind: "loki",
+    auth: "none",
+    labels: [{ name: "app", values: LOKI_APP_VALUES }],
+  });
+
+  // Its kind is fixed: editing opens the Loki form, as saved.
+  await page.getByRole("button", { name: `Edit ${name}` }).click();
+  const edit = page.getByRole("dialog", { name: `Edit ${name}` });
+  await expect(edit.getByLabel("URL")).toHaveValue("https://93.184.216.34");
+  await expect(edit.getByText(LOKI_APP_VALUES.join(", "))).toBeVisible();
   await edit.getByRole("button", { name: "Cancel" }).click();
 
   const removed = await request.delete(`/api/sources/${id}`);

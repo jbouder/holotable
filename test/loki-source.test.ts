@@ -1,5 +1,6 @@
 import { after, before, beforeEach, test } from "node:test";
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 
 /*
  * The Loki client and executor (#562) against a fake endpoint on a loopback
@@ -7,6 +8,7 @@ import assert from "node:assert/strict";
  * loads, so it is imported first.
  */
 import "./support/loki-env";
+import { catalogHealth, describeCatalogHealth } from "@/lib/catalog/health";
 import { Panel, PanelQuery } from "@/lib/ir";
 import { createLogger, setLogger } from "@/lib/log";
 import { LokiUnavailableError } from "@/lib/loki/client";
@@ -16,7 +18,8 @@ import { rowsFromPrometheus } from "@/lib/prometheus/rows";
 import { SourceConfig, type SourceRecord } from "@/lib/registry";
 import { QueryExecutionError } from "@/lib/sources/execution";
 import { wrongLanguage } from "@/lib/sources/registry";
-import { serverKind } from "@/lib/sources/server/registry";
+import { MAX_LABEL_VALUES } from "@/lib/sources/kinds/loki";
+import { lokiDiscovery, serverKind } from "@/lib/sources/server/registry";
 import { type FakeLoki, getOnly, lokiSuccess, startFakeLoki } from "./support/fake-loki";
 import { asQueryPanel } from "./support/panels";
 
@@ -410,4 +413,97 @@ test("the connection test and a refresh read labels with GET and report nothing 
     labels: [{ label: "app", addedValues: ["worker"], removedValues: ["web"] }],
   });
   assert.ok(fake.seen.every((r) => r.method === "GET"));
+});
+
+test("discovery reads label names and one label's values with GET, over the server's last hour, capped (#563)", async () => {
+  fake.handle = getOnly((request) => {
+    if (request.path === "/loki/api/v1/labels")
+      return lokiSuccess(["namespace", "app", "__stream_shard__", "bad label", 7]);
+    if (request.path === "/loki/api/v1/label/app/values")
+      return lokiSuccess(
+        Array.from({ length: MAX_LABEL_VALUES + 30 }, (_, i) => `v${i}`).concat("v1"),
+      );
+    return lokiSuccess([]);
+  });
+  const discovery = lokiDiscovery({
+    workspaceId: "ws",
+    url: fake.url,
+    auth: "bearer",
+    secretRef: "LOKI_TEST",
+  });
+  assert.equal(await discovery.checkUrl(), null);
+  // Reserved and malformed names are not offered; the menu is sorted.
+  assert.deepEqual(await discovery.labels(), ["app", "namespace"]);
+  const values = await discovery.values("app");
+  assert.equal(values.length, MAX_LABEL_VALUES);
+  assert.equal(new Set(values).size, values.length);
+
+  assert.equal(fake.seen.length, 2);
+  for (const request of fake.seen) {
+    assert.equal(request.method, "GET");
+    assert.equal(request.headers.authorization, "Bearer l0ki-t0ken-secret");
+    // The window is the server's: PROMETHEUS_DISCOVERY_WINDOW, an hour by default.
+    const span =
+      BigInt(request.query.get("end") ?? "0") - BigInt(request.query.get("start") ?? "0");
+    assert.equal(span, BigInt(3_600_000) * BigInt(1_000_000));
+  }
+
+  // A URL outside SOURCE_URL_ALLOWLIST is refused before anything is asked.
+  const outside = lokiDiscovery({
+    workspaceId: "ws",
+    url: "http://10.0.0.7:3100",
+    auth: "none",
+    secretRef: null,
+  });
+  assert.notEqual(await outside.checkUrl(), null);
+});
+
+test("the discover route authorizes source:manage and the grant before asking any kind (#563)", () => {
+  const text = readFileSync(
+    new URL("../src/app/api/sources/discover/route.ts", import.meta.url),
+    "utf8",
+  );
+  const authorize = text.indexOf('assertAuthorized(identity, "source:manage"');
+  const grant = text.indexOf("requireGrantedSecretRef(body.secretRef");
+  const ask = text.indexOf("DISCOVER[body.kind]");
+  assert.ok(authorize > 0 && grant > authorize && ask > grant);
+  // Each HTTP kind checks its URL before it asks the endpoint anything.
+  assert.equal(text.match(/await discovery\.checkUrl\(\)/g)?.length, 2);
+  assert.match(text, /lokiDiscovery\(/);
+  assert.match(text, /action: "source\.discover"/);
+});
+
+test("health speaks of labels and the endpoint for a Loki source; a label with no streams is missing (#563)", () => {
+  const loki = {
+    ...source("none"),
+    name: "Logs",
+    catalogRefreshedAt: "2026-10-09T11:00:00Z",
+    catalogMissingTables: ["tenant"],
+  };
+  const health = catalogHealth(loki, { now: new Date("2026-10-09T12:00:00Z") });
+  assert.equal(health.state, "drifted");
+  assert.equal(health.entries, "label");
+  assert.equal(health.liveTableCount, 2);
+  assert.equal(
+    describeCatalogHealth(loki, health),
+    '1 label in "Logs" no longer exists in the endpoint (tenant). Refresh the catalog for source logs and adjust its labels.',
+  );
+  const never = catalogHealth({
+    ...loki,
+    catalogRefreshedAt: null,
+    catalogMissingTables: [],
+  });
+  assert.match(
+    describeCatalogHealth(loki, never),
+    /its labels and values are unverified and generated LogQL/,
+  );
+
+  const view = serverKind(loki).catalogView(loki, health, false);
+  assert.deepEqual(Object.keys(view).sort(), [
+    "canManage",
+    "catalogHealth",
+    "labels",
+    "missingLabels",
+  ]);
+  assert.ok(!JSON.stringify(view).includes(fake.url));
 });
