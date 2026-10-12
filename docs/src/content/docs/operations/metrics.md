@@ -76,6 +76,7 @@ process and Node.js collectors (`holotable_process_cpu_seconds_total`,
 | `holotable_llm_repairs_total` | counter | `route`, `outcome` | Structured-output repairs: one automatic re-ask after a generation failed its schema. `outcome` is `repaired` or `failed`. See [AI provider](/admin/models/#structured-output-repair) |
 | `holotable_sql_validation_rejections_total` | counter | `reason` | Statements refused by the SQL guard |
 | `holotable_promql_validation_rejections_total` | counter | `reason` | Expressions refused by the PromQL guard |
+| `holotable_logql_validation_rejections_total` | counter | `reason` | Expressions refused by the LogQL guard. `reason` adds `stage` (a pipeline stage off the allowlist) to the PromQL guard's set |
 | `holotable_audit_write_failures_total` | counter | — | Audit log rows lost because they could not be written. Anything above zero is a gap in `audit_log`; see [the audit log](/operations/audit-log/) |
 | `holotable_pool_wait_seconds` | histogram | `source` | Time a query waited for a connection from its source's pool, failed or not. Healthy: near zero. Rising: the pool (`MAX_POOL_PER_SOURCE`) is the limit |
 | `holotable_pool_in_use` | gauge | `source` | Connections checked out of a source's pool. Healthy: below `MAX_POOL_PER_SOURCE`. Pinned at it: queries queue, and `pool_wait_seconds` rises next |

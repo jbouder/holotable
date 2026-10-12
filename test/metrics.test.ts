@@ -272,6 +272,7 @@ describe("the scrape body", () => {
       "holotable_llm_requests_total",
       "holotable_sql_validation_rejections_total",
       "holotable_promql_validation_rejections_total",
+      "holotable_logql_validation_rejections_total",
       "holotable_audit_write_failures_total",
       "holotable_chat_panels_total",
     ]) {

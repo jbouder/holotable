@@ -71,6 +71,20 @@ export type PromqlRejectionReason =
   | "bounds"
   | "variable";
 
+/**
+ * Why the LogQL guard refused an expression (#561). A fixed enum, safe as a
+ * label; `stage` is a pipeline stage the allowlist does not list.
+ */
+export type LogqlRejectionReason =
+  | "empty"
+  | "structure"
+  | "stage"
+  | "function"
+  | "time"
+  | "catalog"
+  | "bounds"
+  | "variable";
+
 /** What happened to a model request at the admission gate. */
 export type LlmRequestOutcome = "admitted" | "rate_limited" | "over_budget" | "busy";
 
@@ -91,6 +105,7 @@ interface Instruments {
   chatPanels: Counter<"outcome">;
   sqlRejections: Counter<"reason">;
   promqlRejections: Counter<"reason">;
+  logqlRejections: Counter<"reason">;
   auditWriteFailures: Counter<string>;
   poolWait: Histogram<"source">;
   poolInUse: Gauge<"source">;
@@ -182,6 +197,12 @@ function build(): Instruments {
     promqlRejections: new Counter({
       name: "holotable_promql_validation_rejections_total",
       help: "Expressions refused by the PromQL guard, by the kind of rule that refused them.",
+      labelNames: ["reason"],
+      registers: [registry],
+    }),
+    logqlRejections: new Counter({
+      name: "holotable_logql_validation_rejections_total",
+      help: "Expressions refused by the LogQL guard, by the kind of rule that refused them.",
       labelNames: ["reason"],
       registers: [registry],
     }),
@@ -440,6 +461,11 @@ export function recordSqlRejection(reason: SqlRejectionReason): void {
 /** Record one expression refused by the PromQL guard (#384). */
 export function recordPromqlRejection(reason: PromqlRejectionReason): void {
   instruments().promqlRejections.inc({ reason });
+}
+
+/** Record one expression refused by the LogQL guard (#561). */
+export function recordLogqlRejection(reason: LogqlRejectionReason): void {
+  instruments().logqlRejections.inc({ reason });
 }
 
 /**
