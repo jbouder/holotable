@@ -17,8 +17,11 @@
 //
 // The list is deliberately over-broad and spans dialects: the entries below in
 // ClickHouse vocabulary cost nothing on a PostgreSQL target, and a source
-// driver for another engine inherits them for free. The PostgreSQL entries are
-// the ones that matter today.
+// driver for another engine inherits them for free. The PostgreSQL entries
+// matter on a TimescaleDB or PostgreSQL source, and the DuckDB entries on a
+// DuckDB one (#569), where there are no roles at all: the guard and the
+// engine's locked configuration are the only two belts. One list, read by
+// every SQL kind, so a name refused on one dialect is refused on all of them.
 export const FORBIDDEN_FUNCTIONS = [
   // ClickHouse table functions.
   "file",
@@ -115,6 +118,81 @@ export const FORBIDDEN_FUNCTIONS = [
   "pg_export_snapshot",
   "nextval",
   "setval",
+
+  // DuckDB: functions that read the filesystem, directly or through a glob.
+  // Most are table functions, which a `FROM` refuses anyway (see
+  // `ALLOWED_TABLE_FUNCTIONS`); naming them here refuses them in every other
+  // position too, and lets the editor's hints flag them by name.
+  "read_csv",
+  "read_csv_auto",
+  "read_parquet",
+  "parquet_scan",
+  "read_json",
+  "read_json_auto",
+  "read_json_objects",
+  "read_json_objects_auto",
+  "read_ndjson",
+  "read_ndjson_auto",
+  "read_ndjson_objects",
+  "read_text",
+  "read_blob",
+  "read_xlsx",
+  "glob",
+  "sniff_csv",
+  "parquet_metadata",
+  "parquet_file_metadata",
+  "parquet_kv_metadata",
+  "parquet_schema",
+
+  // DuckDB: the network and other engines. httpfs adds no names of its own (it
+  // makes the readers above accept `s3://` and `https://`); the aws extension
+  // and the scanner extensions do. `s3` itself is in the ClickHouse group.
+  "load_aws_credentials",
+  "iceberg_scan",
+  "iceberg_metadata",
+  "iceberg_snapshots",
+  "delta_scan",
+  "postgres_scan",
+  "postgres_query",
+  "postgres_attach",
+  "mysql_scan",
+  "mysql_query",
+  "sqlite_scan",
+  "sqlite_attach",
+
+  // DuckDB: these take a query string and execute it, the same allowlist
+  // bypass as PostgreSQL's `query_to_xml` family.
+  "query",
+  "query_table",
+  "json_execute_serialized_sql",
+
+  // DuckDB: the environment, settings, session variables and extensions.
+  // `current_setting` is in the PostgreSQL group above.
+  "getenv",
+  "getvariable",
+  "duckdb_settings",
+  "duckdb_extensions",
+  "duckdb_databases",
+  "duckdb_secrets",
+  "which_secret",
+  "load",
+  "install",
+
+  // DuckDB: catalog introspection, which lists the tables and columns the
+  // catalog allowlist does not declare.
+  "duckdb_tables",
+  "duckdb_columns",
+  "duckdb_views",
+  "duckdb_schemas",
+  "duckdb_functions",
+  "duckdb_temporary_files",
+  "pragma_table_info",
+  "pragma_database_list",
+  "pragma_storage_info",
+
+  // DuckDB: table functions that write to the database file.
+  "checkpoint",
+  "force_checkpoint",
 ];
 
 // Non-deterministic / time functions: the model must not filter or branch on
@@ -150,6 +228,14 @@ export const FORBIDDEN_TIME_FUNCTIONS = [
   "gen_random_uuid",
   "uuid_generate_v1",
   "uuid_generate_v4",
+
+  // DuckDB's clock readings and non-determinism, beyond the shared `now`,
+  // `today`, `random` and `gen_random_uuid` above.
+  "get_current_timestamp",
+  "get_current_time",
+  "current_localtimestamp",
+  "current_localtime",
+  "uuid",
 ];
 
 // PostgreSQL's date/time input accepts these words as *values*: `'now'`,
@@ -157,6 +243,14 @@ export const FORBIDDEN_TIME_FUNCTIONS = [
 // with no function call for a denylist to see. Matched case-insensitively
 // after trimming, exactly as the datetime parser does.
 export const TIME_INPUT_LITERALS = new Set(["now", "today", "tomorrow", "yesterday"]);
+
+// Table functions a `FROM` may call (a `RangeFunction`: `FROM read_parquet(…)`,
+// `FROM generate_series(…)`). Everything else in `FROM` is refused by name,
+// whatever the dialect, because a table function is how DuckDB reads a file
+// and the denylist above can only block the ones it has been told about. Empty
+// today: `generate_series` is the one candidate, and it stays out until a
+// panel needs it.
+export const ALLOWED_TABLE_FUNCTIONS: ReadonlySet<string> = new Set<string>();
 
 export const FORBIDDEN_FUNCTION_SET = new Set(FORBIDDEN_FUNCTIONS);
 export const FORBIDDEN_TIME_FUNCTION_SET = new Set(FORBIDDEN_TIME_FUNCTIONS);
