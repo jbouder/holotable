@@ -117,6 +117,30 @@ export function recordedPromqlDashboard(sourceId: string) {
   };
 }
 
+/**
+ * The recorded dashboard for a DuckDB source (#573): the same story as
+ * {@link recordedDashboard}, in DuckDB's spelling of a bucket, against an
+ * `http_requests` table (the e2e stack's generated Parquet file).
+ */
+export function recordedDuckDbDashboard(sourceId: string) {
+  const base = recordedDashboard(sourceId);
+  return {
+    ...base,
+    title: "Request log",
+    panels: base.panels.map((panel) =>
+      panel.id === "requests"
+        ? {
+            ...panel,
+            query: {
+              ...panel.query,
+              sql: "SELECT time_bucket(INTERVAL '1 minute', ts) AS minute, count(*) AS requests FROM http_requests GROUP BY minute ORDER BY minute",
+            },
+          }
+        : panel,
+    ),
+  };
+}
+
 /** The recorded Explore answer for a Prometheus source (#387). */
 export function recordedPromqlExplorePanel(sourceId: string) {
   return {
@@ -328,6 +352,8 @@ export function stubAnswer(options: CallOptions): string {
   // (#564).
   const promql = system.includes(`(id: ${sourceId}, kind: prometheus)`);
   const stream = logqlStreamOf(system, sourceId);
+  // And a DuckDB source gets its own bucket spelling (#573).
+  const duckdb = system.includes(`(id: ${sourceId}, kind: duckdb)`);
   const format = options.responseFormat;
   if (format?.type !== "json") return STUB_CHAT_REPLY;
 
@@ -345,7 +371,9 @@ export function stubAnswer(options: CallOptions): string {
           ? recordedLogqlDashboard(sourceId, stream)
           : promql
             ? recordedPromqlDashboard(sourceId)
-            : recordedDashboard(sourceId),
+            : duckdb
+              ? recordedDuckDbDashboard(sourceId)
+              : recordedDashboard(sourceId),
       );
     }
     case "Panel": {
