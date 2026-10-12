@@ -120,12 +120,20 @@ export function VariablesEditor({
   onChange: (variables: Variable[] | undefined, action: string, key?: string) => void;
 }) {
   const list = variables ?? [];
-  const shapeOf = (row: VariableDraft): QueryShape => {
+  const languageOf = (row: VariableDraft) => {
     const kind = sources.find((s) => s.id === row.sourceId)?.kind;
-    if (kind) return sourceKind(kind).language === "promql" ? "labels" : "sql";
+    return kind ? sourceKind(kind).language : null;
+  };
+  const shapeOf = (row: VariableDraft): QueryShape => {
+    const language = languageOf(row);
+    // PromQL and LogQL sources both answer a label's values (#388, #565).
+    if (language) return language === "sql" ? "sql" : "labels";
     // A removed source: keep what the row was written as.
     return row.labelName && !row.sql ? "labels" : "sql";
   };
+  /** LogQL binds a variable as one matcher value, so a Loki source's variable takes one. */
+  const singleOnly = (row: VariableDraft) =>
+    row.type === "query" && languageOf(row) === "logql";
   const { draft, setDraft, committed } = useSyncedDraft<VariableDraft[]>(
     JSON.stringify(list),
     () => list.map(toDraft),
@@ -137,7 +145,9 @@ export function VariablesEditor({
     const parsed: Variable[] = [];
     const names = new Set<string>();
     for (const [i, row] of rows.entries()) {
-      const result = Variable.safeParse(fromDraft(row, shapeOf(row)));
+      const result = Variable.safeParse(
+        fromDraft(singleOnly(row) ? { ...row, multi: false } : row, shapeOf(row)),
+      );
       if (!result.success) {
         setProblem(`Variable ${i + 1}: ${describeIssue(result.error.issues[0])}`);
         return;
@@ -164,10 +174,11 @@ export function VariablesEditor({
     <div className="space-y-3">
       <p className="text-xs text-muted">
         Reference a variable in panel SQL as <code>:name</code>; a multi-value one as{" "}
-        <code>col = ANY(:name)</code>. In PromQL it is a matcher&rsquo;s value,{" "}
-        <code>{'{host=":host"}'}</code>, or <code>{'{host=~":host"}'}</code> for several.
-        A value is never written into a query as text, and the server refuses any value
-        the variable does not allow.
+        <code>col = ANY(:name)</code>. In PromQL or LogQL it is a matcher&rsquo;s value,{" "}
+        <code>{'{host=":host"}'}</code>, or in PromQL <code>{'{host=~":host"}'}</code> for
+        several; LogQL also takes one in a line filter, <code>{'|= ":needle"'}</code>, and
+        one value at a time. A value is never written into a query as text, and the server
+        refuses any value the variable does not allow.
       </p>
       {draft.map((row, i) => (
         // biome-ignore lint/suspicious/noArrayIndexKey: rows are positional while being named
@@ -264,7 +275,7 @@ export function VariablesEditor({
                     <Label htmlFor={`var-${i}-label-name`}>Label values of</Label>
                     <Input
                       id={`var-${i}-label-name`}
-                      placeholder="instance"
+                      placeholder={languageOf(row) === "logql" ? "job" : "instance"}
                       spellCheck={false}
                       className="font-mono text-xs"
                       value={row.labelName}
@@ -279,10 +290,18 @@ export function VariablesEditor({
                     />
                   </div>
                   <div>
-                    <Label htmlFor={`var-${i}-match`}>From series (optional)</Label>
+                    <Label htmlFor={`var-${i}-match`}>
+                      {languageOf(row) === "logql"
+                        ? "From streams (optional)"
+                        : "From series (optional)"}
+                    </Label>
                     <Input
                       id={`var-${i}-match`}
-                      placeholder="every allowlisted metric"
+                      placeholder={
+                        languageOf(row) === "logql"
+                          ? 'one stream selector, such as {app="api"}'
+                          : "every allowlisted metric"
+                      }
                       spellCheck={false}
                       className="font-mono text-xs"
                       value={row.match}
@@ -343,7 +362,8 @@ export function VariablesEditor({
             </div>
             <Checkbox
               className="h-10"
-              checked={row.multi}
+              checked={row.multi && !singleOnly(row)}
+              disabled={singleOnly(row)}
               label="Several values"
               onCheckedChange={(multi) =>
                 edit(i, { multi }, multi ? "allow several values" : "allow one value")
