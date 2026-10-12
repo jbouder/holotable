@@ -47,6 +47,18 @@ Both work on TimescaleDB too, so they are the safe choice when you do not know
 which the server is. Holotable learns which it is on **Test** or **Refresh**,
 and tells the model when the extension is missing.
 
+## DuckDB
+
+A DuckDB source (a directory of Parquet and CSV files, or a `.duckdb` file)
+takes the same SQL and the same guard. Its tables are in schema `main`; a
+directory's tables are its files, named by their stems. `time_bucket`,
+`date_trunc` and `date_bin` all exist: write the interval as one,
+`time_bucket(INTERVAL '5 minutes', ts)`. Column names are case-sensitive as
+the catalog lists them: double-quote one that is not all lowercase
+(`"Value"`). Do not cast to `::timestamptz`; the engine runs in UTC, so use
+the time column as it is. File readers (`read_parquet`, `read_csv`, …) are
+refused like any table function: query the tables listed.
+
 ## What the server does instead, so you must not
 
 - **The time window.** The server wraps the statement and filters the

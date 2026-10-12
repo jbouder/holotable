@@ -64,6 +64,15 @@ export function formStateFromConfig(config: TimescaleDbConfig): SourceFormState 
   };
 }
 
+/**
+ * What the table picker edits, in any SQL kind's form: the allowlist. The
+ * TimescaleDB form's state and the DuckDB form's (#573) both carry one, so
+ * selection, discovery and the rows are the same functions for both.
+ */
+export interface AllowlistState {
+  tables: CatalogTable[];
+}
+
 /** Errors keyed by the field that caused them; see {@link tableFieldKey}. */
 export type FieldErrors = Record<string, string>;
 
@@ -186,7 +195,7 @@ function claimPort(state: SourceFormState, errors: FieldErrors): number | undefi
   return port;
 }
 
-function collectFieldErrors(
+export function collectFieldErrors(
   issues: readonly { code: string; message: string; path: readonly PropertyKey[] }[],
   into: FieldErrors,
 ): void {
@@ -213,6 +222,7 @@ const LABELS: Record<string, string> = {
   port: "Port",
   database: "Database",
   schema: "Schema",
+  path: "Path",
 };
 
 /**
@@ -287,10 +297,11 @@ export function formStateFromConfigText(text: string): ConfigTextResult {
 /**
  * Whether a column's declared type can carry a time. `data_type` is
  * `information_schema`'s spelling — "timestamp with time zone", "date", "time
- * without time zone" — so the prefix is the whole test.
+ * without time zone", and DuckDB's "TIMESTAMP_NS" (#573) — so the prefix is
+ * the whole test.
  */
 export function isTimestampType(type: string): boolean {
-  return /^(timestamptz|timestamp|date|time)\b/i.test(type.trim());
+  return /^(timestamptz|timestamp(?:_(?:ns|ms|s))?|date|time)\b/i.test(type.trim());
 }
 
 /**
@@ -324,10 +335,10 @@ export function defaultTimeField(table: CatalogTable): string | undefined {
  * existing entry's description and chosen time field survive a re-discovery
  * because removal is what drops them, not a refresh.
  */
-export function toggleTable(
-  state: SourceFormState,
+export function toggleTable<S extends AllowlistState>(
+  state: S,
   discovered: CatalogTable,
-): SourceFormState {
+): S {
   const selected = state.tables.some((table) => table.name === discovered.name);
   if (selected) {
     return {
@@ -386,8 +397,8 @@ export function menuAfterDiscovery(menu: TableMenu, tables: CatalogTable[]): Tab
   };
 }
 
-export interface DiscoveryResult {
-  state: SourceFormState;
+export interface DiscoveryResult<S extends AllowlistState = SourceFormState> {
+  state: S;
   menu: TableMenu;
   /** Allowlisted tables the live schema does not have, now unticked. */
   unticked: string[];
@@ -403,11 +414,11 @@ export interface DiscoveryResult {
  * would save it. It stays on the menu, marked not discovered and whole, so an
  * untick the author disagrees with is one click to undo.
  */
-export function applyDiscovery(
-  state: SourceFormState,
+export function applyDiscovery<S extends AllowlistState>(
+  state: S,
   menu: TableMenu,
   tables: CatalogTable[],
-): DiscoveryResult {
+): DiscoveryResult<S> {
   const found = new Set(tables.map((table) => table.name));
   const missing = state.tables.filter((table) => !found.has(table.name));
   const remembered = missing.reduce(rememberTable, menu);
@@ -433,7 +444,7 @@ export function rememberTable(menu: TableMenu, table: CatalogTable): TableMenu {
  * dropped it — and is marked as not discovered, which is how a name the live
  * schema does not have shows up as the typo it is.
  */
-export function tableRows(state: SourceFormState, menu: TableMenu): TableRow[] {
+export function tableRows(state: AllowlistState, menu: TableMenu): TableRow[] {
   const discovered = new Set(menu.discovered);
   const selected = new Set(state.tables.map((table) => table.name));
   return [
@@ -453,11 +464,11 @@ export function tableRows(state: SourceFormState, menu: TableMenu): TableRow[] {
 }
 
 /** Patch one selected table, by name. */
-export function updateTable(
-  state: SourceFormState,
+export function updateTable<S extends AllowlistState>(
+  state: S,
   name: string,
   patch: Partial<CatalogTable>,
-): SourceFormState {
+): S {
   return {
     ...state,
     tables: state.tables.map((table) =>
@@ -505,7 +516,7 @@ export async function discoverSourceTables(
 }
 
 /** A discovery body is trusted no further than its shape. */
-function readDiscovery(body: unknown): DiscoverOutcome {
+export function readDiscovery(body: unknown): DiscoverOutcome {
   const record = (typeof body === "object" && body !== null ? body : {}) as Record<
     string,
     unknown

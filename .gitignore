@@ -16,6 +16,8 @@
 /e2e/.auth/
 /e2e/test-results/
 /e2e/playwright-report/
+# The DuckDB files e2e/prepare.ts generates (#573).
+/e2e/.duckdb/
 
 # next.js
 /.next/

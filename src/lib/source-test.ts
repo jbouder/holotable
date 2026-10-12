@@ -136,6 +136,8 @@ export interface SourceTestResult {
   labels?: TestLabel[];
   /** A DuckDB source's lock (#572). */
   lock?: TestLock;
+  /** What a DuckDB source names (#573): a directory of files, or a database file. */
+  layout?: "directory" | "database";
 }
 
 /**
@@ -217,6 +219,24 @@ export function hasFinding(result: SourceTestResult): boolean {
   if ((result.metrics ?? []).some((m) => !m.reachable)) return true;
   if ((result.labels ?? []).some((l) => !l.reachable)) return true;
   return (result.tables ?? []).some((t) => !t.reachable);
+}
+
+/** The lock row's tone (#573): a lock that does not hold is a finding. */
+export function lockTone(lock: TestLock): "ok" | "danger" {
+  return lock.holds ? "ok" : "danger";
+}
+
+export function lockHeadline(lock: TestLock): string {
+  return lock.holds
+    ? "Locked: the engine reads only this source's files"
+    : "Not locked: the engine could reach other files or change its settings";
+}
+
+/** How a DuckDB source's layout reads on the report. */
+export function layoutLabel(layout: "directory" | "database"): string {
+  return layout === "directory"
+    ? "a directory of Parquet and CSV files"
+    : "a .duckdb file";
 }
 
 export function writeSurfaceTone(

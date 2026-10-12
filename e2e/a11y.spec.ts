@@ -168,6 +168,19 @@ for (const { theme, palette, name } of APPEARANCES) {
       await expectNoA11yViolations(page);
     });
 
+    test("the DuckDB source form, with its path picker open", async ({ page }) => {
+      await page.goto("/data-sources");
+      await page.getByRole("button", { name: "Add source" }).first().click();
+      const dialog = page.getByRole("dialog", { name: "Add source" });
+      await dialog
+        .getByRole("button", { name: "or enter configuration manually" })
+        .click();
+      await dialog.getByRole("radio", { name: "DuckDB (files)" }).click();
+      await dialog.getByRole("combobox", { name: "Path" }).click();
+      await expect(page.getByRole("option", { name: /requests/ })).toBeVisible();
+      await expectNoA11yViolations(page);
+    });
+
     test("data sources, the Loki form and its discovered labels (#563)", async ({
       page,
     }) => {

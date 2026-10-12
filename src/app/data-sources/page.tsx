@@ -1,6 +1,7 @@
 import { getIdentity } from "@/lib/auth/authorize";
 import { accessibleWorkspaces, hasWorkspaceRole } from "@/lib/auth/claims";
 import { SignIn } from "@/components/sign-in";
+import { sourceKindAvailability } from "@/lib/sources/server/registry";
 import { SourcesClient } from "./sources-client";
 
 export const dynamic = "force-dynamic";
@@ -29,11 +30,17 @@ export default async function DataSourcesPage({
   // create path is still the same guarded POST /api/sources.
   const { new: openCreate } = await searchParams;
 
+  // Which kinds this server can hold (#573), for the Add source dialog's
+  // picker: read here, with the page, as the other facts it opens with are.
+  // Only someone who may add a source is told; the save route checks again.
+  const kinds = manageable.length > 0 ? await sourceKindAvailability() : [];
+
   return (
     <SourcesClient
       workspaces={workspaces}
       manageable={manageable}
       startCreating={openCreate === "1" && manageable.length > 0}
+      kinds={kinds}
     />
   );
 }

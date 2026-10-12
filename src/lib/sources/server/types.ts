@@ -131,6 +131,12 @@ export interface ServerSourceKind {
    * Run when a source is saved; every connection is checked again.
    */
   checkConfig(cfg: SourceConfig): Promise<string | null>;
+  /**
+   * Why this server cannot hold a source of the kind at all, or null (#573):
+   * what the Add source dialog hides the kind for. Absent means always
+   * available.
+   */
+  availability?(): Promise<string | null>;
   /** Why a row filter cannot be saved on this config, or null. */
   rowFilterProblem(cfg: SourceConfig): string | null;
   /** Release what the process holds for a source that is going away. */

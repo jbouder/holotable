@@ -186,10 +186,16 @@ export async function openEngine(
     memory_limit: memoryLimit(),
   };
   if (resolved.layout === "database") options.access_mode = "READ_ONLY";
+  // A file that is not a database (or is locked by a writer) fails here,
+  // and the engine's message names it: scrubbed like every other.
   const instance = await binding.DuckDBInstance.create(
     resolved.layout === "database" ? resolved.absolute : ":memory:",
     options,
-  );
+  ).catch((err: unknown) => {
+    throw new QueryExecutionError(
+      `could not open the DuckDB source: ${scrub(err, resolved)}`,
+    );
+  });
   const connection = await instance.connect();
   const views: string[] = [];
   const files: string[] = [];
@@ -233,9 +239,9 @@ export async function lockHolds(connection: DuckDBConnection): Promise<boolean> 
 }
 
 /** The binding and the resolved path, or the refusal a panel or an admin is shown. */
-async function prepare(
-  source: DuckDbSourceRecord,
-): Promise<{ binding: DuckDbBinding; resolved: ResolvedSourcePath }> {
+async function prepare(source: {
+  config: { path: string };
+}): Promise<{ binding: DuckDbBinding; resolved: ResolvedSourcePath }> {
   const binding = await duckdbBinding();
   if (!binding) throw new QueryExecutionError(DUCKDB_UNAVAILABLE);
   try {
@@ -482,9 +488,10 @@ export interface IntrospectedTable {
 /**
  * Every table and view in `main`, with its columns: for a directory, one per
  * file; for a database, its own tables. Read on a freshly opened, locked
- * instance, which is closed after.
+ * instance, which is closed after. Only the path is read, so discovery can
+ * ask about a source that does not exist yet (#573).
  */
-export async function introspect(source: DuckDbSourceRecord): Promise<{
+export async function introspect(source: { config: { path: string } }): Promise<{
   tables: IntrospectedTable[];
   version: string;
 }> {
