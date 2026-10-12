@@ -50,9 +50,9 @@ const inSources = (path: string) => path.startsWith("src/lib/sources/");
 
 /** A decision made by comparing a kind, rather than by asking the kind. */
 const KIND_COMPARISONS: RegExp[] = [
-  /case\s+["'](?:timescaledb|prometheus|loki)["']/,
-  /[!=]==\s*["'](?:timescaledb|prometheus|loki)["']/,
-  /["'](?:timescaledb|prometheus|loki)["']\s*[!=]==/,
+  /case\s+["'](?:timescaledb|prometheus|loki|duckdb)["']/,
+  /[!=]==\s*["'](?:timescaledb|prometheus|loki|duckdb)["']/,
+  /["'](?:timescaledb|prometheus|loki|duckdb)["']\s*[!=]==/,
   /\b(?:source|record|src|s)\.(?:config\.)?kind\s*[!=]==/,
   /[!=]==\s*(?:source|record|src|s)\.(?:config\.)?kind\b/,
 ];
@@ -105,6 +105,18 @@ test("the TimescaleDB implementation is reached only through its kind", () => {
       !inSources(path) &&
       !path.startsWith("src/lib/timescaledb/") &&
       text.includes("@/lib/timescaledb/"),
+  ).map(({ path }) => path);
+  assert.deepEqual(offenders, []);
+});
+
+test("the DuckDB implementation is reached only through its kind (#572)", () => {
+  // `src/lib/duckdb/` opens files in the server's own process; a route that
+  // imports it by name has stepped around the path guard's one caller.
+  const offenders = APP_FILES.filter(
+    ({ path, text }) =>
+      !inSources(path) &&
+      !path.startsWith("src/lib/duckdb/") &&
+      text.includes("@/lib/duckdb/"),
   ).map(({ path }) => path);
   assert.deepEqual(offenders, []);
 });
@@ -252,6 +264,10 @@ test("catalog facts are read through the row's kind, and unknown ones read as ne
   assert.equal(parseCatalogFacts("timescaledb", null), null);
   assert.equal(parseCatalogFacts("timescaledb", { timescaledb: 2 }), null);
   assert.equal(parseCatalogFacts("timescaledb", { timescaledb: null, x: 1 }), null);
+  // Each kind reads only its own facts (#572).
+  assert.deepEqual(parseCatalogFacts("duckdb", { duckdb: "1.5.6" }), { duckdb: "1.5.6" });
+  assert.equal(parseCatalogFacts("duckdb", { timescaledb: null }), null);
+  assert.equal(parseCatalogFacts("timescaledb", { duckdb: "1.5.6" }), null);
   // A kind that records nothing has nothing to read.
   assert.equal(parseCatalogFacts("prometheus", { timescaledb: null }), null);
 });

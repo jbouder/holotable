@@ -294,6 +294,26 @@ test("a Loki source answers LogQL and label values, and refuses SQL and PromQL (
   );
 });
 
+test("a DuckDB source answers SQL, so PromQL and LogQL against it are refused (#572)", () => {
+  const ts = timescale();
+  const duck = {
+    ...ts,
+    id: "duck",
+    kind: "duckdb",
+    secretRef: null,
+    config: { kind: "duckdb", path: "lake", tables: [] },
+  } as unknown as SourceRecord;
+  assert.equal(wrongLanguage(duck, PanelQuery.parse({ ...SQL, sourceId: "duck" })), null);
+  assert.equal(
+    wrongLanguage(duck, PanelQuery.parse({ ...RANGE, sourceId: "duck" })),
+    'source "duck" answers SQL; this query is PromQL',
+  );
+  assert.equal(
+    wrongLanguage(duck, PanelQuery.parse({ ...LOGS, sourceId: "duck" })),
+    'source "duck" answers SQL; this query is LogQL',
+  );
+});
+
 /*
  * Reading a query's fields directly. On the union a bare `query.sql` does not
  * compile, so what remains is a read behind `isSqlQuery`. A file that reads a
