@@ -11,13 +11,22 @@ import { formatValue } from "@/lib/format";
  * - `points`: `PROMQL_MAX_POINTS` widened a PromQL step, so the window is
  *   drawn at a coarser resolution than the source has. `total` is how many
  *   points the finest step would have drawn.
+ * - `entries`: a Loki log query came back with as many lines as it asked
+ *   for (`LOKI_MAX_ENTRIES`, or the panel's own limit), newest first, so
+ *   older lines matched that were not sent (#562). `total` is unknown.
  * - `window`: the browser's `MAX_WINDOW_POINTS` kept the newest rows of
  *   what the server sent.
  *
  * A result, never a spec: it travels on the stream frame and the chat panel's
  * result, and no `SPEC_VERSION` change is involved.
  */
-export const TRUNCATION_STAGES = ["rows", "bytes", "points", "window"] as const;
+export const TRUNCATION_STAGES = [
+  "rows",
+  "bytes",
+  "points",
+  "entries",
+  "window",
+] as const;
 export type TruncationStage = (typeof TRUNCATION_STAGES)[number];
 
 export interface Truncation {
@@ -70,6 +79,11 @@ export function describeTruncation(t: Truncation): { label: string; detail: stri
       return {
         label: `${count(t.kept)}${of} points`,
         detail: `The window holds more points than PROMQL_MAX_POINTS allows per series, so the step was widened and each point covers a longer span. A shorter window shows the finer resolution.`,
+      };
+    case "entries":
+      return {
+        label: `Newest ${count(t.kept)} lines`,
+        detail: `The query matched more log lines than LOKI_MAX_ENTRIES or the panel's limit allows, so only the newest were read. Narrow the stream selector or add a line filter to see older lines.`,
       };
     case "window":
       return {
