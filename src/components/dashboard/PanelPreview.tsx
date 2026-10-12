@@ -1,6 +1,6 @@
 "use client";
 
-import { isSqlQuery } from "@/lib/ir";
+import { queryLanguage, type QueryLanguage } from "@/lib/ir";
 import * as React from "react";
 import type { VariableValues } from "@/lib/sql/variables";
 import { CheckCircle2, FileCode2, Loader2, Play, ShieldCheck } from "lucide-react";
@@ -52,6 +52,13 @@ export interface PanelPreviewController {
 }
 
 const NO_VALUES: VariableValues = {};
+
+/** How the guard's verdict names the statement it passed. */
+const QUERY_LANGUAGE_NAMES: Record<QueryLanguage, string> = {
+  sql: "SQL",
+  promql: "PromQL",
+  logql: "LogQL",
+};
 
 export function usePanelPreview(
   panel: QueryPanel,
@@ -197,9 +204,8 @@ export function PanelPreview({
           className="stagger-in flex items-center gap-2 text-xs text-success"
         >
           <CheckCircle2 className="h-3.5 w-3.5 shrink-0" />
-          {isSqlQuery(panel.query)
-            ? "This SQL passes the guard for the selected source."
-            : "This PromQL passes the guard for the selected source."}
+          This {QUERY_LANGUAGE_NAMES[queryLanguage(panel.query)]} passes the guard for the
+          selected source.
         </p>
       )}
       {check?.ok && check.hints && check.hints.length > 0 && (

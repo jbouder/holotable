@@ -8,6 +8,7 @@ import {
   type Panel,
   panelTimeRange,
   Duration,
+  type LogqlQuery,
   type PromqlQuery,
   type QueryPanel,
   queryLanguage,
@@ -34,6 +35,7 @@ import { Menu, MenuItem, MenuSeparator } from "@/components/ui/menu";
 import { Select } from "@/components/ui/select";
 import { SqlEditor } from "@/components/sql/SqlEditor";
 import { PromqlEditor, type PromqlVerdict } from "@/components/promql/PromqlEditor";
+import { LogqlEditor, type LogqlVerdict } from "@/components/logql/LogqlEditor";
 import { Checkbox } from "@/components/ui/checkbox";
 import { TimeFieldPicker } from "@/components/sql/TimeFieldPicker";
 import { PanelPreview, usePanelPreview } from "@/components/dashboard/PanelPreview";
@@ -65,6 +67,11 @@ function sqlCatalog(catalog: EditorCatalog | null) {
 /** The metric catalog, when the source has one, for the PromQL editor's. */
 function promqlCatalog(catalog: EditorCatalog | null) {
   return catalog && "metrics" in catalog ? catalog : null;
+}
+
+/** The label catalog, when the source has one, for the LogQL editor's. */
+function logqlCatalog(catalog: EditorCatalog | null) {
+  return catalog && "labels" in catalog ? catalog : null;
 }
 
 /** How a spec change is recorded in the undo stack. */
@@ -358,21 +365,15 @@ function QueryFields({
   const query = panel.query;
 
   if (isLogqlQuery(query)) {
-    // Read-only until LogQL can be edited and run (#565).
     return (
-      <div className="space-y-2">
-        <Label htmlFor="p-logql">LogQL</Label>
-        <Textarea
-          id="p-logql"
-          value={query.logql}
-          readOnly
-          aria-describedby="p-logql-help"
-          className="font-mono"
-        />
-        <p id="p-logql-help" className="text-xs text-muted">
-          LogQL panels cannot be edited or run on this server yet.
-        </p>
-      </div>
+      <LogqlFields
+        panel={panel}
+        query={query}
+        catalog={logqlCatalog(catalog)}
+        variables={variables}
+        preview={preview}
+        onChange={onChange}
+      />
     );
   }
 
@@ -473,11 +474,6 @@ function PromqlFields({
     [sourceId, declared],
   );
 
-  // `minStep` is a duration; the draft holds what is typed until it is one.
-  const [stepDraft, setStepDraft] = React.useState(query.minStep ?? "");
-  const stepValid =
-    stepDraft.trim() === "" || Duration.safeParse(stepDraft.trim()).success;
-
   return (
     <>
       <div className="space-y-2">
@@ -500,51 +496,165 @@ function PromqlFields({
         <PanelPreview panel={panel} preview={preview} />
       </div>
 
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-        <div className="space-y-1">
-          <Checkbox
-            checked={query.instant === true}
-            label="Instant (one value per series, at the window's end)"
-            onCheckedChange={(instant) =>
-              setQuery(
-                { instant: instant ? true : undefined },
-                { action: "change instant query" },
-              )
-            }
-          />
-          <p className="text-xs text-muted">For a stat, a gauge, a table or a pie.</p>
-        </div>
-        <div>
-          <Label htmlFor="p-minstep">Min step</Label>
-          <Input
-            id="p-minstep"
-            placeholder="the server's"
-            value={stepDraft}
-            disabled={query.instant === true}
-            aria-invalid={!stepValid}
-            aria-describedby="p-minstep-help"
-            onChange={(e) => {
-              setStepDraft(e.target.value);
-              const next = e.target.value.trim();
-              if (next === "" || Duration.safeParse(next).success) {
-                setQuery(
-                  { minStep: next === "" ? undefined : next },
-                  { action: "change min step", key: `${panel.id}:minStep` },
-                );
-              }
-            }}
-          />
-          <p
-            id="p-minstep-help"
-            className={stepValid ? "mt-1 text-xs text-muted" : "mt-1 text-xs text-danger"}
-          >
-            {stepValid
-              ? "A floor on the step, such as 1m. The server only ever raises it."
-              : "Write a duration such as 30s, 1m or 1h."}
-          </p>
-        </div>
-      </div>
+      <EvaluationFields
+        panelId={panel.id}
+        query={query}
+        instantLabel="Instant (one value per series, at the window's end)"
+        instantHelp="For a stat, a gauge, a table or a pie."
+        onPatch={setQuery}
+      />
     </>
+  );
+}
+
+/**
+ * A LogQL panel's expression (#565): the editor with label and value
+ * completion and the guard's verdict, then how a metric query is evaluated.
+ * A log query has no say in its evaluation: the server picks the range, the
+ * limit (the panel's own when it asks for fewer lines) and the direction, so
+ * `instant` and `minStep` are for a metric query alone, and the guard refuses
+ * an instant log query.
+ */
+function LogqlFields({
+  panel,
+  query,
+  catalog,
+  variables,
+  preview,
+  onChange,
+}: {
+  panel: QueryPanel;
+  query: LogqlQuery;
+  catalog: ReturnType<typeof logqlCatalog>;
+  variables: VariableValues;
+  preview: ReturnType<typeof usePanelPreview>;
+  onChange: (fn: (p: QueryPanel) => Panel, intent: EditIntent) => void;
+}) {
+  const setQuery = (patch: Partial<LogqlQuery>, intent: EditIntent) =>
+    onChange(
+      (p) => (isLogqlQuery(p.query) ? { ...p, query: { ...p.query, ...patch } } : p),
+      intent,
+    );
+
+  // The verdict the editor underlines, from the same route Validate uses.
+  const sourceId = query.sourceId;
+  const instant = query.instant;
+  const declared = Object.keys(variables).join(",");
+  const check = React.useCallback(
+    async (logql: string): Promise<LogqlVerdict | null> => {
+      const verdict = await validatePanelQuery({
+        query: { sourceId, logql, ...(instant ? { instant } : {}) },
+        variables: declared ? declared.split(",") : [],
+      });
+      if (verdict.ok) return verdict;
+      // A transport failure is not the expression's fault: draw nothing.
+      return verdict.error.kind === "statement"
+        ? { ok: false, error: verdict.error.error }
+        : null;
+    },
+    [sourceId, instant, declared],
+  );
+
+  return (
+    <>
+      <div className="space-y-2">
+        <Label htmlFor="p-logql">
+          LogQL (no range or limit of its own: the server picks them)
+        </Label>
+        <LogqlEditor
+          id="p-logql"
+          value={query.logql}
+          catalog={catalog}
+          check={check}
+          onChange={(logql) =>
+            setQuery({ logql }, { action: "edit LogQL", key: `${panel.id}:logql` })
+          }
+          onRun={() => {
+            if (preview.busy === null) preview.run();
+          }}
+          placeholder='{job="api"} |= "error"'
+        />
+        <PanelPreview panel={panel} preview={preview} />
+      </div>
+
+      <EvaluationFields
+        panelId={panel.id}
+        query={query}
+        instantLabel="Instant (one value per series, at the window's end)"
+        instantHelp="For a metric query on a stat, a gauge, a table or a pie. A log query always runs over the window."
+        onPatch={setQuery}
+      />
+    </>
+  );
+}
+
+/**
+ * How an expression is evaluated (#388): one instant or a range, and a
+ * floor on the step. PromQL and LogQL take the same two fields.
+ */
+function EvaluationFields({
+  panelId,
+  query,
+  instantLabel,
+  instantHelp,
+  onPatch,
+}: {
+  panelId: string;
+  query: { instant?: boolean; minStep?: string };
+  instantLabel: string;
+  instantHelp: string;
+  onPatch: (patch: { instant?: true; minStep?: string }, intent: EditIntent) => void;
+}) {
+  // `minStep` is a duration; the draft holds what is typed until it is one.
+  const [stepDraft, setStepDraft] = React.useState(query.minStep ?? "");
+  const stepValid =
+    stepDraft.trim() === "" || Duration.safeParse(stepDraft.trim()).success;
+
+  return (
+    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+      <div className="space-y-1">
+        <Checkbox
+          checked={query.instant === true}
+          label={instantLabel}
+          onCheckedChange={(instant) =>
+            onPatch(
+              { instant: instant ? true : undefined },
+              { action: "change instant query" },
+            )
+          }
+        />
+        <p className="text-xs text-muted">{instantHelp}</p>
+      </div>
+      <div>
+        <Label htmlFor="p-minstep">Min step</Label>
+        <Input
+          id="p-minstep"
+          placeholder="the server's"
+          value={stepDraft}
+          disabled={query.instant === true}
+          aria-invalid={!stepValid}
+          aria-describedby="p-minstep-help"
+          onChange={(e) => {
+            setStepDraft(e.target.value);
+            const next = e.target.value.trim();
+            if (next === "" || Duration.safeParse(next).success) {
+              onPatch(
+                { minStep: next === "" ? undefined : next },
+                { action: "change min step", key: `${panelId}:minStep` },
+              );
+            }
+          }}
+        />
+        <p
+          id="p-minstep-help"
+          className={stepValid ? "mt-1 text-xs text-muted" : "mt-1 text-xs text-danger"}
+        >
+          {stepValid
+            ? "A floor on the step, such as 1m. The server only ever raises it."
+            : "Write a duration such as 30s, 1m or 1h."}
+        </p>
+      </div>
+    </div>
   );
 }
 
