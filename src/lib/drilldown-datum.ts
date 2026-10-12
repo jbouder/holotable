@@ -156,10 +156,15 @@ const barDatum: DatumMapper = (panel, data, click) => {
   return bar ? { row: bar.row, series: bar.label } : null;
 };
 
-/** A log line is its row, in the order the panel shows; its series is its level. */
+/**
+ * A log line is its row, in the order the panel shows; its series is its
+ * level, and its labels are its columns other than its time and message
+ * (#565): the stream labels a LogQL query returns, and the fields a parser
+ * stage extracted, so a link can carry `{ label: "pod" }` from a clicked line.
+ */
 const lineDatum: DatumMapper = (panel, data, click) => {
   const line = at(logLines(panel, data).lines, click.dataIndex);
-  return line ? { row: line.row, series: line.level } : null;
+  return line ? { row: line.row, series: line.level, labels: line.labels } : null;
 };
 
 /**

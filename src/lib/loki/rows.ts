@@ -1,4 +1,4 @@
-import { PROMQL_TIME_FIELD } from "@/lib/ir";
+import { LOGQL_MESSAGE_FIELD, PROMQL_TIME_FIELD } from "@/lib/ir";
 import { rowsFromPrometheus } from "@/lib/prometheus/rows";
 import type { QueryResult } from "@/lib/sources/execution";
 
@@ -22,7 +22,7 @@ import type { QueryResult } from "@/lib/sources/execution";
  */
 
 const TIME = PROMQL_TIME_FIELD;
-const MESSAGE = "message";
+const MESSAGE = LOGQL_MESSAGE_FIELD;
 
 type Labels = Record<string, string>;
 

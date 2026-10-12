@@ -1,5 +1,10 @@
 import {
+  hasQuery,
+  isLogqlQuery,
   LINK_SET_MAX,
+  LOGQL_MESSAGE_FIELD,
+  type Panel,
+  PROMQL_TIME_FIELD,
   type PanelLink,
   PanelLink as PanelLinkSchema,
   selfLinkProblems,
@@ -14,7 +19,7 @@ import {
 
 /**
  * Where one pick comes from: a literal, a result column, the clicked series,
- * or one label of the clicked PromQL series (#388).
+ * or one label of the clicked PromQL series (#388) or log line (#565).
  */
 export type PickSource = "value" | "column" | "series" | "label";
 
@@ -177,4 +182,18 @@ export function moveLink<T>(list: readonly T[], from: number, to: number): T[] {
   const [item] = next.splice(from, 1);
   next.splice(to, 0, item as T);
   return next;
+}
+
+/**
+ * The labels a `label` pick may name on this panel, from its last preview
+ * (#565): a LogQL log query's columns other than its time and message, which
+ * are the stream labels and parsed fields of each line. Empty for anything
+ * else, whose labels live in a series name the preview does not list.
+ */
+export function labelPickNames(panel: Panel, resultColumns: readonly string[]): string[] {
+  if (!hasQuery(panel) || !isLogqlQuery(panel.query)) return [];
+  if (!resultColumns.includes(LOGQL_MESSAGE_FIELD)) return [];
+  return resultColumns.filter(
+    (c) => c !== PROMQL_TIME_FIELD && c !== LOGQL_MESSAGE_FIELD,
+  );
 }

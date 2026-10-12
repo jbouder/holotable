@@ -181,7 +181,11 @@ const CASES: Record<VizType, Case> = {
     },
     // Lines are newest first: index 1 is the warning.
     click: { dataIndex: 1 },
-    expect: { row: { ts: T(1), level: "warn", message: "slow" }, series: "warn" },
+    expect: {
+      row: { ts: T(1), level: "warn", message: "slow" },
+      series: "warn",
+      labels: { level: "warn" },
+    },
   },
   treemap: {
     panel: panel("treemap", { options: { path: ["region", "host"] } }),
@@ -428,4 +432,76 @@ test("a series label's value is read as the JSON string it was written as, never
   // A label name inside another label's value is not a label.
   assert.equal(seriesLabel('{route="/a, b=\\"c\\""}', "b"), undefined);
   assert.equal(seriesLabel('{host="a\\"b"}', "host"), 'a"b');
+});
+
+/* A label of a clicked log line (#565) ------------------------------------- */
+
+const LOG_PANEL = panel("logs", {
+  query: { sourceId: "loki", logql: '{job="api"} | json' },
+});
+
+/** What `src/lib/loki/rows.ts` writes: time, message, then every label. */
+const LOG_ROWS: PanelData = {
+  columns: ["time", "message", "job", "pod", "level", "status", "time_label"],
+  rows: [
+    {
+      time: T(1),
+      message: "GET /a",
+      job: "api",
+      pod: "api-7f",
+      level: "info",
+      status: "200",
+      time_label: "x",
+    },
+    {
+      time: T(2),
+      message: "GET /b",
+      job: "api",
+      pod: "api-9c",
+      level: "error",
+      status: "",
+    },
+  ],
+};
+
+test("a clicked log line's labels are its columns but its time and message", () => {
+  // Newest first: index 1 is the older line.
+  const datum = datumOf(LOG_PANEL, LOG_ROWS, { dataIndex: 1 });
+  assert.deepEqual(datum?.labels, {
+    job: "api",
+    pod: "api-7f",
+    level: "info",
+    status: "200",
+    time_label: "x",
+  });
+  // An empty field is no label, so a pick of it is left unset.
+  assert.equal(
+    Object.hasOwn(datumOf(LOG_PANEL, LOG_ROWS, { dataIndex: 0 })?.labels ?? {}, "status"),
+    false,
+  );
+  // The keyboard's way to the same line offers the row alone, as for every non-per-row kind.
+  assert.deepEqual(datumOfRow(LOG_PANEL, LOG_ROWS, 0)?.labels, undefined);
+});
+
+test("a label pick on a log line reads its stream label or parsed field", () => {
+  const l = link({
+    set: { pod: { label: "pod" }, code: { label: "status" }, job: { label: "job" } },
+  });
+  const datum = datumOf(LOG_PANEL, LOG_ROWS, { dataIndex: 1 });
+  assert.ok(datum);
+  assert.deepEqual(linkPicks(l, datum), { pod: ["api-7f"], code: ["200"], job: ["api"] });
+  // The message and the time are never labels, even by name.
+  const neither = link({ set: { a: { label: "message" }, b: { label: "time" } } });
+  assert.deepEqual(linkPicks(neither, datum), {});
+  // A label the line lacks is left unset rather than read off the series (its level).
+  assert.deepEqual(linkPicks(link({ set: { n: { label: "node" } } }), datum), {});
+  assert.equal(
+    linkHref(
+      l,
+      "target",
+      { timeRange: { from: "now-1h", to: "now" }, selection: {} },
+      datum,
+    ),
+    "/dashboards/target?from=now-1h&to=now&var-pod=api-7f&var-code=200&var-job=api",
+  );
 });
