@@ -5,6 +5,7 @@ import {
   Histogram,
   Registry,
 } from "@prometheus-io/client";
+import { log } from "@/lib/log";
 import type { TruncationStage } from "@/lib/truncation";
 
 /**
@@ -454,19 +455,33 @@ export function recordChatPanel(outcome: ChatPanelOutcome): void {
   instruments().chatPanels.inc({ outcome });
 }
 
+/**
+ * One refusal is also one log line, `guard.refused`, carrying the language and
+ * the reason and nothing else: both are fixed enums, unlike the guard's
+ * message, which names the offending table or label. The counter answers "how
+ * many"; the line, in a log store, answers "when, and inside which request"
+ * (the seeded Holotable logs dashboard reads it, #567).
+ */
+function logRefusal(language: "sql" | "promql" | "logql", reason: string): void {
+  log.info("guard.refused", { language, reason });
+}
+
 /** Record one statement refused by the SQL guard. */
 export function recordSqlRejection(reason: SqlRejectionReason): void {
   instruments().sqlRejections.inc({ reason });
+  logRefusal("sql", reason);
 }
 
 /** Record one expression refused by the PromQL guard (#384). */
 export function recordPromqlRejection(reason: PromqlRejectionReason): void {
   instruments().promqlRejections.inc({ reason });
+  logRefusal("promql", reason);
 }
 
 /** Record one expression refused by the LogQL guard (#561). */
 export function recordLogqlRejection(reason: LogqlRejectionReason): void {
   instruments().logqlRejections.inc({ reason });
+  logRefusal("logql", reason);
 }
 
 /**

@@ -83,5 +83,10 @@
     "authoredAt": 1,
     "digest": "98257eef1b7eeab0d0f010eb290dcfb9e18c1861210928fe76c37771da42e035",
     "origin": "hand-written (#562): a logs panel, a metric range query and an instant one against a Loki source, with a tenant label and both variable kinds"
+  },
+  "v1-seeded-loki-self-monitoring.json": {
+    "authoredAt": 1,
+    "digest": "3027de6925553d281dbf2853cfab61bf4d3631d0e48d8d5d1c996021589e1223",
+    "origin": "committed (#567): dashboard \"Holotable logs\", the LogQL self-monitoring demo the seeder stores"
   }
 }

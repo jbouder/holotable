@@ -79,8 +79,9 @@ services:
       # resolves, whatever credentials the environment holds.
       SOURCE_SECRET_REFS: ${SOURCE_SECRET_REFS:-TS_METRICS:demo}
       # The Prometheus below, which the seeder registers as `prometheus-self`
-      # (#390). A source URL outside this list must be public https.
-      SOURCE_URL_ALLOWLIST: ${SOURCE_URL_ALLOWLIST:-prometheus}
+      # (#390), and the Loki of the `logs` profile, `loki-self` (#567). A
+      # source URL outside this list must be public https.
+      SOURCE_URL_ALLOWLIST: ${SOURCE_URL_ALLOWLIST:-prometheus,loki}
       # Credentials the app resolves for the 'TS_METRICS' source secret_ref.
       TS_METRICS_USERNAME: ${TS_METRICS_USERNAME:-metrics_ro}
       TS_METRICS_PASSWORD: ${TS_METRICS_PASSWORD:-readonly}
@@ -151,6 +152,10 @@ services:
       TS_METRICS_PORT: "5432"
       SEED_INTERVAL_MS: "2000"
       PROMETHEUS_SELF_URL: http://prometheus:9090
+      # The `logs` profile's Loki (#567). The seeder registers `loki-self` and
+      # the Holotable logs dashboard once it answers, so a stack without the
+      # profile has neither.
+      LOKI_SELF_URL: ${LOKI_SELF_URL-http://loki:3100}
       # History to write before streaming (#252), e.g. 6h. Empty writes none.
       SEED_BACKFILL: ${SEED_BACKFILL:-}
     depends_on:
@@ -202,8 +207,12 @@ services:
       SOURCE_SECRET_REFS: ${SOURCE_SECRET_REFS:-TS_METRICS:demo}
       TS_METRICS_USERNAME: ${TS_METRICS_USERNAME:-metrics_ro}
       TS_METRICS_PASSWORD: ${TS_METRICS_PASSWORD:-readonly}
-      # The Prometheus source's endpoint, allowed exactly as the app allows it.
-      SOURCE_URL_ALLOWLIST: ${SOURCE_URL_ALLOWLIST:-prometheus}
+      # The Prometheus and Loki sources' endpoints, allowed exactly as the app
+      # allows them.
+      SOURCE_URL_ALLOWLIST: ${SOURCE_URL_ALLOWLIST:-prometheus,loki}
+      # The Holotable logs dashboard is smoked too, so the `logs` profile has
+      # to be up (#567). Set LOKI_SELF_URL empty to smoke a stack without it.
+      LOKI_SELF_URL: ${LOKI_SELF_URL-http://loki:3100}
       SMOKE_TIMEOUT_MS: ${SMOKE_TIMEOUT_MS:-180000}
       LOG_LEVEL: ${LOG_LEVEL:-warn}
     depends_on:
@@ -230,6 +239,41 @@ services:
       app:
         condition: service_healthy
 
+  # Logs, off by default (#567):
+  #   docker compose --profile logs up
+  # Alloy tails every container of this compose project through the Docker
+  # socket and pushes the lines to Loki, labeled `app` (the compose service),
+  # `env` and `container`. The app's own lines are JSON (src/lib/log.ts), which
+  # the seeded Holotable logs dashboard parses with `| json`. Loki answers the
+  # `loki-self` source, unauthenticated on the compose network; the app
+  # reaches it because SOURCE_URL_ALLOWLIST names `loki`. Nothing but Alloy
+  # writes to it: Holotable only reads.
+  loki:
+    profiles: ["logs"]
+    image: grafana/loki:3.7.8@sha256:1107dd5274e0ada47e42472b7a7e71f3b2a2fe878878108f3e2f9e51528f0193
+    command: ["-config.file=/etc/loki/loki.yaml"]
+    ports:
+      - "3100:3100"
+    configs:
+      - source: loki_config
+        target: /etc/loki/loki.yaml
+
+  alloy:
+    profiles: ["logs"]
+    image: grafana/alloy:v1.19.2@sha256:b8ec653c44235fbe910879145dac3597d66b0aaecf60bcbbe82580767771a839
+    command:
+      - run
+      - --storage.path=/var/lib/alloy/data
+      - /etc/alloy/config.alloy
+    configs:
+      - source: alloy_config
+        target: /etc/alloy/config.alloy
+    # Read-only: Alloy lists containers and follows their logs, nothing more.
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    depends_on:
+      - loki
+
 # Inline so the bearer token comes from the same .env as the app's, instead of
 # living in a second checked-in file that would have to hold it in clear text.
 configs:
@@ -244,6 +288,82 @@ configs:
             credentials: "${METRICS_TOKEN:-holotable-local-demo-scrape}"
           static_configs:
             - targets: ["app:3000"]
+
+  # A single-binary Loki on its own filesystem, the shape of the image's
+  # local config with usage reporting off. No volume: like Prometheus above,
+  # it holds a demo's worth of lines and starts empty after a recreate.
+  loki_config:
+    content: |
+      auth_enabled: false
+      server:
+        http_listen_port: 3100
+        log_level: warn
+      common:
+        instance_addr: 127.0.0.1
+        path_prefix: /loki
+        storage:
+          filesystem:
+            chunks_directory: /loki/chunks
+            rules_directory: /loki/rules
+        replication_factor: 1
+        ring:
+          kvstore:
+            store: inmemory
+      schema_config:
+        configs:
+          - from: 2024-01-01
+            store: tsdb
+            object_store: filesystem
+            schema: v13
+            index:
+              prefix: index_
+              period: 24h
+      analytics:
+        reporting_enabled: false
+
+  # This project's containers only (the e2e stack is a project of its own),
+  # labeled by compose service and container name. `env` is constant here; a
+  # real deployment sets it per cluster. docs/.../admin/loki.md walks it.
+  alloy_config:
+    content: |
+      discovery.docker "compose" {
+        host = "unix:///var/run/docker.sock"
+        filter {
+          name   = "label"
+          values = ["com.docker.compose.project=${COMPOSE_PROJECT_NAME}"]
+        }
+      }
+
+      discovery.relabel "compose" {
+        targets = []
+
+        rule {
+          source_labels = ["__meta_docker_container_label_com_docker_compose_service"]
+          target_label  = "app"
+        }
+        rule {
+          source_labels = ["__meta_docker_container_name"]
+          regex         = "/(.*)"
+          target_label  = "container"
+        }
+        rule {
+          target_label = "env"
+          replacement  = "dev"
+        }
+      }
+
+      loki.source.docker "compose" {
+        host          = "unix:///var/run/docker.sock"
+        targets       = discovery.docker.compose.targets
+        relabel_rules = discovery.relabel.compose.rules
+        forward_to    = [loki.write.local.receiver]
+      }
+
+      loki.write "local" {
+        endpoint {
+          url = "http://loki:3100/loki/api/v1/push"
+        }
+      }
 
 volumes:
   pgdata:

@@ -233,8 +233,8 @@ jobs:
         run: npx playwright install --with-deps chromium
 
       # e2e/prepare.ts brings up e2e/compose.yml (TimescaleDB, Keycloak with
-      # the dev realm, and a Prometheus that scrapes the app, #390) and
-      # migrates; Playwright then starts the seeder
+      # the dev realm, a Prometheus that scrapes the app, #390, and a Loki it
+      # pushes a few labeled lines to, #567) and migrates; Playwright then starts the seeder
       # and the production build, signs in through the realm, and runs the
       # journey (#88) and the axe scans in both themes (#91). The model is
       # the recorded stub, so nothing here calls a provider.
@@ -454,24 +454,27 @@ jobs:
       # `--wait` holds until the app reports healthy, which is its own
       # liveness probe, so a server that exited on a bad configuration fails
       # here with its logs rather than 4 minutes later as a smoke timeout.
+      # With the `logs` profile, so Loki and Alloy hold the stack's own log
+      # lines for the third self-monitoring dashboard (#567).
       - name: Bring the stack up
-        run: docker compose up -d --wait app seed self-metrics prometheus
+        run: docker compose --profile logs up -d --wait app seed self-metrics prometheus loki alloy
 
-      # The assertion: both seeded self-monitoring dashboards answer with
+      # The assertion: the three seeded self-monitoring dashboards answer with
       # rows, the SQL one from what the collector scraped out of the running
-      # app and the PromQL one from what Prometheus scraped (#390), through
-      # the same guard and executor POST /api/query uses; and the service
-      # health demo answers too, its custom visual compiling (#405).
+      # app, the PromQL one from what Prometheus scraped (#390), and the LogQL
+      # one from the app's lines Alloy shipped to Loki (#567), through the
+      # same guard and executor POST /api/query uses; and the service health
+      # demo answers too, its custom visual compiling (#405).
       - name: Smoke
         run: docker compose --profile smoke run --rm smoke
 
       - name: Logs
         if: failure()
-        run: docker compose logs --no-color --tail 200
+        run: docker compose --profile logs logs --no-color --tail 200
 
       - name: Tear down
         if: always()
-        run: docker compose down --volumes --remove-orphans
+        run: docker compose --profile logs down --volumes --remove-orphans
 
   # Publishes ghcr.io/<owner>/holotable (#250). Each target is built natively
   # on an amd64 and an arm64 runner and pushed by digest, then

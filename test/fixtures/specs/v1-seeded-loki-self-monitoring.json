@@ -1,0 +1,121 @@
+{
+  "specVersion": 1,
+  "title": "Holotable logs",
+  "timeRange": {
+    "from": "now-1h",
+    "to": "now"
+  },
+  "refreshIntervalMs": 15000,
+  "panels": [
+    {
+      "id": "lines-by-level",
+      "title": "Log lines by level per minute",
+      "description": "Every JSON line the app wrote, by level. Live from boot: the server logs its configuration as it starts.",
+      "viz": "bar",
+      "query": {
+        "sourceId": "loki-self",
+        "logql": "sum by (level) (count_over_time({app=\"app\"} | json | __error__=\"\" [1m]))",
+        "minStep": "1m"
+      },
+      "format": "number",
+      "layout": {
+        "x": 0,
+        "y": 0,
+        "w": 6,
+        "h": 3
+      }
+    },
+    {
+      "id": "errors-by-route",
+      "title": "Errors and warnings by route per minute",
+      "description": "Lines at error or warn, by the API route that wrote them. Empty while nothing fails; a request refused or failed adds one.",
+      "viz": "bar",
+      "query": {
+        "sourceId": "loki-self",
+        "logql": "sum by (route) (count_over_time({app=\"app\"} | json | level=~\"error|warn\" [1m]))",
+        "minStep": "1m"
+      },
+      "format": "number",
+      "layout": {
+        "x": 6,
+        "y": 0,
+        "w": 6,
+        "h": 3
+      }
+    },
+    {
+      "id": "request-p95",
+      "title": "Request p95 by route (ms)",
+      "description": "95th percentile of the durationMs each completed request logs, per route. A streaming route's is its time to first byte.",
+      "viz": "line",
+      "query": {
+        "sourceId": "loki-self",
+        "logql": "quantile_over_time(0.95, {app=\"app\"} | json | msg=\"request.completed\" | unwrap durationMs [5m]) by (route)"
+      },
+      "format": "ms",
+      "layout": {
+        "x": 0,
+        "y": 3,
+        "w": 6,
+        "h": 3
+      }
+    },
+    {
+      "id": "guard-refusals",
+      "title": "Guard refusals by reason, last hour",
+      "description": "Queries the SQL, PromQL and LogQL guards refused in the last hour, by language and the class of rule. A refused model draft counts as well as a refused panel.",
+      "viz": "table",
+      "query": {
+        "sourceId": "loki-self",
+        "logql": "sum by (language, reason) (count_over_time({app=\"app\"} | json | msg=\"guard.refused\" [1h]))",
+        "instant": true
+      },
+      "layout": {
+        "x": 6,
+        "y": 3,
+        "w": 6,
+        "h": 3
+      }
+    },
+    {
+      "id": "request-log",
+      "title": "Request log",
+      "description": "One line per API request: method, route, status and duration, newest first. Expand a line for its request id and the rest of its fields.",
+      "viz": "logs",
+      "query": {
+        "sourceId": "loki-self",
+        "logql": "{app=\"app\"} | json | msg=~\"request\\\\.(completed|rejected|failed)\" | line_format \"{{.method}} {{.route}} {{.status}} {{.durationMs}}ms\""
+      },
+      "options": {
+        "level": "level",
+        "limit": 200
+      },
+      "layout": {
+        "x": 0,
+        "y": 6,
+        "w": 12,
+        "h": 4
+      }
+    },
+    {
+      "id": "error-lines",
+      "title": "Errors",
+      "description": "The app's error lines, newest first.",
+      "viz": "logs",
+      "query": {
+        "sourceId": "loki-self",
+        "logql": "{app=\"app\"} | json | level=\"error\" | line_format \"{{.msg}}\""
+      },
+      "options": {
+        "level": "level",
+        "limit": 100
+      },
+      "layout": {
+        "x": 0,
+        "y": 10,
+        "w": 12,
+        "h": 4
+      }
+    }
+  ]
+}

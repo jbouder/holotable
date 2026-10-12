@@ -28,7 +28,8 @@ Natural-language monitoring dashboards. Describe what you want to see; a languag
 model authors a **validated visualization spec** (SQL + chart config) — never the
 data itself — and Holotable executes the guarded SQL against TimescaleDB and
 streams the results live. Prometheus-compatible endpoints are sources too, with
-panels written in guarded PromQL.
+panels written in guarded PromQL, and so are Loki-compatible ones, in guarded
+LogQL.
 
 **Stack:** Next.js 16 (App Router) · TypeScript · Tailwind v4 · Base UI · ECharts ·
 TimescaleDB/PostgreSQL · Vercel AI SDK · Keycloak OIDC · Server-Sent Events. One
@@ -52,7 +53,7 @@ sign-in as `demo` / `demo`, your own `.env`):
 ```bash
 cp .env.example .env    # then set SESSION_SECRET, AI_MODEL and its key, and
                         # OIDC_CLIENT_SECRET=holotable-dev-secret (the local realm's)
-docker compose up
+docker compose up       # --profile logs adds Loki and Alloy, for LogQL
 ```
 
 The [quick start](https://holotable-docs.vibeproject.workers.dev/getting-started/quick-start/)

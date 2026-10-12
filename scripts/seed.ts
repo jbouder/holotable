@@ -7,6 +7,12 @@ import {
   selfMonitoringSpec,
 } from "@/lib/self-monitoring/dashboard";
 import {
+  LOKI_SELF_SOURCE_ID,
+  lokiSelfConfig,
+  lokiSelfLabels,
+  lokiSelfMonitoringSpec,
+} from "@/lib/self-monitoring/loki";
+import {
   PROMETHEUS_SELF_SOURCE_ID,
   prometheusSelfConfig,
   prometheusSelfMonitoringSpec,
@@ -22,6 +28,7 @@ import {
   type SystemMetricRow,
   systemMetricRows,
 } from "./lib/seed-data";
+import { LokiLabelValue, MAX_LABEL_VALUES } from "@/lib/sources/kinds/loki";
 import {
   demoSpec,
   fleetSpec,
@@ -39,6 +46,9 @@ import {
  *    empty charts (#252).
  * 3. (loop) continuously inserts synthetic http_requests rows into TimescaleDB
  *    so the live dashboard streams fresh data.
+ * 4. (loop, with LOKI_SELF_URL) registers the `loki-self` source and the
+ *    Holotable logs dashboard once that Loki answers (#567), which it does
+ *    only when the compose `logs` profile is up.
  *
  * Uses the privileged TimescaleDB connection for inserts — distinct
  * from the app's read-only query user.
@@ -212,6 +222,56 @@ async function ensureDemo() {
   } finally {
     await pg.end();
   }
+}
+
+/**
+ * The Holotable logs source and dashboard (#567), once the Loki at `url`
+ * answers. The label allowlist is the committed one, with the values the live
+ * Loki has for each label added, as discovery in the source form would; a
+ * value Loki has that the config cannot hold is left out. Returns whether it
+ * registered, so the loop asks again until it does.
+ */
+async function ensureLokiSelf(url: string): Promise<boolean> {
+  const ask = async (path: string) => {
+    const res = await fetch(new URL(path, url), { signal: AbortSignal.timeout(5_000) });
+    if (!res.ok) throw new Error(`${path} answered ${res.status}`);
+    return res;
+  };
+  try {
+    await ask("/ready");
+  } catch {
+    return false;
+  }
+  const labels = await Promise.all(
+    lokiSelfLabels().map(async (label) => {
+      const found = await ask(`/loki/api/v1/label/${label.name}/values`)
+        .then((res) => res.json() as Promise<{ data?: unknown }>)
+        .then((body) => (Array.isArray(body.data) ? body.data : []))
+        .catch(() => []);
+      const values = new Set(label.values);
+      for (const v of found) {
+        if (LokiLabelValue.safeParse(v).success) values.add(v as string);
+      }
+      return { name: label.name, values: [...values].sort().slice(0, MAX_LABEL_VALUES) };
+    }),
+  );
+  const pg = new Client({ connectionString: process.env.DATABASE_URL });
+  await pg.connect();
+  try {
+    const config = lokiSelfConfig(url, labels);
+    await upsertSource(pg, {
+      id: LOKI_SELF_SOURCE_ID,
+      name: "Holotable logs (Loki)",
+      kind: config.kind,
+      config,
+      secretRef: null,
+    });
+    await ensureDashboard(pg, lokiSelfMonitoringSpec());
+  } finally {
+    await pg.end();
+  }
+  console.log(`registered ${LOKI_SELF_SOURCE_ID} at ${url}`);
+  return true;
 }
 
 /**
@@ -492,7 +552,23 @@ async function main() {
     );
   }
   console.log(`seeding metrics every ${intervalMs}ms — Ctrl+C to stop`);
+  // Unauthenticated on the compose network, so no secret_ref, and reached by
+  // the app only because SOURCE_URL_ALLOWLIST names its host.
+  const lokiUrl =
+    process.env.DATABASE_URL && process.env.SEED_DEMO !== "false"
+      ? process.env.LOKI_SELF_URL
+      : undefined;
+  let lokiPending = Boolean(lokiUrl);
+  let lokiAskedAt = 0;
   for (;;) {
+    if (lokiUrl && lokiPending && Date.now() - lokiAskedAt >= 10_000) {
+      lokiAskedAt = Date.now();
+      try {
+        lokiPending = !(await ensureLokiSelf(lokiUrl));
+      } catch (err) {
+        console.warn("\nloki seed failed:", err instanceof Error ? err.message : err);
+      }
+    }
     try {
       const now = Date.now();
       await insertHttpRows(client, httpRequestRows(now));

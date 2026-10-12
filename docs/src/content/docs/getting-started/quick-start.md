@@ -34,10 +34,12 @@ are full within seconds.
 image follows `main`; `ghcr.io/jbouder/holotable:<version>-quickstart` pins a
 release.
 
-The quick-start image has no Prometheus, so it shows the three SQL demo
-sources only. The [Prometheus self-monitoring
+The quick-start image has no Prometheus and no Loki, so it shows the three SQL
+demo sources only. The [Prometheus self-monitoring
 dashboard](/operations/demo-data/#the-prometheus-twin) and a Prometheus
-source to try PromQL against come with Docker Compose, below.
+source to try PromQL against come with Docker Compose, below, and the
+[Holotable logs dashboard](/operations/demo-data/#the-logs-profile) and a Loki
+source to try LogQL against with its `logs` profile.
 
 :::caution
 Everyone who can reach this container is signed in to the same demo workspace.
@@ -64,7 +66,11 @@ which.
 This brings up TimescaleDB, Keycloak, a one-shot migration job, the app, the
 seeder and a Prometheus that scrapes the app, as separate services, with real
 OIDC sign-in. The seeder registers that Prometheus as the `prometheus-self`
-source, so the stack has SQL and PromQL sources to compare. Sign in at
+source, so the stack has SQL and PromQL sources to compare.
+`docker compose --profile logs up` adds a Loki and a Grafana Alloy that ships
+every container's log lines to it; the seeder registers that Loki as
+`loki-self`, with a **Holotable logs** dashboard over the app's own JSON log
+lines, for LogQL beside the other two. Sign in at
 `http://localhost:3000` as **`demo` / `demo`**, a source-admin in the `demo`
 workspace and a platform admin; see [the local realm](/admin/keycloak/#the-local-realm). The `seed` service
 continuously inserts demo metrics and, once, creates the demo `demo`

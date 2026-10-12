@@ -128,6 +128,7 @@ export default defineConfig({
             { label: "Executing a panel", slug: "concepts/executing-a-panel" },
             { label: "Streaming and rendering", slug: "concepts/streaming-and-rendering" },
             { label: "Prometheus sources", slug: "concepts/prometheus-sources" },
+            { label: "Loki sources", slug: "concepts/loki-sources" },
           ],
         },
         {
@@ -139,6 +140,7 @@ export default defineConfig({
             { label: "Source secret references", slug: "admin/secret-references" },
             { label: "Your own theme", slug: "admin/themes" },
             { label: "Prometheus endpoints", slug: "admin/prometheus" },
+            { label: "Loki endpoints", slug: "admin/loki" },
             { label: "Row-level filters", slug: "admin/row-level-filters" },
             { label: "Demo mode", slug: "admin/demo-mode" },
             { label: "Sizing memory and pollers", slug: "admin/sizing" },

@@ -8,6 +8,10 @@ import {
   selfMonitoringSpec,
 } from "@/lib/self-monitoring/dashboard";
 import {
+  LOKI_SELF_DASHBOARD_TITLE,
+  lokiSelfMonitoringSpec,
+} from "@/lib/self-monitoring/loki";
+import {
   PROMETHEUS_SELF_DASHBOARD_TITLE,
   prometheusSelfMonitoringSpec,
 } from "@/lib/self-monitoring/prometheus";
@@ -19,8 +23,10 @@ import { demoSpec } from "./lib/demo-dashboards";
 
 /**
  * End-to-end smoke test for the self-monitoring demo (#54), its PromQL twin
- * (#390), which asks the compose stack's Prometheus the same questions, and
- * the service health demo, whose custom visual (#405) must also compile.
+ * (#390), which asks the compose stack's Prometheus the same questions, the
+ * Holotable logs dashboard (#567), which reads the app's own log lines from
+ * the `logs` profile's Loki while LOKI_SELF_URL is set, and the service health
+ * demo, whose custom visual (#405) must also compile.
  *
  * Brings no stack up of its own — `docker compose` does that — and instead
  * asserts that what compose produced actually works:
@@ -31,7 +37,8 @@ import { demoSpec } from "./lib/demo-dashboards";
  *   3. every panel's SQL passes the guard;
  *   4. at least one panel returns rows, which can only happen if the collector
  *      scraped the app's live `/api/metrics` and landed samples — or, for the
- *      PromQL dashboard, if Prometheus scraped it.
+ *      PromQL dashboard, if Prometheus scraped it, and for the LogQL one, if
+ *      Alloy shipped the app's lines to Loki.
  *
  * Steps 3 and 4 call the same functions `POST /api/query` calls, in the same
  * order, so a change that breaks guarded execution breaks this. What it
@@ -73,6 +80,16 @@ const TARGETS: Target[] = [
     committed: prometheusSelfMonitoringSpec,
     feeds: "Prometheus needs a scrape or two",
   },
+  ...(process.env.LOKI_SELF_URL
+    ? [
+        {
+          title: LOKI_SELF_DASHBOARD_TITLE,
+          committed: lokiSelfMonitoringSpec,
+          feeds:
+            "the seeder registers it once Loki answers, and Alloy needs to ship the app's first lines (is the `logs` profile up? LOKI_SELF_URL empty skips this dashboard)",
+        },
+      ]
+    : []),
   {
     title: "Demo service health",
     committed: () => parseDashboard(demoSpec()),
@@ -211,9 +228,7 @@ async function smokeOne(target: Target, deadline: number): Promise<boolean> {
     console.error(`no panel returned rows: ${target.feeds}, and it never happened`);
   }
   if (!failed) {
-    console.log(
-      `  ${populated.length}/${outcomes.length} panels streaming from the app's own metrics`,
-    );
+    console.log(`  ${populated.length}/${outcomes.length} panels returned rows`);
   }
   return !failed;
 }

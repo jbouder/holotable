@@ -61,7 +61,9 @@ matcher on one of them. Its listing carries `labelCount`, never the URL or the
 auth mode, and its `rowFilter` label is the tenant matcher spliced into every
 selector. A log query's answer becomes one row per line (`time`, `message`,
 then a column per stream or parsed label); a metric query's becomes the rows a
-Prometheus answer does.
+Prometheus answer does. See [Loki sources](/concepts/loki-sources/) for the
+source and its panels, and [Loki endpoints](/admin/loki/) for what an operator
+sets up.
 
 `secret_ref` is nullable (migration 018) for a Prometheus or Loki source with
 `auth: none`, which needs no credential, and for a DuckDB source, which never
