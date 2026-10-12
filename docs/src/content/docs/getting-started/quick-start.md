@@ -41,6 +41,13 @@ source to try PromQL against come with Docker Compose, below, and the
 [Holotable logs dashboard](/operations/demo-data/#the-logs-profile) and a Loki
 source to try LogQL against with its `logs` profile.
 
+It ships no sample files either, and sets no `DUCKDB_SOURCES_DIR`, so its
+DuckDB card is hidden. The [files demo](/operations/demo-data/#the-files-demo),
+a **Demo files** dashboard over Parquet and CSV files, comes with Docker
+Compose. To try a DuckDB source here, mount a directory of your own and name
+it: `-v "$PWD/files:/files:ro" -e DUCKDB_SOURCES_DIR=/files`
+([DuckDB files](/admin/duckdb/)).
+
 :::caution
 Everyone who can reach this container is signed in to the same demo workspace.
 It is for trying Holotable, never for real data or credentials.
@@ -70,7 +77,9 @@ source, so the stack has SQL and PromQL sources to compare.
 `docker compose --profile logs up` adds a Loki and a Grafana Alloy that ships
 every container's log lines to it; the seeder registers that Loki as
 `loki-self`, with a **Holotable logs** dashboard over the app's own JSON log
-lines, for LogQL beside the other two. Sign in at
+lines, for LogQL beside the other two. The seeder also writes a small
+directory of Parquet and CSV files, which the app mounts read-only, and
+registers it as the **Demo files** DuckDB source. Sign in at
 `http://localhost:3000` as **`demo` / `demo`**, a source-admin in the `demo`
 workspace and a platform admin; see [the local realm](/admin/keycloak/#the-local-realm). The `seed` service
 continuously inserts demo metrics and, once, creates the demo `demo`

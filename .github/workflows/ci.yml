@@ -464,7 +464,9 @@ jobs:
       # app, the PromQL one from what Prometheus scraped (#390), and the LogQL
       # one from the app's lines Alloy shipped to Loki (#567), through the
       # same guard and executor POST /api/query uses; and the service health
-      # demo answers too, its custom visual compiling (#405).
+      # demo answers too, its custom visual compiling (#405); and the files demo
+      # answers from the Parquet and CSV files the seeder wrote, through the
+      # DuckDB kind (#574).
       - name: Smoke
         run: docker compose --profile smoke run --rm smoke
 

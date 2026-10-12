@@ -295,3 +295,45 @@ so there are no pollers, no live viewers, and no model calls; resident memory is
 the series that is live from boot. What it deliberately does not cover is the
 HTTP and session layer above those functions: reaching
 `/api/dashboards/[id]/stream` needs a signed-in browser session.
+
+## The files demo
+
+With `DUCKDB_SOURCES_DIR` set, the seeder also shows a
+[DuckDB source](/concepts/duckdb-sources/): data that lives in files rather
+than in a database. Docker Compose sets it, and the quick-start image, which
+ships no sample files, does not. Before anything else, the seeder writes three
+files under `<DUCKDB_SOURCES_DIR>/demo/` with the binding itself
+(`scripts/lib/demo-files.ts`), so nothing binary is ever committed:
+
+| File | Table | What it holds |
+| --- | --- | --- |
+| `http_requests.parquet` | `http_requests` | Per-request events for the last seven days: `ts`, `service`, `route`, `host`, `status`, `duration_ms`, `bytes`. The demo's request shape, three to six requests a minute, busier in the afternoon (UTC). |
+| `hosts.csv` | `hosts` | The host inventory: `host`, `region`, `role`, `cores`. |
+| `daily_revenue.parquet` | `daily_revenue` | Orders and revenue per region per day for the last 90 days, ending yesterday: `day`, `region`, `orders`, `revenue`. |
+
+It registers them as the **Demo files** source (`duckdb-demo`, path `demo`,
+no `secret_ref`) with that catalog, and seeds the **Demo files** dashboard.
+Requests per minute and the 5xx rate come from `time_bucket` panels over the
+Parquet file. Daily revenue by region comes from a `date_trunc` panel with
+its own 30-day window. Requests by region joins the Parquet file to the CSV,
+and a table of revenue by region covers the whole file.
+
+Every value in the files is a function of its minute or day, so the seeder
+can rewrite them every minute, and does. Each file is written beside its
+final name as a hidden `.tmp` and renamed over it, which moves the live edge
+forward without the history changing under a dashboard. The app's engine reads
+the new file on its next query, with no refresh needed.
+
+In Compose, the files are a named volume, `duckdb-files`, mounted at
+`/data/duckdb`. The seeder mounts it read-write and is its only writer. The
+app and the smoke test mount it **read-only**, the belt the
+[DuckDB operations page](/admin/duckdb/#mount-it-read-only) recommends. For
+the host loop (`npm run seed` with `npm run dev`), point
+`DUCKDB_SOURCES_DIR` at an absolute path, such as this checkout's
+`data/duckdb`, which is gitignored, and give the app the same value.
+
+The [smoke test](#the-smoke-test) runs **Demo files** too, through the DuckDB
+kind's check, plan and execute, and fails unless one of its panels comes back
+with rows. `npm test` holds the spec to the IR and the SQL guard against the
+seeded catalog, and the end-to-end suite opens the dashboard and waits for its
+panels to go live.

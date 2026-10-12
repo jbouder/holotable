@@ -129,6 +129,7 @@ export default defineConfig({
             { label: "Streaming and rendering", slug: "concepts/streaming-and-rendering" },
             { label: "Prometheus sources", slug: "concepts/prometheus-sources" },
             { label: "Loki sources", slug: "concepts/loki-sources" },
+            { label: "DuckDB sources", slug: "concepts/duckdb-sources" },
           ],
         },
         {
@@ -141,6 +142,7 @@ export default defineConfig({
             { label: "Your own theme", slug: "admin/themes" },
             { label: "Prometheus endpoints", slug: "admin/prometheus" },
             { label: "Loki endpoints", slug: "admin/loki" },
+            { label: "DuckDB files", slug: "admin/duckdb" },
             { label: "Row-level filters", slug: "admin/row-level-filters" },
             { label: "Demo mode", slug: "admin/demo-mode" },
             { label: "Sizing memory and pollers", slug: "admin/sizing" },

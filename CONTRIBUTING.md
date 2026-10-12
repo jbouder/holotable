@@ -421,7 +421,8 @@ request:
 | `src/lib/promql/` (the PromQL guard, its rewrites, the plan) | `concepts/executing-a-panel.md` ("The PromQL guard"), `concepts/prometheus-sources.md`, invariants 7 and 8, the trust model in `SECURITY.md`, the skill's `references/promql-rules.md` |
 | `src/lib/logql/` (the LogQL guard, its rewrites, the plan) | `concepts/executing-a-panel.md` ("The LogQL guard"), `concepts/loki-sources.md`, `operations/metrics.md` |
 | `src/lib/sources/` (a source kind, its config or its server half) | `concepts/prometheus-sources.md`, `concepts/loki-sources.md`, `architecture/data-model.md` (`sources`, "Source kinds") |
-| `src/lib/duckdb/` (the DuckDB path guard, engine and lock) | `architecture/data-model.md` ("DuckDB") |
+| `src/lib/duckdb/` (the DuckDB path guard, engine and lock) | `architecture/data-model.md` ("DuckDB"), `concepts/duckdb-sources.md`, `admin/duckdb.md` |
+| `scripts/seed.ts`, `scripts/lib/demo-dashboards.ts`, `scripts/lib/demo-files.ts`, `scripts/smoke.ts`, `docker-compose.yml` (the demo data, the files demo, the smoke test) | `operations/demo-data.md`, the Compose steps in `getting-started/quick-start.md` |
 | `src/lib/prometheus/` (the client, discovery, the connection test) | `admin/prometheus.md`, `concepts/prometheus-sources.md` |
 | `src/lib/loki/` (the client, the rows, refresh and the connection test) | `admin/loki.md`, `concepts/loki-sources.md`, `architecture/data-model.md` (`sources`), "The LogQL guard" in `concepts/executing-a-panel.md` |
 | `src/app/data-sources/`, `src/components/sources/`, `src/lib/prometheus-form.ts`, `src/lib/loki-form.ts` (the source forms, discovery, the test report, refresh and the catalog browser) | Steps 1 and 2 of `getting-started/your-first-dashboard.md`, the `/api/sources` rows in `reference/api-routes.md` |
