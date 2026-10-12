@@ -1,5 +1,6 @@
 import { isPlainIdentifier, timeColumn } from "@/lib/catalog/identifiers";
 import {
+  isLogqlQuery,
   isPromqlQuery,
   isSqlQuery,
   type Panel,
@@ -8,6 +9,7 @@ import {
   type VizType,
 } from "@/lib/ir";
 import type { CatalogTable, SourceCatalog } from "@/lib/registry";
+import type { LokiCatalog } from "@/lib/sources/kinds/loki";
 import type { PrometheusCatalog } from "@/lib/sources/kinds/prometheus";
 
 /**
@@ -97,11 +99,24 @@ export function panelStarter(
 /* PromQL (#388)                                                              */
 /* ------------------------------------------------------------------------- */
 
-/** The catalog of a source of either kind, as the editor holds it. */
-export type StarterCatalog = Pick<SourceCatalog, "tables"> | PrometheusCatalog | null;
+/** The catalog of a source of any kind, as the editor holds it. */
+export type StarterCatalog =
+  | Pick<SourceCatalog, "tables">
+  | PrometheusCatalog
+  | LokiCatalog
+  | null;
 
 function isPrometheusCatalog(catalog: StarterCatalog): catalog is PrometheusCatalog {
   return catalog !== null && "metrics" in catalog;
+}
+
+function isLokiCatalog(catalog: StarterCatalog): catalog is LokiCatalog {
+  return catalog !== null && "labels" in catalog;
+}
+
+/** A catalog the SQL starter can read: a SQL source's, or none. */
+function sqlCatalog(catalog: StarterCatalog): Pick<SourceCatalog, "tables"> | null {
+  return isPrometheusCatalog(catalog) || isLokiCatalog(catalog) ? null : catalog;
 }
 
 export interface PromqlStarter {
@@ -165,6 +180,51 @@ export function promqlStarter(
   return { promql, viz, title, ...(instant ? { instant: true as const } : {}) };
 }
 
+/* ------------------------------------------------------------------------- */
+/* LogQL (#562)                                                               */
+/* ------------------------------------------------------------------------- */
+
+/**
+ * The stream selector a new LogQL panel starts from: the first allowlisted
+ * label at the first value discovery found for it, which is anchored as the
+ * guard requires. With no value known, a value that matches nothing, which
+ * still parses and is still anchored.
+ */
+function logqlSelector(catalog: LokiCatalog): { selector: string; title: string } {
+  const label = catalog.labels.find((l) => l.values.length > 0) ?? catalog.labels[0];
+  if (!label) return { selector: '{job="*"}', title: "New panel" };
+  const value = label.values[0] ?? "*";
+  return {
+    selector: `{${label.name}=${JSON.stringify(value)}}`,
+    title: label.values.length > 0 ? `${label.name}=${value}` : "New panel",
+  };
+}
+
+/** The kinds a log query feeds: lines to read rather than samples to draw. */
+const LOG_KINDS: ReadonlySet<VizType> = new Set(["logs", "table"]);
+
+function logqlExpression(
+  catalog: LokiCatalog,
+  viz: VizType,
+): { logql: string; title: string } {
+  const { selector, title } = logqlSelector(catalog);
+  if (LOG_KINDS.has(viz)) return { logql: selector, title: `${title} logs` };
+  return { logql: `sum(count_over_time(${selector} [5m]))`, title: `${title} lines` };
+}
+
+/**
+ * A LogQL starter: the lines of one stream for a logs panel (the default), or
+ * their count over time for a kind that draws samples.
+ */
+export function logqlStarter(
+  catalog: LokiCatalog,
+  viz: VizType = "logs",
+): { logql: string; instant?: true; viz: VizType; title: string } {
+  const { logql, title } = logqlExpression(catalog, viz);
+  const instant = !LOG_KINDS.has(viz) && INSTANT_KINDS.has(viz);
+  return { logql, viz, title, ...(instant ? { instant: true as const } : {}) };
+}
+
 /**
  * The query a panel starts from on a source, in that source's language: the
  * one place a new panel, a kind switched back to a query, and a panel moved
@@ -187,7 +247,19 @@ export function starterQuery(
       viz: starter.viz,
     };
   }
-  const starter = panelStarter(catalog);
+  if (isLokiCatalog(catalog)) {
+    const starter = logqlStarter(catalog, viz);
+    return {
+      query: {
+        sourceId,
+        logql: starter.logql,
+        ...(starter.instant ? { instant: true } : {}),
+      },
+      title: starter.title,
+      viz: starter.viz,
+    };
+  }
+  const starter = panelStarter(sqlCatalog(catalog));
   return {
     query: { sourceId, sql: starter.sql, timeField: starter.timeField },
     title: starter.title,
@@ -231,9 +303,15 @@ export function isStarterSql(
 /** `isStarterSql` for a query of either language. */
 export function isStarterQuery(query: PanelQuery, catalog: StarterCatalog): boolean {
   if (isSqlQuery(query)) {
-    return isStarterSql(query.sql, isPrometheusCatalog(catalog) ? null : catalog);
+    return isStarterSql(query.sql, sqlCatalog(catalog));
   }
-  // No LogQL starter exists until a Loki source can be added (#563).
+  if (isLogqlQuery(query)) {
+    if (!isLokiCatalog(catalog)) return false;
+    const seen = normalize(query.logql);
+    return [...LOG_KINDS, "line" as const].some(
+      (viz) => seen === normalize(logqlExpression(catalog, viz).logql),
+    );
+  }
   if (!isPromqlQuery(query)) return false;
   const seen = normalize(query.promql);
   return (

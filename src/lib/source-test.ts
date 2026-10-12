@@ -98,6 +98,14 @@ export interface TestMetric {
   error?: string;
 }
 
+/** Whether one allowlisted Loki label has streams in the discovery window (#562). */
+export interface TestLabel {
+  label: string;
+  reachable: boolean;
+  /** Why not: "no streams in the last 1h", or the endpoint's error. */
+  error?: string;
+}
+
 export interface SourceTestResult {
   /** Did the connection and the basic read succeed. */
   ok: boolean;
@@ -114,6 +122,8 @@ export interface SourceTestResult {
   writeSurface?: TestWriteSurface;
   /** One entry per allowlisted metric, in catalog order. */
   metrics?: TestMetric[];
+  /** One entry per allowlisted Loki label, in catalog order (#562). */
+  labels?: TestLabel[];
 }
 
 /**
@@ -192,6 +202,7 @@ export function hasFinding(result: SourceTestResult): boolean {
   if (result.readOnly && result.readOnly.verdict !== "refused") return true;
   if (result.writeSurface && result.writeSurface.verdict !== "closed") return true;
   if ((result.metrics ?? []).some((m) => !m.reachable)) return true;
+  if ((result.labels ?? []).some((l) => !l.reachable)) return true;
   return (result.tables ?? []).some((t) => !t.reachable);
 }
 

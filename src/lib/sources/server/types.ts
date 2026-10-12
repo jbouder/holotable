@@ -2,6 +2,7 @@ import type { AnyCatalogView } from "@/lib/catalog/browse";
 import type { CatalogHealth } from "@/lib/catalog/health";
 import type { AnyCatalogDiff } from "@/lib/catalog/refresh";
 import type { PanelQuery, TimeRange, VariableQuery } from "@/lib/ir";
+import type { LogqlPlan } from "@/lib/logql/plan";
 import type { PromqlPlan } from "@/lib/promql/plan";
 import type { AnyPlanView } from "@/lib/query-plan";
 import type { SourceConfig, SourceRecord } from "@/lib/registry";
@@ -17,7 +18,8 @@ import type { VariableValues } from "@/lib/sql/variables";
  * poller, `/api/query`, `/api/sql/*`, variables, chat and the MCP tools run a
  * panel without knowing its language. Each kind checks the query is in its
  * own language first: a PromQL query against a SQL source, or the reverse,
- * is refused here like a table the source does not have.
+ * is refused here like a table the source does not have. The kinds are
+ * TimescaleDB (SQL), Prometheus (PromQL) and Loki (LogQL, #562).
  */
 
 /** A catalog refresh, whatever the kind: the config to store and what is missing. */
@@ -43,7 +45,8 @@ export interface QueryCheck {
 /** What a kind's planner built, tagged with the language that runs it. */
 export type SourcePlan =
   | { language: "sql"; plan: ExecutablePlan }
-  | { language: "promql"; plan: PromqlPlan };
+  | { language: "promql"; plan: PromqlPlan }
+  | { language: "logql"; plan: LogqlPlan };
 
 export interface PlanInput {
   from: Date;

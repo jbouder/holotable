@@ -38,7 +38,8 @@ export type CatalogSubject = Pick<
 
 /**
  * What `catalogHealth` needs of a source of any kind (#385). Its allowlist
- * entries are tables for SQL and metrics for PromQL; `catalogMissingTables`
+ * entries are tables for SQL, metrics for PromQL and stream labels for LogQL
+ * (#562); `catalogMissingTables`
  * holds the entries the last refresh could not find, whichever they are.
  */
 export type HealthSubject = Pick<
@@ -54,7 +55,10 @@ function liveEntryCount(source: HealthSubject): number {
       (t) => !missing.has(t.name) && t.columns.length > 0,
     ).length;
   }
-  return source.config.metrics.filter((m) => !missing.has(m.name)).length;
+  if ("metrics" in source.config) {
+    return source.config.metrics.filter((m) => !missing.has(m.name)).length;
+  }
+  return source.config.labels.filter((l) => !missing.has(l.name)).length;
 }
 
 export interface CatalogHealth {

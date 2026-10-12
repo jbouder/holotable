@@ -178,8 +178,13 @@ escaped literals, checks every selector is still anchored (a bound empty
 value is not an anchor), and splices the viewer's tenant matcher into every
 stream selector, including those inside range functions and on both sides of
 an operator. Each rewrite is re-parsed and compared with the original tree. A
-log plan asks for the window's newest `MAX_QUERY_ROWS` lines; a metric plan
-takes its `step` and alignment from the PromQL plan's arithmetic.
+log plan asks for the window's newest lines, `direction=backward`, with a
+`limit` of `LOKI_MAX_ENTRIES` (default 1,000, never above `MAX_QUERY_ROWS`, and
+the logs panel's own `limit` when it asks for fewer); an answer with that many
+lines is badged as cut. A metric plan takes its `step` and alignment from the
+PromQL plan's arithmetic, and its result is held to `LOKI_MAX_SERIES`. The Loki
+client (`src/lib/loki/client.ts`, #562) sends every one as a GET through the
+same guarded exchange as the Prometheus client.
 `test/logql-safety.test.ts` names every rule and its message, and
 `test/logql-safety.fuzz.test.ts` holds every accepted expression to an
 independent walk of the raw parse tree under `npm run test:fuzz`.

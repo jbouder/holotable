@@ -17,7 +17,9 @@ import {
   type AnyCatalogView,
   type CatalogView,
   fetchCatalogView,
+  isLabelCatalogView,
   isMetricCatalogView,
+  type LabelCatalogView,
   type MetricCatalogView,
   searchMetrics,
   searchCatalog,
@@ -213,6 +215,24 @@ export function CatalogBrowser({
       </div>
     );
   }
+  if (isLabelCatalogView(loaded)) {
+    return (
+      <div className="space-y-4">
+        <Freshness source={source} view={loaded} onRefresh={() => setRefreshing(true)} />
+        {notice && (
+          <p className="drop-in text-xs text-muted" role="status">
+            {notice}
+          </p>
+        )}
+        <LabelList view={loaded} query={query} onQuery={setQuery} />
+        {!loaded.canManage && (
+          <p className="text-xs text-muted">
+            Read-only. A source admin for this workspace can refresh the catalog.
+          </p>
+        )}
+      </div>
+    );
+  }
   const view = loaded;
   const matches = searchCatalog(view.tables, query);
   const searching = query.trim() !== "";
@@ -386,6 +406,70 @@ function MetricList({
               {metric.help && <p className="text-xs text-muted">{metric.help}</p>}
               <p className="font-mono text-xs text-muted">
                 {metric.labels.length > 0 ? metric.labels.join(", ") : "no labels listed"}
+              </p>
+            </li>
+          ))}
+        </ul>
+      )}
+    </>
+  );
+}
+
+/** A Loki source's stream labels (#562), with the values discovery found. */
+function LabelList({
+  view,
+  query,
+  onQuery,
+}: {
+  view: LabelCatalogView;
+  query: string;
+  onQuery: (query: string) => void;
+}) {
+  const needle = query.trim().toLowerCase();
+  const matches = needle
+    ? view.labels.filter(
+        (l) =>
+          l.name.toLowerCase().includes(needle) ||
+          l.values.some((v) => v.toLowerCase().includes(needle)),
+      )
+    : view.labels;
+  const missing = new Set(view.missingLabels);
+  return (
+    <>
+      <div className="relative">
+        <Search
+          className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted"
+          aria-hidden
+        />
+        <Input
+          type="search"
+          value={query}
+          onChange={(e) => onQuery(e.target.value)}
+          placeholder="Search labels and values"
+          aria-label="Search the catalog"
+          className="pl-9"
+        />
+      </div>
+      {matches.length === 0 ? (
+        <p className="py-6 text-center text-sm text-muted">
+          {needle ? `Nothing in the catalog matches “${query.trim()}”.` : "No labels."}
+        </p>
+      ) : (
+        <ul className="divide-y divide-border border border-border">
+          {matches.map((label) => (
+            <li key={label.name} className="space-y-1 px-3 py-2">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="font-mono text-xs font-medium text-foreground">
+                  {label.name}
+                </span>
+                {missing.has(label.name) && (
+                  <span className="text-xs text-danger">
+                    no streams at the last refresh
+                  </span>
+                )}
+              </div>
+              <p className="font-mono text-xs text-muted">
+                {label.values.length > 0 ? label.values.join(", ") : "no values listed"}
               </p>
             </li>
           ))}

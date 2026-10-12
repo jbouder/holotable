@@ -2,10 +2,11 @@
 
 import type {
   AnyPlanView,
+  LogqlPlanView,
   PromqlPlanView,
   QueryPlanView as SqlPlan,
 } from "@/lib/query-plan";
-import { isPromqlPlanView, summarizeLimits } from "@/lib/query-plan";
+import { isLogqlPlanView, isPromqlPlanView, summarizeLimits } from "@/lib/query-plan";
 
 /**
  * "What actually runs": the statement the server sends, the values it bound,
@@ -17,7 +18,8 @@ import { isPromqlPlanView, summarizeLimits } from "@/lib/query-plan";
  * nothing is described twice.
  */
 export function QueryPlanView({ plan, stale }: { plan: AnyPlanView; stale?: boolean }) {
-  if (isPromqlPlanView(plan)) return <PromqlPlan plan={plan} stale={stale} />;
+  if (isPromqlPlanView(plan) || isLogqlPlanView(plan))
+    return <ExpressionPlan plan={plan} stale={stale} />;
   return <SqlPlanView plan={plan} stale={stale} />;
 }
 
@@ -86,19 +88,34 @@ function SqlPlanView({ plan, stale }: { plan: SqlPlan; stale?: boolean }) {
 }
 
 /**
- * The PromQL variant (#388): the expression as the endpoint receives it, with
- * the tenant matcher and the variable values already in it, then where each
- * value came from. The endpoint's URL is not part of the view.
+ * The PromQL (#388) and LogQL (#562) variant: the expression as the endpoint
+ * receives it, with the tenant matcher and the variable values already in it,
+ * then where each value came from. The endpoint's URL is not part of the view.
  */
-function PromqlPlan({ plan, stale }: { plan: PromqlPlanView; stale?: boolean }) {
+function ExpressionPlan({
+  plan,
+  stale,
+}: {
+  plan: PromqlPlanView | LogqlPlanView;
+  stale?: boolean;
+}) {
+  const logql = isLogqlPlanView(plan);
+  const executed = logql ? plan.executedLogql : plan.executedPromql;
+  const evaluation =
+    plan.endpoint === "query"
+      ? "One instant"
+      : logql && plan.queryKind === "log"
+        ? "A range of log lines, newest first"
+        : "A range, stepped";
   return (
     <div className="space-y-3">
       <div className="border border-border bg-surface-2">
         <div className="border-b border-border px-3 py-2 text-xs font-medium text-muted">
-          Expression sent to /api/v1/{plan.endpoint}
+          Expression sent to {logql ? "/loki/api/v1/" : "/api/v1/"}
+          {plan.endpoint}
         </div>
         <pre className="max-h-64 overflow-auto whitespace-pre-wrap break-words px-3 py-3 font-mono text-xs leading-relaxed">
-          {plan.executedPromql}
+          {executed}
         </pre>
       </div>
 
@@ -126,7 +143,7 @@ function PromqlPlan({ plan, stale }: { plan: PromqlPlanView; stale?: boolean }) 
 
       <dl className="grid grid-cols-[auto_minmax(0,1fr)] gap-x-4 gap-y-1 text-xs">
         <dt className="text-muted">Query</dt>
-        <dd>{plan.endpoint === "query" ? "One instant" : "A range, stepped"}</dd>
+        <dd>{evaluation}</dd>
         <dt className="text-muted">Limits</dt>
         <dd>{summarizeLimits(plan)}</dd>
       </dl>

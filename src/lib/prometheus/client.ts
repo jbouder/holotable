@@ -1,22 +1,21 @@
-import { parseBaseUrlAllowlist, type BaseUrlAllowlist } from "@/lib/ai/base-url";
-import { BaseUrlRefusedError, guardedFetch } from "@/lib/ai/guarded-fetch";
 import { config } from "@/lib/config";
 import { log } from "@/lib/log";
 import type { PromqlPlan } from "@/lib/promql/plan";
-import { resolveBearerToken, resolveCredentials } from "@/lib/secrets/credentials";
 import { QueryExecutionError } from "@/lib/sources/execution";
 import type { PrometheusConfig } from "@/lib/sources/kinds/prometheus";
+import { endpointUrl, exchange as endpointExchange } from "@/lib/sources/server/endpoint";
+
+export { sourceUrlAllowlist } from "@/lib/sources/server/endpoint";
 
 /**
  * The Prometheus HTTP API, as a source is allowed to reach it (#385).
  *
- * Every request goes through the guarded fetch (`src/lib/ai/guarded-fetch.ts`)
- * under `SOURCE_URL_ALLOWLIST`: https only unless allowlisted, no private
- * address unless allowlisted, checked at DNS time on every connection, no
- * redirect followed. Credentials are resolved from the `secret_ref` on every
- * request, under the workspace grant. The response is read with a byte cap as
- * it arrives and a deadline on the whole exchange, and nothing but its JSON
- * body is kept: no response header ever leaves this module.
+ * Every request goes through `src/lib/sources/server/endpoint.ts`, the one
+ * exchange every HTTP kind shares: the guarded fetch under
+ * `SOURCE_URL_ALLOWLIST`, checked at DNS time on every connection, no
+ * redirect followed, credentials resolved from the `secret_ref` on every
+ * request, the body read under the byte cap and a deadline on the whole
+ * exchange. Nothing but the JSON body is kept.
  */
 
 /** Who is asking, as much of a source as a request needs. */
@@ -43,75 +42,9 @@ export class PrometheusUnavailableError extends Error {
   }
 }
 
-let allowlistCache: { raw: string; allowlist: BaseUrlAllowlist } | null = null;
-
-/** `SOURCE_URL_ALLOWLIST`, parsed once per value. */
-export function sourceUrlAllowlist(): BaseUrlAllowlist {
-  const raw = config.sourceUrlAllowlist;
-  if (allowlistCache?.raw !== raw) {
-    allowlistCache = {
-      raw,
-      allowlist: parseBaseUrlAllowlist(raw, {
-        variable: "SOURCE_URL_ALLOWLIST",
-        noun: "source URL",
-      }),
-    };
-  }
-  return allowlistCache.allowlist;
-}
-
-/** The `Authorization` header for a source's auth mode, resolved now. */
-function authorization(target: PrometheusTarget): Record<string, string> {
-  const { auth } = target.config;
-  if (auth === "none") return {};
-  if (!target.secretRef) {
-    throw new PrometheusUnavailableError(
-      `source ${target.id} has auth "${auth}" but no secret_ref`,
-    );
-  }
-  if (auth === "bearer") {
-    return {
-      Authorization: `Bearer ${resolveBearerToken(target.secretRef, target.workspaceId)}`,
-    };
-  }
-  const { username, password } = resolveCredentials(target.secretRef, target.workspaceId);
-  return {
-    Authorization: `Basic ${Buffer.from(`${username}:${password}`, "utf8").toString("base64")}`,
-  };
-}
-
 /** `<url>/api/v1/<path>`, keeping a path prefix the URL has. */
 export function apiUrl(base: string, path: string): string {
-  const url = new URL(base);
-  url.pathname = `${url.pathname.replace(/\/+$/, "")}/api/v1/${path}`;
-  return url.href;
-}
-
-/** Read a body, stopping as soon as it passes `maxBytes`. */
-async function readCapped(response: Response, maxBytes: number): Promise<string> {
-  const reader = response.body?.getReader();
-  if (!reader) return "";
-  const chunks: Uint8Array[] = [];
-  let total = 0;
-  for (;;) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    total += value.byteLength;
-    if (total > maxBytes) {
-      await reader.cancel();
-      throw new QueryExecutionError(
-        `the result is larger than ${formatBytes(maxBytes)}; narrow the query with a matcher or an aggregation, or shorten the window`,
-      );
-    }
-    chunks.push(value);
-  }
-  return Buffer.concat(chunks).toString("utf8");
-}
-
-function formatBytes(bytes: number): string {
-  if (bytes >= 1024 * 1024) return `${Math.round((bytes / (1024 * 1024)) * 10) / 10} MiB`;
-  if (bytes >= 1024) return `${Math.round((bytes / 1024) * 10) / 10} KiB`;
-  return `${bytes} B`;
+  return endpointUrl(base, `/api/v1/${path}`);
 }
 
 interface ApiEnvelope {
@@ -147,53 +80,22 @@ interface RequestOptions {
  * under `/api/v1/`, or, starting with `/`, under the source URL itself
  * (`/-/ready`).
  */
-async function exchange(
+function exchange(
   target: PrometheusTarget,
   path: string,
   form: URLSearchParams,
   opts: RequestOptions,
 ): Promise<{ status: number; ok: boolean; text: string }> {
-  let url = path.startsWith("/")
-    ? rawUrl(target.config.url, path)
+  const url = path.startsWith("/")
+    ? endpointUrl(target.config.url, path)
     : apiUrl(target.config.url, path);
-  const method = opts.method ?? "POST";
-  if (method === "GET" && [...form.keys()].length > 0) url = `${url}?${form.toString()}`;
-  const fetcher = opts.fetchImpl ?? guardedFetch(target.config.url, sourceUrlAllowlist());
-  let response: Response;
-  try {
-    response = await fetcher(url, {
-      method,
-      headers: {
-        Accept: "application/json",
-        ...(method === "POST"
-          ? { "Content-Type": "application/x-www-form-urlencoded" }
-          : {}),
-        ...authorization(target),
-      },
-      ...(method === "POST" ? { body: form.toString() } : {}),
-      signal: AbortSignal.timeout(opts.timeoutMs + 1_000),
-    });
-  } catch (err) {
-    if (err instanceof QueryExecutionError) throw err;
-    const reason =
-      err instanceof BaseUrlRefusedError
-        ? err.message
-        : err instanceof Error && err.name === "TimeoutError"
-          ? `no answer within ${opts.timeoutMs + 1_000}ms`
-          : err instanceof Error
-            ? err.message
-            : String(err);
-    throw new PrometheusUnavailableError(`source ${target.id}: ${reason}`);
-  }
-  const text = await readCapped(response, config.maxResultBytes);
-  return { status: response.status, ok: response.ok, text };
-}
-
-/** `<url><path>`, for an endpoint beside the API rather than in it. */
-function rawUrl(base: string, path: string): string {
-  const url = new URL(base);
-  url.pathname = `${url.pathname.replace(/\/+$/, "")}${path}`;
-  return url.href;
+  return endpointExchange(
+    target,
+    url,
+    form,
+    { ...opts, method: opts.method ?? "POST" },
+    (message, status) => new PrometheusUnavailableError(message, status),
+  );
 }
 
 /**

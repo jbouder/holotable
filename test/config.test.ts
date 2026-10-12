@@ -881,6 +881,26 @@ test("SOURCE_URL_ALLOWLIST must parse, or the server does not boot (#385)", () =
   ]);
 });
 
+test("LOKI_MAX_ENTRIES and LOKI_MAX_SERIES are positive integers, with defaults (#562)", () => {
+  assert.deepEqual(
+    validateConfig(
+      { ...VALID_PRODUCTION, LOKI_MAX_ENTRIES: "500", LOKI_MAX_SERIES: "50" },
+      { production: true },
+    ),
+    [],
+  );
+  const bad = validateConfig(
+    { LOKI_MAX_ENTRIES: "0", LOKI_MAX_SERIES: "lots" },
+    { production: false },
+  );
+  assert.deepEqual(variables(errors(bad)).sort(), [
+    "LOKI_MAX_ENTRIES",
+    "LOKI_MAX_SERIES",
+  ]);
+  assert.equal(config.lokiMaxEntries, 1_000);
+  assert.equal(config.lokiMaxSeries, 100);
+});
+
 test("an unconfigured metrics endpoint is not a problem; it is the default", () => {
   // /api/metrics answers 404 until one of the two is set, so silence here is
   // correct — the endpoint is closed, not misconfigured.

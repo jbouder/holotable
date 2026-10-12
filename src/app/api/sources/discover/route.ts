@@ -5,6 +5,7 @@ import { audit } from "@/lib/audit";
 import { SourceConnection } from "@/lib/registry";
 import { SECRET_REF_MESSAGE, SECRET_REF_PATTERN } from "@/lib/secret-refs";
 import { requireGrantedSecretRef } from "@/lib/secrets/http";
+import { HttpSourceAuth } from "@/lib/sources/http-config";
 import { prometheusDiscovery, sqlDiscovery } from "@/lib/sources/server/registry";
 import {
   MAX_METRICS,
@@ -41,7 +42,7 @@ const PrometheusBody = z
     kind: z.literal("prometheus"),
     workspaceId: z.string().min(1).max(128),
     url: PrometheusUrl,
-    auth: z.enum(["none", "basic", "bearer"]),
+    auth: HttpSourceAuth,
     secretRef: z.string().regex(SECRET_REF_PATTERN, SECRET_REF_MESSAGE).optional(),
     labelsFor: z.array(PrometheusMetric.shape.name).max(MAX_METRICS).optional(),
   })

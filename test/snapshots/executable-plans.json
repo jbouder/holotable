@@ -379,6 +379,37 @@
     "maxRows": 5000,
     "ranked": false
   },
+  "v1-logql.json#lines": {
+    "kind": "log",
+    "instant": false,
+    "expr": "{app=\"api\", env=\"prod\", tenant=\"fixture-tenant\"} |= \"error\" | json | level=\"error\"",
+    "start": "2026-01-01T00:00:00.000Z",
+    "end": "2026-01-01T01:00:00.000Z",
+    "limit": 200,
+    "direction": "backward",
+    "timeoutMs": 20000
+  },
+  "v1-logql.json#rate": {
+    "kind": "metric",
+    "instant": false,
+    "expr": "sum by (route) (rate({app=\"api\", tenant=\"fixture-tenant\"} |= \"error\" | json [5m]))",
+    "start": "2026-01-01T00:00:00.000Z",
+    "end": "2026-01-01T01:00:00.000Z",
+    "stepSeconds": 30,
+    "timeoutMs": 20000
+  },
+  "v1-logql.json#total": {
+    "kind": "metric",
+    "instant": true,
+    "expr": "sum(count_over_time({app=\"api\", tenant=\"fixture-tenant\"} |= \"error\" [5m]))",
+    "time": "2026-01-01T01:00:00.000Z",
+    "timeoutMs": 20000
+  },
+  "v1-logql.json#variable:app": {
+    "label": "app",
+    "query": "{env=\"prod\", tenant=\"fixture-tenant\"}",
+    "timeoutMs": 20000
+  },
   "v1-logs.json#errors": {
     "sql": "SELECT * FROM (SELECT _holo.*, row_number() OVER () AS _holo_pos, count(*) OVER () AS _holo_total\nFROM (SELECT time_bucket('1 minute', ts) AS minute, count(*) FILTER (WHERE level = 'error') AS errors FROM app_logs GROUP BY minute ORDER BY minute) AS _holo\nWHERE _holo.minute >= $1::timestamptz\n  AND _holo.minute < $2::timestamptz\nORDER BY _holo.minute DESC, _holo_pos DESC\nLIMIT 5000) AS _holo_kept\nORDER BY _holo_kept._holo_pos",
     "params": ["2026-01-01T00:00:00.000Z", "2026-01-01T01:00:00.000Z"],

@@ -186,8 +186,8 @@ Client side (`LiveDashboard.tsx` → `PanelView.tsx` → `EChart.tsx`):
 - Each panel records **when its data arrived**; the status badge reports it, so
   panels that go stale independently can be told apart.
 - **Truncation is said, never silent** (#486). A frame carries `truncated`
-  when the server cut its result (the row cap, or a PromQL step the point cap
-  widened), and the window adds its own when it drops rows. The panel header
+  when the server cut its result (the row cap, a PromQL step the point cap
+  widened, or a Loki log query that returned its whole `limit`), and the window adds its own when it drops rows. The panel header
   shows a badge (“Newest 1,000 of 1,440 rows”) whose popover names the limit.
   `MAX_WINDOW_POINTS` and `PROMQL_MAX_POINTS` are **one point budget**: keep
   them equal, so a PromQL series fits its panel whole. A Chat panel is held

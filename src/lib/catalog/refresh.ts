@@ -73,10 +73,62 @@ export interface MetricCatalogDiff {
   metrics: MetricChange[];
 }
 
-export type AnyCatalogDiff = CatalogDiff | MetricCatalogDiff;
+/** What changed about one allowlisted Loki label (#562): its value hints. */
+export interface LabelChange {
+  label: string;
+  addedValues: string[];
+  removedValues: string[];
+}
+
+/**
+ * A Loki catalog refresh, in the kind's own words. It never edits the
+ * allowlist: a label with no streams is reported missing and keeps its last
+ * known values.
+ */
+export interface LabelCatalogDiff {
+  missingLabels: string[];
+  restoredLabels: string[];
+  labels: LabelChange[];
+}
+
+export type AnyCatalogDiff = CatalogDiff | MetricCatalogDiff | LabelCatalogDiff;
 
 export function isMetricDiff(diff: AnyCatalogDiff): diff is MetricCatalogDiff {
   return "metrics" in diff;
+}
+
+export function isLabelDiff(diff: AnyCatalogDiff): diff is LabelCatalogDiff {
+  return "labels" in diff;
+}
+
+export function diffLabelCatalog(
+  stored: {
+    config: { labels: { name: string; values: string[] }[] };
+    catalogMissingTables: string[];
+  },
+  next: {
+    config: { labels: { name: string; values: string[] }[] };
+    missingTables: string[];
+  },
+): LabelCatalogDiff {
+  const missing = new Set(next.missingTables);
+  const before = new Map(stored.config.labels.map((l) => [l.name, l]));
+  const labels: LabelChange[] = [];
+  for (const label of next.config.labels) {
+    if (missing.has(label.name)) continue;
+    const old = new Set(before.get(label.name)?.values ?? []);
+    const now = new Set(label.values);
+    const addedValues = label.values.filter((v) => !old.has(v));
+    const removedValues = [...old].filter((v) => !now.has(v));
+    if (addedValues.length + removedValues.length > 0) {
+      labels.push({ label: label.name, addedValues, removedValues });
+    }
+  }
+  return {
+    missingLabels: [...next.missingTables],
+    restoredLabels: stored.catalogMissingTables.filter((name) => !missing.has(name)),
+    labels,
+  };
 }
 
 interface MetricCatalog {
@@ -167,6 +219,13 @@ export function diffCatalog(
 
 /** True when applying would change nothing but the freshness timestamp. */
 export function isUnchanged(diff: AnyCatalogDiff): boolean {
+  if (isLabelDiff(diff)) {
+    return (
+      diff.missingLabels.length === 0 &&
+      diff.restoredLabels.length === 0 &&
+      diff.labels.length === 0
+    );
+  }
   if (isMetricDiff(diff)) {
     return (
       diff.missingMetrics.length === 0 &&
@@ -188,6 +247,7 @@ function plural(n: number, word: string): string {
 /** One line for the whole change set: the review's heading and the notice after it. */
 export function summarizeCatalogDiff(diff: AnyCatalogDiff): string {
   if (isMetricDiff(diff)) return summarizeMetricDiff(diff);
+  if (isLabelDiff(diff)) return summarizeLabelDiff(diff);
   const count = (pick: (t: TableChange) => unknown[]) =>
     diff.tables.reduce((n, t) => n + pick(t).length, 0);
   const parts = [
@@ -246,8 +306,32 @@ function summarizeMetricDiff(diff: MetricCatalogDiff): string {
     : "No changes since the last refresh. The catalog still matches the endpoint.";
 }
 
+function summarizeLabelDiff(diff: LabelCatalogDiff): string {
+  const count = (pick: (l: LabelChange) => number) =>
+    diff.labels.reduce((n, l) => n + pick(l), 0);
+  const parts = [
+    diff.missingLabels.length > 0 &&
+      `${plural(diff.missingLabels.length, "label")} missing`,
+    diff.restoredLabels.length > 0 &&
+      `${plural(diff.restoredLabels.length, "label")} found again`,
+    count((l) => l.addedValues.length) > 0 &&
+      `${plural(
+        count((l) => l.addedValues.length),
+        "value",
+      )} added`,
+    count((l) => l.removedValues.length) > 0 &&
+      `${plural(
+        count((l) => l.removedValues.length),
+        "value",
+      )} gone`,
+  ].filter((part): part is string => typeof part === "string");
+  return parts.length > 0
+    ? `${parts.join(", ")}.`
+    : "No changes since the last refresh. The catalog still matches the endpoint.";
+}
+
 export function droppedHiddenColumns(diff: AnyCatalogDiff): string[] {
-  if (isMetricDiff(diff)) return [];
+  if (isMetricDiff(diff) || isLabelDiff(diff)) return [];
   return diff.tables.flatMap((t) =>
     t.removed.filter((c) => !isExposed(c)).map((c) => `${t.table}.${c.name}`),
   );

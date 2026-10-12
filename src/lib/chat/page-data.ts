@@ -8,6 +8,7 @@ import { listSources } from "@/lib/db/repo";
 import { type ChatPreferences, chatPreferencesOf } from "@/lib/preferences";
 import { requestPreferences } from "@/lib/preferences-server";
 import { buildStarters } from "@/lib/prompts/starters";
+import type { QueryLanguage } from "@/lib/ir";
 import { isSqlSource, sourceKind } from "@/lib/sources/registry";
 
 /** A source as the Chat page offers it: names and a verdict, never the catalog. */
@@ -17,7 +18,7 @@ export interface ChatSourceOption {
   workspaceId: string;
   kind: string;
   /** The language its queries are written in, from its kind. */
-  language: "sql" | "promql";
+  language: QueryLanguage;
   /** Server-decided, as `/api/generate` decides it. */
   catalog: CatalogHealth;
   /** Whether this caller may refresh it (`source:manage` here). */

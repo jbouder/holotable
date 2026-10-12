@@ -12,7 +12,9 @@ import {
   type RefreshPreview,
   summarizeCatalogDiff,
   type AnyCatalogDiff,
+  isLabelDiff,
   isMetricDiff,
+  type LabelCatalogDiff,
   type MetricCatalogDiff,
 } from "@/lib/catalog/refresh";
 import type { ApiError } from "@/lib/errors";
@@ -156,10 +158,70 @@ export function CatalogRefreshReview({
 
 /** The change set itself, in the source kind's words. Exported for the tests. */
 export function CatalogDiffView({ diff }: { diff: AnyCatalogDiff }) {
+  if (isLabelDiff(diff)) return <LabelDiffView diff={diff} />;
   return isMetricDiff(diff) ? (
     <MetricDiffView diff={diff} />
   ) : (
     <TableDiffView diff={diff} />
+  );
+}
+
+/** A Loki refresh (#562): labels missing or back, and their value hints. */
+function LabelDiffView({ diff }: { diff: LabelCatalogDiff }) {
+  return (
+    <div className="space-y-3 text-sm">
+      <p className="text-foreground">{summarizeCatalogDiff(diff)}</p>
+      {diff.missingLabels.length > 0 && (
+        <div
+          role="alert"
+          className="space-y-1 border border-danger/40 tinted bg-tint-danger/(--tint-5) px-3 py-2 text-xs text-danger"
+        >
+          <p className="flex items-center gap-1.5 font-medium">
+            <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
+            No streams in the discovery window: {diff.missingLabels.join(", ")}
+          </p>
+          <p className="text-muted">
+            No longer shipped, or not readable with this source&rsquo;s credential. They
+            stay in the allowlist with their last known values, but are left out of the
+            model&rsquo;s catalog until a refresh finds them again.
+          </p>
+        </div>
+      )}
+      {diff.restoredLabels.length > 0 && (
+        <p className="flex items-center gap-1.5 text-xs text-success">
+          <Check className="h-3.5 w-3.5 shrink-0" />
+          Found again: {diff.restoredLabels.join(", ")}
+        </p>
+      )}
+      {diff.labels.length > 0 && (
+        <ul className="divide-y divide-border border border-border">
+          {diff.labels.map((change) => (
+            <li key={change.label} className="space-y-1 px-3 py-2">
+              <p className="font-mono text-xs font-medium text-foreground">
+                {change.label}
+              </p>
+              <ul className="space-y-0.5 font-mono text-xs">
+                {change.addedValues.map((value) => (
+                  <li
+                    key={`+${value}`}
+                    className="flex items-center gap-1.5 text-success"
+                  >
+                    <Plus className="h-3 w-3 shrink-0" aria-label="added" />
+                    {value}
+                  </li>
+                ))}
+                {change.removedValues.map((value) => (
+                  <li key={`-${value}`} className="flex items-center gap-1.5 text-danger">
+                    <Minus className="h-3 w-3 shrink-0" aria-label="gone" />
+                    {value}
+                  </li>
+                ))}
+              </ul>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
   );
 }
 

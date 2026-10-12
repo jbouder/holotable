@@ -152,7 +152,7 @@ test("generation is still asked for SQL only, and never for LogQL", () => {
     ...(panel("line", RANGE) as object),
   });
   assert.equal(generated.success, false);
-  // Not even where PromQL is offered: no source can run LogQL yet (#564).
+  // Not even where PromQL is offered: the model writes LogQL from #564.
   assert.equal(ExplorePanelAnyLanguage.safeParse(panel("line", RANGE)).success, true);
   assert.equal(ExplorePanelAnyLanguage.safeParse(panel("logs", LOGS)).success, false);
 });
@@ -241,7 +241,7 @@ test("a PromQL query against a SQL source is refused as the author's to fix", as
     'source "ts" answers SQL; this query is PromQL',
   );
   assert.equal(cannotRun(source, range), 'source "ts" answers SQL; this query is PromQL');
-  // LogQL is refused the same way: no source this server knows answers it (#562).
+  // LogQL is refused the same way: only a Loki source answers it (#562).
   const logs = PanelQuery.parse({ ...LOGS, sourceId: "ts" });
   assert.equal(
     wrongLanguage(source, logs),
@@ -274,6 +274,26 @@ test("a PromQL query against a SQL source is refused as the author's to fix", as
   ]);
 });
 
+test("a Loki source answers LogQL and label values, and refuses SQL and PromQL (#562)", () => {
+  const loki = { id: "loki", kind: "loki" as const };
+  assert.equal(wrongLanguage(loki, PanelQuery.parse(LOGS)), null);
+  assert.equal(wrongLanguage(loki, PanelQuery.parse(LOGS_INSTANT)), null);
+  assert.equal(wrongLanguage(loki, { sourceId: "loki", label: "app" }), null);
+  assert.equal(
+    wrongLanguage(loki, PanelQuery.parse({ ...SQL, sourceId: "loki" })),
+    'source "loki" answers LogQL; this query is SQL',
+  );
+  assert.equal(
+    cannotRun(loki, PanelQuery.parse({ ...RANGE, sourceId: "loki" })),
+    'source "loki" answers LogQL; this query is PromQL',
+  );
+  // A Prometheus source refuses LogQL just as plainly.
+  assert.equal(
+    wrongLanguage({ id: "prom", kind: "prometheus" }, PanelQuery.parse(LOGS)),
+    'source "prom" answers PromQL; this query is LogQL',
+  );
+});
+
 /*
  * Reading a query's fields directly. On the union a bare `query.sql` does not
  * compile, so what remains is a read behind `isSqlQuery`. A file that reads a
@@ -288,7 +308,7 @@ const SQL_SPECIFIC = [
   "src/lib/ir.ts",
   "src/lib/timescaledb/",
 ];
-/** Where a LogQL query's own field is read by nature: its guard and client, when they exist. */
+/** Where a LogQL query's own field is read by nature: its guard and client. */
 const LOGQL_SPECIFIC = [
   "src/lib/logql/",
   "src/lib/loki/",

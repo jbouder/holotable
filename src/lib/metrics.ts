@@ -5,6 +5,7 @@ import {
   Histogram,
   Registry,
 } from "@prometheus-io/client";
+import type { TruncationStage } from "@/lib/truncation";
 
 /**
  * Prometheus instrumentation.
@@ -244,7 +245,7 @@ function build(): Instruments {
     }),
     resultTruncations: new Counter({
       name: "holotable_result_truncations_total",
-      help: "Results cut short on the server, by stage: the row cap, the byte cap, the PromQL point cap, or a chat panel's window.",
+      help: "Results cut short on the server, by stage: the row cap, the byte cap, the PromQL point cap, a Loki query's entry limit, or a chat panel's window.",
       labelNames: ["stage"],
       registers: [registry],
     }),
@@ -363,7 +364,7 @@ export function recordSseDrop(reason: SseDropReason): void {
 }
 
 /** A result cut short on the server (#486), by its stage. */
-export function recordTruncation(stage: "rows" | "bytes" | "points" | "window"): void {
+export function recordTruncation(stage: TruncationStage): void {
   instruments().resultTruncations.inc({ stage });
 }
 
