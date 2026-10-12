@@ -413,6 +413,20 @@ export const POSITION_COLUMN = "_holo_pos";
 export const TOTAL_COLUMN = "_holo_total";
 
 /**
+ * What a SQL engine spells its own way in the plan's wrapper (#570), supplied
+ * by the source's kind. Only the casts: the row cap, the row filter and
+ * variables are the same in every dialect, and the wrapper is verified the
+ * same way whatever the casts are.
+ */
+export interface SqlDialect {
+  /** The type a bound time bound is cast to: `timestamptz` for PostgreSQL. */
+  timestampCast: string;
+}
+
+/** PostgreSQL's (and so TimescaleDB's): the dialect when a caller names none. */
+export const POSTGRES_DIALECT: SqlDialect = { timestampCast: "timestamptz" };
+
+/**
  * Build the final, guarded executable plan. Assumes `validateSql` already
  * passed. Wraps the validated query as a subquery and injects the server-owned
  * time range via bound parameters on the declared `timeField`.
@@ -422,26 +436,35 @@ export const TOTAL_COLUMN = "_holo_total";
  * is narrowed to the viewer's rows before the statement sees them
  * (`applyRowFilter`), with the value bound as a parameter. Bind it with
  * `bindRowFilter`, which refuses a viewer who lacks the claim.
+ *
+ * `dialect` is the source kind's casts; PostgreSQL's when absent.
  */
-export function buildExecutablePlan(input: {
-  sql: string;
-  timeField?: string;
-  from: Date;
-  to: Date;
-  rowFilter: RowFilterBinding | null;
-  /**
-   * The values of the variables the statement references (#67), already
-   * checked against what the dashboard allows. Each is bound after the time
-   * bounds and the row-filter value; none is ever written into the text.
-   */
-  variables?: VariableValues;
-  /**
-   * The rows the panel asks for (#499). Never above `MAX_QUERY_ROWS`: the
-   * smaller of the two is the plan's cap, and anything not a positive whole
-   * number is the server's own.
-   */
-  maxRows?: number;
-}): ExecutablePlan {
+export function buildExecutablePlan(
+  input: {
+    sql: string;
+    timeField?: string;
+    from: Date;
+    to: Date;
+    rowFilter: RowFilterBinding | null;
+    /**
+     * The values of the variables the statement references (#67), already
+     * checked against what the dashboard allows. Each is bound after the time
+     * bounds and the row-filter value; none is ever written into the text.
+     */
+    variables?: VariableValues;
+    /**
+     * The rows the panel asks for (#499). Never above `MAX_QUERY_ROWS`: the
+     * smaller of the two is the plan's cap, and anything not a positive whole
+     * number is the server's own.
+     */
+    maxRows?: number;
+  },
+  options: { dialect?: SqlDialect } = {},
+): ExecutablePlan {
+  const cast = options.dialect?.timestampCast ?? POSTGRES_DIALECT.timestampCast;
+  if (!/^[A-Za-z_][A-Za-z0-9_ ]*$/.test(cast)) {
+    throw new Error(`invalid timestamp cast: ${cast}`);
+  }
   const asked = input.maxRows;
   const limit =
     asked !== undefined && Number.isInteger(asked) && asked > 0
@@ -494,8 +517,8 @@ export function buildExecutablePlan(input: {
     const tf = input.timeField;
     sql = `SELECT * FROM (SELECT _holo.*, row_number() OVER () AS ${POSITION_COLUMN}, count(*) OVER () AS ${TOTAL_COLUMN}
 FROM (${inner}) AS _holo
-WHERE _holo.${tf} >= $1::timestamptz
-  AND _holo.${tf} < $2::timestamptz
+WHERE _holo.${tf} >= $1::${cast}
+  AND _holo.${tf} < $2::${cast}
 ORDER BY _holo.${tf} DESC, ${POSITION_COLUMN} DESC
 LIMIT ${limit}) AS _holo_kept
 ORDER BY _holo_kept.${POSITION_COLUMN}`;

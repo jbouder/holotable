@@ -24,10 +24,10 @@ const Body = panelQueryBody({
  * Describe what the database would be asked, without asking it.
  *
  * This is `/api/query` with the execution removed: the same `validateSql`, the
- * same `resolveTimeRange`, the same `buildExecutablePlan`, the same
- * `sessionStatements`. Re-deriving any of them here would let the explanation
- * drift from the behaviour it explains, which is the one thing this route must
- * not do. Nothing connects to the source's database and nothing is written.
+ * same `resolveTimeRange`, the same `buildExecutablePlan`, the same session
+ * statements, all through the source's kind. Re-deriving any of them here
+ * would let the explanation drift from the behavior it explains, which is the
+ * one thing this route must not do. Nothing connects to the source's database and nothing is written.
  *
  * Authorization is `/api/sql/validate`'s, for the same reason: the body
  * carries arbitrary SQL, and the guard's rejection message names the table or

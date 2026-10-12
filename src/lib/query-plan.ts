@@ -10,8 +10,9 @@ import type { VariableValues } from "@/lib/sql/variables";
  * A panel's SQL is not the statement that runs. The server wraps it as
  * `(<inner>) AS _holo`, adds a `WHERE` on the declared `timeField` bound to
  * parameters it resolved itself, keeps the newest rows up to a `LIMIT`, and
- * runs the result inside a read-only transaction with a pinned `search_path`
- * and a statement timeout. None of that was visible anywhere, so the claim
+ * runs the result inside the session its source's kind sets up (for
+ * TimescaleDB, a read-only transaction with a pinned `search_path`) and a
+ * statement timeout. None of that was visible anywhere, so the claim
  * that the server owns the time window (invariant 4) was something an author
  * had to take on faith.
  *
@@ -62,7 +63,10 @@ export function buildQueryPlanView(input: {
   timeRange: TimeRange;
   /** The plan `buildExecutablePlan` produced — its SQL and its parameters. */
   plan: { sql: string; params: unknown[]; variables?: string[] };
-  /** `sessionStatements(schema)` from the execution client. */
+  /**
+   * What the source's kind runs before the statement, in order (#570): for
+   * TimescaleDB, `sessionStatements(schema)` from its execution client.
+   */
   session: string[];
   limits: { maxRows: number; statementTimeoutMs: number; maxResultBytes: number };
   /** The claim the source's row filter binds, when it has one (#31). */

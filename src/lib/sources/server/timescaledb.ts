@@ -17,7 +17,7 @@ import type {
   SourcePlan,
 } from "@/lib/sources/server/types";
 import { rowFilterProblem } from "@/lib/sql/row-filter";
-import { buildExecutablePlan, validateSql } from "@/lib/sql/safety";
+import { buildExecutablePlan, type SqlDialect, validateSql } from "@/lib/sql/safety";
 import {
   buildCatalogPrompt,
   discoverTables,
@@ -51,6 +51,13 @@ function sqlSource(source: SourceRecord): TimescaleDbSourceRecord {
   }
   return source as TimescaleDbSourceRecord;
 }
+
+/**
+ * How PostgreSQL spells what the plan's wrapper adds (#570): the time bounds
+ * are cast to `timestamptz`. The row cap, the row filter and variables are
+ * the same in every dialect.
+ */
+const dialect: SqlDialect = { timestampCast: "timestamptz" };
 
 function sqlConfig(cfg: SourceConfig): TimescaleDbConfig {
   if (cfg.kind !== "timescaledb")
@@ -87,15 +94,18 @@ const kind: ServerSourceKind = {
     }
     return {
       language: "sql",
-      plan: buildExecutablePlan({
-        sql: query.sql,
-        timeField: query.timeField,
-        from: input.from,
-        to: input.to,
-        rowFilter: input.rowFilter,
-        variables: input.variables,
-        maxRows: input.maxRows,
-      }),
+      plan: buildExecutablePlan(
+        {
+          sql: query.sql,
+          timeField: query.timeField,
+          from: input.from,
+          to: input.to,
+          rowFilter: input.rowFilter,
+          variables: input.variables,
+          maxRows: input.maxRows,
+        },
+        { dialect },
+      ),
     };
   },
 
