@@ -17,6 +17,112 @@ export interface CorpusEntry {
   note: string;
 }
 
+/**
+ * DuckDB's file, network, query-string, environment and introspection
+ * functions (#571), each with an argument list that parses. Every one is on
+ * `FORBIDDEN_FUNCTIONS`; `test/sql-safety-duckdb.test.ts` names a refusal for
+ * each, in the select list and in FROM, and the corpus below holds both.
+ */
+export const DUCKDB_FORBIDDEN_CALLS: ReadonlyArray<
+  readonly [name: string, args: string]
+> = [
+  // Files.
+  ["read_csv", "('/etc/passwd')"],
+  ["read_csv_auto", "('/etc/passwd')"],
+  ["read_parquet", "('/data/*.parquet')"],
+  ["parquet_scan", "('/data/x.parquet')"],
+  ["read_json", "('/data/x.json')"],
+  ["read_json_auto", "('/data/x.json')"],
+  ["read_json_objects", "('/data/x.json')"],
+  ["read_json_objects_auto", "('/data/x.json')"],
+  ["read_ndjson", "('/data/x.ndjson')"],
+  ["read_ndjson_auto", "('/data/x.ndjson')"],
+  ["read_ndjson_objects", "('/data/x.ndjson')"],
+  ["read_text", "('/etc/passwd')"],
+  ["read_blob", "('/etc/passwd')"],
+  ["read_xlsx", "('/data/x.xlsx')"],
+  ["glob", "('/*')"],
+  ["sniff_csv", "('/etc/passwd')"],
+  ["parquet_metadata", "('/data/x.parquet')"],
+  ["parquet_file_metadata", "('/data/x.parquet')"],
+  ["parquet_kv_metadata", "('/data/x.parquet')"],
+  ["parquet_schema", "('/data/x.parquet')"],
+  // The network and other engines.
+  ["load_aws_credentials", "()"],
+  ["iceberg_scan", "('s3://bucket/t')"],
+  ["iceberg_metadata", "('s3://bucket/t')"],
+  ["iceberg_snapshots", "('s3://bucket/t')"],
+  ["delta_scan", "('s3://bucket/t')"],
+  ["postgres_scan", "('host=x', 'public', 't')"],
+  ["postgres_query", "('db', 'SELECT 1')"],
+  ["postgres_attach", "('host=x')"],
+  ["mysql_scan", "('host=x', 'd', 't')"],
+  ["mysql_query", "('db', 'SELECT 1')"],
+  ["sqlite_scan", "('/data/x.db', 't')"],
+  ["sqlite_attach", "('/data/x.db')"],
+  // Query strings.
+  ["query", "('SELECT * FROM secret')"],
+  ["query_table", "('secret')"],
+  ["json_execute_serialized_sql", "('{}')"],
+  // The environment, settings, variables and extensions.
+  ["getenv", "('HOME')"],
+  ["getvariable", "('x')"],
+  ["current_setting", "('enable_external_access')"],
+  ["duckdb_settings", "()"],
+  ["duckdb_extensions", "()"],
+  ["duckdb_databases", "()"],
+  ["duckdb_secrets", "()"],
+  ["which_secret", "('s3://bucket/x', 's3')"],
+  ["load", "('httpfs')"],
+  ["install", "('httpfs')"],
+  // Catalog introspection.
+  ["duckdb_tables", "()"],
+  ["duckdb_columns", "()"],
+  ["duckdb_views", "()"],
+  ["duckdb_schemas", "()"],
+  ["duckdb_functions", "()"],
+  ["duckdb_temporary_files", "()"],
+  ["pragma_table_info", "('secret')"],
+  ["pragma_database_list", "()"],
+  ["pragma_storage_info", "('secret')"],
+  // Writes.
+  ["checkpoint", "()"],
+  ["force_checkpoint", "()"],
+];
+
+/**
+ * DuckDB statements that are not a SELECT (#571). Several are not PostgreSQL
+ * grammar at all and fail to parse, which is a refusal too; the tests assert
+ * the refusal, not the reason.
+ */
+export const DUCKDB_STATEMENTS: ReadonlyArray<readonly [keyword: string, sql: string]> = [
+  ["ATTACH", "ATTACH '/data/other.duckdb' AS other (READ_ONLY)"],
+  ["DETACH", "DETACH other"],
+  ["COPY", "COPY http_requests TO '/tmp/out.csv'"],
+  ["COPY", "COPY (SELECT * FROM http_requests) TO '/tmp/out.parquet' (FORMAT parquet)"],
+  ["EXPORT", "EXPORT DATABASE '/tmp/dump'"],
+  ["IMPORT", "IMPORT DATABASE '/tmp/dump'"],
+  ["INSTALL", "INSTALL httpfs"],
+  ["LOAD", "LOAD httpfs"],
+  ["SET", "SET enable_external_access = true"],
+  ["SET", "SET VARIABLE x = 1"],
+  ["PRAGMA", "PRAGMA database_list"],
+  ["CALL", "CALL duckdb_settings()"],
+];
+
+/**
+ * SQL a DuckDB source's prompt will teach (#569): time bucketing through
+ * `date_trunc`, `time_bucket` and `date_bin` with a literal origin. Accepted
+ * on every SQL kind, since the grammar is the same.
+ */
+export const DUCKDB_ACCEPTED: readonly string[] = [
+  "SELECT date_trunc('hour', ts) AS t, count(*) AS c FROM http_requests GROUP BY 1 ORDER BY 1",
+  "SELECT time_bucket(interval '5 minutes', ts) AS t, avg(duration_ms) FROM http_requests GROUP BY t ORDER BY t",
+  "SELECT date_bin(interval '15 minutes', ts, TIMESTAMP '2000-01-01') AS t, count(*) FROM http_requests GROUP BY t",
+  "SELECT date_bin('1 hour', ts, timestamptz '2000-01-01 00:00:00+00') AS t, max(duration_ms) FROM http_requests GROUP BY 1",
+  "WITH b AS (SELECT date_trunc('day', ts) AS d, status FROM http_requests) SELECT d, count(*) FILTER (WHERE status >= 500) FROM b GROUP BY d",
+];
+
 export const CORPUS: CorpusEntry[] = [
   // --- Found by fuzzing --------------------------------------------------------
   {
@@ -153,4 +259,46 @@ export const CORPUS: CorpusEntry[] = [
     verdict: "reject",
     note: "the origin is still a literal like any other: a time word there is refused",
   },
+  // --- DuckDB's escapes (#571) ---------------------------------------------------
+  ...DUCKDB_FORBIDDEN_CALLS.flatMap(([name, args]): CorpusEntry[] => [
+    {
+      sql: `SELECT ${name}${args} FROM http_requests`,
+      verdict: "reject",
+      note: `DuckDB's ${name}() in the select list`,
+    },
+    {
+      sql: `SELECT * FROM ${name}${args}`,
+      verdict: "reject",
+      note: `DuckDB's ${name}() as a table function`,
+    },
+  ]),
+  ...DUCKDB_STATEMENTS.map(
+    ([keyword, sql]): CorpusEntry => ({
+      sql,
+      verdict: "reject",
+      note: `DuckDB's ${keyword} is not a SELECT`,
+    }),
+  ),
+  {
+    sql: "SELECT * FROM generate_series(1, 3) g",
+    verdict: "reject",
+    note: "a table function in FROM is refused unless allowlisted, and the allowlist is empty",
+  },
+  {
+    sql: "SELECT h.status FROM http_requests h, LATERAL unnest(ARRAY[h.status]) u",
+    verdict: "reject",
+    note: "a LATERAL table function is a table function in FROM",
+  },
+  {
+    sql: "SELECT * FROM ROWS FROM (generate_series(1, 2), generate_series(3, 4)) AS r(a, b)",
+    verdict: "reject",
+    note: "each function in ROWS FROM is a table function in FROM",
+  },
+  ...DUCKDB_ACCEPTED.map(
+    (sql): CorpusEntry => ({
+      sql,
+      verdict: "accept",
+      note: "DuckDB-flavored time bucketing the prompt will teach",
+    }),
+  ),
 ];
