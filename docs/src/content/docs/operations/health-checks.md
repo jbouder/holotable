@@ -18,7 +18,7 @@ neither is cached.
 Answers `200` whenever the process is serving, unconditionally:
 
 ```json
-{ "status": "ok", "version": "0.1.0", "commit": "9f31c0ab12cd" }
+{ "status": "ok", "version": "0.2.0", "commit": "9f31c0ab12cd" }
 ```
 
 `version` comes from `package.json` unless `APP_VERSION` overrides it, and
