@@ -166,7 +166,11 @@ export function CatalogDiffView({ diff }: { diff: AnyCatalogDiff }) {
   );
 }
 
-/** A Loki refresh (#562): labels missing or back, and their value hints. */
+/**
+ * A Loki refresh (#563): labels missing or back, and each label's value hints
+ * added or gone. A label can carry a hundred values, so each one's list
+ * scrolls on its own rather than pushing Apply off the dialog.
+ */
 function LabelDiffView({ diff }: { diff: LabelCatalogDiff }) {
   return (
     <div className="space-y-3 text-sm">
@@ -197,10 +201,21 @@ function LabelDiffView({ diff }: { diff: LabelCatalogDiff }) {
         <ul className="divide-y divide-border border border-border">
           {diff.labels.map((change) => (
             <li key={change.label} className="space-y-1 px-3 py-2">
-              <p className="font-mono text-xs font-medium text-foreground">
-                {change.label}
+              <p className="flex flex-wrap items-center gap-2 text-xs">
+                <span className="font-mono font-medium text-foreground">
+                  {change.label}
+                </span>
+                <span className="text-muted">
+                  {[
+                    change.addedValues.length > 0 && `${change.addedValues.length} added`,
+                    change.removedValues.length > 0 &&
+                      `${change.removedValues.length} gone`,
+                  ]
+                    .filter(Boolean)
+                    .join(", ")}
+                </span>
               </p>
-              <ul className="space-y-0.5 font-mono text-xs">
+              <ul className="max-h-40 space-y-0.5 overflow-auto font-mono text-xs">
                 {change.addedValues.map((value) => (
                   <li
                     key={`+${value}`}

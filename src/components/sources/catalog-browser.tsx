@@ -21,6 +21,7 @@ import {
   isMetricCatalogView,
   type LabelCatalogView,
   type MetricCatalogView,
+  searchLabels,
   searchMetrics,
   searchCatalog,
   updateColumnExposure,
@@ -415,7 +416,11 @@ function MetricList({
   );
 }
 
-/** A Loki source's stream labels (#562), with the values discovery found. */
+/**
+ * A Loki source's allowlist (#563): each stream label with the values
+ * discovery found, searched by name or value as the metric list is. Nothing
+ * to toggle: a label is allowlisted whole, and its values are hints.
+ */
 function LabelList({
   view,
   query,
@@ -425,15 +430,9 @@ function LabelList({
   query: string;
   onQuery: (query: string) => void;
 }) {
-  const needle = query.trim().toLowerCase();
-  const matches = needle
-    ? view.labels.filter(
-        (l) =>
-          l.name.toLowerCase().includes(needle) ||
-          l.values.some((v) => v.toLowerCase().includes(needle)),
-      )
-    : view.labels;
+  const matches = searchLabels(view.labels, query);
   const missing = new Set(view.missingLabels);
+  const counts = new Map(view.labels.map((l) => [l.name, l.values.length]));
   return (
     <>
       <div className="relative">
@@ -452,27 +451,35 @@ function LabelList({
       </div>
       {matches.length === 0 ? (
         <p className="py-6 text-center text-sm text-muted">
-          {needle ? `Nothing in the catalog matches “${query.trim()}”.` : "No labels."}
+          {query.trim()
+            ? `Nothing in the catalog matches “${query.trim()}”.`
+            : "No labels."}
         </p>
       ) : (
         <ul className="divide-y divide-border border border-border">
-          {matches.map((label) => (
-            <li key={label.name} className="space-y-1 px-3 py-2">
-              <div className="flex flex-wrap items-center gap-2">
-                <span className="font-mono text-xs font-medium text-foreground">
-                  {label.name}
-                </span>
-                {missing.has(label.name) && (
-                  <span className="text-xs text-danger">
-                    no streams at the last refresh
+          {matches.map((label) => {
+            const count = counts.get(label.name) ?? label.values.length;
+            return (
+              <li key={label.name} className="space-y-1 px-3 py-2">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="font-mono text-xs font-medium text-foreground">
+                    {label.name}
                   </span>
-                )}
-              </div>
-              <p className="font-mono text-xs text-muted">
-                {label.values.length > 0 ? label.values.join(", ") : "no values listed"}
-              </p>
-            </li>
-          ))}
+                  <Badge>
+                    {count} value{count === 1 ? "" : "s"}
+                  </Badge>
+                  {missing.has(label.name) && (
+                    <span className="text-xs text-danger">
+                      no streams at the last refresh
+                    </span>
+                  )}
+                </div>
+                <p className="line-clamp-3 break-words font-mono text-xs text-muted">
+                  {label.values.length > 0 ? label.values.join(", ") : "no values listed"}
+                </p>
+              </li>
+            );
+          })}
         </ul>
       )}
     </>

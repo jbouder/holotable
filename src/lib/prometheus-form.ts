@@ -1,4 +1,8 @@
-import { type ApiError, apiErrorFromThrown, readApiError } from "@/lib/errors";
+import {
+  discoverFromEndpoint,
+  type HttpDiscoveryInput,
+  needsSecretRef,
+} from "@/lib/http-source-form";
 import {
   MAX_METRICS,
   type PrometheusConfig,
@@ -48,10 +52,7 @@ export type PrometheusFormResult =
   | { ok: true; config: PrometheusConfig }
   | { ok: false; errors: FieldErrors };
 
-/** Whether this auth mode names a `secret_ref`: every mode but `none`. */
-export function needsSecretRef(auth: PrometheusAuth): boolean {
-  return auth !== "none";
-}
+export { needsSecretRef };
 
 function draft(state: PrometheusFormState): Record<string, unknown> {
   const label = state.rowFilterLabel.trim();
@@ -216,55 +217,11 @@ export function sharedLabels(state: PrometheusFormState): string[] {
 /* Fetch helpers                                                              */
 /* ------------------------------------------------------------------------- */
 
-export interface PrometheusDiscoveryInput {
-  workspaceId: string;
-  url: string;
-  auth: PrometheusAuth;
-  secretRef: string | null;
-}
-
-function body(
-  input: PrometheusDiscoveryInput,
-  extra: Record<string, unknown> = {},
-): string {
-  return JSON.stringify({
-    kind: "prometheus",
-    workspaceId: input.workspaceId,
-    url: input.url,
-    auth: input.auth,
-    ...(input.secretRef ? { secretRef: input.secretRef } : {}),
-    ...extra,
-  });
-}
-
-async function discover<T>(
-  input: PrometheusDiscoveryInput,
-  extra: Record<string, unknown>,
-  pick: (body: Record<string, unknown>) => T,
-): Promise<{ ok: true; value: T } | { ok: false; error: ApiError }> {
-  try {
-    const res = await fetch("/api/sources/discover", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: body(input, extra),
-    });
-    if (!res.ok) return { ok: false, error: await readApiError(res) };
-    const answer = (await res.json()) as Record<string, unknown>;
-    if (answer.ok !== true) {
-      return {
-        ok: false,
-        error: { error: String(answer.error ?? "Discovery failed."), kind: "validation" },
-      };
-    }
-    return { ok: true, value: pick(answer) };
-  } catch (err) {
-    return { ok: false, error: apiErrorFromThrown(err) };
-  }
-}
+export type PrometheusDiscoveryInput = HttpDiscoveryInput;
 
 /** The endpoint's metric menu. */
 export function discoverPrometheusMetrics(input: PrometheusDiscoveryInput) {
-  return discover(input, {}, (b) =>
+  return discoverFromEndpoint("prometheus", input, {}, (b) =>
     Array.isArray(b.metrics) ? (b.metrics as DiscoveredMetric[]) : [],
   );
 }
@@ -274,7 +231,7 @@ export function discoverPrometheusLabels(
   input: PrometheusDiscoveryInput,
   metrics: string[],
 ) {
-  return discover(input, { labelsFor: metrics }, (b) =>
+  return discoverFromEndpoint("prometheus", input, { labelsFor: metrics }, (b) =>
     b.labels && typeof b.labels === "object"
       ? (b.labels as Record<string, string[]>)
       : {},

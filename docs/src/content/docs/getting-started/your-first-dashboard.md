@@ -61,8 +61,8 @@ workspace yet; ask the operator to add one to `SOURCE_SECRET_REFS`.
 
 ### Or a Prometheus endpoint
 
-Choose **Prometheus (PromQL)** under **Kind** to read an existing Prometheus,
-Thanos, Mimir or VictoriaMetrics instead. A source's kind is fixed once it is
+Choose the **Prometheus (PromQL)** card under **Kind** to read an existing
+Prometheus, Thanos, Mimir or VictoriaMetrics instead. A source's kind is fixed once it is
 saved. The form asks for:
 
 - **URL**: the base of the HTTP API, such as `https://prometheus.example.com`.
@@ -79,6 +79,28 @@ saved. The form asks for:
   is refused.
 - **Tenant label** (optional): a label every ticked metric has, matched against
   a claim of the viewer's, so each viewer sees only their own series. See
+  [Row-level filters](/admin/row-level-filters/).
+
+### Or a Loki endpoint
+
+Choose the **Loki (LogQL)** card to read logs from Grafana Loki or Grafana
+Cloud Logs. Its panels carry LogQL. The form asks for:
+
+- **URL**: the base the Loki HTTP API answers under, such as
+  `https://loki.example.com` (the server adds `/loki/api/v1/…`). The same
+  rule as for Prometheus: public https, or listed in `SOURCE_URL_ALLOWLIST`.
+- **Authentication**: a bearer token, a user name and password, or none, read
+  from the `secret_ref` exactly as for Prometheus.
+- **Labels**: press **Discover labels** and search the stream labels the
+  endpoint has seen in the last `PROMETHEUS_DISCOVERY_WINDOW` (an hour by
+  default; the window is the server's, never the browser's). Tick the ones
+  the source may select on, up to 200. Ticking one asks the endpoint for that
+  label's values and keeps up to 100 of them as hints for you and the model.
+  A real Loki has few labels and many values, so the values are shown beside
+  each ticked label. Every stream selector in a LogQL panel must match one of
+  the ticked labels exactly (`{app="api"}`); one that does not is refused.
+- **Tenant label** (optional): a stream label matched against a claim of the
+  viewer's, so each viewer sees only their own streams. See
   [Row-level filters](/admin/row-level-filters/).
 
 **Success looks like:** a row in the source list.
@@ -124,8 +146,18 @@ labels, and reports a metric with no series as missing. **Catalog** lists the
 metrics with their type, help and labels; a metric is allowlisted whole, so
 there is nothing to hide.
 
+For a **Loki** source, **Test** asks `/ready`, makes one `labels` call with the
+credential, names the build that answered (its version is read from
+`/loki/api/v1/status/buildinfo`, never probed), and checks that each
+allowlisted label has values in the discovery window. A label with none is
+listed as a finding. Loki has no write surface a query credential reaches, so
+there is no write verdict. **Refresh** re-reads each listed label's values,
+shows the values added and gone per label, and reports a label with no
+streams as missing; it never adds or drops a label. **Catalog** lists the
+labels with their value hints, searchable by name or value.
+
 **Success looks like:** the Catalog column reads *Catalog fresh*, and the row's
-table or metric count matches what you expect.
+table, metric or label count matches what you expect.
 
 ## 3. Generate your first dashboard
 

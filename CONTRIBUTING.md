@@ -421,6 +421,7 @@ request:
 | `src/lib/duckdb/` (the DuckDB path guard, engine and lock) | `architecture/data-model.md` ("DuckDB") |
 | `src/lib/prometheus/` (the client, discovery, the connection test) | `admin/prometheus.md`, `concepts/prometheus-sources.md` |
 | `src/lib/loki/` (the client, the rows, refresh and the connection test) | `architecture/data-model.md` (`sources`), "The LogQL guard" in `concepts/executing-a-panel.md` |
+| `src/app/data-sources/`, `src/components/sources/`, `src/lib/prometheus-form.ts`, `src/lib/loki-form.ts` (the source forms, discovery, the test report, refresh and the catalog browser) | Steps 1 and 2 of `getting-started/your-first-dashboard.md`, the `/api/sources` rows in `reference/api-routes.md` |
 | `src/lib/sql/row-filter.ts`, `src/lib/row-scope.ts` | `admin/row-level-filters.md`, invariant 8a |
 | `src/lib/sql/variables.ts`, `src/lib/variables.ts`, `variable-selection.ts` | `guide/variables.md` |
 | `src/lib/drilldown.ts`, `drilldown-targets.ts`, `drilldown-datum.ts`, `panel.links` in `ir.ts` | `guide/drilldown.md` |

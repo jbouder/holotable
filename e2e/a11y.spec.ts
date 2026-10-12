@@ -11,6 +11,8 @@ import {
   createShareLink,
   DEMO_DASHBOARD,
   dashboardId,
+  discoverLokiLabels,
+  openLokiForm,
   waitForPanels,
 } from "./support/app";
 
@@ -163,6 +165,17 @@ for (const { theme, palette, name } of APPEARANCES) {
     test("data sources", async ({ page }) => {
       await page.goto("/data-sources");
       await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
+      await expectNoA11yViolations(page);
+    });
+
+    test("data sources, the Loki form and its discovered labels (#563)", async ({
+      page,
+    }) => {
+      const dialog = await openLokiForm(page);
+      await expect(dialog.getByRole("radio", { name: "Loki (LogQL)" })).toBeChecked();
+      await expectNoA11yViolations(page);
+      await discoverLokiLabels(dialog);
+      await expect(dialog.getByLabel("Search the discovered labels")).toBeVisible();
       await expectNoA11yViolations(page);
     });
 

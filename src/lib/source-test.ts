@@ -246,3 +246,15 @@ export function summarizeMetrics(metrics: TestMetric[]): string {
   }
   return `${reachable} of ${metrics.length} metrics have series`;
 }
+
+/** `2 of 3 labels have streams`, for a Loki source (#563). */
+export function summarizeLabels(labels: TestLabel[]): string {
+  const reachable = labels.filter((l) => l.reachable).length;
+  if (labels.length === 0) return "No labels are allowlisted";
+  if (reachable === labels.length) {
+    return labels.length === 1
+      ? "1 label has streams"
+      : `All ${labels.length} labels have streams`;
+  }
+  return `${reachable} of ${labels.length} labels have streams`;
+}
