@@ -1,0 +1,62 @@
+{
+  "format": "holotable.dashboard",
+  "formatVersion": 1,
+  "spec": {
+    "specVersion": 1,
+    "title": "App logs (Loki)",
+    "timeRange": { "from": "now-1h", "to": "now" },
+    "refreshIntervalMs": 30000,
+    "variables": [
+      {
+        "name": "app",
+        "label": "App",
+        "type": "query",
+        "query": { "sourceId": "loki-apps", "label": "app" }
+      }
+    ],
+    "panels": [
+      {
+        "id": "error-rate",
+        "title": "Error lines",
+        "description": "How many error lines the picked app logs per minute.",
+        "viz": "stat",
+        "query": {
+          "sourceId": "loki-apps",
+          "logql": "sum(count_over_time({app=\":app\", level=\"error\"} [1m]))",
+          "instant": true
+        },
+        "options": {
+          "unit": "/min",
+          "thresholds": [
+            { "value": 1, "color": "warning" },
+            { "value": 10, "color": "danger" }
+          ]
+        },
+        "layout": { "x": 0, "y": 0, "w": 4, "h": 3 }
+      },
+      {
+        "id": "lines-by-level",
+        "title": "Lines by level",
+        "description": "The picked app's log volume over time, one line per level.",
+        "viz": "line",
+        "query": {
+          "sourceId": "loki-apps",
+          "logql": "sum by (level) (count_over_time({app=\":app\"} [1m]))"
+        },
+        "layout": { "x": 4, "y": 0, "w": 8, "h": 3 }
+      },
+      {
+        "id": "recent-errors",
+        "title": "Recent errors",
+        "description": "The picked app's newest warning and error lines, to read.",
+        "viz": "logs",
+        "query": {
+          "sourceId": "loki-apps",
+          "logql": "{app=\":app\", env=\"prod\"} | logfmt | level=~\"warn|error\""
+        },
+        "options": { "limit": 200, "level": "level" },
+        "layout": { "x": 0, "y": 3, "w": 12, "h": 6 }
+      }
+    ]
+  }
+}

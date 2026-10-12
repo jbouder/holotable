@@ -1,6 +1,6 @@
 ---
 name: holotable
-description: Write, review and fix Holotable dashboard and panel specs (the JSON IR) and their guarded SQL or PromQL. Use when someone wants a Holotable dashboard or panel written from a description and a table or metric catalog, asks why a spec or query is rejected, wants a spec reviewed or explained, or asks which panel kind, format, threshold or layout to use. Knowledge only; it never connects to a Holotable server.
+description: Write, review and fix Holotable dashboard and panel specs (the JSON IR) and their guarded SQL, PromQL or LogQL. Use when someone wants a Holotable dashboard or panel written from a description and a table, metric or log label catalog, asks why a spec or query is rejected, wants a spec reviewed or explained, or asks which panel kind, format, threshold or layout to use. Knowledge only; it never connects to a Holotable server.
 ---
 
 # Holotable specs
@@ -10,7 +10,8 @@ that says what to query and how to draw it, never the data. Specs are checked
 by a shared Zod schema (the IR, `src/lib/ir.ts`) and every query by its
 source's guard: SQL for a TimescaleDB/PostgreSQL source
 (`src/lib/sql/safety.ts`), PromQL for a Prometheus source
-(`src/lib/promql/safety.ts`). This skill writes specs that pass both on the first
+(`src/lib/promql/safety.ts`), LogQL for a Loki source
+(`src/lib/logql/safety.ts`). This skill writes specs that pass both on the first
 try and advises on making them readable.
 
 It is knowledge only. Do not call a Holotable server, sign in, or ask for a
@@ -32,6 +33,10 @@ repeat them.
   hints, how the server picks `start`, `end` and `step`, `instant` and
   `minStep`, variables as matcher values. Load before writing PromQL or
   explaining a PromQL rejection.
+- `references/logql-rules.md`: the same for LogQL: what is refused, log vs
+  metric queries, which panel takes which, `instant`, variables as matcher
+  values or line-filter strings. Load before writing LogQL or explaining a
+  LogQL rejection.
 - `references/guidance.md`: which kind answers which question, measures,
   formats, thresholds, layout and naming.
 - `examples/`: `catalog.json` (a SQL source catalog), `service-health.json`
@@ -39,16 +44,18 @@ repeat them.
   `sql.json` (accepted and rejected statements per rule);
   `prometheus-catalog.json` (a metric catalog), `fleet-prometheus.json` (a
   complete PromQL import file with a label-values variable) and `promql.json`
-  (accepted and rejected expressions per rule). All are tested against the
+  (accepted and rejected expressions per rule); `loki-catalog.json` (a log
+  label catalog), `app-logs-loki.json` (a complete LogQL import file) and
+  `logql.json` (accepted and rejected LogQL per rule). All are tested against the
   real schema and guards.
 
 ## Write a spec from a description
 
 1. **Get the catalog.** First ask which kind the source is: a
    TimescaleDB/PostgreSQL database (queries are SQL) or a Prometheus-compatible
-   endpoint (queries are PromQL). Then you need its `sourceId` and, for SQL,
+   endpoint (queries are PromQL) or a Loki endpoint (queries are LogQL). Then you need its `sourceId` and, for SQL,
    its tables, columns and their types, or, for Prometheus, its metrics with
-   their type and labels. Ask the person to paste or describe them
+   their type and labels, or, for Loki, its stream labels. Ask the person to paste or describe them
    (Holotable's Data sources page lists each source's id and kind and has a
    catalog browser), or read them from a schema in the repository. Never
    invent a table, column, metric or label. If a column is marked
@@ -62,7 +69,10 @@ repeat them.
    omit it otherwise; only catalog tables and exposed columns. PromQL, to
    `references/promql-rules.md`: `query.promql`, never `sql` or `timeField`;
    only listed metrics and labels; rate a counter; aggregate to the series you
-   want drawn; `"instant": true` for a stat, gauge, table or pie.
+   want drawn; `"instant": true` for a stat, gauge, table or pie. LogQL, to
+   `references/logql-rules.md`: `query.logql`; every selector anchored with
+   `=` on a listed label; a log query for a `logs` panel (with
+   `options.limit`), a metric query for every other kind.
 4. **Assemble the file** in the import wrapper from `references/ir.md`, with
    `specVersion: 1`, unique panel ids, a one-sentence `description` per panel
    (intent, never values), and a layout with no overlaps on the 12-column
@@ -94,7 +104,8 @@ report, most serious first:
 ## Explain and fix a rejection
 
 Match the message to the table in `references/sql-rules.md` (for SQL), in
-`references/promql-rules.md` (for PromQL), or to
+`references/promql-rules.md` (for PromQL), in
+`references/logql-rules.md` (for LogQL), or to
 the field rules in `references/ir.md` (for the schema; messages read
 `path: problem`, such as `panels.2.options.thresholds.1.value: threshold steps
 must be in strictly ascending order of value`). Say which rule it is, why the
