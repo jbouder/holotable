@@ -1,4 +1,4 @@
-import { isSqlQuery, queryText, queryTimeField } from "@/lib/ir";
+import { isLogqlQuery, isSqlQuery, queryText, queryTimeField } from "@/lib/ir";
 import { type ApiError, apiErrorFromThrown, readApiError } from "@/lib/errors";
 import type { PanelQuery, TimeRange } from "@/lib/ir";
 import type { VariableValues } from "@/lib/sql/variables";
@@ -35,6 +35,7 @@ export const EMPTY_ROWS: QueryRows = { columns: [], rows: [] };
 export type QueryRequest = (
   | { sourceId: string; sql: string; timeField?: string }
   | { sourceId: string; promql: string; instant?: boolean; minStep?: string }
+  | { sourceId: string; logql: string; instant?: boolean; minStep?: string }
 ) & {
   timeRange: TimeRange;
   /** The dashboard's variables, as the preview binds them (#67). */
@@ -43,14 +44,13 @@ export type QueryRequest = (
 
 /** The query's own fields, named one by one rather than spread. */
 function queryFields(query: PanelQuery) {
-  return isSqlQuery(query)
-    ? { sourceId: query.sourceId, sql: query.sql, timeField: query.timeField }
-    : {
-        sourceId: query.sourceId,
-        promql: query.promql,
-        instant: query.instant,
-        minStep: query.minStep,
-      };
+  if (isSqlQuery(query)) {
+    return { sourceId: query.sourceId, sql: query.sql, timeField: query.timeField };
+  }
+  const evaluation = { instant: query.instant, minStep: query.minStep };
+  return isLogqlQuery(query)
+    ? { sourceId: query.sourceId, logql: query.logql, ...evaluation }
+    : { sourceId: query.sourceId, promql: query.promql, ...evaluation };
 }
 
 export function queryRequest(
@@ -196,7 +196,27 @@ export async function validatePanelSql(input: {
 }
 
 /**
- * `validatePanelSql` for a query in either language (#388): the body is the
+ * A query's statement and how it is evaluated, for a request body: each
+ * language's fields named rather than spread (#388).
+ */
+export function statementFields(
+  query: PanelQuery,
+):
+  | { sql: string }
+  | { promql: string; instant?: boolean; minStep?: string }
+  | { logql: string; instant?: boolean; minStep?: string } {
+  if (isSqlQuery(query)) return { sql: query.sql };
+  const evaluation = {
+    ...(query.instant !== undefined ? { instant: query.instant } : {}),
+    ...(query.minStep !== undefined ? { minStep: query.minStep } : {}),
+  };
+  return isLogqlQuery(query)
+    ? { logql: query.logql, ...evaluation }
+    : { promql: query.promql, ...evaluation };
+}
+
+/**
+ * `validatePanelSql` for a query in any language (#388): the body is the
  * query's own fields, named rather than spread, and a PromQL verdict carries
  * the guard's hints.
  */
@@ -205,13 +225,7 @@ export async function validatePanelQuery(input: {
   variables?: readonly string[];
 }): Promise<SqlCheck> {
   const { query } = input;
-  const statement = isSqlQuery(query)
-    ? { sql: query.sql }
-    : {
-        promql: query.promql,
-        ...(query.instant !== undefined ? { instant: query.instant } : {}),
-        ...(query.minStep !== undefined ? { minStep: query.minStep } : {}),
-      };
+  const statement = statementFields(query);
   try {
     const res = await fetch("/api/sql/validate", {
       method: "POST",

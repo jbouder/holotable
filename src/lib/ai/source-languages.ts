@@ -13,18 +13,28 @@ interface QueryLike {
   sourceId?: unknown;
   sql?: unknown;
   promql?: unknown;
+  logql?: unknown;
   label?: unknown;
 }
 
 function languageOf(query: QueryLike): QueryLanguage | null {
   if (typeof query.sql === "string") return "sql";
+  if (typeof query.logql === "string") return "logql";
   if (typeof query.promql === "string" || typeof query.label === "string")
     return "promql";
   return null;
 }
 
-const FIELD: Record<QueryLanguage, string> = { sql: "query.sql", promql: "query.promql" };
-const NAME: Record<QueryLanguage, string> = { sql: "SQL", promql: "PromQL" };
+const FIELD: Record<QueryLanguage, string> = {
+  sql: "query.sql",
+  promql: "query.promql",
+  logql: "query.logql",
+};
+const NAME: Record<QueryLanguage, string> = {
+  sql: "SQL",
+  promql: "PromQL",
+  logql: "LogQL",
+};
 
 export function wrongLanguages(
   value: unknown,
@@ -40,6 +50,8 @@ export function wrongLanguages(
     const answers = languages[query.sourceId];
     const written = languageOf(query);
     if (!answers || !written || answers === written) return;
+    // The values of a label are as much a LogQL question as a PromQL one.
+    if (typeof query.label === "string" && answers !== "sql") return;
     found.push({
       path,
       message: `${what} queries source "${query.sourceId}", which answers ${NAME[answers]}; write "${FIELD[answers]}" instead of "${FIELD[written]}"`,

@@ -126,6 +126,31 @@
                 },
                 "required": ["sourceId", "promql"],
                 "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "sourceId": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 128
+                  },
+                  "logql": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 8000
+                  },
+                  "instant": {
+                    "type": "boolean"
+                  },
+                  "minStep": {
+                    "type": "string",
+                    "maxLength": 16,
+                    "pattern": "^\\d+(ms|s|m|h|d)$"
+                  }
+                },
+                "required": ["sourceId", "logql"],
+                "additionalProperties": false
               }
             ]
           },

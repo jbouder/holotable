@@ -117,6 +117,87 @@ test("timeField is optional on a panel query", () => {
   assert.equal(res.success, true);
 });
 
+/*
+ * A LogQL query (#560): the third branch of PanelQuery, keyed on `logql` as
+ * PromQL's is on `promql`. Accepted by the IR; refused at execution until a
+ * Loki source can run it.
+ */
+const LOGS_RANGE = {
+  sourceId: "loki",
+  logql: '{app="api"} |= "error" | json | level="error"',
+};
+
+test("a LogQL query is a panel query of its own, beside SQL and PromQL", () => {
+  const logs = Panel.parse({ ...validPanel, viz: "logs", query: LOGS_RANGE });
+  assert.deepEqual(logs.query, LOGS_RANGE);
+  const rate = {
+    sourceId: "loki",
+    logql: 'sum by (route) (rate({app="api"} | json | status >= 500 [5m]))',
+    minStep: "1m",
+  };
+  assert.deepEqual(Panel.parse({ ...validPanel, query: rate }).query, rate);
+  const instant = { ...rate, instant: true };
+  assert.deepEqual(
+    Panel.parse({ ...validPanel, viz: "stat", query: instant }).query,
+    instant,
+  );
+  // A spec carrying one parses at the current version: additive, no upgrader.
+  assert.equal(
+    safeParseDashboard({
+      ...validDashboard,
+      panels: [{ ...validPanel, viz: "logs", query: LOGS_RANGE }],
+    }).success,
+    true,
+  );
+});
+
+test("a LogQL query is held to its limits and carries nothing else", () => {
+  const ok = (query: object) => Panel.safeParse({ ...validPanel, query }).success;
+  assert.equal(ok({ ...LOGS_RANGE, logql: "" }), false);
+  assert.equal(ok({ ...LOGS_RANGE, logql: "l".repeat(8_001) }), false);
+  assert.equal(ok({ ...LOGS_RANGE, logql: "l".repeat(8_000) }), true);
+  assert.equal(ok({ ...LOGS_RANGE, sourceId: "" }), false);
+  assert.equal(ok({ ...LOGS_RANGE, sourceId: "s".repeat(129) }), false);
+  for (const bad of ["15", "1w", "now-1h", "1m30s"]) {
+    assert.equal(ok({ ...LOGS_RANGE, minStep: bad }), false, bad);
+  }
+  // No limit, URL, time or SQL time field of its own: the server owns those.
+  for (const extra of [
+    { limit: 100 },
+    { url: "http://loki:3100" },
+    { start: "now-1h" },
+    { timeField: "time" },
+  ]) {
+    assert.equal(ok({ ...LOGS_RANGE, ...extra }), false, JSON.stringify(extra));
+  }
+});
+
+test("a kind that needs time refuses an instant LogQL query", () => {
+  for (const viz of ["logs", "state-timeline"]) {
+    const res = Panel.safeParse({
+      ...validPanel,
+      viz,
+      query: { ...LOGS_RANGE, instant: true },
+    });
+    assert.equal(res.success, false, viz);
+    assert.match(
+      res.error?.issues.map((i) => i.message).join("\n") ?? "",
+      /needs a range query; remove "query.instant"/,
+    );
+  }
+});
+
+test("a query carrying two language fields is refused", () => {
+  const ok = (query: object) => Panel.safeParse({ ...validPanel, query }).success;
+  assert.equal(ok({ ...LOGS_RANGE, sql: "SELECT 1" }), false);
+  assert.equal(ok({ ...LOGS_RANGE, promql: "up" }), false);
+  assert.equal(ok({ ...validPanel.query, logql: LOGS_RANGE.logql }), false);
+  assert.equal(
+    ok({ sourceId: "x", sql: "SELECT 1", promql: "up", logql: '{a="b"}' }),
+    false,
+  );
+});
+
 test("TimeExpr accepts relative and ISO forms", () => {
   for (const good of [
     "now",

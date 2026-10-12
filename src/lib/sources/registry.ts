@@ -1,5 +1,6 @@
 import { z } from "zod";
 import {
+  isLogqlQuery,
   isPromqlQuery,
   isSqlQuery,
   type PanelQuery,
@@ -121,11 +122,25 @@ export function sameKind(
   return a.kind === b.kind;
 }
 
-const LANGUAGE_NAMES: Record<QueryLanguage, string> = { sql: "SQL", promql: "PromQL" };
+const LANGUAGE_NAMES: Record<QueryLanguage, string> = {
+  sql: "SQL",
+  promql: "PromQL",
+  logql: "LogQL",
+};
 
-/** The language a panel's or a variable's query is written in. */
+/**
+ * The language a panel's or a variable's query is written in. A label-values
+ * variable is read as PromQL here; it is as much a LogQL question, which
+ * {@link wrongLanguage} allows for.
+ */
 function writtenIn(query: PanelQuery | VariableQuery): QueryLanguage {
-  return isSqlQuery(query) ? "sql" : "promql";
+  if (isSqlQuery(query)) return "sql";
+  return isLogqlQuery(query) ? "logql" : "promql";
+}
+
+/** A label-values variable: the values of one label, which PromQL and LogQL sources both answer. */
+function isLabelValues(query: PanelQuery | VariableQuery): boolean {
+  return !isSqlQuery(query) && !isPromqlQuery(query) && !isLogqlQuery(query);
 }
 
 /**
@@ -141,12 +156,13 @@ export function wrongLanguage(
   const answers = sourceKind(source).language;
   const written = writtenIn(query);
   if (answers === written) return null;
+  if (answers !== "sql" && isLabelValues(query)) return null;
   return `source "${source.id}" answers ${LANGUAGE_NAMES[answers]}; this query is ${LANGUAGE_NAMES[written]}`;
 }
 
 /**
- * The refusal for a query no source this server knows can run yet: PromQL,
- * until the Prometheus kind is registered (#385).
+ * The refusal for a query no source this server knows can run yet: LogQL,
+ * until the Loki kind is registered (#562).
  */
 export function cannotRun(
   source: { id: string; kind: SourceKindName },
@@ -154,7 +170,7 @@ export function cannotRun(
 ): string {
   return (
     wrongLanguage(source, query) ??
-    `${isPromqlQuery(query) ? "PromQL" : "this"} query cannot run on this server yet`
+    `${LANGUAGE_NAMES[writtenIn(query)]} query cannot run on this server yet`
   );
 }
 

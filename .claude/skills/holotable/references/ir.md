@@ -62,10 +62,11 @@ value or a CSS color.
 
 ## Query
 
-A query is SQL or PromQL, decided by which of `sql` and `promql` it carries;
-never both. Which one a panel may use is its source's: a TimescaleDB source
-answers SQL, a Prometheus source PromQL, and a query in the other language is
-refused like a table the source does not have.
+A query is SQL, PromQL or LogQL, decided by which of `sql`, `promql` and
+`logql` it carries; never two. Which one a panel may use is its source's: a
+TimescaleDB source answers SQL, a Prometheus source PromQL, a Loki source
+LogQL, and a query in another language is refused like a table the source does
+not have.
 
 SQL:
 
@@ -86,7 +87,23 @@ PromQL:
 
 A PromQL query has no `timeField`. A range query's rows always carry their time
 in a column called `time`, which is what a time series draws; an instant query
-has none, so a kind that needs time (`state-timeline`) needs a range query.
+has none, so a kind that needs time (`state-timeline`, `logs`) needs a range
+query.
+
+LogQL, for a Loki source. The spec accepts it now; no Holotable server runs it
+until Loki sources ship, so a panel with one is refused when it runs:
+
+| Field | Type | Rules |
+|---|---|---|
+| `sourceId` | string | 1–128 chars, as for SQL. |
+| `logql` | string | 1–8000 chars. One LogQL expression: a log query (`{app="api"} \|= "error"`) or a metric query (`sum by (route) (rate({app="api"} [5m]))`). It carries no time and no limit: the server picks `start`, `end`, `step`, `limit` and `direction`. |
+| `instant` | boolean | Optional. One answer at the end of the window instead of a range, for a metric query: for `stat`, `gauge`, `pie` and `table`. |
+| `minStep` | duration | Optional, as for PromQL: only raises the step the server picks for a metric query. |
+
+A LogQL query has no `timeField` either: a range query's rows always carry
+`time`, a log query's rows as much as a metric query's, so it can feed a `logs`
+panel; an instant one cannot. How many lines a `logs` panel shows is its
+`options.limit`, never the query's.
 
 ## Time expressions
 

@@ -1,4 +1,4 @@
-import { isSqlQuery, queryTimeField } from "@/lib/ir";
+import { isLogqlQuery, isSqlQuery, queryTimeField } from "@/lib/ir";
 import type { Panel } from "@/lib/ir";
 
 /**
@@ -13,24 +13,29 @@ export type PanelDetails = {
   sourceId: string;
   timeField?: string;
   description?: string;
-} & ({ sql: string } | { promql: string; instant?: boolean; minStep?: string });
+} & (
+  | { sql: string }
+  | { promql: string; instant?: boolean; minStep?: string }
+  | { logql: string; instant?: boolean; minStep?: string }
+);
 
 /** How a panel is computed, or null for one that computes nothing (#202). */
 export function panelDetails(panel: Panel): PanelDetails | null {
   if (!panel.query) return null;
   // The statement under its language's name, each named rather than spread.
   const query = panel.query;
-  return {
-    ...(isSqlQuery(query)
-      ? { sql: query.sql }
-      : {
-          promql: query.promql,
-          // How it is evaluated, which the expression alone does not say (#388).
-          ...(query.instant !== undefined ? { instant: query.instant } : {}),
-          ...(query.minStep !== undefined ? { minStep: query.minStep } : {}),
-        }),
+  const common = {
     sourceId: query.sourceId,
     timeField: queryTimeField(query),
     description: panel.description,
   };
+  if (isSqlQuery(query)) return { sql: query.sql, ...common };
+  // How it is evaluated, which the expression alone does not say (#388).
+  const evaluation = {
+    ...(query.instant !== undefined ? { instant: query.instant } : {}),
+    ...(query.minStep !== undefined ? { minStep: query.minStep } : {}),
+  };
+  return isLogqlQuery(query)
+    ? { logql: query.logql, ...evaluation, ...common }
+    : { promql: query.promql, ...evaluation, ...common };
 }

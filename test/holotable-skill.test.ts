@@ -14,6 +14,7 @@ import {
   queryTimeField,
   SqlQuery,
   PromqlQuery,
+  LogqlQuery,
   LabelValuesQuery,
   isSqlQuery,
 } from "@/lib/ir";
@@ -308,9 +309,9 @@ test("the reference's value formats and color tokens are the IR's", () => {
   assert.deepEqual(listed("Color tokens:"), Object.keys(COLOR_TOKENS));
 });
 
-test("the reference documents every field of both query languages (#383)", () => {
+test("the reference documents every field of every query language (#383, #560)", () => {
   const reference = read("references/ir.md");
-  for (const schema of [SqlQuery, PromqlQuery, LabelValuesQuery]) {
+  for (const schema of [SqlQuery, PromqlQuery, LogqlQuery, LabelValuesQuery]) {
     for (const field of Object.keys(schema.shape)) {
       assert.ok(
         reference.includes(`\`${field}\``),

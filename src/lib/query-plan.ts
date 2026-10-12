@@ -1,4 +1,5 @@
 import { isSqlQuery } from "@/lib/ir";
+import { statementFields } from "@/lib/panel-query";
 import { type ApiError, apiErrorFromThrown, readApiError } from "@/lib/errors";
 import type { PanelQuery, TimeRange } from "@/lib/ir";
 import type { VariableValues } from "@/lib/sql/variables";
@@ -238,11 +239,7 @@ export async function fetchQueryPlan(
         // The query's own fields, named rather than spread (#388).
         ...(isSqlQuery(query)
           ? { sql: query.sql, timeField: query.timeField }
-          : {
-              promql: query.promql,
-              ...(query.instant !== undefined ? { instant: query.instant } : {}),
-              ...(query.minStep !== undefined ? { minStep: query.minStep } : {}),
-            }),
+          : statementFields(query)),
         timeRange,
         ...(init?.variables ? { variables: init.variables } : {}),
       }),

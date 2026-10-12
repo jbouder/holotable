@@ -16,6 +16,7 @@ import {
   queryText,
   queryTimeField,
   SqlQuery,
+  isLogqlQuery,
   isSqlQuery,
   isPromqlQuery,
 } from "@/lib/ir";
@@ -183,11 +184,16 @@ for (const { fixture, result } of parsed) {
   });
 }
 
+/** A LogQL fixture needs the LogQL guard to hold it, which phase 2 of #559 adds (#561). */
+const NO_LOGQL_FIXTURE = (file: string, panelId: string) =>
+  `${file} panel ${panelId}: a LogQL fixture waits for the LogQL guard (#561)`;
+
 test("every panel's SQL passes the guard against its fixture catalog", async () => {
   for (const { file, spec } of loaded) {
     const declared = declaredVariables(spec);
     for (const panel of spec.panels.filter(hasQuery)) {
       const { sourceId } = panel.query;
+      if (isLogqlQuery(panel.query)) assert.fail(NO_LOGQL_FIXTURE(file, panel.id));
       const result = isSqlQuery(panel.query)
         ? await validateSql(
             panel.query.sql,
@@ -226,6 +232,7 @@ test("every panel's executable plan matches its snapshot", async () => {
     const variables = defaultValues(spec.variables);
     for (const panel of spec.panels.filter(hasQuery) as QueryPanel[]) {
       const query = panel.query;
+      if (isLogqlQuery(query)) assert.fail(NO_LOGQL_FIXTURE(file, panel.id));
       if (!isSqlQuery(query)) {
         // PromQL (#384): the plan is the rewritten expression and the
         // server's start, end and step. Only entries for PromQL fixtures.
