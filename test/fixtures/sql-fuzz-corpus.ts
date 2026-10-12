@@ -136,4 +136,21 @@ export const CORPUS: CorpusEntry[] = [
     verdict: "reject",
     note: "value keyword with a precision argument",
   },
+
+  // --- Plain PostgreSQL bucketing (#557) ------------------------------------------
+  {
+    sql: "SELECT date_bin('5 minutes', ts, TIMESTAMP '2000-01-01') AS bucket, count(*) AS n FROM http_requests GROUP BY 1 ORDER BY 1",
+    verdict: "accept",
+    note: "a plain PostgreSQL source is told to bucket with date_bin: its origin is a constant timestamp literal, which is not a time word and must pass",
+  },
+  {
+    sql: "SELECT date_bin('5 minutes', ts, TIMESTAMPTZ '2000-01-01 00:00:00+00') AS bucket, avg(duration_ms) FROM http_requests GROUP BY 1",
+    verdict: "accept",
+    note: "as above, with a timestamptz origin",
+  },
+  {
+    sql: "SELECT date_bin('5 minutes', ts, TIMESTAMP 'today') AS bucket FROM http_requests",
+    verdict: "reject",
+    note: "the origin is still a literal like any other: a time word there is refused",
+  },
 ];

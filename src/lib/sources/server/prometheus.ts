@@ -282,6 +282,9 @@ const kind: ServerSourceKind = {
     return trackInFlight(() => testPrometheus(target(prom), prom.config));
   },
 
+  // Nothing about a Prometheus server changes what the model is told.
+  testFacts: () => undefined,
+
   renderCatalog(source) {
     const prom = promSource(source);
     const f = sanitizePromptField;

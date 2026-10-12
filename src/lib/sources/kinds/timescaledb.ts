@@ -53,11 +53,47 @@ export const TimescaleDbConfig = SourceConnection.extend({
 }).strict();
 export type TimescaleDbConfig = z.infer<typeof TimescaleDbConfig>;
 
+/**
+ * What the last Test or Refresh found the server to be (#557): the
+ * TimescaleDB extension's version, or `null` for plain PostgreSQL (Neon,
+ * Supabase, RDS and the rest), where `time_bucket` does not exist.
+ *
+ * Stored beside `config` in `sources.catalog_facts`, never inside it: the
+ * server reads it from the server, and nothing a browser sends sets it. The
+ * version string is shown to people, never to the model.
+ */
+export const TimescaleDbFacts = z
+  .object({ timescaledb: z.string().min(1).max(64).nullable() })
+  .strict();
+export type TimescaleDbFacts = z.infer<typeof TimescaleDbFacts>;
+
+/**
+ * The facts for what `pg_extension` answered: the extension's version, held
+ * to the schema's bound, or null when it is not installed.
+ */
+export function timescaleDbFacts(extversion: string | null): TimescaleDbFacts {
+  return {
+    timescaledb: extversion === null ? null : extversion.slice(0, 64) || "unknown",
+  };
+}
+
+/**
+ * How the server is named to a person: "PostgreSQL" or "TimescaleDB 2.17.2",
+ * or null before any Test or Refresh has said which.
+ */
+export function timescaleDbEngine(
+  facts: TimescaleDbFacts | null | undefined,
+): string | null {
+  if (!facts) return null;
+  return facts.timescaledb === null ? "PostgreSQL" : `TimescaleDB ${facts.timescaledb}`;
+}
+
 export const timescaledb = {
   kind: "timescaledb",
   label: "TimescaleDB",
   language: "sql",
   config: TimescaleDbConfig,
+  facts: TimescaleDbFacts,
 
   /** The connection half of a stored config, for a reconnect or a rediscovery. */
   connection(cfg: TimescaleDbConfig): SourceConnection {
@@ -85,6 +121,7 @@ export const timescaledb = {
       kind: "timescaledb",
       schema: cfg.schema,
       tableCount: cfg.tables.length,
+      engine: timescaleDbEngine(source.catalogFacts),
       tombstonedAt: source.tombstonedAt,
     };
   },

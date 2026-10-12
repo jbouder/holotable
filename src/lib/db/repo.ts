@@ -9,7 +9,11 @@ import {
 } from "@/lib/dashboard-metadata";
 import { log } from "@/lib/log";
 import type { SourceConfig, SourceRecord } from "@/lib/registry";
-import { parseStoredSource } from "@/lib/sources/registry";
+import {
+  type CatalogFacts,
+  parseCatalogFacts,
+  parseStoredSource,
+} from "@/lib/sources/registry";
 import { type Dashboard, parseDashboard } from "@/lib/ir";
 import { upgradeSpec } from "@/lib/ir/upgrade";
 import type { BudgetStore } from "@/lib/limits/budget";
@@ -39,6 +43,7 @@ type SourceRow = {
   secret_ref: string | null;
   catalog_refreshed_at: string | null;
   catalog_missing_tables: string[] | null;
+  catalog_facts: unknown;
   created_by: string;
   created_at: string;
   updated_at: string;
@@ -46,14 +51,16 @@ type SourceRow = {
 };
 
 function mapSource(row: SourceRow): SourceRecord {
+  const stored = parseStoredSource(row.kind, row.config);
   return {
     id: row.id,
     workspaceId: row.workspace_id,
     name: row.name,
-    ...parseStoredSource(row.kind, row.config),
+    ...stored,
     secretRef: row.secret_ref,
     catalogRefreshedAt: row.catalog_refreshed_at,
     catalogMissingTables: row.catalog_missing_tables ?? [],
+    catalogFacts: parseCatalogFacts(stored.kind, row.catalog_facts),
     createdBy: row.created_by,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
@@ -119,6 +126,8 @@ export async function updateSource(
     /** Set together by the refresh route; a null column leaves both alone. */
     catalogRefreshedAt?: Date;
     catalogMissingTables?: string[];
+    /** What the refresh found the server to be (#557); absent leaves it alone. */
+    catalogFacts?: CatalogFacts;
   },
 ): Promise<SourceRecord | null> {
   const rows = await query<SourceRow>(
@@ -128,6 +137,7 @@ export async function updateSource(
          secret_ref = CASE WHEN $8::boolean THEN NULL ELSE COALESCE($5, secret_ref) END,
          catalog_refreshed_at = COALESCE($6::timestamptz, catalog_refreshed_at),
          catalog_missing_tables = COALESCE($7::text[], catalog_missing_tables),
+         catalog_facts = COALESCE($9::jsonb, catalog_facts),
          updated_at = now()
      WHERE id = $1 AND workspace_id = $2 AND tombstoned_at IS NULL
      RETURNING *`,
@@ -140,9 +150,28 @@ export async function updateSource(
       patch.catalogRefreshedAt ?? null,
       patch.catalogMissingTables ?? null,
       patch.secretRef === null,
+      patch.catalogFacts ? JSON.stringify(patch.catalogFacts) : null,
     ],
   );
   return rows[0] ? mapSource(rows[0]) : null;
+}
+
+/**
+ * Record what a Test found the server to be (#557). Its own statement, not
+ * {@link updateSource}: a Test is not an edit, so it leaves `updated_at`
+ * alone. Scoped to the workspace from the source record, and a tombstoned
+ * source is left as it is.
+ */
+export async function recordCatalogFacts(
+  workspaceId: string,
+  id: string,
+  facts: CatalogFacts,
+): Promise<void> {
+  await query(
+    `UPDATE sources SET catalog_facts = $3::jsonb
+     WHERE id = $1 AND workspace_id = $2 AND tombstoned_at IS NULL`,
+    [id, workspaceId, JSON.stringify(facts)],
+  );
 }
 
 /** Is this source referenced by any stored dashboard version spec? */

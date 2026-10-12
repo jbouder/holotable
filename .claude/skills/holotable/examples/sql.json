@@ -6,6 +6,14 @@
       "sql": "SELECT time_bucket('1 minute', ts) AS minute, count(*) AS requests FROM http_requests GROUP BY minute ORDER BY minute"
     },
     {
+      "rule": "On plain PostgreSQL (no TimescaleDB), a calendar bucket is date_trunc",
+      "sql": "SELECT date_trunc('minute', ts) AS minute, count(*) AS requests FROM http_requests GROUP BY minute ORDER BY minute"
+    },
+    {
+      "rule": "On plain PostgreSQL, a fixed-interval bucket is date_bin with a constant origin",
+      "sql": "SELECT date_bin('5 minutes', ts, TIMESTAMP '2000-01-01') AS bucket, count(*) AS requests FROM http_requests GROUP BY bucket ORDER BY bucket"
+    },
+    {
       "rule": "A scalar has no time column at all",
       "sql": "SELECT count(*) AS requests FROM http_requests"
     },

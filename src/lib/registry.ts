@@ -4,6 +4,7 @@ import { TimescaleDbConfig, timescaledb } from "@/lib/sources/kinds/timescaledb"
 import { PrometheusConfig } from "@/lib/sources/kinds/prometheus";
 import type { SourceCatalog } from "@/lib/sources/catalog";
 import {
+  type CatalogFacts,
   type EditorCatalog,
   SourceConfig,
   type SourceKindName,
@@ -170,6 +171,13 @@ export interface SourceRecord {
    * columns as if they were still true.
    */
   catalogMissingTables: string[];
+  /**
+   * What the last Test or applied Refresh found the server to be (#557), in
+   * the kind's shape (`TimescaleDbFacts`). Null or absent: never recorded,
+   * which keeps the behavior from before it was. Read from the server by the
+   * server; no request body sets it, and it is not part of `config`.
+   */
+  catalogFacts?: CatalogFacts | null;
   createdBy: string;
   createdAt: string;
   updatedAt: string;

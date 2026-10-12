@@ -11,7 +11,7 @@ import type { SourceRecord, SqlSourceRecord } from "@/lib/registry";
 import type { SourceListing } from "@/lib/source-listing";
 import type { SourceCatalog } from "@/lib/sources/catalog";
 import { type PrometheusCatalog, prometheus } from "@/lib/sources/kinds/prometheus";
-import { timescaledb } from "@/lib/sources/kinds/timescaledb";
+import { type TimescaleDbFacts, timescaledb } from "@/lib/sources/kinds/timescaledb";
 import type { RowFilterTarget } from "@/lib/sources/types";
 
 /**
@@ -88,6 +88,28 @@ export function parseStoredSource(
   return { kind, config: SourceConfig.parse({ ...raw, kind }) };
 }
 
+/**
+ * What introspection recorded about a source's server (#557): the union of
+ * every kind's `facts`. A kind that records nothing has none.
+ */
+export type CatalogFacts = TimescaleDbFacts;
+
+/**
+ * A stored `sources.catalog_facts`, read through the row's kind. Facts the
+ * kind does not record, or that no longer parse, read as never recorded
+ * (`null`), which is the behavior from before they existed: a fact only ever
+ * adds a hint, so dropping one is safe where guessing one is not.
+ */
+export function parseCatalogFacts(
+  kind: SourceKindName,
+  raw: unknown,
+): CatalogFacts | null {
+  const schema = sourceKind(kind).facts;
+  if (!schema || raw === null || raw === undefined) return null;
+  const parsed = schema.safeParse(raw);
+  return parsed.success ? parsed.data : null;
+}
+
 /** What the editor may see of any source's catalog. */
 export type EditorCatalog = SourceCatalog | PrometheusCatalog;
 
@@ -101,6 +123,8 @@ export interface AnySourceKind {
   kind: SourceKindName;
   label: string;
   language: (typeof SOURCE_KINDS)[SourceKindName]["language"];
+  /** The shape of the kind's `catalog_facts`, when it records any. */
+  facts?: z.ZodType<CatalogFacts>;
   connection(cfg: SourceConfig): unknown;
   catalog(cfg: SourceConfig): EditorCatalog;
   listing(source: SourceRecord): SourceListing;

@@ -31,7 +31,20 @@ A trailing `;` is tolerated and stripped. Everything else PostgreSQL can
 express in a read-only SELECT is fine: CTEs (including recursive), joins,
 subqueries, `FILTER (WHERE …)`, window functions, `percentile_cont(…) WITHIN
 GROUP (ORDER BY …)`, casts, `CASE`, `DISTINCT`, `LIMIT`, set operations, and
-TimescaleDB's `time_bucket`.
+TimescaleDB's `time_bucket` (`date_trunc` or `date_bin` on plain PostgreSQL,
+below).
+
+## Plain PostgreSQL
+
+A TimescaleDB source may be plain PostgreSQL (Neon, Supabase, RDS, Aurora and
+the like). Everything above holds there except bucketing: `time_bucket` is
+TimescaleDB's, and on plain PostgreSQL it does not exist. Bucket with
+`date_trunc('minute', ts)` for a calendar unit, or
+`date_bin('5 minutes', ts, TIMESTAMP '2000-01-01')` for a fixed interval (the
+constant origin is fine; a time word like `'today'` there is still refused).
+Both work on TimescaleDB too, so they are the safe choice when you do not know
+which the server is. Holotable learns which it is on **Test** or **Refresh**,
+and tells the model when the extension is missing.
 
 ## What the server does instead, so you must not
 

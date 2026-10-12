@@ -86,6 +86,7 @@ test("anyone else sees the exposed columns only, and no connection detail", () =
 test("the viewer's source listing names the source and nothing about reaching it", () => {
   const listing = sourceListing(source);
   assert.deepEqual(Object.keys(listing).sort(), [
+    "engine",
     "id",
     "kind",
     "name",

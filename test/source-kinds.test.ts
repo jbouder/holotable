@@ -2,12 +2,18 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join, relative } from "node:path";
-import { SourceConfig, type SourceRecord, sourceCatalog } from "@/lib/registry";
+import {
+  SourceConfig,
+  SourceDraft,
+  type SourceRecord,
+  sourceCatalog,
+} from "@/lib/registry";
 import { selfMonitoringConfig } from "@/lib/self-monitoring/dashboard";
 import { sourceListing } from "@/lib/source-listing";
 import {
   SOURCE_KIND_NAMES,
   SOURCE_KINDS,
+  parseCatalogFacts,
   parseStoredSource,
   sourceKind,
 } from "@/lib/sources/registry";
@@ -173,6 +179,7 @@ function record(): SourceRecord {
 test("a TimescaleDB listing is exactly its named fields", () => {
   const listing = sourceListing(record());
   assert.deepEqual(Object.keys(listing).sort(), [
+    "engine",
     "id",
     "kind",
     "name",
@@ -202,4 +209,47 @@ test("a TimescaleDB catalog projection is the schema and the exposed columns", (
   }
   assert.ok(!("rowFilter" in catalog));
   assert.ok(!("kind" in catalog));
+});
+
+test("catalog facts are read through the row's kind, and unknown ones read as never recorded (#557)", () => {
+  assert.deepEqual(parseCatalogFacts("timescaledb", { timescaledb: "2.17.2" }), {
+    timescaledb: "2.17.2",
+  });
+  assert.deepEqual(parseCatalogFacts("timescaledb", { timescaledb: null }), {
+    timescaledb: null,
+  });
+  assert.equal(parseCatalogFacts("timescaledb", null), null);
+  assert.equal(parseCatalogFacts("timescaledb", { timescaledb: 2 }), null);
+  assert.equal(parseCatalogFacts("timescaledb", { timescaledb: null, x: 1 }), null);
+  // A kind that records nothing has nothing to read.
+  assert.equal(parseCatalogFacts("prometheus", { timescaledb: null }), null);
+});
+
+test("nothing a browser sends sets a source's catalog facts (#557)", () => {
+  const { config } = record();
+  // Not part of the config, nor of a draft: both are strict.
+  assert.equal(
+    SourceConfig.safeParse({ ...config, catalogFacts: { timescaledb: null } }).success,
+    false,
+  );
+  assert.equal(
+    SourceDraft.safeParse({
+      id: "ts",
+      name: "Metrics",
+      secretRef: "TS_METRICS",
+      config,
+      catalogFacts: { timescaledb: null },
+    }).success,
+    false,
+  );
+  // And only the two routes that introspect the server write them, from what
+  // the server read.
+  const writers = APP_FILES.filter(
+    ({ path, text }) =>
+      path.startsWith("src/app/") && /catalogFacts|recordCatalogFacts/.test(text),
+  ).map(({ path }) => path);
+  assert.deepEqual(writers.sort(), [
+    "src/app/api/sources/[id]/refresh/route.ts",
+    "src/app/api/sources/[id]/test/route.ts",
+  ]);
 });

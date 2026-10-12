@@ -26,6 +26,8 @@ export interface TimescaleDbListing extends ListingBase {
   kind: "timescaledb";
   schema: string;
   tableCount: number;
+  /** "PostgreSQL" or "TimescaleDB 2.17.2" (#557); null until a Test or Refresh. */
+  engine: string | null;
 }
 
 /** A Prometheus source (#385): never its URL or its auth mode. */

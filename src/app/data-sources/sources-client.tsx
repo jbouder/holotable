@@ -157,6 +157,8 @@ export function SourcesClient({
       setNotice(`${id}: test failed`);
     }
     setBusy(null);
+    // A test records what the server is (#557), which the row shows.
+    if (body?.ok === true && workspaceId) void load(workspaceId);
   }
 
   // A refresh is reviewed before it is written (#123), so the button opens the
@@ -350,7 +352,10 @@ export function SourcesClient({
               >
                 <TableCell>
                   <div className="font-medium">{source.name}</div>
-                  <div className="text-xs text-muted">{source.id}</div>
+                  <div className="text-xs text-muted">
+                    {source.id}
+                    {"engine" in source && source.engine && ` · ${source.engine}`}
+                  </div>
                 </TableCell>
                 {source.record && (
                   <TableCell className="whitespace-nowrap">
