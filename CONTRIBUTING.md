@@ -347,8 +347,8 @@ issue and make the case first, rather than arriving with it already written.
 Files under `src/lib/sql/`, `src/lib/promql/`, `src/lib/logql/`, `src/lib/auth/`, `src/lib/secrets/`,
 `src/lib/ir.ts`, `src/lib/ir/`, `src/lib/time.ts`, `src/lib/registry.ts`,
 `src/lib/metrics-access.ts`, `src/lib/row-scope.ts`, `src/lib/variables.ts`,
-`src/lib/variable-selection.ts`, `src/lib/ai/base-url.ts` and
-`src/lib/ai/guarded-fetch.ts` have a code owner (`.github/CODEOWNERS`) and
+`src/lib/variable-selection.ts`, `src/lib/ai/base-url.ts`,
+`src/lib/ai/guarded-fetch.ts` and `src/lib/duckdb/path.ts` have a code owner (`.github/CODEOWNERS`) and
 will always be reviewed before merge. These are the files where a quiet
 regression stops being a bug and becomes a vulnerability, so a change there
 needs a test.
@@ -418,6 +418,7 @@ request:
 | `src/lib/promql/` (the PromQL guard, its rewrites, the plan) | `concepts/executing-a-panel.md` ("The PromQL guard"), `concepts/prometheus-sources.md`, invariants 7 and 8, the trust model in `SECURITY.md`, the skill's `references/promql-rules.md` |
 | `src/lib/logql/` (the LogQL guard, its rewrites, the plan) | `concepts/executing-a-panel.md` ("The LogQL guard"), `operations/metrics.md` |
 | `src/lib/sources/` (a source kind, its config or its server half) | `concepts/prometheus-sources.md`, `architecture/data-model.md` (`sources`, "Source kinds") |
+| `src/lib/duckdb/` (the DuckDB path guard, engine and lock) | `architecture/data-model.md` ("DuckDB") |
 | `src/lib/prometheus/` (the client, discovery, the connection test) | `admin/prometheus.md`, `concepts/prometheus-sources.md` |
 | `src/lib/loki/` (the client, the rows, refresh and the connection test) | `architecture/data-model.md` (`sources`), "The LogQL guard" in `concepts/executing-a-panel.md` |
 | `src/lib/sql/row-filter.ts`, `src/lib/row-scope.ts` | `admin/row-level-filters.md`, invariant 8a |

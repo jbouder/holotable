@@ -104,6 +104,8 @@ export interface TestLabel {
   reachable: boolean;
   /** Why not: "no streams in the last 1h", or the endpoint's error. */
   error?: string;
+}
+
 /**
  * A DuckDB source's analog of the read-only proof (#572), read from the
  * engine's own settings rather than probed: external access off and the
