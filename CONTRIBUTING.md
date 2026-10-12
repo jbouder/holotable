@@ -165,14 +165,14 @@ A change to the IR is checked against `test/fixtures/specs/`, stored specs
 that are never edited; see the README there before adding one or changing a
 snapshot under `test/snapshots/`.
 
-`npm run test:fuzz` runs the property-based SQL and PromQL guard suites on
-their own.
+`npm run test:fuzz` runs the property-based SQL, PromQL and LogQL guard
+suites on their own.
 `npm test` includes it with a fixed seed and a small iteration count, so it is
 deterministic; CI also runs it longer with a fresh seed in a job that is not
 required to merge. If it fails, the output has the exact statement and a
 `FUZZ_SEED=… FUZZ_PATH=…` line that replays that one case. Add the statement to
-`test/fixtures/sql-fuzz-corpus.ts` (or, for PromQL,
-`test/fixtures/promql-corpus.ts`) with the verdict it should have, and a named
+`test/fixtures/sql-fuzz-corpus.ts` (or, for PromQL and LogQL,
+`test/fixtures/promql-corpus.ts` and `test/fixtures/logql-corpus.ts`) with the verdict it should have, and a named
 test explaining why.
 
 The row cap keeps the newest rows when a plan has a time field, and every cut
@@ -344,7 +344,7 @@ issue and make the case first, rather than arriving with it already written.
   (#511). Playwright is where that surface is proved.
 - **Draft PRs** are fine and encouraged for work you want early eyes on.
 
-Files under `src/lib/sql/`, `src/lib/promql/`, `src/lib/auth/`, `src/lib/secrets/`,
+Files under `src/lib/sql/`, `src/lib/promql/`, `src/lib/logql/`, `src/lib/auth/`, `src/lib/secrets/`,
 `src/lib/ir.ts`, `src/lib/ir/`, `src/lib/time.ts`, `src/lib/registry.ts`,
 `src/lib/metrics-access.ts`, `src/lib/row-scope.ts`, `src/lib/variables.ts`,
 `src/lib/variable-selection.ts`, `src/lib/ai/base-url.ts` and
@@ -416,6 +416,7 @@ request:
 | `src/lib/panels/` (a panel kind or its options) | `reference/panel-options.md`, "Panel kinds" in `concepts/streaming-and-rendering.md`. The visualization list is generated |
 | `src/lib/sql/safety.ts`, `ast.ts`, `denylist.ts` (the guard) | `concepts/executing-a-panel.md`, invariants 7 and 8, the trust model in `SECURITY.md` |
 | `src/lib/promql/` (the PromQL guard, its rewrites, the plan) | `concepts/executing-a-panel.md` ("The PromQL guard"), `concepts/prometheus-sources.md`, invariants 7 and 8, the trust model in `SECURITY.md`, the skill's `references/promql-rules.md` |
+| `src/lib/logql/` (the LogQL guard, its rewrites, the plan) | `concepts/executing-a-panel.md` ("The LogQL guard"), `operations/metrics.md` |
 | `src/lib/sources/` (a source kind, its config or its server half) | `concepts/prometheus-sources.md`, `architecture/data-model.md` (`sources`, "Source kinds") |
 | `src/lib/prometheus/` (the client, discovery, the connection test) | `admin/prometheus.md`, `concepts/prometheus-sources.md` |
 | `src/lib/sql/row-filter.ts`, `src/lib/row-scope.ts` | `admin/row-level-filters.md`, invariant 8a |

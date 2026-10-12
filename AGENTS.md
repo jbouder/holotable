@@ -21,7 +21,8 @@ it is telling you the rule.
   parallel TypeScript shape.
 - **Every query is untrusted**, whoever wrote it: SELECT-only, read-only,
   allowlisted, row- and time-bounded, through the SQL guard
-  (`src/lib/sql/safety.ts`) or the PromQL guard (`src/lib/promql/safety.ts`).
+  (`src/lib/sql/safety.ts`), the PromQL guard (`src/lib/promql/safety.ts`)
+  or the LogQL guard (`src/lib/logql/safety.ts`).
   Never weaken a guard for convenience.
 - **The server owns time.** The IR carries expressions like `now-15m`; only
   the server resolves and enforces windows.
@@ -119,9 +120,10 @@ The paths in `.github/CODEOWNERS` (the SQL and PromQL guards, `auth/`,
 `metrics-access.ts`) are where a quiet regression is a vulnerability. A
 change there needs a test.
 
-- **Guards.** Run `npm run test:fuzz` after any SQL or PromQL guard change.
-  Promote a counterexample into `test/fixtures/sql-fuzz-corpus.ts` (or
-  `promql-corpus.ts`) and a named test; never bend the generator around it.
+- **Guards.** Run `npm run test:fuzz` after any SQL, PromQL or LogQL guard
+  change. Promote a counterexample into `test/fixtures/sql-fuzz-corpus.ts`
+  (or `promql-corpus.ts`, `logql-corpus.ts`) and a named test; never bend the
+  generator around it.
 - **Query rewrites.** Row filters and variables work on the parse tree,
   never a regex, and every rewrite is re-parsed and verified.
 - **Truncation is said.** The row cap keeps the newest rows when the plan

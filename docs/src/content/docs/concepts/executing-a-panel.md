@@ -128,6 +128,56 @@ message. `test/promql-safety.fuzz.test.ts` generates adversarial expressions and
 holds every accepted one to an independent walk of the raw parse tree, and
 `npm run test:fuzz` runs it beside the SQL suite.
 
+## The LogQL guard
+
+A panel against a Loki source carries a LogQL expression, untrusted exactly as
+SQL and PromQL are. `validateLogql` (`src/lib/logql/safety.ts`, #561) parses it
+with the Loki project's own grammar (`@grafana/lezer-logql`, wrapped in
+`src/lib/logql/parse.ts`) and walks the tree. LogQL is PromQL with a log
+pipeline in front, so the guard is the PromQL guard with the pipeline's rules
+added:
+
+- **Exactly one expression, from allowlisted node types.** A tree with an
+  error node is rejected with its position, and so are comments. Pipeline
+  stages are allowlisted by the grammar node they are: line filters (`|=`,
+  `!=`, `|~`, `!~`, `|>`, `!>`, with `ip()`), the parsers (`json`, `logfmt`,
+  `pattern`, `regexp`, `unpack`), label filters, `line_format`,
+  `label_format`, `keep`, `drop`, `decolorize`, and `unwrap` with its
+  conversions. Range functions and aggregations are allowlisted by name. A
+  stage or function a newer grammar adds is rejected until it is listed.
+- **A log query or a metric query, plainly.** The tree says which: a log
+  query returns lines, a metric query (`rate({app="api"}[5m])`) returns
+  samples. A log query beside a binary operator is rejected; Loki would
+  refuse it too.
+- **Every stream selector is anchored on the label allowlist.** It carries at
+  least one `=` matcher with a value on a label the source's catalog lists.
+  `{app=~".*"}`, `{app!="api"}`, `{app=""}` and a selector anchored only on an
+  unlisted label are rejected, as Loki itself would reject the first three.
+  Any other matcher on a label the catalog does not list is a **hint**.
+- **The server owns time.** The grammar has no `@` and no timestamp. A
+  `[range]` and an `offset` are bounded by `LOGQL_MAX_RANGE` (default
+  `PROMQL_MAX_RANGE`), a range is longer than zero, and an offset looks back,
+  never forward.
+- **Bounds.** At most 8,000 characters, 32 stream selectors and 128 levels of
+  nesting. A long pipeline is a list, not nesting.
+- **Variables only where they are one plain value.** A matcher's whole value
+  with `=` or `!=` (`{env=":env"}`, `| level=":level"`) and the string of a
+  `|=` or `!=` line filter (`|= ":needle"`). Never in a regex or a pattern
+  (`=~`, `!~`, `|~`, `|>`, `regexp`, `pattern`), where a value could change
+  the expression's structure, and never as a label name. A multi-value
+  variable has no slot.
+
+`buildLogqlPlan` (`src/lib/logql/plan.ts`) writes the variable values in as
+escaped literals, checks every selector is still anchored (a bound empty
+value is not an anchor), and splices the viewer's tenant matcher into every
+stream selector, including those inside range functions and on both sides of
+an operator. Each rewrite is re-parsed and compared with the original tree. A
+log plan asks for the window's newest `MAX_QUERY_ROWS` lines; a metric plan
+takes its `step` and alignment from the PromQL plan's arithmetic.
+`test/logql-safety.test.ts` names every rule and its message, and
+`test/logql-safety.fuzz.test.ts` holds every accepted expression to an
+independent walk of the raw parse tree under `npm run test:fuzz`.
+
 ## Checking a query before saving
 
 The panel editor does not make an author discover a rejection at save time.
