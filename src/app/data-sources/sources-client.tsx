@@ -12,6 +12,8 @@ import {
   Database,
   ExternalLink,
   ListTree,
+  Activity,
+  ScrollText,
 } from "lucide-react";
 import { SourceDraft, type SourceRecord, type SqlSourceDraft } from "@/lib/registry";
 import { type SourceListing, sourceListing } from "@/lib/source-listing";
@@ -49,7 +51,8 @@ import {
   PrometheusSourceForm,
   type PrometheusSourceFormInitial,
 } from "./prometheus-source-form";
-import { Select } from "@/components/ui/select";
+import { ChoiceCard, ChoiceCardGroup } from "@/components/ui/choice-card";
+import { LokiSourceForm, type LokiSourceFormInitial } from "./loki-source-form";
 import { type GrantedSecretRefsState, readinessIn } from "@/lib/secret-refs";
 import { Notice } from "@/components/notice";
 import { useReducedMotion } from "@/components/motion-preference";
@@ -230,6 +233,10 @@ export function SourcesClient({
       : undefined;
   const promBeingEdited =
     editedRecord && "metrics" in editedRecord.config
+      ? { record: editedRecord, config: editedRecord.config }
+      : undefined;
+  const lokiBeingEdited =
+    editedRecord && "labels" in editedRecord.config
       ? { record: editedRecord, config: editedRecord.config }
       : undefined;
   const sourceShowingImpact = sources?.find((source) => source.id === showingImpact);
@@ -597,9 +604,81 @@ export function SourcesClient({
           />
         </Dialog>
       )}
+
+      {lokiBeingEdited && (
+        <Dialog
+          open
+          onOpenChange={(open) => {
+            if (!open) setEditing(null);
+          }}
+          title={`Edit ${lokiBeingEdited.record.name}`}
+        >
+          <LokiSourceForm
+            mode="edit"
+            workspaceId={lokiBeingEdited.record.workspaceId}
+            secretRefs={secretRefs}
+            initial={{
+              name: lokiBeingEdited.record.name,
+              secretRef: lokiBeingEdited.record.secretRef,
+              config: lokiBeingEdited.config,
+            }}
+            submitLabel="Save changes"
+            onSubmit={async ({ name, secretRef, config }) => {
+              const res = await fetch(`/api/sources/${lokiBeingEdited.record.id}`, {
+                method: "PUT",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ name, secretRef, config }),
+              });
+              if (!res.ok) return readApiError(res);
+              setEditing(null);
+              setNotice(`${lokiBeingEdited.record.id}: updated`);
+              if (workspaceId) void load(workspaceId);
+              return null;
+            }}
+            onCancel={() => setEditing(null)}
+          />
+        </Dialog>
+      )}
     </div>
   );
 }
+
+/** What the manual form creates, by the language its panels are written in. */
+type FormLanguage = "sql" | "promql" | "logql";
+
+/**
+ * The kind picker's cards: one per kind the form can create, each pictured
+ * by a line of the language its panels carry.
+ */
+const KIND_CHOICES: {
+  value: FormLanguage;
+  label: string;
+  description: string;
+  Icon: typeof Database;
+  sample: string;
+}[] = [
+  {
+    value: "sql",
+    label: "TimescaleDB (SQL)",
+    description: "Tables in TimescaleDB or PostgreSQL.",
+    Icon: Database,
+    sample: "SELECT time_bucket('1m', ts) …",
+  },
+  {
+    value: "promql",
+    label: "Prometheus (PromQL)",
+    description: "Metrics from Prometheus, Thanos, Mimir or VictoriaMetrics.",
+    Icon: Activity,
+    sample: "rate(http_requests_total[5m])",
+  },
+  {
+    value: "logql",
+    label: "Loki (LogQL)",
+    description: "Log streams from Grafana Loki or Grafana Cloud Logs.",
+    Icon: ScrollText,
+    sample: '{app="api"} |= "error"',
+  },
+];
 
 /**
  * The "Add source" body: an optional natural-language drafter that seeds the
@@ -623,14 +702,16 @@ function CreateSourcePanel({
 }) {
   const [seed, setSeed] = React.useState<SqlSourceDraft>();
   const [promSeed, setPromSeed] = React.useState<PrometheusSourceFormInitial>();
-  // Whether the manual form creates a Prometheus source; a draft decides it too.
-  const [promChosen, setPromChosen] = React.useState(false);
+  const [lokiSeed, setLokiSeed] = React.useState<LokiSourceFormInitial>();
+  // Which kind of source the manual form creates; a draft decides it too.
+  const [chosen, setChosen] = React.useState<FormLanguage>("sql");
   // Bumped on each draft so the form remounts and re-seeds from the new values.
   const [seedSeq, setSeedSeq] = React.useState(0);
   // The configuration form stays hidden until the drafter returns a result;
   // an explicit opt-in lets users skip the model and fill it in by hand.
   const [manual, setManual] = React.useState(false);
-  const showForm = seed !== undefined || promSeed !== undefined || manual;
+  const showForm =
+    seed !== undefined || promSeed !== undefined || lokiSeed !== undefined || manual;
 
   return (
     <div className="space-y-4">
@@ -640,30 +721,81 @@ function CreateSourcePanel({
         onDraft={(draft) => {
           if ("sql" in draft) {
             setSeed(draft.sql);
-            setPromChosen(false);
-          } else {
+            setChosen("sql");
+          } else if ("prometheus" in draft) {
             setPromSeed(draft.prometheus);
-            setPromChosen(true);
+            setChosen("promql");
+          } else {
+            setLokiSeed(draft.loki);
+            setChosen("logql");
           }
           setSeedSeq((n) => n + 1);
         }}
       />
       {showForm ? (
         <div className="space-y-4 border-t border-border pt-4">
-          <div className="max-w-xs">
-            <Label htmlFor="s-kind">Kind</Label>
-            <Select
-              id="s-kind"
-              className="w-full"
-              value={promChosen ? "promql" : "sql"}
-              onValueChange={(value) => setPromChosen(value === "promql")}
-              options={[
-                { value: "sql", label: "TimescaleDB (SQL)" },
-                { value: "promql", label: "Prometheus (PromQL)" },
-              ]}
-            />
+          <div className="space-y-2">
+            <div>
+              <h3 id="s-kind" className="text-sm font-medium">
+                Kind
+              </h3>
+              <p id="s-kind-hint" className="text-xs text-muted">
+                What the source reads, and so the language its panels are written in. A
+                source&rsquo;s kind is fixed once it is saved.
+              </p>
+            </div>
+            <ChoiceCardGroup
+              value={chosen}
+              onValueChange={setChosen}
+              labelledBy="s-kind"
+              describedBy="s-kind-hint"
+              className="sm:grid-cols-3"
+            >
+              {KIND_CHOICES.map(({ value, label, description, Icon, sample }) => (
+                <ChoiceCard
+                  key={value}
+                  value={value}
+                  label={
+                    <>
+                      <Icon className="h-4 w-4" aria-hidden /> {label}
+                    </>
+                  }
+                  description={description}
+                >
+                  <span className="block truncate rounded-lg border border-border bg-background px-2 py-1.5 font-mono text-xs text-muted">
+                    {sample}
+                  </span>
+                </ChoiceCard>
+              ))}
+            </ChoiceCardGroup>
           </div>
-          {promChosen ? (
+          {chosen === "logql" ? (
+            <LokiSourceForm
+              key={`l${seedSeq}`}
+              mode="create"
+              workspaceId={workspaceId}
+              secretRefs={secretRefs}
+              submitLabel="Create source"
+              initial={lokiSeed}
+              onSubmit={async ({ id, name, secretRef, config }) => {
+                const res = await fetch("/api/sources", {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({
+                    workspaceId,
+                    id,
+                    name,
+                    ...(secretRef ? { secretRef } : {}),
+                    config,
+                  }),
+                });
+                if (!res.ok) return readApiError(res);
+                onCreated();
+                return null;
+              }}
+              onCancel={onCancel}
+            />
+          ) : chosen === "promql" ? (
             <PrometheusSourceForm
               key={`p${seedSeq}`}
               mode="create"
@@ -739,7 +871,10 @@ function NaturalLanguageDrafter({
   workspaceId: string;
   existing: SourceRecord[];
   onDraft: (
-    draft: { sql: SqlSourceDraft } | { prometheus: PrometheusSourceFormInitial },
+    draft:
+      | { sql: SqlSourceDraft }
+      | { prometheus: PrometheusSourceFormInitial }
+      | { loki: LokiSourceFormInitial },
   ) => void;
 }) {
   const [description, setDescription] = React.useState("");
@@ -763,6 +898,15 @@ function NaturalLanguageDrafter({
       } else if ("metrics" in object.config) {
         onDraft({
           prometheus: {
+            id: object.id,
+            name: object.name,
+            secretRef: object.secretRef ?? null,
+            config: object.config,
+          },
+        });
+      } else if ("labels" in object.config) {
+        onDraft({
+          loki: {
             id: object.id,
             name: object.name,
             secretRef: object.secretRef ?? null,
