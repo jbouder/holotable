@@ -11,6 +11,7 @@ import type { SourceRecord, SqlSourceRecord } from "@/lib/registry";
 import type { SourceListing } from "@/lib/source-listing";
 import type { SourceCatalog } from "@/lib/sources/catalog";
 import { type LokiCatalog, loki } from "@/lib/sources/kinds/loki";
+import { type DuckDbFacts, duckdb } from "@/lib/sources/kinds/duckdb";
 import { type PrometheusCatalog, prometheus } from "@/lib/sources/kinds/prometheus";
 import { type TimescaleDbFacts, timescaledb } from "@/lib/sources/kinds/timescaledb";
 import type { RowFilterTarget } from "@/lib/sources/types";
@@ -28,14 +29,14 @@ import type { RowFilterTarget } from "@/lib/sources/types";
  * `src/lib/sources/`, and on an import of `src/lib/timescaledb/` that does not
  * go through the server half.
  */
-export const SOURCE_KINDS = { timescaledb, prometheus, loki } as const;
+export const SOURCE_KINDS = { timescaledb, prometheus, loki, duckdb } as const;
 
 export type SourceKindName = keyof typeof SOURCE_KINDS;
 
 export const SOURCE_KIND_NAMES = Object.keys(SOURCE_KINDS) as SourceKindName[];
 
 /**
- * The kinds whose panels carry SQL (#570): today TimescaleDB alone. The SQL
+ * The kinds whose panels carry SQL (#570): TimescaleDB and DuckDB. The SQL
  * path (the guard, the planner, the catalog browser, the starters) is keyed
  * on this, the language, never on one kind's name.
  */
@@ -55,6 +56,7 @@ export const SourceConfig = z.discriminatedUnion("kind", [
   timescaledb.config,
   prometheus.config,
   loki.config,
+  duckdb.config,
 ]);
 export type SourceConfig = z.infer<typeof SourceConfig>;
 
@@ -103,7 +105,7 @@ export function parseStoredSource(
  * What introspection recorded about a source's server (#557): the union of
  * every kind's `facts`. A kind that records nothing has none.
  */
-export type CatalogFacts = TimescaleDbFacts;
+export type CatalogFacts = TimescaleDbFacts | DuckDbFacts;
 
 /**
  * A stored `sources.catalog_facts`, read through the row's kind. Facts the

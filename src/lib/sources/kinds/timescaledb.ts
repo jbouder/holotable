@@ -140,6 +140,7 @@ export const timescaledb = {
     const cfg = source.config;
     if (cfg.kind !== "timescaledb")
       throw new Error(`${source.id} is not a TimescaleDB source`);
+    const facts = source.catalogFacts;
     return {
       id: source.id,
       workspaceId: source.workspaceId,
@@ -147,7 +148,7 @@ export const timescaledb = {
       kind: "timescaledb",
       schema: cfg.schema,
       tableCount: cfg.tables.length,
-      engine: timescaleDbEngine(source.catalogFacts),
+      engine: timescaleDbEngine(facts && "timescaledb" in facts ? facts : null),
       tombstonedAt: source.tombstonedAt,
     };
   },

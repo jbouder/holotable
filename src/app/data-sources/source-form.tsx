@@ -8,7 +8,7 @@ import { ErrorDisplay } from "@/components/ui/error-display";
 import { Input, Label, Textarea } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import type { ApiError } from "@/lib/errors";
-import type { CatalogTable, SqlSourceConfig } from "@/lib/registry";
+import type { CatalogTable, TimescaleDbConfig } from "@/lib/registry";
 import {
   configFromFormState,
   configTextFromFormState,
@@ -51,14 +51,14 @@ export interface SourceFormValues {
   id: string;
   name: string;
   secretRef: string;
-  config: SqlSourceConfig;
+  config: TimescaleDbConfig;
 }
 
 export interface SourceFormInitial {
   id?: string;
   name?: string;
   secretRef?: string;
-  config?: SqlSourceConfig;
+  config?: TimescaleDbConfig;
 }
 
 export const CHOOSE_SECRET_REF =

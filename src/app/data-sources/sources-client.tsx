@@ -223,8 +223,11 @@ export function SourcesClient({
 
   // Each kind has its own form; a source's kind is fixed once it exists.
   const editedRecord = sources?.find((source) => source.id === editing)?.record;
+  // The SQL form is the database form; a DuckDB source has none yet (#573).
   const sourceBeingEdited =
-    editedRecord && isSqlSource(editedRecord) ? editedRecord : undefined;
+    editedRecord && "host" in editedRecord.config
+      ? { ...editedRecord, config: editedRecord.config }
+      : undefined;
   const promBeingEdited =
     editedRecord && "metrics" in editedRecord.config
       ? { record: editedRecord, config: editedRecord.config }
@@ -361,7 +364,9 @@ export function SourcesClient({
                   <TableCell className="whitespace-nowrap">
                     {"host" in source.record.config
                       ? `${source.record.config.host}:${source.record.config.port}/${source.record.config.database}`
-                      : source.record.config.url}
+                      : "url" in source.record.config
+                        ? source.record.config.url
+                        : source.record.config.path}
                   </TableCell>
                 )}
                 <TableCell>{"schema" in source ? source.schema : "—"}</TableCell>
@@ -751,7 +756,7 @@ function NaturalLanguageDrafter({
     onFinish({ object }) {
       // The model drafts SQL sources only (#386 adds Prometheus).
       if (!object) return;
-      if ("tables" in object.config && object.secretRef) {
+      if ("host" in object.config && object.secretRef) {
         onDraft({
           sql: { ...object, config: object.config, secretRef: object.secretRef },
         });

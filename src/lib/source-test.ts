@@ -104,6 +104,14 @@ export interface TestLabel {
   reachable: boolean;
   /** Why not: "no streams in the last 1h", or the endpoint's error. */
   error?: string;
+/**
+ * A DuckDB source's analog of the read-only proof (#572), read from the
+ * engine's own settings rather than probed: external access off and the
+ * configuration locked.
+ */
+export interface TestLock {
+  holds: boolean;
+  detail: string;
 }
 
 export interface SourceTestResult {
@@ -124,6 +132,8 @@ export interface SourceTestResult {
   metrics?: TestMetric[];
   /** One entry per allowlisted Loki label, in catalog order (#562). */
   labels?: TestLabel[];
+  /** A DuckDB source's lock (#572). */
+  lock?: TestLock;
 }
 
 /**
@@ -201,6 +211,7 @@ export function hasFinding(result: SourceTestResult): boolean {
   if (!result.ok) return true;
   if (result.readOnly && result.readOnly.verdict !== "refused") return true;
   if (result.writeSurface && result.writeSurface.verdict !== "closed") return true;
+  if (result.lock && !result.lock.holds) return true;
   if ((result.metrics ?? []).some((m) => !m.reachable)) return true;
   if ((result.labels ?? []).some((l) => !l.reachable)) return true;
   return (result.tables ?? []).some((t) => !t.reachable);
