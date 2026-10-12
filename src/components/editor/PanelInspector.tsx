@@ -13,6 +13,7 @@ import {
   queryLanguage,
   ValueFormat,
   VizType,
+  isLogqlQuery,
   isSqlQuery,
 } from "@/lib/ir";
 import { changePanelKind } from "@/lib/panel-kind-change";
@@ -355,6 +356,25 @@ function QueryFields({
   const preview = usePanelPreview(panel, panelTimeRange(panel, timeRange), variables);
   const catalog = sources.find((s) => s.id === panel.query.sourceId)?.catalog ?? null;
   const query = panel.query;
+
+  if (isLogqlQuery(query)) {
+    // Read-only until LogQL can be edited and run (#565).
+    return (
+      <div className="space-y-2">
+        <Label htmlFor="p-logql">LogQL</Label>
+        <Textarea
+          id="p-logql"
+          value={query.logql}
+          readOnly
+          aria-describedby="p-logql-help"
+          className="font-mono"
+        />
+        <p id="p-logql-help" className="text-xs text-muted">
+          LogQL panels cannot be edited or run on this server yet.
+        </p>
+      </div>
+    );
+  }
 
   if (!isSqlQuery(query)) {
     return (

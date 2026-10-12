@@ -3,7 +3,9 @@ import {
   Dashboard,
   declaredVariables,
   hasQuery,
+  isLogqlQuery,
   isSqlQuery,
+  LogqlQuery,
   Panel,
   PromqlQuery,
   queryTimeField,
@@ -97,6 +99,7 @@ export const PANEL_MAX = {
   sourceId: SqlQuery.shape.sourceId.maxLength ?? 128,
   sql: SqlQuery.shape.sql.maxLength ?? 8_000,
   promql: PromqlQuery.shape.promql.maxLength ?? 8_000,
+  logql: LogqlQuery.shape.logql.maxLength ?? 8_000,
   timeField: SqlQuery.shape.timeField.unwrap().maxLength ?? 128,
   /** A text panel's Markdown is context, not the point: a short excerpt. */
   content: 500,
@@ -133,7 +136,9 @@ export function renderPanels(dashboard: Dashboard): string {
       lines.push(
         isSqlQuery(p.query)
           ? `    sql: ${f(p.query.sql, PANEL_MAX.sql)}`
-          : `    promql: ${f(p.query.promql, PANEL_MAX.promql)}`,
+          : isLogqlQuery(p.query)
+            ? `    logql: ${f(p.query.logql, PANEL_MAX.logql)}`
+            : `    promql: ${f(p.query.promql, PANEL_MAX.promql)}`,
       );
       return lines.join("\n");
     })

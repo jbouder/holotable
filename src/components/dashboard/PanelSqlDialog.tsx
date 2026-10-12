@@ -48,7 +48,8 @@ function PanelSqlBody({
 }) {
   // Never null: the dialog is only offered for a panel with a query.
   const details = panelDetails(panel) ?? { sql: "", sourceId: "" };
-  const statement = "sql" in details ? details.sql : details.promql;
+  const statement =
+    "sql" in details ? details.sql : "logql" in details ? details.logql : details.promql;
   const [copied, setCopied] = React.useState(false);
   const [copyFailed, setCopyFailed] = React.useState(false);
 
@@ -99,7 +100,7 @@ function PanelSqlBody({
       <div className="border border-border bg-surface-2">
         <div className="flex items-center justify-between gap-4 border-b border-border px-3 py-2">
           <span className="text-xs font-medium text-muted">
-            {"sql" in details ? "SQL" : "PromQL"}
+            {"sql" in details ? "SQL" : "logql" in details ? "LogQL" : "PromQL"}
           </span>
           <Button onClick={() => void copy()} size="sm" variant="secondary">
             {copied ? (

@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { ShareOrigin } from "@/lib/auth/share";
 import type { ShareRecord } from "@/lib/db/shares";
-import { type Dashboard, hasQuery, TimeRange, isSqlQuery } from "@/lib/ir";
+import { type Dashboard, hasQuery, isLogqlQuery, isSqlQuery, TimeRange } from "@/lib/ir";
 
 /** The longest a share link may live, in days (#65). */
 export const SHARE_MAX_DAYS = 90;
@@ -67,19 +67,26 @@ export function sharedSpec(spec: Dashboard, timeRange: TimeRange | null): Dashbo
       if (!hasQuery(panel)) return panel;
       return {
         ...panel,
-        // Only what drawing needs: the time field, or whether a PromQL
-        // query is an instant one (which decides that it has none).
+        // Only what drawing needs: the time field, or whether a PromQL or
+        // LogQL query is an instant one (which decides that it has none).
+        // Each language is named, never spread.
         query: isSqlQuery(panel.query)
           ? {
               sourceId: "shared",
               sql: "(not shared)",
               ...(panel.query.timeField ? { timeField: panel.query.timeField } : {}),
             }
-          : {
-              sourceId: "shared",
-              promql: "(not shared)",
-              ...(panel.query.instant ? { instant: true } : {}),
-            },
+          : isLogqlQuery(panel.query)
+            ? {
+                sourceId: "shared",
+                logql: "(not shared)",
+                ...(panel.query.instant ? { instant: true } : {}),
+              }
+            : {
+                sourceId: "shared",
+                promql: "(not shared)",
+                ...(panel.query.instant ? { instant: true } : {}),
+              },
       };
     }),
   };

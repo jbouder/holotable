@@ -5,6 +5,8 @@ import { join, relative } from "node:path";
 import {
   Dashboard,
   ExplorePanel,
+  ExplorePanelAnyLanguage,
+  isLogqlQuery,
   isPromqlQuery,
   isSqlQuery,
   Panel,
@@ -22,10 +24,11 @@ import { sharedSpec } from "@/lib/share-view";
 import { cannotRun, wrongLanguage } from "@/lib/sources/registry";
 
 /**
- * A panel's query is SQL or PromQL (#383), keyed on which of `sql` and
- * `promql` it carries. These tests hold the two branches, the helpers every
- * consumer reads a query through, and the refusal a PromQL query meets until
- * a Prometheus source exists to run it.
+ * A panel's query is SQL, PromQL (#383) or LogQL (#560), keyed on which of
+ * `sql`, `promql` and `logql` it carries. These tests hold the branches, the
+ * helpers every consumer reads a query through, and the refusal a query meets
+ * against a source that answers another language. LogQL's own limits are in
+ * `test/ir.test.ts`.
  */
 
 const SQL = { sourceId: "ts", sql: "SELECT ts, v FROM m", timeField: "ts" };
@@ -34,6 +37,12 @@ const RANGE = {
   promql: 'sum(rate(http_requests_total{job="api"}[5m]))',
 };
 const INSTANT = { ...RANGE, instant: true };
+const LOGS = { sourceId: "loki", logql: '{app="api"} |= "error"' };
+const LOGS_INSTANT = {
+  sourceId: "loki",
+  logql: 'sum(count_over_time({app="api"} |= "error" [5m]))',
+  instant: true,
+};
 
 function panel(viz: string, query: unknown): unknown {
   return { id: "p", title: "P", viz, query, layout: { x: 0, y: 0, w: 6, h: 4 } };
@@ -95,13 +104,27 @@ test("the helpers read a query without reaching for its fields", () => {
   const sql = PanelQuery.parse(SQL);
   const range = PanelQuery.parse(RANGE);
   const instant = PanelQuery.parse(INSTANT);
-  assert.equal(isSqlQuery(sql) && !isPromqlQuery(sql), true);
-  assert.equal(isPromqlQuery(range) && !isSqlQuery(range), true);
-  assert.deepEqual([sql, range].map(queryLanguage), ["sql", "promql"]);
-  assert.deepEqual([sql, range, instant].map(queryTimeField), ["ts", "time", undefined]);
-  assert.deepEqual([sql, range].map(queryText), [SQL.sql, RANGE.promql]);
+  const logs = PanelQuery.parse(LOGS);
+  const logsInstant = PanelQuery.parse(LOGS_INSTANT);
+  assert.equal(isSqlQuery(sql) && !isPromqlQuery(sql) && !isLogqlQuery(sql), true);
+  assert.equal(isPromqlQuery(range) && !isSqlQuery(range) && !isLogqlQuery(range), true);
+  assert.equal(isLogqlQuery(logs) && !isSqlQuery(logs) && !isPromqlQuery(logs), true);
+  assert.deepEqual([sql, range, logs].map(queryLanguage), ["sql", "promql", "logql"]);
+  assert.deepEqual([sql, range, instant, logs, logsInstant].map(queryTimeField), [
+    "ts",
+    "time",
+    undefined,
+    "time",
+    undefined,
+  ]);
+  assert.deepEqual([sql, range, logs].map(queryText), [
+    SQL.sql,
+    RANGE.promql,
+    LOGS.logql,
+  ]);
   assert.deepEqual(queryStatement(sql), { sql: SQL.sql });
   assert.deepEqual(queryStatement(range), { promql: RANGE.promql });
+  assert.deepEqual(queryStatement(logs), { logql: LOGS.logql });
 });
 
 test("a query variable is a SELECT or the values of a label", () => {
@@ -124,11 +147,14 @@ test("a query variable is a SELECT or the values of a label", () => {
   );
 });
 
-test("generation is still asked for SQL only", () => {
+test("generation is still asked for SQL only, and never for LogQL", () => {
   const generated = ExplorePanel.safeParse({
     ...(panel("line", RANGE) as object),
   });
   assert.equal(generated.success, false);
+  // Not even where PromQL is offered: no source can run LogQL yet (#564).
+  assert.equal(ExplorePanelAnyLanguage.safeParse(panel("line", RANGE)).success, true);
+  assert.equal(ExplorePanelAnyLanguage.safeParse(panel("logs", LOGS)).success, false);
 });
 
 test("details and a share carry the statement by its language's name, and nothing else", () => {
@@ -157,6 +183,28 @@ test("details and a share carry the statement by its language's name, and nothin
     ],
   );
   assert.ok(!JSON.stringify(shared).includes("http_requests_total"));
+
+  const logqlPanel = Panel.parse(panel("stat", LOGS_INSTANT));
+  assert.deepEqual(panelDetails(logqlPanel), {
+    logql: LOGS_INSTANT.logql,
+    instant: true,
+    sourceId: "loki",
+    timeField: undefined,
+    description: undefined,
+  });
+  const logsDashboard = Dashboard.parse({
+    ...dashboard,
+    panels: [logqlPanel, Panel.parse({ ...(panel("logs", LOGS) as object), id: "q" })],
+  });
+  const sharedLogs = sharedSpec(logsDashboard, null);
+  assert.deepEqual(
+    sharedLogs.panels.map((p) => p.query),
+    [
+      { sourceId: "shared", logql: "(not shared)", instant: true },
+      { sourceId: "shared", logql: "(not shared)" },
+    ],
+  );
+  assert.ok(!JSON.stringify(sharedLogs).includes("app="));
 });
 
 function timescale(): SourceRecord {
@@ -193,6 +241,13 @@ test("a PromQL query against a SQL source is refused as the author's to fix", as
     'source "ts" answers SQL; this query is PromQL',
   );
   assert.equal(cannotRun(source, range), 'source "ts" answers SQL; this query is PromQL');
+  // LogQL is refused the same way: no source this server knows answers it (#562).
+  const logs = PanelQuery.parse({ ...LOGS, sourceId: "ts" });
+  assert.equal(
+    wrongLanguage(source, logs),
+    'source "ts" answers SQL; this query is LogQL',
+  );
+  assert.equal(cannotRun(source, logs), 'source "ts" answers SQL; this query is LogQL');
 
   let executed = false;
   const executor = makePanelExecutor(async () => {
@@ -233,6 +288,13 @@ const SQL_SPECIFIC = [
   "src/lib/ir.ts",
   "src/lib/timescaledb/",
 ];
+/** Where a LogQL query's own field is read by nature: its guard and client, when they exist. */
+const LOGQL_SPECIFIC = [
+  "src/lib/logql/",
+  "src/lib/loki/",
+  "src/lib/sources/",
+  "src/lib/ir.ts",
+];
 /** Read a partial, still-streaming draft, or raw model output, which is not a `PanelQuery` yet. */
 const DRAFT_READERS = ["src/lib/panel-diff.ts", "src/lib/ai/source-languages.ts"];
 
@@ -249,15 +311,31 @@ function files(dir: string): string[] {
   return out;
 }
 
+function directReaders(direct: RegExp, specific: string[], guard: string): string[] {
+  return [...files("src"), ...files("scripts")]
+    .map((path) => ({ path: relative(ROOT, path), text: readFileSync(path, "utf8") }))
+    .filter(({ path }) => !specific.some((p) => path.startsWith(p)))
+    .filter(({ path }) => !DRAFT_READERS.includes(path))
+    .filter(({ text }) => text.split("\n").some((line) => direct.test(line)))
+    .filter(({ text }) => !text.includes(guard))
+    .map(({ path }) => path);
+}
+
 test("a query's SQL fields are read only behind isSqlQuery", () => {
   // `query.sql` / `query?.timeField` as code, not inside a prompt's quotes.
   const direct = /(?<![`'])\bquery\??\.(sql|timeField)\b/;
-  const offenders = [...files("src"), ...files("scripts")]
-    .map((path) => ({ path: relative(ROOT, path), text: readFileSync(path, "utf8") }))
-    .filter(({ path }) => !SQL_SPECIFIC.some((p) => path.startsWith(p)))
-    .filter(({ path }) => !DRAFT_READERS.includes(path))
-    .filter(({ text }) => text.split("\n").some((line) => direct.test(line)))
-    .filter(({ text }) => !text.includes("isSqlQuery"))
-    .map(({ path }) => path);
-  assert.deepEqual(offenders, [], "read the query through queryText/queryTimeField");
+  assert.deepEqual(
+    directReaders(direct, SQL_SPECIFIC, "isSqlQuery"),
+    [],
+    "read the query through queryText/queryTimeField",
+  );
+});
+
+test("a query's LogQL field is read only behind isLogqlQuery", () => {
+  const direct = /(?<![`'])\bquery\??\.logql\b/;
+  assert.deepEqual(
+    directReaders(direct, LOGQL_SPECIFIC, "isLogqlQuery"),
+    [],
+    "read the query through queryText, or narrow with isLogqlQuery",
+  );
 });

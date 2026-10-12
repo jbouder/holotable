@@ -100,21 +100,47 @@ export const PromqlQuery = z
 export type PromqlQuery = z.infer<typeof PromqlQuery>;
 
 /**
- * A panel query: SQL or PromQL, decided by which of `sql` and `promql` it
- * carries. Both branches are strict and each has a field the other lacks, so
- * every spec stored before PromQL existed parses through `SqlQuery` exactly
- * as it did, and a query carrying both is refused. Which language a panel may
- * use is its source's kind's to say (#382), and is checked where it runs.
+ * A LogQL panel query (#560), against a Loki-compatible source. The same
+ * shape as PromQL under its own field: untrusted, validated and rewritten by
+ * the guard before it runs, and carrying no time and no limit. The server
+ * picks `start`, `end`, `step`, `limit` and `direction`; how many lines a
+ * logs panel asks for is the panel's `options.limit`, never the query's. A
+ * range query's rows always carry a `time` column, log lines and metric
+ * samples alike.
+ */
+export const LogqlQuery = z
+  .object({
+    sourceId: z.string().min(1).max(128),
+    /** The LogQL expression. Untrusted; validated and rewritten by the guard before execution. */
+    logql: z.string().min(1).max(8_000),
+    /**
+     * One answer at the end of the window (`/loki/api/v1/query`) instead of a
+     * range. For stat, gauge, pie and table panels.
+     */
+    instant: z.boolean().optional(),
+    /** A floor on the step of a metric query. The server picks the step; this only raises it. */
+    minStep: Duration.optional(),
+  })
+  .strict();
+export type LogqlQuery = z.infer<typeof LogqlQuery>;
+
+/**
+ * A panel query: SQL, PromQL or LogQL, decided by which of `sql`, `promql`
+ * and `logql` it carries. Every branch is strict and has a field the others
+ * lack, so every spec stored before PromQL or LogQL existed parses through
+ * `SqlQuery` exactly as it did, and a query carrying two is refused. Which
+ * language a panel may use is its source's kind's to say (#382), and is
+ * checked where it runs.
  *
  * Code reads a query through the helpers below (`isSqlQuery`,
  * `queryLanguage`, `queryTimeField`, `queryText`), never its fields, outside
- * the SQL-specific modules; `test/query-language.test.ts` holds that.
+ * the language-specific modules; `test/query-language.test.ts` holds that.
  */
-export const PanelQuery = z.union([SqlQuery, PromqlQuery]);
+export const PanelQuery = z.union([SqlQuery, PromqlQuery, LogqlQuery]);
 export type PanelQuery = z.infer<typeof PanelQuery>;
 
 /** The language a query is written in. */
-export type QueryLanguage = "sql" | "promql";
+export type QueryLanguage = "sql" | "promql" | "logql";
 
 export function isSqlQuery<Q extends { sourceId: string }>(
   query: Q,
@@ -128,22 +154,29 @@ export function isPromqlQuery<Q extends { sourceId: string }>(
   return "promql" in query && typeof query.promql === "string";
 }
 
+export function isLogqlQuery<Q extends { sourceId: string }>(
+  query: Q,
+): query is Extract<Q, { logql: string }> {
+  return "logql" in query && typeof query.logql === "string";
+}
+
 export function queryLanguage(query: PanelQuery): QueryLanguage {
-  return isSqlQuery(query) ? "sql" : "promql";
+  if (isSqlQuery(query)) return "sql";
+  return isPromqlQuery(query) ? "promql" : "logql";
 }
 
 /**
  * The output column the server filters time on and a chart draws time from:
- * the declared `timeField` of a SQL query; `time` for a PromQL range query,
- * whose rows always carry it; nothing for an instant query, which has one
- * sample per series and no axis.
+ * the declared `timeField` of a SQL query; `time` for a PromQL or LogQL range
+ * query, whose rows always carry it; nothing for an instant query, which has
+ * one answer per series and no axis.
  */
 export function queryTimeField(query: PanelQuery): string | undefined {
   if (isSqlQuery(query)) return query.timeField;
   return query.instant ? undefined : PROMQL_TIME_FIELD;
 }
 
-/** The column a PromQL range query's rows carry their time in. */
+/** The column a PromQL or LogQL range query's rows carry their time in. */
 export const PROMQL_TIME_FIELD = "time";
 
 /**
@@ -154,6 +187,7 @@ export const PROMQL_TIME_FIELD = "time";
 export function queryText(query: PanelQuery | VariableQuery): string {
   if (isSqlQuery(query)) return query.sql;
   if (isPromqlQuery(query)) return query.promql;
+  if (isLogqlQuery(query)) return query.logql;
   return query.match
     ? `label_values(${query.match}, ${query.label})`
     : `label_values(${query.label})`;
@@ -439,6 +473,13 @@ const kindsWhere = (query: "required" | "none") =>
   ];
 
 /**
+ * The query languages generation may write. LogQL is accepted in a stored
+ * spec (#560) but not offered to the model until a Loki source can run it
+ * (#564), so no generation is asked for a query that would be refused.
+ */
+const GeneratedAnyQuery = z.union([SqlQuery, PromqlQuery]);
+
+/**
  * A generated panel of a kind that runs a query: `query` is required. A
  * generation over SQL sources only is shown the SQL branch alone, so its
  * prompt is what it was before PromQL existed; one with a Prometheus source is
@@ -452,7 +493,7 @@ const GeneratedQueryPanel = PanelFields.extend({
 /** As {@link GeneratedQueryPanel}, in either language. */
 const GeneratedAnyQueryPanel = PanelFields.extend({
   viz: z.enum(kindsWhere("required")),
-  query: PanelQuery,
+  query: GeneratedAnyQuery,
 });
 
 /** A generated panel of a kind that runs no query: it has no `query`. */
@@ -531,13 +572,16 @@ export function hasQuery(panel: Panel): panel is QueryPanel {
 
 /**
  * A query's statement under the name of its language, for an audit row or a
- * log line: `{ sql }` or `{ promql }`, each of which the log reduces to a
- * digest.
+ * log line: `{ sql }`, `{ promql }` or `{ logql }`, each of which the log
+ * reduces to a digest. A label-values variable is written as PromQL's
+ * `label_values(...)`, whichever HTTP source it asks.
  */
 export function queryStatement(
   query: PanelQuery | VariableQuery,
-): { sql: string } | { promql: string } {
-  return isSqlQuery(query) ? { sql: query.sql } : { promql: queryText(query) };
+): { sql: string } | { promql: string } | { logql: string } {
+  if (isSqlQuery(query)) return { sql: query.sql };
+  if (isLogqlQuery(query)) return { logql: query.logql };
+  return { promql: queryText(query) };
 }
 
 /** A panel's time column, through {@link queryTimeField}; none for a panel with no query. */

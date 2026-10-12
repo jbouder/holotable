@@ -177,6 +177,15 @@ describe("redaction", () => {
     assert.ok(!JSON.stringify(out).includes("show me cpu"));
   });
 
+  test("PromQL and LogQL are logged as a digest too", () => {
+    const promql = 'up{instance="web-1"}';
+    const logql = '{app="api"} |= "web-1"';
+    const out = redacted({ promql, logql });
+    assert.deepEqual(out.promql, digest(promql));
+    assert.deepEqual(out.logql, digest(logql));
+    assert.ok(!JSON.stringify(out).includes("web-1"));
+  });
+
   test("the same statement digests to the same value, a different one does not", () => {
     assert.equal(digest("SELECT 1").sha256, digest("SELECT 1").sha256);
     assert.notEqual(digest("SELECT 1").sha256, digest("SELECT 2").sha256);

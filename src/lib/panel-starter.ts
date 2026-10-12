@@ -1,5 +1,6 @@
 import { isPlainIdentifier, timeColumn } from "@/lib/catalog/identifiers";
 import {
+  isPromqlQuery,
   isSqlQuery,
   type Panel,
   type PanelLayout,
@@ -232,6 +233,8 @@ export function isStarterQuery(query: PanelQuery, catalog: StarterCatalog): bool
   if (isSqlQuery(query)) {
     return isStarterSql(query.sql, isPrometheusCatalog(catalog) ? null : catalog);
   }
+  // No LogQL starter exists until a Loki source can be added (#563).
+  if (!isPromqlQuery(query)) return false;
   const seen = normalize(query.promql);
   return (
     seen === PLACEHOLDER_PROMQL ||
