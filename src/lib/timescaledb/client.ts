@@ -4,7 +4,7 @@ import { resolveCredentials } from "@/lib/secrets/credentials";
 import { config } from "@/lib/config";
 import { type ExecutablePlan, POSITION_COLUMN, TOTAL_COLUMN } from "@/lib/sql/safety";
 import { sourcePool } from "@/lib/timescaledb/pool";
-import { ResultCollector } from "@/lib/timescaledb/result-cap";
+import { ResultCollector } from "@/lib/sql/result-cap";
 import {
   observePoolWait,
   observeQuery,

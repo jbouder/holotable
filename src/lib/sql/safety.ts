@@ -13,7 +13,9 @@ import {
 import {
   allowedTables,
   type CatalogTable,
+  type SourceCatalog,
   type SqlSourceConfig,
+  sqlCatalog,
   unexposedColumns,
 } from "@/lib/registry";
 import {
@@ -244,7 +246,13 @@ export async function checkSql(
   // folded unquoted identifiers to lowercase and kept quoted ones as written,
   // so the comparison is exact. Lowercasing here would let `"HTTP_REQUESTS"`
   // pass as `http_requests`, and those are two different relations.
-  const allow = allowedTables(source);
+  // The schema bare names resolve in is the kind's (#572); the tables are the
+  // whole allowlist, unexposed columns included, which the column check reads.
+  const catalog: SourceCatalog = {
+    schema: sqlCatalog(source).schema,
+    tables: source.tables,
+  };
+  const allow = allowedTables(catalog);
   for (const table of tables) {
     const ref = table.schema ? `${table.schema}.${table.name}` : table.name;
     if (!allow.has(ref)) {
@@ -252,7 +260,7 @@ export async function checkSql(
     }
   }
 
-  const columns = checkColumns(analyzed.analysis, source);
+  const columns = checkColumns(analyzed.analysis, catalog);
   if (columns) return reject("column", columns);
 
   // A table function in FROM is refused by name unless it is allowlisted,
@@ -315,7 +323,7 @@ export async function checkSql(
  */
 export function checkColumns(
   analysis: SelectAnalysis,
-  source: SqlSourceConfig,
+  source: SourceCatalog,
 ): string | null {
   const catalogTable = (ref: TableRef): CatalogTable | undefined =>
     source.tables.find(
