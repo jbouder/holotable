@@ -103,6 +103,23 @@ Cloud Logs. Its panels carry LogQL. The form asks for:
   viewer's, so each viewer sees only their own streams. See
   [Row-level filters](/admin/row-level-filters/).
 
+### Or files on the server, with DuckDB
+
+Choose the **DuckDB (files)** card to query a directory of Parquet and CSV
+files, or a `.duckdb` database file, that the operator has put under
+`DUCKDB_SOURCES_DIR`. The card is there only when the operator has set that
+variable and the server's DuckDB binding loaded. A DuckDB source has no credentials, so there is no secret
+reference. The form asks for:
+
+- **Path**: pick from the directories and `.duckdb` files directly under
+  `DUCKDB_SOURCES_DIR`, or type one below them (`lake/2026`). It is always
+  relative: an absolute path, a `..`, or a symlink that leads out of the root
+  is refused when you save, and again whenever the source is opened.
+- **Tables**: press **Discover tables**. A directory's tables are its Parquet
+  and CSV files, named by their stems (`http_requests.parquet` is
+  `http_requests`); a database file's are its own tables. Tick the ones the
+  source may read and choose each one's time column, as for a database.
+
 **Success looks like:** a row in the source list.
 
 ## 2. Test and refresh the catalog
@@ -155,6 +172,14 @@ there is no write verdict. **Refresh** re-reads each listed label's values,
 shows the values added and gone per label, and reports a label with no
 streams as missing; it never adds or drops a label. **Catalog** lists the
 labels with their value hints, searchable by name or value.
+
+For a **DuckDB** source, **Test** opens the files as a panel would and
+reports the engine's version, whether the path is a directory or a database
+file, and whether the engine is **locked**: external access off and its
+configuration fixed, so a statement can read this source's files and nothing
+else on the server. A lock that does not hold is a finding. It then checks
+that each allowlisted table is there. **Refresh** opens the path afresh (for a
+directory, a new listing of its files) and re-reads each table's columns.
 
 **Success looks like:** the Catalog column reads *Catalog fresh*, and the row's
 table, metric or label count matches what you expect.
