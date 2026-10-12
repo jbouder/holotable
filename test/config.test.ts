@@ -536,6 +536,7 @@ test("malformed values are errors regardless of environment", () => {
     MAX_QUERY_ROWS: "lots",
     MAX_RESULT_BYTES: "0",
     PROMQL_MAX_RANGE: "a week",
+    LOGQL_MAX_RANGE: "a fortnight",
     QUERY_TIMEOUT_SECONDS: "-5",
     MAX_POOL_PER_SOURCE: "0",
     CATALOG_STALE_AFTER_DAYS: "-1",
@@ -566,6 +567,19 @@ test("PROMQL_MAX_RANGE takes a single-unit duration longer than zero (#384)", ()
   for (const bad of ["0d", "7", "1h30m", "-1d", "7 days"]) {
     assert.equal(problemsFor(bad).length, 1, bad);
   }
+});
+
+test("LOGQL_MAX_RANGE takes a single-unit duration, and defaults to PROMQL_MAX_RANGE (#561)", () => {
+  const problemsFor = (value: string) =>
+    validateConfig({ LOGQL_MAX_RANGE: value }, { production: false }).filter(
+      (p) => p.variable === "LOGQL_MAX_RANGE",
+    );
+  assert.deepEqual(problemsFor("7d"), []);
+  assert.deepEqual(problemsFor("12h"), []);
+  for (const bad of ["0d", "7", "1h30m", "-1d", "7 days"]) {
+    assert.equal(problemsFor(bad).length, 1, bad);
+  }
+  assert.equal(config.logqlMaxRange, config.promqlMaxRange);
 });
 
 test("a catalog staleness threshold of zero is allowed and disables the check", () => {

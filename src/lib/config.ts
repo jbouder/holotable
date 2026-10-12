@@ -139,6 +139,11 @@ export const config = {
    * duration such as `7d` or `12h`.
    */
   promqlMaxRange: str("PROMQL_MAX_RANGE", "7d"),
+  /**
+   * The longest range or offset a LogQL expression may ask for (#561). Unset,
+   * it is `PROMQL_MAX_RANGE`: one bound on how far back a panel may read.
+   */
+  logqlMaxRange: str("LOGQL_MAX_RANGE", str("PROMQL_MAX_RANGE", "7d")),
   /** Max points retained per series in the browser rolling window. */
   maxWindowPoints: num("MAX_WINDOW_POINTS", 1_000),
   /** Statement timeout (seconds) applied to every metrics query. */
@@ -679,6 +684,15 @@ const EnvSchema = z.object({
   MAX_QUERY_ROWS: blank(positiveInt),
   MAX_RESULT_BYTES: blank(positiveInt),
   PROMQL_MAX_RANGE: blank(
+    z
+      .string()
+      .regex(DURATION, "must be a duration such as 7d or 12h")
+      .refine(
+        (v) => !DURATION.test(v) || Number(DURATION.exec(v)?.[1]) > 0,
+        "must be longer than zero",
+      ),
+  ),
+  LOGQL_MAX_RANGE: blank(
     z
       .string()
       .regex(DURATION, "must be a duration such as 7d or 12h")
