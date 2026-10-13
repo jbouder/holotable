@@ -14,15 +14,17 @@ import { currentRequest, log, runWithRequest } from "@/lib/log";
  *
  * The case worth naming is the one an operator cannot guess from a status
  * code: an OpenAI-compatible aggregator (OpenCode Zen, for one) lists a model
- * at `/models` that does not speak the protocol `OPENAI_API` selects, and
+ * at `/models` that does not speak the protocol the model's API selects, and
  * answers every request with "Model does not support this protocol".
  */
 
 const PROTOCOL_MISMATCH =
   /does not support this protocol|protocol (?:is )?not supported|unsupported (?:api|protocol)/i;
 
+// Read under the in-app model form as well as in a generation (#591), so it
+// names the setting by what it is, not only by its environment variable.
 export const PROTOCOL_MISMATCH_MESSAGE =
-  'The model provider says the model in AI_MODEL does not support the API this server calls it with. Set OPENAI_API to "chat" (Chat Completions) or "responses" (Responses API) to match what the provider offers for that model, or choose another AI_MODEL.';
+  "The model provider says this model does not support the API it was called with. Switch the model's API between Responses and Chat Completions (OPENAI_API for the server's own model). If neither works, the provider serves this model only over its vendor's own API: choose another model, or a provider that speaks that API.";
 
 /** True when the provider refused the request because of the protocol, not the request. */
 export function isProtocolMismatch(error: unknown): boolean {
