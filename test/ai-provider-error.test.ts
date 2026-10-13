@@ -51,11 +51,16 @@ test("a protocol mismatch is recognized, in the message or the body", () => {
   );
 });
 
-test("a mismatch names AI_MODEL and OPENAI_API", () => {
+test("a mismatch names the API setting, wherever the model was configured", () => {
   const message = providerErrorMessage(MISMATCH);
   assert.equal(message, PROTOCOL_MISMATCH_MESSAGE);
-  assert.match(message, /AI_MODEL/);
+  // The in-app form's API field, and the environment's switch (#591).
+  assert.match(message, /Responses and Chat Completions/);
   assert.match(message, /OPENAI_API/);
+  // No fix that exists only in the environment.
+  assert.doesNotMatch(message, /AI_MODEL/);
+  // And what to do when neither API works.
+  assert.match(message, /If neither works/);
 });
 
 test("any other refusal gives the status, never the provider's reply", () => {

@@ -255,17 +255,21 @@ Claude and Gemini models answer every request with "Model does not support this
 protocol", under `OPENAI_API=chat` and `responses` alike
 ([#337](https://github.com/jbouder/holotable/issues/337)).
 
-An author then sees, in place of an answer:
+An author then sees, in place of an answer, and whoever is configuring the model sees under
+**Test connection** in the model dialog
+([#591](https://github.com/jbouder/holotable/issues/591)):
 
-> The model provider says the model in AI_MODEL does not support the API this
-> server calls it with. Set OPENAI_API to "chat" (Chat Completions) or
-> "responses" (Responses API) to match what the provider offers for that
-> model, or choose another AI_MODEL.
+> The model provider says this model does not support the API it was called
+> with. Switch the model's API between Responses and Chat Completions
+> (OPENAI_API for the server's own model). If neither works, the provider
+> serves this model only over its vendor's own API: choose another model, or
+> a provider that speaks that API.
 
 The server log has the provider's own reply, as `model.request_failed` with
 `protocolMismatch: true`. To fix it:
 
-1. Try the other `OPENAI_API` value, and restart.
+1. Try the other API: the **API** field of a model configured in the app, or
+   the other `OPENAI_API` value (and restart) for the environment's model.
 2. If neither works, the model needs its vendor's own protocol. Use a model
    the aggregator serves over the OpenAI API, point `AI_PROVIDER=gateway` at
    it, or use the vendor's native provider once one is supported.
