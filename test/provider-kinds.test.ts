@@ -53,7 +53,7 @@ const APP_FILES = [...files("src"), ...files("scripts")].map((path) => ({
 const PROVIDER_COMPARISONS: RegExp[] = [
   /\.provider\s*[!=]==\s*["'`]/,
   /["'`]\s*[!=]==\s*[\w.?]*\.provider\b/,
-  /case\s+["'](?:openai-compatible|openai|anthropic|google|gateway|azure|bedrock|mistral|xai)["']/,
+  /case\s+["'](?:openai-compatible|openai|anthropic-compatible|anthropic|google|gateway|azure|bedrock|mistral|xai)["']/,
   /switch\s*\(\s*[\w.?]*\.provider\s*\)/,
 ];
 
@@ -163,6 +163,8 @@ function validSettings(name: string): Record<string, unknown> {
   switch (name) {
     case "openai-compatible":
       return { ...base, baseUrl: "https://llm.example.com/v1", api: "chat" };
+    case "anthropic-compatible":
+      return { ...base, baseUrl: "https://llm.example.com/zen/v1" };
     case "azure":
       return { ...base, resourceName: "my-resource", api: "chat" };
     case "bedrock":

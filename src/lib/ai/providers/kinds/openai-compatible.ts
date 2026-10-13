@@ -1,17 +1,20 @@
 import { z } from "zod";
 import {
   API_FIELD_OPTIONS,
+  baseUrlField,
+  baseUrlInput,
   defineProviderKind,
   modelField,
   modelInput,
   OPENAI_APIS,
-  PROVIDER_LIMITS,
+  OptionalApiKeyCredentials,
+  optionalApiKeyField,
 } from "@/lib/ai/providers/types";
 
 /**
  * Any endpoint that speaks the OpenAI protocol (#331): OpenRouter, Groq,
- * Together, Ollama, vLLM, LM Studio, a company proxy. The one kind whose
- * endpoint a person types, so its base URL is held to the base URL guard
+ * Together, Ollama, vLLM, LM Studio, a company proxy. A kind whose endpoint
+ * a person types, so its base URL is held to the base URL guard
  * (`ai/base-url.ts`) on save and on every connection. The key is optional,
  * for a local endpoint that needs none.
  */
@@ -24,25 +27,14 @@ export const openaiCompatibleKind = defineProviderKind({
   settings: z
     .object({
       provider: z.literal("openai-compatible"),
-      baseUrl: z
-        .url({ protocol: /^https?$/, error: "must be an http(s) URL" })
-        .max(PROVIDER_LIMITS.baseUrl),
+      baseUrl: baseUrlField(),
       model: modelField(),
       api: z.enum(OPENAI_APIS).default("responses"),
     })
     .strict(),
-  credentials: z
-    .object({ apiKey: z.string().trim().max(PROVIDER_LIMITS.secret).optional() })
-    .strict(),
+  credentials: OptionalApiKeyCredentials,
   fields: [
-    {
-      name: "baseUrl",
-      in: "settings",
-      label: "Base URL",
-      placeholder: "https://openrouter.ai/api/v1",
-      input: "url",
-      maxLength: PROVIDER_LIMITS.baseUrl,
-    },
+    baseUrlInput("https://openrouter.ai/api/v1"),
     modelInput("openai/gpt-4o-mini"),
     {
       name: "api",
@@ -52,15 +44,7 @@ export const openaiCompatibleKind = defineProviderKind({
       options: API_FIELD_OPTIONS,
       maxLength: 16,
     },
-    {
-      name: "apiKey",
-      in: "credentials",
-      label: "API key",
-      placeholder: "sk-…",
-      secret: true,
-      optional: true,
-      maxLength: PROVIDER_LIMITS.secret,
-    },
+    optionalApiKeyField("sk-…"),
   ],
   endpoint: (settings) => settings.baseUrl,
   userSetsEndpoint: true,

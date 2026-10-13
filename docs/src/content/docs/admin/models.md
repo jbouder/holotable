@@ -64,6 +64,7 @@ provider and keeps its settings as JSON.
 | Kind | What it talks to | Settings beyond the model id | Credentials | Where requests go |
 |---|---|---|---|---|
 | `openai-compatible` | Any endpoint that speaks the OpenAI API: OpenRouter, Groq, Together, Ollama, vLLM, LM Studio | Base URL; Responses or Chat Completions | API key, optional | The typed base URL, held to the [base URL guard](#the-base-url-guard) |
+| `anthropic-compatible` | Any endpoint that speaks Anthropic's Messages API: OpenCode Zen's Claude models, LiteLLM, a proxy ([#592](https://github.com/jbouder/holotable/issues/592)) | Base URL | API key, optional | The typed base URL, held to the [base URL guard](#the-base-url-guard) |
 | `openai` | OpenAI | | API key | `api.openai.com` |
 | `anthropic` | Anthropic (Claude) | | API key | `api.anthropic.com` |
 | `google` | Google Gemini (AI Studio key) | | API key | `generativelanguage.googleapis.com` |
@@ -74,7 +75,8 @@ provider and keeps its settings as JSON.
 | `xai` | xAI (Grok) | | API key | `api.x.ai` |
 | `stub` | Recorded answers, no network; for the end-to-end suite | | none | nowhere; refused in production unless `AI_STUB_IN_PRODUCTION=true` |
 
-Only `openai-compatible` has a base URL a person types. Every other kind's
+Only `openai-compatible` and `anthropic-compatible` have a base URL a person
+types. Every other kind's
 host is the vendor's own, derived at most from a resource name or region
 that must be a single DNS label, and every request is held to that origin
 with no redirect followed. The credentials and the vendor's URL are always
@@ -270,9 +272,13 @@ The server log has the provider's own reply, as `model.request_failed` with
 
 1. Try the other API: the **API** field of a model configured in the app, or
    the other `OPENAI_API` value (and restart) for the environment's model.
-2. If neither works, the model needs its vendor's own protocol. Use a model
-   the aggregator serves over the OpenAI API, point `AI_PROVIDER=gateway` at
-   it, or use the vendor's native provider once one is supported.
+2. If neither works, the model needs its vendor's own protocol. For a Claude
+   model behind an aggregator, use the **Anthropic-compatible** kind with the
+   same base URL. For Zen that is `https://opencode.ai/zen/v1` and the bare
+   model id (`claude-sonnet-5-5`), in the app or as an `AI_MODELS_FILE` entry
+   ([#592](https://github.com/jbouder/holotable/issues/592)). Otherwise use a
+   model the aggregator serves over the OpenAI API, or point
+   `AI_PROVIDER=gateway` at it.
 
 `npm run eval -- --live --case <name>` with `AI_MODEL` set for that one run, or
 `--model <name>` for an `AI_MODELS_FILE` entry, is a quick way to try a model

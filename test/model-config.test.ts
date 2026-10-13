@@ -35,6 +35,7 @@ import {
 import { workspaceModelView } from "@/lib/ai/model-admin";
 import { resolveModel } from "@/lib/ai/models";
 import { providerErrorMessage } from "@/lib/ai/provider-error";
+import { PROVIDER_KIND_NAMES, providerKind } from "@/lib/ai/providers/registry";
 import { auditRow } from "@/lib/audit";
 import { parseGroups } from "@/lib/auth/claims";
 import { sealRefreshToken } from "@/lib/auth/refresh-token";
@@ -497,15 +498,30 @@ test("a stored key cannot be pointed at a different host without entering it aga
   assert.ok(Buffer.isBuffer(moved.credentials));
 });
 
-test("a save refuses a base URL the guard refuses", async () => {
-  await assert.rejects(
-    prepareWrite(ip("https://169.254.169.254/latest"), null, deps({})),
-    /not a public address/,
-  );
-  await assert.rejects(
-    prepareWrite(ip("http://93.184.216.34/v1"), null, deps({})),
-    /https/,
-  );
+/** Every kind whose endpoint a person types (#331, #592). */
+const TYPED_ENDPOINT_KINDS = PROVIDER_KIND_NAMES.filter(
+  (name) => providerKind(name)?.userSetsEndpoint,
+);
+
+test("a save refuses a base URL the guard refuses, for every kind with a typed endpoint", async () => {
+  assert.deepEqual(TYPED_ENDPOINT_KINDS.sort(), [
+    "anthropic-compatible",
+    "openai-compatible",
+  ]);
+  for (const provider of TYPED_ENDPOINT_KINDS) {
+    const typed = (baseUrl: string) =>
+      ({ settings: { provider, baseUrl, model: "m" } }) as ModelConfigInput;
+    await assert.rejects(
+      prepareWrite(typed("https://169.254.169.254/latest"), null, deps({})),
+      /not a public address/,
+      provider,
+    );
+    await assert.rejects(
+      prepareWrite(typed("http://93.184.216.34/v1"), null, deps({})),
+      /https/,
+      provider,
+    );
+  }
 });
 
 /* -------------------------------------------------------------------------- */
