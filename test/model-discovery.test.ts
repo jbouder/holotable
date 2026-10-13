@@ -78,6 +78,21 @@ const CASES: Array<{
     expected: [{ id: "claude-sonnet-5-5", name: "Claude Sonnet 5.5" }],
   },
   {
+    // An aggregator's Messages API (#592): the path under the base URL, and
+    // the key both ways, to the typed origin only.
+    name: "anthropic-compatible",
+    settings: {
+      provider: "anthropic-compatible",
+      baseUrl: "https://llm.example.com/zen/v1/",
+      model: "x",
+    },
+    reply: { data: [{ id: "claude-sonnet-5-5" }, { id: "gpt-5", name: "GPT-5" }] },
+    origin: "https://llm.example.com",
+    path: /^\/zen\/v1\/models$/,
+    keyHeader: ["x-api-key", KEY],
+    expected: [{ id: "claude-sonnet-5-5" }, { id: "gpt-5", name: "GPT-5" }],
+  },
+  {
     name: "google",
     settings: { provider: "google", model: "x" },
     reply: {

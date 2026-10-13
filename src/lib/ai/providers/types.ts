@@ -18,6 +18,41 @@ export const PROVIDER_LIMITS = {
   secret: 4_096,
 } as const;
 
+/**
+ * A base URL a person types, for a kind whose endpoint is theirs to choose
+ * (`openai-compatible`, `anthropic-compatible`). The kind sets
+ * `userSetsEndpoint`, so the base URL guard holds it on save and on every
+ * connection.
+ */
+export const baseUrlField = () =>
+  z
+    .url({ protocol: /^https?$/, error: "must be an http(s) URL" })
+    .max(PROVIDER_LIMITS.baseUrl);
+
+export const baseUrlInput = (placeholder: string): ProviderField => ({
+  name: "baseUrl",
+  in: "settings",
+  label: "Base URL",
+  placeholder,
+  input: "url",
+  maxLength: PROVIDER_LIMITS.baseUrl,
+});
+
+/** An API key that may be left empty, for an endpoint that needs none. */
+export const OptionalApiKeyCredentials = z
+  .object({ apiKey: z.string().trim().max(PROVIDER_LIMITS.secret).optional() })
+  .strict();
+
+export const optionalApiKeyField = (placeholder: string): ProviderField => ({
+  name: "apiKey",
+  in: "credentials",
+  label: "API key",
+  placeholder,
+  secret: true,
+  optional: true,
+  maxLength: PROVIDER_LIMITS.secret,
+});
+
 /** The model id every kind's settings carry. */
 export const modelField = (message = "name a model") =>
   z.string().trim().min(1, message).max(PROVIDER_LIMITS.model);

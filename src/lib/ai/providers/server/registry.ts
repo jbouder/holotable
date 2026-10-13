@@ -8,6 +8,7 @@ import {
   type ProviderKindName,
 } from "@/lib/ai/providers/registry";
 import { anthropicServer } from "@/lib/ai/providers/server/anthropic";
+import { anthropicCompatibleServer } from "@/lib/ai/providers/server/anthropic-compatible";
 import { azureServer } from "@/lib/ai/providers/server/azure";
 import { bedrockServer } from "@/lib/ai/providers/server/bedrock";
 import { gatewayServer } from "@/lib/ai/providers/server/gateway";
@@ -33,6 +34,7 @@ export const SERVER_PROVIDER_KINDS = {
   "openai-compatible": openaiCompatibleServer,
   openai: openaiServer,
   anthropic: anthropicServer,
+  "anthropic-compatible": anthropicCompatibleServer,
   google: googleServer,
   gateway: gatewayServer,
   azure: azureServer,

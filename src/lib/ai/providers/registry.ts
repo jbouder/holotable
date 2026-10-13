@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { anthropicKind } from "@/lib/ai/providers/kinds/anthropic";
+import { anthropicCompatibleKind } from "@/lib/ai/providers/kinds/anthropic-compatible";
 import { azureKind } from "@/lib/ai/providers/kinds/azure";
 import { bedrockKind } from "@/lib/ai/providers/kinds/bedrock";
 import { gatewayKind } from "@/lib/ai/providers/kinds/gateway";
@@ -25,6 +26,7 @@ export const PROVIDER_KINDS = {
   "openai-compatible": openaiCompatibleKind,
   openai: openaiKind,
   anthropic: anthropicKind,
+  "anthropic-compatible": anthropicCompatibleKind,
   google: googleKind,
   gateway: gatewayKind,
   azure: azureKind,
@@ -46,6 +48,7 @@ export const ModelSettings = z.discriminatedUnion("provider", [
   openaiCompatibleKind.settings,
   openaiKind.settings,
   anthropicKind.settings,
+  anthropicCompatibleKind.settings,
   googleKind.settings,
   gatewayKind.settings,
   azureKind.settings,
