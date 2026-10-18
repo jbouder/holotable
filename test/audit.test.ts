@@ -329,6 +329,7 @@ const EMITTERS: Record<string, string[]> = {
   "me/models/[modelId]": ["user.model.update", "user.model.delete"],
   "me/models/test": ["user.model.test"],
   "models/discover": ["workspace.model.discover", "user.model.discover"],
+  "models/detect": ["model.detect"],
   "workspaces/[id]/annotations": ["annotation.create"],
   "workspaces/[id]/annotations/[annotationId]": ["annotation.delete"],
   "dashboards/[id]/shares": ["share.create"],
