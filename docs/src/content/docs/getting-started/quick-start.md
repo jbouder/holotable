@@ -42,7 +42,8 @@ source to try PromQL against come with Docker Compose, below, and the
 source to try LogQL against with its `logs` profile.
 
 It ships no sample files either, and sets no `DUCKDB_SOURCES_DIR`, so its
-DuckDB card is hidden. The [files demo](/operations/demo-data/#the-files-demo),
+DuckDB and **Upload files** cards are hidden. (Uploading needs a source
+admin, and a demo sign-in is at most an editor.) The [files demo](/operations/demo-data/#the-files-demo),
 a **Demo files** dashboard over Parquet and CSV files, comes with Docker
 Compose. To try a DuckDB source here, mount a directory of your own and name
 it: `-v "$PWD/files:/files:ro" -e DUCKDB_SOURCES_DIR=/files`

@@ -1,6 +1,6 @@
 ---
 title: DuckDB files
-description: Letting DuckDB sources read files on the server — the root, the lock and allowed paths, the read-only mount, the memory and thread bounds, and the binding.
+description: Letting DuckDB sources read files on the server — the root, uploads from the browser, the lock and allowed paths, the mount, the memory and thread bounds, and the binding.
 ---
 
 What a DuckDB source is, and how its SQL runs, is in
@@ -40,7 +40,70 @@ the root. Those are what the path picker offers:
 The root is one list for every workspace. A source admin in any workspace may
 register any path under it, so a directory that must stay one tenant's
 belongs under a root of its own, on a server of its own, or behind a
-[row-level filter](/admin/row-level-filters/).
+[row-level filter](/admin/row-level-filters/). The one exception is
+`uploads/`, below: it is never offered in the picker, and each workspace may
+name only its own.
+
+## Uploads
+
+A source admin can also make a DuckDB source from CSV files uploaded in the
+browser ([#595](https://github.com/jbouder/holotable/issues/595)), with no
+access to the server: **Add source → Upload files**. The files land under the
+same root, never a second one:
+
+```
+/var/lib/holotable/files/
+└── uploads/
+    └── <workspace id>/
+        └── 3f9c0a51d2e47b86/          one upload: a fresh random id
+            ├── household_expenses.csv
+            └── budget_2026.csv
+```
+
+Each file is named by its own stem, lowercased and reduced to `[a-z0-9_]`
+(`Budget 2026.csv` is `budget_2026`; a stem that starts with a digit gets
+`t_` in front), because that is the table's name. The source stores the
+directory, `uploads/<workspace id>/<id>`, like any other path, and is a
+directory source from then on: Test, Refresh and every query go through the
+same guard and the same locked engine.
+
+**On and off.** Uploads are on when `DUCKDB_SOURCES_DIR` is set, the binding
+loads, and the server can create and write `<root>/uploads`. Otherwise the
+**Upload files** card is hidden and the upload route answers why, naming the
+variable and never the path. The server needs write access to `uploads/`
+only; [the rest of the root](#the-mount) can stay read-only.
+
+**The rules.** An upload is all or nothing. Each of these refuses the whole
+request, and a refused or cancelled upload leaves no file behind:
+
+| Refused | Bound |
+| --- | --- |
+| A file larger than `DUCKDB_UPLOAD_MAX_BYTES` | default `52428800` (50 MiB) |
+| More than `DUCKDB_UPLOAD_MAX_FILES` files | default `20`, at most `200` (a source's table limit) |
+| A file that is not text: a NUL byte, or not UTF-8, in its first 64 KiB | whatever its name or content type says |
+| An empty file, a name that reduces to nothing, two files that would be one table | |
+
+The file is streamed to disk as it arrives and never held whole in memory.
+A malformed bound is a warning in development (the default is used) and a
+startup error in production; set without `DUCKDB_SOURCES_DIR`, it is a
+warning, since no upload can land.
+
+**The workspace rule.** A path under `uploads/` names its workspace in its
+second segment, and a source may name only an upload directory of its own
+workspace. That is checked on the path as typed and on where it resolves, so
+a symlink elsewhere under the root cannot lead into another workspace's
+uploads either. It is checked when the source is saved and again before
+every open, the same as the root.
+
+**Deleting.** Deleting an upload source removes its directory, unless
+another source in the workspace still names it. That holds when the source
+is tombstoned because a dashboard still uses it, too: a tombstoned source
+never runs again. Deleting any other DuckDB source removes nothing: what is under the root is the
+operator's. An upload whose source is never created stays under `uploads/`
+until someone removes it.
+
+Every upload is audited as `source.upload`, with the file count and total
+bytes, or the refusal ([Audit log](/operations/audit-log/)).
 
 ## The lock and `allowed_paths`
 
@@ -70,23 +133,27 @@ directory would let a statement that slipped past the SQL guard create a file
 beside the source's own. File by file, it cannot. A `.duckdb` source sets no
 allowed path at all: its file is opened `READ_ONLY` before the lock.
 
-## Mount it read-only
+## The mount
 
 The remaining gap is narrow: a statement could still overwrite one of a
 source's own listed files. The SQL guard, which allows exactly one `SELECT`,
-is what stops that. The recommended belt behind it is to give the server
+is what stops that. Without uploads, the belt behind it is to give the server
 **read-only** access to the root:
 
-- **Docker / Compose**: `- files:/var/lib/holotable/files:ro`. The repository's
-  `docker-compose.yml` does exactly this for the
-  [files demo](/operations/demo-data/#the-files-demo). The seeder mounts the
-  volume read-write and is its only writer; the app and the smoke test mount
-  it `:ro`.
+- **Docker**: `- files:/var/lib/holotable/files:ro`.
 - **Kubernetes**: mount the volume with `readOnly: true`
   (`extraVolumes` / `extraVolumeMounts` in the Helm chart), and give the
   pod's file system no write path into it.
 
-Whatever writes the files (a batch job, a sync from object storage) runs
+[Uploads](#uploads) need the server to write `uploads/` under the root, so
+with them on, the server's mount is read-write. To keep the operator's files
+read-only all the same, mount the root read-only and a writable volume at
+`<root>/uploads` on top of it. The repository's `docker-compose.yml` mounts
+the [files demo](/operations/demo-data/#the-files-demo) volume read-write
+for the app, so uploads work there; the seeder writes `demo/` and the smoke
+test mounts it `:ro`.
+
+Whatever else writes the files (a batch job, a sync from object storage) runs
 outside Holotable, with its own credentials.
 
 ## Memory, threads and time
@@ -96,6 +163,8 @@ outside Holotable, with its own credentials.
 | `DUCKDB_SOURCES_DIR` | (unset) | The directory DuckDB sources may read. Unset refuses every one. |
 | `DUCKDB_MEMORY_LIMIT` | `512MB` | The memory one source's engine may use (`512MB`, `2GB`, `1GiB`). A query that needs more fails with DuckDB's out-of-memory error, not the process's. |
 | `DUCKDB_THREADS` | `2` | The threads one source's engine may run a query on. |
+| `DUCKDB_UPLOAD_MAX_BYTES` | `52428800` | The largest file one [upload](#uploads) may hold, in bytes. |
+| `DUCKDB_UPLOAD_MAX_FILES` | `20` | The most files one upload may hold (at most `200`). |
 | `QUERY_TIMEOUT_SECONDS` | `20` | When a running query is interrupted, as on every SQL source. |
 | `MAX_QUERY_ROWS`, `MAX_RESULT_BYTES` | `5000`, `4 MiB` | The rows and bytes a result may carry. A cut travels as `truncated` to a badge on the panel. |
 
@@ -126,7 +195,8 @@ a warning with its error code.
 | `ghcr.io/jbouder/holotable:quickstart` | Alpine | musl, `linux-x64` and `linux-arm64` |
 
 Both load it. **The quick-start image ships no sample files** and sets no
-`DUCKDB_SOURCES_DIR`, so its DuckDB card is hidden. To try a DuckDB source
+`DUCKDB_SOURCES_DIR`, so its DuckDB and Upload files cards are hidden (and
+its demo sign-in, at most an editor, could not manage a source anyway). To try a DuckDB source
 there, mount a directory and name it:
 `docker run -v "$PWD/files:/files:ro" -e DUCKDB_SOURCES_DIR=/files …`. The
 Docker Compose stack has a [files demo](/operations/demo-data/#the-files-demo)
@@ -145,4 +215,9 @@ with a seeded source and dashboard.
   replaced under the same name is read fresh on the next query, with no
   refresh needed.
 - **Writing, importing or converting.** Holotable reads. `COPY`, `CREATE`,
-  `INSERT` and `ATTACH` stay refused.
+  `INSERT` and `ATTACH` stay refused. [Uploads](#uploads) store a CSV file
+  as it was sent; nothing converts it.
+- **Other upload formats, quotas and replacing a file.** Uploads take CSV.
+  There is no per-workspace disk quota beyond the per-file and per-upload
+  caps, and no replacing a file in place: upload again and make a new
+  source.

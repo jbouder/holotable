@@ -120,6 +120,21 @@ reference. The form asks for:
   `http_requests`); a database file's are its own tables. Tick the ones the
   source may read and choose each one's time column, as for a database.
 
+### Or CSV files from your computer
+
+Choose the **Upload files** card to make a DuckDB source from CSV files you
+have, with no access to the server: a bank export, a fitness log, a sheet
+saved as CSV. The card is there when the server can write uploads
+([DuckDB files](/admin/duckdb/#uploads)). **Choose files…**, or **Try the
+sample** ([`household-expenses.csv`](https://github.com/jbouder/holotable/blob/main/public/samples/household-expenses.csv),
+six months of made-up household spending, which the app serves at
+`/samples/household-expenses.csv`), then **Upload**. Each file shows its
+progress, and the form says what stage it is at: uploading, checking,
+discovering tables. Each file becomes a table named after it
+(`household-expenses.csv` is `household_expenses`), and the tables are
+discovered as soon as the upload is stored. Tick them and create the source
+as above. **Cancel upload** stops it, and nothing is kept.
+
 **Success looks like:** a row in the source list.
 
 ## 2. Test and refresh the catalog

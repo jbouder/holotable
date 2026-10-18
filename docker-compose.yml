@@ -109,11 +109,13 @@ services:
       METRICS_TOKEN: *metrics-token
       METRICS_ALLOWED_CIDRS: ${METRICS_ALLOWED_CIDRS:-}
       # The files demo (#574): DuckDB sources may read what is under here and
-      # nothing else. The seeder writes it; the app's mount is read-only, the
-      # belt behind the SQL guard (admin/duckdb.md).
+      # nothing else. The seeder writes demo/; the app writes uploads/, the
+      # CSV files source admins upload from the browser (#595), so its mount
+      # is writable. The SQL guard and the locked engine still let a source
+      # read only its own files (admin/duckdb.md).
       DUCKDB_SOURCES_DIR: /data/duckdb
     volumes:
-      - duckdb-files:/data/duckdb:ro
+      - duckdb-files:/data/duckdb
     ports:
       - "3000:3000"
     # `docker compose stop` sends SIGTERM and waits this long before SIGKILL.

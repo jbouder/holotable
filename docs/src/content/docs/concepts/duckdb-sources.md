@@ -62,6 +62,28 @@ The **Data sources** page registers one through the **DuckDB (files)** card.
 the path as a panel would and fills the allowlist. See [your first
 dashboard](/getting-started/your-first-dashboard/#or-files-on-the-server-with-duckdb).
 
+## Uploaded files
+
+A source admin with no access to the server can make a DuckDB source from CSV
+files instead: the **Upload files** card. The files are sent to
+`POST /api/sources/duckdb/uploads`, which streams them to
+`DUCKDB_SOURCES_DIR/uploads/<workspace id>/<fresh id>/<name>.csv` and answers
+the relative directory, and the form goes on as above, from **Discover
+tables**. Nothing new reaches the IR, a listing or the browser: an uploaded
+source is a directory source whose directory the server wrote, and `path` is
+an ordinary relative path. Each file's table is its stem reduced to
+`[a-z0-9_]`, so `Household Expenses.csv` is `household_expenses`. A sample to
+try ships with the app,
+[`household-expenses.csv`](https://github.com/jbouder/holotable/blob/main/public/samples/household-expenses.csv)
+(`date, merchant, category, amount, payment_method`; DuckDB reads `date` as
+`DATE` and `amount` as `DOUBLE`).
+
+An upload is all or nothing, and bounded: a file over
+`DUCKDB_UPLOAD_MAX_BYTES`, too many files, a file that is not UTF-8 text, an
+empty file or two files that would be one table refuse the whole upload, and
+nothing is kept. The operator's side, and how to turn uploads on, is in
+[DuckDB files](/admin/duckdb/#uploads).
+
 ## The path and the root
 
 A path is checked twice. When it is typed, lexically, by the rules above.
@@ -74,9 +96,15 @@ Then on save, and again on **every** open, by the path guard
 3. checks the target is a directory, or a regular file whose name ends
    `.duckdb`.
 
+It also holds [uploads](#uploaded-files) to their workspace: a path under
+`uploads/` must be `uploads/<the source's own workspace>/<upload>`, as typed
+and where it resolves, so a source cannot name, or symlink its way into,
+another workspace's files.
+
 Its refusals name the variable, never a path. Because the guard runs on every
 open, a symlink changed after a source was saved cannot point an existing
-source somewhere new.
+source somewhere new, and a stored row naming another workspace's uploads
+cannot run.
 
 ## Two layouts
 
@@ -179,7 +207,7 @@ the lock statements as they run, with the files named by their role.
 One gap remains, by design of DuckDB 1.5: the engine may write wherever it may
 read, so a statement could overwrite one of the source's own listed files.
 The guard, which allows exactly one `SELECT`, is what stops that, and
-[mounting the root read-only](/admin/duckdb/#mount-it-read-only) is the belt
+[mounting the root read-only](/admin/duckdb/#the-mount) is the belt
 behind it.
 
 ## What is refused, and why
@@ -187,6 +215,7 @@ behind it.
 | Refused | Because |
 | --- | --- |
 | A path that is absolute, has `..`, or resolves outside `DUCKDB_SOURCES_DIR` | A path is as untrusted as a URL. The root is the operator's decision. |
+| A path under `uploads/` that is not an upload of the source's own workspace | Uploaded files are their workspace's; the guard checks it on save and on every open. |
 | Any DuckDB source while `DUCKDB_SOURCES_DIR` is unset | Closed by default: nothing is readable until the operator names a root. |
 | A table not on the allowlist | The allowlist is the catalog, exactly as for a database. |
 | `read_csv(…)`, `FROM read_parquet(…)`, `glob(…)` and every other file function | A file function reads whatever path it is given, past the allowlist and the root. |

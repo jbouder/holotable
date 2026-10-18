@@ -325,9 +325,10 @@ forward without the history changing under a dashboard. The app's engine reads
 the new file on its next query, with no refresh needed.
 
 In Compose, the files are a named volume, `duckdb-files`, mounted at
-`/data/duckdb`. The seeder mounts it read-write and is its only writer. The
-app and the smoke test mount it **read-only**, the belt the
-[DuckDB operations page](/admin/duckdb/#mount-it-read-only) recommends. For
+`/data/duckdb`. The seeder mounts it read-write and writes `demo/`. The app
+mounts it read-write too, because it writes `uploads/`, the CSV files source
+admins [upload from the browser](/admin/duckdb/#uploads); the smoke test
+mounts it **read-only**. For
 the host loop (`npm run seed` with `npm run dev`), point
 `DUCKDB_SOURCES_DIR` at an absolute path, such as this checkout's
 `data/duckdb`, which is gitignored, and give the app the same value.
