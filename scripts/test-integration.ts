@@ -38,7 +38,7 @@ import {
  */
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
-const IMAGE = "timescale/timescaledb:2.17.2-pg16";
+const IMAGE = "timescale/timescaledb:2.30.2-pg16";
 
 /**
  * The tests that run against the server: everything under `test/integration/`
