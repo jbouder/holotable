@@ -21,7 +21,7 @@
 # The base is pinned by digest so every stage builds from the same bytes on
 # every machine; Dependabot keeps the digests current (#37). The Debian stages
 # derive from `base`; the quick-start stages name their own two Alpine bases.
-FROM node:24-bookworm-slim@sha256:d6aa754f16b3197301076f047b5def2f02ea1dbbc2ca920407d46d7ec7f87b20 AS base
+FROM node:24-bookworm-slim@sha256:a5f4366e834695d5f363b920c104953a535d3a9864d1bdf74566a0ebe01daee5 AS base
 WORKDIR /app
 ENV NEXT_TELEMETRY_DISABLED=1
 # The unprivileged user the Debian targets run as.
@@ -107,7 +107,7 @@ RUN npm ci --omit=dev \
     node_modules/@duckdb/node-bindings-linux-x64 \
     node_modules/@duckdb/node-bindings-linux-arm64
 
-FROM timescale/timescaledb:2.17.2-pg16@sha256:4e459e217f00cbb09920c34d245501e63427e6767a495de57ce76823ff280f12 AS quickstart
+FROM timescale/timescaledb:2.30.2-pg16@sha256:6f139d56042989bd35f50ba5986e492cd32e35cc6778c50be2659add298dc09f AS quickstart
 
 # Node 22 from the same Alpine release `quickstart-deps` uses. `--upgrade` with
 # sqlite-libs because Alpine's node links SQLite's session extension, which the
