@@ -63,9 +63,19 @@ export async function register() {
   // Uploads no source came to name (#604): swept once at boot, in the
   // background, and again after each upload, for that workspace. A server
   // with no DUCKDB_SOURCES_DIR has nothing to sweep.
-  const { config } = await import("@/lib/config");
+  const { config, localModelDetection } = await import("@/lib/config");
   if (config.duckdbSourcesDir) {
     const { sweepUploads } = await import("@/lib/sources/server/registry");
     void sweepUploads();
+  }
+
+  // A model on the person's own machine (#607): Ollama, LM Studio. Probed
+  // once at boot, in the background, when LOCAL_MODEL_DETECT resolves to on
+  // (by default in local mode); the Models page's Re-scan probes again.
+  if (localModelDetection(process.env)) {
+    const { scanLocalModels } = await import("@/lib/ai/local-models");
+    void scanLocalModels().catch((error: unknown) =>
+      log.warn("models.detect_failed", { error }),
+    );
   }
 }

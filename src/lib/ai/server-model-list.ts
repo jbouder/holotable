@@ -1,6 +1,15 @@
 import { readFileSync } from "node:fs";
 import { aiConfigProblem } from "@/lib/ai/configured";
 import { parseBaseUrlAllowlist } from "@/lib/ai/base-url";
+import {
+  type DetectedModel,
+  detectedDefault,
+  detectedModels,
+  detectedSettings,
+  detectionAllowlist,
+  type LocalScan,
+  lastLocalScan,
+} from "@/lib/ai/local-models";
 import { environmentResolution, type ResolvedModel } from "@/lib/ai/model-resolution";
 import { configuredModel } from "@/lib/ai/provider";
 import { kindOf } from "@/lib/ai/providers/registry";
@@ -15,7 +24,8 @@ import { log } from "@/lib/log";
 /**
  * The server's models at runtime (#440): the entries of `AI_MODELS_FILE`,
  * then the legacy `AI_PROVIDER`/`AI_MODEL` variables as one implicit entry
- * named `default`.
+ * named `default`, then the models found on this machine at the last scan
+ * (#607, `local-models.ts`).
  *
  * The file is read once per path and kept: a change takes a restart, like
  * every variable. Boot refuses a file that does not parse
@@ -34,6 +44,8 @@ export interface ServerModel {
   credentialVars: Record<string, string>;
   /** Why it cannot be called, or null. */
   unavailable: string | null;
+  /** Found on this machine (#607) rather than declared by the operator. */
+  detected: boolean;
   resolve(): ResolvedModel;
 }
 
@@ -102,6 +114,7 @@ function fromEntry(entry: ServerModelEntry, env: Environment): ServerModel {
     model: entry.settings.model,
     credentialVars: entry.credentials,
     unavailable,
+    detected: false,
     resolve: () =>
       unavailable
         ? { ok: false, id: entry.id, source: "environment", problem: unavailable }
@@ -135,7 +148,37 @@ function legacyModel(env: Environment): ServerModel {
     model: provider === "stub" ? "stub" : (env.AI_MODEL ?? ""),
     credentialVars: keyVar ? { apiKey: keyVar } : {},
     unavailable: resolved.ok ? null : resolved.problem,
+    detected: false,
     resolve: () => environmentResolution(id, env),
+  };
+}
+
+/**
+ * A model found on this machine (#607), built as an `AI_MODELS_FILE` entry
+ * of the same settings would be, except that its requests go through the
+ * base URL guard with the detection allowlist: the endpoint's host reachable
+ * over plain http, and nothing else widened.
+ */
+function fromDetected(found: DetectedModel, env: Environment): ServerModel | null {
+  const settings = detectedSettings(found);
+  const allowlist = detectionAllowlist(env);
+  // Detection turned off under a running scan's results: nothing to offer.
+  if (!settings || !allowlist) return null;
+  return {
+    id: found.id,
+    name: found.id,
+    provider: settings.provider,
+    model: found.model,
+    credentialVars: {},
+    unavailable: null,
+    detected: true,
+    resolve: () => ({
+      ok: true,
+      id: found.id,
+      source: "environment",
+      modelId: found.model,
+      model: configuredModel(settings, {}, allowlist),
+    }),
   };
 }
 
@@ -144,18 +187,31 @@ function legacyModel(env: Environment): ServerModel {
  * `"default": true` entry; else the legacy variables' model, when they name
  * one; else the file's first entry.
  */
-export function serverModelList(env: Environment = process.env): ServerModel[] {
+export function serverModelList(
+  env: Environment = process.env,
+  scan: LocalScan | null = lastLocalScan(),
+): ServerModel[] {
   const path = env.AI_MODELS_FILE;
   const fromFile = path ? fileEntries(path) : [];
+  const local = detectedModels(scan)
+    .map((found) => fromDetected(found, env))
+    .filter((m): m is ServerModel => m !== null);
+  const localDefault = local.find((m) => m.id === detectedDefault(scan, env));
+  // The unconfigured legacy entry stays listed, as before, unless a model
+  // found on this machine takes its place as the default (#607).
   const legacy =
-    !path || legacyConfigured(env)
+    (!path || legacyConfigured(env)) && !localDefault
       ? fromFile.some((e) => e.name === LEGACY_MODEL_NAME)
         ? null
         : legacyModel(env)
       : null;
-  const models = [...fromFile.map((e) => fromEntry(e, env)), ...(legacy ? [legacy] : [])];
+  const models = [
+    ...fromFile.map((e) => fromEntry(e, env)),
+    ...(legacy ? [legacy] : []),
+    ...local,
+  ];
   const declared = fromFile.find((e) => e.default)?.id;
-  const defaultId = declared ?? legacy?.id ?? models[0]?.id;
+  const defaultId = declared ?? legacy?.id ?? localDefault?.id ?? models[0]?.id;
   return [
     ...models.filter((m) => m.id === defaultId),
     ...models.filter((m) => m.id !== defaultId),
@@ -175,6 +231,8 @@ export function serverModelProblem(env: Environment = process.env): string | nul
   if (!env.AI_MODELS_FILE) {
     const problem = aiConfigProblem(env);
     if (!problem) return null;
+    // A model found on this machine stands in for the variables (#607).
+    if (detectedDefault(lastLocalScan(), env)) return null;
     return problem === "AI_PROVIDER"
       ? "AI_PROVIDER is not recognized"
       : `${problem} is not set`;

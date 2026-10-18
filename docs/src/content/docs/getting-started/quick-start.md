@@ -43,7 +43,7 @@ dashboards (the service health demo, the self-monitoring dashboard and the
 
 | Option | Effect |
 | --- | --- |
-| `-e AI_MODEL=… -e OPENAI_API_KEY=…` (and `OPENAI_BASE_URL`, `OPENAI_API`) | Turns on generation and chat. Without them those pages say what to set; you can also add a model on the **Models** page. |
+| `-e AI_MODEL=… -e OPENAI_API_KEY=…` (and `OPENAI_BASE_URL`, `OPENAI_API`) | Turns on generation and chat. Not needed with Ollama or LM Studio running on your machine: their models are found on their own and listed under **Detected on this machine** on the **Models** page ([A model on your machine](/admin/demo-mode/#a-model-on-your-machine)). Without any, those pages say what to do; you can also add a model on the **Models** page. |
 | `-v holotable-data:/var/lib/postgresql/data` | Keeps the data: dashboards, sources, and your favorites and chats. A restart fills only the history it missed. |
 | `-v holotable-files:/var/lib/holotable/files` | Keeps uploaded files across runs. Without it an upload's source outlives its files. |
 | `-v "$PWD/files:/var/lib/holotable/files/mine:ro"` | Reads a directory of your own as well: the DuckDB path picker offers `mine` beside the files demo ([DuckDB files](/admin/duckdb/)). |
@@ -157,7 +157,9 @@ npm run dev                        # http://localhost:3000
 Three things must be true, and each has its own failure mode:
 
 1. **An AI provider is configured.** `AI_MODEL` must be set; there is no default
-   model. See [AI provider](/admin/models/).
+   model. See [AI provider](/admin/models/). In local mode (the quick-start
+   image), a model running in Ollama or LM Studio on the same machine is
+   found instead ([A model on your machine](/admin/demo-mode/#a-model-on-your-machine)).
 2. **A data source is registered** with a table catalog. Generation sends the
    model that catalog as metadata — it designs against a schema, not against data.
 3. **The source's `secret_ref` is granted to its workspace and has

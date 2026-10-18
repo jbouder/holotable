@@ -104,6 +104,31 @@ instead of restarting with `-e`. A banner at the top of every page says that
 everyone who can reach the server is its owner; it can be dismissed, and the
 dismissal is kept in the browser.
 
+### A model on your machine
+
+In local mode the server looks for a model already running on the machine:
+[Ollama](https://ollama.com) or [LM Studio](https://lmstudio.ai), or anything
+else that answers the OpenAI-style `GET /models`. No key and no variable is
+needed. At boot it asks each endpoint in `LOCAL_MODEL_ENDPOINTS` (by default
+Ollama's port 11434 and LM Studio's 1234, on `host.docker.internal` for the
+quick-start container and on `localhost` outside one) for its models, and lists
+what answered under **Detected on this machine** on the [Models
+page](/guide/models/#detected-on-this-machine), with the time of the scan.
+Started Ollama after the server? Choose **Re-scan** there.
+
+A model found this way works like a server model: chat, Explore and generation
+can use it, with no key. When exactly one endpoint answered and the server has
+no model of its own (`AI_MODEL` and `AI_MODELS_FILE` unset), its first model
+is the default; when more than one answered, none is, and you pick one in the
+model menu, which is remembered for the workspace. From inside the quick-start
+container Ollama must listen beyond loopback (`OLLAMA_HOST=0.0.0.0`) for
+`host.docker.internal` to reach it; on Linux, also run the container with
+`--add-host=host.docker.internal:host-gateway`.
+
+`LOCAL_MODEL_DETECT=off` turns this off; `on` turns it on outside local mode.
+The variables, the allowlist they imply and the names detected models get are
+under [A model on this machine](/admin/models/#a-model-on-this-machine).
+
 ### The guards
 
 Each is an error, so the server refuses to boot:
@@ -125,7 +150,9 @@ In demo and local mode `AI_MODEL` and the provider key are optional. A missing
 one is a startup warning, not an error. The seeded dashboards, the live viewer
 and the SQL editor need no model. The new-dashboard page, Explore, the panel
 editor's natural-language edit and the dashboard chat show a notice naming the
-variables to set, instead of sending a request that can only fail. With
+variables to set, instead of sending a request that can only fail. In local
+mode the notice also says to start Ollama or LM Studio and re-scan (see [A
+model on your machine](#a-model-on-your-machine)). With
 `AUTH_MODE=oidc` a missing model is still an error in production.
 
 Only the server's models are used in demo mode: the [models configured in

@@ -85,6 +85,71 @@ export const DEFAULT_DEMO_GROUPS = "/workspaces/demo/editor";
 /** What the local owner is granted when `LOCAL_GROUPS` is unset (#600). */
 export const DEFAULT_LOCAL_GROUPS = "/workspaces/local/source-admin";
 
+/**
+ * `LOCAL_MODEL_DETECT` values (#607): `auto` is on in local mode and off
+ * otherwise; `on` and `off` say so outright.
+ */
+export const LOCAL_MODEL_DETECT_VALUES = ["auto", "on", "off"] as const;
+
+/**
+ * Where a model on the person's own machine is looked for when
+ * `LOCAL_MODEL_ENDPOINTS` is unset (#607): Ollama (11434) and LM Studio (1234),
+ * from inside a container and from outside one.
+ */
+export const DEFAULT_LOCAL_MODEL_ENDPOINTS =
+  "http://host.docker.internal:11434/v1, http://localhost:11434/v1, http://host.docker.internal:1234/v1, http://localhost:1234/v1";
+
+/** The most endpoints `LOCAL_MODEL_ENDPOINTS` may list: each is probed at every scan. */
+export const MAX_LOCAL_MODEL_ENDPOINTS = 16;
+
+/**
+ * Does detection of a model on this machine run (#607)? `LOCAL_MODEL_DETECT`
+ * resolved against `AUTH_MODE`. A value that is not one of the three is off
+ * here, so a typo fails closed (and `validateConfig` refuses to boot on it).
+ */
+export function localModelDetection(env: Environment): boolean {
+  const raw = env.LOCAL_MODEL_DETECT || "auto";
+  if (raw === "on") return true;
+  if (raw === "auto") return env.AUTH_MODE === "local";
+  return false;
+}
+
+/**
+ * `LOCAL_MODEL_ENDPOINTS` (or its default) as base URLs. An entry that is not
+ * an `http`/`https` URL with a host and no credentials is dropped and reported
+ * by its position in the list (1-based), never by its text: a mistyped entry
+ * may carry a password.
+ */
+export function parseLocalModelEndpoints(raw: string | undefined): {
+  endpoints: string[];
+  invalid: number[];
+} {
+  const entries = (raw || DEFAULT_LOCAL_MODEL_ENDPOINTS).split(/[,\s]+/).filter(Boolean);
+  const endpoints: string[] = [];
+  const invalid: number[] = [];
+  entries.forEach((entry, index) => {
+    let url: URL;
+    try {
+      url = new URL(entry);
+    } catch {
+      invalid.push(index + 1);
+      return;
+    }
+    if (
+      (url.protocol !== "http:" && url.protocol !== "https:") ||
+      !url.hostname ||
+      url.username ||
+      url.password
+    ) {
+      invalid.push(index + 1);
+      return;
+    }
+    const href = url.href.replace(/\/+$/, "");
+    if (!endpoints.includes(href)) endpoints.push(href);
+  });
+  return { endpoints, invalid };
+}
+
 /** `DEMO_GROUPS` / `LOCAL_GROUPS` as group paths: comma- or whitespace-separated. */
 export function splitGroups(raw: string): string[] {
   return raw.split(/[\s,]+/).filter(Boolean);
@@ -271,6 +336,22 @@ export const config = {
    * public https. The environment's own OPENAI_BASE_URL is not held to it.
    */
   aiBaseUrlAllowlist: str("AI_BASE_URL_ALLOWLIST", ""),
+  /**
+   * Whether the server looks for a model on the person's own machine (#607):
+   * `auto` (on when AUTH_MODE=local, off otherwise), `on` or `off`. When on,
+   * every host in LOCAL_MODEL_ENDPOINTS is reachable by the probe and by the
+   * models it finds as if it were in AI_BASE_URL_ALLOWLIST; a base URL typed in
+   * the app is still held to AI_BASE_URL_ALLOWLIST alone.
+   */
+  localModelDetect: str("LOCAL_MODEL_DETECT", "auto"),
+  /**
+   * The OpenAI-style base URLs probed for a model on this machine (#607),
+   * comma- or whitespace-separated. The default is Ollama's and LM Studio's,
+   * from inside a container and outside: `http://host.docker.internal:11434/v1`,
+   * `http://localhost:11434/v1`, `http://host.docker.internal:1234/v1`,
+   * `http://localhost:1234/v1`. Ignored unless LOCAL_MODEL_DETECT resolves to on.
+   */
+  localModelEndpoints: str("LOCAL_MODEL_ENDPOINTS", DEFAULT_LOCAL_MODEL_ENDPOINTS),
 
   /**
    * Hosts, addresses and CIDR ranges a Prometheus source's URL may reach
@@ -698,6 +779,27 @@ const EnvSchema = z.object({
     z.string().refine((v) => invalidAllowlistEntries(v).length === 0, {
       error:
         "must be a comma-separated list of host names, addresses and CIDR ranges, e.g. ollama.internal,10.0.0.0/8",
+    }),
+  ),
+  LOCAL_MODEL_DETECT: blank(
+    z.enum(LOCAL_MODEL_DETECT_VALUES, {
+      error: 'must be "auto" (on in local mode, off otherwise), "on" or "off"',
+    }),
+  ),
+  LOCAL_MODEL_ENDPOINTS: blank(
+    z.string().superRefine((v, ctx) => {
+      const { endpoints, invalid } = parseLocalModelEndpoints(v);
+      if (invalid.length > 0) {
+        ctx.addIssue({
+          code: "custom",
+          message: `${invalid.length > 1 ? "entries" : "entry"} ${invalid.join(", ")} ${invalid.length > 1 ? "are" : "is"} not an http(s) base URL with a host and no user name or password, e.g. http://localhost:11434/v1`,
+        });
+      } else if (endpoints.length > MAX_LOCAL_MODEL_ENDPOINTS) {
+        ctx.addIssue({
+          code: "custom",
+          message: `lists ${endpoints.length} endpoints; at most ${MAX_LOCAL_MODEL_ENDPOINTS} may be probed`,
+        });
+      }
     }),
   ),
   SOURCE_URL_ALLOWLIST: blank(
@@ -1183,6 +1285,17 @@ export function validateConfig(
     }
   } else if (env.LOCAL_GROUPS) {
     warning("LOCAL_GROUPS", "is set but ignored unless AUTH_MODE=local.");
+  }
+
+  // --- A model on this machine (#607) -------------------------------------
+  // Detection probes the listed endpoints and reaches them over plain http, so
+  // a list that is set but never used is worth a word: it is not allowlisting
+  // anything.
+  if (env.LOCAL_MODEL_ENDPOINTS && !localModelDetection(env)) {
+    warning(
+      "LOCAL_MODEL_ENDPOINTS",
+      "is set but ignored: LOCAL_MODEL_DETECT resolves to off (auto is on only when AUTH_MODE=local).",
+    );
   }
 
   // --- Row-filter claims (#31) ---------------------------------------------

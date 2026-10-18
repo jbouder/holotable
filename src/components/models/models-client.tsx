@@ -2,9 +2,10 @@
 
 import * as React from "react";
 import { useRouter } from "next/navigation";
-import { Cpu, FlaskConical, Pencil, Plus, Star, Trash2 } from "lucide-react";
+import { Cpu, FlaskConical, Pencil, Plus, RefreshCw, Star, Trash2 } from "lucide-react";
 import { ModelDialog, type ModelDialogTarget } from "@/components/models/model-dialog";
 import { useReducedMotion } from "@/components/motion-preference";
+import { LocalTime } from "@/components/time-display";
 import { useFlip } from "@/components/use-flip";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -23,6 +24,7 @@ import {
 } from "@/components/ui/table";
 import type {
   CatalogModelRow,
+  DetectedModelsSection,
   ModelConfigInput,
   ModelsPageData,
   ModelView,
@@ -249,6 +251,16 @@ export function ModelsClient({ data }: { data: ModelsPageData }) {
 
       <ServerCard rows={data.server} demo={data.demo} />
 
+      {data.detected && (
+        <DetectedCard
+          section={data.detected}
+          onScanned={(message, ok) => {
+            setNotice(message);
+            if (ok) router.refresh();
+          }}
+        />
+      )}
+
       {data.workspaces.map((section) => {
         const target = workspaceTarget(section.workspaceId);
         const prefix = `ws-${section.workspaceId}`;
@@ -472,6 +484,140 @@ function ServerCard({ rows, demo }: { rows: ServerModelRow[]; demo: boolean }) {
             </TableBody>
           </Table>
         )}
+      </CardContent>
+    </Card>
+  );
+}
+
+/**
+ * "Detected on this machine" (#607): the models the last scan found on the
+ * endpoints the operator listed, and a Re-scan for whoever manages a
+ * workspace. Read-only, like the server's.
+ */
+function DetectedCard({
+  section,
+  onScanned,
+}: {
+  section: DetectedModelsSection;
+  onScanned: (message: string, ok: boolean) => void;
+}) {
+  const [scanning, setScanning] = React.useState(false);
+  const answered = section.endpoints.filter((e) => e.ok);
+
+  async function rescan() {
+    if (!section.rescanWorkspace) return;
+    setScanning(true);
+    try {
+      const res = await fetch("/api/models/detect", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ workspaceId: section.rescanWorkspace }),
+      });
+      if (!res.ok) {
+        onScanned((await readApiError(res)).error, false);
+        return;
+      }
+      const result = (await res.json()) as {
+        found: number;
+        endpoints: Array<{ host: string; ok: boolean }>;
+      };
+      const reached = result.endpoints.filter((e) => e.ok).length;
+      onScanned(
+        `Re-scan found ${result.found} ${result.found === 1 ? "model" : "models"} on ${reached} of ${result.endpoints.length} endpoints.`,
+        true,
+      );
+    } catch (err) {
+      onScanned(apiErrorFromThrown(err).error, false);
+    } finally {
+      setScanning(false);
+    }
+  }
+
+  return (
+    <Card>
+      <CardHeader className="flex flex-row flex-wrap items-start justify-between gap-3">
+        <div className="space-y-1">
+          <CardTitle>Detected on this machine</CardTitle>
+          <p className="text-xs text-muted">
+            Found by asking each endpoint in{" "}
+            <span className="font-mono">LOCAL_MODEL_ENDPOINTS</span> for its models. No
+            key needed.{" "}
+            {section.scannedAt ? (
+              <>
+                Last scanned <LocalTime iso={section.scannedAt} />.
+              </>
+            ) : (
+              "Not scanned yet."
+            )}
+          </p>
+        </div>
+        {section.rescanWorkspace && (
+          <Button
+            size="sm"
+            variant="secondary"
+            busy={scanning}
+            onClick={() => void rescan()}
+          >
+            <RefreshCw className="h-4 w-4" /> Re-scan
+          </Button>
+        )}
+      </CardHeader>
+      <CardContent className="space-y-4">
+        {section.rows.length === 0 ? (
+          <EmptyState
+            icon={<Cpu className="h-6 w-6" />}
+            title="Nothing detected"
+            description={
+              section.local
+                ? "Start Ollama or LM Studio on this machine, pull a model, then choose Re-scan."
+                : "No listed endpoint answered with a model."
+            }
+          />
+        ) : (
+          <Table>
+            <TableHead>
+              <TableRow>
+                <TableHeader>Name</TableHeader>
+                <TableHeader>Provider</TableHeader>
+                <TableHeader>Model</TableHeader>
+                <TableHeader>Credentials</TableHeader>
+              </TableRow>
+            </TableHead>
+            <TableBody>
+              {section.rows.map((row) => (
+                <TableRow key={row.id}>
+                  <TableCell className="font-mono">
+                    {row.name} {row.isDefault && <Badge variant="outline">Default</Badge>}
+                  </TableCell>
+                  <TableCell>{providerLabel(row.provider)}</TableCell>
+                  <TableCell className="font-mono">{row.model}</TableCell>
+                  <TableCell className="text-muted">None needed</TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        )}
+        {section.pickNeeded && (
+          <p className="text-xs text-muted">
+            More than one endpoint answered, so none is the default. Pick one in the model
+            menu where you generate or chat; it is remembered for the workspace.
+          </p>
+        )}
+        <p className="text-xs text-muted">
+          {section.endpoints.length === 0
+            ? "No endpoints are listed."
+            : `${answered.length} of ${section.endpoints.length} endpoints answered: `}
+          {section.endpoints.map((e, i) => (
+            <React.Fragment key={e.host}>
+              {i > 0 && ", "}
+              <span className="font-mono">{e.host}</span>{" "}
+              {e.ok
+                ? `(${e.models} ${e.models === 1 ? "model" : "models"})`
+                : "(no answer)"}
+            </React.Fragment>
+          ))}
+          {section.endpoints.length > 0 && "."}
+        </p>
       </CardContent>
     </Card>
   );

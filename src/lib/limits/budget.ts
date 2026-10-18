@@ -20,7 +20,8 @@ export type LlmRoute =
   | "source-draft"
   | "chat"
   | "model-test"
-  | "model-discover";
+  | "model-discover"
+  | "model-detect";
 
 export interface UsageDelta {
   workspaceId: string;

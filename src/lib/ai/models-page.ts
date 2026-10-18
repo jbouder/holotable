@@ -3,6 +3,7 @@ import type { Identity } from "@/lib/auth/claims";
 import { listModels, personalOwner, workspaceModelView } from "@/lib/ai/model-admin";
 import type {
   CatalogModelRow,
+  DetectedModelsSection,
   ModelsPageData,
   ModelView,
   WorkspaceModelsSection,
@@ -13,9 +14,15 @@ import {
   storedResolution,
   stubAllowed,
 } from "@/lib/ai/model-resolution";
+import {
+  detectionEndpoints,
+  endpointLabel,
+  type LocalScan,
+  lastLocalScan,
+} from "@/lib/ai/local-models";
 import { usableModels } from "@/lib/ai/models";
 import { serverModelList } from "@/lib/ai/server-model-list";
-import { config } from "@/lib/config";
+import { config, type Environment, localModelDetection } from "@/lib/config";
 
 /**
  * Who sees the Models page (#441): anyone who may generate somewhere, as AI
@@ -48,12 +55,43 @@ function rowOf(view: ModelView, unavailable: string | null): CatalogModelRow {
  * its source-admins get each model's settings to edit, everyone else the
  * listing they could pick from. Demo mode has the server's models only.
  */
+/**
+ * "Detected on this machine" (#607), or null when detection is off. Hosts
+ * and counts only: what each endpoint answered stays on the server. The
+ * Re-scan is offered against a workspace the caller manages, the route's
+ * gate; anyone else sees the last scan without the button.
+ */
+export function detectedSection(
+  identity: Identity,
+  rows: ModelsPageData["server"],
+  env: Environment,
+  scan: LocalScan | null = lastLocalScan(),
+): DetectedModelsSection | null {
+  if (!localModelDetection(env)) return null;
+  const endpoints = scan
+    ? scan.endpoints.map((e) => ({ host: e.host, ok: e.ok, models: e.models.length }))
+    : detectionEndpoints(env).map((url) => ({
+        host: endpointLabel(url),
+        ok: false,
+        models: 0,
+      }));
+  return {
+    scannedAt: scan?.scannedAt ?? null,
+    endpoints,
+    rows,
+    pickNeeded: rows.length > 0 && !rows.some((r) => r.isDefault),
+    local: env.AUTH_MODE === "local",
+    rescanWorkspace: identity.serviceAccount
+      ? null
+      : (authorizedWorkspaces(identity, "source:manage")[0] ?? null),
+  };
+}
+
 export async function modelsPageData(
   identity: Identity,
   deps: ModelResolutionDeps = defaultModelDeps(),
 ): Promise<ModelsPageData> {
-  const all = serverModelList(deps.env);
-  const server = all.map((m, i) => ({
+  const all = serverModelList(deps.env).map((m, i) => ({
     id: m.id,
     name: m.name,
     provider: m.provider,
@@ -61,8 +99,16 @@ export async function modelsPageData(
     credentialVars: m.credentialVars,
     unavailable: m.unavailable,
     isDefault: i === 0,
+    detected: m.detected,
   }));
-  const base = { server, demo: deps.demo, allowStub: stubAllowed(deps.env) };
+  const strip = ({ detected: _, ...row }: (typeof all)[number]) => row;
+  const server = all.filter((m) => !m.detected).map(strip);
+  const detected = detectedSection(
+    identity,
+    all.filter((m) => m.detected).map(strip),
+    deps.env,
+  );
+  const base = { server, detected, demo: deps.demo, allowStub: stubAllowed(deps.env) };
   if (deps.demo) {
     return { ...base, workspaces: [], personal: null, personalAppliesIn: [] };
   }

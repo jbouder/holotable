@@ -79,6 +79,7 @@ export const AUDIT_ACTIONS = [
   "user.model.delete",
   "user.model.test",
   "user.model.discover",
+  "model.detect",
   "annotation.create",
   "annotation.delete",
   "share.create",

@@ -239,7 +239,7 @@ export function environmentResolution(id: string, env: Environment): ResolvedMod
       ok: false,
       id,
       source: "environment",
-      problem: aiUnavailableMessage(problem),
+      problem: aiUnavailableMessage(problem, env),
     };
   }
   return {

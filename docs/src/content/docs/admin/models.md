@@ -192,6 +192,55 @@ The variables below keep working as one more entry named `default`, listed
 after the file's. With only the variables set, nothing changes. In Helm the
 file is `ai.models`; see [Kubernetes](/operations/kubernetes/).
 
+## A model on this machine
+
+([#607](https://github.com/jbouder/holotable/issues/607)) The server can look
+for a model already running beside it, such as Ollama or LM Studio, and offer it
+with no key and no other variable. On by default in [local
+mode](/admin/demo-mode/#a-model-on-your-machine), off otherwise.
+
+| Variable | Default | What it does |
+|---|---|---|
+| `LOCAL_MODEL_DETECT` | `auto` | `auto` is on when `AUTH_MODE=local` and off otherwise; `on` and `off` say so outright. Anything else is a startup error. |
+| `LOCAL_MODEL_ENDPOINTS` | `http://host.docker.internal:11434/v1, http://localhost:11434/v1, http://host.docker.internal:1234/v1, http://localhost:1234/v1` | The OpenAI-style base URLs probed, comma- or whitespace-separated: Ollama and LM Studio, from inside a container and from outside one. Each must be an `http` or `https` URL with a host and no user name or password; a bad entry is a startup error that names its position in the list, never the entry. At most 16. Set while detection is off, it is ignored with a warning. |
+
+While detection is on:
+
+- At boot, in the background, the server asks each endpoint for `GET
+  <endpoint>/models` through the [base URL guard](#the-base-url-guard)'s
+  fetch: the reply read under the 4 MiB model-list cap, the whole request
+  given up after 3 seconds, no redirect followed. An endpoint that does not
+  answer, answers with an error, or replies with something that is not a
+  model list, or too much of one, is skipped and counted. The server logs one
+  `models.detected` line with the counts and the endpoints' hosts, never a
+  reply. **Re-scan** on the [Models page](/guide/models/#detected-on-this-machine)
+  asks again (`POST /api/models/detect`, for whoever manages a workspace,
+  audited as `model.detect`).
+- **The allowlist.** Each endpoint's host is reachable by the probe, and by
+  the models it finds, exactly as if it were in `AI_BASE_URL_ALLOWLIST`: plain
+  `http`, and whatever address it resolves to. The endpoints are the
+  operator's configuration, not a typed URL. A base URL typed in the app is
+  still held to `AI_BASE_URL_ALLOWLIST` alone, on the same host or not. With
+  detection off nothing is probed and nothing is allowlisted. Nothing a
+  browser sends can add an endpoint.
+- **Names.** Each model found becomes a server model, as an
+  `AI_MODELS_FILE` entry of `provider: openai-compatible`, that `baseUrl`,
+  `api: chat` and no credentials would: named
+  `local:<host>:<port>/<model>`, for example
+  `local:localhost:11434/llama3.2:latest`, which is also its id. The prefix
+  is one neither a file entry's `env:<name>` id nor a stored model's id can
+  take. A model whose name holds characters outside letters, digits and
+  `. _ : / @ + -`, or that is longer than 120 characters, is left out; so is
+  every model past the 50th on one endpoint.
+- **The default.** When the server has no model of its own (`AI_MODEL` and
+  `AI_MODELS_FILE` unset, and not the stub) and exactly one endpoint answered
+  with a model, its first model (by id) is the server's default, and the log
+  line says which. With more than one endpoint answering, none is: the
+  Models page says to pick one, and the [model chip](/guide/models/#picking-a-model)
+  remembers the pick for the workspace.
+
+The scan is kept in memory for the process; a restart scans again.
+
 ## `AI_PROVIDER=gateway`
 
 The bare `AI_MODEL` string is routed by the AI SDK Gateway, using

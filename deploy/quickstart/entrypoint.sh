@@ -67,7 +67,7 @@ if [ -z "${METRICS_TOKEN:-}" ]; then
   export METRICS_TOKEN
 fi
 if [ -z "${AI_MODEL:-}" ] && [ -z "${AI_MODELS_FILE:-}" ]; then
-  log "No model configured: the dashboards, the live viewer and the SQL editor work; generation, Explore and chat are off. Pass -e AI_MODEL=... -e OPENAI_API_KEY=... (or mount a models file and pass -e AI_MODELS_FILE=...) to turn them on."
+  log "No model configured: the dashboards, the live viewer and the SQL editor work; generation, Explore and chat are off. Pass -e AI_MODEL=... -e OPENAI_API_KEY=... (or mount a models file and pass -e AI_MODELS_FILE=...) to turn them on. In local mode a model running in Ollama or LM Studio on this machine is looked for at boot and on Re-scan (Models page)."
 fi
 if [ "${AUTH_MODE:-}" = "local" ]; then
   log "AUTH_MODE=local: everyone who can reach this container's port is signed in as its owner and can manage its sources. Publish it on localhost only (-p 127.0.0.1:3000:3000) on a shared network."
