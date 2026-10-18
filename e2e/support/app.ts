@@ -20,7 +20,11 @@ export function unique(): string {
 
 /** A seeded dashboard's id, by title (scripts/seed.ts). */
 export async function dashboardId(request: APIRequestContext, title: string) {
-  const res = await request.get(`/api/dashboards?q=${encodeURIComponent(title)}`);
+  // By title, so the exact one comes before the copies tests make of it
+  // (`copyDashboard`), however many earlier runs left on the first page.
+  const res = await request.get(
+    `/api/dashboards?q=${encodeURIComponent(title)}&sort=title`,
+  );
   expect(res.ok(), `GET /api/dashboards answered ${res.status()}`).toBe(true);
   const body = (await res.json()) as { dashboards: { id: string; title: string }[] };
   const found = body.dashboards.find((d) => d.title === title);
