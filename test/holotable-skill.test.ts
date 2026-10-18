@@ -457,6 +457,8 @@ test("the SQL rules' DuckDB note says what the model is told about DuckDB (#573)
     "::timestamptz",
     "read_parquet",
     "read_csv",
+    "read_json",
+    "->>",
   ]) {
     assert.ok(DUCKDB_PROMPT.includes(`\`${name}`), `the prompt names ${name}`);
     assert.ok(note.includes(`\`${name}`), `the DuckDB note names ${name}`);

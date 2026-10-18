@@ -235,7 +235,7 @@ export function lockHeadline(lock: TestLock): string {
 /** How a DuckDB source's layout reads on the report. */
 export function layoutLabel(layout: "directory" | "database"): string {
   return layout === "directory"
-    ? "a directory of Parquet and CSV files"
+    ? "a directory of Parquet, CSV and JSON files"
     : "a .duckdb file";
 }
 

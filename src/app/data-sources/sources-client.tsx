@@ -732,14 +732,14 @@ const KIND_CHOICES: {
   {
     value: "files",
     label: "DuckDB (files)",
-    description: "Parquet and CSV files, or a .duckdb file, on the server.",
+    description: "Parquet, CSV and JSON files, or a .duckdb file, on the server.",
     Icon: FolderOpen,
     sample: "SELECT time_bucket(INTERVAL '1m', ts) …",
   },
   {
     value: "upload",
     label: "Upload files",
-    description: "CSV files from your computer, read with DuckDB.",
+    description: "CSV and JSON files from your computer, read with DuckDB.",
     Icon: Upload,
     sample: "SELECT category, sum(amount) …",
   },

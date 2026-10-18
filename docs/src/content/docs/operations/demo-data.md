@@ -306,7 +306,7 @@ With `DUCKDB_SOURCES_DIR` set, the seeder also shows a
 [DuckDB source](/concepts/duckdb-sources/): data that lives in files rather
 than in a database. Docker Compose and the quick-start image set it
 ([#600](https://github.com/jbouder/holotable/issues/600)). Before anything
-else, the seeder writes three files under `<DUCKDB_SOURCES_DIR>/demo/` with the binding itself
+else, the seeder writes four files under `<DUCKDB_SOURCES_DIR>/demo/` with the binding itself
 (`scripts/lib/demo-files.ts`), so nothing binary is ever committed:
 
 | File | Table | What it holds |
@@ -314,13 +314,16 @@ else, the seeder writes three files under `<DUCKDB_SOURCES_DIR>/demo/` with the 
 | `http_requests.parquet` | `http_requests` | Per-request events for the last seven days: `ts`, `service`, `route`, `host`, `status`, `duration_ms`, `bytes`. The demo's request shape, three to six requests a minute, busier in the afternoon (UTC). |
 | `hosts.csv` | `hosts` | The host inventory: `host`, `region`, `role`, `cores`. |
 | `daily_revenue.parquet` | `daily_revenue` | Orders and revenue per region per day for the last 90 days, ending yesterday: `day`, `region`, `orders`, `revenue`. |
+| `deploys.jsonl` | `deploys` | One JSON object per deploy for the last seven days ([#596](https://github.com/jbouder/holotable/issues/596)): `ts`, `service`, `version`, `ok`, and a nested `actor` object, read as `actor STRUCT("name" VARCHAR, team VARCHAR)`. |
 
 It registers them as the **Demo files** source (`duckdb-demo`, path `demo`,
 no `secret_ref`) with that catalog, and seeds the **Demo files** dashboard.
 Requests per minute and the 5xx rate come from `time_bucket` panels over the
 Parquet file. Daily revenue by region comes from a `date_trunc` panel with
 its own 30-day window. Requests by region joins the Parquet file to the CSV,
-and a table of revenue by region covers the whole file.
+a table of revenue by region covers the whole file, and a table of deploys
+reads the JSON-lines file, its nested object as `actor.name` and
+`actor.team`.
 
 Every value in the files is a function of its minute or day, so the seeder
 can rewrite them every minute, and does. Each file is written beside its
@@ -330,7 +333,7 @@ the new file on its next query, with no refresh needed.
 
 In Compose, the files are a named volume, `duckdb-files`, mounted at
 `/data/duckdb`. The seeder mounts it read-write and writes `demo/`. The app
-mounts it read-write too, because it writes `uploads/`, the CSV files source
+mounts it read-write too, because it writes `uploads/`, the CSV and JSON files source
 admins [upload from the browser](/admin/duckdb/#uploads); the smoke test
 mounts it **read-only**. For
 the host loop (`npm run seed` with `npm run dev`), point

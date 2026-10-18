@@ -25,13 +25,17 @@ Setting `DUCKDB_MEMORY_LIMIT` or `DUCKDB_THREADS` without it is a startup
 warning, since they would bound nothing.
 
 Lay it out as one directory (or one `.duckdb` file) per source, directly under
-the root. Those are what the path picker offers:
+the root. Those are what the path picker offers. A directory's tables are its
+`.parquet`, `.csv`, `.json`, `.jsonl` and `.ndjson` files; when two share a
+stem, Parquet wins over CSV and CSV over JSON
+([Two layouts](/concepts/duckdb-sources/#two-layouts)):
 
 ```
 /var/lib/holotable/files/
 ├── requests/                 a source: one table per file
 │   ├── http_requests.parquet
-│   └── hosts.csv
+│   ├── hosts.csv
+│   └── deploys.jsonl
 ├── finance/
 │   └── daily_revenue.parquet
 └── warehouse.duckdb          a source: the database's tables
@@ -46,8 +50,9 @@ name only its own.
 
 ## Uploads
 
-A source admin can also make a DuckDB source from CSV files uploaded in the
-browser ([#595](https://github.com/jbouder/holotable/issues/595)), with no
+A source admin can also make a DuckDB source from CSV or JSON files uploaded
+in the browser ([#595](https://github.com/jbouder/holotable/issues/595),
+[#596](https://github.com/jbouder/holotable/issues/596)), with no
 access to the server: **Add source → Upload files**. The files land under the
 same root, never a second one:
 
@@ -57,12 +62,19 @@ same root, never a second one:
     └── <workspace id>/
         └── 3f9c0a51d2e47b86/          one upload: a fresh random id
             ├── household_expenses.csv
-            └── budget_2026.csv
+            ├── budget_2026.csv
+            └── workouts.jsonl
 ```
 
 Each file is named by its own stem, lowercased and reduced to `[a-z0-9_]`
 (`Budget 2026.csv` is `budget_2026`; a stem that starts with a digit gets
-`t_` in front), because that is the table's name. The source stores the
+`t_` in front), because that is the table's name. A `.json`, `.jsonl` or
+`.ndjson` file keeps its extension (lowercased), because the directory picks
+a file's reader by it; a file with any other name is stored as `.csv`. The
+form offers two samples the app serves,
+[`household-expenses.csv`](https://github.com/jbouder/holotable/blob/main/public/samples/household-expenses.csv)
+and
+[`workouts.jsonl`](https://github.com/jbouder/holotable/blob/main/public/samples/workouts.jsonl). The source stores the
 directory, `uploads/<workspace id>/<id>`, like any other path, and is a
 directory source from then on: Test, Refresh and every query go through the
 same guard and the same locked engine.
@@ -80,8 +92,8 @@ request, and a refused or cancelled upload leaves no file behind:
 | --- | --- |
 | A file larger than `DUCKDB_UPLOAD_MAX_BYTES` | default `52428800` (50 MiB) |
 | More than `DUCKDB_UPLOAD_MAX_FILES` files | default `20`, at most `200` (a source's table limit) |
-| A file that is not text: a NUL byte, or not UTF-8, in its first 64 KiB | whatever its name or content type says |
-| An empty file, a name that reduces to nothing, two files that would be one table | |
+| A file that is not text: a NUL byte, or not UTF-8, in its first 64 KiB | whatever its name or content type says; CSV and JSON alike |
+| An empty file, a name that reduces to nothing, two files that would be one table (`events.csv` and `events.jsonl` too) | |
 
 The file is streamed to disk as it arrives and never held whole in memory.
 A malformed bound is a warning in development (the default is used) and a
@@ -120,6 +132,14 @@ SET memory_limit='512MB'
 SET threads=2
 SET lock_configuration=true
 ```
+
+A JSON file's view is made with its reader's bounds named:
+`maximum_object_size` (`JSON_MAX_OBJECT_BYTES`, 16 MiB per object) and
+`sample_size` (`JSON_SAMPLE_ROWS`, 20,480 records typed), so a hostile file
+cannot make the reader allocate past them; the memory limit and the query
+timeout stay the outer bound
+([JSON files](/concepts/duckdb-sources/#json-files)). The `json` extension
+is compiled into the binding, so reading JSON needs no install or load.
 
 The zone is a statement rather than an option to the engine, because it is
 ICU's setting and the Linux bindings load ICU only after an engine's options
@@ -218,9 +238,11 @@ it beside the files demo:
   replaced under the same name is read fresh on the next query, with no
   refresh needed.
 - **Writing, importing or converting.** Holotable reads. `COPY`, `CREATE`,
-  `INSERT` and `ATTACH` stay refused. [Uploads](#uploads) store a CSV file
-  as it was sent; nothing converts it.
-- **Other upload formats, quotas and replacing a file.** Uploads take CSV.
+  `INSERT` and `ATTACH` stay refused. [Uploads](#uploads) store a CSV or
+  JSON file as it was sent; nothing converts it, and nested JSON is not
+  flattened (a query reads a `STRUCT` field directly).
+- **Other upload formats, quotas and replacing a file.** Uploads take CSV
+  and JSON.
   There is no per-workspace disk quota beyond the per-file and per-upload
   caps, and no replacing a file in place: upload again and make a new
   source.

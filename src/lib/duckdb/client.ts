@@ -26,8 +26,8 @@ import type { Truncation } from "@/lib/truncation";
  * The DuckDB engine behind a source (#572): one in-process instance per
  * source, opened, locked, and then only ever read.
  *
- * A directory opens in memory with one view per Parquet or CSV file directly
- * under it; a `.duckdb` file opens `READ_ONLY`. Then, before anything a panel
+ * A directory opens in memory with one view per Parquet, CSV or JSON file
+ * directly under it; a `.duckdb` file opens `READ_ONLY`. Then, before anything a panel
  * wrote can run, the instance is locked: external access off except for the
  * source's own directory, no extension installed or autoloaded, a memory and
  * thread cap, and `lock_configuration`, after which no statement can change
@@ -91,10 +91,43 @@ function identifier(name: string): string {
   return `"${name.replaceAll('"', '""')}"`;
 }
 
-const READERS: Record<string, string> = {
-  ".parquet": "read_parquet",
-  ".csv": "read_csv",
-};
+/**
+ * The most bytes one JSON object (#596) may take, an array's element or a
+ * line's: `read_json_auto`'s `maximum_object_size`. Named here, beside the
+ * engine's memory and thread caps, rather than left to the engine's default,
+ * so a hostile file cannot make the reader allocate past it and an engine
+ * upgrade cannot quietly raise it.
+ */
+export const JSON_MAX_OBJECT_BYTES = 16 * 1024 * 1024;
+
+/**
+ * How many JSON records (#596) the reader samples to infer a file's columns
+ * and types: `read_json_auto`'s `sample_size`. A ragged file is typed from
+ * this many records, never read whole to type it.
+ */
+export const JSON_SAMPLE_ROWS = 20_480;
+
+/**
+ * The file readers a directory source uses, by extension, in precedence
+ * order: when two files share a stem, the one whose reader comes first makes
+ * the view, so Parquet, then CSV, then JSON (#596). `.json` holds an array of
+ * objects or a single object, `.jsonl` and `.ndjson` one object per line;
+ * `read_json_auto` reads all three.
+ */
+export const READERS: readonly { extensions: readonly string[]; reader: string }[] = [
+  { extensions: [".parquet"], reader: "read_parquet" },
+  { extensions: [".csv"], reader: "read_csv" },
+  { extensions: [".json", ".jsonl", ".ndjson"], reader: "read_json_auto" },
+];
+
+/** The reader for a file extension, lowercased, or undefined. */
+export function readerFor(ext: string): string | undefined {
+  return READERS.find((r) => r.extensions.includes(ext))?.reader;
+}
+
+function readerRank(reader: string): number {
+  return READERS.findIndex((r) => r.reader === reader);
+}
 
 /** A file a directory source reads, and the view it becomes. */
 export interface DirectoryFile {
@@ -106,18 +139,20 @@ export interface DirectoryFile {
 }
 
 /**
- * The Parquet and CSV files directly under a directory, by stem; not
+ * The Parquet, CSV and JSON files directly under a directory, by stem; not
  * recursive. A symlink is followed and kept only when it resolves to a
  * regular file inside the directory, so a link cannot make a view of a file
- * elsewhere. Two files with one stem (`a.parquet`, `a.csv`) make one view,
- * from the Parquet file. At most {@link MAX_TABLES}, in name order.
+ * elsewhere. Two files with one stem make one view, from the file whose
+ * reader ranks first in {@link READERS} (`a.parquet` over `a.csv` over
+ * `a.json`); two JSON files with one stem, the first in name order. At most
+ * {@link MAX_TABLES}, in name order.
  */
 export async function listDirectoryFiles(dir: string): Promise<DirectoryFile[]> {
   const entries = (await readdir(dir)).sort();
   const byName = new Map<string, DirectoryFile>();
   for (const entry of entries) {
     const ext = extname(entry).toLowerCase();
-    const reader = READERS[ext];
+    const reader = readerFor(ext);
     if (!reader) continue;
     const name = entry.slice(0, -ext.length);
     if (name.length === 0 || name.length > 128) continue;
@@ -129,10 +164,26 @@ export async function listDirectoryFiles(dir: string): Promise<DirectoryFile[]> 
       continue;
     }
     const prior = byName.get(name);
-    if (prior && prior.reader === "read_parquet") continue;
+    if (prior && readerRank(prior.reader) <= readerRank(reader)) continue;
     byName.set(name, { name, absolute, reader });
   }
-  return [...byName.values()].slice(0, MAX_TABLES);
+  return [...byName.values()]
+    .sort((a, b) => (a.name < b.name ? -1 : a.name > b.name ? 1 : 0))
+    .slice(0, MAX_TABLES);
+}
+
+/**
+ * The statement that makes a file its view, run before the lock. A JSON
+ * file's reader is given its bounds ({@link JSON_MAX_OBJECT_BYTES},
+ * {@link JSON_SAMPLE_ROWS}) explicitly; the instance's memory limit, thread
+ * cap and the query timer stay the outer bound.
+ */
+export function viewStatement(file: DirectoryFile): string {
+  const options =
+    file.reader === "read_json_auto"
+      ? `, maximum_object_size=${JSON_MAX_OBJECT_BYTES}, sample_size=${JSON_SAMPLE_ROWS}`
+      : "";
+  return `CREATE VIEW ${identifier(file.name)} AS SELECT * FROM ${file.reader}(${literal(file.absolute)}${options})`;
 }
 
 /**
@@ -207,9 +258,13 @@ export async function openEngine(
   try {
     if (resolved.layout === "directory") {
       for (const file of await listDirectoryFiles(resolved.absolute)) {
-        await connection.run(
-          `CREATE VIEW ${identifier(file.name)} AS SELECT * FROM ${file.reader}(${literal(file.absolute)})`,
-        );
+        // A file the reader cannot parse is named by its table, never its
+        // path: the engine's own message is scrubbed below.
+        await connection.run(viewStatement(file)).catch((err: unknown) => {
+          throw new Error(
+            `the file for the table "${file.name}" could not be read: ${scrub(err, resolved)}`,
+          );
+        });
         views.push(file.name);
         files.push(file.absolute);
       }

@@ -17,13 +17,14 @@ const RATE_PER_MINUTE = 10;
 const rateStore = new MemoryRateLimitStore();
 
 /**
- * Upload CSV files as a DuckDB source (#595), with no access to the server's
+ * Upload CSV or JSON files as a DuckDB source (#595, #596), with no access to the server's
  * file system: `?workspaceId=` and a `multipart/form-data` body of `files`.
  *
  * - gated on `source:manage` in the named workspace, the role that may then
  *   create a source over what was uploaded, and rate limited per caller;
  * - streamed to `DUCKDB_SOURCES_DIR/uploads/<workspaceId>/<fresh id>/`, one
- *   `<name>.csv` per file, never held whole in memory, under
+ *   `<name>.csv` (or `.json`, `.jsonl`, `.ndjson`) per file, never held
+ *   whole in memory, under
  *   `DUCKDB_UPLOAD_MAX_BYTES` per file and `DUCKDB_UPLOAD_MAX_FILES` files;
  * - all or nothing: a refused or cancelled upload leaves no file behind;
  * - answered `{ ok: true, path, files: [{ name, bytes }] }`, the relative path

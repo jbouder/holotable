@@ -105,8 +105,8 @@ Cloud Logs. Its panels carry LogQL. The form asks for:
 
 ### Or files on the server, with DuckDB
 
-Choose the **DuckDB (files)** card to query a directory of Parquet and CSV
-files, or a `.duckdb` database file, that the operator has put under
+Choose the **DuckDB (files)** card to query a directory of Parquet, CSV and
+JSON files, or a `.duckdb` database file, that the operator has put under
 `DUCKDB_SOURCES_DIR`. The card is there only when the operator has set that
 variable and the server's DuckDB binding loaded. A DuckDB source has no credentials, so there is no secret
 reference. The form asks for:
@@ -115,20 +115,27 @@ reference. The form asks for:
   `DUCKDB_SOURCES_DIR`, or type one below them (`lake/2026`). It is always
   relative: an absolute path, a `..`, or a symlink that leads out of the root
   is refused when you save, and again whenever the source is opened.
-- **Tables**: press **Discover tables**. A directory's tables are its Parquet
-  and CSV files, named by their stems (`http_requests.parquet` is
+- **Tables**: press **Discover tables**. A directory's tables are its
+  Parquet, CSV and JSON (`.json`, `.jsonl`, `.ndjson`) files, named by their
+  stems (`http_requests.parquet` is
   `http_requests`); a database file's are its own tables. Tick the ones the
   source may read and choose each one's time column, as for a database.
 
-### Or CSV files from your computer
+### Or CSV and JSON files from your computer
 
-Choose the **Upload files** card to make a DuckDB source from CSV files you
-have, with no access to the server: a bank export, a fitness log, a sheet
-saved as CSV. The card is there when the server can write uploads
-([DuckDB files](/admin/duckdb/#uploads)). **Choose files…**, or **Try the
-sample** ([`household-expenses.csv`](https://github.com/jbouder/holotable/blob/main/public/samples/household-expenses.csv),
-six months of made-up household spending, which the app serves at
-`/samples/household-expenses.csv`), then **Upload**. Each file shows its
+Choose the **Upload files** card to make a DuckDB source from CSV or JSON
+files you have, with no access to the server: a bank export, a sheet saved as
+CSV, a streaming history or an API's saved reply as JSON (an array of
+objects, one object per line, or one object). The card is there when the
+server can write uploads ([DuckDB files](/admin/duckdb/#uploads)). **Choose
+files…**, or try a sample, then **Upload**. The form offers two, which the
+app serves under `/samples/`:
+**household expenses**
+([`household-expenses.csv`](https://github.com/jbouder/holotable/blob/main/public/samples/household-expenses.csv),
+six months of made-up household spending) and **workouts**
+([`workouts.jsonl`](https://github.com/jbouder/holotable/blob/main/public/samples/workouts.jsonl),
+a fitness log whose nested `location` becomes one `STRUCT` column, read as
+`location.country`). Each file shows its
 progress, and the form says what stage it is at: uploading, checking,
 discovering tables. Each file becomes a table named after it
 (`household-expenses.csv` is `household_expenses`), and the tables are

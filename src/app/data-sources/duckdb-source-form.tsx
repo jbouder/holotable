@@ -230,7 +230,7 @@ export function DuckDbSourceForm({
             id="d-path"
             label="Path"
             error={pathError}
-            hint="A directory of Parquet and CSV files, or a .duckdb file, under the server's DUCKDB_SOURCES_DIR."
+            hint="A directory of Parquet, CSV and JSON files, or a .duckdb file, under the server's DUCKDB_SOURCES_DIR."
           >
             <Autocomplete
               id="d-path"
@@ -256,7 +256,7 @@ export function DuckDbSourceForm({
         where={upload ? "in the uploaded files" : "under this path"}
         empty={
           menu.ran
-            ? "No tables under this path: a directory's tables are its Parquet and CSV files."
+            ? "No tables under this path: a directory's tables are its Parquet, CSV and JSON files."
             : upload
               ? "Upload files, and their tables are discovered here."
               : "Choose a path, then discover the tables this source may read."

@@ -310,7 +310,7 @@ export const config = {
 
   /**
    * The directory DuckDB sources (#572) may read: an absolute path, under
-   * which each source names a directory of Parquet and CSV files or a
+   * which each source names a directory of Parquet, CSV and JSON files or a
    * `.duckdb` file. A path that resolves outside it, symlinks included, is
    * refused. Empty (the default) refuses every DuckDB source, so the kind is
    * closed until an operator chooses what it may read.

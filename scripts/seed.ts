@@ -59,8 +59,8 @@ import { seedWorkspace } from "./lib/seed-workspace";
  *    Holotable logs dashboard once that Loki answers (#567), which it does
  *    only when the compose `logs` profile is up.
  *
- * With `DUCKDB_SOURCES_DIR` set, it also writes the files demo's Parquet and
- * CSV files under `<dir>/demo/` before anything else, and rewrites them every
+ * With `DUCKDB_SOURCES_DIR` set, it also writes the files demo's Parquet,
+ * CSV and JSON-lines files under `<dir>/demo/` before anything else, and rewrites them every
  * minute (#574, `scripts/lib/demo-files.ts`).
  *
  * Uses the privileged TimescaleDB connection for inserts — distinct
@@ -233,7 +233,7 @@ async function ensureDemo() {
       });
     }
 
-    // The files demo (#574): a DuckDB source over the Parquet and CSV files
+    // The files demo (#574): a DuckDB source over the Parquet, CSV and JSON files
     // the loop writes under DUCKDB_SOURCES_DIR. Only where that is set:
     // compose and the quick-start image (#600) set it. No secret_ref: a
     // DuckDB source has nothing to log in to.

@@ -36,7 +36,7 @@ export function renderDuckDbCatalog(source: DuckDbSourceRecord): string {
   const lines: string[] = [
     `Source: ${f(source.name, MAX.sourceName)} (id: ${f(source.id, MAX.sourceId)}, kind: duckdb)`,
     layout === "directory"
-      ? "Engine: DuckDB, over a directory of files (each table is one Parquet or CSV file)"
+      ? "Engine: DuckDB, over a directory of files (each table is one Parquet, CSV or JSON file)"
       : "Engine: DuckDB, over a database file",
     `Schema: ${DUCKDB_SCHEMA}`,
     "Tables (only these may be queried):",
@@ -73,8 +73,10 @@ export const DUCKDB_PROMPT =
   "`time_bucket(INTERVAL '5 minutes', ts)`, `date_trunc('minute', ts)` or " +
   "`date_bin(INTERVAL '5 minutes', ts, TIMESTAMP '2000-01-01')`. Column names are " +
   'case-sensitive as listed: double-quote any name that is not all lowercase (`"Value"`). ' +
-  "Do not cast to `::timestamptz`: use the time column as it is. Table functions " +
-  "such as `read_parquet` or `read_csv` are refused: query the tables listed.";
+  "Do not cast to `::timestamptz`: use the time column as it is. A STRUCT column " +
+  "(nested JSON) is read with `struct.field` (`location.city`) or `->>` " +
+  "(`location->>'city'`). Table functions such as `read_parquet`, `read_csv` or " +
+  "`read_json` are refused: query the tables listed.";
 
 /** The catalog block of the generation prompt, fenced as untrusted data. */
 export function buildDuckDbCatalogPrompt(source: DuckDbSourceRecord): string {

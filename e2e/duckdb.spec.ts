@@ -76,7 +76,9 @@ test("a DuckDB source: path picker, discovery, test, generate, render", async ({
     const report = page.getByRole("region", { name: `Test result for ${sourceName}` });
     await expect(report).toBeVisible();
     await expect(report.getByText(/^DuckDB \d/)).toBeVisible();
-    await expect(report.getByText("a directory of Parquet and CSV files")).toBeVisible();
+    await expect(
+      report.getByText("a directory of Parquet, CSV and JSON files"),
+    ).toBeVisible();
     await expect(report.getByText(/^Locked:/)).toBeVisible();
     await expectNoA11yViolations(page);
 
@@ -162,9 +164,12 @@ test("an uploaded CSV: progress, discovery, create, generate, render", async ({
     await dialog.getByRole("radio", { name: "Upload files" }).click();
     await dialog.getByLabel("Source id").fill(sourceId);
     await dialog.getByLabel("Name").fill(sourceName);
-    // The form offers the sample by URL; the journey picks the same file
-    // from disk, as a person would.
-    await expect(dialog.getByRole("button", { name: "Try the sample" })).toBeVisible();
+    // The form offers the samples by URL; the journey picks the CSV from
+    // disk, as a person would (the JSON journey below takes its sample).
+    await expect(
+      dialog.getByRole("button", { name: "household expenses" }),
+    ).toBeVisible();
+    await expect(dialog.getByRole("button", { name: "workouts" })).toBeVisible();
     await dialog.getByLabel("Files", { exact: true }).setInputFiles({
       name: "household-expenses.csv",
       mimeType: "text/csv",
@@ -243,15 +248,77 @@ test("an uploaded CSV: progress, discovery, create, generate, render", async ({
   expect(existsSync(join(DUCKDB_DIR, uploaded))).toBe(false);
 });
 
-test("the seeded Demo files dashboard renders from its Parquet and CSV files", async ({
+/*
+ * Uploading JSON lines (#596): the form's workouts sample, fetched from the
+ * app as the button does, stored with its own extension so the directory
+ * reads it as JSON, and its nested `location` queried as a STRUCT through
+ * the guard.
+ */
+test("an uploaded JSON-lines sample: stored as JSON, its nested field queried", async ({
+  page,
+  request,
+}) => {
+  test.setTimeout(120_000);
+  const sourceId = `e2e-json-${Date.now().toString(36)}`;
+  const sourceName = `E2E JSON ${sourceId}`;
+
+  await page.goto("/data-sources");
+  await page.getByRole("button", { name: "Add source" }).first().click();
+  const dialog = page.getByRole("dialog", { name: "Add source" });
+  await dialog.getByRole("button", { name: "or enter configuration manually" }).click();
+  await dialog.getByRole("radio", { name: "Upload files" }).click();
+  await dialog.getByLabel("Source id").fill(sourceId);
+  await dialog.getByLabel("Name").fill(sourceName);
+  await dialog.getByRole("button", { name: "workouts" }).click();
+  await expect(dialog.getByRole("progressbar", { name: "workouts.jsonl" })).toBeVisible();
+  await dialog.getByRole("button", { name: "Upload", exact: true }).click();
+  await expect(dialog.getByText("Stored as the table workouts")).toBeVisible();
+  await expect(dialog.getByText("Done", { exact: true })).toBeVisible();
+  // The nested object is one STRUCT column, offered like any other.
+  const table = dialog.getByRole("checkbox", { name: /^workouts\b/ });
+  await table.check();
+  await dialog.getByRole("button", { name: "Create source" }).click();
+  await expect(dialog).toBeHidden();
+
+  const listing = await request.get("/api/sources?workspaceId=demo");
+  const row = (await listing.json()).sources.find(
+    (s: { id: string }) => s.id === sourceId,
+  );
+  const uploaded: string = row?.config?.path ?? "";
+  expect(existsSync(join(DUCKDB_DIR, uploaded, "workouts.jsonl"))).toBe(true);
+  const location = row?.config?.tables?.[0]?.columns?.find(
+    (c: { name: string }) => c.name === "location",
+  );
+  expect(location?.type).toBe("STRUCT(city VARCHAR, country VARCHAR)");
+
+  const answer = await request.post("/api/query", {
+    data: {
+      sourceId,
+      sql: "SELECT location.country AS country, count(*) AS workouts FROM workouts GROUP BY 1 ORDER BY 1",
+      timeRange: { from: "now-1h", to: "now" },
+    },
+  });
+  expect(answer.ok(), await answer.text()).toBe(true);
+  expect((await answer.json()).rows).toEqual([
+    { country: "CA", workouts: 22 },
+    { country: "US", workouts: 68 },
+  ]);
+
+  const removed = await request.delete(`/api/sources/${sourceId}`);
+  expect(removed.ok(), await removed.text()).toBe(true);
+  expect(existsSync(join(DUCKDB_DIR, uploaded))).toBe(false);
+});
+
+test("the seeded Demo files dashboard renders from its Parquet, CSV and JSON files", async ({
   page,
   request,
 }) => {
   await page.goto(`/dashboards/${await dashboardId(request, "Demo files")}`);
   await waitForPanels(page);
   // A panel per file: requests by minute (time_bucket), revenue by day
-  // (date_trunc), and the requests file joined to the CSV inventory.
-  for (const id of ["rpm", "traffic", "revenue-daily", "requests-by-region"]) {
+  // (date_trunc), the requests file joined to the CSV inventory, and the
+  // deploys from JSON lines with a nested object (#596).
+  for (const id of ["rpm", "traffic", "revenue-daily", "requests-by-region", "deploys"]) {
     await expect(page.locator(`[data-panel-id="${id}"]`)).toHaveAttribute(
       "data-status",
       "live",

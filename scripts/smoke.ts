@@ -29,7 +29,7 @@ import { seedWorkspace } from "./lib/seed-workspace";
  * Holotable logs dashboard (#567), which reads the app's own log lines from
  * the `logs` profile's Loki while LOKI_SELF_URL is set, the service health
  * demo, whose custom visual (#405) must also compile, and the files demo
- * (#574), which reads Parquet and CSV files through DuckDB.
+ * (#574), which reads Parquet, CSV and JSON files through DuckDB.
  *
  * Brings no stack up of its own — `docker compose` does that, or the
  * quick-start image, inside which it runs as well (#600) — and instead
@@ -106,7 +106,7 @@ const TARGETS: Target[] = [
     committed: () => parseDashboard(demoSpec()),
     feeds: "the seeder writes demo rows every few seconds",
   },
-  // The files demo (#574): a DuckDB source over the Parquet and CSV files
+  // The files demo (#574): a DuckDB source over the Parquet, CSV and JSON files
   // the seeder writes under DUCKDB_SOURCES_DIR, which compose mounts here
   // read-only, as it does for the app. The seeder registers it only where
   // that is set.

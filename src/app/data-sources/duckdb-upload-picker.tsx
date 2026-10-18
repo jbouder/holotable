@@ -10,15 +10,17 @@ import {
   perFileSent,
   sampleUploadFile,
   type UploadedFile,
+  type UploadSample,
   uploadDuckDbFiles,
   uploadFilesProblem,
 } from "@/lib/duckdb-form";
+import { UPLOAD_ACCEPT } from "@/lib/sources/kinds/duckdb";
 import type { UploadAvailability } from "@/lib/sources/types";
 import { cn } from "@/lib/utils";
 
 /**
  * The file picker the "Upload files" form has in place of a path (#595):
- * choose CSV files (or the sample), upload them with progress per file and
+ * choose CSV or JSON files (or a sample), upload them with progress per file and
  * by stage, then the form goes on exactly as the server-files form does,
  * from discovery. Everything that decides anything is in `@/lib/duckdb-form`;
  * the server holds every rule again.
@@ -63,7 +65,7 @@ export function DuckDbUploadPicker({
     cancelled?: boolean;
   } | null>(null);
   const [stored, setStored] = React.useState<UploadedFile[]>([]);
-  const [fetchingSample, setFetchingSample] = React.useState(false);
+  const [fetchingSample, setFetchingSample] = React.useState<UploadSample | null>(null);
 
   // An upload still running when the form goes away is cancelled with it.
   React.useEffect(() => () => abortRef.current?.(), []);
@@ -79,10 +81,10 @@ export function DuckDbUploadPicker({
     setPhase("idle");
   }
 
-  async function trySample() {
-    setFetchingSample(true);
-    const sample = await sampleUploadFile();
-    setFetchingSample(false);
+  async function trySample(which: UploadSample) {
+    setFetchingSample(which);
+    const sample = await sampleUploadFile(which);
+    setFetchingSample(null);
     if (sample) choose([sample]);
     else setFailure({ error: "The sample could not be loaded from this server." });
   }
@@ -141,7 +143,7 @@ export function DuckDbUploadPicker({
           Files
         </span>
         <p id="d-files-hint" className="text-xs text-muted">
-          CSV files from your computer, up to {limits.maxFiles} at{" "}
+          CSV or JSON files from your computer, up to {limits.maxFiles} at{" "}
           {formatBytes(limits.maxBytes)} each. Each file becomes a table named after it.
         </p>
       </div>
@@ -150,7 +152,7 @@ export function DuckDbUploadPicker({
         id="d-files"
         type="file"
         multiple
-        accept=".csv,text/csv"
+        accept={UPLOAD_ACCEPT}
         className="sr-only"
         aria-labelledby="d-files-label"
         aria-describedby="d-files-hint"
@@ -196,16 +198,25 @@ export function DuckDbUploadPicker({
       </div>
       {files.length === 0 && (
         <p className="text-xs text-muted">
-          No file handy?{" "}
+          No file handy? Try a sample:{" "}
           <button
             type="button"
             className="text-foreground underline underline-offset-2"
-            aria-busy={fetchingSample || undefined}
-            onClick={() => void trySample()}
+            aria-busy={fetchingSample === "expenses" || undefined}
+            onClick={() => void trySample("expenses")}
           >
-            Try the sample
+            household expenses
           </button>{" "}
-          (six months of household expenses).
+          (a CSV, six months) or{" "}
+          <button
+            type="button"
+            className="text-foreground underline underline-offset-2"
+            aria-busy={fetchingSample === "workouts" || undefined}
+            onClick={() => void trySample("workouts")}
+          >
+            workouts
+          </button>{" "}
+          (JSON lines, with a nested location).
         </p>
       )}
 

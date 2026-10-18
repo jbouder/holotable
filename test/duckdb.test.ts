@@ -5,6 +5,7 @@ import {
   mkdtempSync,
   readFileSync,
   realpathSync,
+  rmSync,
   symlinkSync,
   writeFileSync,
 } from "node:fs";
@@ -13,7 +14,14 @@ import { join } from "node:path";
 import { DuckDBInstance } from "@duckdb/node-api";
 import { config } from "@/lib/config";
 import { DUCKDB_UNAVAILABLE, setDuckDbLoaderForTests } from "@/lib/duckdb/binding";
-import { lockStatements, openEngine } from "@/lib/duckdb/client";
+import {
+  JSON_MAX_OBJECT_BYTES,
+  JSON_SAMPLE_ROWS,
+  listDirectoryFiles,
+  lockStatements,
+  openEngine,
+  viewStatement,
+} from "@/lib/duckdb/client";
 import { listSourcePaths, resolveSourcePath, SOURCES_DIR_UNSET } from "@/lib/duckdb/path";
 import { parseGroups } from "@/lib/auth/claims";
 import { can } from "@/lib/auth/authorize";
@@ -34,7 +42,7 @@ import type { SourcePlan } from "@/lib/sources/server/types";
 
 /**
  * The DuckDB kind end to end (#572), against the real binding: a directory
- * of Parquet and CSV files and a `.duckdb` file each register, test, refresh
+ * of Parquet, CSV and JSON (#596) files and a `.duckdb` file each register, test, refresh
  * and answer a panel; the locked engine refuses the escapes the guard is
  * meant to stop first; and no path reaches a listing, a result or a log line.
  * The fixture files are written by the binding itself under a temporary
@@ -548,6 +556,104 @@ test("a panel runs through the poller's executor, and the plan view names no pat
     "session" in view && view.session.includes("SET lock_configuration=true"),
     JSON.stringify(view),
   );
+});
+
+test("a directory reads JSON as an array, one object per line or one object, after Parquet and CSV (#596)", async () => {
+  // Under the root for this test alone, so the picker's listing below is
+  // unchanged.
+  const dir = join(root, "json-files");
+  mkdirSync(dir);
+  try {
+    writeFileSync(
+      join(dir, "events.jsonl"),
+      '{"ts":"2026-01-01T00:06:00Z","kind":"deploy","where":{"city":"Oslo"}}\n' +
+        '{"ts":"2026-01-01T00:07:00Z","kind":"page","where":{"city":"Lima"}}\n',
+    );
+    writeFileSync(join(dir, "list.json"), '[{"n":1},{"n":2},{"n":3}]');
+    writeFileSync(join(dir, "single.ndjson"), '{"n":1}\n');
+    writeFileSync(join(dir, "one.JSON"), '{"name":"ada","tags":["a","b"]}');
+    // One stem, several files: Parquet over CSV over JSON, and among JSON
+    // files the first by name.
+    writeFileSync(join(dir, "both.csv"), "from\ncsv\n");
+    writeFileSync(join(dir, "both.json"), '[{"from":"json"}]');
+    writeFileSync(join(dir, "twice.jsonl"), '{"from":"jsonl"}\n');
+    writeFileSync(join(dir, "twice.json"), '{"from":"json"}');
+    writeFileSync(join(dir, "notes.txt"), "not a table\n");
+    const writer = await DuckDBInstance.create(":memory:");
+    const c = await writer.connect();
+    await c.run(
+      `COPY (SELECT 'parquet' AS "from") TO '${dir}/all.parquet' (FORMAT parquet)`,
+    );
+    await c.run(`COPY (SELECT 'csv' AS "from") TO '${dir}/all.csv' (HEADER)`);
+    await c.run(`COPY (SELECT 'json' AS "from") TO '${dir}/all.ndjson' (FORMAT json)`);
+    c.closeSync();
+    writer.closeSync();
+
+    const files = await listDirectoryFiles(dir);
+    assert.deepEqual(
+      files.map((f) => [f.name, f.reader, f.absolute.slice(dir.length + 1)]),
+      [
+        ["all", "read_parquet", "all.parquet"],
+        ["both", "read_csv", "both.csv"],
+        ["events", "read_json_auto", "events.jsonl"],
+        ["list", "read_json_auto", "list.json"],
+        ["one", "read_json_auto", "one.JSON"],
+        ["single", "read_json_auto", "single.ndjson"],
+        ["twice", "read_json_auto", "twice.json"],
+      ],
+    );
+    // A JSON file's view names the reader's bounds; the others take none.
+    const events = files.find((f) => f.name === "events");
+    assert.ok(events);
+    const statement = viewStatement(events);
+    assert.match(statement, /^CREATE VIEW "events" AS SELECT \* FROM read_json_auto\('/);
+    assert.ok(statement.includes(`maximum_object_size=${JSON_MAX_OBJECT_BYTES}`));
+    assert.ok(statement.includes(`sample_size=${JSON_SAMPLE_ROWS}`));
+    assert.ok(Number.isSafeInteger(JSON_MAX_OBJECT_BYTES) && JSON_MAX_OBJECT_BYTES > 0);
+    assert.ok(Number.isSafeInteger(JSON_SAMPLE_ROWS) && JSON_SAMPLE_ROWS > 0);
+    const csv = files.find((f) => f.name === "both");
+    assert.ok(csv && !viewStatement(csv).includes("maximum_object_size"));
+
+    // Read through discovery and a guarded panel, under the locked engine.
+    const tables = await duckdbDiscovery("json-files", "ws").tables();
+    const columns = Object.fromEntries(
+      tables.map((t) => [t.name, t.columns.map((col) => `${col.name} ${col.type}`)]),
+    );
+    assert.deepEqual(columns.events, [
+      "ts TIMESTAMP",
+      "kind VARCHAR",
+      "where STRUCT(city VARCHAR)",
+    ]);
+    assert.deepEqual(columns.list, ["n BIGINT"]);
+    assert.deepEqual(columns.one, ["name VARCHAR", "tags VARCHAR[]"]);
+    const source = record("json-files", {
+      kind: "duckdb",
+      path: "json-files",
+      tables: tables.filter((t) => ["events", "list", "one"].includes(t.name)),
+    });
+    const nested = await run(
+      source,
+      `SELECT ts, "where".city AS city, "where"->>'city' AS also FROM events ORDER BY ts`,
+      "ts",
+    );
+    assert.deepEqual(nested.rows, [
+      { ts: "2026-01-01T00:06:00.000Z", city: "Oslo", also: "Oslo" },
+      { ts: "2026-01-01T00:07:00.000Z", city: "Lima", also: "Lima" },
+    ]);
+    assert.equal((await run(source, "SELECT sum(n) AS n FROM list")).rows[0]?.n, 6);
+    assert.equal((await run(source, "SELECT name FROM one")).rows[0]?.name, "ada");
+    await serverKind("duckdb").dispose("json-files");
+
+    // A file the reader cannot parse fails discovery by its table, never a path.
+    writeFileSync(join(dir, "broken.json"), '[{"n":1}, {"n":');
+    await assert.rejects(duckdbDiscovery("json-files", "ws").tables(), (err: Error) => {
+      assert.match(err.message, /the table "broken" could not be read/);
+      assertNoPath(err.message);
+      return true;
+    });
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
 });
 
 test("the path picker lists names directly under the root, and nothing the guard would refuse (#573)", async () => {
