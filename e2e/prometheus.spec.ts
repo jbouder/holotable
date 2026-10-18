@@ -1,7 +1,7 @@
 import { expect, test } from "@playwright/test";
 import { PROM_URL } from "./env";
 import { expectNoA11yViolations, setAppearance } from "./support/a11y";
-import { waitForPanels } from "./support/app";
+import { unique, waitForPanels } from "./support/app";
 
 /*
  * A Prometheus source end to end (#390), against the stack's real Prometheus,
@@ -31,7 +31,7 @@ test("a Prometheus source: form, discovery, test, generate, render, brush, plan"
   request,
 }) => {
   test.setTimeout(180_000);
-  const sourceId = `e2e-prom-${Date.now().toString(36)}`;
+  const sourceId = `e2e-prom-${unique()}`;
   const sourceName = `E2E Prometheus ${sourceId}`;
 
   await test.step("register it through the form, discovering its metrics", async () => {
@@ -76,6 +76,17 @@ test("a Prometheus source: form, discovery, test, generate, render, brush, plan"
       .click();
     await expect(refresh).toBeHidden();
     await expect(page.locator(`#source-${sourceId}`)).toContainText("Catalog fresh");
+  });
+
+  await test.step("its kind is fixed: editing opens the Prometheus form, as saved", async () => {
+    await page.getByRole("button", { name: `Edit ${sourceName}` }).click();
+    const edit = page.getByRole("dialog", { name: `Edit ${sourceName}` });
+    await expect(edit.getByLabel("URL")).toHaveValue(PROM_URL);
+    await expect(
+      edit.getByText(/le, outcome, source|outcome, source/).first(),
+    ).toBeVisible();
+    await edit.getByRole("button", { name: "Cancel" }).click();
+    await expect(edit).toBeHidden();
   });
 
   let dashboardUrl = "";
@@ -153,7 +164,7 @@ test("clicking a PromQL series' label filters the dashboard to it (#388, #390)",
   page,
   request,
 }) => {
-  const stamp = Date.now().toString(36);
+  const stamp = unique();
   const created = await request.post("/api/dashboards", {
     data: {
       spec: {
