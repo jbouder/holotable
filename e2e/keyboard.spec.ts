@@ -1,11 +1,13 @@
 import { expect, type Page, test } from "@playwright/test";
 import { setAppearance } from "./support/a11y";
-import { DEMO_DASHBOARD, dashboardId, waitForPanels } from "./support/app";
+import { copyDashboard, DEMO_DASHBOARD, dashboardId, waitForPanels } from "./support/app";
 
 /*
  * What axe cannot see, because it is behavior (#77, #91): where focus goes when
  * a dialog opens and closes, that a keyboard can always see where it is, the
- * skip link, and the editor's panel keys.
+ * skip link, and the theme gallery's arrow keys. The editor's panel keys
+ * (arrows move a tile, Delete removes it) are held by
+ * test/panel-layout-grid.test.tsx, and its undo by test/editor-history.test.ts.
  */
 
 test.beforeEach(async ({ page }) => {
@@ -67,8 +69,10 @@ test("the share dialog keeps focus while it creates a link", async ({
   request,
 }) => {
   // #540: Create link disabled itself while focused, which dropped focus to
-  // the page behind the modal, and the next Tabs walked the page.
-  await page.goto(`/dashboards/${await dashboardId(request, DEMO_DASHBOARD)}`);
+  // the page behind the modal, and the next Tabs walked the page. On a copy,
+  // since this revokes every link it lists and the embed scan in
+  // a11y.spec.ts holds one on the seeded dashboard at the same time.
+  await page.goto(`/dashboards/${await copyDashboard(request, DEMO_DASHBOARD)}`);
   await waitForPanels(page);
   await page.getByRole("button", { name: "More actions" }).click();
   await page.getByRole("menuitem", { name: /Share read-only/ }).click();
@@ -133,34 +137,6 @@ for (const path of ["/dashboards", "/data-sources", "/explore"]) {
     expect(invisible, "focused without a visible indicator").toEqual([]);
   });
 }
-
-test("in the editor, Delete on a focused panel tile removes it, and undo restores it", async ({
-  page,
-  request,
-}) => {
-  await page.goto(`/dashboards/${await dashboardId(request, DEMO_DASHBOARD)}/edit`);
-  const tile = page.getByRole("button", { name: /^5xx error rate, column/ });
-  await tile.focus();
-  // Arrow keys move it: the label follows the panel's new position.
-  await page.keyboard.press("ArrowDown");
-  await expect(
-    page.getByRole("button", { name: /^5xx error rate, column \d+, row 5/ }),
-  ).toBeVisible();
-  await page.getByRole("button", { name: /^5xx error rate, column/ }).focus();
-  await page.keyboard.press("Delete");
-  // The demo panel's SQL is not a starter, so the editor asks first.
-  const confirm = page.getByRole("dialog");
-  if (await confirm.isVisible().catch(() => false)) {
-    await confirm.getByRole("button", { name: /^Delete/ }).click();
-  }
-  await expect(page.getByRole("button", { name: /^5xx error rate, column/ })).toHaveCount(
-    0,
-  );
-  await page.getByRole("button", { name: "Undo" }).click();
-  await expect(page.getByRole("button", { name: /^5xx error rate, column/ })).toHaveCount(
-    1,
-  );
-});
 
 test("the theme gallery is a radio group: Tab reaches the choice, arrows move and choose", async ({
   page,

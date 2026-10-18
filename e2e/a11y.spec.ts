@@ -10,35 +10,52 @@ import {
   createLinkedDashboards,
   createLogqlDashboard,
   createPromqlDashboard,
+  copyDashboard,
   createShareLink,
   DEMO_DASHBOARD,
   dashboardId,
   discoverLokiLabels,
   openLokiForm,
+  unique,
   waitForPanels,
 } from "./support/app";
 
 /*
- * Every main surface, in both themes (#91): contrast differs between them, so
- * a token that passes in one can fail in the other.
+ * The accessibility scans (#91), and what is scanned where (#610).
+ *
+ * Every main surface, its dialogs, menus and popovers, in the default
+ * palette's two schemes, dark and light: what only a browser can prove is
+ * that a surface is built right (roles, names, labels, focus, nothing
+ * unnamed), and contrast differs between the schemes, so a token that passes
+ * in one can fail in the other.
+ *
+ * Each other shipped palette (#503) is scanned on one page, the live
+ * dashboard (the most components at once, a truncation popover among them),
+ * in both of its schemes, so the palette switch and its tokens are still
+ * exercised in a browser. That every token pairing meets AA in every palette
+ * is held without a browser, by test/contrast.test.ts (CONTRAST_PAIRS, every
+ * palette's blocks over Holotable's) and test/theme-quality.test.ts (every
+ * shipped theme against the quality bar in both schemes); scanning thirty
+ * surfaces sixteen times proved that again, slowly.
+ *
+ * The forced-colors tests, the embed's theme from its link (hostile values
+ * included) and the signed-out card are below, unchanged.
+ *
+ * A scan that stores an upload is tagged @serial and runs in the serial
+ * project (e2e/playwright.config.ts): uploads are rate limited per person,
+ * and the DuckDB spec spends from the same budget.
  */
 
 const THEMES: Theme[] = ["dark", "light"];
 
-// Every shipped named theme (#503) in both schemes. Holotable keeps the names
-// the suite always had.
-const APPEARANCES = PALETTE_INFO.flatMap((p) =>
-  THEMES.map((theme) => ({
-    theme,
-    palette: p.name,
-    name: p.name === "holotable" ? `${theme} theme` : `${p.label} ${theme}`,
-  })),
-);
+/** A scan that stores an upload: run one at a time, after the parallel specs. */
+const SERIAL = { tag: "@serial" };
 
-for (const { theme, palette, name } of APPEARANCES) {
-  test.describe(name, () => {
+// Every surface in the default palette, in each scheme.
+for (const theme of THEMES) {
+  test.describe(`${theme} theme`, () => {
     test.beforeEach(async ({ page }) => {
-      await setAppearance(page, theme, palette);
+      await setAppearance(page, theme);
     });
 
     test("dashboard list", async ({ page }) => {
@@ -183,135 +200,140 @@ for (const { theme, palette, name } of APPEARANCES) {
       await expectNoA11yViolations(page);
     });
 
-    test("the upload form, finished, with its progress bars (#595)", async ({ page }) => {
-      // Each run stores an upload (rate limited per user), so the default
-      // palette in both schemes, not every named theme.
-      test.skip(palette !== "holotable", "scanned in the default palette's two schemes");
-      await page.goto("/data-sources");
-      await page.getByRole("button", { name: "Add source" }).first().click();
-      const dialog = page.getByRole("dialog", { name: "Add source" });
-      await dialog
-        .getByRole("button", { name: "or enter configuration manually" })
-        .click();
-      await dialog.getByRole("radio", { name: "Upload files" }).click();
-      await dialog.getByRole("button", { name: "household expenses" }).click();
-      await expect(dialog.getByRole("progressbar")).toBeVisible();
-      await dialog.getByRole("button", { name: "Upload", exact: true }).click();
-      await expect(dialog.getByText("Done", { exact: true })).toBeVisible();
-      await expectNoA11yViolations(page);
-    });
-
-    test("the Add files dialog on an upload source, with a file chosen (#604)", async ({
-      page,
-      request,
-    }) => {
-      // Each run stores an upload, so the default palette's two schemes only.
-      test.skip(palette !== "holotable", "scanned in the default palette's two schemes");
-      const id = `a11y-add-${theme}-${Date.now().toString(36)}`;
-      const name = `A11y upload ${id}`;
-      const upload = await request.post("/api/sources/duckdb/uploads?workspaceId=demo", {
-        multipart: {
-          files: {
-            name: "a11y.csv",
-            mimeType: "text/csv",
-            buffer: Buffer.from("a\n1\n"),
-          },
-        },
-      });
-      expect(upload.ok(), await upload.text()).toBe(true);
-      const { path } = await upload.json();
-      const created = await request.post("/api/sources", {
-        data: {
-          workspaceId: "demo",
-          id,
-          name,
-          config: {
-            kind: "duckdb",
-            path,
-            tables: [{ name: "a11y", columns: [{ name: "a", type: "BIGINT" }] }],
-          },
-        },
-      });
-      expect(created.ok(), await created.text()).toBe(true);
-      try {
+    test(
+      "the upload form, finished, with its progress bars (#595)",
+      SERIAL,
+      async ({ page }) => {
         await page.goto("/data-sources");
-        await page.getByRole("button", { name: `Add files to ${name}` }).click();
-        const dialog = page.getByRole("dialog", { name: `Add files to ${name}` });
-        await expect(dialog).toBeVisible();
-        await expectNoA11yViolations(page);
+        await page.getByRole("button", { name: "Add source" }).first().click();
+        const dialog = page.getByRole("dialog", { name: "Add source" });
+        await dialog
+          .getByRole("button", { name: "or enter configuration manually" })
+          .click();
+        await dialog.getByRole("radio", { name: "Upload files" }).click();
         await dialog.getByRole("button", { name: "household expenses" }).click();
         await expect(dialog.getByRole("progressbar")).toBeVisible();
+        await dialog.getByRole("button", { name: "Upload", exact: true }).click();
+        await expect(dialog.getByText("Done", { exact: true })).toBeVisible();
         await expectNoA11yViolations(page);
-      } finally {
-        await request.delete(`/api/sources/${id}`);
-      }
-    });
+      },
+    );
 
-    test("new dashboard led by a recognized starter, and the starter applied (#606)", async ({
-      page,
-      request,
-    }) => {
-      // Each run stores an upload, so the default palette's two schemes only.
-      test.skip(palette !== "holotable", "scanned in the default palette's two schemes");
-      const id = `a11y-starter-${theme}-${Date.now().toString(36)}`;
-      const upload = await request.post("/api/sources/duckdb/uploads?workspaceId=demo", {
-        multipart: {
-          files: {
-            name: "household-expenses.csv",
-            mimeType: "text/csv",
-            buffer: readFileSync(
-              join(process.cwd(), "public/samples/household-expenses.csv"),
-            ),
-          },
-        },
-      });
-      expect(upload.ok(), await upload.text()).toBe(true);
-      const { path } = await upload.json();
-      const created = await request.post("/api/sources", {
-        data: {
-          workspaceId: "demo",
-          id,
-          name: `A11y starter ${id}`,
-          config: {
-            kind: "duckdb",
-            path,
-            tables: [
-              {
-                name: "household_expenses",
-                timeField: "date",
-                columns: [
-                  { name: "date", type: "DATE" },
-                  { name: "merchant", type: "VARCHAR" },
-                  { name: "category", type: "VARCHAR" },
-                  { name: "amount", type: "DOUBLE" },
-                  { name: "payment_method", type: "VARCHAR" },
-                ],
+    test(
+      "the Add files dialog on an upload source, with a file chosen (#604)",
+      SERIAL,
+      async ({ page, request }) => {
+        const id = `a11y-add-${theme}-${unique()}`;
+        const name = `A11y upload ${id}`;
+        const upload = await request.post(
+          "/api/sources/duckdb/uploads?workspaceId=demo",
+          {
+            multipart: {
+              files: {
+                name: "a11y.csv",
+                mimeType: "text/csv",
+                buffer: Buffer.from("a\n1\n"),
               },
-            ],
+            },
           },
-        },
-      });
-      expect(created.ok(), await created.text()).toBe(true);
-      try {
-        await page.goto(`/dashboards/new?source=${id}`);
-        const start = page.getByRole("button", {
-          name: "Start from Spending — household_expenses",
+        );
+        expect(upload.ok(), await upload.text()).toBe(true);
+        const { path } = await upload.json();
+        const created = await request.post("/api/sources", {
+          data: {
+            workspaceId: "demo",
+            id,
+            name,
+            config: {
+              kind: "duckdb",
+              path,
+              tables: [{ name: "a11y", columns: [{ name: "a", type: "BIGINT" }] }],
+            },
+          },
         });
-        await expect(start).toBeVisible();
-        await expectNoA11yViolations(page);
-        await start.click();
-        const preview = page.getByRole("region", { name: "Dashboard preview" });
-        await expect(
-          preview.getByRole("heading", { name: "Spending — household_expenses" }),
-        ).toBeVisible();
-        await expect(
-          preview.locator('[data-panel-id][data-status="loading"]'),
-        ).toHaveCount(0);
-        await expectNoA11yViolations(page);
-      } finally {
-        await request.delete(`/api/sources/${id}`);
-      }
-    });
+        expect(created.ok(), await created.text()).toBe(true);
+        try {
+          await page.goto("/data-sources");
+          await page.getByRole("button", { name: `Add files to ${name}` }).click();
+          const dialog = page.getByRole("dialog", { name: `Add files to ${name}` });
+          await expect(dialog).toBeVisible();
+          await expectNoA11yViolations(page);
+          await dialog.getByRole("button", { name: "household expenses" }).click();
+          await expect(dialog.getByRole("progressbar")).toBeVisible();
+          await expectNoA11yViolations(page);
+        } finally {
+          await request.delete(`/api/sources/${id}`);
+        }
+      },
+    );
+
+    test(
+      "new dashboard led by a recognized starter, and the starter applied (#606)",
+      SERIAL,
+      async ({ page, request }) => {
+        const id = `a11y-starter-${theme}-${unique()}`;
+        const upload = await request.post(
+          "/api/sources/duckdb/uploads?workspaceId=demo",
+          {
+            multipart: {
+              files: {
+                name: "household-expenses.csv",
+                mimeType: "text/csv",
+                buffer: readFileSync(
+                  join(process.cwd(), "public/samples/household-expenses.csv"),
+                ),
+              },
+            },
+          },
+        );
+        expect(upload.ok(), await upload.text()).toBe(true);
+        const { path } = await upload.json();
+        const created = await request.post("/api/sources", {
+          data: {
+            workspaceId: "demo",
+            id,
+            name: `A11y starter ${id}`,
+            config: {
+              kind: "duckdb",
+              path,
+              tables: [
+                {
+                  name: "household_expenses",
+                  timeField: "date",
+                  columns: [
+                    { name: "date", type: "DATE" },
+                    { name: "merchant", type: "VARCHAR" },
+                    { name: "category", type: "VARCHAR" },
+                    { name: "amount", type: "DOUBLE" },
+                    { name: "payment_method", type: "VARCHAR" },
+                  ],
+                },
+              ],
+            },
+          },
+        });
+        expect(created.ok(), await created.text()).toBe(true);
+        try {
+          await page.goto(`/dashboards/new?source=${id}`);
+          const start = page.getByRole("button", {
+            name: "Start from Spending — household_expenses",
+          });
+          await expect(start).toBeVisible();
+          await expectNoA11yViolations(page);
+          await start.click();
+          const preview = page.getByRole("region", { name: "Dashboard preview" });
+          await expect(
+            preview.getByRole("heading", { name: "Spending — household_expenses" }),
+          ).toBeVisible();
+          await expect(
+            preview.locator('[data-panel-id][data-status="loading"]'),
+          ).toHaveCount(0);
+          await expectNoA11yViolations(page);
+        } finally {
+          await request.delete(`/api/sources/${id}`);
+        }
+      },
+    );
 
     test("data sources, the Loki form and its discovered labels (#563)", async ({
       page,
@@ -400,7 +422,9 @@ for (const { theme, palette, name } of APPEARANCES) {
     });
 
     test("the dashboard chat panel", async ({ page, request }) => {
-      await page.goto(`/dashboards/${await dashboardId(request, DEMO_DASHBOARD)}`);
+      // A copy: a dashboard's chat is stored per person, and other tests chat
+      // on the seeded one at the same time.
+      await page.goto(`/dashboards/${await copyDashboard(request, DEMO_DASHBOARD)}`);
       await waitForPanels(page);
       await page
         .getByRole("button", { name: "Ask about this dashboard" })
@@ -422,6 +446,30 @@ for (const { theme, palette, name } of APPEARANCES) {
       await chat.getByRole("button", { name: "Clear chat" }).click();
     });
   });
+}
+
+/**
+ * Every other shipped palette (#503), on the live dashboard in both schemes:
+ * the switch reaches the page, and its tokens draw a scanned surface. The
+ * pairings themselves are measured in test/contrast.test.ts and
+ * test/theme-quality.test.ts.
+ */
+for (const palette of PALETTE_INFO.filter((p) => p.name !== "holotable")) {
+  for (const theme of THEMES) {
+    test(`${palette.label} ${theme}: the live dashboard`, async ({ page, request }) => {
+      await setAppearance(page, theme, palette.name);
+      await page.goto(`/dashboards/${await dashboardId(request, DEMO_DASHBOARD)}`);
+      await expect(page.locator("html")).toHaveAttribute("data-palette", palette.name);
+      await expect(page.locator("html")).toHaveAttribute("data-theme", theme);
+      await waitForPanels(page);
+      const cut = page.getByRole("button", { name: /some rows are not shown/ }).first();
+      await expect(cut).toBeVisible();
+      await expectNoA11yViolations(page);
+      await cut.click();
+      await expect(page.getByText(/MAX_WINDOW_POINTS rows/)).toBeVisible();
+      await expectNoA11yViolations(page);
+    });
+  }
 }
 
 test("signed out: the sign-in card", async ({ browser }) => {

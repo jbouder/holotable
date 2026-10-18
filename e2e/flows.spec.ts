@@ -1,24 +1,30 @@
 import { expect, test } from "@playwright/test";
 import { STUB_CHAT_REPLY } from "../src/lib/ai/stub";
 import { SPEC_VERSION } from "../src/lib/ir";
-import { LOKI_URL, PG_PORT, storageStatePath } from "./env";
+import { PG_PORT, storageStatePath } from "./env";
 import {
   askChat,
   clickChart,
+  copyDashboard,
   createDrilldownDashboards,
   createLinkedDashboards,
   DEMO_DASHBOARD,
   dashboardId,
-  discoverLokiLabels,
-  LOKI_APP_VALUES,
-  openLokiForm,
+  unique,
   waitForPanels,
 } from "./support/app";
 
 /*
  * The flows around the core journey (#88): Chat, dashboard chat, a source
  * removed out from under a dashboard, and a viewer kept out of the editor.
+ *
+ * In the parallel project (#610): each test makes its own records under a
+ * unique name. The two tagged @serial change something the whole workspace
+ * or the whole person shares, and say what at their top.
  */
+
+/** Runs in the serial project, one at a time after the parallel ones. */
+const SERIAL = { tag: "@serial" };
 
 test("Explore is in the main nav, and an old /chat link lands there", async ({
   page,
@@ -30,7 +36,7 @@ test("Explore is in the main nav, and an old /chat link lands there", async ({
     .click();
   await expect(page).toHaveURL(/\/explore$/);
   await expect(page.getByRole("heading", { level: 1, name: "Explore" })).toBeVisible();
-  await page.goto("/explore");
+  await page.goto("/chat");
   await expect(page).toHaveURL(/\/explore$/);
 });
 
@@ -44,7 +50,9 @@ test("a chat panel is added to a new dashboard as the ordinary save", async ({
   const dialog = page.getByRole("dialog", { name: "Add to dashboard" });
   await dialog.getByRole("combobox", { name: "Dashboard" }).click();
   await page.getByRole("option", { name: "New dashboard…" }).click();
-  await dialog.getByRole("textbox", { name: "New dashboard title" }).fill("From chat");
+  await dialog
+    .getByRole("textbox", { name: "New dashboard title" })
+    .fill(`From chat ${unique()}`);
   await dialog.getByRole("button", { name: "Create dashboard" }).click();
   // A new dashboard opens in the editor with the panel selected.
   await expect(page).toHaveURL(
@@ -73,58 +81,59 @@ test("chat answers with an inline panel that survives a reload", async ({ page }
 });
 
 test("chat history: a conversation is listed, renamed and deleted", async ({ page }) => {
-  await askChat(page, "Which service is busiest right now?");
+  // Titles of this test's own, since other tests chat at the same time.
+  const id = unique();
+  const question = `Which service is busiest right now? ${id}`;
+  const renamed = `Busiest service ${id}`;
+  await askChat(page, question);
   await expect(page.getByText(STUB_CHAT_REPLY)).toBeVisible();
   const history = page.getByRole("navigation", { name: "History" });
-  const entry = history.getByRole("link", {
-    name: "Which service is busiest right now?",
-  });
+  const entry = history.getByRole("link", { name: question });
   await expect(entry).toHaveAttribute("aria-current", "page");
 
-  await history
-    .getByRole("button", { name: "Rename Which service is busiest right now?" })
-    .click();
-  await history
-    .getByRole("textbox", { name: "Conversation title" })
-    .fill("Busiest service");
+  await history.getByRole("button", { name: `Rename ${question}` }).click();
+  await history.getByRole("textbox", { name: "Conversation title" }).fill(renamed);
   await history.getByRole("button", { name: "Save title" }).click();
-  await expect(history.getByRole("link", { name: "Busiest service" })).toBeVisible();
+  await expect(history.getByRole("link", { name: renamed })).toBeVisible();
 
   // Deleting the open conversation leaves for a new one.
-  await history.getByRole("button", { name: "Delete Busiest service" }).click();
+  await history.getByRole("button", { name: `Delete ${renamed}` }).click();
   await expect(page).toHaveURL(/\/explore$/);
   await expect(
     page
       .getByRole("navigation", { name: "History" })
-      .getByRole("link", { name: "Busiest service" }),
+      .getByRole("link", { name: renamed }),
   ).toHaveCount(0);
 });
 
-test("chat with Keep my conversations off: answered, stored nowhere", async ({
-  page,
-  request,
-}) => {
-  await askChat(page, "Kept question");
-  await expect(page.getByText(STUB_CHAT_REPLY)).toBeVisible();
-  try {
-    // Turning it off asks, then deletes what was kept and starts again.
-    await page.getByRole("checkbox", { name: "Keep my conversations" }).click();
-    const confirm = page.getByRole("dialog", { name: "Stop keeping conversations?" });
-    await confirm.getByRole("button", { name: "Stop and delete" }).click();
-    await expect(page).toHaveURL(/\/explore$/);
-    const list = await (await request.get("/api/chat")).json();
-    expect(list.conversations).toEqual([]);
+test(
+  "chat with Keep my conversations off: answered, stored nowhere",
+  SERIAL,
+  async ({ page, request }) => {
+    // Serial: the preference is the person's, everywhere, and turning it off
+    // deletes every conversation they kept, other tests' among them.
+    await askChat(page, "Kept question");
+    await expect(page.getByText(STUB_CHAT_REPLY)).toBeVisible();
+    try {
+      // Turning it off asks, then deletes what was kept and starts again.
+      await page.getByRole("checkbox", { name: "Keep my conversations" }).click();
+      const confirm = page.getByRole("dialog", { name: "Stop keeping conversations?" });
+      await confirm.getByRole("button", { name: "Stop and delete" }).click();
+      await expect(page).toHaveURL(/\/explore$/);
+      const list = await (await request.get("/api/chat")).json();
+      expect(list.conversations).toEqual([]);
 
-    // A question is still answered, with its panel, through the unkept turn.
-    await askChat(page, "Unkept question");
-    const table = page.getByRole("region", { name: "Requests by service, table" });
-    await expect(table.getByRole("cell", { name: "api", exact: true })).toBeVisible();
-    await expect(page).toHaveURL(/\/explore$/);
-    expect((await (await request.get("/api/chat")).json()).conversations).toEqual([]);
-  } finally {
-    await request.patch("/api/me/preferences", { data: { rememberChats: true } });
-  }
-});
+      // A question is still answered, with its panel, through the unkept turn.
+      await askChat(page, "Unkept question");
+      const table = page.getByRole("region", { name: "Requests by service, table" });
+      await expect(table.getByRole("cell", { name: "api", exact: true })).toBeVisible();
+      await expect(page).toHaveURL(/\/explore$/);
+      expect((await (await request.get("/api/chat")).json()).conversations).toEqual([]);
+    } finally {
+      await request.patch("/api/me/preferences", { data: { rememberChats: true } });
+    }
+  },
+);
 
 for (const width of [1440, 390]) {
   test(`the demo dashboard at ${width} px does not scroll sideways`, async ({
@@ -185,7 +194,9 @@ test("Open in Explore continues the dashboard's conversation on its own page", a
   page,
   request,
 }) => {
-  await page.goto(`/dashboards/${await dashboardId(request, DEMO_DASHBOARD)}`);
+  // A copy: a dashboard's chat is stored per person, and other tests chat
+  // on the seeded one at the same time.
+  await page.goto(`/dashboards/${await copyDashboard(request, DEMO_DASHBOARD)}`);
   await page.getByRole("button", { name: "Ask about this dashboard" }).click();
   const chat = page.getByRole("dialog", { name: "Dashboard chat" });
   const clear = chat.getByRole("button", { name: "Clear chat" });
@@ -212,8 +223,9 @@ test("Open in Explore continues the dashboard's conversation on its own page", a
 
 test("dashboard chat answers in the panel", async ({ page, request }) => {
   // A window that is not the dashboard's own, so the URL carries it (#366).
+  // A copy, as above: its chat is this test's alone.
   await page.goto(
-    `/dashboards/${await dashboardId(request, DEMO_DASHBOARD)}?from=now-2d&to=now`,
+    `/dashboards/${await copyDashboard(request, DEMO_DASHBOARD)}?from=now-2d&to=now`,
   );
   const launcher = page.getByRole("button", { name: "Ask about this dashboard" });
   await launcher.click();
@@ -271,95 +283,8 @@ test("dashboard chat answers in the panel", async ({ page, request }) => {
   await chat.getByRole("button", { name: "Clear chat" }).click();
 });
 
-test("a source admin registers a Prometheus source through the form (#386)", async ({
-  page,
-  request,
-}) => {
-  const id = `e2e-prom-${Date.now().toString(36)}`;
-  const name = `Prometheus ${id}`;
-  await page.goto("/data-sources");
-  await page.getByRole("button", { name: "Add source" }).first().click();
-  const dialog = page.getByRole("dialog", { name: "Add source" });
-  await dialog.getByRole("button", { name: "or enter configuration manually" }).click();
-  await dialog.getByRole("radio", { name: "Prometheus (PromQL)" }).click();
-  await dialog.getByLabel("Source id").fill(id);
-  await dialog.getByLabel("Name").fill(name);
-  // A public address literal: the save checks it against SOURCE_URL_ALLOWLIST
-  // without resolving anything, and nothing here contacts it.
-  await dialog.getByLabel("URL").fill("https://93.184.216.34");
-  await dialog.getByRole("combobox", { name: "Authentication" }).click();
-  await page.getByRole("option", { name: "None (in-cluster endpoint)" }).click();
-  // No endpoint to discover from here, so the allowlist goes in through the
-  // JSON view, which the form reads back.
-  await dialog.getByRole("button", { name: "Advanced (JSON)" }).click();
-  await dialog.getByLabel("Endpoint + catalog (JSON)").fill(
-    JSON.stringify({
-      kind: "prometheus",
-      url: "https://93.184.216.34",
-      auth: "none",
-      metrics: [{ name: "up", type: "gauge", labels: ["job", "instance"] }],
-    }),
-  );
-  await dialog.getByRole("button", { name: "Back to the form" }).click();
-  await expect(dialog.getByText("job, instance")).toBeVisible();
-  await dialog.getByRole("button", { name: "Create source" }).click();
-  await expect(dialog).toBeHidden();
-  const row = page.locator(`#source-${id}`);
-  await expect(row).toBeVisible();
-  await expect(row).toContainText("https://93.184.216.34");
-
-  // Its kind is fixed: editing opens the Prometheus form, as saved.
-  await page.getByRole("button", { name: `Edit ${name}` }).click();
-  const edit = page.getByRole("dialog", { name: `Edit ${name}` });
-  await expect(edit.getByLabel("URL")).toHaveValue("https://93.184.216.34");
-  await expect(edit.getByText("job, instance")).toBeVisible();
-  await edit.getByRole("button", { name: "Cancel" }).click();
-
-  const removed = await request.delete(`/api/sources/${id}`);
-  expect(removed.ok(), await removed.text()).toBe(true);
-});
-
-test("a source admin registers a Loki source through the form (#563)", async ({
-  page,
-  request,
-}) => {
-  const id = `e2e-loki-${Date.now().toString(36)}`;
-  const name = `Loki ${id}`;
-  const dialog = await openLokiForm(page);
-  await dialog.getByLabel("Source id").fill(id);
-  await dialog.getByLabel("Name").fill(name);
-  await discoverLokiLabels(dialog);
-  await dialog.getByRole("button", { name: "Create source" }).click();
-  await expect(dialog).toBeHidden();
-  const row = page.locator(`#source-${id}`);
-  await expect(row).toBeVisible();
-  await expect(row).toContainText(LOKI_URL);
-  // Discovered, never refreshed: the health says so.
-  await expect(row).toContainText("Never refreshed");
-
-  // Saved as ticked, with the values discovery found as hints.
-  const saved = await request.get(`/api/sources/${id}`);
-  expect(saved.ok(), await saved.text()).toBe(true);
-  const body = (await saved.json()) as { source: { config: unknown } };
-  expect(body.source.config).toMatchObject({
-    kind: "loki",
-    auth: "none",
-    labels: [{ name: "app", values: LOKI_APP_VALUES }],
-  });
-
-  // Its kind is fixed: editing opens the Loki form, as saved.
-  await page.getByRole("button", { name: `Edit ${name}` }).click();
-  const edit = page.getByRole("dialog", { name: `Edit ${name}` });
-  await expect(edit.getByLabel("URL")).toHaveValue(LOKI_URL);
-  await expect(edit.getByText(LOKI_APP_VALUES.join(", "))).toBeVisible();
-  await edit.getByRole("button", { name: "Cancel" }).click();
-
-  const removed = await request.delete(`/api/sources/${id}`);
-  expect(removed.ok(), await removed.text()).toBe(true);
-});
-
 test("a deleted source tombstones the panels that used it", async ({ page, request }) => {
-  const id = `e2e-gone-${Date.now().toString(36)}`;
+  const id = `e2e-gone-${unique()}`;
   const name = `Doomed ${id}`;
   const created = await request.post("/api/sources", {
     data: {
@@ -554,51 +479,55 @@ test("an author adds a link in the inspector, and a reader follows it (#374)", a
   expect(new URL(page.url()).searchParams.getAll("var-route")).toEqual(["/search"]);
 });
 
-test("a source admin adds, tests, sets as default and deletes a workspace model (#441)", async ({
-  page,
-}) => {
-  const name = `E2E stub ${Date.now().toString(36)}`;
-  await page.goto("/dashboards");
-  await page
-    .getByRole("navigation", { name: "Main" })
-    .getByRole("link", { name: "Models" })
-    .click();
-  await expect(page).toHaveURL(/\/models$/);
-  await expect(page.getByRole("heading", { level: 1, name: "Models" })).toBeVisible();
-  await expect(page.getByText("Server", { exact: true })).toBeVisible();
+test(
+  "a source admin adds, tests, sets as default and deletes a workspace model (#441)",
+  SERIAL,
+  async ({ page }) => {
+    // Serial: while it is the workspace's default, every generation that has
+    // no pick of its own runs on it, and it is deleted at the end.
+    const name = `E2E stub ${unique()}`;
+    await page.goto("/dashboards");
+    await page
+      .getByRole("navigation", { name: "Main" })
+      .getByRole("link", { name: "Models" })
+      .click();
+    await expect(page).toHaveURL(/\/models$/);
+    await expect(page.getByRole("heading", { level: 1, name: "Models" })).toBeVisible();
+    await expect(page.getByText("Server", { exact: true })).toBeVisible();
 
-  await page.getByRole("button", { name: "Add model to demo" }).click();
-  const dialog = page.getByRole("dialog", { name: "Add model" });
-  await dialog.getByLabel("Name").fill(name);
-  await dialog.getByRole("combobox", { name: "Provider" }).click();
-  await page.getByRole("option", { name: "Stub (recorded answers)" }).click();
-  // The stub lists one model (#443); the field still takes any typed id.
-  await dialog.getByRole("button", { name: "List models" }).click();
-  await expect(dialog.getByText(/1 model listed/)).toBeVisible();
-  // The suggestions open under the field as it is typed in; Tab moves on and
-  // closes them, as it would for a person.
-  await dialog.getByLabel(/^Model/).fill("stub");
-  await expect(page.getByRole("option", { name: /stub/ })).toBeVisible();
-  await dialog.getByLabel(/^Model/).press("Tab");
-  await expect(page.getByRole("option", { name: /stub/ })).toHaveCount(0);
-  await dialog.getByRole("button", { name: "Test connection" }).click();
-  await expect(dialog.getByText(/answered in \d+ ms/)).toBeVisible();
-  await dialog.getByRole("button", { name: "Add model" }).click();
-  await expect(dialog).toBeHidden();
+    await page.getByRole("button", { name: "Add model to demo" }).click();
+    const dialog = page.getByRole("dialog", { name: "Add model" });
+    await dialog.getByLabel("Name").fill(name);
+    await dialog.getByRole("combobox", { name: "Provider" }).click();
+    await page.getByRole("option", { name: "Stub (recorded answers)" }).click();
+    // The stub lists one model (#443); the field still takes any typed id.
+    await dialog.getByRole("button", { name: "List models" }).click();
+    await expect(dialog.getByText(/1 model listed/)).toBeVisible();
+    // The suggestions open under the field as it is typed in; Tab moves on and
+    // closes them, as it would for a person.
+    await dialog.getByLabel(/^Model/).fill("stub");
+    await expect(page.getByRole("option", { name: /stub/ })).toBeVisible();
+    await dialog.getByLabel(/^Model/).press("Tab");
+    await expect(page.getByRole("option", { name: /stub/ })).toHaveCount(0);
+    await dialog.getByRole("button", { name: "Test connection" }).click();
+    await expect(dialog.getByText(/answered in \d+ ms/)).toBeVisible();
+    await dialog.getByRole("button", { name: "Add model" }).click();
+    await expect(dialog).toBeHidden();
 
-  const row = page.getByRole("row").filter({ hasText: name });
-  await expect(row).toBeVisible();
-  await row.getByRole("button", { name: /Set as default/ }).click();
-  await expect(row.getByText("Default", { exact: true })).toBeVisible();
-  await expect(page.getByText(`generations here use ${name}`)).toBeVisible();
+    const row = page.getByRole("row").filter({ hasText: name });
+    await expect(row).toBeVisible();
+    await row.getByRole("button", { name: /Set as default/ }).click();
+    await expect(row.getByText("Default", { exact: true })).toBeVisible();
+    await expect(page.getByText(`generations here use ${name}`)).toBeVisible();
 
-  await page.getByRole("button", { name: `Delete ${name}` }).click();
-  await page
-    .getByRole("dialog", { name: `Delete ${name}?` })
-    .getByRole("button", { name: "Delete" })
-    .click();
-  await expect(row).toHaveCount(0);
-});
+    await page.getByRole("button", { name: `Delete ${name}` }).click();
+    await page
+      .getByRole("dialog", { name: `Delete ${name}?` })
+      .getByRole("button", { name: "Delete" })
+      .click();
+    await expect(row).toHaveCount(0);
+  },
+);
 
 test("the Models page lists a model detected on this machine, and Re-scan asks again (#607)", async ({
   page,
@@ -635,7 +564,7 @@ test("a generation runs on the model picked on the chip, and the audit row names
   await page.getByRole("menuitemradio", { name: /^stub-b\b/ }).click();
   await expect(page.getByRole("button", { name: /^Model: stub-b/ })).toBeVisible();
 
-  const prompt = `Checkout health ${Date.now().toString(36)}`;
+  const prompt = `Checkout health ${unique()}`;
   await page.getByLabel("Describe the dashboard").fill(prompt);
   await page.getByRole("button", { name: "Generate" }).click();
   const preview = page.getByRole("region", { name: "Dashboard preview" });
@@ -673,20 +602,5 @@ test.describe("as a viewer", () => {
       page.getByRole("heading", { name: "This page could not be found." }),
     ).toBeVisible();
     await expect(page.locator("#p-title")).toHaveCount(0);
-  });
-
-  test("a viewer generates nowhere, so has no Models link and no Models page (#441)", async ({
-    page,
-  }) => {
-    await page.goto("/dashboards");
-    await expect(
-      page
-        .getByRole("navigation", { name: "Main" })
-        .getByRole("link", { name: "Models" }),
-    ).toHaveCount(0);
-    await page.goto("/models");
-    await expect(
-      page.getByRole("heading", { name: "This page could not be found." }),
-    ).toBeVisible();
   });
 });

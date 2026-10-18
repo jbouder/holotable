@@ -3,8 +3,10 @@ import { LOKI_URL } from "./env";
 import { expectNoA11yViolations, setAppearance, type Theme } from "./support/a11y";
 import {
   discoverLokiLabels,
+  expectSource,
   LOKI_APP_VALUES,
   openLokiForm,
+  unique,
   waitForPanels,
 } from "./support/app";
 
@@ -24,7 +26,7 @@ test("a Loki source: form, discovery, test, generate, render, plan", async ({
 }) => {
   test.setTimeout(180_000);
   await setAppearance(page, "dark");
-  const sourceId = `e2e-loki-${Date.now().toString(36)}`;
+  const sourceId = `e2e-loki-${unique()}`;
   const sourceName = `E2E Loki ${sourceId}`;
 
   await test.step("register it through the form, discovering its labels", async () => {
@@ -41,7 +43,11 @@ test("a Loki source: form, discovery, test, generate, render, plan", async ({
     await expectNoA11yViolations(page);
     await dialog.getByRole("button", { name: "Create source" }).click();
     await expect(dialog).toBeHidden();
-    await expect(page.locator(`#source-${sourceId}`)).toBeVisible();
+    const row = page.locator(`#source-${sourceId}`);
+    await expect(row).toBeVisible();
+    await expect(row).toContainText(LOKI_URL);
+    // Discovered, never refreshed: the health says so.
+    await expect(row).toContainText("Never refreshed");
 
     const saved = await request.get(`/api/sources/${sourceId}`);
     expect(saved.ok(), await saved.text()).toBe(true);
@@ -69,6 +75,15 @@ test("a Loki source: form, discovery, test, generate, render, plan", async ({
       .click();
     await expect(refresh).toBeHidden();
     await expect(page.locator(`#source-${sourceId}`)).toContainText("Catalog fresh");
+  });
+
+  await test.step("its kind is fixed: editing opens the Loki form, as saved", async () => {
+    await page.getByRole("button", { name: `Edit ${sourceName}` }).click();
+    const edit = page.getByRole("dialog", { name: `Edit ${sourceName}` });
+    await expect(edit.getByLabel("URL")).toHaveValue(LOKI_URL);
+    await expect(edit.getByText(LOKI_APP_VALUES.join(", "))).toBeVisible();
+    await edit.getByRole("button", { name: "Cancel" }).click();
+    await expect(edit).toBeHidden();
   });
 
   let dashboardUrl = "";
@@ -150,13 +165,14 @@ async function createLokiDashboard(request: APIRequestContext) {
         },
       },
     });
-    expect(source.status(), await source.text()).toBe(201);
+    // Both schemes' tests may create it at once (#610); one create wins.
+    if (source.status() !== 201) await expectSource(request, sourceId);
   }
   const res = await request.post("/api/dashboards", {
     data: {
       spec: {
         specVersion: 1,
-        title: `Loki lines ${Date.now().toString(36)}`,
+        title: `Loki lines ${unique()}`,
         timeRange: { from: "now-1h", to: "now" },
         refreshIntervalMs: 30_000,
         panels: [
