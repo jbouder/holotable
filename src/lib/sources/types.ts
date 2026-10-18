@@ -74,4 +74,22 @@ export interface KindAvailability {
   kind: string;
   available: boolean;
   reason?: string;
+  /**
+   * Whether a source of the kind can be made from files uploaded in the
+   * browser (#595), for a kind that takes uploads at all: off, with a
+   * `reason` naming the variable, when the server cannot write them. The
+   * bounds let the form refuse a file before sending it; the upload route
+   * enforces them either way.
+   */
+  uploads?: UploadAvailability;
+}
+
+/** What {@link KindAvailability.uploads} says. */
+export interface UploadAvailability {
+  available: boolean;
+  reason?: string;
+  /** The largest file, in bytes. */
+  maxBytes: number;
+  /** The most files one upload may hold. */
+  maxFiles: number;
 }

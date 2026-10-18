@@ -310,6 +310,7 @@ const EMITTERS: Record<string, string[]> = {
   "sources/[id]/test": ["source.test"],
   "sources/[id]/refresh": ["source.refresh"],
   "sources/discover": ["source.discover"],
+  "sources/duckdb/uploads": ["source.upload"],
   "sources/generate": ["source.draft"],
   templates: ["template.create"],
   "templates/[id]": ["template.delete"],

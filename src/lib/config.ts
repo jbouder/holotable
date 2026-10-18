@@ -42,6 +42,13 @@ function num(name: string, fallback: number): number {
  */
 export const DUCKDB_MEMORY = /^\d+(?:\.\d+)?(?:KB|MB|GB|TB|KiB|MiB|GiB|TiB)$/;
 
+/**
+ * The ceiling on `DUCKDB_UPLOAD_MAX_FILES` (#595): every uploaded file is a
+ * table, and a source's allowlist holds at most this many (`MAX_TABLES`,
+ * which `test/config.test.ts` holds it to).
+ */
+export const MAX_UPLOAD_FILES = 200;
+
 /** A single-unit duration, as `PROMQL_MAX_RANGE` takes one: `7d`, `12h`. */
 const DURATION = /^(\d+)(ms|s|m|h|d|w)$/;
 
@@ -297,6 +304,14 @@ export const config = {
   duckdbMemoryLimit: str("DUCKDB_MEMORY_LIMIT", "512MB"),
   /** The threads one DuckDB source's engine may run a query on. */
   duckdbThreads: num("DUCKDB_THREADS", 2),
+  /**
+   * The largest file, in bytes, a source admin may upload from the browser as
+   * a DuckDB source (#595). Streamed to disk under `DUCKDB_SOURCES_DIR/uploads`
+   * and refused, with nothing left behind, past this.
+   */
+  duckdbUploadMaxBytes: num("DUCKDB_UPLOAD_MAX_BYTES", 50 * 1024 * 1024),
+  /** The most files one upload, and so one uploaded DuckDB source, may hold. */
+  duckdbUploadMaxFiles: num("DUCKDB_UPLOAD_MAX_FILES", 20),
 
   /**
    * Model requests per minute allowed per user in a workspace, on every
@@ -682,6 +697,10 @@ const EnvSchema = z.object({
     z.string().regex(DUCKDB_MEMORY, "must be a size such as 512MB or 2GB"),
   ),
   DUCKDB_THREADS: blank(positiveInt),
+  // Shape-checked in validateConfig rather than here, so a bad value warns in
+  // development (the default is used) and is fatal only in production.
+  DUCKDB_UPLOAD_MAX_BYTES: blank(z.string()),
+  DUCKDB_UPLOAD_MAX_FILES: blank(z.string()),
   LLM_RATE_PER_MINUTE: blank(nonNegativeInt),
   LLM_DAILY_TOKEN_BUDGET: blank(nonNegativeInt),
 
@@ -931,8 +950,37 @@ export function validateConfig(
   // Closed by default, like `/api/metrics`: an unset directory is not a
   // problem, it refuses every DuckDB source with a message naming it. What
   // is worth saying is a bound set for an engine that can never open.
+  // The upload bounds (#595): a malformed one falls back to its default, so
+  // it is fatal only where a typo should stop a deploy.
+  const uploadBound = (
+    variable: "DUCKDB_UPLOAD_MAX_BYTES" | "DUCKDB_UPLOAD_MAX_FILES",
+    max: number,
+    what: string,
+  ) => {
+    const raw = values[variable];
+    if (raw === undefined) return;
+    const n = Number(raw);
+    if (!/^\d+$/.test(raw.trim()) || !Number.isSafeInteger(n) || n < 1 || n > max) {
+      missing(variable, `must be a whole number from 1 to ${max} (${what}).`);
+    }
+  };
+  uploadBound(
+    "DUCKDB_UPLOAD_MAX_BYTES",
+    Number.MAX_SAFE_INTEGER,
+    "the largest uploaded file, in bytes",
+  );
+  uploadBound(
+    "DUCKDB_UPLOAD_MAX_FILES",
+    MAX_UPLOAD_FILES,
+    "the most files one upload may hold; each is a table",
+  );
   if (!values.DUCKDB_SOURCES_DIR) {
-    for (const variable of ["DUCKDB_MEMORY_LIMIT", "DUCKDB_THREADS"] as const) {
+    for (const variable of [
+      "DUCKDB_MEMORY_LIMIT",
+      "DUCKDB_THREADS",
+      "DUCKDB_UPLOAD_MAX_BYTES",
+      "DUCKDB_UPLOAD_MAX_FILES",
+    ] as const) {
       if (env[variable]) {
         warning(
           variable,

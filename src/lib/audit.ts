@@ -63,6 +63,7 @@ export const AUDIT_ACTIONS = [
   "source.test",
   "source.refresh",
   "source.discover",
+  "source.upload",
   "source.draft",
   "template.create",
   "template.delete",

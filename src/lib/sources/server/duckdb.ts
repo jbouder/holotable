@@ -34,6 +34,7 @@ import {
   testDuckDbSource,
 } from "@/lib/duckdb/client";
 import { DuckDbPathError, resolveSourcePath, SOURCES_DIR_UNSET } from "@/lib/duckdb/path";
+import { removeUpload, uploadLimits, uploadsAvailability } from "@/lib/duckdb/uploads";
 
 /**
  * The server half of the DuckDB kind (#572): the same SQL guard and planner
@@ -71,12 +72,16 @@ export const DUCKDB_DIALECT: SqlDialect = { timestampCast: "TIMESTAMP" };
 
 /**
  * Why a DuckDB config cannot be saved on this server, or null: the kind is
- * off (`DUCKDB_SOURCES_DIR` unset), the binding did not load, or the path
- * does not resolve to a directory or a `.duckdb` file inside the root.
+ * off (`DUCKDB_SOURCES_DIR` unset), the binding did not load, the path does
+ * not resolve to a directory or a `.duckdb` file inside the root, or it is
+ * under `uploads/` and not one of `workspaceId`'s own (#595).
  */
-export async function duckdbConfigProblem(cfg: DuckDbConfig): Promise<string | null> {
+export async function duckdbConfigProblem(
+  cfg: DuckDbConfig,
+  workspaceId: string,
+): Promise<string | null> {
   try {
-    await resolveSourcePath(cfg.path);
+    await resolveSourcePath(cfg.path, workspaceId);
   } catch (err) {
     if (err instanceof DuckDbPathError) return err.message;
     throw err;
@@ -167,8 +172,19 @@ const kind: ServerSourceKind = {
     });
   },
 
-  checkConfig: async (cfg) => (cfg.kind === "duckdb" ? duckdbConfigProblem(cfg) : null),
+  checkConfig: async (cfg, workspaceId) =>
+    cfg.kind === "duckdb" ? duckdbConfigProblem(cfg, workspaceId) : null,
   availability: duckdbAvailability,
+  uploads: { availability: () => uploadsAvailability(), limits: uploadLimits },
+  async removed(source, others) {
+    const duck = duckSource(source);
+    await removeUpload(
+      { workspaceId: duck.workspaceId, path: duck.config.path },
+      others.flatMap((o) =>
+        o.id !== duck.id && o.config.kind === "duckdb" ? [o.config.path] : [],
+      ),
+    );
+  },
   refresh: (source) => refreshDuckDbCatalog(duckSource(source)),
   refreshDiff: (source, refresh) =>
     diffCatalog(duckSource(source), {

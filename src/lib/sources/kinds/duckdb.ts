@@ -53,6 +53,31 @@ export function duckdbPathProblem(path: string): string | null {
   return null;
 }
 
+/**
+ * The directory under `DUCKDB_SOURCES_DIR` that browser uploads land in
+ * (#595): `uploads/<workspaceId>/<sourceDir>/<name>.csv`. One root, never a
+ * second one; the path guard resolves an upload path like any other.
+ */
+export const UPLOADS_DIR = "uploads";
+
+/**
+ * Why a source in `workspaceId` may not name `path`, or null (#595): a path
+ * under `uploads/` names its workspace in its second segment, and a source
+ * may only name an upload directory of its own workspace, exactly
+ * `uploads/<workspaceId>/<sourceDir>`. Lexical, and case-insensitive on the
+ * first segment so a case-insensitive file system cannot be used to spell
+ * its way past it; the server half checks again on the resolved path, on
+ * save and before every execution. Names no path.
+ */
+export function uploadScopeProblem(path: string, workspaceId: string): string | null {
+  const segments = path.replace(/\/$/, "").split("/");
+  if (segments[0]?.toLowerCase() !== UPLOADS_DIR) return null;
+  if (segments.length !== 3 || segments[1] !== workspaceId) {
+    return `must be an upload directory of this workspace: a path under ${UPLOADS_DIR}/ may only name ${UPLOADS_DIR}/<this workspace>/<upload>`;
+  }
+  return null;
+}
+
 /** Whether a path names a database file (`.duckdb`) rather than a directory. */
 export function duckdbLayout(path: string): "directory" | "database" {
   return path.toLowerCase().endsWith(DUCKDB_FILE_EXTENSION) ? "database" : "directory";

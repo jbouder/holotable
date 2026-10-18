@@ -129,14 +129,34 @@ export interface ServerSourceKind {
    * What is wrong with a config this server would have to reach, or null:
    * for Prometheus, its URL against `SOURCE_URL_ALLOWLIST`, DNS included.
    * Run when a source is saved; every connection is checked again.
+   * `workspaceId` is the workspace the source is saved in, from the stored
+   * record or the authorized request: a DuckDB path under `uploads/` must
+   * name that workspace's own (#595).
    */
-  checkConfig(cfg: SourceConfig): Promise<string | null>;
+  checkConfig(cfg: SourceConfig, workspaceId: string): Promise<string | null>;
   /**
    * Why this server cannot hold a source of the kind at all, or null (#573):
    * what the Add source dialog hides the kind for. Absent means always
    * available.
    */
   availability?(): Promise<string | null>;
+  /**
+   * For a kind a source can be made of uploaded files (#595): why this
+   * server cannot take an upload, or null, and the bounds one must keep.
+   * Absent means the kind takes no uploads.
+   */
+  uploads?: {
+    availability(): Promise<string | null>;
+    limits(): { maxBytes: number; maxFiles: number };
+  };
+  /**
+   * Release what the server stored for a source that was deleted or
+   * tombstoned (#595), neither of which ever runs again: an uploaded DuckDB
+   * source's directory. `others` are the workspace's sources, tombstoned
+   * included, so nothing another one still names is removed.
+   * Absent means the kind stores nothing of its own.
+   */
+  removed?(source: SourceRecord, others: readonly SourceRecord[]): Promise<void>;
   /** Why a row filter cannot be saved on this config, or null. */
   rowFilterProblem(cfg: SourceConfig): string | null;
   /** Release what the process holds for a source that is going away. */

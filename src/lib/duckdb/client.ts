@@ -243,14 +243,22 @@ export async function lockHolds(connection: DuckDBConnection): Promise<boolean> 
   return row?.external === false && row?.locked === true;
 }
 
-/** The binding and the resolved path, or the refusal a panel or an admin is shown. */
+/**
+ * The binding and the resolved path, or the refusal a panel or an admin is
+ * shown. The path guard runs here, so on every open: the root, and (#595)
+ * the workspace a path under `uploads/` names, against the source's own.
+ */
 async function prepare(source: {
+  workspaceId: string;
   config: { path: string };
 }): Promise<{ binding: DuckDbBinding; resolved: ResolvedSourcePath }> {
   const binding = await duckdbBinding();
   if (!binding) throw new QueryExecutionError(DUCKDB_UNAVAILABLE);
   try {
-    return { binding, resolved: await resolveSourcePath(source.config.path) };
+    return {
+      binding,
+      resolved: await resolveSourcePath(source.config.path, source.workspaceId),
+    };
   } catch (err) {
     if (err instanceof DuckDbPathError) throw new QueryExecutionError(err.message);
     throw err;
@@ -496,7 +504,10 @@ export interface IntrospectedTable {
  * instance, which is closed after. Only the path is read, so discovery can
  * ask about a source that does not exist yet (#573).
  */
-export async function introspect(source: { config: { path: string } }): Promise<{
+export async function introspect(source: {
+  workspaceId: string;
+  config: { path: string };
+}): Promise<{
   tables: IntrospectedTable[];
   version: string;
 }> {

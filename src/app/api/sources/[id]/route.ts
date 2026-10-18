@@ -3,7 +3,7 @@ import { requireIdentity, assertAuthorized, can, HttpError } from "@/lib/auth/au
 import { readJson, json, route } from "@/lib/http";
 import { assertRowFilterSavable } from "@/lib/row-scope";
 import { audit } from "@/lib/audit";
-import { getSourceById, updateSource, deleteSource } from "@/lib/db/repo";
+import { getSourceById, updateSource, deleteSource, listSources } from "@/lib/db/repo";
 import { checkSecretRef, SourceConfig, SourceDraftFields } from "@/lib/registry";
 import { sourceListing } from "@/lib/source-listing";
 import { sameKind } from "@/lib/sources/registry";
@@ -98,7 +98,10 @@ export const PUT = route(
       );
     }
     if (patch.config) {
-      const unreachable = await serverKind(source).checkConfig(patch.config);
+      const unreachable = await serverKind(source).checkConfig(
+        patch.config,
+        source.workspaceId,
+      );
       if (unreachable) throw new HttpError(400, unreachable, {}, "validation");
     }
     // Named, never the parsed body passed on: what introspection recorded
@@ -139,6 +142,16 @@ export const DELETE = route(
     // Its connections would close at the idle timeout anyway; nothing will
     // check them out again, so close them now.
     await serverKind(source).dispose(id);
+    // A deleted source takes what the server stored for it (an uploaded
+    // DuckDB source's files, #595). A tombstoned one too: nothing restores
+    // a tombstone, and it never runs again.
+    const kind = serverKind(source);
+    if (outcome !== "not_found" && kind.removed) {
+      await kind.removed(
+        source,
+        await listSources(source.workspaceId, { includeTombstoned: true }),
+      );
+    }
     audit({
       actor: identity,
       action: "source.delete",
