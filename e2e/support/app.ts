@@ -8,6 +8,16 @@ import { LOKI_URL } from "../env";
 
 /** Helpers shared by the specs. Nothing here signs in; the setup project did. */
 
+/**
+ * A suffix no other test is using: the time and a random part, so two tests
+ * started in the same millisecond on two workers (#610) still differ. Every
+ * record a test creates (a source id, a dashboard title) carries one, and no
+ * test counts a shared list.
+ */
+export function unique(): string {
+  return `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
+}
+
 /** A seeded dashboard's id, by title (scripts/seed.ts). */
 export async function dashboardId(request: APIRequestContext, title: string) {
   const res = await request.get(`/api/dashboards?q=${encodeURIComponent(title)}`);
@@ -20,6 +30,22 @@ export async function dashboardId(request: APIRequestContext, title: string) {
 
 /** The seeded dashboard every read-only spec opens. */
 export const DEMO_DASHBOARD = "Demo service health";
+
+/**
+ * A copy of a seeded dashboard, under a title of its own, for a test that
+ * changes what is stored per dashboard (its chat, its share links): with
+ * specs running in parallel (#610), the seeded one is everyone's.
+ */
+export async function copyDashboard(request: APIRequestContext, title: string) {
+  const res = await request.get(`/api/dashboards/${await dashboardId(request, title)}`);
+  expect(res.ok(), await res.text()).toBe(true);
+  const { dashboard } = (await res.json()) as { dashboard: { spec: object } };
+  const created = await request.post("/api/dashboards", {
+    data: { spec: { ...dashboard.spec, title: `${title} ${unique()}` } },
+  });
+  expect(created.ok(), await created.text()).toBe(true);
+  return ((await created.json()) as { dashboard: { id: string } }).dashboard.id;
+}
 
 /**
  * Wait for a live dashboard to have drawn: every panel's loading skeleton gone.
@@ -37,7 +63,7 @@ export async function waitForPanels(page: Page) {
  * so the picks carry across.
  */
 export async function createLinkedDashboards(request: APIRequestContext) {
-  const stamp = Date.now().toString(36);
+  const stamp = unique();
   const variables = [
     { name: "route", type: "enum", values: ["/login", "/checkout", "/search"] },
   ];
@@ -90,7 +116,7 @@ export async function createDrilldownDashboards(
   request: APIRequestContext,
   { withSelf = false }: { withSelf?: boolean } = {},
 ) {
-  const stamp = Date.now().toString(36);
+  const stamp = unique();
   const host = {
     name: "host",
     type: "query",
@@ -161,7 +187,7 @@ export async function clickChart(page: Page, panelId: string) {
  * it to answer, because the editor's guard runs against the catalog.
  */
 export async function createPromqlDashboard(request: APIRequestContext) {
-  const stamp = Date.now().toString(36);
+  const stamp = unique();
   const sourceId = `e2e-promql-${stamp}`;
   const source = await request.post("/api/sources", {
     data: {
@@ -213,14 +239,16 @@ export async function createPromqlDashboard(request: APIRequestContext) {
  * answer: the editor's completion and guard run against the label catalog.
  */
 export async function createLogqlDashboard(request: APIRequestContext) {
-  const stamp = Date.now().toString(36);
-  // One source for every theme's run: each is another entry in the demo
+  const stamp = unique();
+  // One source for both schemes' runs: each is another entry in the demo
   // workspace's source menus, which the chat journeys open.
   const sourceId = "e2e-logql";
   const listed = await request.get("/api/sources?workspaceId=demo");
   expect(listed.ok(), await listed.text()).toBe(true);
   const { sources } = (await listed.json()) as { sources: { id: string }[] };
   if (!sources.some((s) => s.id === sourceId)) {
+    // Another worker may create it between the listing and here (#610),
+    // which this create then loses; either way the source is there.
     const source = await request.post("/api/sources", {
       data: {
         workspaceId: "demo",
@@ -237,7 +265,7 @@ export async function createLogqlDashboard(request: APIRequestContext) {
         },
       },
     });
-    expect(source.status(), await source.text()).toBe(201);
+    if (source.status() !== 201) await expectSource(request, sourceId);
   }
   const res = await request.post("/api/dashboards", {
     data: {
@@ -281,6 +309,14 @@ export async function askChat(page: Page, question = "Which service is busiest?"
   await page.keyboard.press("Escape");
   await page.getByRole("textbox", { name: "Message" }).fill(question);
   await page.keyboard.press("Enter");
+}
+
+/** That a source is in the demo workspace, whoever created it. */
+export async function expectSource(request: APIRequestContext, sourceId: string) {
+  const listed = await request.get("/api/sources?workspaceId=demo");
+  expect(listed.ok(), await listed.text()).toBe(true);
+  const { sources } = (await listed.json()) as { sources: { id: string }[] };
+  expect(sources.map((s) => s.id)).toContain(sourceId);
 }
 
 /** A fresh read-only share link to a dashboard, as its absolute embed URL. */
