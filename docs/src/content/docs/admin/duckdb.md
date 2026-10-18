@@ -295,7 +295,16 @@ a warning with its error code.
 | `ghcr.io/jbouder/holotable` (production) | `node:24-bookworm-slim` | glibc, `linux-x64` and `linux-arm64` |
 | `ghcr.io/jbouder/holotable:quickstart` | Alpine | musl, `linux-x64` and `linux-arm64` |
 
-Both load it. **The quick-start image** sets
+Both load it. The production image runs the standalone server, whose
+dependencies `next build` traces; the tracer copies the binding's
+`duckdb.node` but cannot see the `libduckdb.so` that file loads at run time,
+so `next.config.ts` adds it with `outputFileTracingIncludes`, for the glibc
+bindings only (#615). CI holds this twice: the Build job fails if
+`libduckdb.so` is missing from the standalone server, and the Compose smoke
+test runs a **Demo files** panel through the production image's own
+`POST /api/query` ([the smoke test](/operations/demo-data/#the-smoke-test)).
+The quick-start image installs its own dependencies on Alpine instead.
+**The quick-start image** sets
 `DUCKDB_SOURCES_DIR=/var/lib/holotable/files`, writable by its app user, and
 runs in [local mode](/admin/demo-mode/#local-mode), whose owner is a source
 admin, so **Upload files** works out of the box and the seeder writes the
