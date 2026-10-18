@@ -15,6 +15,7 @@ import {
   Activity,
   ScrollText,
   FolderOpen,
+  Upload,
 } from "lucide-react";
 import { SourceDraft, type SourceRecord, type SqlSourceDraft } from "@/lib/registry";
 import { type SourceListing, sourceListing } from "@/lib/source-listing";
@@ -46,7 +47,7 @@ import { ModelChip, useModelChoice } from "@/components/model-chip";
 import { FIRST_DASHBOARD_DOCS_URL } from "@/lib/onboarding";
 import { apiErrorFromThrown, readApiError } from "@/lib/errors";
 import { buildSourceDescriptionStarters } from "@/lib/prompts/starters";
-import { isKindAvailable, isSqlSource } from "@/lib/sources/registry";
+import { availableUploads, isKindAvailable, isSqlSource } from "@/lib/sources/registry";
 import { SourceForm } from "./source-form";
 import {
   PrometheusSourceForm,
@@ -55,7 +56,7 @@ import {
 import { ChoiceCard, ChoiceCardGroup } from "@/components/ui/choice-card";
 import { LokiSourceForm, type LokiSourceFormInitial } from "./loki-source-form";
 import { DuckDbSourceForm } from "./duckdb-source-form";
-import type { KindAvailability } from "@/lib/sources/types";
+import type { KindAvailability, UploadAvailability } from "@/lib/sources/types";
 import { type GrantedSecretRefsState, readinessIn } from "@/lib/secret-refs";
 import { Notice } from "@/components/notice";
 import { useReducedMotion } from "@/components/motion-preference";
@@ -536,6 +537,7 @@ export function SourcesClient({
             existing={(sources ?? []).flatMap((row) => (row.record ? [row.record] : []))}
             secretRefs={secretRefs}
             duckdbAvailable={isKindAvailable(kinds, "duckdb")}
+            uploads={availableUploads(kinds, "duckdb")}
             onCreated={() => {
               setCreating(false);
               setNotice("source created");
@@ -690,9 +692,10 @@ export function SourcesClient({
 /**
  * What the manual form creates, by the language its panels are written in,
  * and `files` for DuckDB (#573): SQL too, but its own form, a path in place
- * of a connection.
+ * of a connection. `upload` is the same DuckDB form with files from the
+ * browser in place of the path (#595).
  */
-type FormLanguage = "sql" | "promql" | "logql" | "files";
+type FormLanguage = "sql" | "promql" | "logql" | "files" | "upload";
 
 /**
  * The kind picker's cards: one per kind the form can create, each pictured
@@ -733,6 +736,13 @@ const KIND_CHOICES: {
     Icon: FolderOpen,
     sample: "SELECT time_bucket(INTERVAL '1m', ts) …",
   },
+  {
+    value: "upload",
+    label: "Upload files",
+    description: "CSV files from your computer, read with DuckDB.",
+    Icon: Upload,
+    sample: "SELECT category, sum(amount) …",
+  },
 ];
 
 /**
@@ -745,6 +755,7 @@ function CreateSourcePanel({
   existing,
   secretRefs,
   duckdbAvailable = false,
+  uploads = null,
   onCreated,
   onCancel,
 }: {
@@ -755,6 +766,8 @@ function CreateSourcePanel({
   secretRefs: GrantedSecretRefsState;
   /** Offer DuckDB (#573): the server has the binding and `DUCKDB_SOURCES_DIR`. */
   duckdbAvailable?: boolean;
+  /** Offer "Upload files" (#595): the server can write uploads, within these bounds. */
+  uploads?: UploadAvailability | null;
   onCreated: () => void;
   onCancel: () => void;
 }) {
@@ -765,7 +778,11 @@ function CreateSourcePanel({
   const [chosen, setChosen] = React.useState<FormLanguage>("sql");
   // DuckDB is offered only where the server can hold it, and never drafted:
   // its path is the operator's to pick (#573).
-  const choices = KIND_CHOICES.filter((c) => c.value !== "files" || duckdbAvailable);
+  const choices = KIND_CHOICES.filter(
+    (c) =>
+      (c.value !== "files" || duckdbAvailable) &&
+      (c.value !== "upload" || uploads !== null),
+  );
   // Bumped on each draft so the form remounts and re-seeds from the new values.
   const [seedSeq, setSeedSeq] = React.useState(0);
   // The configuration form stays hidden until the drafter returns a result;
@@ -830,8 +847,10 @@ function CreateSourcePanel({
               ))}
             </ChoiceCardGroup>
           </div>
-          {chosen === "files" ? (
+          {chosen === "files" || chosen === "upload" ? (
             <DuckDbSourceForm
+              key={chosen}
+              upload={chosen === "upload" ? (uploads ?? undefined) : undefined}
               mode="create"
               workspaceId={workspaceId}
               submitLabel="Create source"

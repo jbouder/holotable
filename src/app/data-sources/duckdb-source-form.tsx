@@ -29,16 +29,23 @@ import {
   updateTable,
 } from "@/lib/source-form";
 import type { DuckDbConfig } from "@/lib/sources/kinds/duckdb";
+import type { UploadAvailability } from "@/lib/sources/types";
+import { DuckDbUploadPicker } from "./duckdb-upload-picker";
 import { Field, fieldAria, TableAllowlist } from "./source-form";
 
 /**
  * The DuckDB source form (#573): a path under `DUCKDB_SOURCES_DIR`, picked
  * from what the server lists there, and the same table allowlist the
  * TimescaleDB form has, discovered from the files or the database the path
- * names. No `secret_ref`: there is nothing to log in to. Everything that
+ * names. With `upload` (#595) the path picker is a file picker instead: the
+ * server stores the files under `uploads/` and answers the path, and the
+ * form goes on from discovery. No `secret_ref`: there is nothing to log in to. Everything that
  * decides anything lives in `@/lib/duckdb-form` and `@/lib/source-form`; this
  * file is the controls.
  */
+
+/** Upload mode's path error: there is no path to type, only files to send. */
+const UPLOAD_FIRST = "Upload the files first.";
 
 export interface DuckDbSourceFormValues {
   id: string;
@@ -59,6 +66,7 @@ export function DuckDbSourceForm({
   initial,
   onSubmit,
   onCancel,
+  upload,
 }: {
   mode: "create" | "edit";
   /** The workspace the path listing and discovery are authorized against. */
@@ -68,6 +76,8 @@ export function DuckDbSourceForm({
   /** Resolves to the failure to show, or null on success. */
   onSubmit: (values: DuckDbSourceFormValues) => Promise<ApiError | null>;
   onCancel?: () => void;
+  /** Make the source from uploaded files (#595), within these bounds. */
+  upload?: UploadAvailability;
 }) {
   const [id, setId] = React.useState(initial?.id ?? "");
   const [name, setName] = React.useState(initial?.name ?? "");
@@ -85,12 +95,13 @@ export function DuckDbSourceForm({
   // What the picker offers: asked once, when the form opens.
   const [paths, setPaths] = React.useState<DuckDbPathsOutcome | null>(null);
   React.useEffect(() => {
+    if (upload) return;
     const controller = new AbortController();
     void listDuckDbPaths(workspaceId, { signal: controller.signal }).then((outcome) => {
       if (!controller.signal.aborted) setPaths(outcome);
     });
     return () => controller.abort();
-  }, [workspaceId]);
+  }, [workspaceId, upload]);
 
   /** Clear one field's error as soon as it is edited. */
   function clear(field: string) {
@@ -101,21 +112,24 @@ export function DuckDbSourceForm({
     });
   }
 
-  async function discover() {
+  async function discover(base: DuckDbFormState = form, baseMenu: TableMenu = menu) {
     setError(null);
-    const pathErrors = duckdbPathErrors(form.path);
+    const pathErrors = duckdbPathErrors(base.path);
     if (Object.keys(pathErrors).length > 0) {
-      setErrors((current) => ({ ...current, ...pathErrors }));
+      setErrors((current) => ({
+        ...current,
+        ...(upload ? { path: UPLOAD_FIRST } : pathErrors),
+      }));
       return;
     }
     setDiscovering(true);
-    const outcome = await discoverDuckDbTables({ workspaceId, path: form.path.trim() });
+    const outcome = await discoverDuckDbTables({ workspaceId, path: base.path.trim() });
     setDiscovering(false);
     if (!outcome.ok) {
       setError(outcome.error);
       return;
     }
-    const applied = applyDiscovery(form, menu, outcome.tables);
+    const applied = applyDiscovery(base, baseMenu, outcome.tables);
     setForm(applied.state);
     setMenu(applied.menu);
     setUnticked(applied.unticked);
@@ -130,7 +144,7 @@ export function DuckDbSourceForm({
       ...(config.ok ? {} : config.errors),
     };
     if (!config.ok || Object.keys(found).length > 0) {
-      setErrors(found);
+      setErrors(upload && found.path ? { ...found, path: UPLOAD_FIRST } : found);
       setError({ error: "Some fields still need attention.", kind: "validation" });
       return;
     }
@@ -188,37 +202,64 @@ export function DuckDbSourceForm({
       </div>
 
       <div className="border-t border-border pt-4">
-        <Field
-          id="d-path"
-          label="Path"
-          error={pathError}
-          hint="A directory of Parquet and CSV files, or a .duckdb file, under the server's DUCKDB_SOURCES_DIR."
-        >
-          <Autocomplete
-            id="d-path"
-            value={form.path}
-            onValueChange={(path) => {
-              setForm((current) => ({ ...current, path }));
+        {upload ? (
+          <DuckDbUploadPicker
+            workspaceId={workspaceId}
+            limits={upload}
+            discovering={discovering}
+            discovered={menu.ran}
+            error={errors.path}
+            onUploaded={(path) => {
+              // Straight on to discovery, from the path the server answered.
+              const next = { ...form, path, tables: [] };
+              setForm(next);
+              const fresh = emptyMenu();
+              setMenu(fresh);
+              setUnticked([]);
               clear("path");
+              void discover(next, fresh);
             }}
-            suggestions={suggestions}
-            placeholder={paths === null ? "Loading…" : "Choose a directory or file"}
-            autoComplete="off"
-            spellCheck={false}
-            {...fieldAria("d-path", pathError)}
+            onReset={() => {
+              setForm((current) => ({ ...current, path: "", tables: [] }));
+              setMenu(emptyMenu());
+              setUnticked([]);
+            }}
           />
-        </Field>
+        ) : (
+          <Field
+            id="d-path"
+            label="Path"
+            error={pathError}
+            hint="A directory of Parquet and CSV files, or a .duckdb file, under the server's DUCKDB_SOURCES_DIR."
+          >
+            <Autocomplete
+              id="d-path"
+              value={form.path}
+              onValueChange={(path) => {
+                setForm((current) => ({ ...current, path }));
+                clear("path");
+              }}
+              suggestions={suggestions}
+              placeholder={paths === null ? "Loading…" : "Choose a directory or file"}
+              autoComplete="off"
+              spellCheck={false}
+              {...fieldAria("d-path", pathError)}
+            />
+          </Field>
+        )}
       </div>
 
       <TableAllowlist
         rows={rows}
         errors={errors}
         unticked={unticked}
-        where="under this path"
+        where={upload ? "in the uploaded files" : "under this path"}
         empty={
           menu.ran
             ? "No tables under this path: a directory's tables are its Parquet and CSV files."
-            : "Choose a path, then discover the tables this source may read."
+            : upload
+              ? "Upload files, and their tables are discovered here."
+              : "Choose a path, then discover the tables this source may read."
         }
         discovering={discovering}
         onDiscover={() => void discover()}

@@ -784,6 +784,24 @@ html[data-vt="tab"] [role="tab"][aria-selected="true"] {
 }
 
 /*
+ * A progress bar that cannot be measured yet (#595, `Progress`): a third of
+ * the track sliding across it, by `translate` only. Stilled by the reduce
+ * rule like every other animation.
+ */
+@utility progress-indeterminate {
+  animation: holotable-progress-slide 1.2s var(--ease-standard) infinite;
+}
+
+@keyframes holotable-progress-slide {
+  from {
+    translate: -100% 0;
+  }
+  to {
+    translate: 300% 0;
+  }
+}
+
+/*
  * The minimum comfortable target for a finger, applied only where there is a
  * finger (#78). Scoped to a coarse pointer so a mouse-driven dashboard keeps
  * its compact toolbars, which is most of what makes a dense grid readable.
