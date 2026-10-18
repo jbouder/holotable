@@ -112,8 +112,10 @@ are the checks required to merge. The same workflow also round-trips the
 migrations and runs the integration suites against one TimescaleDB
 (`Database`), lints and renders the Helm chart, builds the Docker images and
 runs the self-monitoring smoke test against them (`Images and smoke`), runs
-the `End-to-end and accessibility` suite, and fuzzes the SQL guard for longer;
-those report on every pull request without gating it, so look at them too.
+the `End-to-end and accessibility` suite, and fuzzes the guards for longer;
+those report on a pull request without gating it, so look at them too. The
+fuzz runs on a pull request only when it touches a guard path (see below);
+otherwise it shows as skipped.
 
 ```bash
 npm run lint         # biome check (lint + format, no writes)
@@ -185,8 +187,22 @@ snapshot under `test/snapshots/`.
 `npm run test:fuzz` runs the property-based SQL, PromQL and LogQL guard
 suites on their own.
 `npm test` includes it with a fixed seed and a small iteration count, so it is
-deterministic; CI also runs it longer with a fresh seed in a job that is not
-required to merge. If it fails, the output has the exact statement and a
+deterministic. CI also runs it longer, with the run id as a fresh seed, in a
+job that is not required to merge, in three tiers:
+
+- **A pull request that touches a guard path**: 5,000 iterations. The guard
+  paths are `src/lib/sql/`, `src/lib/promql/`, `src/lib/logql/`,
+  `src/lib/duckdb/` (its dialect feeds the SQL guard), the fuzz corpora
+  (`test/fixtures/*-corpus.ts`), the fuzz suites (`test/*fuzz*`) and
+  `package-lock.json` (a parser upgrade). A pull request that touches none of
+  them skips the job, and the checks list shows it as skipped, not passed.
+- **A push to `main`**: 20,000 iterations.
+- **Nightly** (`.github/workflows/fuzz.yml`, 03:41 UTC, or run by hand):
+  100,000 iterations. On a failure it opens an issue titled "Fuzz
+  counterexample", or comments on the open one, with the seed and the replay
+  lines from the log.
+
+If it fails, the output has the exact statement and a
 `FUZZ_SEED=… FUZZ_PATH=…` line that replays that one case. Add the statement to
 `test/fixtures/sql-fuzz-corpus.ts` (or, for PromQL and LogQL,
 `test/fixtures/promql-corpus.ts` and `test/fixtures/logql-corpus.ts`) with the verdict it should have, and a named

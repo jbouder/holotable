@@ -158,6 +158,17 @@ tricks, comments, casing, whitespace — and checks that everything poisoned is
 rejected, everything benign is accepted, and everything accepted satisfies an
 independent walk of the parse tree.
 
+CI runs the SQL, PromQL and LogQL fuzz suites longer than `npm test` does, each
+time with a fresh seed
+([#611](https://github.com/jbouder/holotable/issues/611)): 5,000 iterations on
+a pull request that touches a guard path (the SQL, PromQL, LogQL and DuckDB
+modules, the fuzz corpora and suites, or the lockfile), 20,000 on every push
+to `main`, and 100,000 nightly. A pull request that touches no guard path skips
+the fuzz, and its checks show it as skipped. A nightly failure opens an issue
+titled "Fuzz counterexample", or comments on the open one, with the seed and
+the lines that replay it; the counterexample then goes into the corpus and a
+named test.
+
 A dashboard variable ([Dashboard variables](/guide/variables/), #67) never
 widens this. `:name` is found by PostgreSQL's scanner, must be declared, and is
 checked as the `$n` it runs as; a statement's own `$n` is still refused. The
