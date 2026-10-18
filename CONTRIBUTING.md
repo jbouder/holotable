@@ -403,7 +403,9 @@ line, and never 25 or later (the `node` base images and `@types/node` are
 ignored from 25): take a Node major in one pull request that moves both of
 the Dockerfile's Node bases, CI's `node-version` and `@types/node` together. The app's
 TypeScript is held below 7 until Next supports it, because 7 drops the
-JavaScript compiler API that `next build` and `next typegen` load.
+JavaScript compiler API that `next build` and `next typegen` load. And
+`@grafana/lezer-logql` stays below 0.4, whose releases pin `@lezer/lr` to one
+exact version that the other grammars have moved past.
 
 ### Releasing
 

@@ -389,4 +389,5 @@ npm run load:stream      # many viewers of one dashboard stream, some stalled (a
   tables to the code.
 - **Actions** are pinned to a full commit SHA with a `# vX.Y.Z` comment
   (`test/workflow-pins.test.ts`). Dependabot's ignores (Node 25+,
-  TypeScript 7+) are explained in `.github/dependabot.yml`.
+  TypeScript 7+, `@grafana/lezer-logql` 0.4+) are explained in
+  `.github/dependabot.yml`.
