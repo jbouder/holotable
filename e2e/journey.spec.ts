@@ -1,5 +1,6 @@
 import { expect, test } from "@playwright/test";
 import { PG_PORT } from "./env";
+import { unique } from "./support/app";
 import { observeSse, sseCounts } from "./support/sse";
 
 /*
@@ -15,7 +16,7 @@ test("source → generate → save → stream → pause → resume → edit → 
   request,
 }) => {
   test.setTimeout(180_000);
-  const sourceId = `e2e-${Date.now().toString(36)}`;
+  const sourceId = `e2e-${unique()}`;
   const sourceName = `E2E metrics ${sourceId}`;
 
   await test.step("register a source", async () => {

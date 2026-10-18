@@ -15,11 +15,24 @@ import {
  *   npm run e2e                 prepare the stack, build, start, run everything
  *   E2E_SKIP_BUILD=1 npm run e2e   reuse the last `next build`
  *
- * Playwright starts two processes and stops both when the run ends: the
- * looping seeder, so live panels have rows arriving while a test watches, and
- * the production build of the app. Signing in happens once per role in the
- * `setup` project, through the real Keycloak login form; every other spec
- * starts from the saved session.
+ * Playwright starts three processes and stops them when the run ends: the
+ * stub model endpoint, the looping seeder, so live panels have rows arriving
+ * while a test watches, and the production build of the app. Signing in
+ * happens once per role in the `setup` project, through the real Keycloak
+ * login form; every other spec starts from the saved session.
+ *
+ * Two projects run the specs (#610), against that one app and one database:
+ *
+ * - `parallel`, every test not tagged `@serial`, spread over the workers. A
+ *   test here reads seeded state or creates records of its own under a name
+ *   no other test uses (`unique()` in e2e/support/app.ts), and never counts
+ *   a shared list.
+ * - `serial`, the tests tagged `@serial`, one at a time once `parallel` is
+ *   done: they share mutable state through the one workspace (uploads under
+ *   the per-person upload budget, the DuckDB root and the files demo, a
+ *   workspace's default model, the person's "keep conversations"), and each
+ *   says why at its top. Because it depends on `parallel`, a failure there
+ *   skips it: fix that one first.
  */
 
 const skipBuild = process.env.E2E_SKIP_BUILD === "1";
@@ -27,9 +40,10 @@ const skipBuild = process.env.E2E_SKIP_BUILD === "1";
 export default defineConfig({
   testDir: ".",
   outputDir: "test-results",
-  // The journey is one story told in order, and the stack is one database.
-  fullyParallel: false,
-  workers: 1,
+  // Four on GitHub's Linux runners, which have four cores; locally half the
+  // machine's cores, Playwright's default. `npm run e2e -- --workers=N`
+  // overrides either; the serial project stays at one.
+  workers: process.env.CI ? 4 : undefined,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 1 : 0,
   timeout: 60_000,
@@ -50,9 +64,21 @@ export default defineConfig({
   projects: [
     { name: "setup", testMatch: /auth\.setup\.ts$/ },
     {
-      name: "chromium",
+      name: "parallel",
       testMatch: /\.spec\.ts$/,
+      grepInvert: /@serial/,
+      fullyParallel: true,
       dependencies: ["setup"],
+      use: { ...devices["Desktop Chrome"], storageState: storageStatePath("admin") },
+    },
+    {
+      name: "serial",
+      testMatch: /\.spec\.ts$/,
+      grep: /@serial/,
+      fullyParallel: false,
+      workers: 1,
+      // After the parallel project, so these do not share the stack under load.
+      dependencies: ["parallel"],
       use: { ...devices["Desktop Chrome"], storageState: storageStatePath("admin") },
     },
   ],
