@@ -142,8 +142,10 @@ test("a DuckDB source: path picker, discovery, test, generate, render", async ({
 /*
  * Uploading CSV files from the browser (#595): the sample the app ships,
  * read from disk the way a person's file would be picked, uploaded with
- * progress, its table discovered and allowlisted, a dashboard generated over
- * it with the recorded model, and a panel rendered from the uploaded rows.
+ * progress, its table discovered and allowlisted, offered as a Spending
+ * starter in one click and saved with no model (#606), then a dashboard
+ * generated over it with the recorded model, and a panel rendered from the
+ * uploaded rows.
  * Then a file dropped on its Add files dialog (#604), reviewed and applied
  * as a new table through the catalog refresh, and queried.
  */
@@ -192,6 +194,47 @@ test("an uploaded CSV: progress, discovery, create, generate, render", async ({
     await expect(page.locator(`#source-${sourceId}`)).toBeVisible();
   });
 
+  let starterUrl = "";
+  await test.step("its columns read as spending: one click to a starter, no model (#606)", async () => {
+    const start = page.getByRole("link", {
+      name: "Start from: Spending — household_expenses",
+    });
+    await expect(start).toBeVisible();
+    await expectNoA11yViolations(page);
+    await start.click();
+    await page.waitForURL(/\/dashboards\/new\?/);
+    // Applied as turn one, unsaved, exactly as the template picker leaves it.
+    const preview = page.getByRole("region", { name: "Dashboard preview" });
+    await expect(
+      preview.getByRole("heading", { name: "Spending — household_expenses" }),
+    ).toBeVisible();
+    await expect(preview.getByText("5 panels · not saved yet")).toBeVisible();
+    await preview.getByRole("button", { name: "Save dashboard" }).click();
+    const save = page.getByRole("dialog", { name: "Save dashboard" });
+    await save.getByRole("button", { name: "Save dashboard" }).click();
+    await page.waitForURL(/\/dashboards\/[0-9a-f-]{36}$/);
+    starterUrl = page.url();
+
+    await waitForPanels(page);
+    for (const id of [
+      "per-week",
+      "latest-month",
+      "by-category",
+      "top-merchants",
+      "by-month",
+    ]) {
+      await expect(page.locator(`[data-panel-id="${id}"]`)).toHaveAttribute(
+        "data-status",
+        "live",
+        { timeout: 30_000 },
+      );
+    }
+    // Rows from the uploaded file: the biggest merchants, by what was spent.
+    const top = page.locator('[data-panel-id="top-merchants"]');
+    await expect(top.getByRole("cell", { name: "Corner Grocer" })).toBeVisible();
+    await expect(page.locator('[data-panel-id][data-status="error"]')).toHaveCount(0);
+  });
+
   let uploaded = "";
   await test.step("its path is an ordinary relative path under its own uploads", async () => {
     const listing = await request.get("/api/sources?workspaceId=demo");
@@ -204,6 +247,7 @@ test("an uploaded CSV: progress, discovery, create, generate, render", async ({
   });
 
   await test.step("refresh, then generate a dashboard against it", async () => {
+    await page.goto("/data-sources");
     await page.getByRole("button", { name: `Refresh ${sourceName}` }).click();
     const refresh = page.getByRole("dialog");
     await refresh
@@ -286,8 +330,10 @@ test("an uploaded CSV: progress, discovery, create, generate, render", async ({
     ]);
   });
 
-  const id = dashboardUrl.split("/").at(-1);
-  if (id) await request.delete(`/api/dashboards/${id}`);
+  for (const url of [dashboardUrl, starterUrl]) {
+    const id = url.split("/").at(-1);
+    if (id) await request.delete(`/api/dashboards/${id}`);
+  }
   const removed = await request.delete(`/api/sources/${sourceId}`);
   expect(removed.ok(), await removed.text()).toBe(true);
   // Deleting an upload source takes its files with it.

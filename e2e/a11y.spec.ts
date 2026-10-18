@@ -1,3 +1,5 @@
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { expect, test } from "@playwright/test";
 import { PALETTE_INFO } from "../src/lib/theme";
 import { expectNoA11yViolations, type Theme, setAppearance } from "./support/a11y";
@@ -239,6 +241,72 @@ for (const { theme, palette, name } of APPEARANCES) {
         await expectNoA11yViolations(page);
         await dialog.getByRole("button", { name: "household expenses" }).click();
         await expect(dialog.getByRole("progressbar")).toBeVisible();
+        await expectNoA11yViolations(page);
+      } finally {
+        await request.delete(`/api/sources/${id}`);
+      }
+    });
+
+    test("new dashboard led by a recognized starter, and the starter applied (#606)", async ({
+      page,
+      request,
+    }) => {
+      // Each run stores an upload, so the default palette's two schemes only.
+      test.skip(palette !== "holotable", "scanned in the default palette's two schemes");
+      const id = `a11y-starter-${theme}-${Date.now().toString(36)}`;
+      const upload = await request.post("/api/sources/duckdb/uploads?workspaceId=demo", {
+        multipart: {
+          files: {
+            name: "household-expenses.csv",
+            mimeType: "text/csv",
+            buffer: readFileSync(
+              join(process.cwd(), "public/samples/household-expenses.csv"),
+            ),
+          },
+        },
+      });
+      expect(upload.ok(), await upload.text()).toBe(true);
+      const { path } = await upload.json();
+      const created = await request.post("/api/sources", {
+        data: {
+          workspaceId: "demo",
+          id,
+          name: `A11y starter ${id}`,
+          config: {
+            kind: "duckdb",
+            path,
+            tables: [
+              {
+                name: "household_expenses",
+                timeField: "date",
+                columns: [
+                  { name: "date", type: "DATE" },
+                  { name: "merchant", type: "VARCHAR" },
+                  { name: "category", type: "VARCHAR" },
+                  { name: "amount", type: "DOUBLE" },
+                  { name: "payment_method", type: "VARCHAR" },
+                ],
+              },
+            ],
+          },
+        },
+      });
+      expect(created.ok(), await created.text()).toBe(true);
+      try {
+        await page.goto(`/dashboards/new?source=${id}`);
+        const start = page.getByRole("button", {
+          name: "Start from Spending — household_expenses",
+        });
+        await expect(start).toBeVisible();
+        await expectNoA11yViolations(page);
+        await start.click();
+        const preview = page.getByRole("region", { name: "Dashboard preview" });
+        await expect(
+          preview.getByRole("heading", { name: "Spending — household_expenses" }),
+        ).toBeVisible();
+        await expect(
+          preview.locator('[data-panel-id][data-status="loading"]'),
+        ).toHaveCount(0);
         await expectNoA11yViolations(page);
       } finally {
         await request.delete(`/api/sources/${id}`);
