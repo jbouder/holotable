@@ -600,6 +600,22 @@ test("a source admin adds, tests, sets as default and deletes a workspace model 
   await expect(row).toHaveCount(0);
 });
 
+test("the Models page lists a model detected on this machine, and Re-scan asks again (#607)", async ({
+  page,
+}) => {
+  await page.goto("/models");
+  await expect(page.getByText("Detected on this machine", { exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "Re-scan" }).click();
+  await expect(
+    page.getByText("Re-scan found 1 model on 1 of 2 endpoints."),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("cell", { name: /^local:localhost:\d+\/e2e-local$/ }),
+  ).toBeVisible();
+  await expect(page.getByText(/1 of 2 endpoints answered/)).toBeVisible();
+  await expect(page.getByText(/Last scanned/)).toBeVisible();
+});
+
 test("the old model settings sections open the Models page (#441)", async ({ page }) => {
   await page.goto("/settings/model");
   await expect(page).toHaveURL(/\/models$/);

@@ -1,5 +1,13 @@
 import { defineConfig, devices } from "@playwright/test";
-import { APP_ENV, APP_PORT, BASE_URL, ROOT, SEED_ENV, storageStatePath } from "./env";
+import {
+  APP_ENV,
+  APP_PORT,
+  BASE_URL,
+  MODEL_ENDPOINT_URL,
+  ROOT,
+  SEED_ENV,
+  storageStatePath,
+} from "./env";
 
 /**
  * The end-to-end suite (#88) and the accessibility scans that ride on it (#91).
@@ -49,6 +57,14 @@ export default defineConfig({
     },
   ],
   webServer: [
+    {
+      // Before the app, so its boot scan finds the model (#607).
+      command: "npx tsx e2e/model-endpoint.ts",
+      cwd: ROOT,
+      url: `${MODEL_ENDPOINT_URL}/models`,
+      reuseExistingServer: false,
+      timeout: 60_000,
+    },
     {
       command: "npx tsx scripts/seed.ts",
       cwd: ROOT,

@@ -25,6 +25,13 @@ export const LOKI_PORT = Number(process.env.E2E_LOKI_PORT || 13100);
 /** Where the app and the setup reach that Loki. */
 export const LOKI_URL = `http://localhost:${LOKI_PORT}`;
 
+/**
+ * The stub of a model on "this machine" (#607, `e2e/model-endpoint.ts`):
+ * an OpenAI-style model list that the app's detection probes.
+ */
+export const MODEL_ENDPOINT_PORT = Number(process.env.E2E_MODEL_PORT || 11534);
+export const MODEL_ENDPOINT_URL = `http://localhost:${MODEL_ENDPOINT_PORT}/v1`;
+
 export const BASE_URL = `http://localhost:${APP_PORT}`;
 export const ISSUER = `http://localhost:${KC_PORT}/realms/holotable`;
 export const DATABASE_URL = `postgresql://holotable:holotable@localhost:${PG_PORT}/holotable`;
@@ -105,6 +112,11 @@ export const APP_ENV: Record<string, string> = {
   SOURCE_URL_ALLOWLIST: "localhost",
   // DuckDB sources (#573) may read the generated files, and nothing else.
   DUCKDB_SOURCES_DIR: DUCKDB_DIR,
+  // A model on this machine (#607): the stub endpoint answers, and a closed
+  // port stands for an Ollama that is not running. AI_MODELS_FILE keeps the
+  // server's default, so the detected model is listed but never chosen.
+  LOCAL_MODEL_DETECT: "on",
+  LOCAL_MODEL_ENDPOINTS: `${MODEL_ENDPOINT_URL}, http://localhost:9/v1`,
 };
 
 /** The looping seeder (scripts/seed.ts): demo sources, dashboards and rows. */
