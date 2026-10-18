@@ -64,8 +64,8 @@ dashboard](/getting-started/your-first-dashboard/#or-files-on-the-server-with-du
 
 ## Uploaded files
 
-A source admin with no access to the server can make a DuckDB source from CSV
-or JSON files instead: the **Upload files** card. The files are sent to
+A source admin with no access to the server can make a DuckDB source from CSV,
+JSON or Excel files instead: the **Upload files** card. The files are sent to
 `POST /api/sources/duckdb/uploads`, which streams them to
 `DUCKDB_SOURCES_DIR/uploads/<workspace id>/<fresh id>/<name>.<ext>` and answers
 the relative directory, and the form goes on as above, from **Discover
@@ -75,21 +75,74 @@ an ordinary relative path. Each file's table is its stem reduced to
 `[a-z0-9_]`, so `Household Expenses.csv` is `household_expenses`. A file keeps
 its extension when it is `.json`, `.jsonl` or `.ndjson`, so the directory
 reads it as [JSON](#json-files); a file with any other name is stored as
-`.csv` and read as CSV. Two samples to try ship with the app, and the form
-offers both:
+`.csv` and read as CSV. An Excel workbook (`.xlsx`) becomes
+[one table per sheet](#workbooks). Three samples to try ship with the app, and
+the form offers each:
 [`household-expenses.csv`](https://github.com/jbouder/holotable/blob/main/public/samples/household-expenses.csv)
 (`date, merchant, category, amount, payment_method`; DuckDB reads `date` as
 `DATE` and `amount` as `DOUBLE`) and
 [`workouts.jsonl`](https://github.com/jbouder/holotable/blob/main/public/samples/workouts.jsonl)
 (a fitness log, one object per line, whose nested `location` is the column
-`location STRUCT(city VARCHAR, country VARCHAR)`).
+`location STRUCT(city VARCHAR, country VARCHAR)`) and
+[`home-energy.xlsx`](https://github.com/jbouder/holotable/blob/main/public/samples/home-energy.xlsx)
+(two sheets, `Electricity` and `Gas`, which become the tables
+`home_energy_electricity` and `home_energy_gas`, their `date` read as `DATE`).
 
 An upload is all or nothing, and bounded: a file over
 `DUCKDB_UPLOAD_MAX_BYTES`, too many files, a file that is not UTF-8 text, an
 empty file or two files that would be one table (`events.csv` and
 `events.jsonl` included) refuse the whole upload, and nothing is kept. A JSON
-file is held to the same caps and the same text check as a CSV. The operator's side, and how to turn uploads on, is in
+file is held to the same caps and the same text check as a CSV; a workbook to
+the same caps and [its own](#workbooks). The operator's side, and how to turn uploads on, is in
 [DuckDB files](/admin/duckdb/#uploads).
+
+## Workbooks
+
+An Excel workbook (`.xlsx`) is converted when it is uploaded
+([#597](https://github.com/jbouder/holotable/issues/597)): each sheet is
+written as a CSV in the upload's directory, and the workbook itself is not
+kept. The engine sees only CSVs, so nothing about how a source is opened,
+locked or queried changes. (DuckDB's own `excel` extension is not bundled
+with the binding, and the locked engine loads nothing.)
+
+**Naming.** A workbook with one sheet is one table, named by the file's stem
+like a CSV: `Budget 2026.xlsx` is `budget_2026`. A workbook with several is a
+table per sheet, `<stem>_<sheet>`, the sheet's name reduced to `[a-z0-9_]` the
+same way: `home-energy.xlsx`'s `Electricity` and `Gas` are
+`home_energy_electricity` and `home_energy_gas`. A sheet whose name reduces to
+nothing, or two sheets (or a sheet and another file in the upload) that would
+be one table, refuse the upload, naming the sheet. Hidden sheets and sheets
+with no cells are skipped, and the form says which.
+
+**Cells.** The first row with anything in it is the header; a header cell
+that is empty becomes `column_<n>`, counting from 1. Then, so DuckDB types
+each column the way the sheet did:
+
+| Cell | Written as |
+| --- | --- |
+| A number | the number (`2.86`) |
+| `TRUE` / `FALSE` | `true` / `false` |
+| A number formatted as a date | `2026-04-01` |
+| … as a date with a time | `2026-04-01T08:30:00` |
+| … as a time of day | `08:30:00` |
+| Text | quoted text, so `00123` keeps its zeros and a comma or line break stays in the cell |
+| A formula | the value Excel last calculated and saved |
+| An error (`#DIV/0!`, `#N/A`) | empty |
+
+A date or time is written as the sheet shows it, with no time zone: it is
+read as UTC, the engine's zone. A row with no cells is passed over, and every
+row is padded to the widest one.
+
+**Bounds.** The workbook as received counts against
+`DUCKDB_UPLOAD_MAX_BYTES`, and so do its CSVs together, since a small
+workbook can hold a lot. A workbook turns at most 32 sheets into tables, and a
+sheet may hold at most 1,000,000 rows; past either, the upload is refused
+naming the sheet, and nothing is kept.
+
+**Not accepted.** `.xls` (the older Excel format), `.xlsb`, `.xlsm`, `.ods`
+and `.numbers` are refused by name: save them as an Excel Workbook (`.xlsx`)
+or as CSV. A workbook with a password cannot be read either. Cell styles,
+charts and ranges are not carried over; a sheet is its cells.
 
 ## The path and the root
 

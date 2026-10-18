@@ -121,21 +121,26 @@ reference. The form asks for:
   `http_requests`); a database file's are its own tables. Tick the ones the
   source may read and choose each one's time column, as for a database.
 
-### Or CSV and JSON files from your computer
+### Or CSV, JSON and Excel files from your computer
 
-Choose the **Upload files** card to make a DuckDB source from CSV or JSON
-files you have, with no access to the server: a bank export, a sheet saved as
-CSV, a streaming history or an API's saved reply as JSON (an array of
-objects, one object per line, or one object). The card is there when the
+Choose the **Upload files** card to make a DuckDB source from CSV, JSON or
+Excel files you have, with no access to the server: a bank export, a
+spreadsheet (`.xlsx`, each sheet its own table), a streaming history or an
+API's saved reply as JSON (an array of objects, one object per line, or one
+object). The card is there when the
 server can write uploads ([DuckDB files](/admin/duckdb/#uploads)). **Choose
-files…**, or try a sample, then **Upload**. The form offers two, which the
+files…**, or try a sample, then **Upload**. The form offers three, which the
 app serves under `/samples/`:
 **household expenses**
 ([`household-expenses.csv`](https://github.com/jbouder/holotable/blob/main/public/samples/household-expenses.csv),
-six months of made-up household spending) and **workouts**
+six months of made-up household spending), **workouts**
 ([`workouts.jsonl`](https://github.com/jbouder/holotable/blob/main/public/samples/workouts.jsonl),
 a fitness log whose nested `location` becomes one `STRUCT` column, read as
-`location.country`). Each file shows its
+`location.country`) and **home energy**
+([`home-energy.xlsx`](https://github.com/jbouder/holotable/blob/main/public/samples/home-energy.xlsx),
+a workbook whose `Electricity` and `Gas` sheets become the tables
+`home_energy_electricity` and `home_energy_gas`; see
+[Workbooks](/concepts/duckdb-sources/#workbooks)). Each file shows its
 progress, and the form says what stage it is at: uploading, checking,
 discovering tables. Each file becomes a table named after it
 (`household-expenses.csv` is `household_expenses`), and the tables are

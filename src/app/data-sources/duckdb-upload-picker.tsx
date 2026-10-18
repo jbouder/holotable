@@ -9,6 +9,7 @@ import {
   formatBytes,
   perFileSent,
   sampleUploadFile,
+  storedAs,
   type UploadedFile,
   type UploadSample,
   uploadDuckDbFiles,
@@ -20,7 +21,7 @@ import { cn } from "@/lib/utils";
 
 /**
  * The file picker the "Upload files" form has in place of a path (#595):
- * choose CSV or JSON files (or a sample), upload them with progress per file and
+ * choose CSV, JSON or Excel files (or a sample), upload them with progress per file and
  * by stage, then the form goes on exactly as the server-files form does,
  * from discovery. Everything that decides anything is in `@/lib/duckdb-form`;
  * the server holds every rule again.
@@ -143,8 +144,9 @@ export function DuckDbUploadPicker({
           Files
         </span>
         <p id="d-files-hint" className="text-xs text-muted">
-          CSV or JSON files from your computer, up to {limits.maxFiles} at{" "}
-          {formatBytes(limits.maxBytes)} each. Each file becomes a table named after it.
+          CSV, JSON or Excel (.xlsx) files from your computer, up to {limits.maxFiles} at{" "}
+          {formatBytes(limits.maxBytes)} each. Each file becomes a table named after it,
+          and each sheet of a workbook its own table.
         </p>
       </div>
       <input
@@ -207,7 +209,7 @@ export function DuckDbUploadPicker({
           >
             household expenses
           </button>{" "}
-          (a CSV, six months) or{" "}
+          (a CSV, six months),{" "}
           <button
             type="button"
             className="text-foreground underline underline-offset-2"
@@ -216,7 +218,16 @@ export function DuckDbUploadPicker({
           >
             workouts
           </button>{" "}
-          (JSON lines, with a nested location).
+          (JSON lines, with a nested location) or{" "}
+          <button
+            type="button"
+            className="text-foreground underline underline-offset-2"
+            aria-busy={fetchingSample === "energy" || undefined}
+            onClick={() => void trySample("energy")}
+          >
+            home energy
+          </button>{" "}
+          (an Excel workbook, two sheets).
         </p>
       )}
 
@@ -236,7 +247,7 @@ export function DuckDbUploadPicker({
             const done = phase === "stored";
             const bytes = perFile[i] ?? 0;
             const pct = file.size > 0 ? Math.round((bytes / file.size) * 100) : 0;
-            const table = done ? stored[i]?.name : undefined;
+            const result = done ? stored[i] : undefined;
             return (
               <li
                 key={`${file.name}-${file.size}-${file.lastModified}`}
@@ -257,8 +268,8 @@ export function DuckDbUploadPicker({
                     ? "Refused"
                     : phase === "failed"
                       ? "Not kept"
-                      : table
-                        ? `Stored as the table ${table}`
+                      : result
+                        ? storedAs(result)
                         : phase === "checking"
                           ? "Checking"
                           : null}

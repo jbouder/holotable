@@ -6,7 +6,11 @@ import {
   type FieldErrors,
   readDiscovery,
 } from "@/lib/source-form";
-import { DuckDbConfig, duckdbPathProblem } from "@/lib/sources/kinds/duckdb";
+import {
+  DuckDbConfig,
+  duckdbPathProblem,
+  spreadsheetProblem,
+} from "@/lib/sources/kinds/duckdb";
 
 /**
  * The DuckDB source form, as data (#573), in the shape of
@@ -142,20 +146,54 @@ export async function listDuckDbPaths(
 
 /**
  * The samples the upload form offers, served by the app itself from
- * `public/samples/`: a CSV (#595) and a JSON-lines file with a nested object
- * (#596).
+ * `public/samples/`: a CSV (#595), a JSON-lines file with a nested object
+ * (#596) and an Excel workbook of two sheets (#597).
  */
 export const UPLOAD_SAMPLES = {
   expenses: { url: "/samples/household-expenses.csv", type: "text/csv" },
   workouts: { url: "/samples/workouts.jsonl", type: "application/x-ndjson" },
+  energy: {
+    url: "/samples/home-energy.xlsx",
+    type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  },
 } as const;
 
 export type UploadSample = keyof typeof UPLOAD_SAMPLES;
 
-/** One file the server stored: its table name and size. */
+/** A sheet of a workbook that became no table, and why (#597). */
+export interface SkippedSheet {
+  sheet: string;
+  reason: "hidden" | "empty";
+}
+
+/**
+ * One file the server took: its table name and size, and for a workbook
+ * (#597) the tables its sheets became and the sheets it skipped.
+ */
 export interface UploadedFile {
   name: string;
   bytes: number;
+  views?: string[];
+  skipped?: SkippedSheet[];
+}
+
+/** "a", "a and b", "a, b and c". */
+function listed(items: readonly string[]): string {
+  if (items.length <= 1) return items.join("");
+  return `${items.slice(0, -1).join(", ")} and ${items.at(-1)}`;
+}
+
+/**
+ * What became of one uploaded file, for its line in the form: the table it
+ * is stored as, or the tables a workbook's sheets became and the sheets it
+ * skipped.
+ */
+export function storedAs(file: UploadedFile): string {
+  if (!file.views) return `Stored as the table ${file.name}`;
+  const tables = `Converted to the ${file.views.length === 1 ? "table" : "tables"} ${listed(file.views)}`;
+  if (!file.skipped?.length) return tables;
+  const skipped = file.skipped.map((s) => `${s.sheet} (${s.reason})`);
+  return `${tables}; skipped ${listed(skipped)}`;
 }
 
 export type UploadOutcome =
@@ -184,11 +222,15 @@ export function uploadFilesProblem(
   files: readonly { name: string; size: number }[],
   limits: { maxBytes: number; maxFiles: number },
 ): { error: string; file?: string } | null {
-  if (files.length === 0) return { error: "Choose at least one CSV or JSON file." };
+  if (files.length === 0) {
+    return { error: "Choose at least one CSV, JSON or Excel file." };
+  }
   if (files.length > limits.maxFiles) {
     return { error: `An upload holds at most ${limits.maxFiles} files.` };
   }
   for (const file of files) {
+    const other = spreadsheetProblem(file.name);
+    if (other) return { error: other, file: file.name };
     if (file.size === 0) return { error: `"${file.name}" is empty.`, file: file.name };
     if (file.size > limits.maxBytes) {
       return {
@@ -250,13 +292,32 @@ export function uploadDuckDbFiles(
         // Not JSON: a proxy's page, say. Said below by the status.
       }
       if (parsed.ok === true && typeof parsed.path === "string") {
-        const stored = (Array.isArray(parsed.files) ? parsed.files : []).filter(
-          (f): f is UploadedFile =>
-            typeof f === "object" &&
-            f !== null &&
-            typeof (f as UploadedFile).name === "string" &&
-            typeof (f as UploadedFile).bytes === "number",
-        );
+        const stored = (Array.isArray(parsed.files) ? parsed.files : [])
+          .filter(
+            (f): f is UploadedFile =>
+              typeof f === "object" &&
+              f !== null &&
+              typeof (f as UploadedFile).name === "string" &&
+              typeof (f as UploadedFile).bytes === "number",
+          )
+          .map((f) => ({
+            name: f.name,
+            bytes: f.bytes,
+            ...(Array.isArray(f.views)
+              ? { views: f.views.filter((v): v is string => typeof v === "string") }
+              : {}),
+            ...(Array.isArray(f.skipped)
+              ? {
+                  skipped: f.skipped.filter(
+                    (s): s is SkippedSheet =>
+                      typeof s === "object" &&
+                      s !== null &&
+                      typeof s.sheet === "string" &&
+                      (s.reason === "hidden" || s.reason === "empty"),
+                  ),
+                }
+              : {}),
+          }));
         resolve({ ok: true, path: parsed.path, files: stored });
         return;
       }

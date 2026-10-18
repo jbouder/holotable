@@ -13,16 +13,24 @@ import { join } from "node:path";
 import { config } from "@/lib/config";
 import { DuckDbPathError, resolveSourcePath, SOURCES_DIR_UNSET } from "@/lib/duckdb/path";
 import { log } from "@/lib/log";
+import {
+  convertWorkbook,
+  type SkippedSheet,
+  WorkbookError,
+  type WorkbookLimits,
+} from "@/lib/duckdb/workbook";
 import { MultipartError, multipartBoundary, readMultipart } from "@/lib/multipart";
 import {
+  isWorkbookName,
+  spreadsheetProblem,
   UPLOAD_EXTENSIONS,
   UPLOADS_DIR,
   uploadScopeProblem,
 } from "@/lib/sources/kinds/duckdb";
 
 /**
- * CSV and JSON files uploaded from the browser as a DuckDB source (#595,
- * #596).
+ * CSV, JSON and Excel files uploaded from the browser as a DuckDB source
+ * (#595, #596, #597).
  *
  * An upload is a DuckDB source whose directory the server wrote: each file
  * lands at `DUCKDB_SOURCES_DIR/uploads/<workspaceId>/<sourceDir>/<name><ext>`,
@@ -30,10 +38,15 @@ import {
  * other. `sourceDir` is a fresh random id; `name` is the file's own stem,
  * reduced to an identifier, because it becomes the table's name; `ext` is
  * {@link uploadExtension}'s, because the directory's reader is chosen by it.
+ * An Excel workbook (`.xlsx`) is the exception: it is streamed to a
+ * temporary file in the same directory, each sheet converted to a CSV beside
+ * it (`./workbook.ts`), and the workbook removed; it is binary, so the text
+ * check is not held against it.
  *
  * Every request is all or nothing: a file over the byte cap, one too many, a
  * file that is not text, an empty one, a stem that reduces to nothing or two
- * files with one stem each refuse the whole upload, and the directory the
+ * files with one stem each refuse the whole upload, as does a workbook a
+ * sheet of which is refused, and the directory the
  * request made is removed before the answer goes back. So is a request the
  * browser cancelled. Files are streamed to disk as they arrive, never held
  * whole in memory. Every message names the variable or the person's own file
@@ -59,6 +72,19 @@ export const TEXT_PROBE_BYTES = 64 * 1024;
 
 /** The longest table name an upload makes. */
 export const MAX_UPLOAD_STEM = 64;
+
+/**
+ * The most sheets one uploaded workbook may turn into tables (#597). Hidden
+ * and empty sheets do not count. A constant, like the file cap's ceiling: a
+ * workbook past it is a person's to split.
+ */
+export const MAX_WORKBOOK_SHEETS = 32;
+
+/**
+ * The most rows one sheet of an uploaded workbook may hold, its header
+ * included (#597). Excel itself stops at 1,048,576.
+ */
+export const MAX_SHEET_ROWS = 1_000_000;
 
 const UPLOADS_OFF = (why: string) => `Uploads are off on this server: ${why}`;
 
@@ -151,10 +177,16 @@ export async function uploadsAvailability(
   }
 }
 
-/** One stored file: its table name and size. */
+/**
+ * One uploaded file: its table name and the bytes received. A workbook
+ * (#597) also says the tables its sheets became, in sheet order, and the
+ * sheets it skipped; `name` is then only its stem.
+ */
 export interface UploadedFile {
   name: string;
   bytes: number;
+  views?: string[];
+  skipped?: SkippedSheet[];
 }
 
 /** A finished upload: the source path to store, and what it holds. */
@@ -186,6 +218,8 @@ export async function receiveUpload(input: {
   contentLength?: number | null;
   body: ReadableStream<Uint8Array> | null;
   root?: string;
+  /** For tests: smaller sheet and row caps than the constants. */
+  workbookCaps?: Partial<Pick<WorkbookLimits, "maxSheets" | "maxRows">>;
 }): Promise<UploadResult> {
   const root = input.root ?? config.duckdbSourcesDir;
   const off = await uploadsAvailability(root);
@@ -250,6 +284,12 @@ export async function receiveUpload(input: {
         if (files.length >= maxFiles) {
           throw new UploadError(`an upload holds at most ${maxFiles} files.`, label);
         }
+        const other = spreadsheetProblem(part.filename);
+        if (other) throw new UploadError(other, label);
+        const workbook = isWorkbookName(part.filename);
+        // A workbook waits here, under a dot name no directory source reads,
+        // only until its sheets are converted.
+        const workbookName = `.workbook-${files.length}.xlsx`;
         const stem = uploadStem(part.filename);
         if (!stem) {
           throw new UploadError(
@@ -267,7 +307,9 @@ export async function receiveUpload(input: {
         try {
           // A name built here, under a directory made above: not a path to
           // trace into the build (the extension is one of a fixed few).
-          const name = `${stem}${uploadExtension(part.filename)}`;
+          const name = workbook
+            ? workbookName
+            : `${stem}${uploadExtension(part.filename)}`;
           handle = await open(join(/* turbopackIgnore: true */ dir, name), "wx", 0o640);
         } catch (err) {
           throw storageFailure(err);
@@ -275,8 +317,8 @@ export async function receiveUpload(input: {
         const file: UploadedFile = { name: stem, bytes: 0 };
         files.push(file);
         // The first chunk (up to TEXT_PROBE_BYTES) is held and checked
-        // before anything of the file is written.
-        let probe: Buffer | null = Buffer.alloc(0);
+        // before anything of the file is written. A workbook is binary.
+        let probe: Buffer | null = workbook ? null : Buffer.alloc(0);
 
         const flushProbe = async (final: boolean) => {
           if (!probe) return;
@@ -320,13 +362,29 @@ export async function receiveUpload(input: {
             } catch (err) {
               throw storageFailure(err);
             }
+            if (workbook) {
+              const converted = await convertUpload(
+                join(/* turbopackIgnore: true */ dir, workbookName),
+                dir,
+                stem,
+                label,
+                stems,
+                {
+                  maxSheets: input.workbookCaps?.maxSheets ?? MAX_WORKBOOK_SHEETS,
+                  maxRows: input.workbookCaps?.maxRows ?? MAX_SHEET_ROWS,
+                  maxBytes,
+                },
+              );
+              file.views = converted.views;
+              if (converted.skipped.length > 0) file.skipped = converted.skipped;
+            }
           },
         };
       },
       { maxParts: maxFiles + 1 },
     );
     if (files.length === 0)
-      throw new UploadError("choose at least one CSV or JSON file to upload.");
+      throw new UploadError("choose at least one CSV, JSON or Excel file to upload.");
     // The finished directory resolves like any saved source would.
     await resolveSourcePath(path, input.workspaceId, root);
   } catch (err) {
@@ -339,6 +397,42 @@ export async function receiveUpload(input: {
     throw new UploadError("the upload did not finish; nothing was kept.");
   }
   return { path, files };
+}
+
+/**
+ * Convert one received workbook into CSVs in `dir`, then remove it (#597).
+ * The tables its sheets become join `taken`, so a later file cannot take
+ * one. A refusal names the person's file and the sheet, never a path.
+ */
+async function convertUpload(
+  workbookFile: string,
+  dir: string,
+  stem: string,
+  label: string,
+  taken: Set<string>,
+  limits: WorkbookLimits,
+): Promise<{ views: string[]; skipped: SkippedSheet[] }> {
+  let result: Awaited<ReturnType<typeof convertWorkbook>>;
+  try {
+    result = await convertWorkbook({ file: workbookFile, dir, stem, taken, limits });
+  } catch (err) {
+    if (err instanceof WorkbookError) {
+      throw new UploadError(`"${label}" could not be converted: ${err.message}.`, label);
+    }
+    throw storageFailure(err);
+  }
+  try {
+    await rm(workbookFile, { force: true });
+  } catch (err) {
+    throw storageFailure(err);
+  }
+  for (const v of result.views) taken.add(v.view);
+  log.info("duckdb.upload_workbook_converted", {
+    sheets: result.views.length,
+    skipped: result.skipped.length,
+    rows: result.views.reduce((sum, v) => sum + v.rows, 0),
+  });
+  return { views: result.views.map((v) => v.view), skipped: result.skipped };
 }
 
 /**

@@ -23,9 +23,10 @@ a source admin of one workspace, `local`. Bring your own data first:
 
 1. Open **Data sources**, choose **Add source**, then **or enter
    configuration manually** and **Upload files**.
-2. Pick a CSV or JSON file, or try a sample the app ships (**household
-   expenses**, a CSV, or **workouts**, JSON lines), then **Upload**. Its table is discovered for you; check it and
-   **Create source**.
+2. Pick a CSV, JSON or Excel (`.xlsx`) file, or try a sample the app ships
+   (**household expenses**, a CSV, **workouts**, JSON lines, or **home
+   energy**, a workbook of two sheets), then **Upload**. Its tables are
+   discovered for you; check them and **Create source**.
 3. Ask for a dashboard over it on **New dashboard**, once a model is
    configured (below), or write a panel's SQL yourself in the editor.
 

@@ -17,8 +17,9 @@ const RATE_PER_MINUTE = 10;
 const rateStore = new MemoryRateLimitStore();
 
 /**
- * Upload CSV or JSON files as a DuckDB source (#595, #596), with no access to the server's
- * file system: `?workspaceId=` and a `multipart/form-data` body of `files`.
+ * Upload CSV, JSON or Excel files as a DuckDB source (#595, #596, #597), with
+ * no access to the server's file system: `?workspaceId=` and a
+ * `multipart/form-data` body of `files`.
  *
  * - gated on `source:manage` in the named workspace, the role that may then
  *   create a source over what was uploaded, and rate limited per caller;
@@ -26,8 +27,13 @@ const rateStore = new MemoryRateLimitStore();
  *   `<name>.csv` (or `.json`, `.jsonl`, `.ndjson`) per file, never held
  *   whole in memory, under
  *   `DUCKDB_UPLOAD_MAX_BYTES` per file and `DUCKDB_UPLOAD_MAX_FILES` files;
+ * - an Excel workbook (`.xlsx`) converted on arrival to one `<name>.csv` per
+ *   visible sheet with data, the workbook not kept, its CSVs together under
+ *   `DUCKDB_UPLOAD_MAX_BYTES` too, and the sheet and row caps in
+ *   `src/lib/duckdb/uploads.ts`;
  * - all or nothing: a refused or cancelled upload leaves no file behind;
- * - answered `{ ok: true, path, files: [{ name, bytes }] }`, the relative path
+ * - answered `{ ok: true, path, files: [{ name, bytes, views?, skipped? }] }`
+ *   (a workbook's tables and the sheets it skipped), the relative path
  *   the source then stores, or `{ ok: false, error, file? }` with a message
  *   that names the variable or the person's own file, never a server path;
  * - audited as `source.upload`, success or failure, with the file count and
