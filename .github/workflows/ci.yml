@@ -107,6 +107,25 @@ jobs:
             exit 1
           fi
 
+      # The other side of the trace (#615): `duckdb.node` loads libduckdb.so
+      # with the dynamic linker, which the tracer cannot see, so
+      # outputFileTracingIncludes adds it, for the glibc bindings only. Without
+      # it the runtime image answers every DuckDB source "not available".
+      - name: The standalone server carries libduckdb.so
+        run: |
+          shopt -s nullglob
+          glibc=(.next/standalone/node_modules/@duckdb/node-bindings-linux-{x64,arm64}/libduckdb.so)
+          musl=(.next/standalone/node_modules/@duckdb/node-bindings-linux-*-musl/libduckdb.so)
+          if [ "${#glibc[@]}" -eq 0 ]; then
+            echo "::error::no libduckdb.so under .next/standalone/node_modules/@duckdb/node-bindings-linux-*; see outputFileTracingIncludes in next.config.ts"
+            exit 1
+          fi
+          if [ "${#musl[@]}" -ne 0 ]; then
+            echo "::error::a musl libduckdb.so is in .next/standalone, which the Debian runtime image never loads: ${musl[*]}"
+            exit 1
+          fi
+          ls -l "${glibc[@]}"
+
       # The end-to-end job runs this build rather than making its own (#610):
       # what `next start` reads, which is `.next` without the compiler's cache
       # and without the standalone server (the images build their own). A tar,
