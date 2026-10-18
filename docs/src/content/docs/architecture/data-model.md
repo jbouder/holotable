@@ -84,8 +84,9 @@ is resolved by the path guard (`src/lib/duckdb/path.ts`) against
 inside the root; unset, the variable refuses every DuckDB config, so the kind
 is closed until an operator chooses what it may read. A path under `uploads/`
 (CSV and JSON files a source admin uploaded from the browser, and the CSVs
-an Excel workbook's sheets were converted to, #595, #596, #597,
-`src/lib/duckdb/uploads.ts`) must be one of the source's own workspace's,
+an Excel workbook's sheets were converted to, #595, #596, #597, and files
+added to an upload source later, #604, `src/lib/duckdb/uploads.ts`) must be
+one of the source's own workspace's,
 `uploads/<workspaceId>/<id>`, as typed and as resolved. The guard runs when a
 source is saved and again on every open. Each source gets one in-process
 engine that is locked before anything a panel wrote can run: external access

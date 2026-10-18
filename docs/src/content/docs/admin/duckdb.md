@@ -74,8 +74,8 @@ Each file is named by its own stem, lowercased and reduced to `[a-z0-9_]`
 `t_` in front), because that is the table's name. A `.json`, `.jsonl` or
 `.ndjson` file keeps its extension (lowercased), because the directory picks
 a file's reader by it; a file with any other name is stored as `.csv`. An
-`.xlsx` workbook is converted to a CSV per sheet as it arrives
-([Workbooks](#workbooks)). The form offers three samples the app serves,
+`.xlsx` or `.xlsm` workbook is converted to a CSV per sheet as it arrives
+([Workbooks](#workbooks)). Files can be chosen or dropped on the form. The form offers three samples the app serves,
 [`household-expenses.csv`](https://github.com/jbouder/holotable/blob/main/public/samples/household-expenses.csv),
 [`workouts.jsonl`](https://github.com/jbouder/holotable/blob/main/public/samples/workouts.jsonl)
 and
@@ -97,11 +97,11 @@ request, and a refused or cancelled upload leaves no file behind:
 | --- | --- |
 | A file larger than `DUCKDB_UPLOAD_MAX_BYTES` | default `52428800` (50 MiB) |
 | More than `DUCKDB_UPLOAD_MAX_FILES` files | default `20`, at most `200` (a source's table limit) |
-| A file that is not text: a NUL byte, or not UTF-8, in its first 64 KiB | whatever its name or content type says; CSV and JSON alike (not an `.xlsx` workbook, which is binary) |
+| A file that is not text: a NUL byte, or not UTF-8, in its first 64 KiB | whatever its name or content type says; CSV and JSON alike (not a workbook, which is binary) |
 | An empty file, a name that reduces to nothing, two files that would be one table (`events.csv` and `events.jsonl` too) | |
 | A workbook's CSVs, together, larger than `DUCKDB_UPLOAD_MAX_BYTES` | the same bound as the workbook itself |
 | A workbook with more sheets to convert, or a sheet with more rows | 32 sheets, 1,000,000 rows (`MAX_WORKBOOK_SHEETS`, `MAX_SHEET_ROWS` in `src/lib/duckdb/uploads.ts`) |
-| `.xls`, `.xlsb`, `.xlsm`, `.ods`, `.numbers` | refused by name: only `.xlsx` is converted |
+| `.xls`, `.xlsb`, `.ods`, `.numbers` | refused by name: only `.xlsx` and `.xlsm` are converted |
 
 The file is streamed to disk as it arrives and never held whole in memory.
 A malformed bound is a warning in development (the default is used) and a
@@ -110,7 +110,9 @@ warning, since no upload can land.
 
 ### Workbooks
 
-An `.xlsx` workbook is streamed to a temporary file inside the upload's own
+An `.xlsx` workbook, or an `.xlsm` one
+([#604](https://github.com/jbouder/holotable/issues/604)), which is the same
+container with macros beside the sheets, is streamed to a temporary file inside the upload's own
 directory, converted there to one `<table>.csv` per visible sheet with data,
 and removed, so the directory holds only CSVs and the engine is exactly as
 it is for any other upload: no `excel` extension, nothing loaded before the
@@ -126,7 +128,58 @@ once to count, once to write; 128 MiB for the shared text and styles, which
 are held), so an archive that claims to be small and inflates without end
 stops at the cap. An encrypted entry, a ZIP64 archive and anything that is
 not an Office Open XML workbook are refused. Every refusal names the file
-and the sheet, never a path.
+and the sheet, never a path. Only the sheets' XML is read: an `.xlsm`
+workbook's macros are never opened, let alone run, and are not kept.
+
+### Adding files
+
+An upload source can take more files later
+([#604](https://github.com/jbouder/holotable/issues/604)): **Add files** on
+its row in **Data sources** (shown only for a source made by uploading, and
+only to a source admin) opens the same picker, and the files are added to
+the source's own directory as new tables beside the ones it has. It is
+`POST /api/sources/<id>/uploads`, authorized in the source's own workspace,
+and every rule above holds, with three more:
+
+| Refused | |
+| --- | --- |
+| A source that was not made by uploading | another kind, or a DuckDB source over the server's own files, by name |
+| A file whose table the source already has | `"budget.csv" would be the table "budget", which is already a table in this source; rename it`, a workbook's sheets included |
+| More files than `DUCKDB_UPLOAD_MAX_FILES` in the directory | the files already there count, and each sheet of a workbook once converted |
+
+All or nothing applies to the request's own files: they are received into a
+staging directory beside the source's (`uploads/<workspace id>/.adding-<id>`,
+which no source can name) and linked into the source's directory only once
+all of them are accepted, each under a name created exclusively, so a file
+already there is never overwritten, read or removed. A refused or cancelled
+request removes the staging directory and exactly the names it linked.
+
+Stored files are not tables yet: the allowlist is never edited by an upload.
+When the files are stored, the browser opens the source's
+[catalog refresh](/concepts/duckdb-sources/#adding-files-to-an-upload-source),
+which offers them as new tables; applying that review adds them. The audit
+event is `source.upload` on the source, with `added: true`.
+
+### Orphaned uploads
+
+An upload whose source is never created (the dialog closed, the connection
+lost, a refusal in the form) would otherwise stay under `uploads/` forever.
+So the server sweeps ([#604](https://github.com/jbouder/holotable/issues/604)):
+an `uploads/<workspace>/<directory>` is removed when it is older than an hour
+(`UPLOAD_ORPHAN_AGE_MS` in `src/lib/duckdb/uploads.ts`), judged by the newest
+change inside it, **and** no source of that workspace, tombstoned ones
+included, names it. The sources are read after the directories are listed,
+so one created meanwhile counts, and when they cannot be read nothing of
+that workspace is removed. The sweep never touches anything outside
+`uploads/`, a symlink, or a directory whose workspace segment is not a
+workspace id. It runs once at boot, in the background, and after every
+successful upload for that workspace, so a long-running server stays clean
+without a scheduler. It logs `uploads.swept` with `{ removed, kept }` and
+never a path.
+
+Create the source within the hour: an upload left in the form longer than
+that may be swept, and **Create source** then answers that the path does not
+exist. Upload again.
 
 **The workspace rule.** A path under `uploads/` names its workspace in its
 second segment, and a source may name only an upload directory of its own
@@ -139,8 +192,8 @@ every open, the same as the root.
 another source in the workspace still names it. That holds when the source
 is tombstoned because a dashboard still uses it, too: a tombstoned source
 never runs again. Deleting any other DuckDB source removes nothing: what is under the root is the
-operator's. An upload whose source is never created stays under `uploads/`
-until someone removes it.
+operator's. An upload whose source is never created is
+[swept](#orphaned-uploads) after an hour.
 
 Every upload is audited as `source.upload`, with the file count and total
 bytes, or the refusal ([Audit log](/operations/audit-log/)).
@@ -262,17 +315,19 @@ it beside the files demo:
 - **MotherDuck.** It needs credentials and the network; it would be a kind of
   its own.
 - **Hot reload.** The catalog is what the last **Refresh** found. A new file
-  in a source's directory becomes a table on the next refresh. A file
+  in an upload source's directory is offered as a new table by the next
+  refresh; in a directory of the server's own, it is added by editing the
+  source and discovering its tables again. A file
   replaced under the same name is read fresh on the next query, with no
   refresh needed.
 - **Writing, importing or converting.** Holotable reads. `COPY`, `CREATE`,
   `INSERT` and `ATTACH` stay refused. [Uploads](#uploads) store a CSV or
   JSON file as it was sent, and nested JSON is not flattened (a query reads
-  a `STRUCT` field directly); the one conversion is an `.xlsx` workbook's
+  a `STRUCT` field directly); the one conversion is an `.xlsx` or `.xlsm` workbook's
   sheets to CSV, on arrival ([Workbooks](#workbooks)).
 - **Other upload formats, quotas and replacing a file.** Uploads take CSV,
-  JSON and `.xlsx`; `.xls`, `.ods` and `.numbers` are refused, as are a
-  sheet or range picker and keeping the workbook to convert again.
-  There is no per-workspace disk quota beyond the per-file and per-upload
-  caps, and no replacing a file in place: upload again and make a new
-  source.
+  JSON, `.xlsx` and `.xlsm`; `.xls`, `.xlsb`, `.ods` and `.numbers` are
+  refused, as are a sheet or range picker and keeping the workbook to
+  convert again. There is no per-workspace disk quota beyond the per-file
+  and per-upload caps, and no replacing or deleting a single file of an
+  upload source: add it under a new name, or make a new source.
