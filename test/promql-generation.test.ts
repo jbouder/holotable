@@ -164,7 +164,7 @@ const duck: SourceRecord = {
 test("a DuckDB source is told its dialect after its catalog; a TimescaleDB prompt is not (#573)", () => {
   assert.equal(
     DUCKDB_PROMPT,
-    "This source is DuckDB, queried with the same SELECT-only SQL as PostgreSQL. `time_bucket`, `date_trunc` and `date_bin` all exist: bucket time with `time_bucket(INTERVAL '5 minutes', ts)`, `date_trunc('minute', ts)` or `date_bin(INTERVAL '5 minutes', ts, TIMESTAMP '2000-01-01')`. Column names are case-sensitive as listed: double-quote any name that is not all lowercase (`\"Value\"`). Do not cast to `::timestamptz`: use the time column as it is. Table functions such as `read_parquet` or `read_csv` are refused: query the tables listed.",
+    "This source is DuckDB, queried with the same SELECT-only SQL as PostgreSQL. `time_bucket`, `date_trunc` and `date_bin` all exist: bucket time with `time_bucket(INTERVAL '5 minutes', ts)`, `date_trunc('minute', ts)` or `date_bin(INTERVAL '5 minutes', ts, TIMESTAMP '2000-01-01')`. Column names are case-sensitive as listed: double-quote any name that is not all lowercase (`\"Value\"`). Do not cast to `::timestamptz`: use the time column as it is. A STRUCT column (nested JSON) is read with `struct.field` (`location.city`) or `->>` (`location->>'city'`). Table functions such as `read_parquet`, `read_csv` or `read_json` are refused: query the tables listed.",
   );
   const block = serverKind(duck).catalogPrompt(duck);
   // Outside the fence, as an instruction, once.

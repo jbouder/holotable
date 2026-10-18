@@ -19,7 +19,7 @@ accepted and one rejected statement per rule, each checked by a test against
 | A time literal: `'now'`, `'today'`, `'tomorrow'`, `'yesterday'` | `disallowed time literal 'now'` |
 | Non-determinism: `random()`, `gen_random_uuid()`, … | `disallowed function random()` |
 | Exfiltration, side effects and server identity: `pg_sleep`, `pg_read_file`, `lo_import`, `dblink`, `query_to_xml`, `current_setting`, `set_config`, `version()`, `inet_server_addr()`, … | `disallowed table function: pg_sleep()` |
-| A function used as a table in `FROM`: `generate_series(…)`, `unnest(…)`, `LATERAL …`, `ROWS FROM (…)`, and DuckDB's file readers (`read_csv`, `read_parquet`, `glob`, …) | `table functions are not allowed in FROM: generate_series()` |
+| A function used as a table in `FROM`: `generate_series(…)`, `unnest(…)`, `LATERAL …`, `ROWS FROM (…)`, and DuckDB's file readers (`read_csv`, `read_parquet`, `read_json`, `glob`, …) | `table functions are not allowed in FROM: generate_series()` |
 | A table not in the source's catalog, including system catalogs and the same table under another schema | `table not in catalog allowlist: public.http_requests` |
 | A column the catalog marks `"exposed": false`, by name anywhere (select list, WHERE, ORDER BY, joins) | `column not exposed: http_requests.client_ip` |
 | `SELECT *` (or `t.*`, or a whole-row reference) over a table that has an unexposed column | `SELECT * is not allowed on http_requests: it has unexposed columns; name the columns instead` |
@@ -49,15 +49,18 @@ and tells the model when the extension is missing.
 
 ## DuckDB
 
-A DuckDB source (a directory of Parquet and CSV files, or a `.duckdb` file)
+A DuckDB source (a directory of Parquet, CSV and JSON files, or a `.duckdb`
+file)
 takes the same SQL and the same guard. Its tables are in schema `main`; a
 directory's tables are its files, named by their stems. `time_bucket`,
 `date_trunc` and `date_bin` all exist: write the interval as one,
 `time_bucket(INTERVAL '5 minutes', ts)`. Column names are case-sensitive as
 the catalog lists them: double-quote one that is not all lowercase
 (`"Value"`). Do not cast to `::timestamptz`; the engine runs in UTC, so use
-the time column as it is. File readers (`read_parquet`, `read_csv`, …) are
-refused like any table function: query the tables listed.
+the time column as it is. A nested JSON value is a STRUCT column: read a
+field with `struct.field` (`location.city`) or `->>` (`location->>'city'`).
+File readers (`read_parquet`, `read_csv`, `read_json`, …) are refused like
+any table function: query the tables listed.
 
 ## What the server does instead, so you must not
 
