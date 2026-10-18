@@ -7,6 +7,9 @@ const nextConfig: NextConfig = {
   // SQL guard; it loads its WebAssembly binary from disk next to its own
   // entrypoint, which only resolves when Node requires it from node_modules.
   // `@duckdb/node-api` (#572) loads a native binding per platform the same way.
+  // The trace copies that binding's duckdb.node but not the libduckdb.so it
+  // loads in turn with the dynamic linker, which the tracer cannot see (#615):
+  // `outputFileTracingIncludes` below adds it.
   serverExternalPackages: ["pg", "libpg-query", "@duckdb/node-api"],
   // The dev-tools badge sits over the top-left of the nav bar, which is where
   // the brand and the first link are. Development-only either way — it is not
@@ -20,6 +23,19 @@ const nextConfig: NextConfig = {
   images: { unoptimized: true },
   outputFileTracingExcludes: {
     "*": ["node_modules/sharp/**", "node_modules/@img/**"],
+  },
+  // The library `duckdb.node` loads at run time (#615), for the glibc builds
+  // only: the runtime image is Debian. npm installs the musl packages on glibc
+  // too (they declare no `libc`), and each would add another ~66 MB the
+  // binding's loader never picks there. Only the package for the build's own
+  // architecture is installed, so one library lands in the standalone server.
+  // The quick-start image does not use the trace's node_modules; it installs
+  // its own on Alpine.
+  outputFileTracingIncludes: {
+    "*": [
+      "node_modules/@duckdb/node-bindings-linux-x64/libduckdb.so",
+      "node_modules/@duckdb/node-bindings-linux-arm64/libduckdb.so",
+    ],
   },
   // From 16.3, `next dev` writes a managed block into AGENTS.md and a
   // CLAUDE.md beside it, pointing agents at node_modules/next/dist/docs/.

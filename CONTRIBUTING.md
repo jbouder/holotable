@@ -483,6 +483,7 @@ request:
 | `src/app/models/`, `src/components/models/`, `src/components/model-chip.tsx` | `guide/models.md` |
 | `src/lib/ir.ts`, a panel kind, a color token, or a guard rule in `src/lib/sql/` or `src/lib/promql/` | The skill's `.claude/skills/holotable/references/` and `examples/` (`test/holotable-skill.test.ts` holds its examples and lists to the code) |
 | `docker-compose.yml`, `deploy/quickstart/`, the `Dockerfile`'s `quickstart` target | `getting-started/quick-start.md`, the quick start in `README.md`; the `logs` profile's Loki and Alloy also `operations/demo-data.md` and the Alloy example in `admin/loki.md`; the image's mode and files root also `admin/demo-mode.md` and "The binding and the image" in `admin/duckdb.md` |
+| The `Dockerfile`'s `build` and `runtime` stages, the trace settings in `next.config.ts` (`outputFileTracingIncludes` / `Excludes`) | "The binding and the image" in `architecture/data-model.md` and in `admin/duckdb.md` |
 | `src/lib/auth/demo.ts`, `AUTH_MODE` / `DEMO_GROUPS` / `LOCAL_GROUPS` in `src/lib/config.ts`, `src/components/demo-banner.tsx` | `admin/demo-mode.md`, the demo and local mode paragraphs in `SECURITY.md` |
 | `deploy/cloudflare/demo/` | `operations/cloudflare-demo.md` |
 | `deploy/helm/holotable/` | `operations/kubernetes.md`, the chart's own `README.md` |

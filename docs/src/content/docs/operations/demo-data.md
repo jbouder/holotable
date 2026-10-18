@@ -138,6 +138,7 @@ database.
 | `SELF_METRICS_INTERVAL_MS` | `15000` | Collector only: delay between scrapes of `/api/metrics`. |
 | `METRICS_URL` | `http://app:3000/api/metrics` | Collector only: what to scrape. |
 | `SMOKE_TIMEOUT_MS` | `180000` | Smoke test only: how long to wait for the first panel with rows. |
+| `SMOKE_APP_URL` | — | Smoke test only: where the app answers (`http://app:3000` in compose). Set, one **Demo files** panel also runs through the app's own `POST /api/query`. |
 
 :::caution
 The seeder is for demos and local development. It uses a **privileged**
@@ -297,8 +298,19 @@ stack without it).
 It asserts "at least one" because an idle stack has nobody viewing a dashboard,
 so there are no pollers, no live viewers, and no model calls; resident memory is
 the series that is live from boot. What it deliberately does not cover is the
-HTTP and session layer above those functions: reaching
-`/api/dashboards/[id]/stream` needs a signed-in browser session.
+session layer: reaching `/api/dashboards/[id]/stream` needs a signed-in
+browser session.
+
+Those functions run in the smoke container, which has every dependency
+installed; the app's image has only what `next build` traced. So, with
+`SMOKE_APP_URL` set (compose sets it), the smoke test also sends one
+**Demo files** panel to the app's own `POST /api/query` and fails unless it
+answers with rows. It signs that request with a
+[service-account token](/integrations/api-tokens/) it creates in the database for the
+purpose, an editor of the seeded workspace for ten minutes, and revokes it
+once the answer is in. DuckDB is the kind that needs this: its binding is
+native, and a runtime image missing part of it answers every DuckDB source
+"DuckDB is not available on this server" (#615).
 
 ## The files demo
 
@@ -342,6 +354,6 @@ the host loop (`npm run seed` with `npm run dev`), point
 
 The [smoke test](#the-smoke-test) runs **Demo files** too, through the DuckDB
 kind's check, plan and execute, and fails unless one of its panels comes back
-with rows. `npm test` holds the spec to the IR and the SQL guard against the
+with rows, both in its own process and through the app. `npm test` holds the spec to the IR and the SQL guard against the
 seeded catalog, and the end-to-end suite opens the dashboard and waits for its
 panels to go live.

@@ -122,10 +122,9 @@ WORKDIR /app
 # The musl install, then the app from the shared glibc `build` stage: the
 # standalone server (server.js, its package.json and its .next) without the
 # standalone's traced node_modules. The server resolves every package from
-# the musl install instead. The trace is not used here because it is not
-# enough on its own: it carries both libcs' duckdb.node but not the
-# libduckdb.so that duckdb.node loads at run time, which the tracer cannot
-# see, and the scripts need packages the server never imports.
+# the musl install instead. The trace is not used here because it is the
+# runtime image's: its libduckdb.so is the glibc one (next.config.ts adds it,
+# #615), and the scripts need packages the server never imports.
 COPY --from=quickstart-deps /app/node_modules ./node_modules
 COPY --from=build /app/.next/standalone/server.js /app/.next/standalone/package.json ./
 COPY --from=build /app/.next/standalone/.next ./.next
@@ -207,8 +206,9 @@ ENV NODE_ENV=production
 
 # `next build` with `output: "standalone"` traces the server's runtime
 # dependencies (including the externalized `pg` and `libpg-query`, WebAssembly
-# binary included) into .next/standalone/node_modules. That is the whole
-# dependency tree this image needs; the full `node_modules`, `scripts/`, and
+# binary included) into .next/standalone/node_modules, with the glibc
+# libduckdb.so the tracer cannot see added by next.config.ts (#615). That is
+# the whole dependency tree this image needs; the full `node_modules`, `scripts/`, and
 # `migrations/` belong to the `migrate` target.
 COPY --from=build /app/.next/standalone ./
 COPY --from=build /app/.next/static ./.next/static

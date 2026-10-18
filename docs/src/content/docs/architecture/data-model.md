@@ -120,14 +120,20 @@ production image (`node:24-bookworm-slim`) is glibc.
 Both images are targets of the one repository `Dockerfile` and share one
 build of the app (#612): `next build` runs once, in its `build` stage on
 glibc, and its output is JavaScript and static assets, the same on either
-libc. What differs is `node_modules`, so each image installs its own on its
+libc. What differs is `node_modules`, so each image takes its own for its
 own base. The production image runs the standalone server with the
-dependencies `next build` traced. The quick-start image installs its
-production dependencies on Alpine, where npm and the binding's loader pick
-the musl builds, and copies the standalone server without the traced
-`node_modules`: the trace carries `duckdb.node` but not the `libduckdb.so`
-it loads at run time, which the tracer cannot see, and the quick-start's
-scripts need packages the server never imports. CI builds the runtime image
+dependencies `next build` traced, on glibc like the build. The tracer copies
+the binding's `duckdb.node` but cannot see the `libduckdb.so` it loads with
+the dynamic linker at run time, so `outputFileTracingIncludes` in
+`next.config.ts` adds that library for the glibc bindings only (#615): npm
+installs the musl packages on glibc too, and their library would add about
+66 MB the runtime image never loads. The Build job checks the library is in
+the standalone output, and the Compose smoke test runs a DuckDB panel
+through the production image's `POST /api/query`. The quick-start image
+installs its production dependencies on Alpine, where npm and the binding's
+loader pick the musl builds, and copies the standalone server without the
+traced `node_modules`, which carries the glibc library and lacks packages
+the quick-start's scripts need. CI builds the runtime image
 first, and the quick-start build reports the `build` stage cached; a release
 builds every target through the same stages. The quick-start image
 ships no sample files (#574); the Compose stack has a
