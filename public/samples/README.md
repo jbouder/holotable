@@ -1,7 +1,7 @@
 # Sample files
 
 Small, made-up datasets shaped like the files people actually have, for
-trying a DuckDB source by upload (#595). Each is served by the app at
+trying a DuckDB source by upload (#595, #596, #597). Each is served by the app at
 `/samples/<name>` and linked from the upload form and the docs.
 
 | File | Shape | Rows | Shows |

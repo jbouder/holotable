@@ -50,9 +50,10 @@ name only its own.
 
 ## Uploads
 
-A source admin can also make a DuckDB source from CSV or JSON files uploaded
-in the browser ([#595](https://github.com/jbouder/holotable/issues/595),
-[#596](https://github.com/jbouder/holotable/issues/596)), with no
+A source admin can also make a DuckDB source from CSV, JSON or Excel files
+uploaded in the browser ([#595](https://github.com/jbouder/holotable/issues/595),
+[#596](https://github.com/jbouder/holotable/issues/596),
+[#597](https://github.com/jbouder/holotable/issues/597)), with no
 access to the server: **Add source → Upload files**. The files land under the
 same root, never a second one:
 
@@ -63,18 +64,22 @@ same root, never a second one:
         └── 3f9c0a51d2e47b86/          one upload: a fresh random id
             ├── household_expenses.csv
             ├── budget_2026.csv
-            └── workouts.jsonl
+            ├── workouts.jsonl
+            ├── home_energy_electricity.csv   from home-energy.xlsx
+            └── home_energy_gas.csv           (the workbook is not kept)
 ```
 
 Each file is named by its own stem, lowercased and reduced to `[a-z0-9_]`
 (`Budget 2026.csv` is `budget_2026`; a stem that starts with a digit gets
 `t_` in front), because that is the table's name. A `.json`, `.jsonl` or
 `.ndjson` file keeps its extension (lowercased), because the directory picks
-a file's reader by it; a file with any other name is stored as `.csv`. The
-form offers two samples the app serves,
-[`household-expenses.csv`](https://github.com/jbouder/holotable/blob/main/public/samples/household-expenses.csv)
+a file's reader by it; a file with any other name is stored as `.csv`. An
+`.xlsx` workbook is converted to a CSV per sheet as it arrives
+([Workbooks](#workbooks)). The form offers three samples the app serves,
+[`household-expenses.csv`](https://github.com/jbouder/holotable/blob/main/public/samples/household-expenses.csv),
+[`workouts.jsonl`](https://github.com/jbouder/holotable/blob/main/public/samples/workouts.jsonl)
 and
-[`workouts.jsonl`](https://github.com/jbouder/holotable/blob/main/public/samples/workouts.jsonl). The source stores the
+[`home-energy.xlsx`](https://github.com/jbouder/holotable/blob/main/public/samples/home-energy.xlsx). The source stores the
 directory, `uploads/<workspace id>/<id>`, like any other path, and is a
 directory source from then on: Test, Refresh and every query go through the
 same guard and the same locked engine.
@@ -92,13 +97,36 @@ request, and a refused or cancelled upload leaves no file behind:
 | --- | --- |
 | A file larger than `DUCKDB_UPLOAD_MAX_BYTES` | default `52428800` (50 MiB) |
 | More than `DUCKDB_UPLOAD_MAX_FILES` files | default `20`, at most `200` (a source's table limit) |
-| A file that is not text: a NUL byte, or not UTF-8, in its first 64 KiB | whatever its name or content type says; CSV and JSON alike |
+| A file that is not text: a NUL byte, or not UTF-8, in its first 64 KiB | whatever its name or content type says; CSV and JSON alike (not an `.xlsx` workbook, which is binary) |
 | An empty file, a name that reduces to nothing, two files that would be one table (`events.csv` and `events.jsonl` too) | |
+| A workbook's CSVs, together, larger than `DUCKDB_UPLOAD_MAX_BYTES` | the same bound as the workbook itself |
+| A workbook with more sheets to convert, or a sheet with more rows | 32 sheets, 1,000,000 rows (`MAX_WORKBOOK_SHEETS`, `MAX_SHEET_ROWS` in `src/lib/duckdb/uploads.ts`) |
+| `.xls`, `.xlsb`, `.xlsm`, `.ods`, `.numbers` | refused by name: only `.xlsx` is converted |
 
 The file is streamed to disk as it arrives and never held whole in memory.
 A malformed bound is a warning in development (the default is used) and a
 startup error in production; set without `DUCKDB_SOURCES_DIR`, it is a
 warning, since no upload can land.
+
+### Workbooks
+
+An `.xlsx` workbook is streamed to a temporary file inside the upload's own
+directory, converted there to one `<table>.csv` per visible sheet with data,
+and removed, so the directory holds only CSVs and the engine is exactly as
+it is for any other upload: no `excel` extension, nothing loaded before the
+lock. The naming and cell rules are in
+[DuckDB sources](/concepts/duckdb-sources/#workbooks); dates are written as
+the sheet shows them and read as UTC, the engine's zone.
+
+The workbook is untrusted. It is read with a small ZIP reader over Node's
+own zlib and the `saxes` XML parser (pure JavaScript, no native code), which
+expands no entity the XML did not start with. Every part is inflated as a
+stream against a cap counted as it comes out (1 GiB for a sheet, read twice:
+once to count, once to write; 128 MiB for the shared text and styles, which
+are held), so an archive that claims to be small and inflates without end
+stops at the cap. An encrypted entry, a ZIP64 archive and anything that is
+not an Office Open XML workbook are refused. Every refusal names the file
+and the sheet, never a path.
 
 **The workspace rule.** A path under `uploads/` names its workspace in its
 second segment, and a source may name only an upload directory of its own
@@ -239,10 +267,12 @@ it beside the files demo:
   refresh needed.
 - **Writing, importing or converting.** Holotable reads. `COPY`, `CREATE`,
   `INSERT` and `ATTACH` stay refused. [Uploads](#uploads) store a CSV or
-  JSON file as it was sent; nothing converts it, and nested JSON is not
-  flattened (a query reads a `STRUCT` field directly).
-- **Other upload formats, quotas and replacing a file.** Uploads take CSV
-  and JSON.
+  JSON file as it was sent, and nested JSON is not flattened (a query reads
+  a `STRUCT` field directly); the one conversion is an `.xlsx` workbook's
+  sheets to CSV, on arrival ([Workbooks](#workbooks)).
+- **Other upload formats, quotas and replacing a file.** Uploads take CSV,
+  JSON and `.xlsx`; `.xls`, `.ods` and `.numbers` are refused, as are a
+  sheet or range picker and keeping the workbook to convert again.
   There is no per-workspace disk quota beyond the per-file and per-upload
   caps, and no replacing a file in place: upload again and make a new
   source.
