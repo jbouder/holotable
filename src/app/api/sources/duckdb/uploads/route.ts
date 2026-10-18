@@ -1,20 +1,16 @@
 import { assertAuthorized, HttpError, requireIdentity } from "@/lib/auth/authorize";
 import { audit } from "@/lib/audit";
 import { json, route } from "@/lib/http";
-import { MemoryRateLimitStore } from "@/lib/limits/rate";
-import { duckdbUpload } from "@/lib/sources/server/registry";
+import {
+  duckdbUpload,
+  sweepUploads,
+  UPLOAD_RATE_PER_MINUTE,
+  uploadRateStore,
+} from "@/lib/sources/server/registry";
 
 export const runtime = "nodejs";
 // A large file on a slow link takes a while; the byte cap bounds it.
 export const maxDuration = 300;
-
-/**
- * The ceiling on uploads, per user per workspace. A constant, like the path
- * route's, not a capacity knob: an upload is a person choosing files.
- */
-const RATE_PER_MINUTE = 10;
-
-const rateStore = new MemoryRateLimitStore();
 
 /**
  * Upload CSV, JSON or Excel files as a DuckDB source (#595, #596, #597), with
@@ -27,7 +23,7 @@ const rateStore = new MemoryRateLimitStore();
  *   `<name>.csv` (or `.json`, `.jsonl`, `.ndjson`) per file, never held
  *   whole in memory, under
  *   `DUCKDB_UPLOAD_MAX_BYTES` per file and `DUCKDB_UPLOAD_MAX_FILES` files;
- * - an Excel workbook (`.xlsx`) converted on arrival to one `<name>.csv` per
+ * - an Excel workbook (`.xlsx` or `.xlsm`) converted on arrival to one `<name>.csv` per
  *   visible sheet with data, the workbook not kept, its CSVs together under
  *   `DUCKDB_UPLOAD_MAX_BYTES` too, and the sheet and row caps in
  *   `src/lib/duckdb/uploads.ts`;
@@ -37,7 +33,10 @@ const rateStore = new MemoryRateLimitStore();
  *   the source then stores, or `{ ok: false, error, file? }` with a message
  *   that names the variable or the person's own file, never a server path;
  * - audited as `source.upload`, success or failure, with the file count and
- *   sizes and never a path or a file's contents.
+ *   sizes and never a path or a file's contents;
+ * - followed, on success, by a sweep of this workspace's uploads that no
+ *   source came to name and that are past their age (#604), in the
+ *   background.
  *
  * Creating the source is still `POST /api/sources`, whose save check holds a
  * path under `uploads/` to the source's own workspace.
@@ -49,16 +48,17 @@ export const POST = route("sources.duckdb.uploads", async (req: Request) => {
 
   assertAuthorized(identity, "source:manage", { workspaceId });
 
-  const decision = await rateStore.take(
+  // One bucket with adding files to a source (#604).
+  const decision = await uploadRateStore.take(
     `${workspaceId}\u0000${identity.sub}`,
-    { perMinute: RATE_PER_MINUTE },
+    { perMinute: UPLOAD_RATE_PER_MINUTE },
     Date.now(),
   );
   if (!decision.allowed) {
     const seconds = Math.max(1, Math.ceil(decision.retryAfterMs / 1000));
     throw new HttpError(
       429,
-      `too many uploads: ${RATE_PER_MINUTE} per minute per user in this workspace; retry after ${seconds}s`,
+      `too many uploads: ${UPLOAD_RATE_PER_MINUTE} per minute per user in this workspace; retry after ${seconds}s`,
       { "Retry-After": String(seconds) },
     );
   }
@@ -80,6 +80,7 @@ export const POST = route("sources.duckdb.uploads", async (req: Request) => {
         bytes: result.files.reduce((sum, f) => sum + f.bytes, 0),
       },
     });
+    void sweepUploads(workspaceId);
     return json(
       { ok: true, path: result.path, files: result.files },
       { headers: { "cache-control": "no-store" } },

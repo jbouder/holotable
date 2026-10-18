@@ -1,4 +1,5 @@
 import type { AnyCatalogView } from "@/lib/catalog/browse";
+import type { SweepCounts, UploadResult } from "@/lib/duckdb/uploads";
 import type { CatalogHealth } from "@/lib/catalog/health";
 import type { AnyCatalogDiff } from "@/lib/catalog/refresh";
 import type { PanelQuery, TimeRange, VariableQuery } from "@/lib/ir";
@@ -33,6 +34,22 @@ export interface CatalogRefresh {
    */
   facts?: CatalogFacts;
 }
+
+/** An upload's body, as the route received it (#595, #604). */
+export interface UploadRequest {
+  contentType: string | null;
+  contentLength: number | null;
+  body: ReadableStream<Uint8Array> | null;
+}
+
+/**
+ * An upload's answer: the path the source stores and what was stored, or a
+ * refusal whose message names the variable or the person's file, never a
+ * server path.
+ */
+export type UploadReply =
+  | ({ ok: true } & UploadResult)
+  | { ok: false; error: string; file?: string };
 
 /** A guard's verdict, in the shape `validateSql` has always returned. */
 export interface QueryCheck {
@@ -148,6 +165,23 @@ export interface ServerSourceKind {
   uploads?: {
     availability(): Promise<string | null>;
     limits(): { maxBytes: number; maxFiles: number };
+    /**
+     * Add uploaded files to an existing source (#604), in the source's own
+     * workspace, all or nothing and never touching what it already holds.
+     * A source that was not made by uploading is refused by name. The files
+     * are on disk, not yet tables: the allowlist changes only through a
+     * reviewed `refresh`.
+     */
+    add(source: SourceRecord, request: UploadRequest): Promise<UploadReply>;
+    /**
+     * Remove what an upload stored that no source came to name (#604), past
+     * the kind's age: in `workspaceId`, or every workspace. `sourcesIn` is a
+     * workspace's sources, tombstoned included, asked after the listing.
+     */
+    sweep(
+      sourcesIn: (workspaceId: string) => Promise<readonly SourceRecord[]>,
+      workspaceId?: string,
+    ): Promise<SweepCounts>;
   };
   /**
    * Release what the server stored for a source that was deleted or

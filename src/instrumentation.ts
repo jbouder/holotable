@@ -59,4 +59,13 @@ export async function register() {
   // writes to are swept on a timer, not only when something is written.
   const { startRetentionSweep } = await import("@/lib/retention");
   startRetentionSweep();
+
+  // Uploads no source came to name (#604): swept once at boot, in the
+  // background, and again after each upload, for that workspace. A server
+  // with no DUCKDB_SOURCES_DIR has nothing to sweep.
+  const { config } = await import("@/lib/config");
+  if (config.duckdbSourcesDir) {
+    const { sweepUploads } = await import("@/lib/sources/server/registry");
+    void sweepUploads();
+  }
 }

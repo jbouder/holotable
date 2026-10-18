@@ -75,34 +75,43 @@ export const UPLOAD_EXTENSIONS = [".csv", ".json", ".jsonl", ".ndjson"] as const
  */
 export const WORKBOOK_EXTENSION = ".xlsx";
 
+/**
+ * The workbook extensions an upload converts (#604): `.xlsm` is the same
+ * container as `.xlsx`, and only the sheets' XML is ever read, so its macros
+ * are never opened, let alone run.
+ */
+export const WORKBOOK_EXTENSIONS = [WORKBOOK_EXTENSION, ".xlsm"] as const;
+
 /** What the upload form's file picker offers: the extensions and their types. */
 export const UPLOAD_ACCEPT = [
   ...UPLOAD_EXTENSIONS,
-  WORKBOOK_EXTENSION,
+  ...WORKBOOK_EXTENSIONS,
   "text/csv",
   "application/json",
   "application/x-ndjson",
   "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  "application/vnd.ms-excel.sheet.macroEnabled.12",
 ].join(",");
 
 /** Spreadsheet files an upload refuses by name (#597), and what each one is. */
 const OTHER_SPREADSHEETS: Record<string, string> = {
   ".xls": "an older Excel workbook",
   ".xlsb": "a binary Excel workbook",
-  ".xlsm": "a macro-enabled Excel workbook",
   ".ods": "an OpenDocument spreadsheet",
   ".numbers": "a Numbers spreadsheet",
 };
 
-/** Whether a file name is an Excel workbook an upload converts (#597). */
+/** Whether a file name is an Excel workbook an upload converts (#597, #604). */
 export function isWorkbookName(filename: string): boolean {
-  return filename.toLowerCase().endsWith(WORKBOOK_EXTENSION);
+  const name = filename.toLowerCase();
+  return WORKBOOK_EXTENSIONS.some((ext) => name.endsWith(ext));
 }
 
 /**
- * Why a spreadsheet file cannot be uploaded, or null (#597): only `.xlsx` is
- * converted, so `.xls`, `.ods`, `.numbers` and their kin are refused by name,
- * saying what to save them as, instead of failing the text check as a CSV.
+ * Why a spreadsheet file cannot be uploaded, or null (#597): only `.xlsx`
+ * and `.xlsm` (#604) are converted, so `.xls`, `.xlsb`, `.ods`, `.numbers`
+ * are refused by name, saying what to save them as, instead of failing the
+ * text check as a CSV.
  * Held by the form and again by the server.
  */
 export function spreadsheetProblem(filename: string): string | null {
@@ -130,6 +139,22 @@ export function uploadScopeProblem(path: string, workspaceId: string): string | 
     return `must be an upload directory of this workspace: a path under ${UPLOADS_DIR}/ may only name ${UPLOADS_DIR}/<this workspace>/<upload>`;
   }
   return null;
+}
+
+/**
+ * Whether `path` is one of `workspaceId`'s own upload directories (#604),
+ * exactly `uploads/<workspaceId>/<sourceDir>`: a source made by uploading,
+ * which may take more files. Lexical; the path guard still resolves it
+ * before anything is written.
+ */
+export function isUploadPath(path: string, workspaceId: string): boolean {
+  const segments = path.replace(/\/$/, "").split("/");
+  return (
+    segments.length === 3 &&
+    segments[0] === UPLOADS_DIR &&
+    segments[1] === workspaceId &&
+    duckdbPathProblem(path) === null
+  );
 }
 
 /** Whether a path names a database file (`.duckdb`) rather than a directory. */
@@ -185,6 +210,11 @@ export interface DuckDbListing extends ListingBase {
   tableCount: number;
   /** "DuckDB 1.5.6"; null until a Test or Refresh. */
   engine: string | null;
+  /**
+   * Whether the source was made by uploading files (#604), so it may take
+   * more: derived from the path, which itself is never listed.
+   */
+  uploaded: boolean;
 }
 
 /**
@@ -227,6 +257,7 @@ export const duckdb = {
       layout: duckdbLayout(cfg.path),
       tableCount: cfg.tables.length,
       engine: facts && "duckdb" in facts ? duckDbEngine(facts) : null,
+      uploaded: isUploadPath(cfg.path, source.workspaceId),
       tombstonedAt: source.tombstonedAt,
     };
   },
