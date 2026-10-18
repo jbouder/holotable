@@ -50,6 +50,13 @@ export interface CatalogDiff {
   restoredTables: string[];
   /** Tables whose columns changed. Unchanged tables are not listed. */
   tables: TableChange[];
+  /**
+   * Tables the refresh would add to the allowlist (#604), each also in
+   * `tables` with its columns as added: only a DuckDB source made by
+   * uploading offers any, the tables of files added to it since. Absent or
+   * empty for every other source.
+   */
+  addedTables?: string[];
 }
 
 /** The stored side of a diff: the catalog and the last refresh's missing list. */
@@ -210,10 +217,14 @@ export function diffCatalog(
     }
   }
 
+  const addedTables = next.config.tables
+    .filter((t) => !before.has(t.name))
+    .map((t) => t.name);
   return {
     missingTables: [...next.missingTables],
     restoredTables: stored.catalogMissingTables.filter((name) => !missing.has(name)),
     tables,
+    ...(addedTables.length > 0 ? { addedTables } : {}),
   };
 }
 
@@ -248,9 +259,14 @@ function plural(n: number, word: string): string {
 export function summarizeCatalogDiff(diff: AnyCatalogDiff): string {
   if (isMetricDiff(diff)) return summarizeMetricDiff(diff);
   if (isLabelDiff(diff)) return summarizeLabelDiff(diff);
+  const added = new Set(diff.addedTables ?? []);
+  // A new table's columns are the table, not columns added to one.
   const count = (pick: (t: TableChange) => unknown[]) =>
-    diff.tables.reduce((n, t) => n + pick(t).length, 0);
+    diff.tables
+      .filter((t) => !added.has(t.table))
+      .reduce((n, t) => n + pick(t).length, 0);
   const parts = [
+    added.size > 0 && `${plural(added.size, "table")} added`,
     diff.missingTables.length > 0 &&
       `${plural(diff.missingTables.length, "table")} missing`,
     diff.restoredTables.length > 0 &&

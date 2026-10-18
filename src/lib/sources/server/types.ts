@@ -117,7 +117,10 @@ export interface ServerSourceKind {
   }): AnyPlanView;
   /**
    * The catalog re-read from the source (#386): the config to store and the
-   * allowlisted entries it could not find. Never edits the allowlist.
+   * allowlisted entries it could not find. Never edits the allowlist on its
+   * own: what it returns is reviewed as a diff and stored only on apply. It
+   * never widens it either, but for one case: a DuckDB source made by
+   * uploading offers the tables of the files added to it (#604).
    */
   refresh(source: SourceRecord): Promise<CatalogRefresh>;
   /** What a refresh would change, in the kind's own words. */
