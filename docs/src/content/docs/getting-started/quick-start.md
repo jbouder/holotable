@@ -183,7 +183,7 @@ npm run lint:fix       # apply Biome's safe fixes
 npm run format         # Biome format --write
 npm run typecheck      # next typegen && tsc --noEmit
 npm test               # node --test via tsx
-npm run test:fuzz      # the property-based SQL guard suite alone (FUZZ_RUNS, FUZZ_SEED)
+npm run test:fuzz      # the property-based SQL, PromQL and LogQL guard suites alone (FUZZ_RUNS, FUZZ_SEED)
 npm run test:integration # real-database suites against TimescaleDB (Docker)
 npm run e2e            # Playwright journeys and axe scans against their own stack (Docker)
 npm run e2e:down       # remove the e2e stack

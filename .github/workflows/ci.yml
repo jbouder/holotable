@@ -5,6 +5,8 @@ name: CI
 # path filter never reports a conclusion — GitHub then blocks the pull request
 # forever waiting for a run that will not happen. docs.yml can filter by path
 # precisely because none of its jobs are required.
+# The fuzz, which is not required either, skips itself on a pull request
+# that touches no guard path (`guard-paths` below).
 #
 # A `v*` tag runs the whole pipeline too: `publish` below releases the images,
 # and it only runs once every check has passed on that exact commit.
@@ -120,24 +122,78 @@ jobs:
           if-no-files-found: error
           retention-days: 1
 
+  # Did this pull request touch a guard (#611)? The fuzz below runs on a pull
+  # request only when it did. The answer is a job of its own so the fuzz can
+  # be skipped at the job level, which the checks list shows as "skipped",
+  # rather than run with every step skipped, which it would show as a pass.
+  #
+  # A pull request is checked out as GitHub's merge commit, whose first parent
+  # is the base branch as it stands, so `HEAD^1..HEAD` is exactly what the pull
+  # request changes against it, with no third-party action and no API call.
+  # Any other event (a push to main, a tag) always fuzzes.
+  guard-paths:
+    name: Guard paths changed?
+    runs-on: ubuntu-latest
+    outputs:
+      changed: ${{ steps.filter.outputs.changed }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        if: github.event_name == 'pull_request'
+        with:
+          fetch-depth: 2
+
+      # The guard paths: the SQL, PromQL and LogQL guards; the DuckDB dialect,
+      # which feeds the SQL guard; the fuzz corpora and the fuzz suites; and
+      # the lockfile, since a parser upgrade changes what the guards see.
+      # Keep this list and the one in CONTRIBUTING.md together.
+      - id: filter
+        name: Compare against the base branch
+        env:
+          EVENT: ${{ github.event_name }}
+        run: |
+          if [ "$EVENT" != "pull_request" ]; then
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+            echo "A ${EVENT} always runs the fuzz." >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          files=$(git diff --name-only HEAD^1 HEAD)
+          guard=$(printf '%s\n' "$files" | grep -E \
+            '^(src/lib/(sql|promql|logql|duckdb)/|test/fixtures/[^/]*-corpus\.ts$|test/[^/]*fuzz[^/]*$|package-lock\.json$)' || true)
+          if [ -n "$guard" ]; then
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+            {
+              echo "A guard path changed, so the fuzz runs:"
+              echo
+              echo "$guard" | sed 's/^/- `/; s/$/`/'
+            } >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+            echo "::notice title=Fuzz skipped::No guard path changed, fuzz skipped."
+            echo "No guard path changed, fuzz skipped." >> "$GITHUB_STEP_SUMMARY"
+          fi
+
   fuzz:
     name: Fuzz the SQL guard
+    needs: guard-paths
+    if: github.event_name != 'pull_request' || needs.guard-paths.outputs.changed == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: ./.github/actions/setup
 
-      # `npm test` already runs test/sql-safety.fuzz.test.ts with a fixed seed
-      # and a small iteration count, so the required Test job is deterministic.
-      # This job is the long run: many more iterations, and a fresh seed on
-      # every run so it keeps exploring new inputs. It is deliberately not a
-      # required check — a failure here is a real finding against main, not
+      # `npm test` already runs the SQL, PromQL and LogQL fuzz suites with a
+      # fixed seed and a small iteration count, so the required Test job is
+      # deterministic. This job runs them longer, with a fresh seed on every
+      # run so it keeps exploring new inputs, in three tiers (#611): a pull
+      # request that touches a guard path gets 5,000 iterations, a push to main
+      # 20,000, and the nightly in fuzz.yml 100,000. It is deliberately not a
+      # required check: a failure here is a real finding against main, not
       # necessarily against the pull request. The failure output prints the
       # exact statement and a FUZZ_SEED/FUZZ_PATH line to replay it locally.
       - name: Fuzz
         run: npm run test:fuzz
         env:
-          FUZZ_RUNS: 20000
+          FUZZ_RUNS: ${{ github.event_name == 'pull_request' && '5000' || '20000' }}
           FUZZ_SEED: ${{ github.run_id }}
 
   database:
