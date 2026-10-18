@@ -609,7 +609,7 @@ test("a workbook's cells: shared and inline text, numbers, booleans, errors, for
     `<row r="1"><c r="A1" t="s"><v>0</v></c><c r="C1" t="inlineStr"><is><r><t>am</t></r><r><t>ount</t></r></is></c><c r="D1" t="s"><v>1</v></c><c r="E1" t="s"><v>2</v></c><c r="F1" t="s"><v>3</v></c></row>`,
     // Row 2 is empty: passed over. Row 3 holds every kind of cell.
     `<row r="2"/>`,
-    `<row r="3"><c r="A3" t="s"><v>4</v></c><c r="B3" t="b"><v>1</v></c><c r="C3"><f>1+1</f><v>2</v></c><c r="D3" t="e"><v>#DIV/0!</v></c><c r="E3" s="1"><v>46113</v></c><c r="F3" s="2"><v>46113.5</v></c><c r="G3" t="str"><f>A3</f><v>a, "b"</v></c></row>`,
+    `<row r="3"><c r="A3" t="s"><v>4</v></c><c r="B3" t="b"><v>1</v></c><c r="C3"><f>1+1</f><v>2</v></c><c r="D3" t="e"><v>#DIV/0!</v></c><c r="E3" s="1"><v>46113</v></c><c r="F3" s="2"><v>46113.5</v></c><c r="G3" t="str"><f>A3</f><v>a, "b"</v></c><c r="H3" t="d"><v>2026-04-02T10:00:00</v></c></row>`,
     `<row r="4"><c r="A4" t="s"><v>5</v></c><c r="B4" t="b"><v>0</v></c><c r="E4" s="3"><v>0.25</v></c></row>`,
   ].join("");
   const book = xlsx(
@@ -644,9 +644,9 @@ test("a workbook's cells: shared and inline text, numbers, booleans, errors, for
   assert.equal(
     csv,
     [
-      '"zip","column_2","amount","ok","date","at","column_7"',
-      '"00123",true,2,,2026-04-01,2026-04-01T12:00:00,"a, ""b"""',
-      '"line\ntwo",false,,,06:00:00,,',
+      '"zip","column_2","amount","ok","date","at","column_7","column_8"',
+      '"00123",true,2,,2026-04-01,2026-04-01T12:00:00,"a, ""b""",2026-04-02T10:00:00',
+      '"line\ntwo",false,,,06:00:00,,,',
       "",
     ].join("\n"),
   );
@@ -825,6 +825,18 @@ test("a workbook that is not a readable archive, or that inflates past its cap, 
     dir,
     [{ name: "bad.xlsx", body: xlsx([{ name: "S", rows: "<row><c><v>1</row>" }]) }],
     /not well-formed XML/,
+  );
+  await refused(
+    dir,
+    [
+      {
+        name: "wide.xlsx",
+        body: xlsx([
+          { name: "Wide", rows: '<row><c r="XFE1"><v>1</v></c><c><v>2</v></c></row>' },
+        ]),
+      },
+    ],
+    /sheet "Wide" has more than 16384 columns/,
   );
   // An entity it was not born with is not expanded, let alone a recursive one.
   await refused(

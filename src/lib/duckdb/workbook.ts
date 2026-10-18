@@ -372,17 +372,22 @@ export function excelSerialToMs(serial: number, date1904: boolean): number | nul
   return Math.round((epoch + serial * DAY_MS) / 1000) * 1000;
 }
 
-/** A column's index from a cell reference (`C12` is 2), or -1. */
+/** Excel's own widest sheet, in columns (`XFD`). */
+const MAX_COLUMNS = 16_384;
+
+/**
+ * A column's index from a cell reference (`C12` is 2), or -1 when it names
+ * none. A column past Excel's widest is {@link MAX_COLUMNS} or more.
+ */
 function columnOf(ref: string): number {
   let col = 0;
   let i = 0;
-  for (; i < ref.length; i++) {
-    const code = ref.charCodeAt(i);
-    if (code >= 65 && code <= 90) col = col * 26 + (code - 64);
-    else if (code >= 97 && code <= 122) col = col * 26 + (code - 96);
-    else break;
+  for (; i < ref.length && i < 4; i++) {
+    const code = ref.charCodeAt(i) | 0x20;
+    if (code < 97 || code > 122) break;
+    col = col * 26 + (code - 96);
   }
-  return i === 0 || col > 16_384 ? -1 : col - 1;
+  return i === 0 ? -1 : col - 1;
 }
 
 /** One cell's value, from its type, its style and the text read for it. */
@@ -408,12 +413,17 @@ function cellValue(
     case "e":
       return null;
     case "d": {
-      const ms = Date.parse(value.trim().endsWith("Z") ? value : `${value.trim()}Z`);
-      if (!Number.isFinite(ms)) return hasValue ? value : null;
-      return {
-        ms: Math.round(ms / 1000) * 1000,
-        show: value.includes("T") ? "datetime" : "date",
-      };
+      // An ISO 8601 date cell, rare outside Strict files: read as UTC.
+      const text = value.trim();
+      const timed = text.includes("T");
+      const iso = !timed
+        ? `${text}T00:00:00Z`
+        : /(?:[zZ]|[+-]\d\d:?\d\d)$/.test(text)
+          ? text
+          : `${text}Z`;
+      const ms = Date.parse(iso);
+      if (!Number.isFinite(ms)) return hasValue && text !== "" ? text : null;
+      return { ms: Math.round(ms / 1000) * 1000, show: timed ? "datetime" : "date" };
     }
     default: {
       if (!hasValue || value.trim() === "") return null;
@@ -437,6 +447,7 @@ function cellValue(
 async function readSheet(
   file: string,
   entry: ZipEntry,
+  sheetName: string,
   book: Book,
   onRow: (cells: CsvCell[]) => void,
   drain?: () => Promise<void>,
@@ -465,6 +476,11 @@ async function readSheet(
       } else if (name === "c" && row) {
         const at = attrs.r ? columnOf(attrs.r) : -1;
         col = at >= 0 ? at : col + 1;
+        if (col >= MAX_COLUMNS) {
+          throw new WorkbookError(
+            `sheet "${sheetName}" has more than ${MAX_COLUMNS} columns`,
+          );
+        }
         type = attrs.t ?? "n";
         style = Number(attrs.s ?? 0);
         value = "";
@@ -552,7 +568,7 @@ export async function convertWorkbook(input: {
       }
       let rows = 0;
       let width = 0;
-      await readSheet(file, entry, book, (cells) => {
+      await readSheet(file, entry, sheet.name, book, (cells) => {
         rows++;
         if (rows > limits.maxRows) {
           throw new WorkbookError(
@@ -630,7 +646,7 @@ function asWorkbookError(err: unknown): unknown {
 async function writeSheet(
   file: string,
   book: Book,
-  sheet: { entry: ZipEntry; width: number; view: string },
+  sheet: { sheet: string; entry: ZipEntry; width: number; view: string },
   dir: string,
   count: (bytes: number) => void,
 ): Promise<number> {
@@ -658,6 +674,7 @@ async function writeSheet(
     await readSheet(
       file,
       sheet.entry,
+      sheet.sheet,
       book,
       (cells) => {
         const line = header ? csvHeader(cells, sheet.width) : csvRow(cells, sheet.width);
