@@ -170,6 +170,7 @@ test("an uploaded CSV: progress, discovery, create, generate, render", async ({
       dialog.getByRole("button", { name: "household expenses" }),
     ).toBeVisible();
     await expect(dialog.getByRole("button", { name: "workouts" })).toBeVisible();
+    await expect(dialog.getByRole("button", { name: "home energy" })).toBeVisible();
     await dialog.getByLabel("Files", { exact: true }).setInputFiles({
       name: "household-expenses.csv",
       mimeType: "text/csv",
@@ -303,6 +304,77 @@ test("an uploaded JSON-lines sample: stored as JSON, its nested field queried", 
     { country: "CA", workouts: 22 },
     { country: "US", workouts: 68 },
   ]);
+
+  const removed = await request.delete(`/api/sources/${sourceId}`);
+  expect(removed.ok(), await removed.text()).toBe(true);
+  expect(existsSync(join(DUCKDB_DIR, uploaded))).toBe(false);
+});
+
+/*
+ * Uploading an Excel workbook (#597): the form's home-energy sample, two
+ * sheets converted on the server to one CSV each and the workbook not kept,
+ * both tables discovered, their date cells typed as dates and their numbers
+ * as numbers, and a sheet queried through the guard.
+ */
+test("an uploaded Excel workbook: one table per sheet, dates typed as dates", async ({
+  page,
+  request,
+}) => {
+  test.setTimeout(120_000);
+  const sourceId = `e2e-xlsx-${Date.now().toString(36)}`;
+  const sourceName = `E2E workbook ${sourceId}`;
+
+  await page.goto("/data-sources");
+  await page.getByRole("button", { name: "Add source" }).first().click();
+  const dialog = page.getByRole("dialog", { name: "Add source" });
+  await dialog.getByRole("button", { name: "or enter configuration manually" }).click();
+  await dialog.getByRole("radio", { name: "Upload files" }).click();
+  await dialog.getByLabel("Source id").fill(sourceId);
+  await dialog.getByLabel("Name").fill(sourceName);
+  await dialog.getByRole("button", { name: "home energy" }).click();
+  await expect(
+    dialog.getByRole("progressbar", { name: "home-energy.xlsx" }),
+  ).toBeVisible();
+  await dialog.getByRole("button", { name: "Upload", exact: true }).click();
+  await expect(
+    dialog.getByText(
+      "Converted to the tables home_energy_electricity and home_energy_gas",
+    ),
+  ).toBeVisible();
+  await expect(dialog.getByText("Done", { exact: true })).toBeVisible();
+  await dialog.getByRole("checkbox", { name: /^home_energy_electricity\b/ }).check();
+  await dialog.getByRole("checkbox", { name: /^home_energy_gas\b/ }).check();
+  await dialog.getByRole("button", { name: "Create source" }).click();
+  await expect(dialog).toBeHidden();
+
+  const listing = await request.get("/api/sources?workspaceId=demo");
+  const row = (await listing.json()).sources.find(
+    (s: { id: string }) => s.id === sourceId,
+  );
+  const uploaded: string = row?.config?.path ?? "";
+  for (const file of ["home_energy_electricity.csv", "home_energy_gas.csv"]) {
+    expect(existsSync(join(DUCKDB_DIR, uploaded, file))).toBe(true);
+  }
+  expect(existsSync(join(DUCKDB_DIR, uploaded, "home-energy.xlsx"))).toBe(false);
+  const gas = row?.config?.tables?.find(
+    (t: { name: string }) => t.name === "home_energy_gas",
+  );
+  const types = Object.fromEntries(
+    (gas?.columns ?? []).map((c: { name: string; type: string }) => [c.name, c.type]),
+  );
+  expect(types).toMatchObject({ date: "DATE", therms: "DOUBLE", cost_usd: "DOUBLE" });
+
+  const answer = await request.post("/api/query", {
+    data: {
+      sourceId,
+      sql: "SELECT count(*) AS days, min(date) AS first FROM home_energy_electricity",
+      timeRange: { from: "now-1h", to: "now" },
+    },
+  });
+  expect(answer.ok(), await answer.text()).toBe(true);
+  const [first] = (await answer.json()).rows;
+  expect(Number(first.days)).toBe(183);
+  expect(String(first.first)).toMatch(/^2026-04-01/);
 
   const removed = await request.delete(`/api/sources/${sourceId}`);
   expect(removed.ok(), await removed.text()).toBe(true);
