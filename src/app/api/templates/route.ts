@@ -10,6 +10,7 @@ import {
 } from "@/lib/db/repo";
 import { resolveAndValidateDashboard } from "@/lib/dashboard-service";
 import { buildBuiltinTemplates } from "@/lib/builtin-templates";
+import { buildFileTemplates } from "@/lib/builtin-templates-files";
 import { buildPrometheusTemplates } from "@/lib/builtin-templates-promql";
 import { TemplateCreate, TemplateKind, templateValidationSpec } from "@/lib/templates";
 
@@ -58,12 +59,15 @@ export const GET = route("templates.list", async (req: Request) => {
     // Scoped to the named workspace, so a source elsewhere reads exactly as
     // one that does not exist: naming it discloses nothing.
     // The built-ins are each kind's: SQL against a source's tables, PromQL
-    // against its metrics (#388).
+    // against its metrics (#388). A starter recognized from a table's column
+    // shape (#606) leads the list, ahead of the workspace's own templates:
+    // for a file someone just uploaded it is the likeliest first pick.
     if (source && !source.tombstonedAt && source.workspaceId === workspaceId) {
       const cfg = source.config;
-      if (isSqlSource(source))
+      if (isSqlSource(source)) {
+        templates.unshift(...buildFileTemplates(source, kind?.data));
         templates.push(...buildBuiltinTemplates(source, kind?.data));
-      else if ("metrics" in cfg)
+      } else if ("metrics" in cfg)
         templates.push(
           ...buildPrometheusTemplates({ ...source, config: cfg }, kind?.data),
         );

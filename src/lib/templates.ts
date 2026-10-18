@@ -106,6 +106,12 @@ export interface Template {
   name: string;
   description?: string;
   body: TemplateBody;
+  /**
+   * A built-in chosen by a table's column shape (#606): spending, an activity
+   * log, daily measurements. The surfaces that start a dashboard lead with
+   * these, since a recognized file's starter is the likeliest first pick.
+   */
+  recognized?: boolean;
   /** Absent on a built-in. */
   workspaceId?: string;
   createdBy?: string;
@@ -368,6 +374,7 @@ function readTemplate(input: unknown): Template | null {
     id: row.id,
     origin: row.origin === "builtin" ? "builtin" : "workspace",
     kind: kind.data,
+    ...(row.origin === "builtin" && row.recognized === true ? { recognized: true } : {}),
     name: row.name,
     description: typeof row.description === "string" ? row.description : undefined,
     body: body.data,
