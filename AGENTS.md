@@ -204,7 +204,8 @@ thing and match it.
   `Button` / `ButtonLink`, `Input`, `Select`, `Autocomplete`, `Checkbox`,
   `ChoiceCard` (two to five pictured options, one chosen),
   `Menu`, `Popover`, `Dialog`, `ConfirmDialog`, `Card`, `Table`, `Badge`,
-  `PageHeader`, `EmptyState`, `Skeleton`, `ErrorDisplay`. A new kind of
+  `PageHeader`, `EmptyState`, `Skeleton`, `ErrorDisplay`, `Progress` (a bar
+  with the `progressbar` role for work with a known or unknown extent). A new kind of
   control becomes a primitive there, built on Base UI and styled like its
   neighbors, not a one-off in a feature.
 - Never a native browser widget where the app has a primitive: no
