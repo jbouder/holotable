@@ -438,6 +438,7 @@ request:
 | `src/lib/auth/mcp-token.ts`, `/api/mcp`, the realm's MCP client | `admin/keycloak.md` ("MCP clients"), `SECURITY.md` |
 | `src/lib/mcp/` (a tool, the protocol) | `integrations/mcp.md`, `SECURITY.md` |
 | `src/components/editor/` (an inspector section), `src/lib/link-form.ts` | `guide/editing-a-dashboard.md` |
+| `src/lib/builtin-templates.ts`, `builtin-templates-promql.ts`, `builtin-templates-files.ts` (the built-in templates and the starters for files) | "Keeping one, and applying it again" in `concepts/the-shared-ir.md`, step 3 of `getting-started/your-first-dashboard.md`, `public/samples/README.md` |
 | `src/lib/editor/`, `src/lib/panel-starter.ts`, `src/lib/preview-runs.ts` | "What the editor holds before a save" in `concepts/executing-a-panel.md` |
 | `src/components/dashboard/LiveDashboard.tsx`, `src/lib/connection.ts`, the time picker, a panel's menu | `guide/viewing-a-dashboard.md`, the viewer sections of `concepts/streaming-and-rendering.md` |
 | `src/lib/ai/chat.ts`, `src/app/api/dashboards/[id]/chat/` | "Dashboard chat" in `concepts/generating-a-panel.md` |

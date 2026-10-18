@@ -27,8 +27,13 @@ a source admin of one workspace, `local`. Bring your own data first:
    (**household expenses**, a CSV, **workouts**, JSON lines, or **home
    energy**, a workbook of two sheets), then **Upload**. Its tables are
    discovered for you; check them and **Create source**.
-3. Ask for a dashboard over it on **New dashboard**, once a model is
-   configured (below), or write a panel's SQL yourself in the editor.
+3. If a table's columns read as spending, an activity log or daily
+   measurements (each sample does), the page offers **Start from:** that
+   starter dashboard right after **Create source**: one click opens it on
+   **New dashboard**, built from your columns with no model, and **Save
+   dashboard** keeps it. Otherwise, or for something else, ask for a
+   dashboard on **New dashboard** once a model is configured (below), or
+   write a panel's SQL yourself in the editor.
 
 One container holds TimescaleDB, the app, the demo seeder and the
 self-monitoring collector. It needs no `.env`, no Keycloak and no key. The

@@ -224,8 +224,12 @@ to three from one workspace. Describe what you want to watch in plain English.
 Until you send the first prompt, suggestions built from your own catalog (so
 they name your tables, not a demo's) sit under the bar, and **Start from a
 template…** and your recent prompts sit on the right of the page title, beside
-the model that will answer. Something concrete works better than something
-broad:
+the model that will answer. When one of the source's tables reads as
+spending, an activity log or daily measurements, its starter dashboard leads,
+above the suggestions: **Start from** it and it opens as the first version,
+built from your columns with no model call, ready to refine or save (see
+[starters for files](/concepts/the-shared-ir/#starters-for-files)). Otherwise,
+or for anything else, something concrete works better than something broad:
 
 > Request volume over time and the five slowest routes, plus a stat panel with
 > the total error count
