@@ -353,9 +353,11 @@ export async function receiveUpload(input: {
     handle = null;
     if (target) {
       for (const name of linked) {
-        await rm(join(target, name), { force: true }).catch((err: unknown) => {
-          storageFailure(err);
-        });
+        await rm(join(/* turbopackIgnore: true */ target, name), { force: true }).catch(
+          (err: unknown) => {
+            storageFailure(err);
+          },
+        );
       }
     }
     await rm(dir, { recursive: true, force: true }).catch((err: unknown) => {
@@ -673,7 +675,9 @@ async function realDirectory(path: string): Promise<boolean> {
 async function newestChange(dir: string): Promise<number> {
   let newest = (await lstat(dir)).mtimeMs;
   for (const name of await readdir(dir)) {
-    const info = await lstat(join(dir, name)).catch(() => null);
+    const info = await lstat(join(/* turbopackIgnore: true */ dir, name)).catch(
+      () => null,
+    );
     if (info) newest = Math.max(newest, info.mtimeMs);
   }
   return newest;
@@ -721,13 +725,17 @@ export async function sweepOrphanedUploads(input: {
     }
     for (const workspaceId of workspaces) {
       if (!WORKSPACE_DIR.test(workspaceId)) continue;
-      const workspaceDir = join(uploads, workspaceId);
+      const workspaceDir = join(/* turbopackIgnore: true */ uploads, workspaceId);
       if (!(await realDirectory(workspaceDir))) continue;
       const old: string[] = [];
       for (const entry of await readdir(workspaceDir, { withFileTypes: true })) {
         // Dirent does not follow a symlink: a link is never a directory here.
         if (!entry.isDirectory()) continue;
-        const age = now - (await newestChange(join(workspaceDir, entry.name)));
+        const age =
+          now -
+          (await newestChange(
+            join(/* turbopackIgnore: true */ workspaceDir, entry.name),
+          ));
         if (age >= UPLOAD_ORPHAN_AGE_MS) old.push(entry.name);
         else counts.kept++;
       }
@@ -749,7 +757,10 @@ export async function sweepOrphanedUploads(input: {
           continue;
         }
         try {
-          await rm(join(workspaceDir, name), { recursive: true, force: true });
+          await rm(join(/* turbopackIgnore: true */ workspaceDir, name), {
+            recursive: true,
+            force: true,
+          });
           counts.removed++;
         } catch (err) {
           storageFailure(err);
