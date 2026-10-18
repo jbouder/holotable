@@ -265,11 +265,10 @@ export async function receiveUpload(input: {
         }
         stems.add(stem);
         try {
-          handle = await open(
-            join(dir, `${stem}${uploadExtension(part.filename)}`),
-            "wx",
-            0o640,
-          );
+          // A name built here, under a directory made above: not a path to
+          // trace into the build (the extension is one of a fixed few).
+          const name = `${stem}${uploadExtension(part.filename)}`;
+          handle = await open(join(/* turbopackIgnore: true */ dir, name), "wx", 0o640);
         } catch (err) {
           throw storageFailure(err);
         }
