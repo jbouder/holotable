@@ -192,7 +192,7 @@ for (const { theme, palette, name } of APPEARANCES) {
         .getByRole("button", { name: "or enter configuration manually" })
         .click();
       await dialog.getByRole("radio", { name: "Upload files" }).click();
-      await dialog.getByRole("button", { name: "Try the sample" }).click();
+      await dialog.getByRole("button", { name: "household expenses" }).click();
       await expect(dialog.getByRole("progressbar")).toBeVisible();
       await dialog.getByRole("button", { name: "Upload", exact: true }).click();
       await expect(dialog.getByText("Done", { exact: true })).toBeVisible();
