@@ -86,6 +86,20 @@ interface SourceOption {
    * Per source, so switching the picker switches the suggestions.
    */
   starters: string[];
+  /**
+   * The starter dashboards this source's tables are recognized as by their
+   * column shape (#606): spending, an activity log, daily measurements.
+   * Server-built like the starters, and applied with no model call.
+   */
+  recognized: Template[];
+}
+
+/** A template as the first turn of a conversation: no model was asked. */
+function templateTurn(template: Template, sourceId: string) {
+  return {
+    prompt: `From template "${template.name}"`,
+    spec: templateSpec(template.body, { title: template.name, sourceId }),
+  };
 }
 
 /**
@@ -102,10 +116,17 @@ interface SourceOption {
  */
 export function NewDashboardClient({
   sources,
+  initial,
   models,
   canManageSources,
 }: {
   sources: SourceOption[];
+  /**
+   * The source to start on, and the recognized starter to open with as turn
+   * one, from `?source=` and `?template=` (#606): where the sources page's
+   * offer after an upload lands. Checked against `sources` on the server.
+   */
+  initial?: { sourceId: string; templateId?: string };
   /**
    * The model a generation in each workspace would use, and why generation
    * cannot be attempted there (no model configured), keyed by workspace id
@@ -120,7 +141,7 @@ export function NewDashboardClient({
 }) {
   const router = useRouter();
   const [sourceId, setSourceIdState] = React.useState<string | null>(
-    sources[0]?.id ?? null,
+    initial?.sourceId ?? sources[0]?.id ?? null,
   );
   // The dashboard's other sources (#104): same workspace, at most two more.
   const [additionalIds, setAdditionalIds] = React.useState<string[]>([]);
@@ -136,15 +157,24 @@ export function NewDashboardClient({
   // hydration mismatch. Until then the first source stands in, which is also
   // what a first visit gets.
   // With recent prompts off in Preferences, the last source is not kept either.
+  // A source named in the address wins over the remembered one.
   const { prompts: rememberPrompts } = useHistoryPreferences();
+  const named = initial !== undefined;
   React.useEffect(() => {
-    if (!rememberPrompts) return;
+    if (!rememberPrompts || named) return;
     const remembered = defaultSourceId(sources, readLastSource(browserStorage()));
     if (remembered) setSourceId(remembered);
-  }, [sources, setSourceId, rememberPrompts]);
+  }, [sources, setSourceId, rememberPrompts, named]);
 
   const [prompt, setPrompt] = React.useState("");
-  const [history, setHistory] = React.useState<TurnHistory>(EMPTY_HISTORY);
+  // Opened with a recognized starter (#606), it is already turn one.
+  const [history, setHistory] = React.useState<TurnHistory>(() => {
+    const start = sources.find((s) => s.id === initial?.sourceId);
+    const template = start?.recognized.find((t) => t.id === initial?.templateId);
+    return start && template
+      ? appendTurn(EMPTY_HISTORY, templateTurn(template, start.id))
+      : EMPTY_HISTORY;
+  });
   const [saveError, setSaveError] = React.useState<ApiError | null>(null);
   const [saving, setSaving] = React.useState(false);
   const [confirmingSave, setConfirmingSave] = React.useState(false);
@@ -171,6 +201,8 @@ export function NewDashboardClient({
   // Suggestions for the selected source. Server-built from its catalog, so they
   // change with the source and never describe a table this source cannot read.
   const starters = source?.starters ?? [];
+  // Its recognized starter dashboards, which need no model (#606).
+  const recognized = source?.recognized ?? [];
 
   // Recent prompts for this workspace, offered back on a fresh screen (#83).
   // Per workspace because a prompt names that workspace's tables; the list
@@ -290,13 +322,7 @@ export function NewDashboardClient({
    * a dashboard template's arrangement is most of what made it worth keeping.
    */
   function applyTemplate(input: { template: Template; sourceId: string }) {
-    const spec = templateSpec(input.template.body, {
-      title: input.template.name,
-      sourceId: input.sourceId,
-    });
-    setHistory((h) =>
-      appendTurn(h, { prompt: `From template "${input.template.name}"`, spec }),
-    );
+    setHistory((h) => appendTurn(h, templateTurn(input.template, input.sourceId)));
     setSourceId(input.sourceId);
     // A template is built over one source.
     setAdditionalIds([]);
@@ -496,6 +522,31 @@ export function NewDashboardClient({
             )}
           </div>
         </form>
+        {/*
+          The source's recognized starter dashboards lead (#606): a table
+          whose columns read as spending, an activity log or daily
+          measurements gets one, applied in one click as turn one with no
+          model call, so they stay offered when generation is unavailable.
+        */}
+        {!refining && !isLoading && recognized.length > 0 && (
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-xs text-muted">Start from</span>
+            {recognized.slice(0, 3).map((template) => (
+              <Button
+                key={template.id}
+                variant="secondary"
+                size="sm"
+                aria-label={`Start from ${template.name}`}
+                title={template.description}
+                onClick={() => {
+                  if (source) applyTemplate({ template, sourceId: source.id });
+                }}
+              >
+                <LayoutTemplate className="h-4 w-4" aria-hidden /> {template.name}
+              </Button>
+            ))}
+          </div>
+        )}
         {/*
           A few of the source's starters, on a fresh screen only. A pick fills
           the box rather than sending. Gone once a generation starts, since none

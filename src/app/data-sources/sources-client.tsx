@@ -17,6 +17,8 @@ import {
   FolderOpen,
   Upload,
   FileUp,
+  LayoutTemplate,
+  X,
 } from "lucide-react";
 import { SourceDraft, type SourceRecord, type SqlSourceDraft } from "@/lib/registry";
 import { type SourceListing, sourceListing } from "@/lib/source-listing";
@@ -27,7 +29,7 @@ import { type CatalogHealth, describeCatalogHealth } from "@/lib/catalog/health"
 import { CatalogHealthBadge } from "@/components/sources/catalog-health";
 import { SourceTestReport } from "@/components/sources/SourceTestReport";
 import type { SourceTestResult } from "@/lib/source-test";
-import { Button, ButtonLabel } from "@/components/ui/button";
+import { Button, ButtonLabel, ButtonLink } from "@/components/ui/button";
 import { Textarea, Label } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
@@ -49,6 +51,7 @@ import { FIRST_DASHBOARD_DOCS_URL } from "@/lib/onboarding";
 import { apiErrorFromThrown, readApiError } from "@/lib/errors";
 import { buildSourceDescriptionStarters } from "@/lib/prompts/starters";
 import { availableUploads, isKindAvailable, isSqlSource } from "@/lib/sources/registry";
+import { fetchTemplates, type Template } from "@/lib/templates";
 import { SourceForm } from "./source-form";
 import {
   PrometheusSourceForm,
@@ -126,6 +129,32 @@ export function SourcesClient({
   const [refreshing, setRefreshing] = React.useState<string | null>(null);
   // The upload source files are being added to (#604).
   const [adding, setAdding] = React.useState<string | null>(null);
+  // After a create, the starter dashboards its tables were recognized as
+  // (#606), offered in one click each. Gone when dismissed or replaced.
+  const [offer, setOffer] = React.useState<{
+    sourceId: string;
+    sourceName: string;
+    templates: Template[];
+  } | null>(null);
+
+  /**
+   * Ask the template listing what a source just created is recognized as.
+   * The listing builds them from the catalog on the server, as the picker's
+   * built-ins; nothing is offered when nothing is recognized.
+   */
+  async function offerStarters(ws: string, created: { id: string; name: string }) {
+    setOffer(null);
+    const outcome = await fetchTemplates({
+      workspaceId: ws,
+      kind: "dashboard",
+      sourceId: created.id,
+    });
+    if (!outcome.ok) return;
+    const templates = outcome.templates.filter((t) => t.recognized);
+    if (templates.length > 0) {
+      setOffer({ sourceId: created.id, sourceName: created.name, templates });
+    }
+  }
 
   const load = React.useCallback(async (ws: string) => {
     const res = await fetch(`/api/sources?workspaceId=${encodeURIComponent(ws)}`);
@@ -196,6 +225,7 @@ export function SourcesClient({
     setNotice(res.ok ? `${id}: ${body.outcome}` : `${id}: delete failed`);
     setBusy(null);
     setConfirmingDelete(null);
+    if (res.ok) setOffer((o) => (o?.sourceId === id ? null : o));
     // The row leaves before the list reloads without it (#237). It is found
     // by the anchor id the row already carries for the command palette.
     const row = res.ok ? document.getElementById(`source-${id}`) : null;
@@ -294,6 +324,49 @@ export function SourcesClient({
         className="border border-border bg-surface px-3 py-2 text-sm text-muted"
       >
         {notice}
+      </Notice>
+
+      {/*
+        The next step after creating a source whose tables read as spending,
+        an activity log or daily measurements (#606): a dashboard in one
+        click, with no model. Each lands on New dashboard with the starter
+        applied, unsaved, exactly as the template picker would leave it.
+      */}
+      <Notice
+        open={offer !== null}
+        role="status"
+        className="border border-border bg-surface px-3 py-2 text-sm"
+      >
+        {offer && (
+          <div className="flex flex-wrap items-center gap-2">
+            <p className="min-w-0 flex-1 basis-64 text-muted">
+              <span className="text-foreground">{offer.sourceName}</span> is ready, and
+              its columns fit a starter dashboard. Start from one — no model needed — or
+              describe your own on New dashboard.
+            </p>
+            {offer.templates.slice(0, 3).map((template) => (
+              <ButtonLink
+                key={template.id}
+                variant="secondary"
+                size="sm"
+                title={template.description}
+                href={`/dashboards/new?source=${encodeURIComponent(offer.sourceId)}&template=${encodeURIComponent(template.id)}`}
+              >
+                <LayoutTemplate className="h-4 w-4" aria-hidden /> Start from:{" "}
+                {template.name}
+              </ButtonLink>
+            ))}
+            <Button
+              variant="ghost"
+              size="icon"
+              aria-label="Dismiss the starter dashboards"
+              title="Dismiss"
+              onClick={() => setOffer(null)}
+            >
+              <X className="h-4 w-4" />
+            </Button>
+          </div>
+        )}
       </Notice>
 
       {testResult && (
@@ -574,10 +647,11 @@ export function SourcesClient({
             secretRefs={secretRefs}
             duckdbAvailable={isKindAvailable(kinds, "duckdb")}
             uploads={availableUploads(kinds, "duckdb")}
-            onCreated={() => {
+            onCreated={(created) => {
               setCreating(false);
               setNotice("source created");
               void load(workspaceId);
+              void offerStarters(workspaceId, created);
             }}
             onCancel={() => setCreating(false)}
           />
@@ -804,7 +878,8 @@ function CreateSourcePanel({
   duckdbAvailable?: boolean;
   /** Offer "Upload files" (#595): the server can write uploads, within these bounds. */
   uploads?: UploadAvailability | null;
-  onCreated: () => void;
+  /** The source just created, by id and name. */
+  onCreated: (created: { id: string; name: string }) => void;
   onCancel: () => void;
 }) {
   const [seed, setSeed] = React.useState<SqlSourceDraft>();
@@ -897,7 +972,7 @@ function CreateSourcePanel({
                   body: JSON.stringify({ workspaceId, id, name, config }),
                 });
                 if (!res.ok) return readApiError(res);
-                onCreated();
+                onCreated({ id, name });
                 return null;
               }}
               onCancel={onCancel}
@@ -923,7 +998,7 @@ function CreateSourcePanel({
                   }),
                 });
                 if (!res.ok) return readApiError(res);
-                onCreated();
+                onCreated({ id, name });
                 return null;
               }}
               onCancel={onCancel}
@@ -949,7 +1024,7 @@ function CreateSourcePanel({
                   }),
                 });
                 if (!res.ok) return readApiError(res);
-                onCreated();
+                onCreated({ id, name });
                 return null;
               }}
               onCancel={onCancel}
@@ -969,7 +1044,7 @@ function CreateSourcePanel({
                   body: JSON.stringify({ workspaceId, id, name, secretRef, config }),
                 });
                 if (!res.ok) return readApiError(res);
-                onCreated();
+                onCreated({ id, name });
                 return null;
               }}
               onCancel={onCancel}

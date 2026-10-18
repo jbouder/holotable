@@ -255,8 +255,47 @@ statement against the chosen source's catalog and shows what fails, and fixing
 it is the author's job in the editor.
 
 The starter templates that ship with the app are not stored at all. They are
-built from a source's own catalog on request (`src/lib/builtin-templates.ts`),
-the way the starter prompts are: the four golden signals, parameterized by a
-table and its time column, offered only where the columns support them. That
-also means they cannot drift — a built-in exists for as long as the catalog
-supports it, and stops being offered when it does not.
+built from a source's own catalog on request, the way the starter prompts are,
+and offered only where the columns support them. That also means they cannot
+drift — a built-in exists for as long as the catalog supports it, and stops
+being offered when it does not. There are two families:
+
+- **Golden signals** (`src/lib/builtin-templates.ts`): rate, errors,
+  duration and saturation, parameterized by a table and its time column, for
+  monitoring-shaped tables; on a Prometheus source, the same four from its
+  metrics (`src/lib/builtin-templates-promql.ts`).
+- **Starters for files** (`src/lib/builtin-templates-files.ts`, #606): a
+  whole dashboard for the kinds of file people upload, chosen by the shape of
+  one table's columns, with no model call.
+
+### Starters for files
+
+Each SQL table with a time column (its declared time column, else the first
+`date` or `timestamp` column) is read for one of three shapes. The column
+roles come from the names, since a catalog records a name and a type and
+nothing about the values; a name that is not a plain identifier is skipped.
+
+| Starter | What it looks for | What it builds |
+| --- | --- | --- |
+| **Activity log** | a number named as a distance (`distance`, `_km`, `_mi`, `meters`) **and** one named as a duration (`duration`, `minutes`, `seconds`, or a unit such as `_min` or `_s` after a time word); optionally a `type` or `sport` text column and a heart-rate column | distance and time per week, average speed per week (derived from the two, in km/h or mi/h when the names say the units), heart rate per week, activities by type, the latest activities |
+| **Spending** | a number named as money (`amount`, `total`, `cost`, `price`, `value`, `debit`, `credit`, `_usd`…) **and** a text column to break it down by (`category`, `type`, `account`, `method`…, else a `merchant`, `payee` or `vendor`) | spent per week, the latest month's total, spent by category, the top merchants, month by month by category |
+| **Daily measurements** | two or more other numbers (ids, keys and calendar parts such as `year` are not measures), and no distance or duration without its other half | the latest value of each, with the days behind it, a daily series for each, and the latest rows; up to four measures |
+
+A table gets at most one: an activity log first, then spending, then daily
+measurements. Money with nothing to break it down by is a measurement, which
+is why a utility bill's `cost_usd` beside `kwh` reads as daily measurements
+rather than spending.
+
+The SQL is one statement for both dialects (TimescaleDB's PostgreSQL and
+DuckDB), checked by the same guard as any other. A time series buckets the
+time column and declares the bucket as its `timeField`, so the dashboard's
+window narrows it; a breakdown (a pie, a top-ten table) has no time column
+for the window to narrow and reads the whole table, as its description says.
+The window is the last 365 days (`now-365d`), a relative expression the
+server resolves: a file is history, and the picker changes it in one click.
+
+Where they appear: they lead the template listing, ahead of the workspace's
+own templates; **New dashboard** shows a source's starters above the prompt,
+applied in one click as the first version, unsaved, with no model; and the
+**Data sources** page, after a source is created, offers each of its starters
+as a link to New dashboard with it applied.
