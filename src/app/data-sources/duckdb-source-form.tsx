@@ -204,7 +204,7 @@ export function DuckDbSourceForm({
       <div className="border-t border-border pt-4">
         {upload ? (
           <DuckDbUploadPicker
-            workspaceId={workspaceId}
+            target={{ workspaceId }}
             limits={upload}
             discovering={discovering}
             discovered={menu.ran}
