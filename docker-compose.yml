@@ -223,6 +223,9 @@ services:
       # The Prometheus and Loki sources' endpoints, allowed exactly as the app
       # allows them.
       SOURCE_URL_ALLOWLIST: ${SOURCE_URL_ALLOWLIST:-prometheus,loki}
+      # The PromQL self-monitoring dashboard is smoked where the seeder
+      # registered it, which is wherever this names a Prometheus (#600).
+      PROMETHEUS_SELF_URL: http://prometheus:9090
       # The Holotable logs dashboard is smoked too, so the `logs` profile has
       # to be up (#567). Set LOKI_SELF_URL empty to smoke a stack without it.
       LOKI_SELF_URL: ${LOKI_SELF_URL-http://loki:3100}

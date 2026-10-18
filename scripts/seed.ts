@@ -43,6 +43,7 @@ import {
   demoFilesSpec,
   writeDemoFiles,
 } from "./lib/demo-files";
+import { seedWorkspace } from "./lib/seed-workspace";
 
 /**
  * Looping seeder.
@@ -64,7 +65,13 @@ import {
  *
  * Uses the privileged TimescaleDB connection for inserts — distinct
  * from the app's read-only query user.
+ *
+ * The sources and dashboards go into the `demo` workspace, or in local mode
+ * (#600) the local owner's (`local` by default): `scripts/lib/seed-workspace.ts`.
  */
+
+/** The workspace every seeded source and dashboard belongs to. */
+const WORKSPACE = seedWorkspace();
 
 function metricsClient() {
   const connectionString = process.env.TIMESCALEDB_URL || process.env.DATABASE_URL;
@@ -105,9 +112,10 @@ async function upsertSource(
 ) {
   await pg.query(
     `INSERT INTO sources (id, workspace_id, name, kind, config, secret_ref, created_by, catalog_refreshed_at)
-     VALUES ($1, 'demo', $2, $4, $3, $5, 'seed', now())
+     VALUES ($1, $6, $2, $4, $3, $5, 'seed', now())
      ON CONFLICT (id) DO UPDATE
-       SET name = EXCLUDED.name, kind = EXCLUDED.kind, config = EXCLUDED.config,
+       SET workspace_id = EXCLUDED.workspace_id,
+           name = EXCLUDED.name, kind = EXCLUDED.kind, config = EXCLUDED.config,
            secret_ref = EXCLUDED.secret_ref, tombstoned_at = NULL,
            catalog_refreshed_at = now(), catalog_missing_tables = '{}'`,
     [
@@ -116,6 +124,7 @@ async function upsertSource(
       JSON.stringify(source.config),
       source.kind ?? "timescaledb",
       source.secretRef === undefined ? "TS_METRICS" : source.secretRef,
+      WORKSPACE,
     ],
   );
 }
@@ -226,8 +235,8 @@ async function ensureDemo() {
 
     // The files demo (#574): a DuckDB source over the Parquet and CSV files
     // the loop writes under DUCKDB_SOURCES_DIR. Only where that is set:
-    // compose sets it, and the quick-start image, which ships no files,
-    // does not. No secret_ref: a DuckDB source has nothing to log in to.
+    // compose and the quick-start image (#600) set it. No secret_ref: a
+    // DuckDB source has nothing to log in to.
     if (process.env.DUCKDB_SOURCES_DIR) {
       const filesConfig = demoFilesConfig();
       await upsertSource(pg, {
@@ -323,9 +332,9 @@ async function retireDashboard(pg: Client, title: string): Promise<void> {
        FROM dashboard_versions v
       WHERE v.id = d.current_version_id
         AND v.created_by = 'seed'
-        AND d.workspace_id = 'demo' AND d.title = $1 AND d.deleted_at IS NULL
+        AND d.workspace_id = $2 AND d.title = $1 AND d.deleted_at IS NULL
       RETURNING d.id`,
-    [title],
+    [title, WORKSPACE],
   );
   for (const { id } of rows) console.log(`retired demo dashboard ${id} (${title})`);
 }
@@ -343,10 +352,10 @@ async function ensureDashboard(pg: Client, input: unknown): Promise<string> {
             (SELECT max(version) FROM dashboard_versions WHERE dashboard_id = d.id) AS latest
        FROM dashboards d
        LEFT JOIN dashboard_versions v ON v.id = d.current_version_id
-      WHERE d.workspace_id = 'demo' AND d.title = $1 AND d.deleted_at IS NULL
+      WHERE d.workspace_id = $3 AND d.title = $1 AND d.deleted_at IS NULL
       ORDER BY d.created_at
       LIMIT 1`,
-    [spec.title, json],
+    [spec.title, json, WORKSPACE],
   );
   const found = existing.rows[0];
   if (found) {
@@ -363,8 +372,8 @@ async function ensureDashboard(pg: Client, input: unknown): Promise<string> {
     return found.id;
   }
   const d = await pg.query<{ id: string }>(
-    `INSERT INTO dashboards (workspace_id, title, created_by) VALUES ('demo', $1, 'seed') RETURNING id`,
-    [spec.title],
+    `INSERT INTO dashboards (workspace_id, title, created_by) VALUES ($2, $1, 'seed') RETURNING id`,
+    [spec.title, WORKSPACE],
   );
   const dashboardId = d.rows[0].id;
   await writeVersion(pg, dashboardId, 1, json, null);

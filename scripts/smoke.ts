@@ -21,6 +21,7 @@ import { resolveTimeRange } from "@/lib/time";
 import { serverKind } from "@/lib/sources/server/registry";
 import { demoSpec } from "./lib/demo-dashboards";
 import { DEMO_FILES_DASHBOARD_TITLE, demoFilesSpec } from "./lib/demo-files";
+import { seedWorkspace } from "./lib/seed-workspace";
 
 /**
  * End-to-end smoke test for the self-monitoring demo (#54), its PromQL twin
@@ -30,8 +31,9 @@ import { DEMO_FILES_DASHBOARD_TITLE, demoFilesSpec } from "./lib/demo-files";
  * demo, whose custom visual (#405) must also compile, and the files demo
  * (#574), which reads Parquet and CSV files through DuckDB.
  *
- * Brings no stack up of its own — `docker compose` does that — and instead
- * asserts that what compose produced actually works:
+ * Brings no stack up of its own — `docker compose` does that, or the
+ * quick-start image, inside which it runs as well (#600) — and instead
+ * asserts that what the stack produced actually works:
  *
  *   1. the seeder registered the `holotable-self` source and its dashboard;
  *   2. the spec the seeder stored still parses against the current IR and is
@@ -77,11 +79,18 @@ const TARGETS: Target[] = [
     committed: selfMonitoringSpec,
     feeds: "the collector needs a scrape or two",
   },
-  {
-    title: PROMETHEUS_SELF_DASHBOARD_TITLE,
-    committed: prometheusSelfMonitoringSpec,
-    feeds: "Prometheus needs a scrape or two",
-  },
+  // Only where the seeder registered it: compose names its Prometheus, and
+  // the quick-start image, which has none, does not (#600).
+  ...(process.env.PROMETHEUS_SELF_URL
+    ? [
+        {
+          title: PROMETHEUS_SELF_DASHBOARD_TITLE,
+          committed: prometheusSelfMonitoringSpec,
+          feeds:
+            "Prometheus needs a scrape or two (PROMETHEUS_SELF_URL empty skips this dashboard)",
+        },
+      ]
+    : []),
   ...(process.env.LOKI_SELF_URL
     ? [
         {
@@ -97,18 +106,24 @@ const TARGETS: Target[] = [
     committed: () => parseDashboard(demoSpec()),
     feeds: "the seeder writes demo rows every few seconds",
   },
-  {
-    // The files demo (#574): a DuckDB source over the Parquet and CSV files
-    // the seeder writes under DUCKDB_SOURCES_DIR, which compose mounts here
-    // read-only, as it does for the app.
-    title: DEMO_FILES_DASHBOARD_TITLE,
-    committed: () => parseDashboard(demoFilesSpec()),
-    feeds: "the seeder writes the files under DUCKDB_SOURCES_DIR first",
-  },
+  // The files demo (#574): a DuckDB source over the Parquet and CSV files
+  // the seeder writes under DUCKDB_SOURCES_DIR, which compose mounts here
+  // read-only, as it does for the app. The seeder registers it only where
+  // that is set.
+  ...(process.env.DUCKDB_SOURCES_DIR
+    ? [
+        {
+          title: DEMO_FILES_DASHBOARD_TITLE,
+          committed: () => parseDashboard(demoFilesSpec()),
+          feeds: "the seeder writes the files under DUCKDB_SOURCES_DIR first",
+        },
+      ]
+    : []),
 ];
 
 async function findDashboard(title: string) {
-  const { dashboards } = await listDashboards("demo", { search: title });
+  // Where the seeder put them: `demo`, or the local owner's workspace (#600).
+  const { dashboards } = await listDashboards(seedWorkspace(), { search: title });
   const summary = dashboards.find((d) => d.title === title);
   if (!summary) return null;
   // Parses the stored spec against the IR on the way out; a spec the current
