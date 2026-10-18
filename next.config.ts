@@ -7,6 +7,8 @@ const nextConfig: NextConfig = {
   // SQL guard; it loads its WebAssembly binary from disk next to its own
   // entrypoint, which only resolves when Node requires it from node_modules.
   // `@duckdb/node-api` (#572) loads a native binding per platform the same way.
+  // The trace copies that binding's duckdb.node but not the libduckdb.so it
+  // loads in turn (#615); the quick-start image installs its own instead.
   serverExternalPackages: ["pg", "libpg-query", "@duckdb/node-api"],
   // The dev-tools badge sits over the top-left of the nav bar, which is where
   // the brand and the first link are. Development-only either way — it is not
