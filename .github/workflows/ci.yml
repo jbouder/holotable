@@ -445,8 +445,8 @@ jobs:
 
   images:
     name: Images and smoke
-    # The images run `npm run build` inside their build stage, and the smoke
-    # test brings the whole compose stack up, so this waits for the cheaper
+    # The images run `npm run build` inside their shared build stage, and the
+    # smoke test brings the whole compose stack up, so this waits for the cheaper
     # jobs to have their say first: a type error or a failing unit test should
     # not cost an image build and a stack bring-up to discover.
     needs: [test, build]
@@ -491,17 +491,24 @@ jobs:
           cache-from: type=gha
 
       # The all-in-one quick-start image (#253): TimescaleDB, the server and
-      # the demo jobs, built on Alpine from its own Dockerfile. Loaded, so the
-      # step after the compose smoke can run it exactly as `docker run` does.
+      # the demo jobs on Alpine. The `quickstart` target of the same
+      # Dockerfile (#612): it installs its own musl node_modules and copies
+      # the app from the `build` stage the runtime image built above, which
+      # this build reports CACHED rather than running `next build` again.
+      # Loaded, so the step after the compose smoke can run it exactly as
+      # `docker run` does. Its own cache scope, so its layers do not replace
+      # the runtime image's in the default one, which it also reads.
       - name: Build quick-start image
         uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
         with:
           context: .
-          file: deploy/quickstart/Dockerfile
+          target: quickstart
           push: false
           load: true
           tags: ${{ env.IMAGE }}:${{ env.TAG }}-quickstart
-          cache-from: type=gha,scope=quickstart
+          cache-from: |
+            type=gha
+            type=gha,scope=quickstart
           cache-to: type=gha,scope=quickstart,mode=max
 
       # The app refuses to boot on an invalid configuration, and in production
@@ -653,8 +660,9 @@ jobs:
         id: build
         uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
         with:
+          # One Dockerfile for all three targets (#612), so a release builds
+          # through the same stages as the "Images and smoke" job above.
           context: .
-          file: ${{ matrix.target == 'quickstart' && 'deploy/quickstart/Dockerfile' || 'Dockerfile' }}
           target: ${{ matrix.target }}
           platforms: linux/${{ matrix.arch }}
           labels: ${{ steps.meta.outputs.labels }}
