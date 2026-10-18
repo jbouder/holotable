@@ -126,6 +126,7 @@ async function main(): Promise<void> {
         specVersion: SPEC_VERSION,
         title: "Quick-start smoke",
         timeRange: { from: "now-1h", to: "now" },
+        refreshIntervalMs: 60000,
         panels: [
           {
             id: "by-category",
