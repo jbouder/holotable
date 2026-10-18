@@ -347,9 +347,9 @@ export const config = {
   /**
    * The OpenAI-style base URLs probed for a model on this machine (#607),
    * comma- or whitespace-separated. The default is Ollama's and LM Studio's,
-   * from inside a container and outside: http://host.docker.internal:11434/v1,
-   * http://localhost:11434/v1, http://host.docker.internal:1234/v1,
-   * http://localhost:1234/v1. Ignored unless LOCAL_MODEL_DETECT resolves to on.
+   * from inside a container and outside: `http://host.docker.internal:11434/v1`,
+   * `http://localhost:11434/v1`, `http://host.docker.internal:1234/v1`,
+   * `http://localhost:1234/v1`. Ignored unless LOCAL_MODEL_DETECT resolves to on.
    */
   localModelEndpoints: str("LOCAL_MODEL_ENDPOINTS", DEFAULT_LOCAL_MODEL_ENDPOINTS),
 
