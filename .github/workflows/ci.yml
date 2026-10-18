@@ -113,8 +113,8 @@ jobs:
       # it the runtime image answers every DuckDB source "not available".
       - name: The standalone server carries libduckdb.so
         run: |
-          shopt -s nullglob
-          glibc=(.next/standalone/node_modules/@duckdb/node-bindings-linux-{x64,arm64}/libduckdb.so)
+          shopt -s nullglob extglob
+          glibc=(.next/standalone/node_modules/@duckdb/node-bindings-linux-@(x64|arm64)/libduckdb.so)
           musl=(.next/standalone/node_modules/@duckdb/node-bindings-linux-*-musl/libduckdb.so)
           if [ "${#glibc[@]}" -eq 0 ]; then
             echo "::error::no libduckdb.so under .next/standalone/node_modules/@duckdb/node-bindings-linux-*; see outputFileTracingIncludes in next.config.ts"
