@@ -30,7 +30,11 @@ import {
 import { PromptHistoryMenu, usePromptHistory } from "@/components/prompt-history";
 import { PROMPT_MAX_LENGTH, promptLabel } from "@/lib/prompt-history";
 import { browserStorage } from "@/lib/browser-storage";
-import { COMPOSER_CHIP_CLASS, SourceChipLabel } from "@/components/composer-chip";
+import {
+  COMPOSER_CHIP_CLASS,
+  SourceChipLabel,
+  sourceChipName,
+} from "@/components/composer-chip";
 import { Button } from "@/components/ui/button";
 import { Input, Label } from "@/components/ui/input";
 import { AiUnavailable } from "@/components/ai-unavailable";
@@ -633,7 +637,7 @@ export function NewDashboardClient({
                   refining an earlier one drops the versions after it.
                 */}
                 <Menu
-                  label={`Versions: showing ${history.index + 1} of ${history.turns.length}`}
+                  label={`Versions, showing version ${history.index + 1} of ${history.turns.length}`}
                   className="h-8 w-auto gap-1.5 px-2 text-sm"
                   panelClassName="max-w-md"
                   trigger={
@@ -866,7 +870,11 @@ function SourceMenu({
   const selection = { primaryId: source.id, additionalIds };
   return (
     <Menu
-      label={`Data source: ${source.name}, workspace ${source.workspaceId}${extra > 0 ? `, and ${extra} more` : ""}`}
+      label={sourceChipName("Data source", {
+        name: source.name,
+        workspaceId: source.workspaceId,
+        extra,
+      })}
       className={COMPOSER_CHIP_CLASS}
       panelClassName="max-w-sm"
       trigger={

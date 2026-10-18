@@ -81,9 +81,12 @@ function Tile({ tile }: { tile: StatusTile }) {
           : undefined
       }
     >
+      {/* The spaces between the lines are not drawn (they are flex items) but
+          keep the words apart in the text a checker reads off the link, which
+          must appear in its name (WCAG 2.5.3, Label in Name). */}
       <span className={cn("truncate text-xs text-foreground", ink)} title={tile.label}>
         {tile.label}
-      </span>
+      </span>{" "}
       {tile.text && (
         <span
           className={cn(
@@ -93,7 +96,7 @@ function Tile({ tile }: { tile: StatusTile }) {
         >
           {tile.text}
         </span>
-      )}
+      )}{" "}
       {tile.state && (
         <span className={cn("truncate text-xs font-medium text-foreground", ink)}>
           {tile.state}

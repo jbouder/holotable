@@ -243,8 +243,10 @@ Checked, not hoped for:
   (`test/color-literals.test.ts`).
 - A chart goes through `AccessibleChart`; a link styled as a button is
   `ButtonLink` (never `<Link><Button>`); an icon-only control has an
-  `aria-label`; every input has a label; focus is visible and keyboard order
-  follows the page.
+  `aria-label`; an `aria-label` on a control that shows text holds that text,
+  word for word and in order (WCAG 2.5.3, checked by axe), with a `{" "}`
+  between sibling spans so their words stay apart; every input has a label;
+  focus is visible and keyboard order follows the page.
 - A palette is proven by those unit tests, not the browser. `npm run e2e`
   scans every main surface with axe in the default palette's dark and light,
   and each other palette on one page (the live dashboard) in both schemes

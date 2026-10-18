@@ -75,7 +75,7 @@ test("source → generate → save → stream → pause → resume → edit → 
     await page.keyboard.press("Escape");
     await expect(
       page.getByRole("button", {
-        name: new RegExp(`^Data source: ${sourceName}, workspace [^,]+$`),
+        name: new RegExp(`^Data source: ${sourceName}, [^,]+ \\(workspace\\)$`),
       }),
     ).toBeVisible();
     await page.getByLabel("Describe the dashboard").fill("Checkout service health");

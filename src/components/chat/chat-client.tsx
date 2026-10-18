@@ -17,7 +17,11 @@ import {
 import type { EffectiveModel } from "@/lib/ai/model-config";
 import { AiUnavailable } from "@/components/ai-unavailable";
 import { WorkingStatus } from "@/components/composing";
-import { COMPOSER_CHIP_CLASS, SourceChipLabel } from "@/components/composer-chip";
+import {
+  COMPOSER_CHIP_CLASS,
+  SourceChipLabel,
+  sourceChipName,
+} from "@/components/composer-chip";
 import { ModelChip, useModelChoice } from "@/components/model-chip";
 import { NoSources } from "@/components/onboarding/no-sources";
 import { MarkdownView } from "@/components/panels/text";
@@ -600,7 +604,15 @@ export function ChatClient({
                 <div className="pointer-events-none absolute inset-x-2 bottom-2 flex items-center justify-between gap-2">
                   <div className="pointer-events-auto flex min-w-0 items-center">
                     <Menu
-                      label={`Sources: ${chosen.map((s) => s.name).join(", ") || "none"}`}
+                      label={
+                        primary
+                          ? sourceChipName("Sources", {
+                              name: primary.name,
+                              workspaceId: primary.workspaceId,
+                              extra: chosen.length - 1,
+                            })
+                          : "Sources: pick a source"
+                      }
                       className={cn(
                         COMPOSER_CHIP_CLASS,
                         "h-8 max-w-[min(20rem,60vw)] px-2.5",

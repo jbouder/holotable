@@ -57,6 +57,7 @@ export function TimeRangeFilter({
   const rolling = isRolling(value);
   const display = useTimeDisplay();
   const zone = useZoneBadge();
+  const shown = describeRange(value, new Date(), display);
 
   return (
     <div className="flex items-center gap-1">
@@ -68,16 +69,15 @@ export function TimeRangeFilter({
           <ChevronLeft className="h-4 w-4" />
         </IconButton>
         <Popover
-          label="Change the time range"
+          // What the trigger shows, in order, inside its name (WCAG 2.5.3).
+          label={`Change the time range, ${shown}${zone ? ` ${zone}` : ""}`}
           align="end"
           panelClassName="w-80 max-w-[min(20rem,calc(100vw-2rem))] p-4"
           className={cn("h-7 w-auto gap-1.5 px-2 text-xs", !rolling && "text-warning")}
           trigger={
             <>
               <Clock className="h-3.5 w-3.5" aria-hidden />
-              <span className="max-w-44 truncate">
-                {describeRange(value, new Date(), display)}
-              </span>
+              <span className="max-w-44 truncate">{shown}</span>{" "}
               {zone && (
                 <span className="border border-border px-1 text-[10px] text-muted">
                   {zone}
