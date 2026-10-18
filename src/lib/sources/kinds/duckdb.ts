@@ -67,13 +67,52 @@ export const UPLOADS_DIR = "uploads";
  */
 export const UPLOAD_EXTENSIONS = [".csv", ".json", ".jsonl", ".ndjson"] as const;
 
+/**
+ * An Excel workbook (#597): taken by an upload, never stored. Each of its
+ * sheets is converted to a CSV in the upload's directory as it arrives
+ * (`src/lib/duckdb/workbook.ts`), so the directory holds only files it
+ * already reads.
+ */
+export const WORKBOOK_EXTENSION = ".xlsx";
+
 /** What the upload form's file picker offers: the extensions and their types. */
 export const UPLOAD_ACCEPT = [
   ...UPLOAD_EXTENSIONS,
+  WORKBOOK_EXTENSION,
   "text/csv",
   "application/json",
   "application/x-ndjson",
+  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
 ].join(",");
+
+/** Spreadsheet files an upload refuses by name (#597), and what each one is. */
+const OTHER_SPREADSHEETS: Record<string, string> = {
+  ".xls": "an older Excel workbook",
+  ".xlsb": "a binary Excel workbook",
+  ".xlsm": "a macro-enabled Excel workbook",
+  ".ods": "an OpenDocument spreadsheet",
+  ".numbers": "a Numbers spreadsheet",
+};
+
+/** Whether a file name is an Excel workbook an upload converts (#597). */
+export function isWorkbookName(filename: string): boolean {
+  return filename.toLowerCase().endsWith(WORKBOOK_EXTENSION);
+}
+
+/**
+ * Why a spreadsheet file cannot be uploaded, or null (#597): only `.xlsx` is
+ * converted, so `.xls`, `.ods`, `.numbers` and their kin are refused by name,
+ * saying what to save them as, instead of failing the text check as a CSV.
+ * Held by the form and again by the server.
+ */
+export function spreadsheetProblem(filename: string): string | null {
+  const base = filename.split(/[\\/]/).pop() ?? "";
+  const dot = base.lastIndexOf(".");
+  const what = dot > 0 ? OTHER_SPREADSHEETS[base.slice(dot).toLowerCase()] : undefined;
+  return what
+    ? `"${base}" is ${what}; save it as an Excel Workbook (.xlsx) or as CSV and upload that.`
+    : null;
+}
 
 /**
  * Why a source in `workspaceId` may not name `path`, or null (#595): a path

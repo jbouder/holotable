@@ -11,8 +11,11 @@ import {
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { crc32, deflateRawSync } from "node:zlib";
 import { config } from "@/lib/config";
 import {
+  MAX_SHEET_ROWS,
+  MAX_WORKBOOK_SHEETS,
   receiveUpload,
   removeUpload,
   textProblem,
@@ -22,7 +25,13 @@ import {
   uploadStem,
 } from "@/lib/duckdb/uploads";
 import { readerFor } from "@/lib/duckdb/client";
-import { UPLOAD_ACCEPT, UPLOAD_EXTENSIONS } from "@/lib/sources/kinds/duckdb";
+import { excelSerialToMs, formatShows, sheetViewName } from "@/lib/duckdb/workbook";
+import {
+  spreadsheetProblem,
+  UPLOAD_ACCEPT,
+  UPLOAD_EXTENSIONS,
+  WORKBOOK_EXTENSION,
+} from "@/lib/sources/kinds/duckdb";
 import { SOURCES_DIR_UNSET } from "@/lib/duckdb/path";
 import {
   MultipartError,
@@ -37,7 +46,9 @@ import {
  * byte and file caps, the text check, the stem rules, the stored extension
  * that picks the reader (#596), all-or-nothing on
  * every refusal and on a cancelled request, messages that name no server
- * path, and that only an upload directory is ever removed.
+ * path, and that only an upload directory is ever removed. And an Excel
+ * workbook (#597): an untrusted ZIP of XML converted to one CSV per sheet,
+ * its naming, its cell rules and its caps.
  */
 
 const writable = config as { duckdbUploadMaxBytes: number; duckdbUploadMaxFiles: number };
@@ -95,16 +106,19 @@ function stream(
   });
 }
 
-const upload = (
-  dir: string,
-  files: FilePart[],
-  opts: { size?: number; stopAfter?: number } = {},
-) =>
+type UploadOptions = {
+  size?: number;
+  stopAfter?: number;
+  workbookCaps?: { maxSheets?: number; maxRows?: number };
+};
+
+const upload = (dir: string, files: FilePart[], opts: UploadOptions = {}) =>
   receiveUpload({
     workspaceId: "ops",
     contentType: `multipart/form-data; boundary=${BOUNDARY}`,
-    body: stream(multipart(files), opts.size, opts.stopAfter),
+    body: stream(multipart(files), opts.size ?? 7, opts.stopAfter),
     root: dir,
+    workbookCaps: opts.workbookCaps,
   });
 
 /** Nothing is left under the workspace's uploads. */
@@ -116,8 +130,14 @@ function nothingKept(dir: string) {
   );
 }
 
-async function refused(dir: string, files: FilePart[], message: RegExp, file?: string) {
-  await assert.rejects(upload(dir, files), (err: unknown) => {
+async function refused(
+  dir: string,
+  files: FilePart[],
+  message: RegExp,
+  file?: string,
+  opts: UploadOptions = {},
+) {
+  await assert.rejects(upload(dir, files, opts), (err: unknown) => {
     assert.ok(err instanceof UploadError, String(err));
     assert.match(err.message, message);
     assert.ok(!err.message.includes(dir), `a path leaked: ${err.message}`);
@@ -352,7 +372,7 @@ test("the byte cap, the file cap, the text check and the stem rules each refuse 
       ],
       /both be the table "events"/,
     );
-    await refused(dir, [], /at least one CSV or JSON file/);
+    await refused(dir, [], /at least one CSV, JSON or Excel file/);
     await refused(
       dir,
       [{ name: "a.csv", body: "a\n", field: "other" }],
@@ -436,4 +456,415 @@ test("removing a deleted source's files touches only its own upload directory", 
   assert.ok(existsSync(join(dir, path)));
   assert.equal(await removeUpload({ workspaceId: "ops", path }, [], dir), true);
   assert.ok(!existsSync(join(dir, path)));
+});
+
+/* -------------------------------------------------------------------------- */
+/* Excel workbooks (#597)                                                     */
+/* -------------------------------------------------------------------------- */
+
+/** A ZIP archive of `entries`, each deflated (or stored, when `stored`). */
+function zip(entries: Record<string, string | Buffer>, stored = false): Buffer {
+  const locals: Buffer[] = [];
+  const central: Buffer[] = [];
+  let offset = 0;
+  for (const [name, content] of Object.entries(entries)) {
+    const raw = Buffer.from(content);
+    const data = stored ? raw : deflateRawSync(raw);
+    const nameBytes = Buffer.from(name);
+    const local = Buffer.alloc(30);
+    local.writeUInt32LE(0x04034b50, 0);
+    local.writeUInt16LE(20, 4);
+    local.writeUInt16LE(stored ? 0 : 8, 8);
+    local.writeUInt32LE(crc32(raw), 14);
+    local.writeUInt32LE(data.length, 18);
+    local.writeUInt32LE(raw.length, 22);
+    local.writeUInt16LE(nameBytes.length, 26);
+    const head = Buffer.alloc(46);
+    head.writeUInt32LE(0x02014b50, 0);
+    head.writeUInt16LE(20, 4);
+    head.writeUInt16LE(20, 6);
+    head.writeUInt16LE(stored ? 0 : 8, 10);
+    head.writeUInt32LE(crc32(raw), 16);
+    head.writeUInt32LE(data.length, 20);
+    head.writeUInt32LE(raw.length, 24);
+    head.writeUInt16LE(nameBytes.length, 28);
+    head.writeUInt32LE(offset, 42);
+    locals.push(local, nameBytes, data);
+    central.push(head, nameBytes);
+    offset += 30 + nameBytes.length + data.length;
+  }
+  const cd = Buffer.concat(central);
+  const end = Buffer.alloc(22);
+  end.writeUInt32LE(0x06054b50, 0);
+  end.writeUInt16LE(Object.keys(entries).length, 8);
+  end.writeUInt16LE(Object.keys(entries).length, 10);
+  end.writeUInt32LE(cd.length, 12);
+  end.writeUInt32LE(offset, 16);
+  return Buffer.concat([...locals, cd, end]);
+}
+
+const NS = 'xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"';
+const REL = "http://schemas.openxmlformats.org/officeDocument/2006/relationships";
+
+type SheetSpec = { name: string; rows: string; state?: string };
+
+/**
+ * An `.xlsx` workbook: sheets of raw `<row>` XML, optional shared strings
+ * and cell styles (`numFmtIds`, one per `cellXfs` entry, custom formats in
+ * `formats`), in the 1904 date system when asked.
+ */
+function xlsx(
+  sheets: SheetSpec[],
+  opts: {
+    shared?: string[];
+    numFmtIds?: number[];
+    formats?: Record<number, string>;
+    date1904?: boolean;
+    extra?: Record<string, string | Buffer>;
+  } = {},
+): Buffer {
+  const parts: Record<string, string | Buffer> = {
+    "[Content_Types].xml": "<Types/>",
+    "_rels/.rels": `<Relationships><Relationship Id="r1" Type="${REL}/officeDocument" Target="xl/workbook.xml"/></Relationships>`,
+    "xl/workbook.xml": `<workbook ${NS} xmlns:r="${REL}"><workbookPr${opts.date1904 ? ' date1904="1"' : ""}/><sheets>${sheets
+      .map(
+        (s, i) =>
+          `<sheet name="${s.name}" sheetId="${i + 1}" r:id="rId${i + 1}"${s.state ? ` state="${s.state}"` : ""}/>`,
+      )
+      .join("")}</sheets></workbook>`,
+    "xl/_rels/workbook.xml.rels": `<Relationships>${sheets
+      .map(
+        (_, i) =>
+          `<Relationship Id="rId${i + 1}" Type="${REL}/worksheet" Target="worksheets/sheet${i + 1}.xml"/>`,
+      )
+      .join(
+        "",
+      )}<Relationship Id="rS" Type="${REL}/sharedStrings" Target="/xl/sharedStrings.xml"/><Relationship Id="rT" Type="${REL}/styles" Target="styles.xml"/></Relationships>`,
+    "xl/sharedStrings.xml": `<sst ${NS}>${(opts.shared ?? [])
+      .map((t) => `<si><t xml:space="preserve">${t}</t></si>`)
+      .join("")}</sst>`,
+    "xl/styles.xml": `<styleSheet ${NS}><numFmts>${Object.entries(opts.formats ?? {})
+      .map(([id, code]) => `<numFmt numFmtId="${id}" formatCode="${code}"/>`)
+      .join("")}</numFmts><cellStyleXfs><xf numFmtId="14"/></cellStyleXfs><cellXfs>${(
+      opts.numFmtIds ?? [0]
+    )
+      .map((id) => `<xf numFmtId="${id}"/>`)
+      .join("")}</cellXfs></styleSheet>`,
+    ...Object.fromEntries(
+      sheets.map((s, i) => [
+        `xl/worksheets/sheet${i + 1}.xml`,
+        `<worksheet ${NS}><sheetData>${s.rows}</sheetData></worksheet>`,
+      ]),
+    ),
+    ...opts.extra,
+  };
+  return zip(parts);
+}
+
+/** A row of inline-string and number cells, by position. */
+function row(r: number, ...cells: (string | number | null)[]): string {
+  const letters = "ABCDEFGHIJ";
+  return `<row r="${r}">${cells
+    .map((c, i) =>
+      c === null
+        ? ""
+        : typeof c === "number"
+          ? `<c r="${letters[i]}${r}"><v>${c}</v></c>`
+          : `<c r="${letters[i]}${r}" t="inlineStr"><is><t>${c}</t></is></c>`,
+    )
+    .join("")}</row>`;
+}
+
+const SAMPLE = readFileSync(join(process.cwd(), "public/samples/home-energy.xlsx"));
+
+test("a workbook of two sheets becomes one CSV per sheet, <stem>_<sheet>, and is not kept", async () => {
+  const dir = root();
+  const result = await upload(dir, [{ name: "home-energy.xlsx", body: SAMPLE }], {
+    size: 4096,
+  });
+  assert.deepEqual(result.files, [
+    {
+      name: "home_energy",
+      bytes: SAMPLE.length,
+      views: ["home_energy_electricity", "home_energy_gas"],
+    },
+  ]);
+  const stored = join(dir, result.path);
+  assert.deepEqual(readdirSync(stored).sort(), [
+    "home_energy_electricity.csv",
+    "home_energy_gas.csv",
+  ]);
+  const gas = readFileSync(join(stored, "home_energy_gas.csv"), "utf8").split("\n");
+  // The sample's date cells are real dates, written as ISO dates; numbers bare.
+  assert.equal(gas[0], '"date","therms","cost_usd"');
+  assert.match(gas[1] ?? "", /^2026-04-01,\d+(\.\d+)?,\d+(\.\d+)?$/);
+  assert.equal(gas.length, 1 + 183 + 1);
+  // Every converted file is one a directory source reads; the sample is offered.
+  assert.ok(UPLOAD_ACCEPT.split(",").includes(WORKBOOK_EXTENSION));
+});
+
+test("a workbook's cells: shared and inline text, numbers, booleans, errors, formulas' cached values and dates", async () => {
+  const dir = root();
+  const sheet = [
+    `<row r="1"><c r="A1" t="s"><v>0</v></c><c r="C1" t="inlineStr"><is><r><t>am</t></r><r><t>ount</t></r></is></c><c r="D1" t="s"><v>1</v></c><c r="E1" t="s"><v>2</v></c><c r="F1" t="s"><v>3</v></c></row>`,
+    // Row 2 is empty: passed over. Row 3 holds every kind of cell.
+    `<row r="2"/>`,
+    `<row r="3"><c r="A3" t="s"><v>4</v></c><c r="B3" t="b"><v>1</v></c><c r="C3"><f>1+1</f><v>2</v></c><c r="D3" t="e"><v>#DIV/0!</v></c><c r="E3" s="1"><v>46113</v></c><c r="F3" s="2"><v>46113.5</v></c><c r="G3" t="str"><f>A3</f><v>a, "b"</v></c></row>`,
+    `<row r="4"><c r="A4" t="s"><v>5</v></c><c r="B4" t="b"><v>0</v></c><c r="E4" s="3"><v>0.25</v></c></row>`,
+  ].join("");
+  const book = xlsx(
+    [
+      { name: "Data", rows: sheet },
+      { name: "Secret", rows: row(1, "x"), state: "hidden" },
+      { name: "Blank", rows: "" },
+    ],
+    {
+      shared: ["zip", "ok", "date", "at", "00123", "line&#10;two"],
+      numFmtIds: [0, 14, 164, 165],
+      formats: { 164: "yyyy-mm-dd hh:mm", 165: "h:mm AM/PM" },
+    },
+  );
+  const result = await upload(dir, [{ name: "Budget 2026.xlsx", body: book }], {
+    size: 512,
+  });
+  // One sheet with data: the view is the file's own stem. Hidden and empty
+  // sheets are skipped and said.
+  assert.deepEqual(result.files, [
+    {
+      name: "budget_2026",
+      bytes: book.length,
+      views: ["budget_2026"],
+      skipped: [
+        { sheet: "Secret", reason: "hidden" },
+        { sheet: "Blank", reason: "empty" },
+      ],
+    },
+  ]);
+  const csv = readFileSync(join(dir, result.path, "budget_2026.csv"), "utf8");
+  assert.equal(
+    csv,
+    [
+      '"zip","column_2","amount","ok","date","at","column_7"',
+      '"00123",true,2,,2026-04-01,2026-04-01T12:00:00,"a, ""b"""',
+      '"line\ntwo",false,,,06:00:00,,',
+      "",
+    ].join("\n"),
+  );
+});
+
+test("dates follow the workbook's date system and number formats, in UTC", () => {
+  assert.equal(excelSerialToMs(46113, false), Date.UTC(2026, 3, 1));
+  assert.equal(excelSerialToMs(1, false), Date.UTC(1900, 0, 1));
+  assert.equal(excelSerialToMs(61, false), Date.UTC(1900, 2, 1));
+  assert.equal(excelSerialToMs(0, true), Date.UTC(1904, 0, 1));
+  assert.equal(excelSerialToMs(46113.75, false), Date.UTC(2026, 3, 1, 18));
+  assert.equal(excelSerialToMs(-1, false), null);
+  assert.equal(formatShows("yyyy-mm-dd"), "date");
+  assert.equal(formatShows("d mmm yyyy h:mm"), "datetime");
+  assert.equal(formatShows("[$-409]h:mm:ss AM/PM"), "time");
+  assert.equal(formatShows("mm:ss"), "time");
+  // Not dates: a number with quoted text, a color, an elapsed duration.
+  assert.equal(formatShows('#,##0.00 "kWh"'), null);
+  assert.equal(formatShows("[Red]0.00;[Blue]-0.00"), null);
+  assert.equal(formatShows("[h]:mm"), null);
+  assert.equal(formatShows("General"), null);
+  assert.equal(formatShows("0.00E+00"), null);
+});
+
+test("a sheet's table name is <stem>_<sheet> reduced to [a-z0-9_], or nothing", () => {
+  assert.equal(sheetViewName("home_energy", "Electricity"), "home_energy_electricity");
+  assert.equal(sheetViewName("budget", "Q1 / 2026 (draft)"), "budget_q1_2026_draft");
+  assert.equal(sheetViewName("b", "Ünïcode"), "b_n_code");
+  for (const empty of ["", "---", "  ", "日本"]) {
+    assert.equal(sheetViewName("b", empty), null, empty);
+  }
+  assert.ok((sheetViewName("a".repeat(60), "sheet") ?? "").length <= 64);
+});
+
+test("the sheet cap, the row cap and the converted-size cap each refuse the whole upload, naming the sheet", async () => {
+  const dir = root();
+  const three = xlsx([
+    { name: "One", rows: row(1, "a") + row(2, 1) },
+    { name: "Two", rows: row(1, "a") + row(2, 1) },
+    { name: "Three", rows: row(1, "a") + row(2, 1) },
+  ]);
+  await refused(
+    dir,
+    [
+      { name: "ok.csv", body: "a\n1\n" },
+      { name: "book.xlsx", body: three },
+    ],
+    /"book\.xlsx" could not be converted: sheet "Three" is past the 2 sheets/,
+    "book.xlsx",
+    { workbookCaps: { maxSheets: 2 } },
+  );
+  const long = xlsx([
+    {
+      name: "Log",
+      rows: Array.from({ length: 6 }, (_, i) => row(i + 1, i)).join(""),
+    },
+  ]);
+  await refused(
+    dir,
+    [{ name: "log.xlsx", body: long }],
+    /sheet "Log" has more than 5 rows/,
+    "log.xlsx",
+    { workbookCaps: { maxRows: 5 } },
+  );
+  // A workbook small as received, its CSV large: the converted bytes count too.
+  writable.duckdbUploadMaxBytes = 4000;
+  try {
+    const wide = xlsx([
+      {
+        name: "Wide",
+        // Rows without references, so the archive compresses them well.
+        rows: "<row><c><v>1</v></c><c><v>2</v></c><c><v>3</v></c></row>".repeat(800),
+      },
+    ]);
+    assert.ok(wide.length < 4000, `the workbook is ${wide.length} bytes`);
+    await refused(
+      dir,
+      [{ name: "wide.xlsx", body: wide }],
+      /sheet "Wide" takes its CSVs past 4000 bytes \(DUCKDB_UPLOAD_MAX_BYTES\)/,
+      "wide.xlsx",
+      { size: 1024 },
+    );
+  } finally {
+    Object.assign(writable, saved);
+  }
+  assert.ok(MAX_WORKBOOK_SHEETS >= 2 && MAX_SHEET_ROWS >= 1_000);
+});
+
+test("sheet names that reduce to nothing or collide, and other spreadsheets, are refused by name", async () => {
+  const dir = root();
+  const sheet = row(1, "a") + row(2, 1);
+  await refused(
+    dir,
+    [
+      {
+        name: "b.xlsx",
+        body: xlsx([
+          { name: "Data", rows: sheet },
+          { name: "---", rows: sheet },
+        ]),
+      },
+    ],
+    /sheet "---" has no name left/,
+    "b.xlsx",
+  );
+  await refused(
+    dir,
+    [
+      {
+        name: "b.xlsx",
+        body: xlsx([
+          { name: "Q 1", rows: sheet },
+          { name: "q_1", rows: sheet },
+        ]),
+      },
+    ],
+    /sheets "Q 1" and "q_1" would both be the table "b_q_1"/,
+  );
+  await refused(
+    dir,
+    [
+      { name: "home_energy_gas.csv", body: "a\n1\n" },
+      { name: "home-energy.xlsx", body: SAMPLE },
+    ],
+    /sheet "Gas" would be the table "home_energy_gas", which another file/,
+    "home-energy.xlsx",
+    { size: 4096 },
+  );
+  // A later file cannot take a table a workbook's sheet became.
+  await refused(
+    dir,
+    [
+      { name: "home-energy.xlsx", body: SAMPLE },
+      { name: "home_energy_gas.jsonl", body: '{"a":1}\n' },
+    ],
+    /both be the table "home_energy_gas"/,
+    undefined,
+    { size: 4096 },
+  );
+  for (const [name, what] of [
+    ["budget.xls", "an older Excel workbook"],
+    ["Budget.ODS", "an OpenDocument spreadsheet"],
+    ["plan.numbers", "a Numbers spreadsheet"],
+  ] as const) {
+    assert.match(String(spreadsheetProblem(name)), new RegExp(what));
+    await refused(
+      dir,
+      [{ name, body: Buffer.from([0xd0, 0xcf, 0x11, 0xe0]) }],
+      /save it as an Excel Workbook \(\.xlsx\) or as CSV/,
+      name,
+    );
+  }
+  assert.equal(spreadsheetProblem("orders.csv"), null);
+  assert.equal(spreadsheetProblem("book.xlsx"), null);
+});
+
+test("a workbook that is not a readable archive, or that inflates past its cap, keeps nothing", async () => {
+  const dir = root();
+  await refused(
+    dir,
+    [{ name: "fake.xlsx", body: "a,b\n1,2\n" }],
+    /"fake\.xlsx" could not be converted: it is not an \.xlsx workbook that can be read: it is not a ZIP archive/,
+    "fake.xlsx",
+  );
+  await refused(
+    dir,
+    [{ name: "nothing.xlsx", body: zip({ "a.txt": "hello" }) }],
+    /it is not an Excel workbook/,
+  );
+  await refused(
+    dir,
+    [{ name: "empty.xlsx", body: xlsx([{ name: "Blank", rows: "" }]) }],
+    /it has no sheet with data/,
+  );
+  await refused(
+    dir,
+    [{ name: "bad.xlsx", body: xlsx([{ name: "S", rows: "<row><c><v>1</row>" }]) }],
+    /not well-formed XML/,
+  );
+  // An entity it was not born with is not expanded, let alone a recursive one.
+  await refused(
+    dir,
+    [
+      {
+        name: "entity.xlsx",
+        body: xlsx([{ name: "S", rows: row(1, "&lol;") }]),
+      },
+    ],
+    /not well-formed XML/,
+  );
+  // Shared strings that inflate past the held-part cap stop at the cap.
+  const bomb = Buffer.alloc(129 * 1024 * 1024, 0x20);
+  await refused(
+    dir,
+    [
+      {
+        name: "bomb.xlsx",
+        body: xlsx([{ name: "S", rows: row(1, "a") }], {
+          extra: {
+            "xl/sharedStrings.xml": Buffer.concat([Buffer.from(`<sst ${NS}>`), bomb]),
+          },
+        }),
+      },
+    ],
+    /inflates past 134217728 bytes/,
+    "bomb.xlsx",
+    { size: 64 * 1024 },
+  );
+  // A stored (uncompressed) archive reads like a deflated one.
+  const storedBook = zip(
+    {
+      "_rels/.rels": `<Relationships><Relationship Id="r1" Type="${REL}/officeDocument" Target="xl/workbook.xml"/></Relationships>`,
+      "xl/workbook.xml": `<workbook ${NS} xmlns:r="${REL}"><sheets><sheet name="S" sheetId="1" r:id="rId1"/></sheets></workbook>`,
+      "xl/_rels/workbook.xml.rels": `<Relationships><Relationship Id="rId1" Type="${REL}/worksheet" Target="worksheets/sheet1.xml"/></Relationships>`,
+      "xl/worksheets/sheet1.xml": `<worksheet ${NS}><sheetData>${row(1, "n")}${row(2, 7)}</sheetData></worksheet>`,
+    },
+    true,
+  );
+  const result = await upload(dir, [{ name: "stored.xlsx", body: storedBook }]);
+  assert.equal(readFileSync(join(dir, result.path, "stored.csv"), "utf8"), '"n"\n7\n');
 });
