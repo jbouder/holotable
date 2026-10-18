@@ -6,7 +6,9 @@ import {
   config,
   cookieSecure,
   formatConfigProblems,
+  localModelDetection,
   MAX_UPLOAD_FILES,
+  parseLocalModelEndpoints,
   validateConfig,
   type ConfigProblem,
   type Environment,
@@ -1322,6 +1324,133 @@ test("LOCAL_GROUPS outside local mode, and DEMO_GROUPS in it, are ignored with a
   ).filter((p) => p.variable === "DEMO_GROUPS");
   assert.equal(demoGroups.length, 1);
   assert.match(demoGroups[0].message, /ignored unless AUTH_MODE=demo/);
+});
+
+/* -------------------------------------------------------------------------- */
+/* A model on this machine (#607)                                             */
+/* -------------------------------------------------------------------------- */
+
+test("LOCAL_MODEL_DETECT: auto is on only in local mode; on and off say so; anything else refuses to boot", () => {
+  assert.equal(localModelDetection({ AUTH_MODE: "local" }), true);
+  assert.equal(
+    localModelDetection({ AUTH_MODE: "local", LOCAL_MODEL_DETECT: "auto" }),
+    true,
+  );
+  for (const mode of [undefined, "oidc", "demo"]) {
+    assert.equal(localModelDetection({ AUTH_MODE: mode }), false, String(mode));
+    assert.equal(
+      localModelDetection({ AUTH_MODE: mode, LOCAL_MODEL_DETECT: "on" }),
+      true,
+      String(mode),
+    );
+  }
+  assert.equal(
+    localModelDetection({ AUTH_MODE: "local", LOCAL_MODEL_DETECT: "off" }),
+    false,
+  );
+  // A typo fails closed at runtime, and is a boot error.
+  assert.equal(
+    localModelDetection({ AUTH_MODE: "local", LOCAL_MODEL_DETECT: "yes" }),
+    false,
+  );
+  for (const production of [true, false]) {
+    const problems = validateConfig(
+      { ...VALID_LOCAL, LOCAL_MODEL_DETECT: "yes" },
+      { production },
+    );
+    const bad = errors(problems).filter((p) => p.variable === "LOCAL_MODEL_DETECT");
+    assert.equal(bad.length, 1);
+    assert.match(bad[0].message, /"auto".*"on".*"off"/);
+  }
+  for (const value of ["auto", "on", "off", ""]) {
+    const problems = validateConfig(
+      { ...VALID_LOCAL, LOCAL_MODEL_DETECT: value },
+      { production: true },
+    );
+    assert.deepEqual(errors(problems), [], value);
+  }
+});
+
+test("LOCAL_MODEL_ENDPOINTS: a bad entry refuses to boot, named by its position and never printed", () => {
+  for (const bad of [
+    "http://localhost:11434/v1, http://ollama:pa55word@host:11434/v1",
+    "http://localhost:11434/v1 ftp://files.example/v1",
+    "http://localhost:11434/v1, not-a-url",
+  ]) {
+    const problems = validateConfig(
+      { ...VALID_LOCAL, LOCAL_MODEL_ENDPOINTS: bad },
+      { production: true },
+    );
+    const errs = errors(problems).filter((p) => p.variable === "LOCAL_MODEL_ENDPOINTS");
+    assert.equal(errs.length, 1, bad);
+    assert.match(errs[0].message, /entry 2 is not/);
+    const text = formatConfigProblems(problems);
+    for (const part of ["pa55word", "ollama:", "ftp://", "files.example", "not-a-url"]) {
+      assert.ok(!text.includes(part), `${part} was printed`);
+    }
+  }
+  const many = Array.from({ length: 17 }, (_, i) => `http://h${i}.local:11434/v1`).join(
+    ",",
+  );
+  assert.ok(
+    variables(
+      errors(
+        validateConfig(
+          { ...VALID_LOCAL, LOCAL_MODEL_ENDPOINTS: many },
+          { production: true },
+        ),
+      ),
+    ).includes("LOCAL_MODEL_ENDPOINTS"),
+  );
+  // The default list parses, and a valid list boots.
+  assert.deepEqual(parseLocalModelEndpoints(undefined), {
+    endpoints: [
+      "http://host.docker.internal:11434/v1",
+      "http://localhost:11434/v1",
+      "http://host.docker.internal:1234/v1",
+      "http://localhost:1234/v1",
+    ],
+    invalid: [],
+  });
+  assert.deepEqual(
+    errors(
+      validateConfig(
+        {
+          ...VALID_LOCAL,
+          LOCAL_MODEL_ENDPOINTS: "http://10.0.0.5:11434/v1 https://gpu.lan/v1",
+        },
+        { production: true },
+      ),
+    ),
+    [],
+  );
+});
+
+test("LOCAL_MODEL_ENDPOINTS set while detection is off is ignored with a warning", () => {
+  for (const env of [
+    { ...VALID_PRODUCTION, LOCAL_MODEL_ENDPOINTS: "http://localhost:11434/v1" },
+    {
+      ...VALID_LOCAL,
+      LOCAL_MODEL_DETECT: "off",
+      LOCAL_MODEL_ENDPOINTS: "http://localhost:11434/v1",
+    },
+  ]) {
+    const problems = validateConfig(env, { production: true });
+    assert.deepEqual(errors(problems), []);
+    const ignored = warnings(problems).filter(
+      (p) => p.variable === "LOCAL_MODEL_ENDPOINTS",
+    );
+    assert.equal(ignored.length, 1);
+    assert.match(ignored[0].message, /ignored/);
+  }
+  const on = validateConfig(
+    { ...VALID_LOCAL, LOCAL_MODEL_ENDPOINTS: "http://localhost:11434/v1" },
+    { production: true },
+  );
+  assert.deepEqual(
+    variables(on).filter((v) => v.startsWith("LOCAL_MODEL")),
+    [],
+  );
 });
 
 test("local mode's allowances never reach demo mode: source-admin DEMO_GROUPS stay an error", () => {

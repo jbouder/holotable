@@ -79,6 +79,28 @@ export function parseBaseUrlAllowlist(
 }
 
 /**
+ * An allowlist with each endpoint's host added, as if it were listed (#607):
+ * the endpoints of `LOCAL_MODEL_ENDPOINTS`, operator configuration rather
+ * than a typed URL. A new allowlist, so the one it extends (and every base URL
+ * typed in the app, which is held to that one) is unchanged. An endpoint that
+ * does not parse adds nothing.
+ */
+export function withEndpointHosts(
+  allowlist: BaseUrlAllowlist,
+  endpoints: readonly string[],
+): BaseUrlAllowlist {
+  const hosts = new Set(allowlist.hosts);
+  for (const endpoint of endpoints) {
+    try {
+      hosts.add(hostOf(new URL(endpoint)));
+    } catch {
+      // Not a URL: validateConfig refuses to boot on one anyway.
+    }
+  }
+  return { ...allowlist, hosts };
+}
+
+/**
  * Every range that is not the public internet: "this network", RFC 1918,
  * carrier-grade NAT, loopback, link-local (which holds the cloud metadata
  * endpoint), the IETF and documentation blocks, benchmarking, multicast and
