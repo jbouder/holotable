@@ -105,6 +105,21 @@ jobs:
             exit 1
           fi
 
+      # The end-to-end job runs this build rather than making its own (#610):
+      # what `next start` reads, which is `.next` without the compiler's cache
+      # and without the standalone server (the images build their own). A tar,
+      # so the links Next writes under .next/node_modules to the packages it
+      # keeps external stay links, resolved against that job's `npm ci`.
+      - name: Pack the build for the end-to-end job
+        run: tar -cf next-build.tar --exclude=.next/cache --exclude=.next/standalone .next
+
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: next-build
+          path: next-build.tar
+          if-no-files-found: error
+          retention-days: 1
+
   fuzz:
     name: Fuzz the SQL guard
     runs-on: ubuntu-latest
@@ -219,28 +234,37 @@ jobs:
 
   e2e:
     name: End-to-end and accessibility
-    # Builds the app itself (Playwright's webServer runs `next build`), so it
-    # waits for the cheaper jobs rather than spending a stack bring-up on a
-    # type error. Not a required check yet: a browser suite earns that after
-    # it has been quiet on main for a while.
+    # Runs the build job's output (#610), so it never runs `next build`
+    # itself, and waits for the test job rather than spending a stack
+    # bring-up on a failing unit test. Not a required check yet: a browser
+    # suite earns that after it has been quiet on main for a while.
     needs: [test, build]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: ./.github/actions/setup
 
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: next-build
+
+      - name: Unpack the build
+        run: tar -xf next-build.tar && rm next-build.tar
+
       - name: Install Chromium
         run: npx playwright install --with-deps chromium
 
       # e2e/prepare.ts brings up e2e/compose.yml (TimescaleDB, Keycloak with
       # the dev realm, a Prometheus that scrapes the app, #390, and a Loki it
-      # pushes a few labeled lines to, #567) and migrates; Playwright then starts the seeder
-      # and the production build, signs in through the realm, and runs the
-      # journey (#88) and the axe scans in both themes (#91). The model is
-      # the recorded stub, so nothing here calls a provider.
+      # pushes a few labeled lines to, #567) and migrates; Playwright then
+      # starts the stub model endpoint, the seeder and the build unpacked
+      # above, signs in through the realm, and runs the specs: the parallel
+      # project on four workers, then the serial one (#610). The model is the
+      # recorded stub, so nothing here calls a provider.
       - name: End-to-end
         run: npm run e2e
         env:
+          E2E_SKIP_BUILD: 1
           NEXT_TELEMETRY_DISABLED: 1
 
       - name: Traces, screenshots and the report
