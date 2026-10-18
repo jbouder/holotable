@@ -115,7 +115,21 @@ this server". The quick-start image stays on Alpine: the pinned binding ships
 musl builds for `linux-x64` and `linux-arm64` beside the glibc ones, and the
 binding was checked loading and answering on the image's base
 (`timescale/timescaledb:2.17.2-pg16` with Alpine's Node 22) on both. The
-production image (`node:24-bookworm-slim`) is glibc. The quick-start image
+production image (`node:24-bookworm-slim`) is glibc.
+
+Both images are targets of the one repository `Dockerfile` and share one
+build of the app (#612): `next build` runs once, in its `build` stage on
+glibc, and its output is JavaScript and static assets, the same on either
+libc. What differs is `node_modules`, so each image installs its own on its
+own base. The production image runs the standalone server with the
+dependencies `next build` traced. The quick-start image installs its
+production dependencies on Alpine, where npm and the binding's loader pick
+the musl builds, and copies the standalone server without the traced
+`node_modules`: the trace carries `duckdb.node` but not the `libduckdb.so`
+it loads at run time, which the tracer cannot see, and the quick-start's
+scripts need packages the server never imports. CI builds the runtime image
+first, and the quick-start build reports the `build` stage cached; a release
+builds every target through the same stages. The quick-start image
 ships no sample files (#574); the Compose stack has a
 [files demo](/operations/demo-data/#the-files-demo). What a DuckDB source is
 to a source admin is in [DuckDB sources](/concepts/duckdb-sources/), and what

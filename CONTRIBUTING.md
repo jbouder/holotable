@@ -389,7 +389,7 @@ needs a test.
 ### Dependency updates
 
 Dependabot (`.github/dependabot.yml`) opens version updates monthly for the app,
-the docs site, the hosted demo's Worker, both Dockerfiles' base images and the
+the docs site, the hosted demo's Worker, the Dockerfile's base images and the
 workflow actions. Minor and patch updates arrive grouped; each major arrives on
 its own. Review one like any other pull request: read the changelog for
 anything in the guard, auth or rendering path, let the required checks pass,
@@ -400,8 +400,8 @@ accepting it. Workflow actions are pinned to a commit SHA, with the version in
 a trailing comment (`uses: actions/checkout@<sha> # v4.4.0`); a tag is refused
 by `test/workflow-pins.test.ts`. Dependabot proposes Node up to 24, the LTS
 line, and never 25 or later (the `node` base images and `@types/node` are
-ignored from 25): take a Node major in one pull request that moves both
-Dockerfiles, CI's `node-version` and `@types/node` together. The app's
+ignored from 25): take a Node major in one pull request that moves both of
+the Dockerfile's Node bases, CI's `node-version` and `@types/node` together. The app's
 TypeScript is held below 7 until Next supports it, because 7 drops the
 JavaScript compiler API that `next build` and `next typegen` load.
 
@@ -482,7 +482,7 @@ request:
 | `src/lib/ai/local-models.ts`, `LOCAL_MODEL_DETECT` / `LOCAL_MODEL_ENDPOINTS` in `src/lib/config.ts` | "A model on this machine" in `admin/models.md`, "A model on your machine" in `admin/demo-mode.md`, "Detected on this machine" in `guide/models.md` |
 | `src/app/models/`, `src/components/models/`, `src/components/model-chip.tsx` | `guide/models.md` |
 | `src/lib/ir.ts`, a panel kind, a color token, or a guard rule in `src/lib/sql/` or `src/lib/promql/` | The skill's `.claude/skills/holotable/references/` and `examples/` (`test/holotable-skill.test.ts` holds its examples and lists to the code) |
-| `docker-compose.yml`, `deploy/quickstart/` | `getting-started/quick-start.md`, the quick start in `README.md`; the `logs` profile's Loki and Alloy also `operations/demo-data.md` and the Alloy example in `admin/loki.md`; the image's mode and files root also `admin/demo-mode.md` and "The binding and the image" in `admin/duckdb.md` |
+| `docker-compose.yml`, `deploy/quickstart/`, the `Dockerfile`'s `quickstart` target | `getting-started/quick-start.md`, the quick start in `README.md`; the `logs` profile's Loki and Alloy also `operations/demo-data.md` and the Alloy example in `admin/loki.md`; the image's mode and files root also `admin/demo-mode.md` and "The binding and the image" in `admin/duckdb.md` |
 | `src/lib/auth/demo.ts`, `AUTH_MODE` / `DEMO_GROUPS` / `LOCAL_GROUPS` in `src/lib/config.ts`, `src/components/demo-banner.tsx` | `admin/demo-mode.md`, the demo and local mode paragraphs in `SECURITY.md` |
 | `deploy/cloudflare/demo/` | `operations/cloudflare-demo.md` |
 | `deploy/helm/holotable/` | `operations/kubernetes.md`, the chart's own `README.md` |
