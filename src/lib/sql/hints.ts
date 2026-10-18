@@ -558,3 +558,5 @@ export function timeFieldWarning(
     listed ? ` — it returns ${listed}` : ""
   }. The server filters time on the query's output, so this will fail when it runs.`;
 }
+
+// Throwaway (#611): proves a guard-path change runs the short fuzz. Reverted next.
