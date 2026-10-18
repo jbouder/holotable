@@ -14,7 +14,12 @@ import {
   storedResolution,
   stubAllowed,
 } from "@/lib/ai/model-resolution";
-import { detectionEndpoints, type LocalScan, lastLocalScan } from "@/lib/ai/local-models";
+import {
+  detectionEndpoints,
+  endpointLabel,
+  type LocalScan,
+  lastLocalScan,
+} from "@/lib/ai/local-models";
 import { usableModels } from "@/lib/ai/models";
 import { serverModelList } from "@/lib/ai/server-model-list";
 import { config, type Environment, localModelDetection } from "@/lib/config";
@@ -66,7 +71,7 @@ export function detectedSection(
   const endpoints = scan
     ? scan.endpoints.map((e) => ({ host: e.host, ok: e.ok, models: e.models.length }))
     : detectionEndpoints(env).map((url) => ({
-        host: new URL(url).host,
+        host: endpointLabel(url),
         ok: false,
         models: 0,
       }));
