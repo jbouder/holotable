@@ -1,4 +1,6 @@
 import "./lib/env";
+import { apiTokenHash, generateApiToken } from "@/lib/auth/api-token";
+import { pgApiTokenStore } from "@/lib/db/api-tokens";
 import { getDashboardById, getSourceById, listDashboards } from "@/lib/db/repo";
 import { hasQuery, panelTimeRange, parseDashboard, type QueryPanel } from "@/lib/ir";
 import { panelKind } from "@/lib/panels/registry";
@@ -45,11 +47,18 @@ import { seedWorkspace } from "./lib/seed-workspace";
  *      Alloy shipped the app's lines to Loki.
  *
  * Steps 3 and 4 call the same functions `POST /api/query` calls, in the same
- * order, so a change that breaks guarded execution breaks this. What it
- * deliberately does not cover is the HTTP and session layer above them: a
- * browser reaching `/api/stream` needs a Keycloak login, which is not
- * something CI should be made to hold. `holotable_sse_subscribers` staying at
- * zero in this run is that gap, visible in the output.
+ * order, so a change that breaks guarded execution breaks this. They run in
+ * this process, though, which has the full `node_modules`; the runtime image
+ * has only what `next build` traced. So where SMOKE_APP_URL names the app,
+ * one files-demo panel also runs through the app's own `POST /api/query`
+ * (#615): DuckDB loads a native binding, and only the app can say whether
+ * its image carries all of it. That request authenticates with a
+ * service-account token (#288) minted here for the purpose, an editor of the
+ * seeded workspace for ten minutes, and revoked once the answer is in.
+ * What it deliberately does not cover is the session layer: a browser
+ * reaching `/api/stream` needs a Keycloak login, which is not something CI
+ * should be made to hold. `holotable_sse_subscribers` staying at zero in this
+ * run is that gap, visible in the output.
  *
  * Only *some* panels can have rows in an idle stack — nobody has opened a
  * dashboard, so there are no pollers and no model calls — which is why the
@@ -71,7 +80,12 @@ interface Target {
   committed: () => Dashboard;
   /** What has to happen before a panel can have rows. */
   feeds: string;
+  /** Also run a panel that had rows through the app (SMOKE_APP_URL). */
+  throughApp?: boolean;
 }
+
+/** Where the app answers, for the request that goes through it. */
+const APP_URL = process.env.SMOKE_APP_URL?.replace(/\/$/, "");
 
 const TARGETS: Target[] = [
   {
@@ -116,6 +130,7 @@ const TARGETS: Target[] = [
           title: DEMO_FILES_DASHBOARD_TITLE,
           committed: () => parseDashboard(demoFilesSpec()),
           feeds: "the seeder writes the files under DUCKDB_SOURCES_DIR first",
+          throughApp: true,
         },
       ]
     : []),
@@ -226,6 +241,50 @@ function assertCommittedSpec(target: Target, stored: unknown) {
   }
 }
 
+/**
+ * One panel through the app's own `POST /api/query`, as the editor previews
+ * it: the guard, the plan and the executor run in the app's process, from
+ * the app's image. True when it answered with rows.
+ */
+async function runThroughApp(
+  appUrl: string,
+  panel: QueryPanel,
+  timeRange: { from: string; to: string },
+): Promise<boolean> {
+  const token = generateApiToken();
+  const record = await pgApiTokenStore.create({
+    workspaceId: seedWorkspace(),
+    name: "smoke",
+    tokenHash: await apiTokenHash(token),
+    role: "editor",
+    createdBy: "smoke",
+    expiresAt: new Date(Date.now() + 10 * 60_000).toISOString(),
+  });
+  try {
+    const res = await fetch(`${appUrl}/api/query`, {
+      method: "POST",
+      headers: { authorization: `Bearer ${token}`, "content-type": "application/json" },
+      body: JSON.stringify({ ...panel.query, timeRange }),
+    });
+    const text = await res.text();
+    if (!res.ok) {
+      console.error(`  ✗ ${panel.id.padEnd(18)} through the app: ${res.status} ${text}`);
+      return false;
+    }
+    const rows = (JSON.parse(text) as { rows?: unknown[] }).rows?.length ?? 0;
+    if (rows === 0) {
+      console.error(`  ✗ ${panel.id.padEnd(18)} through the app: no rows`);
+      return false;
+    }
+    console.log(
+      `  ✓ ${panel.id.padEnd(18)} ${rows} rows through the app's POST /api/query`,
+    );
+    return true;
+  } finally {
+    await pgApiTokenStore.revoke({ id: record.id, workspaceId: record.workspaceId });
+  }
+}
+
 /** One dashboard's smoke: true when it passed. */
 async function smokeOne(target: Target, deadline: number): Promise<boolean> {
   console.log(`smoke: ${target.title}`);
@@ -257,6 +316,11 @@ async function smokeOne(target: Target, deadline: number): Promise<boolean> {
   }
   if (!failed) {
     console.log(`  ${populated.length}/${outcomes.length} panels returned rows`);
+  }
+  if (!failed && target.throughApp && APP_URL) {
+    const { panel } = populated[0];
+    const range = panelTimeRange(panel, dashboard.spec.timeRange);
+    if (!(await runThroughApp(APP_URL, panel, range))) failed = true;
   }
   return !failed;
 }

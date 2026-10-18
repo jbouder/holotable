@@ -205,7 +205,8 @@ services:
   # End-to-end check, off by default:
   #   docker compose --profile smoke run --rm smoke
   # Waits for the self-monitoring dashboard to answer with real rows through
-  # the same guard and executor POST /api/query uses, and fails otherwise.
+  # the same guard and executor POST /api/query uses, and fails otherwise;
+  # then asks the app itself for one files-demo panel (#615).
   smoke:
     profiles: ["smoke"]
     image: *migrate-image
@@ -233,6 +234,9 @@ services:
       LOG_LEVEL: ${LOG_LEVEL:-warn}
       # The files demo (#574), read-only, as the app reads it.
       DUCKDB_SOURCES_DIR: /data/duckdb
+      # One files-demo panel also runs through the app's own POST /api/query
+      # (#615), so DuckDB is proved inside the runtime image, not only here.
+      SMOKE_APP_URL: http://app:3000
     volumes:
       - duckdb-files:/data/duckdb:ro
     depends_on:
@@ -240,6 +244,8 @@ services:
         condition: service_healthy
       migrate:
         condition: service_completed_successfully
+      app:
+        condition: service_healthy
 
   # Scrapes the app's /api/metrics, and answers the `prometheus-self` source
   # the seeder registers (#390): the PromQL self-monitoring dashboard reads
