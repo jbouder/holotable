@@ -266,7 +266,7 @@ test("an uploaded CSV: progress, discovery, create, generate, render", async ({
     // Stored, not yet a table: the refresh opens with it as a new table.
     const refresh = page.getByRole("dialog", { name: `Refresh catalog: ${sourceName}` });
     await expect(refresh.getByText("1 table added.").first()).toBeVisible();
-    await expect(refresh.getByText("new table")).toBeVisible();
+    await expect(refresh.getByText("new table", { exact: true })).toBeVisible();
     await refresh.getByRole("button", { name: "Apply changes" }).click();
     await expect(refresh).toBeHidden();
     expect(existsSync(join(DUCKDB_DIR, uploaded, "budget.csv"))).toBe(true);
