@@ -1,0 +1,93 @@
+name: Fuzz (nightly)
+
+# The longest run of the SQL, PromQL and LogQL guard fuzz suites (#611):
+# 100,000 iterations with a fresh seed each night. ci.yml runs the shorter
+# tiers: 5,000 on a pull request that touches a guard path, 20,000 on every
+# push to main. This workflow is the nightly alone, so a night does not run
+# the whole CI matrix.
+#
+# A failure here is a finding against main, and a log nobody reads loses it,
+# so on a failure the job opens an issue titled "Fuzz counterexample" (or
+# comments on the open one) with the seed and the replay lines. Promote the
+# counterexample into the corpus and a named test, as AGENTS.md "Guards" says;
+# never bend the generator around it.
+#
+# 03:41 UTC: a quiet hour, clear of the LLM eval nightly at 06:17.
+on:
+  schedule:
+    - cron: "41 3 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: fuzz-nightly
+  cancel-in-progress: false
+
+jobs:
+  fuzz:
+    name: Fuzz the guards (nightly)
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    # Only this job, and only for the failure step, may write an issue.
+    permissions:
+      contents: read
+      issues: write
+    env:
+      FUZZ_RUNS: 100000
+      FUZZ_SEED: ${{ github.run_id }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: ./.github/actions/setup
+
+      - name: Fuzz
+        run: |
+          echo "FUZZ_RUNS=${FUZZ_RUNS} FUZZ_SEED=${FUZZ_SEED}"
+          echo "Fuzzed ${FUZZ_RUNS} iterations per property with \`FUZZ_SEED=${FUZZ_SEED}\`." >> "$GITHUB_STEP_SUMMARY"
+          set -o pipefail
+          npm run test:fuzz 2>&1 | tee fuzz.log
+
+      # The SQL suite prints `FUZZ_SEED=… FUZZ_PATH="…" npm run test:fuzz`;
+      # the PromQL and LogQL suites print fast-check's `{ seed: …, path: "…" }`
+      # line. Both go into the issue, with the run's own seed and count, which
+      # replay the whole run.
+      - name: File the counterexample
+        if: failure()
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          TITLE: Fuzz counterexample
+        run: |
+          replay=$(grep -oE 'FUZZ_SEED=-?[0-9]+ FUZZ_PATH="[^"]*"|seed: -?[0-9]+, path: "[^"]*"' fuzz.log 2>/dev/null | sort -u || true)
+          {
+            echo "The nightly fuzz failed on \`${GITHUB_SHA}\`: ${RUN_URL}"
+            echo
+            echo "Replay the whole run:"
+            echo
+            echo '```bash'
+            echo "FUZZ_RUNS=${FUZZ_RUNS} FUZZ_SEED=${FUZZ_SEED} npm run test:fuzz"
+            echo '```'
+            echo
+            if [ -n "$replay" ]; then
+              echo "Replay lines from the log:"
+              echo
+              echo '```'
+              echo "$replay"
+              echo '```'
+            else
+              echo "No replay line was found in the log; the run may have failed before a property did. See the run."
+            fi
+            echo
+            echo "Promote the counterexample into \`test/fixtures/sql-fuzz-corpus.ts\` (or \`promql-corpus.ts\`, \`logql-corpus.ts\`) and a named test; never bend the generator around it (AGENTS.md, \"Guards\")."
+          } > issue.md
+          number=$(gh issue list --repo "$GITHUB_REPOSITORY" --state open \
+            --search "\"${TITLE}\" in:title" --json number,title \
+            --jq "map(select(.title == \"${TITLE}\")) | .[0].number // empty")
+          if [ -n "$number" ]; then
+            gh issue comment "$number" --repo "$GITHUB_REPOSITORY" --body-file issue.md
+            echo "Commented on #${number}." >> "$GITHUB_STEP_SUMMARY"
+          else
+            gh issue create --repo "$GITHUB_REPOSITORY" --title "$TITLE" --body-file issue.md
+            echo "Opened a \"${TITLE}\" issue." >> "$GITHUB_STEP_SUMMARY"
+          fi
