@@ -3,7 +3,8 @@ import { join } from "node:path";
 import { SPEC_VERSION } from "@/lib/ir";
 
 /**
- * The files demo (#574): a small directory of Parquet and CSV files the
+ * The files demo (#574): a small directory of Parquet, CSV and JSON-lines
+ * (#596) files the
  * seeder writes under `DUCKDB_SOURCES_DIR`, the DuckDB source it registers
  * over them, and the **Demo files** dashboard that reads them.
  *
@@ -55,6 +56,23 @@ export const DEMO_FILES_TABLES = [
       { name: "region", type: "VARCHAR" },
       { name: "role", type: "VARCHAR" },
       { name: "cores", type: "BIGINT" },
+    ],
+  },
+  {
+    name: "deploys",
+    description:
+      "one JSON object per deploy, the last seven days, with a nested actor (deploys.jsonl)",
+    timeField: "ts",
+    columns: [
+      { name: "ts", type: "TIMESTAMP" },
+      { name: "service", type: "VARCHAR" },
+      { name: "version", type: "VARCHAR" },
+      { name: "ok", type: "BOOLEAN" },
+      {
+        name: "actor",
+        type: 'STRUCT("name" VARCHAR, team VARCHAR)',
+        description: "who shipped it: read actor.name or actor.team",
+      },
     ],
   },
   {
@@ -119,6 +137,20 @@ export function demoFileQueries(now: number): Record<string, string> {
                WHERE k < 3 + floor(3 * (1 + sin(2 * pi() * ((m % 1440) - 600) / 1440.0)) / 2)) t
        ORDER BY ts`,
     "hosts.csv": `SELECT * FROM (VALUES ${hosts}) v(host, region, role, cores) ORDER BY host`,
+    // A deploy in about one hour in four, per service; one in ten rolled
+    // back. One object per line, the person who shipped it nested.
+    "deploys.jsonl": `
+      SELECT make_timestamp((hr * 3600 * 1000000 + (h % 3600000000))::BIGINT) AS ts,
+             service,
+             '1.' || (hr // 24 % 100)::VARCHAR || '.' || (hr % 24)::VARCHAR AS version,
+             (h >> 12) % 10 <> 0 AS ok,
+             {'name': ['ada', 'grace', 'linus', 'margaret'][1 + ((h >> 20) % 4)::INTEGER],
+              'team': ['platform', 'payments', 'search'][1 + ((h >> 28) % 3)::INTEGER]} AS actor
+        FROM (SELECT hr, service, hash(hr * 4 + si) AS h
+                FROM range(${Math.floor(fromMinute / 60)}, ${Math.floor(toMinute / 60)}) r(hr),
+                     (VALUES (0, 'api'), (1, 'web'), (2, 'worker')) s(si, service)) t
+       WHERE (h >> 4) % 4 = 0
+       ORDER BY ts`,
     // A weekly shape (weekends quieter), a region's size, and some noise.
     "daily_revenue.parquet": `
       SELECT make_timestamp((d * ${DAY_MS * 1000})::BIGINT) AS day,
@@ -150,7 +182,11 @@ export async function writeDemoFiles(root: string, now = Date.now()): Promise<st
   try {
     for (const [file, select] of Object.entries(demoFileQueries(now))) {
       const temporary = join(dir, `.${file}.tmp`);
-      const format = file.endsWith(".csv") ? "csv, HEADER" : "parquet";
+      const format = file.endsWith(".csv")
+        ? "csv, HEADER"
+        : file.endsWith(".jsonl")
+          ? "json"
+          : "parquet";
       await connection.run(
         `COPY (${select}) TO ${literal(temporary)} (FORMAT ${format})`,
       );
@@ -173,7 +209,10 @@ const perDay = (select: string) =>
 
 const REGIONS = ["us-east", "us-west", "eu-central"];
 
-/** What the files say: traffic from one file, money from another, joined to a CSV. */
+/**
+ * What the files say: traffic from one file, money from another, joined to a
+ * CSV, and deploys from JSON lines with a nested object.
+ */
 export function demoFilesSpec() {
   return {
     specVersion: SPEC_VERSION,
@@ -189,7 +228,7 @@ export function demoFilesSpec() {
           content: [
             "## Files, not a database",
             "",
-            "Every panel here reads a file through the **Demo files** DuckDB source: `http_requests.parquet`, `hosts.csv` and `daily_revenue.parquet`, which the seeder writes under `DUCKDB_SOURCES_DIR` and rewrites every minute. The same SQL guard and server-owned window as a database source, run in process.",
+            "Every panel here reads a file through the **Demo files** DuckDB source: `http_requests.parquet`, `hosts.csv`, `daily_revenue.parquet` and `deploys.jsonl`, which the seeder writes under `DUCKDB_SOURCES_DIR` and rewrites every minute. The same SQL guard and server-owned window as a database source, run in process.",
           ].join("\n"),
         },
         layout: { x: 0, y: 0, w: 12, h: 3 },
@@ -312,6 +351,30 @@ export function demoFilesSpec() {
           ],
         },
         layout: { x: 7, y: 10, w: 5, h: 4 },
+      },
+      {
+        id: "deploys",
+        title: "Deploys",
+        description:
+          "The JSON-lines file (#596): who shipped it is a nested object, read as actor.name and actor.team.",
+        viz: "table",
+        timeRange: { from: "now-7d", to: "now" },
+        query: {
+          sourceId: DEMO_FILES_SOURCE_ID,
+          timeField: "ts",
+          sql: "SELECT ts, service, version, actor.name AS shipped_by, actor.team AS team, ok FROM deploys ORDER BY ts DESC",
+        },
+        options: {
+          columns: [
+            { name: "ts", label: "When" },
+            { name: "service", label: "Service" },
+            { name: "version", label: "Version" },
+            { name: "shipped_by", label: "Shipped by" },
+            { name: "team", label: "Team" },
+            { name: "ok", label: "Succeeded" },
+          ],
+        },
+        layout: { x: 0, y: 14, w: 12, h: 4 },
       },
     ],
   };
