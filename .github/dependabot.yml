@@ -22,7 +22,7 @@
 # `@types/node`): Holotable tracks Node's long-term-support line, so 24 may be
 # proposed but 25 (odd, never LTS) and 26 are not. A Node major is still a
 # deliberate change: when 24 arrives, take it in one pull request that moves
-# both Dockerfiles, the CI `node-version` and `@types/node` together rather
+# the Dockerfile's two Node bases, the CI `node-version` and `@types/node` together rather
 # than merging the per-file bumps. Raise the bound when the next LTS line is
 # the one to move to.
 #
@@ -116,32 +116,14 @@ updates:
         applies-to: security-updates
         patterns: ["*"]
 
-  # The repository Dockerfile's digest-pinned base. Digest pinning (#36) is
-  # what makes this necessary: a pinned digest never moves on its own.
+  # The repository Dockerfile's digest-pinned bases. Digest pinning (#36) is
+  # what makes this necessary: a pinned digest never moves on its own. Three:
+  # the Debian Node base, and the quick-start target's Alpine Node base and
+  # the TimescaleDB base it runs on (#612 moved them into this file). A
+  # TimescaleDB update should move docker-compose.yml and the CI service
+  # containers to the same version in the same pull request.
   - package-ecosystem: docker
     directory: /
-    schedule:
-      interval: monthly
-    ignore:
-      # Node 25+ is not proposed; see the header.
-      - dependency-name: node
-        versions: [">=25"]
-    open-pull-requests-limit: 5
-    commit-message:
-      prefix: chore
-      include: scope
-    groups:
-      # A base image moves by digest, which has no semver level; one group
-      # takes every update to this Dockerfile's bases together.
-      images:
-        patterns: ["*"]
-
-  # The all-in-one quick-start image: a digest-pinned Node base for its build
-  # stages and a digest-pinned TimescaleDB base it runs on. A TimescaleDB
-  # update here should move docker-compose.yml and the CI service containers
-  # to the same version in the same pull request.
-  - package-ecosystem: docker
-    directory: /deploy/quickstart
     schedule:
       interval: monthly
     ignore:
