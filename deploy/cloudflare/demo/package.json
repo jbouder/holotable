@@ -16,8 +16,8 @@
     "@cloudflare/containers": "0.3.7"
   },
   "devDependencies": {
-    "@types/node": "^24.19.1",
+    "@types/node": "^24.19.2",
     "typescript": "7.0.2",
-    "wrangler": "4.149.0"
+    "wrangler": "4.151.0"
   }
 }
