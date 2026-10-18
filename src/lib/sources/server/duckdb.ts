@@ -17,6 +17,8 @@ import type {
   QueryCheck,
   ServerSourceKind,
   SourcePlan,
+  UploadReply,
+  UploadRequest,
 } from "@/lib/sources/server/types";
 import { rowFilterProblem } from "@/lib/sql/row-filter";
 import { buildExecutablePlan, type SqlDialect, validateSql } from "@/lib/sql/safety";
@@ -34,7 +36,14 @@ import {
   testDuckDbSource,
 } from "@/lib/duckdb/client";
 import { DuckDbPathError, resolveSourcePath, SOURCES_DIR_UNSET } from "@/lib/duckdb/path";
-import { removeUpload, uploadLimits, uploadsAvailability } from "@/lib/duckdb/uploads";
+import {
+  receiveUpload,
+  removeUpload,
+  sweepOrphanedUploads,
+  UploadError,
+  uploadLimits,
+  uploadsAvailability,
+} from "@/lib/duckdb/uploads";
 
 /**
  * The server half of the DuckDB kind (#572): the same SQL guard and planner
@@ -100,6 +109,39 @@ export async function duckdbAvailability(): Promise<string | null> {
   if (!config.duckdbSourcesDir) return SOURCES_DIR_UNSET;
   if (!(await duckdbBinding())) return DUCKDB_UNAVAILABLE;
   return null;
+}
+
+/** The DuckDB paths among a workspace's sources: what their uploads may not lose. */
+function duckdbPaths(sources: readonly SourceRecord[]): string[] {
+  return sources.flatMap((o) => (o.config.kind === "duckdb" ? [o.config.path] : []));
+}
+
+/**
+ * Add uploaded files to a DuckDB source made by uploading (#604): received
+ * into the source's own directory, in the source's own workspace, under the
+ * rules `receiveUpload` holds. A refusal is an answer, not a throw.
+ */
+async function addUploadedFiles(
+  source: SourceRecord,
+  request: UploadRequest,
+): Promise<UploadReply> {
+  const duck = duckSource(source);
+  try {
+    return {
+      ok: true,
+      ...(await receiveUpload({
+        ...request,
+        workspaceId: duck.workspaceId,
+        into: duck.config.path,
+      })),
+    };
+  } catch (err) {
+    if (err instanceof UploadError) {
+      return { ok: false, error: err.message, ...(err.file ? { file: err.file } : {}) };
+    }
+    if (err instanceof DuckDbPathError) return { ok: false, error: err.message };
+    throw err;
+  }
 }
 
 function errorMessage(err: unknown): string {
@@ -175,14 +217,21 @@ const kind: ServerSourceKind = {
   checkConfig: async (cfg, workspaceId) =>
     cfg.kind === "duckdb" ? duckdbConfigProblem(cfg, workspaceId) : null,
   availability: duckdbAvailability,
-  uploads: { availability: () => uploadsAvailability(), limits: uploadLimits },
+  uploads: {
+    availability: () => uploadsAvailability(),
+    limits: uploadLimits,
+    add: addUploadedFiles,
+    sweep: (sourcesIn, workspaceId) =>
+      sweepOrphanedUploads({
+        workspaceId,
+        named: async (ws) => duckdbPaths(await sourcesIn(ws)),
+      }),
+  },
   async removed(source, others) {
     const duck = duckSource(source);
     await removeUpload(
       { workspaceId: duck.workspaceId, path: duck.config.path },
-      others.flatMap((o) =>
-        o.id !== duck.id && o.config.kind === "duckdb" ? [o.config.path] : [],
-      ),
+      duckdbPaths(others.filter((o) => o.id !== duck.id)),
     );
   },
   refresh: (source) => refreshDuckDbCatalog(duckSource(source)),

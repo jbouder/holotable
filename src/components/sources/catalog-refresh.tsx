@@ -311,6 +311,8 @@ function MetricDiffView({ diff }: { diff: MetricCatalogDiff }) {
 function TableDiffView({ diff }: { diff: CatalogDiff }) {
   const dropped = droppedHiddenColumns(diff);
   const added = diff.tables.some((t) => t.added.length > 0);
+  // An upload source's new files (#604): tables the apply adds to the allowlist.
+  const newTables = new Set(diff.addedTables ?? []);
 
   return (
     <div className="space-y-3 text-sm">
@@ -345,8 +347,9 @@ function TableDiffView({ diff }: { diff: CatalogDiff }) {
         <ul className="divide-y divide-border border border-border">
           {diff.tables.map((change) => (
             <li key={change.table} className="space-y-1 px-3 py-2">
-              <p className="font-mono text-xs font-medium text-foreground">
+              <p className="flex items-center gap-2 font-mono text-xs font-medium text-foreground">
                 {change.table}
+                {newTables.has(change.table) && <Badge>new table</Badge>}
               </p>
               <ul className="space-y-0.5 font-mono text-xs">
                 {change.added.map((column) => (
@@ -388,6 +391,12 @@ function TableDiffView({ diff }: { diff: CatalogDiff }) {
         </ul>
       )}
 
+      {newTables.size > 0 && (
+        <p className="text-xs text-muted">
+          Applying adds the new tables to the allowlist: they are the files added to this
+          source.
+        </p>
+      )}
       {added && (
         <p className="text-xs text-muted">
           New columns start exposed: the model is told about them and generated SQL may

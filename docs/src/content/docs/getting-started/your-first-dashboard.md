@@ -163,7 +163,10 @@ removed or retyped, and any allowlisted table the database no longer has.
 Nothing is written until you press **Apply**. What it records is the columns
 and types of every allowlisted table, and that is what the model is shown.
 Refresh does not widen anything — it never adds a table you did not list, it
-only makes what you did list accurate. A table you allowed that the database no
+only makes what you did list accurate. (The one exception is a source made by
+uploading files: its refresh offers the files you
+[added to it](/concepts/duckdb-sources/#adding-files-to-an-upload-source) as
+new tables, for you to review and apply.) A table you allowed that the database no
 longer has is reported as missing rather than quietly kept.
 
 **Catalog** opens the source's tables and columns as a searchable tree, with

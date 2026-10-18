@@ -9,6 +9,7 @@ import {
   type DuckDbFacts,
   type DuckDbSourceRecord,
   duckdbLayout,
+  isUploadPath,
 } from "@/lib/sources/kinds/duckdb";
 
 // The clamp for each catalog field in a prompt is the registry schema's own
@@ -93,9 +94,15 @@ export interface DuckDbCatalogRefresh {
 /**
  * Re-read the allowlisted tables' columns from a freshly opened engine: a
  * directory is listed again (a file gone is a table missing), a database's
- * `information_schema` is read. Like every refresh it never adds a table to
- * the allowlist and never drops one: a missing table keeps its last known
- * columns and is reported.
+ * `information_schema` is read. It never drops a table: a missing table
+ * keeps its last known columns and is reported.
+ *
+ * Like every refresh it never adds a table to the allowlist, with one
+ * exception (#604): a source made by uploading, whose every file a source
+ * admin of its workspace chose to upload into it, has the tables added to
+ * it since offered as new tables, shown in the review's diff and stored
+ * only when that review is applied, up to {@link MAX_TABLES}. A directory
+ * the operator manages, and every other kind, are never widened.
  */
 export async function refreshDuckDbCatalog(
   source: DuckDbSourceRecord,
@@ -115,11 +122,40 @@ export async function refreshDuckDbCatalog(
         rows.length > 0 ? refreshedColumns(existing.columns, rows) : existing.columns,
     });
   }
+  if (isUploadPath(source.config.path, source.workspaceId)) {
+    const listed = new Set(tables.map((t) => t.name));
+    for (const table of found.tables) {
+      if (tables.length >= MAX_TABLES) break;
+      if (listed.has(table.name)) continue;
+      const added = catalogTable(table);
+      if (added) tables.push(added);
+    }
+  }
   return {
     config: DuckDbConfig.parse({ ...source.config, tables }),
     missingTables,
     facts: { duckdb: found.version },
   };
+}
+
+/**
+ * An introspected table as a catalog entry, or null when its name is too
+ * long for the catalog or it has no column that fits: a name too long is
+ * left out and a type too long is cut, rather than failing the whole read.
+ */
+function catalogTable(table: {
+  name: string;
+  columns: { column_name: string; data_type: string }[];
+}): CatalogTable | null {
+  if (table.name.length > MAX.table) return null;
+  const columns = table.columns
+    .filter((c) => c.column_name.length > 0 && c.column_name.length <= MAX.column)
+    .slice(0, MAX_COLUMNS)
+    .map((c) => ({
+      name: c.column_name,
+      type: c.data_type.slice(0, MAX.columnType) || "unknown",
+    }));
+  return columns.length > 0 ? { name: table.name, columns } : null;
 }
 
 /**
@@ -138,15 +174,8 @@ export async function discoverDuckDbTables(
   const tables: CatalogTable[] = [];
   for (const table of found.tables) {
     if (tables.length >= MAX_TABLES) break;
-    if (table.name.length > MAX.table) continue;
-    const columns = table.columns
-      .filter((c) => c.column_name.length > 0 && c.column_name.length <= MAX.column)
-      .slice(0, MAX_COLUMNS)
-      .map((c) => ({
-        name: c.column_name,
-        type: c.data_type.slice(0, MAX.columnType) || "unknown",
-      }));
-    if (columns.length > 0) tables.push({ name: table.name, columns });
+    const entry = catalogTable(table);
+    if (entry) tables.push(entry);
   }
   return tables;
 }

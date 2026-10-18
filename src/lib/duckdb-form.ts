@@ -262,14 +262,27 @@ export function perFileSent(
 }
 
 /**
- * Send files to `POST /api/sources/duckdb/uploads`. Through
+ * Where an upload goes: a new source's directory in a workspace (#595), or
+ * an existing upload source, by id, to add files to (#604).
+ */
+export type UploadTarget = { workspaceId: string } | { sourceId: string };
+
+function uploadUrl(target: UploadTarget): string {
+  return "sourceId" in target
+    ? `/api/sources/${encodeURIComponent(target.sourceId)}/uploads`
+    : `/api/sources/duckdb/uploads?workspaceId=${encodeURIComponent(target.workspaceId)}`;
+}
+
+/**
+ * Send files to `POST /api/sources/duckdb/uploads`, or to
+ * `POST /api/sources/[id]/uploads` to add them to a source (#604). Through
  * `XMLHttpRequest`, not `fetch`, because only its `upload.onprogress`
  * reports bytes sent in every browser. `onSent` fires once the last byte has
  * gone and the server is checking and writing. `abort` cancels it; the
  * server keeps nothing of a request that did not finish.
  */
 export function uploadDuckDbFiles(
-  workspaceId: string,
+  target: UploadTarget,
   files: readonly File[],
   handlers: {
     onProgress?: (loaded: number, total: number) => void;
@@ -339,10 +352,7 @@ export function uploadDuckDbFiles(
         error: "Upload cancelled. Nothing was kept on the server.",
       });
   });
-  xhr.open(
-    "POST",
-    `/api/sources/duckdb/uploads?workspaceId=${encodeURIComponent(workspaceId)}`,
-  );
+  xhr.open("POST", uploadUrl(target));
   xhr.send(body);
   return { done, abort: () => xhr.abort() };
 }

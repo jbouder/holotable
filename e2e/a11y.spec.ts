@@ -199,6 +199,52 @@ for (const { theme, palette, name } of APPEARANCES) {
       await expectNoA11yViolations(page);
     });
 
+    test("the Add files dialog on an upload source, with a file chosen (#604)", async ({
+      page,
+      request,
+    }) => {
+      // Each run stores an upload, so the default palette's two schemes only.
+      test.skip(palette !== "holotable", "scanned in the default palette's two schemes");
+      const id = `a11y-add-${theme}-${Date.now().toString(36)}`;
+      const name = `A11y upload ${id}`;
+      const upload = await request.post("/api/sources/duckdb/uploads?workspaceId=demo", {
+        multipart: {
+          files: {
+            name: "a11y.csv",
+            mimeType: "text/csv",
+            buffer: Buffer.from("a\n1\n"),
+          },
+        },
+      });
+      expect(upload.ok(), await upload.text()).toBe(true);
+      const { path } = await upload.json();
+      const created = await request.post("/api/sources", {
+        data: {
+          workspaceId: "demo",
+          id,
+          name,
+          config: {
+            kind: "duckdb",
+            path,
+            tables: [{ name: "a11y", columns: [{ name: "a", type: "BIGINT" }] }],
+          },
+        },
+      });
+      expect(created.ok(), await created.text()).toBe(true);
+      try {
+        await page.goto("/data-sources");
+        await page.getByRole("button", { name: `Add files to ${name}` }).click();
+        const dialog = page.getByRole("dialog", { name: `Add files to ${name}` });
+        await expect(dialog).toBeVisible();
+        await expectNoA11yViolations(page);
+        await dialog.getByRole("button", { name: "household expenses" }).click();
+        await expect(dialog.getByRole("progressbar")).toBeVisible();
+        await expectNoA11yViolations(page);
+      } finally {
+        await request.delete(`/api/sources/${id}`);
+      }
+    });
+
     test("data sources, the Loki form and its discovered labels (#563)", async ({
       page,
     }) => {

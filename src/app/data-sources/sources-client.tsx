@@ -16,6 +16,7 @@ import {
   ScrollText,
   FolderOpen,
   Upload,
+  FileUp,
 } from "lucide-react";
 import { SourceDraft, type SourceRecord, type SqlSourceDraft } from "@/lib/registry";
 import { type SourceListing, sourceListing } from "@/lib/source-listing";
@@ -56,6 +57,7 @@ import {
 import { ChoiceCard, ChoiceCardGroup } from "@/components/ui/choice-card";
 import { LokiSourceForm, type LokiSourceFormInitial } from "./loki-source-form";
 import { DuckDbSourceForm } from "./duckdb-source-form";
+import { AddFilesDialog } from "./add-files-dialog";
 import type { KindAvailability, UploadAvailability } from "@/lib/sources/types";
 import { type GrantedSecretRefsState, readinessIn } from "@/lib/secret-refs";
 import { Notice } from "@/components/notice";
@@ -122,6 +124,8 @@ export function SourcesClient({
   // The source whose catalog is open, and the one whose refresh is in review.
   const [browsing, setBrowsing] = React.useState<string | null>(null);
   const [refreshing, setRefreshing] = React.useState<string | null>(null);
+  // The upload source files are being added to (#604).
+  const [adding, setAdding] = React.useState<string | null>(null);
 
   const load = React.useCallback(async (ws: string) => {
     const res = await fetch(`/api/sources?workspaceId=${encodeURIComponent(ws)}`);
@@ -255,6 +259,7 @@ export function SourcesClient({
   const sourceBeingBrowsed = sources?.find((source) => source.id === browsing) ?? null;
   const sourceBeingRefreshed =
     sources?.find((source) => source.id === refreshing) ?? null;
+  const sourceBeingAddedTo = sources?.find((source) => source.id === adding) ?? null;
 
   return (
     <div className="space-y-6">
@@ -458,6 +463,23 @@ export function SourcesClient({
                           <RefreshCw className="h-4 w-4" /> Refresh
                           <span className="sr-only"> {source.name}</span>
                         </Button>
+                        {"uploaded" in source &&
+                          source.uploaded &&
+                          !source.tombstonedAt &&
+                          availableUploads(kinds, source.kind) && (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              disabled={busy === source.id}
+                              onClick={() => {
+                                setNotice(null);
+                                setAdding(source.id);
+                              }}
+                            >
+                              <FileUp className="h-4 w-4" /> Add files
+                              <span className="sr-only"> to {source.name}</span>
+                            </Button>
+                          )}
                         <Button
                           variant="ghost"
                           size="sm"
@@ -499,6 +521,20 @@ export function SourcesClient({
         source={sourceBeingBrowsed}
         onClose={() => setBrowsing(null)}
         onChanged={(id, health) => setCatalog((prev) => ({ ...prev, [id]: health }))}
+      />
+
+      <AddFilesDialog
+        source={sourceBeingAddedTo}
+        limits={
+          sourceBeingAddedTo ? availableUploads(kinds, sourceBeingAddedTo.kind) : null
+        }
+        onClose={() => setAdding(null)}
+        onUploaded={(id) => {
+          // Stored, not yet tables: straight on to the reviewed refresh,
+          // where the new files show as new tables to apply.
+          setAdding(null);
+          setRefreshing(id);
+        }}
       />
 
       <RefreshCatalogDialog

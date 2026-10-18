@@ -12,6 +12,7 @@ import {
   storedAs,
   type UploadedFile,
   type UploadSample,
+  type UploadTarget,
   uploadDuckDbFiles,
   uploadFilesProblem,
 } from "@/lib/duckdb-form";
@@ -23,24 +24,32 @@ import { cn } from "@/lib/utils";
  * The file picker the "Upload files" form has in place of a path (#595):
  * choose CSV, JSON or Excel files (or a sample), upload them with progress per file and
  * by stage, then the form goes on exactly as the server-files form does,
- * from discovery. Everything that decides anything is in `@/lib/duckdb-form`;
+ * from discovery. The Add files dialog (#604) uses it too, aimed at an
+ * existing source. Everything that decides anything is in `@/lib/duckdb-form`;
  * the server holds every rule again.
+ *
+ * Files can also be dropped on it (#604): the drop zone is an addition to
+ * Choose files, which stays the way in for a keyboard or a screen reader.
  */
 
 /** Where an upload stands. */
 type Phase = "idle" | "uploading" | "checking" | "stored" | "failed";
 
 export function DuckDbUploadPicker({
-  workspaceId,
+  target,
   limits,
+  finalStage = "Discover",
   discovering,
   discovered,
   error: fieldError,
   onUploaded,
   onReset,
 }: {
-  workspaceId: string;
+  /** A new source's workspace, or the upload source to add files to (#604). */
+  target: UploadTarget;
   limits: UploadAvailability;
+  /** What follows the upload: discovery for a new source, review for added files. */
+  finalStage?: string;
   /** The form is discovering the uploaded tables. */
   discovering: boolean;
   /** Discovery has answered. */
@@ -67,6 +76,10 @@ export function DuckDbUploadPicker({
   } | null>(null);
   const [stored, setStored] = React.useState<UploadedFile[]>([]);
   const [fetchingSample, setFetchingSample] = React.useState<UploadSample | null>(null);
+  // Files are being dragged over the picker. Counted, because every child
+  // the pointer crosses fires its own enter and leave.
+  const [dragging, setDragging] = React.useState(false);
+  const dragDepth = React.useRef(0);
 
   // An upload still running when the form goes away is cancelled with it.
   React.useEffect(() => () => abortRef.current?.(), []);
@@ -99,7 +112,7 @@ export function DuckDbUploadPicker({
     setFailure(null);
     setPhase("uploading");
     setSent({ loaded: 0, total: 0 });
-    const request = uploadDuckDbFiles(workspaceId, files, {
+    const request = uploadDuckDbFiles(target, files, {
       onProgress: (loaded, total) => setSent({ loaded, total }),
       onSent: () => setPhase("checking"),
     });
@@ -137,16 +150,48 @@ export function DuckDbUploadPicker({
               ? "Uploaded"
               : null;
 
+  // Only a drag that carries files is a drop; text or a link is left to the page.
+  const carriesFiles = (event: React.DragEvent) =>
+    Array.from(event.dataTransfer.types).includes("Files");
+
   return (
-    <div className="space-y-3">
+    // A fieldset, so the drop target is a group of the form rather than a
+    // bare element with handlers. Unnamed: the file input carries the label.
+    <fieldset
+      className="min-w-0 space-y-3"
+      onDragEnter={(event) => {
+        if (!carriesFiles(event)) return;
+        event.preventDefault();
+        dragDepth.current += 1;
+        setDragging(true);
+      }}
+      onDragOver={(event) => {
+        if (!carriesFiles(event)) return;
+        event.preventDefault();
+        event.dataTransfer.dropEffect = running ? "none" : "copy";
+      }}
+      onDragLeave={(event) => {
+        if (!carriesFiles(event)) return;
+        dragDepth.current = Math.max(0, dragDepth.current - 1);
+        if (dragDepth.current === 0) setDragging(false);
+      }}
+      onDrop={(event) => {
+        if (!carriesFiles(event)) return;
+        event.preventDefault();
+        dragDepth.current = 0;
+        setDragging(false);
+        const dropped = Array.from(event.dataTransfer.files);
+        if (!running && dropped.length > 0) choose(dropped);
+      }}
+    >
       <div className="space-y-1">
         <span id="d-files-label" className="text-sm font-medium">
           Files
         </span>
         <p id="d-files-hint" className="text-xs text-muted">
-          CSV, JSON or Excel (.xlsx) files from your computer, up to {limits.maxFiles} at{" "}
-          {formatBytes(limits.maxBytes)} each. Each file becomes a table named after it,
-          and each sheet of a workbook its own table.
+          CSV, JSON or Excel (.xlsx, .xlsm) files from your computer, up to{" "}
+          {limits.maxFiles} at {formatBytes(limits.maxBytes)} each. Each file becomes a
+          table named after it, and each sheet of a workbook its own table.
         </p>
       </div>
       <input
@@ -163,7 +208,13 @@ export function DuckDbUploadPicker({
           event.target.value = "";
         }}
       />
-      <div className="flex flex-wrap items-center gap-2">
+      <div
+        data-dragging={dragging || undefined}
+        className={cn(
+          "flex flex-wrap items-center gap-2 rounded-md border border-dashed border-border p-3 transition-colors duration-(--duration-fast) ease-standard",
+          dragging && "border-solid border-success/60 tinted bg-tint-success/(--tint-10)",
+        )}
+      >
         <Button
           type="button"
           variant="secondary"
@@ -197,6 +248,9 @@ export function DuckDbUploadPicker({
             <X className="h-4 w-4" /> Cancel upload
           </Button>
         )}
+        <span className="text-xs text-muted" aria-hidden>
+          {dragging ? "Drop to choose these files" : "or drop files here"}
+        </span>
       </div>
       {files.length === 0 && (
         <p className="text-xs text-muted">
@@ -233,6 +287,7 @@ export function DuckDbUploadPicker({
 
       {stage && (
         <StageLine
+          finalStage={finalStage}
           phase={phase}
           discovering={discovering}
           discovered={discovered}
@@ -286,17 +341,19 @@ export function DuckDbUploadPicker({
         </p>
       )}
       {failure && <ErrorDisplay error={{ error: failure.error, kind: "validation" }} />}
-    </div>
+    </fieldset>
   );
 }
 
 /** The stages of an upload, each with its icon; a finished one pops its check in. */
 function StageLine({
+  finalStage,
   phase,
   discovering,
   discovered,
   text,
 }: {
+  finalStage: string;
   phase: Phase;
   discovering: boolean;
   discovered: boolean;
@@ -308,7 +365,7 @@ function StageLine({
     { label: "Upload", state: at > 0 ? "done" : at === 0 ? "running" : "pending" },
     { label: "Check", state: at > 1 ? "done" : at === 1 ? "running" : "pending" },
     {
-      label: "Discover",
+      label: finalStage,
       state: discovered ? "done" : discovering ? "running" : "pending",
     },
   ];

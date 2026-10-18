@@ -8,6 +8,9 @@ import {
   readdirSync,
   readFileSync,
   realpathSync,
+  symlinkSync,
+  utimesSync,
+  writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -18,6 +21,9 @@ import {
   MAX_WORKBOOK_SHEETS,
   receiveUpload,
   removeUpload,
+  STAGING_PREFIX,
+  sweepOrphanedUploads,
+  UPLOAD_ORPHAN_AGE_MS,
   textProblem,
   UploadError,
   uploadExtension,
@@ -27,12 +33,16 @@ import {
 import { readerFor } from "@/lib/duckdb/client";
 import { excelSerialToMs, formatShows, sheetViewName } from "@/lib/duckdb/workbook";
 import {
+  duckdb,
+  isUploadPath,
   spreadsheetProblem,
   UPLOAD_ACCEPT,
   UPLOAD_EXTENSIONS,
   WORKBOOK_EXTENSION,
 } from "@/lib/sources/kinds/duckdb";
-import { SOURCES_DIR_UNSET } from "@/lib/duckdb/path";
+import { DuckDbPathError, SOURCES_DIR_UNSET } from "@/lib/duckdb/path";
+import { createLogger, setLogger } from "@/lib/log";
+import type { SourceRecord } from "@/lib/registry";
 import {
   MultipartError,
   multipartBoundary,
@@ -879,4 +889,458 @@ test("a workbook that is not a readable archive, or that inflates past its cap, 
   );
   const result = await upload(dir, [{ name: "stored.xlsx", body: storedBook }]);
   assert.equal(readFileSync(join(dir, result.path, "stored.csv"), "utf8"), '"n"\n7\n');
+});
+
+/* -------------------------------------------------------------------------- */
+/* Adding files to an upload source (#604)                                    */
+/* -------------------------------------------------------------------------- */
+
+const add = (dir: string, into: string, files: FilePart[], opts: UploadOptions = {}) =>
+  receiveUpload({
+    workspaceId: "ops",
+    contentType: `multipart/form-data; boundary=${BOUNDARY}`,
+    body: stream(multipart(files), opts.size ?? 7, opts.stopAfter),
+    into,
+    root: dir,
+    workbookCaps: opts.workbookCaps,
+  });
+
+/** Every file under a directory, by relative name, with its contents. */
+function snapshot(dir: string): Record<string, string> {
+  const out: Record<string, string> = {};
+  const walk = (at: string, prefix: string) => {
+    for (const entry of readdirSync(at, { withFileTypes: true })) {
+      const rel = prefix ? `${prefix}/${entry.name}` : entry.name;
+      if (entry.isDirectory()) walk(join(at, entry.name), rel);
+      else out[rel] = readFileSync(join(at, entry.name), "utf8");
+    }
+  };
+  walk(dir, "");
+  return out;
+}
+
+/** A refused add: an UploadError naming no path, and the root exactly as it was. */
+async function addRefused(
+  dir: string,
+  into: string,
+  files: FilePart[],
+  message: RegExp,
+  opts: UploadOptions = {},
+) {
+  const before = snapshot(dir);
+  await assert.rejects(add(dir, into, files, opts), (err: unknown) => {
+    assert.ok(err instanceof UploadError || err instanceof DuckDbPathError, String(err));
+    assert.match(err.message, message);
+    assert.ok(!err.message.includes(dir), `a path leaked: ${err.message}`);
+    return true;
+  });
+  assert.deepEqual(snapshot(dir), before, "a refused add changed the files");
+}
+
+test("files are added to the source's own directory, beside what it holds, which is untouched", async () => {
+  const dir = root();
+  const { path } = await upload(dir, [{ name: "january.csv", body: "a\n1\n" }]);
+  const result = await add(dir, path, [
+    { name: "february.csv", body: "a\n2\n" },
+    { name: "runs.jsonl", body: '{"a":3}\n' },
+  ]);
+  // The same reply shape, the path the source's own.
+  assert.equal(result.path, path);
+  assert.deepEqual(
+    result.files.map((f) => f.name),
+    ["february", "runs"],
+  );
+  assert.deepEqual(snapshot(join(dir, path)), {
+    "january.csv": "a\n1\n",
+    "february.csv": "a\n2\n",
+    "runs.jsonl": '{"a":3}\n',
+  });
+  // Nothing staged is left beside it.
+  assert.deepEqual(readdirSync(join(dir, "uploads", "ops")), [path.split("/")[2]]);
+  // A workbook, and one under the .xlsm name, convert into it too.
+  await add(dir, path, [{ name: "home-energy.xlsm", body: SAMPLE }], { size: 4096 });
+  assert.deepEqual(readdirSync(join(dir, path)).sort(), [
+    "february.csv",
+    "home_energy_electricity.csv",
+    "home_energy_gas.csv",
+    "january.csv",
+    "runs.jsonl",
+  ]);
+});
+
+test("only an upload directory of the source's own workspace takes files, checked before anything is written", async () => {
+  const dir = root();
+  const { path } = await upload(dir, [{ name: "a.csv", body: "a\n1\n" }]);
+  mkdirSync(join(dir, "lake"));
+  writeFileSync(join(dir, "lake", "x.csv"), "x\n1\n");
+  const files = [{ name: "b.csv", body: "b\n1\n" }];
+  // A directory the operator manages is not an upload source.
+  await addRefused(
+    dir,
+    "lake",
+    files,
+    /only a source made by uploading files takes more/,
+  );
+  // Another workspace's upload directory, however it is spelled.
+  for (const into of [path.replace("/ops/", "/fin/"), `${path}/..`, "uploads/ops"]) {
+    await assert.rejects(
+      receiveUpload({
+        workspaceId: "fin",
+        contentType: `multipart/form-data; boundary=${BOUNDARY}`,
+        body: stream(multipart(files)),
+        into,
+        root: dir,
+      }),
+      (err: unknown) => err instanceof UploadError || err instanceof DuckDbPathError,
+    );
+  }
+  assert.deepEqual(readdirSync(join(dir, path)), ["a.csv"]);
+  assert.ok(
+    !existsSync(join(dir, "uploads", "fin")) ||
+      readdirSync(join(dir, "uploads", "fin")).length === 0,
+  );
+  // A directory that is gone is refused by the guard, naming no path.
+  await addRefused(dir, "uploads/ops/0123456789abcdef", files, /does not exist/);
+  assert.ok(isUploadPath(path, "ops"));
+  assert.ok(!isUploadPath(path, "fin"));
+  assert.ok(!isUploadPath("lake", "ops"));
+});
+
+test("a table the source already has is refused by name, a workbook's sheets included", async () => {
+  const dir = root();
+  const { path } = await upload(
+    dir,
+    [
+      { name: "expenses.csv", body: "a\n1\n" },
+      { name: "home-energy.xlsx", body: SAMPLE },
+    ],
+    { size: 4096 },
+  );
+  // The same stem, whatever its extension.
+  await addRefused(
+    dir,
+    path,
+    [
+      { name: "new.csv", body: "a\n1\n" },
+      { name: "Expenses.jsonl", body: '{"a":1}\n' },
+    ],
+    /"Expenses\.jsonl" would be the table "expenses", which is already a table in this source; rename it/,
+  );
+  // A sheet's table counts as a table the source has.
+  await addRefused(
+    dir,
+    path,
+    [{ name: "home_energy_gas.csv", body: "a\n1\n" }],
+    /already a table in this source/,
+  );
+  // And a new workbook's sheet may not take one.
+  await addRefused(
+    dir,
+    path,
+    [{ name: "home-energy.xlsm", body: SAMPLE }],
+    /sheet "Electricity" would be the table "home_energy_electricity", which is already a table in this source/,
+    { size: 4096 },
+  );
+  const twoSheets = xlsx([
+    { name: "Expenses", rows: row(1, "a") + row(2, 1) },
+    { name: "Other", rows: row(1, "a") + row(2, 1) },
+  ]);
+  await add(dir, path, [{ name: "book.xlsx", body: twoSheets }]);
+  await addRefused(
+    dir,
+    path,
+    [{ name: "book.xlsm", body: twoSheets }],
+    /already a table in this source/,
+  );
+});
+
+test("the file cap counts the files the source already holds", async () => {
+  const dir = root();
+  writable.duckdbUploadMaxFiles = 3;
+  try {
+    const { path } = await upload(dir, [
+      { name: "a.csv", body: "a\n1\n" },
+      { name: "b.csv", body: "b\n1\n" },
+    ]);
+    await addRefused(
+      dir,
+      path,
+      [
+        { name: "c.csv", body: "c\n1\n" },
+        { name: "d.csv", body: "d\n1\n" },
+      ],
+      /already holds 2 files; it may hold at most 3 \(DUCKDB_UPLOAD_MAX_FILES\)/,
+    );
+    // A workbook's sheets are each a file once converted.
+    await addRefused(
+      dir,
+      path,
+      [{ name: "home-energy.xlsx", body: SAMPLE }],
+      /past the 3 it may hold \(DUCKDB_UPLOAD_MAX_FILES\)/,
+      { size: 4096 },
+    );
+    await add(dir, path, [{ name: "c.csv", body: "c\n1\n" }]);
+    await addRefused(
+      dir,
+      path,
+      [{ name: "d.csv", body: "d\n1\n" }],
+      /already holds 3 files/,
+    );
+  } finally {
+    writable.duckdbUploadMaxFiles = saved.duckdbUploadMaxFiles;
+  }
+});
+
+test("a refused or cancelled add leaves the existing files as they were and nothing new", async () => {
+  const dir = root();
+  const { path } = await upload(dir, [{ name: "keep.csv", body: "k\n1\n" }]);
+  // The second file is refused after the first was written to staging.
+  await addRefused(
+    dir,
+    path,
+    [
+      { name: "fine.csv", body: "f\n1\n" },
+      { name: "bad.csv", body: "a\u0000b" },
+    ],
+    /is not a text file/,
+  );
+  await addRefused(dir, path, [{ name: "empty.csv", body: "" }], /is empty/);
+  const body = multipart([
+    { name: "fine.csv", body: "f\n1\n" },
+    { name: "more.csv", body: "m\n".repeat(200) },
+  ]);
+  await addRefused(
+    dir,
+    path,
+    [
+      { name: "fine.csv", body: "f\n1\n" },
+      { name: "more.csv", body: "m\n".repeat(200) },
+    ],
+    /did not finish/,
+    {
+      stopAfter: body.length - 50,
+    },
+  );
+  // A name that appeared in the source meanwhile (after its files were
+  // read, while the body streamed) is never overwritten: the exclusive link
+  // refuses, and only what this request linked is removed.
+  const raced = multipart([
+    { name: "aaa.csv", body: "a\n1\n" },
+    { name: "zzz.csv", body: "mine\n" },
+  ]);
+  let offset = 0;
+  const staged = receiveUpload({
+    workspaceId: "ops",
+    contentType: `multipart/form-data; boundary=${BOUNDARY}`,
+    body: new ReadableStream({
+      pull(controller) {
+        // The second pull: the body is being read, the source's files were.
+        if (offset === 16) writeFileSync(join(dir, path, "zzz.csv"), "theirs\n");
+        if (offset >= raced.length) {
+          controller.close();
+          return;
+        }
+        controller.enqueue(raced.slice(offset, offset + 16));
+        offset += 16;
+      },
+    }),
+    into: path,
+    root: dir,
+  });
+  await assert.rejects(staged, /"zzz" is already in this source/);
+  assert.deepEqual(snapshot(join(dir, path)), {
+    "keep.csv": "k\n1\n",
+    "zzz.csv": "theirs\n",
+  });
+  assert.deepEqual(readdirSync(join(dir, "uploads", "ops")), [path.split("/")[2]]);
+});
+
+test("the sample workbook under an .xlsm name yields the same tables as under .xlsx", async () => {
+  const dir = root();
+  const asXlsx = await upload(dir, [{ name: "home-energy.xlsx", body: SAMPLE }], {
+    size: 4096,
+  });
+  const asXlsm = await upload(dir, [{ name: "home-energy.xlsm", body: SAMPLE }], {
+    size: 4096,
+  });
+  assert.deepEqual(asXlsm.files, asXlsx.files);
+  assert.deepEqual(snapshot(join(dir, asXlsm.path)), snapshot(join(dir, asXlsx.path)));
+  // Accepted where it used to be refused; its older kin still are.
+  assert.equal(spreadsheetProblem("macros.xlsm"), null);
+  assert.ok(UPLOAD_ACCEPT.split(",").includes(".xlsm"));
+  assert.match(String(spreadsheetProblem("book.xlsb")), /a binary Excel workbook/);
+});
+
+test("the listing says whether a source was made by uploading, and never its path", () => {
+  const record = (path: string) =>
+    ({
+      id: "s",
+      workspaceId: "ops",
+      name: "S",
+      kind: "duckdb",
+      config: { kind: "duckdb", path, tables: [{ name: "t", columns: [] }] },
+      secretRef: null,
+      catalogRefreshedAt: null,
+      catalogMissingTables: [],
+      catalogFacts: null,
+      createdBy: "u",
+      createdAt: "",
+      updatedAt: "",
+      tombstonedAt: null,
+    }) as unknown as SourceRecord;
+  const uploaded = duckdb.listing(record("uploads/ops/0123456789abcdef"));
+  assert.equal(uploaded.uploaded, true);
+  assert.ok(!JSON.stringify(uploaded).includes("uploads/"), "the path leaked");
+  assert.equal(duckdb.listing(record("lake")).uploaded, false);
+  // Another workspace's upload path (refused on save anyway) is not one.
+  assert.equal(duckdb.listing(record("uploads/fin/0123456789abcdef")).uploaded, false);
+});
+
+/* -------------------------------------------------------------------------- */
+/* The sweep for orphaned uploads (#604)                                      */
+/* -------------------------------------------------------------------------- */
+
+/** Make a directory, and everything in it, `ageMs` old. */
+function age(path: string, ageMs: number) {
+  const when = (Date.now() - ageMs) / 1000;
+  for (const name of readdirSync(path)) utimesSync(join(path, name), when, when);
+  utimesSync(path, when, when);
+}
+
+async function sweep(
+  dir: string,
+  named: Record<string, string[]>,
+  workspaceId?: string,
+): Promise<{ removed: number; kept: number; lines: Record<string, unknown>[] }> {
+  const lines: Record<string, unknown>[] = [];
+  const restore = setLogger(
+    createLogger({
+      level: "debug",
+      format: "json",
+      sink: (line) => lines.push(JSON.parse(line) as Record<string, unknown>),
+    }),
+  );
+  try {
+    const counts = await sweepOrphanedUploads({
+      root: dir,
+      workspaceId,
+      named: async (ws) => named[ws] ?? [],
+    });
+    return { ...counts, lines };
+  } finally {
+    restore();
+  }
+}
+
+const OLD = UPLOAD_ORPHAN_AGE_MS + 60_000;
+
+test("the sweep removes an old upload no source names, and keeps a young or a named one", async () => {
+  const dir = root();
+  const orphan = (await upload(dir, [{ name: "a.csv", body: "a\n1\n" }])).path;
+  const young = (await upload(dir, [{ name: "b.csv", body: "b\n1\n" }])).path;
+  const named = (await upload(dir, [{ name: "c.csv", body: "c\n1\n" }])).path;
+  const tombstoned = (await upload(dir, [{ name: "d.csv", body: "d\n1\n" }])).path;
+  age(join(dir, orphan), OLD);
+  age(join(dir, named), OLD * 24);
+  age(join(dir, tombstoned), OLD);
+  // A directory with one fresh file in it is as young as that file.
+  const touched = (await upload(dir, [{ name: "e.csv", body: "e\n1\n" }])).path;
+  age(join(dir, touched), OLD);
+  writeFileSync(join(dir, touched, "f.csv"), "f\n1\n");
+  // An add-files request's abandoned staging directory is an orphan too.
+  const staging = join(dir, "uploads", "ops", `${STAGING_PREFIX}0011223344556677`);
+  mkdirSync(staging);
+  writeFileSync(join(staging, "x.csv"), "x\n");
+  age(staging, OLD);
+
+  const result = await sweep(dir, { ops: [named, `${tombstoned}/`] });
+  assert.equal(result.removed, 2);
+  assert.equal(result.kept, 4);
+  assert.ok(!existsSync(join(dir, orphan)));
+  assert.ok(!existsSync(staging));
+  for (const kept of [young, named, tombstoned, touched]) {
+    assert.ok(existsSync(join(dir, kept)), `${kept} was removed`);
+  }
+  // The log line carries counts, never a path.
+  const line = result.lines.find((l) => l.msg === "uploads.swept");
+  assert.ok(line, "no uploads.swept line");
+  assert.equal(line.removed, 2);
+  assert.equal(line.kept, 4);
+  const text = JSON.stringify(result.lines);
+  assert.ok(!text.includes(dir) && !text.includes("uploads/"), `a path leaked: ${text}`);
+});
+
+test("the sweep never touches anything outside uploads/, a bad workspace segment or a link", async () => {
+  const dir = root();
+  // An operator's directory, old and named by nothing.
+  mkdirSync(join(dir, "lake"));
+  writeFileSync(join(dir, "lake", "x.csv"), "x\n");
+  age(join(dir, "lake"), OLD);
+  // A workspace segment that is no workspace id.
+  for (const ws of ["_bad", "-x"]) {
+    mkdirSync(join(dir, "uploads", ws, "abc"), { recursive: true });
+    age(join(dir, "uploads", ws, "abc"), OLD);
+  }
+  // A symlink under a workspace, pointing out of uploads/.
+  mkdirSync(join(dir, "uploads", "ops"), { recursive: true });
+  symlinkSync(join(dir, "lake"), join(dir, "uploads", "ops", "link"));
+  // A file where a directory would be.
+  writeFileSync(join(dir, "uploads", "ops", "stray.csv"), "s\n");
+
+  const result = await sweep(dir, {});
+  assert.equal(result.removed, 0);
+  assert.ok(existsSync(join(dir, "lake", "x.csv")));
+  assert.ok(existsSync(join(dir, "uploads", "_bad", "abc")));
+  assert.ok(existsSync(join(dir, "uploads", "-x", "abc")));
+  assert.ok(existsSync(join(dir, "uploads", "ops", "link")));
+  assert.ok(existsSync(join(dir, "uploads", "ops", "stray.csv")));
+});
+
+test("the sweep asks after listing, keeps everything when it cannot ask, and stays in its workspace", async () => {
+  const dir = root();
+  const mine = (await upload(dir, [{ name: "a.csv", body: "a\n1\n" }])).path;
+  const other = (
+    await receiveUpload({
+      workspaceId: "fin",
+      contentType: `multipart/form-data; boundary=${BOUNDARY}`,
+      body: stream(multipart([{ name: "b.csv", body: "b\n1\n" }])),
+      root: dir,
+    })
+  ).path;
+  age(join(dir, mine), OLD);
+  age(join(dir, other), OLD);
+
+  // The lookup failing keeps every candidate.
+  const failed = await sweepOrphanedUploads({
+    root: dir,
+    named: async () => {
+      throw new Error("database down");
+    },
+  });
+  assert.deepEqual(failed, { removed: 0, kept: 2 });
+  assert.ok(existsSync(join(dir, mine)) && existsSync(join(dir, other)));
+
+  // Asked only once the directories are listed: a source named meanwhile counts.
+  const asked: string[] = [];
+  const scoped = await sweepOrphanedUploads({
+    root: dir,
+    workspaceId: "ops",
+    named: async (ws) => {
+      asked.push(ws);
+      return [];
+    },
+  });
+  assert.deepEqual(asked, ["ops"]);
+  assert.deepEqual(scoped, { removed: 1, kept: 0 });
+  assert.ok(!existsSync(join(dir, mine)));
+  assert.ok(existsSync(join(dir, other)), "another workspace's upload was swept");
+  // No root, no uploads/: nothing to do, and no throw.
+  assert.deepEqual(await sweepOrphanedUploads({ root: "", named: async () => [] }), {
+    removed: 0,
+    kept: 0,
+  });
+  assert.deepEqual(await sweepOrphanedUploads({ root: root(), named: async () => [] }), {
+    removed: 0,
+    kept: 0,
+  });
 });

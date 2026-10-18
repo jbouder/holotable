@@ -309,6 +309,7 @@ const EMITTERS: Record<string, string[]> = {
   "sources/[id]/catalog": ["source.update"],
   "sources/[id]/test": ["source.test"],
   "sources/[id]/refresh": ["source.refresh"],
+  "sources/[id]/uploads": ["source.upload"],
   "sources/discover": ["source.discover"],
   "sources/duckdb/uploads": ["source.upload"],
   "sources/generate": ["source.draft"],

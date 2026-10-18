@@ -10,7 +10,16 @@ import { checkBaseUrl } from "@/lib/ai/guarded-fetch";
 import { discoverLabels, discoverMetrics } from "@/lib/prometheus/catalog";
 import { discoverLokiLabels, discoverLokiLabelValues } from "@/lib/loki/catalog";
 import { sourceUrlAllowlist } from "@/lib/prometheus/client";
-import type { ServerSourceKind } from "@/lib/sources/server/types";
+import type {
+  ServerSourceKind,
+  UploadReply,
+  UploadRequest,
+} from "@/lib/sources/server/types";
+import { listSources } from "@/lib/db/repo";
+import { MemoryRateLimitStore } from "@/lib/limits/rate";
+import { log } from "@/lib/log";
+import { sourceKind } from "@/lib/sources/registry";
+import type { SourceRecord } from "@/lib/registry";
 import type { KindAvailability } from "@/lib/sources/types";
 import { discoverDuckDbTables } from "@/lib/duckdb/catalog";
 import { DuckDbPathError, listSourcePaths } from "@/lib/duckdb/path";
@@ -149,6 +158,59 @@ export async function duckdbUpload(input: {
     }
     if (err instanceof DuckDbPathError) return { ok: false, error: err.message };
     throw err;
+  }
+}
+
+/**
+ * The ceiling on uploads, per user per workspace, whether they create a
+ * source or add files to one (#604): one bucket for both routes. A
+ * constant, not a capacity knob: an upload is a person choosing files.
+ */
+export const UPLOAD_RATE_PER_MINUTE = 10;
+
+/** The bucket both upload routes take from. Per process, like every memory store. */
+export const uploadRateStore = new MemoryRateLimitStore();
+
+/**
+ * Add uploaded files to an existing source (#604), through its kind: a kind
+ * that takes no uploads, or a source that was not made by uploading, is
+ * refused by name. The caller has authorized `source:manage` in the
+ * source's own workspace.
+ */
+export async function addUploadedFiles(
+  source: SourceRecord,
+  request: UploadRequest,
+): Promise<UploadReply> {
+  const uploads = serverKind(source).uploads;
+  if (!uploads) {
+    return {
+      ok: false,
+      error: `a ${sourceKind(source).label} source is not made of uploaded files; only a source made by uploading files takes more.`,
+    };
+  }
+  return uploads.add(source, request);
+}
+
+/**
+ * Sweep what uploads left that no source names (#604), in one workspace or
+ * all of them, for every kind that takes uploads; each workspace's sources,
+ * tombstoned included, are read after its uploads are listed. Never throws:
+ * a sweep that fails is logged and tried again at the next upload or boot.
+ */
+export async function sweepUploads(workspaceId?: string): Promise<void> {
+  for (const server of Object.values(SERVER_KINDS)) {
+    if (!server.uploads) continue;
+    try {
+      await server.uploads.sweep(
+        (ws) => listSources(ws, { includeTombstoned: true }),
+        workspaceId,
+      );
+    } catch (err) {
+      log.warn("uploads.sweep_failed", {
+        kind: server.kind,
+        error: err instanceof Error ? err.name : "unknown",
+      });
+    }
   }
 }
 

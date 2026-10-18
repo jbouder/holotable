@@ -75,8 +75,9 @@ an ordinary relative path. Each file's table is its stem reduced to
 `[a-z0-9_]`, so `Household Expenses.csv` is `household_expenses`. A file keeps
 its extension when it is `.json`, `.jsonl` or `.ndjson`, so the directory
 reads it as [JSON](#json-files); a file with any other name is stored as
-`.csv` and read as CSV. An Excel workbook (`.xlsx`) becomes
-[one table per sheet](#workbooks). Three samples to try ship with the app, and
+`.csv` and read as CSV. An Excel workbook (`.xlsx` or `.xlsm`) becomes
+[one table per sheet](#workbooks). Files can be chosen, or dropped on the
+form's file area. Three samples to try ship with the app, and
 the form offers each:
 [`household-expenses.csv`](https://github.com/jbouder/holotable/blob/main/public/samples/household-expenses.csv)
 (`date, merchant, category, amount, payment_method`; DuckDB reads `date` as
@@ -96,12 +97,36 @@ file is held to the same caps and the same text check as a CSV; a workbook to
 the same caps and [its own](#workbooks). The operator's side, and how to turn uploads on, is in
 [DuckDB files](/admin/duckdb/#uploads).
 
+### Adding files to an upload source
+
+A second CSV need not be a second source
+([#604](https://github.com/jbouder/holotable/issues/604)). **Add files** on an
+upload source's row opens the same picker, and the files go into that
+source's own directory, each a new table beside the ones it has: this
+month's statement beside last month's. The same rules hold, and three more:
+a file whose table the source already has (a workbook's sheets included) is
+refused by name, so rename it; `DUCKDB_UPLOAD_MAX_FILES` counts the files
+already there; and only a source made by uploading takes files. A refused or
+cancelled request leaves the source's files exactly as they were.
+
+The new files are stored, not yet queryable: an upload never edits the
+allowlist. So when they are stored, the [catalog refresh](#the-catalog)
+opens for the source and shows them as new tables; **Apply changes** adds
+them, and from then on they are queried like any other table. Closing the
+review without applying leaves them on disk, offered again by the next
+refresh.
+
+An upload that never became a source is removed after an hour
+([Orphaned uploads](/admin/duckdb/#orphaned-uploads)).
+
 ## Workbooks
 
-An Excel workbook (`.xlsx`) is converted when it is uploaded
-([#597](https://github.com/jbouder/holotable/issues/597)): each sheet is
+An Excel workbook (`.xlsx`, or a macro-enabled `.xlsm`,
+[#604](https://github.com/jbouder/holotable/issues/604)) is converted when it
+is uploaded ([#597](https://github.com/jbouder/holotable/issues/597)): each sheet is
 written as a CSV in the upload's directory, and the workbook itself is not
-kept. The engine sees only CSVs, so nothing about how a source is opened,
+kept. Only the sheets' cells are read, so an `.xlsm` workbook's macros are
+ignored: never opened, never run, never kept. The engine sees only CSVs, so nothing about how a source is opened,
 locked or queried changes. (DuckDB's own `excel` extension is not bundled
 with the binding, and the locked engine loads nothing.)
 
@@ -139,8 +164,8 @@ workbook can hold a lot. A workbook turns at most 32 sheets into tables, and a
 sheet may hold at most 1,000,000 rows; past either, the upload is refused
 naming the sheet, and nothing is kept.
 
-**Not accepted.** `.xls` (the older Excel format), `.xlsb`, `.xlsm`, `.ods`
-and `.numbers` are refused by name: save them as an Excel Workbook (`.xlsx`)
+**Not accepted.** `.xls` (the older Excel format), `.xlsb`, `.ods` and
+`.numbers` are refused by name: save them as an Excel Workbook (`.xlsx`)
 or as CSV. A workbook with a password cannot be read either. Cell styles,
 charts and ranges are not carried over; a sheet is its cells.
 
@@ -210,9 +235,14 @@ not be read: …`), never its path.
 the files again. Column types are DuckDB's own names (`TIMESTAMP`, `VARCHAR`,
 `DOUBLE`, `BIGINT`). The time column picker offers `TIMESTAMP`,
 `TIMESTAMP_NS`/`_MS`/`_S`, `TIMESTAMPTZ`, `DATE` and `TIME` columns. As on
-every kind, a refresh never adds a table to the allowlist and never drops one:
-a file that has gone is reported as a missing table, with its last known
-columns kept. **Test** probes each allowlisted table with `LIMIT 0` and reports
+every kind, a refresh never drops a table from the allowlist: a file that has
+gone is reported as a missing table, with its last known columns kept. Nor
+does it add one, with one exception: an upload source's refresh offers the
+files [added to it](#adding-files-to-an-upload-source) as new tables, marked
+**new table** in the review and added only when it is applied, since every
+file in that directory is one a source admin chose to upload into it. A
+directory of the server's own is never widened by a refresh; edit the source
+and discover its tables to add one. **Test** probes each allowlisted table with `LIMIT 0` and reports
 the engine version (`DuckDB 1.5.6`), the layout and whether the lock holds.
 
 ## The dialect

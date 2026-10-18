@@ -144,6 +144,8 @@ test("a DuckDB source: path picker, discovery, test, generate, render", async ({
  * read from disk the way a person's file would be picked, uploaded with
  * progress, its table discovered and allowlisted, a dashboard generated over
  * it with the recorded model, and a panel rendered from the uploaded rows.
+ * Then a file dropped on its Add files dialog (#604), reviewed and applied
+ * as a new table through the catalog refresh, and queried.
  */
 test("an uploaded CSV: progress, discovery, create, generate, render", async ({
   page,
@@ -239,6 +241,49 @@ test("an uploaded CSV: progress, discovery, create, generate, render", async ({
       "data-status",
       "live",
     );
+  });
+
+  await test.step("add a file to it by dropping it, then review and apply its table (#604)", async () => {
+    await page.goto("/data-sources");
+    await page.getByRole("button", { name: `Add files to ${sourceName}` }).click();
+    const dialog = page.getByRole("dialog", { name: `Add files to ${sourceName}` });
+    // Dropped on the picker, as a person drags a file from their desktop.
+    const dataTransfer = await page.evaluateHandle(() => {
+      const transfer = new DataTransfer();
+      transfer.items.add(
+        new File(["category,budget\nrent,1200\ngroceries,450\n"], "budget.csv", {
+          type: "text/csv",
+        }),
+      );
+      return transfer;
+    });
+    const zone = dialog.locator("fieldset");
+    await zone.dispatchEvent("dragenter", { dataTransfer });
+    await expect(dialog.getByText("Drop to choose these files")).toBeVisible();
+    await zone.dispatchEvent("drop", { dataTransfer });
+    await expect(dialog.getByRole("progressbar", { name: "budget.csv" })).toBeVisible();
+    await dialog.getByRole("button", { name: "Upload", exact: true }).click();
+    // Stored, not yet a table: the refresh opens with it as a new table.
+    const refresh = page.getByRole("dialog", { name: `Refresh catalog: ${sourceName}` });
+    await expect(refresh.getByText("1 table added.").first()).toBeVisible();
+    await expect(refresh.getByText("new table", { exact: true })).toBeVisible();
+    await refresh.getByRole("button", { name: "Apply changes" }).click();
+    await expect(refresh).toBeHidden();
+    expect(existsSync(join(DUCKDB_DIR, uploaded, "budget.csv"))).toBe(true);
+    expect(existsSync(join(DUCKDB_DIR, uploaded, "household_expenses.csv"))).toBe(true);
+
+    const answer = await request.post("/api/query", {
+      data: {
+        sourceId,
+        sql: "SELECT category, budget FROM budget ORDER BY budget DESC",
+        timeRange: { from: "now-1h", to: "now" },
+      },
+    });
+    expect(answer.ok(), await answer.text()).toBe(true);
+    expect((await answer.json()).rows).toEqual([
+      { category: "rent", budget: 1200 },
+      { category: "groceries", budget: 450 },
+    ]);
   });
 
   const id = dashboardUrl.split("/").at(-1);

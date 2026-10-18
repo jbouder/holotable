@@ -39,6 +39,7 @@ import {
   sourceKindAvailability,
 } from "@/lib/sources/server/registry";
 import type { SourcePlan } from "@/lib/sources/server/types";
+import { summarizeCatalogDiff } from "@/lib/catalog/refresh";
 
 /**
  * The DuckDB kind end to end (#572), against the real binding: a directory
@@ -204,9 +205,12 @@ test("a DuckDB source names no secret_ref, and its listing names no path", () =>
     "name",
     "tableCount",
     "tombstonedAt",
+    "uploaded",
     "workspaceId",
   ]);
   assert.equal(listing.kind, "duckdb");
+  // Whether it was made by uploading (#604), never where it is.
+  assert.ok("uploaded" in listing && listing.uploaded === false);
   assert.ok("layout" in listing && listing.layout === "directory");
   assert.ok("engine" in listing && listing.engine === "DuckDB 1.5.6");
   const app = sourceListing(appSource());
@@ -510,6 +514,39 @@ test("Test opens, checks each table and reads the lock; refresh reports and neve
       assert.equal(requests?.columns.find((c) => c.name === "token")?.exposed, false);
     }
   }
+});
+
+test("an upload source's refresh offers the files added to it as new tables, for review (#604)", async () => {
+  const dir = join(root, "uploads", "ws", "00112233aabbccdd");
+  mkdirSync(dir, { recursive: true });
+  writeFileSync(join(dir, "january.csv"), "a\n1\n");
+  writeFileSync(join(dir, "february.csv"), "a,b\n2,x\n");
+  const source = record("upload", {
+    kind: "duckdb",
+    path: "uploads/ws/00112233aabbccdd",
+    tables: [{ name: "january", columns: [{ name: "a", type: "BIGINT" }] }],
+  });
+  const kind = serverKind(source);
+  const refresh = await kind.refresh(source);
+  assertNoPath(refresh);
+  assert.deepEqual(
+    refresh.config.kind === "duckdb" && refresh.config.tables.map((t) => t.name),
+    ["january", "february"],
+  );
+  const diff = kind.refreshDiff(source, refresh);
+  assert.ok("tables" in diff);
+  assert.deepEqual(diff.addedTables, ["february"]);
+  assert.equal(summarizeCatalogDiff(diff), "1 table added.");
+  // Applying stores exactly what was reviewed: the digest covers the new table.
+  assert.notEqual(
+    kind.refreshDigest(refresh),
+    kind.refreshDigest({ ...refresh, config: source.config }),
+  );
+  // Once applied, nothing more is offered.
+  const applied = { ...source, config: refresh.config };
+  const again = kind.refreshDiff(applied, await kind.refresh(applied));
+  assert.ok("tables" in again && again.addedTables === undefined);
+  await kind.dispose("upload");
 });
 
 test("a panel runs through the poller's executor, and the plan view names no path", async () => {
