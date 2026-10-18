@@ -47,7 +47,10 @@ Try it in one container, with demo data and no sign-in (or open the
 docker run -p 3000:3000 ghcr.io/jbouder/holotable:quickstart
 ```
 
-Then open <http://localhost:3000>. With Docker Compose instead (Keycloak, real
+Then open <http://localhost:3000>: you are its owner, so **Data sources → Add
+source → Upload files** takes a CSV straight away. Keep it on your own
+machine; everyone who can reach the port is signed in the same way. With
+Docker Compose instead (Keycloak, real
 sign-in as `demo` / `demo`, your own `.env`):
 
 ```bash

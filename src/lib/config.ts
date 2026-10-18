@@ -57,14 +57,35 @@ function str(name: string, fallback: string): string {
   return raw === undefined || raw === "" ? fallback : raw;
 }
 
-/** `AUTH_MODE` values. `oidc` is Keycloak, the default and the only real one. */
-export const AUTH_MODES = ["oidc", "demo"] as const;
+/**
+ * `AUTH_MODE` values. `oidc` is Keycloak, the default and the only real one.
+ * `demo` (a public demo, #251) and `local` (one person on their own machine,
+ * #600) mint a session without a login instead.
+ */
+export const AUTH_MODES = ["oidc", "demo", "local"] as const;
 export type AuthMode = (typeof AUTH_MODES)[number];
+
+/** The modes that mint their own sessions: no realm, no login screen. */
+export type MintingMode = Exclude<AuthMode, "oidc">;
+
+/**
+ * Whether a mode signs people in through a realm. False for `demo` and
+ * `local`, which mint a session on arrival: there is no callback, no renewal,
+ * no back-channel logout and no MCP client. Takes a raw string too, for the
+ * checks that read the environment before `config` exists; anything that is
+ * not a minting mode is `oidc`, so a typo fails closed.
+ */
+export function hasRealm(mode: string | undefined): boolean {
+  return mode !== "demo" && mode !== "local";
+}
 
 /** What a demo visitor is granted when `DEMO_GROUPS` is unset. */
 export const DEFAULT_DEMO_GROUPS = "/workspaces/demo/editor";
 
-/** `DEMO_GROUPS` as group paths: comma- or whitespace-separated. */
+/** What the local owner is granted when `LOCAL_GROUPS` is unset (#600). */
+export const DEFAULT_LOCAL_GROUPS = "/workspaces/local/source-admin";
+
+/** `DEMO_GROUPS` / `LOCAL_GROUPS` as group paths: comma- or whitespace-separated. */
 export function splitGroups(raw: string): string[] {
   return raw.split(/[\s,]+/).filter(Boolean);
 }
@@ -401,14 +422,18 @@ export const config = {
 
   /**
    * How people sign in (#251). `oidc` is Keycloak and the default. `demo` is
-   * for evaluation and the public demo only: `/api/auth/login` mints a session
-   * for every visitor with no login screen, holding {@link demoGroups}.
-   * Anything but the exact string `demo` is `oidc`, so a typo fails closed
-   * (and `validateConfig` refuses to boot on it). Server-only in practice:
-   * the browser bundle has no `AUTH_MODE` and always reads `oidc`, so a client
-   * component is handed the mode as a prop instead of reading it here.
+   * for the public demo only: `/api/auth/login` mints a session for every
+   * visitor with no login screen, holding {@link demoGroups}. `local` (#600)
+   * is one person on their own machine: the same route mints the one owner's
+   * session, holding {@link localGroups}. Anything but the exact string
+   * `demo` or `local` is `oidc`, so a typo fails closed (and `validateConfig`
+   * refuses to boot on it). Server-only in practice: the browser bundle has
+   * no `AUTH_MODE` and always reads `oidc`, so a client component is handed
+   * the mode as a prop instead of reading it here.
    */
-  authMode: (process.env.AUTH_MODE === "demo" ? "demo" : "oidc") as AuthMode,
+  authMode: (process.env.AUTH_MODE === "demo" || process.env.AUTH_MODE === "local"
+    ? process.env.AUTH_MODE
+    : "oidc") as AuthMode,
   /**
    * The named theme a browser shows before its person picks one (#503): a
    * built-in theme, or the one `THEME_FILE` loads (#508). A name the app does
@@ -428,6 +453,13 @@ export const config = {
    * refuses both. Ignored unless {@link authMode} is `demo`.
    */
   demoGroups: splitGroups(str("DEMO_GROUPS", DEFAULT_DEMO_GROUPS)),
+  /**
+   * The groups the local owner's session carries (#600), parsed like
+   * {@link demoGroups}. Source-admin is allowed, which is the point of the
+   * mode; platform admin is not, and a workspace role is required:
+   * `validateConfig` refuses both. Ignored unless {@link authMode} is `local`.
+   */
+  localGroups: splitGroups(str("LOCAL_GROUPS", DEFAULT_LOCAL_GROUPS)),
 
   /**
    * Realm claims carried from the id_token into the session (#31), for a
@@ -706,10 +738,12 @@ const EnvSchema = z.object({
 
   AUTH_MODE: blank(
     z.enum(AUTH_MODES, {
-      error: 'must be "oidc" (Keycloak, the default) or "demo" (evaluation only)',
+      error:
+        'must be "oidc" (Keycloak, the default), "demo" (a public demo) or "local" (one person on their own machine)',
     }),
   ),
   DEMO_GROUPS: blank(z.string()),
+  LOCAL_GROUPS: blank(z.string()),
   THEME_DEFAULT_PALETTE: blank(
     z
       .string()
@@ -825,6 +859,9 @@ export function validateConfig(
   // once (for its shape) rather than twice.
   const values: Partial<Env> = parsed.success ? parsed.data : partialParse(env);
   const demo = values.AUTH_MODE === "demo";
+  const local = values.AUTH_MODE === "local";
+  // Either mode that mints its own sessions (#600): no realm to configure.
+  const minting = demo || local;
 
   // --- Themes -------------------------------------------------------------
   // A default that is not built in must be the operator's own, which only
@@ -886,13 +923,10 @@ export function validateConfig(
   }
 
   // A session cookie without `Secure` can be read off any plain-HTTP hop. The
-  // quick-start image sets this on purpose and runs in demo mode, where there
-  // is nothing worth stealing; a real deployment should hear about it.
-  if (
-    production &&
-    values.SESSION_COOKIE_SECURE === "false" &&
-    values.AUTH_MODE !== "demo"
-  ) {
+  // quick-start image sets this on purpose and runs in local mode (the hosted
+  // demo in demo mode), where there is no login to steal; a real deployment
+  // should hear about it.
+  if (production && values.SESSION_COOKIE_SECURE === "false" && !minting) {
     warning(
       "SESSION_COOKIE_SECURE",
       "is false; session cookies will be sent over plain HTTP. Serve the app over HTTPS and leave it unset.",
@@ -991,10 +1025,10 @@ export function validateConfig(
   }
 
   // --- AI provider --------------------------------------------------------
-  // In demo mode the model is optional: the seeded dashboards, the viewer and
-  // the SQL editor need no key, and the generate and chat pages say
+  // In demo and local mode the model is optional: the seeded dashboards, the
+  // viewer and the SQL editor need no key, and the generate and chat pages say
   // what is missing instead of failing a request (src/lib/ai/configured.ts).
-  const aiMissing = demo ? warning : missing;
+  const aiMissing = minting ? warning : missing;
   const provider = values.AI_PROVIDER ?? "openai-compatible";
   // With AI_MODELS_FILE (#440) the server's models come from the file, which
   // `src/lib/startup.ts` reads and checks; the legacy variables are then
@@ -1118,6 +1152,39 @@ export function validateConfig(
     warning("DEMO_GROUPS", "is set but ignored unless AUTH_MODE=demo.");
   }
 
+  // --- Local mode ---------------------------------------------------------
+  // One person on their own machine (#600): every request without a session
+  // is signed in as the one owner, holding LOCAL_GROUPS. Source-admin is the
+  // point (adding a source, uploading files), so it is allowed here where demo
+  // mode refuses it; what keeps the mode fenced is that it never shares a
+  // deployment with a realm, never reaches platform admin, and the banner and
+  // the docs say that everyone who can reach the server is its owner.
+  if (local) {
+    for (const variable of oidcVariables) {
+      if (env[variable]) {
+        error(
+          variable,
+          "is set while AUTH_MODE is local. Local mode signs in everyone who can reach the server as its owner, without a login, and must never run beside a real identity provider; unset it, or set AUTH_MODE=oidc.",
+        );
+      }
+    }
+    const groups = splitGroups(values.LOCAL_GROUPS ?? DEFAULT_LOCAL_GROUPS);
+    const identity = parseGroups("local", groups);
+    if (identity.platformAdmin || groups.includes(PLATFORM_ADMIN_GROUP)) {
+      error(
+        "LOCAL_GROUPS",
+        `contains ${PLATFORM_ADMIN_GROUP}; the local owner is never a platform admin. Grant /workspaces/<id>/source-admin, editor or viewer.`,
+      );
+    } else if (Object.keys(identity.workspaces).length === 0) {
+      error(
+        "LOCAL_GROUPS",
+        "grants no workspace role, so the local owner would see an empty app. Use paths like /workspaces/local/source-admin.",
+      );
+    }
+  } else if (env.LOCAL_GROUPS) {
+    warning("LOCAL_GROUPS", "is set but ignored unless AUTH_MODE=local.");
+  }
+
   // --- Row-filter claims (#31) ---------------------------------------------
   // Each name is written back into the first-party session token beside the
   // claims it already uses, so one of those names would overwrite them.
@@ -1154,11 +1221,11 @@ export function validateConfig(
   }
 
   // --- OIDC ---------------------------------------------------------------
-  // Keycloak is the only way to sign in outside demo mode, so in production
-  // the confidential client must be configured completely.
+  // Keycloak is the only way to sign in outside demo and local mode, so in
+  // production the confidential client must be configured completely.
   // OIDC_REDIRECT_URI is optional: it is derived from the request origin when
-  // unset. Demo mode has no realm, and the block above refuses one.
-  const oidcRequired: Array<[keyof Env, string]> = demo
+  // unset. Demo and local mode have no realm, and the blocks above refuse one.
+  const oidcRequired: Array<[keyof Env, string]> = minting
     ? []
     : [
         ["OIDC_ISSUER", "the realm URL; login and token verification both need it"],
@@ -1197,7 +1264,7 @@ export function validateConfig(
   // by `aud` and `azp`. The same id for both would make every browser sign-in's
   // access token a valid MCP credential, and the public client's tokens valid
   // wherever the confidential client's are checked by audience.
-  if (!demo && values.OIDC_MCP_CLIENT_ID) {
+  if (!minting && values.OIDC_MCP_CLIENT_ID) {
     if (values.OIDC_MCP_CLIENT_ID === values.OIDC_CLIENT_ID) {
       error(
         "OIDC_MCP_CLIENT_ID",

@@ -5,9 +5,13 @@
 #      which runs initdb and /docker-entrypoint-initdb.d only on an empty
 #      data directory, so a mounted volume boots straight to step 2.
 #   2. scripts/migrate.ts         applies pending migrations, idempotent
-#   3. scripts/seed.ts            demo sources and dashboards, SEED_BACKFILL
-#                                 history, then the live loop (background)
-#   4. node server.js             the app, AUTH_MODE=demo (background)
+#   3. scripts/seed.ts            demo sources and dashboards in the local
+#                                 owner's workspace (the demo's, under
+#                                 AUTH_MODE=demo), the files demo under
+#                                 DUCKDB_SOURCES_DIR, SEED_BACKFILL history,
+#                                 then the live loop (background)
+#   4. node server.js             the app, AUTH_MODE=local unless set
+#                                 (background)
 #   5. scripts/self-metrics.ts    once /api/ready answers (background)
 #
 # On SIGTERM or SIGINT it stops the server first, which drains on its own
@@ -64,6 +68,9 @@ if [ -z "${METRICS_TOKEN:-}" ]; then
 fi
 if [ -z "${AI_MODEL:-}" ] && [ -z "${AI_MODELS_FILE:-}" ]; then
   log "No model configured: the dashboards, the live viewer and the SQL editor work; generation, Explore and chat are off. Pass -e AI_MODEL=... -e OPENAI_API_KEY=... (or mount a models file and pass -e AI_MODELS_FILE=...) to turn them on."
+fi
+if [ "${AUTH_MODE:-}" = "local" ]; then
+  log "AUTH_MODE=local: everyone who can reach this container's port is signed in as its owner and can manage its sources. Publish it on localhost only (-p 127.0.0.1:3000:3000) on a shared network."
 fi
 
 # --- 1. postgres -----------------------------------------------------------

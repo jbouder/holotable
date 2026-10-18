@@ -194,13 +194,16 @@ a warning with its error code.
 | `ghcr.io/jbouder/holotable` (production) | `node:24-bookworm-slim` | glibc, `linux-x64` and `linux-arm64` |
 | `ghcr.io/jbouder/holotable:quickstart` | Alpine | musl, `linux-x64` and `linux-arm64` |
 
-Both load it. **The quick-start image ships no sample files** and sets no
-`DUCKDB_SOURCES_DIR`, so its DuckDB and Upload files cards are hidden (and
-its demo sign-in, at most an editor, could not manage a source anyway). To try a DuckDB source
-there, mount a directory and name it:
-`docker run -v "$PWD/files:/files:ro" -e DUCKDB_SOURCES_DIR=/files …`. The
-Docker Compose stack has a [files demo](/operations/demo-data/#the-files-demo)
-with a seeded source and dashboard.
+Both load it. **The quick-start image** sets
+`DUCKDB_SOURCES_DIR=/var/lib/holotable/files`, writable by its app user, and
+runs in [local mode](/admin/demo-mode/#local-mode), whose owner is a source
+admin, so **Upload files** works out of the box and the seeder writes the
+[files demo](/operations/demo-data/#the-files-demo) under `demo/`. Keep uploads
+across runs with a volume at the root
+(`-v holotable-files:/var/lib/holotable/files`). To read a directory of your
+own as well, mount it read-only *under* the root, where the path picker offers
+it beside the files demo:
+`docker run -v "$PWD/files:/var/lib/holotable/files/mine:ro" …`.
 
 ## What is out of scope
 

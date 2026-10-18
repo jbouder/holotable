@@ -1092,9 +1092,22 @@ const VALID_DEMO: Environment = {
   SESSION_SECRET: "k3Jd9sLq2mZx8vBn4tRw7yUa1cFe6hGp0oIiPlKj",
 };
 
-test("AUTH_MODE accepts only oidc or demo", () => {
-  for (const value of ["oidc", "demo", ""]) {
-    const env = value === "demo" ? VALID_DEMO : { ...VALID_PRODUCTION, AUTH_MODE: value };
+/** The quick-start image's shape (#600): local mode, no realm, no model. */
+const VALID_LOCAL: Environment = {
+  AUTH_MODE: "local",
+  SOURCE_SECRET_REFS: "TS_METRICS:local",
+  DATABASE_URL: "postgresql://holotable:pw@db.internal:5432/holotable",
+  SESSION_SECRET: "k3Jd9sLq2mZx8vBn4tRw7yUa1cFe6hGp0oIiPlKj",
+};
+
+test("AUTH_MODE accepts only oidc, demo or local", () => {
+  for (const value of ["oidc", "demo", "local", ""]) {
+    const env =
+      value === "demo"
+        ? VALID_DEMO
+        : value === "local"
+          ? VALID_LOCAL
+          : { ...VALID_PRODUCTION, AUTH_MODE: value };
     assert.deepEqual(errors(validateConfig(env, { production: true })), [], value);
   }
   const bad = validateConfig(
@@ -1102,7 +1115,7 @@ test("AUTH_MODE accepts only oidc or demo", () => {
     { production: true },
   );
   assert.deepEqual(variables(errors(bad)), ["AUTH_MODE"]);
-  assert.match(bad[0].message, /"oidc".*"demo"/);
+  assert.match(bad[0].message, /"oidc".*"demo".*"local"/);
 });
 
 test("demo mode in production needs no realm and boots with the model as a warning", () => {
@@ -1206,6 +1219,134 @@ test("DEMO_GROUPS outside demo mode is ignored with a warning", () => {
   assert.deepEqual(errors(problems), []);
   assert.deepEqual(variables(warnings(problems)), ["DEMO_GROUPS"]);
   assert.match(warnings(problems)[0].message, /ignored unless AUTH_MODE=demo/);
+});
+
+/* -------------------------------------------------------------------------- */
+/* AUTH_MODE=local (#600)                                                      */
+/* -------------------------------------------------------------------------- */
+
+test("local mode in production needs no realm and boots with the model as a warning", () => {
+  const problems = validateConfig(VALID_LOCAL, { production: true });
+  assert.deepEqual(errors(problems), []);
+  assert.deepEqual(variables(warnings(problems)).sort(), ["AI_MODEL", "OPENAI_API_KEY"]);
+  // The quick-start image serves plain HTTP on purpose; no warning for it here.
+  assert.deepEqual(
+    validateConfig(
+      { ...VALID_LOCAL, SESSION_COOKIE_SECURE: "false" },
+      { production: true },
+    )
+      .map((p) => p.variable)
+      .filter((v) => v === "SESSION_COOKIE_SECURE"),
+    [],
+  );
+});
+
+test("local mode beside any OIDC variable refuses to boot, naming both", () => {
+  for (const variable of [
+    "OIDC_ISSUER",
+    "OIDC_CLIENT_ID",
+    "OIDC_CLIENT_SECRET",
+    "OIDC_JWKS_URL",
+    "OIDC_MCP_CLIENT_ID",
+  ]) {
+    for (const production of [true, false]) {
+      const problems = validateConfig(
+        { ...VALID_LOCAL, [variable]: VALID_PRODUCTION[variable] ?? "holotable-mcp" },
+        { production },
+      );
+      const errs = errors(problems).filter((p) => p.variable === variable);
+      assert.equal(errs.length, 1, `${variable} production=${production}`);
+      assert.match(errs[0].message, /AUTH_MODE is local/);
+    }
+  }
+});
+
+test("LOCAL_GROUPS may never reach platform admin", () => {
+  for (const groups of [
+    "/platform-admins",
+    "platform-admins",
+    "/workspaces/local/source-admin /platform-admins",
+  ]) {
+    for (const production of [true, false]) {
+      const problems = validateConfig(
+        { ...VALID_LOCAL, LOCAL_GROUPS: groups },
+        { production },
+      );
+      assert.ok(
+        variables(errors(problems)).includes("LOCAL_GROUPS"),
+        `${groups} production=${production}`,
+      );
+    }
+  }
+});
+
+test("LOCAL_GROUPS that grant no workspace are an error", () => {
+  const problems = validateConfig(
+    { ...VALID_LOCAL, LOCAL_GROUPS: "/workspaces/local/owner,/teams/x" },
+    { production: true },
+  );
+  assert.ok(variables(errors(problems)).includes("LOCAL_GROUPS"));
+});
+
+test("source-admin LOCAL_GROUPS, the default, are accepted, as are lesser roles", () => {
+  for (const groups of [
+    undefined,
+    "/workspaces/local/source-admin",
+    "/workspaces/local/source-admin, /workspaces/sandbox/editor",
+    "/workspaces/local/viewer",
+  ]) {
+    const problems = validateConfig(
+      { ...VALID_LOCAL, LOCAL_GROUPS: groups },
+      { production: true },
+    );
+    assert.deepEqual(errors(problems), [], String(groups));
+  }
+});
+
+test("LOCAL_GROUPS outside local mode, and DEMO_GROUPS in it, are ignored with a warning", () => {
+  for (const env of [
+    { ...VALID_PRODUCTION, LOCAL_GROUPS: "/workspaces/local/source-admin" },
+    { ...VALID_DEMO, LOCAL_GROUPS: "/workspaces/local/source-admin" },
+  ]) {
+    const problems = validateConfig(env, { production: true });
+    assert.deepEqual(errors(problems), []);
+    const ignored = warnings(problems).filter((p) => p.variable === "LOCAL_GROUPS");
+    assert.equal(ignored.length, 1);
+    assert.match(ignored[0].message, /ignored unless AUTH_MODE=local/);
+  }
+  const demoGroups = warnings(
+    validateConfig(
+      { ...VALID_LOCAL, DEMO_GROUPS: "/workspaces/demo/editor" },
+      { production: true },
+    ),
+  ).filter((p) => p.variable === "DEMO_GROUPS");
+  assert.equal(demoGroups.length, 1);
+  assert.match(demoGroups[0].message, /ignored unless AUTH_MODE=demo/);
+});
+
+test("local mode's allowances never reach demo mode: source-admin DEMO_GROUPS stay an error", () => {
+  const problems = validateConfig(
+    { ...VALID_DEMO, DEMO_GROUPS: "/workspaces/local/source-admin" },
+    { production: true },
+  );
+  assert.ok(variables(errors(problems)).includes("DEMO_GROUPS"));
+});
+
+test("the quick-start image defaults to local mode, and the hosted demo says demo itself", () => {
+  // Both run the same image (#600). The image is for one person on their own
+  // machine; the public demo must never inherit that default, where every
+  // visitor would be a source-admin.
+  const dockerfile = readFileSync("deploy/quickstart/Dockerfile", "utf8");
+  // The ENV instruction's lines, not the comments that mention the demo.
+  const modes = [...dockerfile.matchAll(/^\s+AUTH_MODE=(\w+) \\$/gm)].map((m) => m[1]);
+  assert.deepEqual(modes, ["local"]);
+  assert.match(dockerfile, /\bDUCKDB_SOURCES_DIR=\/var\/lib\/holotable\/files\b/);
+
+  const worker = readFileSync("deploy/cloudflare/demo/src/worker.ts", "utf8");
+  const envVars = worker.slice(worker.indexOf("this.envVars"));
+  assert.match(envVars, /^\s*AUTH_MODE: "demo",$/m);
+  const smoke = readFileSync("deploy/cloudflare/demo/scripts/smoke.ts", "utf8");
+  assert.match(smoke, /startsWith\("demo:"\)/, "the demo's smoke proves the mode");
 });
 
 /* -------------------------------------------------------------------------- */

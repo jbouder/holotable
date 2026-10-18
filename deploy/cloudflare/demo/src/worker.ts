@@ -43,6 +43,12 @@ export class HolotableDemo extends Container<Env> {
     const optional = (value: string | undefined) => (value ? value : undefined);
     this.envVars = Object.fromEntries(
       Object.entries({
+        // The image defaults to AUTH_MODE=local (#600), where everyone who
+        // reaches it is its owner and may register sources. A public demo
+        // must be demo mode, whose visitors are at most editors, so it says
+        // so here rather than inheriting the image's default.
+        // test/config.test.ts in the app holds the two apart.
+        AUTH_MODE: "demo",
         // Sessions survive a wake when this is a stable secret; the image
         // generates one per boot when it is not.
         SESSION_SECRET: optional(env.SESSION_SECRET),

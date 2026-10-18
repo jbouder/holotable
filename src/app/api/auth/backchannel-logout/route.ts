@@ -3,7 +3,7 @@ import { verifyLogoutToken } from "@/lib/auth/backchannel";
 import { revoke } from "@/lib/auth/revocation";
 import { realmJwks } from "@/lib/auth/session";
 import { removeSessionsFor } from "@/lib/auth/session-store";
-import { config } from "@/lib/config";
+import { config, hasRealm } from "@/lib/config";
 import { route } from "@/lib/http";
 import { audit } from "@/lib/audit";
 import { log } from "@/lib/log";
@@ -30,13 +30,13 @@ const MAX_BODY_BYTES = 16 * 1024;
  * 400 to anything that fails it, and 200 once the revocation is in force,
  * even if the row delete then fails — a row left behind can only be renewed
  * by asking the realm, which has ended that session. A 404 when there is no
- * realm (demo mode, or OIDC not configured).
+ * realm (demo or local mode, or OIDC not configured).
  */
 export const POST = route("auth.backchannel_logout", async (req: Request) => {
   const keys = realmJwks();
   const issuer = process.env.OIDC_ISSUER;
   const clientId = process.env.OIDC_CLIENT_ID;
-  if (config.authMode === "demo" || !keys || !issuer || !clientId) {
+  if (!hasRealm(config.authMode) || !keys || !issuer || !clientId) {
     throw new HttpError(404, "not found");
   }
   // A logout token is addressed to one client; the realm sends one for the

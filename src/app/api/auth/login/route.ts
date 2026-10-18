@@ -1,7 +1,7 @@
 import { cookies } from "next/headers";
 import { buildAuthorizeUrl } from "@/lib/auth/oidc";
 import { newHandshake } from "@/lib/auth/sign-in";
-import { demoLogin } from "@/lib/auth/demo";
+import { mintedLogin } from "@/lib/auth/demo";
 import {
   clearSessionCookie,
   readSessionIdCookie,
@@ -12,7 +12,7 @@ import { safeNextPath } from "@/lib/auth/next-path";
 import { renewSession } from "@/lib/auth/renewal";
 import { renewalDeps } from "@/lib/auth/session-store";
 import { verifySessionToken } from "@/lib/auth/session";
-import { config } from "@/lib/config";
+import { config, type MintingMode } from "@/lib/config";
 import { route } from "@/lib/http";
 import { audit } from "@/lib/audit";
 
@@ -24,14 +24,15 @@ export const runtime = "nodejs";
  * renewed first (#27), exactly as `POST /api/auth/refresh` would, so a tab
  * that slept past its token comes straight back without a trip to the realm;
  * otherwise this starts the Keycloak OIDC flow. With `AUTH_MODE=demo` it
- * mints a demo visitor's session on the spot (#251).
+ * mints a demo visitor's session on the spot (#251), and with
+ * `AUTH_MODE=local` the local owner's (#600).
  *
  * A GET, unlike refresh, because the proxy sends page requests here. A
  * cross-site link that lands here can only renew, or start, the visitor's
  * own session, never anyone else's.
  */
 export const GET = route("auth.login", async (req: Request) => {
-  if (config.authMode === "demo") return demoSession(req);
+  if (config.authMode !== "oidc") return mintedSession(req, config.authMode);
 
   const next = safeNextPath(new URL(req.url).searchParams.get("next"));
   if (await resumed()) return redirectTo(next);
@@ -85,12 +86,13 @@ function redirectTo(location: string): Response {
   });
 }
 
-async function demoSession(req: Request): Promise<Response> {
+async function mintedSession(req: Request, mode: MintingMode): Promise<Response> {
   const store = await cookies();
-  const { location, session } = await demoLogin(
+  const { location, session } = await mintedLogin(
+    mode,
     new URL(req.url).searchParams.get("next"),
     store.get(config.sessionCookieName)?.value,
-    config.demoGroups,
+    mode === "local" ? config.localGroups : config.demoGroups,
   );
   if (session) {
     await setSessionCookie(session);
@@ -102,7 +104,7 @@ async function demoSession(req: Request): Promise<Response> {
         actor: identity,
         action: "auth.login",
         workspaceId: null,
-        detail: { mode: "demo" },
+        detail: { mode },
       });
     }
   }

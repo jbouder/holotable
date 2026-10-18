@@ -7,7 +7,7 @@ import {
 } from "@/lib/auth/cookie";
 import { renewSession } from "@/lib/auth/renewal";
 import { renewalDeps } from "@/lib/auth/session-store";
-import { config } from "@/lib/config";
+import { config, hasRealm } from "@/lib/config";
 import { json, route } from "@/lib/http";
 
 export const runtime = "nodejs";
@@ -29,10 +29,10 @@ export const runtime = "nodejs";
  *
  * POST, so a cross-site page cannot trigger it with the cookies attached
  * (`SameSite=Lax`); and if one could, it would only renew the victim's own
- * session. A 404 in demo mode, where there is no realm to ask.
+ * session. A 404 in demo and local mode, where there is no realm to ask.
  */
 export const POST = route("auth.refresh", async () => {
-  if (config.authMode === "demo") throw new HttpError(404, "not found");
+  if (!hasRealm(config.authMode)) throw new HttpError(404, "not found");
 
   const sessionId = await readSessionIdCookie();
   if (!sessionId) throw new HttpError(401, "no renewable session");

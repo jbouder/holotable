@@ -100,12 +100,22 @@ export function roleGuide(): { role: WorkspaceRole; label: string; allows: strin
 /**
  * Where this person's profile and roles come from, in words, for the account
  * page. In demo mode (#251) there is no identity provider and no account: the
- * session was minted on arrival, and every visitor holds the same role.
+ * session was minted on arrival, and every visitor holds the same role. In
+ * local mode (#600) there is none either: the server signs in everyone who
+ * reaches it as its one owner.
  */
 export function accountOrigin(
   mode: AuthMode,
   accountUrl: string,
 ): { profile: string; roles: string } {
+  if (mode === "local") {
+    return {
+      profile:
+        "You are this server's owner. There is no account behind this session: the server signed you in when you arrived, as it does everyone who can reach it, and your settings, favorites and chats stay with this server.",
+      roles:
+        "Your role is set by the server, not by an identity provider. Change it with LOCAL_GROUPS and a restart.",
+    };
+  }
   if (mode === "demo") {
     return {
       profile:

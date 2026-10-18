@@ -142,7 +142,7 @@ export interface ModelResolutionDeps {
   store: ModelStore;
   /** Absent: nothing is remembered (tests, scripts). */
   picks?: ModelPicks;
-  /** `AUTH_MODE=demo` turns both in-app levels off. */
+  /** `AUTH_MODE=demo` turns both in-app levels off; local mode (#600) keeps them, for its one owner. */
   demo: boolean;
   env: Environment;
   allowlist: BaseUrlAllowlist;

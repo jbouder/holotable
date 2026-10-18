@@ -13,7 +13,11 @@ Loki to ask.
 
 It registers five demo sources and their demo dashboards in the `demo`
 workspace, if they do not already exist (the fifth only when
-`PROMETHEUS_SELF_URL` is set). Four are TimescaleDB sources that point
+`PROMETHEUS_SELF_URL` is set). Under `AUTH_MODE=local` they go to the local
+owner's workspace instead, the first `LOCAL_GROUPS` names (`local` by
+default), so the [quick start](/getting-started/quick-start/) opens on them
+([local mode](/admin/demo-mode/#local-mode)); the smoke test reads the same
+workspace. Four are TimescaleDB sources that point
 at the `metrics` schema and share the read-only `TS_METRICS` secret reference;
 they differ only in the tables they expose. The fifth is a Prometheus source:
 the compose stack's own Prometheus, which scrapes the app. A sixth, the
@@ -129,7 +133,7 @@ database.
 | `SEED_BACKFILL` | — | History to write before streaming: `30m`, `6h`, `1d`, at most `7d`. Unset writes none. An invalid value exits 1. |
 | `TS_METRICS_HOST` / `TS_METRICS_PORT` | `localhost` / `5432` | Host and port written into the seeded source configs. |
 | `POSTGRES_DB` | `holotable` | Database name written into the seeded source configs. |
-| `PROMETHEUS_SELF_URL` | — | Where the seeded `prometheus-self` source asks: `http://prometheus:9090` in compose, `http://localhost:9090` in `.env.example`. Unset, the Prometheus source and its dashboard are not seeded, as in the quick-start image. The app reaches it only if `SOURCE_URL_ALLOWLIST` names its host. |
+| `PROMETHEUS_SELF_URL` | — | Where the seeded `prometheus-self` source asks: `http://prometheus:9090` in compose, `http://localhost:9090` in `.env.example`. Unset, the Prometheus source and its dashboard are not seeded, as in the quick-start image. The app reaches it only if `SOURCE_URL_ALLOWLIST` names its host. Smoke test too: set, it checks the PromQL self-monitoring dashboard; unset, it skips it. |
 | `LOKI_SELF_URL` | — | Where the seeded `loki-self` source asks, once it answers: `http://loki:3100` in compose, `http://localhost:3100` in `.env.example`. Unset, the Loki source and the Holotable logs dashboard are not seeded, as in the quick-start image. Smoke test too: set, it checks the Holotable logs dashboard; empty, it skips it. |
 | `SELF_METRICS_INTERVAL_MS` | `15000` | Collector only: delay between scrapes of `/api/metrics`. |
 | `METRICS_URL` | `http://app:3000/api/metrics` | Collector only: what to scrape. |
@@ -300,9 +304,9 @@ HTTP and session layer above those functions: reaching
 
 With `DUCKDB_SOURCES_DIR` set, the seeder also shows a
 [DuckDB source](/concepts/duckdb-sources/): data that lives in files rather
-than in a database. Docker Compose sets it, and the quick-start image, which
-ships no sample files, does not. Before anything else, the seeder writes three
-files under `<DUCKDB_SOURCES_DIR>/demo/` with the binding itself
+than in a database. Docker Compose and the quick-start image set it
+([#600](https://github.com/jbouder/holotable/issues/600)). Before anything
+else, the seeder writes three files under `<DUCKDB_SOURCES_DIR>/demo/` with the binding itself
 (`scripts/lib/demo-files.ts`), so nothing binary is ever committed:
 
 | File | Table | What it holds |

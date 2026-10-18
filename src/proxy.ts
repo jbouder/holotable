@@ -2,7 +2,7 @@ import { type NextRequest, NextResponse } from "next/server";
 import { embedAppearance, embedAppearanceHeader } from "@/lib/embed-appearance";
 import { operatorTheme } from "@/lib/operator-theme";
 import { publicOrigin } from "@/lib/auth/origin";
-import { config as appConfig } from "@/lib/config";
+import { config as appConfig, hasRealm } from "@/lib/config";
 import { shareFrameAncestors, verifyShareToken } from "@/lib/auth/share";
 import {
   contentSecurityPolicy,
@@ -34,8 +34,8 @@ import {
  * A page request with no session cookie is sent to
  * `/api/auth/login?next=<path>` first, so nobody stops at a sign-in card on
  * the way in. With a realm, that route renews a session that has only
- * expired, else goes to Keycloak, and comes back to `next`; in demo mode
- * (#251) it mints a session and comes straight back. The card is still what
+ * expired, else goes to Keycloak, and comes back to `next`; in demo or local
+ * mode (#251, #600) it mints a session and comes straight back. The card is still what
  * an expired or invalid cookie gets, and what someone who just signed out
  * gets (the signed-out cookie): the realm's own session would otherwise sign
  * them straight back in. Cookie *presence* only: nothing is verified here,
@@ -111,7 +111,7 @@ function requestOrigin(request: NextRequest): string {
 
 /**
  * A browser navigation with no session cookie, from someone who has not just
- * signed out (with a realm; a demo visitor has nothing to sign out of).
+ * signed out (with a realm; a demo visitor or the local owner has nothing to sign out of).
  *
  * Only a navigation is redirected: a browser keeps the cookie the login route
  * sets and comes straight back, while a cookie-less client (a health check,
@@ -125,7 +125,7 @@ function needsSession(request: NextRequest): boolean {
   if (request.method !== "GET") return false;
   if (request.cookies.has(appConfig.sessionCookieName)) return false;
   if (
-    appConfig.authMode !== "demo" &&
+    hasRealm(appConfig.authMode) &&
     request.cookies.has(appConfig.signedOutCookieName)
   ) {
     return false;

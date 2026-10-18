@@ -8,8 +8,8 @@ sidebar:
 Three steps, from trying Holotable to running it: **`docker run`** to evaluate,
 **Docker Compose** to integrate, **Helm** for production. Or skip all three:
 the [public demo](https://holotable-demo.vibeproject.workers.dev) runs the same
-image as step 1, reset whenever it sleeps
-([Hosted demo](/operations/cloudflare-demo/)).
+image as step 1 in [demo mode](/admin/demo-mode/#demo-mode), reset whenever it
+sleeps ([Hosted demo](/operations/cloudflare-demo/)).
 
 ## 1. Evaluate with `docker run`
 
@@ -17,41 +17,50 @@ image as step 1, reset whenever it sleeps
 docker run -p 3000:3000 ghcr.io/jbouder/holotable:quickstart
 ```
 
-Open `http://localhost:3000`. One container holds TimescaleDB, the app, the
-demo seeder and the self-monitoring collector. It needs no `.env`, no Keycloak
-and no key. It signs every visitor in with [demo mode](/admin/demo-mode/)
-and writes six hours of demo history before streaming, so the seeded dashboards
-are full within seconds.
+Open `http://localhost:3000`. There is no login: the image runs in [local
+mode](/admin/demo-mode/#local-mode), which signs you in as the server's owner,
+a source admin of one workspace, `local`. Bring your own data first:
+
+1. Open **Data sources**, choose **Add source**, then **or enter
+   configuration manually** and **Upload files**.
+2. Pick a CSV file, or **Try the sample** (a household-expenses file the app
+   ships), then **Upload**. Its table is discovered for you; check it and
+   **Create source**.
+3. Ask for a dashboard over it on **New dashboard**, once a model is
+   configured (below), or write a panel's SQL yourself in the editor.
+
+One container holds TimescaleDB, the app, the demo seeder and the
+self-monitoring collector. It needs no `.env`, no Keycloak and no key. The
+seeder writes six hours of demo history before streaming, so the seeded
+dashboards (the service health demo, the self-monitoring dashboard and the
+**Demo files** dashboard over Parquet and CSV files) are full within seconds.
 
 | Option | Effect |
 | --- | --- |
-| `-e AI_MODEL=… -e OPENAI_API_KEY=…` (and `OPENAI_BASE_URL`, `OPENAI_API`) | Turns on generation and chat. Without them those pages say what to set. |
-| `-e SESSION_SECRET=<32+ random characters>` | Keeps sessions across restarts. Unset, one is generated per run. |
-| `-v holotable-data:/var/lib/postgresql/data` | Keeps the data. A restart fills only the history it missed. |
+| `-e AI_MODEL=… -e OPENAI_API_KEY=…` (and `OPENAI_BASE_URL`, `OPENAI_API`) | Turns on generation and chat. Without them those pages say what to set; you can also add a model on the **Models** page. |
+| `-v holotable-data:/var/lib/postgresql/data` | Keeps the data: dashboards, sources, and your favorites and chats. A restart fills only the history it missed. |
+| `-v holotable-files:/var/lib/holotable/files` | Keeps uploaded files across runs. Without it an upload's source outlives its files. |
+| `-v "$PWD/files:/var/lib/holotable/files/mine:ro"` | Reads a directory of your own as well: the DuckDB path picker offers `mine` beside the files demo ([DuckDB files](/admin/duckdb/)). |
+| `-e SESSION_SECRET=<32+ random characters>` | Keeps your session across restarts. Unset, one is generated per run, and a restart signs you in again without a word; nothing you saved is lost. |
 | `-e SEED_BACKFILL=1d` | More or less history on a fresh start, at most `7d`. |
 
 `docker stop` shuts it down cleanly within Docker's default ten seconds. The
 image follows `main`; `ghcr.io/jbouder/holotable:<version>-quickstart` pins a
 release.
 
-The quick-start image has no Prometheus and no Loki, so it shows the three SQL
-demo sources only. The [Prometheus self-monitoring
+The quick-start image has no Prometheus and no Loki, so it shows the SQL and
+DuckDB demo sources only. The [Prometheus self-monitoring
 dashboard](/operations/demo-data/#the-prometheus-twin) and a Prometheus
 source to try PromQL against come with Docker Compose, below, and the
 [Holotable logs dashboard](/operations/demo-data/#the-logs-profile) and a Loki
 source to try LogQL against with its `logs` profile.
 
-It ships no sample files either, and sets no `DUCKDB_SOURCES_DIR`, so its
-DuckDB and **Upload files** cards are hidden. (Uploading needs a source
-admin, and a demo sign-in is at most an editor.) The [files demo](/operations/demo-data/#the-files-demo),
-a **Demo files** dashboard over Parquet and CSV files, comes with Docker
-Compose. To try a DuckDB source here, mount a directory of your own and name
-it: `-v "$PWD/files:/files:ro" -e DUCKDB_SOURCES_DIR=/files`
-([DuckDB files](/admin/duckdb/)).
-
-:::caution
-Everyone who can reach this container is signed in to the same demo workspace.
-It is for trying Holotable, never for real data or credentials.
+:::danger
+Everyone who can reach this container is signed in as its owner and can manage
+its sources, including registering one that points at any host the container
+can reach. Keep it on your own machine: on a shared network, publish the port
+on localhost alone (`-p 127.0.0.1:3000:3000`). It is for trying Holotable,
+never for real credentials.
 :::
 
 ## 2. Integrate with Docker Compose
@@ -122,7 +131,7 @@ docker compose up -d postgres seed # TimescaleDB, migrations, demo data
 npm run dev:demo                   # http://localhost:3000, demo sign-in
 ```
 
-`npm run dev:demo` is `npm run dev` in [demo mode](/admin/demo-mode/), with
+`npm run dev:demo` is `npm run dev` in [demo mode](/admin/demo-mode/#demo-mode), with
 the Keycloak variables blanked for that run. Work on sign-in or authorization
 runs `npm run dev` against the Compose realm instead.
 

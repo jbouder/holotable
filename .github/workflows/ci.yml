@@ -411,15 +411,15 @@ jobs:
           cache-from: type=gha
 
       # The all-in-one quick-start image (#253): TimescaleDB, the server and
-      # the demo jobs, built on Alpine from its own Dockerfile. Built, never
-      # run here; the boot is verified by hand and recorded in its PR.
+      # the demo jobs, built on Alpine from its own Dockerfile. Loaded, so the
+      # step after the compose smoke can run it exactly as `docker run` does.
       - name: Build quick-start image
         uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
         with:
           context: .
           file: deploy/quickstart/Dockerfile
           push: false
-          load: false
+          load: true
           tags: ${{ env.IMAGE }}:${{ env.TAG }}-quickstart
           cache-from: type=gha,scope=quickstart
           cache-to: type=gha,scope=quickstart,mode=max
@@ -473,6 +473,30 @@ jobs:
       - name: Logs
         if: failure()
         run: docker compose --profile logs logs --no-color --tail 200
+
+      # The quick-start image with no flags at all (#600), as the docs tell
+      # people to run it: local mode, so the visitor is the owner and can
+      # upload. Its seeded dashboards answer through `npm run smoke` run
+      # inside it, and smoke-quickstart walks the upload journey over HTTP:
+      # sign in, upload the sample CSV, create a source and a dashboard over
+      # it, query it. The compose stack is down first, for the port.
+      - name: Quick-start image
+        run: |
+          docker compose --profile logs down --volumes --remove-orphans
+          docker run -d --name quickstart -p 3000:3000 "${IMAGE}:${TAG}-quickstart"
+          for _ in $(seq 1 90); do
+            status="$(docker inspect -f '{{.State.Health.Status}}' quickstart)"
+            [ "$status" = healthy ] && break
+            [ "$(docker inspect -f '{{.State.Running}}' quickstart)" = true ] || break
+            sleep 2
+          done
+          docker inspect -f '{{.State.Health.Status}}' quickstart | grep -qx healthy
+          docker exec -e SMOKE_TIMEOUT_MS=240000 quickstart node node_modules/.bin/tsx scripts/smoke.ts
+          docker exec quickstart node node_modules/.bin/tsx scripts/smoke-quickstart.ts
+
+      - name: Quick-start logs
+        if: failure()
+        run: docker logs --tail 200 quickstart || true
 
       - name: Tear down
         if: always()

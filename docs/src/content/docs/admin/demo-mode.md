@@ -1,13 +1,29 @@
 ---
-title: Demo mode
-description: AUTH_MODE=demo gives every visitor a session with no login, for evaluating Holotable and for public demos.
+title: Demo and local mode
+description: AUTH_MODE=demo gives every visitor a session with no login, for public demos; AUTH_MODE=local signs in one owner, for running Holotable on your own machine.
 sidebar:
   order: 1
 ---
 
-Holotable signs people in through Keycloak, and that does not change. Demo mode
-is the one exception. It exists for two cases where a login screen is in the
-way: trying Holotable on your own machine, and running a public demo.
+Holotable signs people in through Keycloak, and that does not change. Two
+modes are the exception, one for each case where a login screen is in the way:
+
+- **Demo mode** (`AUTH_MODE=demo`), for running a public demo. Every visitor is
+  a stranger, gets a session of their own, and is at most an editor.
+- **Local mode** (`AUTH_MODE=local`), for trying Holotable on your own machine.
+  Whoever reaches the server is its one owner, and may add sources and upload
+  files. The [quick-start image](/getting-started/quick-start/) runs in it.
+
+Both change how a session is *created*, never how one is *checked*. Session
+verification, group parsing and the `can()` authorization check are the same
+code in every mode. A page request with no session cookie is redirected to
+`/api/auth/login`, which in either mode mints an ordinary first-party session
+on the spot and sends the browser back to the page it asked for. There is no
+login screen. The OIDC callback, session renewal and back-channel logout
+answer 404, and the [MCP endpoint](/integrations/mcp/) stays closed. Signing
+out clears the cookie, and the next page load mints a new session.
+
+## Demo mode
 
 ```bash
 AUTH_MODE=demo
@@ -21,14 +37,10 @@ is a member of the `DEMO_GROUPS` workspaces. It sits outside the
 [trust model](https://github.com/jbouder/holotable/blob/main/SECURITY.md).
 :::
 
-## What a visitor gets
+### What a visitor gets
 
-1. A page request with no session cookie is redirected to `/api/auth/login`.
-2. In demo mode that route mints a session on the spot and sends the browser
-   back to the page it asked for. There is no login screen.
-3. The session is an ordinary first-party session token. It names a fresh
-   subject, `demo:<random>`, holds the `DEMO_GROUPS` groups, and lasts eight
-   hours.
+A demo session names a fresh subject, `demo:<random>`, holds the
+`DEMO_GROUPS` groups, and lasts eight hours.
 
 Every visitor gets their own subject. Preferences, favorites, chat history and
 the per-person model rate limit are therefore per visitor. Dashboards belong to
@@ -36,15 +48,9 @@ the workspace, so every visitor sees and edits the same ones. That is the point
 of a shared demo, and a banner at the top of every page says so. A visitor can
 dismiss it, and the dismissal is kept in their browser.
 
-The OIDC callback answers 404 in demo mode. Signing out clears the cookie, and
-the next page load mints a new visitor.
+### The guards
 
-## The guards
-
-The exception is in how a session is *created*, never in how one is
-*checked*. Session verification, group parsing and the `can()` authorization
-check are the same code in both modes. What keeps demo mode fenced is a set of
-startup checks. Each is an error, so the server refuses to boot:
+Each is an error, so the server refuses to boot:
 
 | Configuration | Why it is refused |
 | --- | --- |
@@ -57,13 +63,69 @@ startup checks. Each is an error, so the server refuses to boot:
 production. `DEMO_GROUPS` set without `AUTH_MODE=demo` is ignored with a
 warning.
 
+The [hosted demo](/operations/cloudflare-demo/) runs the quick-start image,
+whose default is local mode, so it sets `AUTH_MODE=demo` itself, and its
+smoke test checks that a visitor is a `demo:` subject with no source-admin
+role.
+
+## Local mode
+
+```bash
+AUTH_MODE=local
+LOCAL_GROUPS=/workspaces/local/source-admin   # the default
+```
+
+:::danger
+Run local mode only on a machine, and a port, that nobody else can reach.
+Everyone who can reach the server is signed in as its owner, with the
+`LOCAL_GROUPS` roles: they can see everything in its workspace, register a
+source pointing at any host the server can reach, and upload files to it. The
+server cannot tell whether it is reachable from elsewhere; publish the port on
+`127.0.0.1` alone (`-p 127.0.0.1:3000:3000`) on a shared network. Never give it
+a real credential. Like demo mode, it sits outside the
+[trust model](https://github.com/jbouder/holotable/blob/main/SECURITY.md).
+:::
+
+### What the owner gets
+
+Every local session names the same subject, `local:owner`, shown as **Local
+owner** on the account page and in the [audit log](/operations/audit-log/). It
+holds the `LOCAL_GROUPS` groups and lasts eight hours; a session that has
+expired is replaced without a word on the next page load. Preferences,
+favorites and chat history belong to that one subject, so they survive sessions
+and restarts as long as the database does (the quick start's data volume).
+
+With the default groups the owner is a source-admin of one workspace, `local`:
+they can add sources, [upload files](/admin/duckdb/#uploads), and
+manage the workspace's limits and models. Unlike demo mode, the [models
+configured in the app](/admin/models/#models-configured-in-the-app) stay on,
+so the owner can add a model and its key on the [Models page](/guide/models/)
+instead of restarting with `-e`. A banner at the top of every page says that
+everyone who can reach the server is its owner; it can be dismissed, and the
+dismissal is kept in the browser.
+
+### The guards
+
+Each is an error, so the server refuses to boot:
+
+| Configuration | Why it is refused |
+| --- | --- |
+| Any of `OIDC_ISSUER`, `OIDC_CLIENT_ID`, `OIDC_CLIENT_SECRET`, `OIDC_JWKS_URL`, `OIDC_MCP_CLIENT_ID` | Local mode would hand out sessions beside real ones. |
+| `LOCAL_GROUPS` containing `/platform-admins` | The settings a platform admin owns are server management, not a local user's concern. |
+| `LOCAL_GROUPS` granting no workspace | The owner would see an empty app. |
+
+`source-admin` is allowed: that is the point of the mode. `SESSION_SECRET`,
+`DATABASE_URL` and `SOURCE_SECRET_REFS` are still required in production.
+`LOCAL_GROUPS` set without `AUTH_MODE=local` is ignored with a warning, as is
+`DEMO_GROUPS` under local mode.
+
 ## Without a model
 
-In demo mode `AI_MODEL` and the provider key are optional. A missing one is a
-startup warning, not an error. The seeded dashboards, the live viewer and the
-SQL editor need no model. The new-dashboard page, Explore, the panel editor's
-natural-language edit and the dashboard chat show a notice naming the variables
-to set, instead of sending a request that can only fail. With
+In demo and local mode `AI_MODEL` and the provider key are optional. A missing
+one is a startup warning, not an error. The seeded dashboards, the live viewer
+and the SQL editor need no model. The new-dashboard page, Explore, the panel
+editor's natural-language edit and the dashboard chat show a notice naming the
+variables to set, instead of sending a request that can only fail. With
 `AUTH_MODE=oidc` a missing model is still an error in production.
 
 Only the server's models are used in demo mode: the [models configured in
@@ -73,15 +135,16 @@ has no Add, and every model route refuses a write. A model stored by an
 earlier non-demo run is ignored. So a visitor can neither spend someone's
 stored key nor point the server at an address of their choosing. The
 [model chip](/guide/models/#picking-a-model) still picks among the server's
-models when the operator declares more than one in `AI_MODELS_FILE`.
+models when the operator declares more than one in `AI_MODELS_FILE`. Local
+mode keeps the models configured in the app, for its one owner.
 
 ## Not for auth development
 
-Demo mode is fine for working on dashboards, panels and charts. It is not a way
-to develop or test authentication. Anything that touches the session, the
-claims or authorization runs against a realm; see
+Neither mode is a way to develop or test authentication. They are fine for
+working on dashboards, panels and charts. Anything that touches the session,
+the claims or authorization runs against a realm; see
 [Keycloak setup](/admin/keycloak/).
 
 ---
 
-*Last verified against the code at commit `00ea858` (2026-10-05).*
+*Last verified against the code at commit `a7a479b` (2026-10-17).*

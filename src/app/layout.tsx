@@ -6,7 +6,7 @@ import { NavBar } from "@/components/nav-bar";
 import { CommandPalette } from "@/components/command-palette";
 import { DemoBanner } from "@/components/demo-banner";
 import { SessionKeepalive } from "@/components/session-keepalive";
-import { config } from "@/lib/config";
+import { config, hasRealm } from "@/lib/config";
 import { getIdentity } from "@/lib/auth/authorize";
 import { modelsPageVisible } from "@/lib/ai/models-page";
 import { tokenExpiry } from "@/lib/auth/session";
@@ -76,10 +76,11 @@ export default async function RootLayout({
     ? { displayName: identity.displayName ?? null, email: identity.email ?? null }
     : null;
   // When this session's token expires, so the browser can renew it first
-  // (#27). Only for a realm session; a demo session has nothing to renew with.
+  // (#27). Only for a realm session; a demo or local session has nothing to
+  // renew with.
   const sessionToken = (await cookies()).get(config.sessionCookieName)?.value;
   const sessionExpiresAt =
-    identity && config.authMode !== "demo" && sessionToken
+    identity && hasRealm(config.authMode) && sessionToken
       ? tokenExpiry(sessionToken)
       : null;
   // How this person wants times shown (#214). Signed out it is browser-local;
@@ -165,7 +166,7 @@ export default async function RootLayout({
                   account={account}
                   showModels={identity !== null && modelsPageVisible(identity)}
                 />
-                {config.authMode === "demo" && <DemoBanner />}
+                {config.authMode !== "oidc" && <DemoBanner mode={config.authMode} />}
                 {sessionExpiresAt !== null && (
                   <SessionKeepalive expiresAt={sessionExpiresAt} />
                 )}
