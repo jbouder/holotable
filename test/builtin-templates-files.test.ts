@@ -343,7 +343,8 @@ test("the distance and duration pair: one without the other is not an activity l
     ["distance_mi", "real"],
     ["calories", "integer"],
   ]);
-  assert.equal(recognizeTable(distanceOnly)?.starter, "measurements");
+  // Half an activity log is not a set of measurements either.
+  assert.equal(recognizeTable(distanceOnly), null);
   const durationOnly = table("runs", [
     ["day", "date"],
     ["duration_min", "integer"],
@@ -419,6 +420,8 @@ test("the measure cap: at most a fixed number of measures, keys and calendar par
     ["wind_kph", "double precision"],
     ["rain_mm", "double precision"],
     ["kwh_per_day", "double precision"],
+    // A minimum, not minutes: a short unit is a duration only after a time word.
+    ["min_temp", "double precision"],
   ]);
   const r = recognizeTable(wide);
   assert.equal(r?.starter, "measurements");

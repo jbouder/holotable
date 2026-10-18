@@ -27,9 +27,10 @@ import type { Template, TemplateKind } from "@/lib/templates";
  * - **One template per table, the most specific recognizer wins**: an
  *   activity log (it needs a distance *and* a duration), then spending (a
  *   money column *and* a column to break it down by), then daily
- *   measurements (two or more numbers, whatever they are called). A money
- *   column with nothing to break it down by is only a measure, which is what
- *   keeps a utility bill's `cost_usd` a measurement rather than spending.
+ *   measurements (two or more other numbers). A money column with nothing to
+ *   break it down by is only a measure, which is what keeps a utility bill's
+ *   `cost_usd` a measurement rather than spending; a distance or a duration
+ *   without its other half is half an activity log, and gets nothing.
  * - **Names, not statistics.** The catalog records a column's name and type
  *   and nothing about its values, so a role is read off the name. A wrong
  *   guess costs one starter nobody applies.
@@ -125,38 +126,47 @@ const MERCHANT = [
   "description",
 ];
 
-/** Names that read as a distance, and the unit a word implies. */
-const DISTANCE_UNIT: Record<string, string | null> = {
-  distance: null,
-  km: "km",
-  kilometers: "km",
-  kilometres: "km",
-  mi: "mi",
-  miles: "mi",
-  meters: "m",
-  metres: "m",
-};
+/** Words that read as a distance, and the unit each implies (null: none). */
+const DISTANCE_UNIT = new Map<string, string | null>([
+  ["distance", null],
+  ["km", "km"],
+  ["kilometers", "km"],
+  ["kilometres", "km"],
+  ["mi", "mi"],
+  ["miles", "mi"],
+  ["meters", "m"],
+  ["metres", "m"],
+]);
 
 /**
- * Names that read as a duration, and how many of the unit make an hour (the
- * factor a speed in distance per hour needs). `null` is a duration in an
- * unknown unit, whose speed is shown per that unit.
+ * Words that make a number a duration on their own, and how many of the unit
+ * make an hour, the factor a speed in distance per hour needs (null: a unit
+ * the name does not say, whose speed is shown per that unit).
  */
-const DURATION_PER_HOUR: Record<string, number | null> = {
-  duration: null,
-  elapsed: null,
-  min: 60,
-  mins: 60,
-  minutes: 60,
-  s: 3600,
-  sec: 3600,
-  secs: 3600,
-  seconds: 3600,
-  h: 1,
-  hr: 1,
-  hrs: 1,
-  hours: 1,
-};
+const DURATION_WORD = new Map<string, number | null>([
+  ["duration", null],
+  ["elapsed", null],
+  ["minutes", 60],
+  ["mins", 60],
+  ["seconds", 3600],
+  ["secs", 3600],
+  ["hours", 1],
+  ["hrs", 1],
+]);
+
+/**
+ * Short units, which name a duration's unit only as the last word after a
+ * time word (`duration_min`, `moving_time_s`): alone, `min` is as likely a
+ * minimum and `hr` a heart rate.
+ */
+const DURATION_UNIT = new Map<string, number>([
+  ["min", 60],
+  ["s", 3600],
+  ["sec", 3600],
+  ["h", 1],
+  ["hr", 1],
+]);
+const TIME_WORD = ["duration", "elapsed", "time", "moving"];
 
 /** Names that classify an activity. */
 const ACTIVITY_TYPE = ["type", "sport", "activity", "kind", "category"];
@@ -234,24 +244,31 @@ function byPreference(
 /** The unit a distance column's name implies, or null. */
 function distanceUnit(column: CatalogColumn): string | null {
   for (const w of words(column.name)) {
-    const unit = DISTANCE_UNIT[w];
+    const unit = DISTANCE_UNIT.get(w);
     if (unit) return unit;
   }
   return null;
 }
 
-/** How many of a duration column's unit make an hour, or null. */
-function perHour(column: CatalogColumn): number | null {
-  for (const w of words(column.name)) {
-    const factor = DURATION_PER_HOUR[w];
-    if (factor) return factor;
-  }
-  return null;
+const isDistance = (c: CatalogColumn) => words(c.name).some((w) => DISTANCE_UNIT.has(w));
+
+/**
+ * Whether a column reads as a duration and, when it does, how many of its
+ * unit make an hour (null when the name does not say the unit).
+ */
+function durationOf(column: CatalogColumn): { perHour: number | null } | null {
+  const w = words(column.name);
+  const unit = DURATION_UNIT.get(w[w.length - 1] ?? "");
+  if (unit !== undefined && w.some((x) => TIME_WORD.includes(x)))
+    return { perHour: unit };
+  const found = w.filter((x) => DURATION_WORD.has(x));
+  if (found.length === 0) return null;
+  // `duration_seconds`: the word that says the unit, over the one that does not.
+  const known = found.map((x) => DURATION_WORD.get(x)).find((f) => typeof f === "number");
+  return { perHour: known ?? null };
 }
 
-const isDistance = (c: CatalogColumn) => words(c.name).some((w) => w in DISTANCE_UNIT);
-const isDuration = (c: CatalogColumn) =>
-  words(c.name).some((w) => w in DURATION_PER_HOUR) || c.name.toLowerCase() === "time_s";
+const isDuration = (c: CatalogColumn) => durationOf(c) !== null;
 
 /* -------------------------------------------------------------------------- */
 /* The recognizers                                                            */
@@ -314,6 +331,10 @@ function spending(shape: Shape): Recognized | null {
 
 function measurements(shape: Shape): Recognized | null {
   if (shape.numbers.length < 2) return null;
+  // A distance or a duration without its other half is half an activity
+  // log, which a daily average would misread: no starter rather than a
+  // wrong one.
+  if (shape.numbers.some((c) => isDistance(c) || isDuration(c))) return null;
   return { starter: "measurements", measures: shape.numbers.slice(0, MAX_MEASURES) };
 }
 
@@ -458,7 +479,7 @@ function activityPanels(
   const distance = r.distance.name;
   const duration = r.duration.name;
   const unit = distanceUnit(r.distance);
-  const factor = perHour(r.duration);
+  const factor = durationOf(r.duration)?.perHour ?? null;
   // Distance per hour when the duration's unit is known, else per its unit.
   const speed =
     factor === null

@@ -2,6 +2,7 @@ import { queryText } from "@/lib/ir";
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { buildBuiltinTemplates } from "@/lib/builtin-templates";
+import { buildFileTemplates } from "@/lib/builtin-templates-files";
 import { exposedCatalogTables } from "@/lib/catalog/health";
 import { panelStarter } from "@/lib/panel-starter";
 import { buildSourceDescriptionStarters, buildStarters } from "@/lib/prompts/starters";
@@ -123,6 +124,11 @@ test("suggestions are built from exposed columns only, and the guard accepts eve
   const starter = panelStarter(sqlCatalog(config));
   assertNoHidden(starter.sql, "the new-panel starter");
   assert.equal((await validateSql(starter.sql, config)).ok, true, starter.sql);
+
+  // The file starters (#606) read the same exposed projection; a hidden
+  // column changing what a table is recognized as is held in
+  // `test/builtin-templates-files.test.ts`.
+  assertNoHidden(JSON.stringify(buildFileTemplates(source)), "file starters");
 
   const templates = buildBuiltinTemplates(source);
   assert.ok(templates.length > 0, "the exposed columns still support some template");
