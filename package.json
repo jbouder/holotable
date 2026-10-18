@@ -66,6 +66,7 @@
     "react-dom": "19.3.0",
     "saxes": "6.0.0",
     "tailwind-merge": "3.7.0",
+    "tsx": "4.23.15",
     "undici": "8.11.2",
     "vega": "6.4.0",
     "vega-interpreter": "2.3.2",
@@ -87,7 +88,6 @@
     "fast-check": "4.10.2",
     "jsdom": "30.1.2",
     "tailwindcss": "4.3.3",
-    "tsx": "4.23.15",
     "typescript": "^6"
   }
 }
