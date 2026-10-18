@@ -22,7 +22,7 @@ import {
 import { PROMPT_HISTORY_PREFIX, promptHistoryKey } from "@/lib/prompt-history";
 import { LAST_SOURCE_KEY } from "@/lib/source-selection";
 import { MOTION_STORAGE_KEY } from "@/lib/motion";
-import { DEMO_BANNER_KEY } from "@/lib/demo-banner";
+import { DEMO_BANNER_KEY, LOCAL_BANNER_KEY } from "@/lib/demo-banner";
 import { THEME_STORAGE_KEY } from "@/lib/theme";
 import { RESUME_ATTEMPT_KEY, SESSION_EXPIRY_KEY } from "@/lib/session-renewal";
 
@@ -193,6 +193,7 @@ test("every storage key the app defines is registered or deliberately excluded",
     THEME_STORAGE_KEY,
     MOTION_STORAGE_KEY,
     DEMO_BANNER_KEY,
+    LOCAL_BANNER_KEY,
   ]) {
     const owned = storeForKey(key) !== null || exclusions.some((m) => keyMatches(m, key));
     assert.ok(owned, `${key} is neither a local-data store nor an exclusion`);

@@ -7,7 +7,7 @@ import {
   roleCapabilities,
   roleGuide,
 } from "@/lib/account";
-import { config } from "@/lib/config";
+import { config, hasRealm } from "@/lib/config";
 import { settingsSection } from "@/lib/settings";
 import { SignIn } from "@/components/sign-in";
 import { SettingsSectionPage } from "@/components/settings/section";
@@ -36,9 +36,8 @@ export default async function AccountSettings() {
   const identity = await getIdentity();
   if (!identity) return <SignIn />;
   const account = accountSummary(identity);
-  const demo = config.authMode === "demo";
-  // No identity provider in demo mode, so no account page to link to.
-  const accountUrl = demo ? "" : config.oidcAccountUrl;
+  // No identity provider in demo or local mode, so no account page to link to.
+  const accountUrl = hasRealm(config.authMode) ? config.oidcAccountUrl : "";
   const origin = accountOrigin(config.authMode, accountUrl);
 
   return (

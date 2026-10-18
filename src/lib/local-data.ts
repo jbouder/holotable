@@ -2,7 +2,7 @@ import type { BrowserStorage } from "@/lib/browser-storage";
 import { CHAT_EXPANDED_KEY, CHAT_PANEL_CLOSED_KEY } from "@/lib/chat-layout";
 import { clearRecents, parseRecents, RECENTS_STORAGE_KEY } from "@/lib/command-palette";
 import { clearRecent, readRecent, RECENT_KEY } from "@/lib/dashboard-list";
-import { DEMO_BANNER_KEY } from "@/lib/demo-banner";
+import { DEMO_BANNER_KEY, LOCAL_BANNER_KEY } from "@/lib/demo-banner";
 import { SETUP_DISMISSED_COOKIE } from "@/lib/dismissals";
 import { RESUME_ATTEMPT_KEY, SESSION_EXPIRY_KEY } from "@/lib/session-renewal";
 import { clearDrafts, DRAFT_KEY_PREFIX, listDrafts } from "@/lib/editor/drafts";
@@ -114,6 +114,11 @@ export const LOCAL_STORAGE_EXCLUSIONS: readonly { key: KeyMatch; reason: string 
     key: { exact: DEMO_BANNER_KEY },
     reason:
       "Demo mode only: whether the shared-workspace banner was dismissed. Clearing site data brings it back.",
+  },
+  {
+    key: { exact: LOCAL_BANNER_KEY },
+    reason:
+      "Local mode only: whether the owner banner was dismissed. Clearing site data brings it back.",
   },
   {
     key: { exact: MOTION_STORAGE_KEY },
