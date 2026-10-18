@@ -72,12 +72,15 @@ export type ModelInput = z.infer<typeof ModelInput>;
 /** The prefix of a server model's id: `env:<name>`. */
 export const SERVER_MODEL_PREFIX = "env:";
 
-/** A model id as a request may carry it: a catalog uuid, or `env:<name>`. */
+/**
+ * A model id as a request may carry it: a catalog uuid, `env:<name>`, or a
+ * model found on this machine, `local:<host>:<port>/<model>` (#607).
+ */
 export const ModelId = z
   .string()
-  .max(64)
+  .max(240)
   .regex(
-    /^(?:[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}|env:[a-z0-9][a-z0-9-]{0,39})$/i,
+    /^(?:[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}|env:[a-z0-9][a-z0-9-]{0,39}|local:[a-z0-9.-]{1,100}:\d{1,5}\/[A-Za-z0-9._:/@+-]{1,120})$/i,
     "not a model id",
   );
 
@@ -333,9 +336,32 @@ export interface WorkspaceModelsSection {
   models: CatalogModelRow[];
 }
 
+/** One endpoint at the last scan for a model on this machine (#607): its host, never a reply. */
+export interface DetectedEndpointRow {
+  host: string;
+  ok: boolean;
+  models: number;
+}
+
+/** "Detected on this machine" (#607): what the last scan found, and whether to say how to get one. */
+export interface DetectedModelsSection {
+  /** When the last scan finished, ISO 8601, or null before the first. */
+  scannedAt: string | null;
+  endpoints: DetectedEndpointRow[];
+  rows: ServerModelRow[];
+  /** Models were found but none is the default: the person picks one. */
+  pickNeeded: boolean;
+  /** The server runs in local mode, so the page says how to start a model here. */
+  local: boolean;
+  /** A workspace the caller manages, which a Re-scan is gated on; null hides the button. */
+  rescanWorkspace: string | null;
+}
+
 /** Everything the Models page draws, read on the server. */
 export interface ModelsPageData {
   server: ServerModelRow[];
+  /** Models found on this machine (#607), or null when detection is off. */
+  detected: DetectedModelsSection | null;
   workspaces: WorkspaceModelsSection[];
   /** The caller's own models, or null where they may have none (demo mode). */
   personal: CatalogModelRow[] | null;

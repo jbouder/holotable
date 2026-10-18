@@ -1,4 +1,4 @@
-import type { Environment } from "@/lib/config";
+import { type Environment, localModelDetection } from "@/lib/config";
 
 /**
  * Is a model configured well enough to try? Configuration only: nothing here
@@ -24,20 +24,26 @@ export function aiConfigProblem(env: Environment = process.env): string | null {
  * What the generate, panel-edit and chat surfaces show in place of a
  * request that would fail (#251). Names the variables to set; demo mode makes
  * a missing model a warning rather than a boot failure, so this is what a
- * visitor to a demo without a key sees.
+ * visitor to a demo without a key sees. Where the server looks for a model on
+ * this machine (#607, in local mode by default) it says how to have one found.
  */
-export function aiUnavailableMessage(problem: string): string {
-  if (problem === "AI_GATEWAY_API_KEY") {
-    return "No model configured. Set AI_MODEL and AI_GATEWAY_API_KEY on the server to generate with AI.";
-  }
+export function aiUnavailableMessage(problem: string, env: Environment = {}): string {
   if (problem === "AI_PROVIDER") {
     return "AI_PROVIDER is not recognized, so no model can be called. Set it to openai-compatible or gateway.";
   }
-  return "No model configured. Set AI_MODEL and OPENAI_API_KEY on the server to generate with AI.";
+  const base =
+    problem === "AI_GATEWAY_API_KEY"
+      ? "No model configured. Set AI_MODEL and AI_GATEWAY_API_KEY on the server to generate with AI."
+      : "No model configured. Set AI_MODEL and OPENAI_API_KEY on the server to generate with AI.";
+  return localModelDetection(env) ? `${base} ${LOCAL_MODEL_HINT}` : base;
 }
+
+/** The sentence a server that detects local models adds to "No model configured". */
+export const LOCAL_MODEL_HINT =
+  "Or, on this machine, start Ollama or LM Studio and choose Re-scan on the Models page, then pick a model it found.";
 
 /** The message for this server's environment, or `null` when a model is configured. */
 export function aiUnavailable(env: Environment = process.env): string | null {
   const problem = aiConfigProblem(env);
-  return problem ? aiUnavailableMessage(problem) : null;
+  return problem ? aiUnavailableMessage(problem, env) : null;
 }

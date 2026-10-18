@@ -102,9 +102,9 @@ const ModelByWorkspaceSchema = z
     z.string().max(64),
     z
       .string()
-      .max(64)
+      .max(240)
       .regex(
-        /^(?:[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}|env:[a-z0-9][a-z0-9-]{0,39})$/i,
+        /^(?:[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}|env:[a-z0-9][a-z0-9-]{0,39}|local:[a-z0-9.-]{1,100}:\d{1,5}\/[A-Za-z0-9._:/@+-]{1,120})$/i,
         "must be a model id",
       ),
   )
