@@ -7,7 +7,7 @@ import { safeNextPath } from "@/lib/auth/next-path";
 import { startSession } from "@/lib/auth/renewal";
 import { renewalDeps } from "@/lib/auth/session-store";
 import { HttpError } from "@/lib/auth/authorize";
-import { config } from "@/lib/config";
+import { config, hasRealm } from "@/lib/config";
 import { route } from "@/lib/http";
 import { audit } from "@/lib/audit";
 
@@ -19,11 +19,11 @@ export const runtime = "nodejs";
  * its nonce to be this browser's (#281) — only the validated sub + groups are trusted for
  * authorization — and mints a first-party session cookie. The display name and
  * email are carried over as display-only claims (#208). When the realm issued a
- * refresh token the session is renewable (#27). A 404 in demo mode.
+ * refresh token the session is renewable (#27). A 404 in demo and local mode.
  */
 export const GET = route("auth.callback", async (req: Request) => {
-  // Demo mode has no realm to come back from (#251).
-  if (config.authMode === "demo") throw new HttpError(404, "not found");
+  // Demo and local mode have no realm to come back from (#251, #600).
+  if (!hasRealm(config.authMode)) throw new HttpError(404, "not found");
   const url = new URL(req.url);
 
   // Read once and deleted at once, whatever happens next: each value is good

@@ -4,7 +4,7 @@ import { HttpError } from "@/lib/auth/authorize";
 import type { Identity } from "@/lib/auth/claims";
 import { publicOrigin } from "@/lib/auth/origin";
 import { identityFromPayload, realmJwks } from "@/lib/auth/session";
-import { config } from "@/lib/config";
+import { config, hasRealm } from "@/lib/config";
 import type { ApiTokenStore } from "@/lib/db/api-tokens";
 
 /**
@@ -113,11 +113,11 @@ export function mcpAuthDeps(): McpAuthDeps {
 }
 
 /**
- * Whether `/api/mcp` is open at all: never in demo mode, which has no realm,
- * and not until the MCP client and the realm are configured.
+ * Whether `/api/mcp` is open at all: never in demo or local mode, which have
+ * no realm, and not until the MCP client and the realm are configured.
  */
 export function mcpEnabled(deps: McpAuthDeps = mcpAuthDeps()): boolean {
-  return config.authMode !== "demo" && Boolean(deps.keys && deps.issuer && deps.clientId);
+  return hasRealm(config.authMode) && Boolean(deps.keys && deps.issuer && deps.clientId);
 }
 
 /**

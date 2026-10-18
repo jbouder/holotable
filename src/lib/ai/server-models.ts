@@ -1,5 +1,5 @@
 import { z } from "zod";
-import type { ConfigProblem } from "@/lib/config";
+import { type ConfigProblem, hasRealm } from "@/lib/config";
 import {
   credentialFields,
   kindOf,
@@ -202,7 +202,8 @@ export function checkServerModels(
   for (const problem of parsed.problems) add("error", problem);
   if (parsed.problems.length > 0) return problems;
 
-  const demo = env.AUTH_MODE === "demo";
+  // Demo and local mode run without a model (#600), as validateConfig allows.
+  const demo = !hasRealm(env.AUTH_MODE);
   const legacy = Boolean(env.AI_PROVIDER || env.AI_MODEL);
   if (parsed.entries.length === 0 && !legacy) {
     add(
