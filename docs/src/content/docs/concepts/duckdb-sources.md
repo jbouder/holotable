@@ -1,11 +1,11 @@
 ---
 title: DuckDB sources
-description: A directory of Parquet and CSV files, or a .duckdb file, as a data source. Its panels are the same guarded SQL, run in process against a locked engine.
+description: A directory of Parquet, CSV and JSON files, or a .duckdb file, as a data source. Its panels are the same guarded SQL, run in process against a locked engine.
 ---
 
 A source has a **kind** ([Source kinds](/architecture/data-model/#source-kinds)).
 A **DuckDB** source reads files that live on the server: a directory of
-Parquet and CSV files, or a `.duckdb` database file, under a root the operator
+Parquet, CSV and JSON files, or a `.duckdb` database file, under a root the operator
 chooses. It is the second SQL kind. Its panels carry the same `query.sql` a
 TimescaleDB panel does, checked by the same guard and windowed by the same
 plan. What differs is where the rows come from: DuckDB runs inside the server
@@ -65,23 +65,30 @@ dashboard](/getting-started/your-first-dashboard/#or-files-on-the-server-with-du
 ## Uploaded files
 
 A source admin with no access to the server can make a DuckDB source from CSV
-files instead: the **Upload files** card. The files are sent to
+or JSON files instead: the **Upload files** card. The files are sent to
 `POST /api/sources/duckdb/uploads`, which streams them to
-`DUCKDB_SOURCES_DIR/uploads/<workspace id>/<fresh id>/<name>.csv` and answers
+`DUCKDB_SOURCES_DIR/uploads/<workspace id>/<fresh id>/<name>.<ext>` and answers
 the relative directory, and the form goes on as above, from **Discover
 tables**. Nothing new reaches the IR, a listing or the browser: an uploaded
 source is a directory source whose directory the server wrote, and `path` is
 an ordinary relative path. Each file's table is its stem reduced to
-`[a-z0-9_]`, so `Household Expenses.csv` is `household_expenses`. A sample to
-try ships with the app,
+`[a-z0-9_]`, so `Household Expenses.csv` is `household_expenses`. A file keeps
+its extension when it is `.json`, `.jsonl` or `.ndjson`, so the directory
+reads it as [JSON](#json-files); a file with any other name is stored as
+`.csv` and read as CSV. Two samples to try ship with the app, and the form
+offers both:
 [`household-expenses.csv`](https://github.com/jbouder/holotable/blob/main/public/samples/household-expenses.csv)
 (`date, merchant, category, amount, payment_method`; DuckDB reads `date` as
-`DATE` and `amount` as `DOUBLE`).
+`DATE` and `amount` as `DOUBLE`) and
+[`workouts.jsonl`](https://github.com/jbouder/holotable/blob/main/public/samples/workouts.jsonl)
+(a fitness log, one object per line, whose nested `location` is the column
+`location STRUCT(city VARCHAR, country VARCHAR)`).
 
 An upload is all or nothing, and bounded: a file over
 `DUCKDB_UPLOAD_MAX_BYTES`, too many files, a file that is not UTF-8 text, an
-empty file or two files that would be one table refuse the whole upload, and
-nothing is kept. The operator's side, and how to turn uploads on, is in
+empty file or two files that would be one table (`events.csv` and
+`events.jsonl` included) refuse the whole upload, and nothing is kept. A JSON
+file is held to the same caps and the same text check as a CSV. The operator's side, and how to turn uploads on, is in
 [DuckDB files](/admin/duckdb/#uploads).
 
 ## The path and the root
@@ -110,7 +117,7 @@ cannot run.
 
 | `path` names | What the tables are |
 | --- | --- |
-| A **directory** | One view per `.parquet` or `.csv` file directly under it, named by its stem: `http_requests.parquet` is the table `http_requests`. Not recursive. Other extensions, and anything a symlink takes outside the directory, are skipped. When `a.parquet` and `a.csv` both exist, the Parquet file wins. At most 200 files, in name order. |
+| A **directory** | One view per `.parquet`, `.csv`, `.json`, `.jsonl` or `.ndjson` file directly under it, named by its stem: `http_requests.parquet` is the table `http_requests`. Not recursive. Other extensions, and anything a symlink takes outside the directory, are skipped. When two files share a stem, one view is made, from Parquet first, then CSV, then JSON (`a.parquet` over `a.csv` over `a.json`; between two JSON files, the first by name). At most 200 files, in name order. |
 | A **`.duckdb` file** | The database's own tables in `main`. It is attached `READ_ONLY`. |
 
 A directory is the shape a data-lake drop, a vendor export or a batch job's
@@ -120,6 +127,28 @@ by itself: the catalog is what the last refresh found
 file's contents under the same name needs no refresh. The next query reads the
 new file, which is how the [files demo](/operations/demo-data/#the-files-demo)
 moves its live edge forward every minute.
+
+## JSON files
+
+A `.json`, `.jsonl` or `.ndjson` file is read by DuckDB's bundled JSON reader,
+`read_json_auto`, which takes an array of objects, one object per line, or a
+single object (one row). The `json` extension is compiled into the binding, so
+nothing is installed or loaded and the lock is the same as for any other file.
+Each top-level key is a column; a nested object is a `STRUCT` column and an
+array a list, shown in the catalog by DuckDB's own type name
+(`STRUCT(city VARCHAR, country VARCHAR)`, `VARCHAR[]`). Nothing is flattened:
+a query reads a field as `location.city` or `location->>'city'`, and the model
+is told so.
+
+The reader samples a file to type it and is bounded explicitly, by constants
+beside the engine's other caps in `src/lib/duckdb/client.ts`: one object (an
+array element, a line) may be at most 16 MiB (`JSON_MAX_OBJECT_BYTES`, the
+reader's `maximum_object_size`), and the columns and types are inferred from
+the first 20,480 records (`JSON_SAMPLE_ROWS`, `sample_size`). The memory
+limit, the thread cap and the query timeout stay the outer bound. A file the
+reader cannot parse fails **Discover tables**, **Refresh** and every query
+with a message that names its table (`the file for the table "events" could
+not be read: …`), never its path.
 
 ## The catalog
 
@@ -146,7 +175,10 @@ What the model is told for a DuckDB source (`DUCKDB_PROMPT` in
 - **Column names are case-sensitive as listed.** A name that is not all
   lowercase is double-quoted (`"Value"`).
 - **No `::timestamptz`.** The time column is used as it is.
-- **No table functions.** Query the listed tables, not `read_parquet(…)`.
+- **Nested JSON.** A `STRUCT` column is read with `struct.field`
+  (`location.city`) or `->>` (`location->>'city'`).
+- **No table functions.** Query the listed tables, not `read_parquet(…)`,
+  `read_csv(…)` or `read_json(…)`.
 
 ```sql
 SELECT time_bucket(INTERVAL '1 minute', ts) AS minute,
@@ -218,7 +250,7 @@ behind it.
 | A path under `uploads/` that is not an upload of the source's own workspace | Uploaded files are their workspace's; the guard checks it on save and on every open. |
 | Any DuckDB source while `DUCKDB_SOURCES_DIR` is unset | Closed by default: nothing is readable until the operator names a root. |
 | A table not on the allowlist | The allowlist is the catalog, exactly as for a database. |
-| `read_csv(…)`, `FROM read_parquet(…)`, `glob(…)` and every other file function | A file function reads whatever path it is given, past the allowlist and the root. |
+| `read_csv(…)`, `FROM read_parquet(…)`, `read_json(…)`, `glob(…)` and every other file function | A file function reads whatever path it is given, past the allowlist and the root. |
 | `ATTACH`, `INSTALL`, `LOAD`, `SET`, `COPY` | Not a `SELECT`; and the locked engine would refuse each of them anyway. |
 | `s3://`, `https://`, `httpfs` | A file is local to the server. Remote storage is an operator's mount, not Holotable's fetch. |
 | Every run, with "DuckDB is not available on this server" | The platform has no DuckDB binding. Every other kind keeps working. |

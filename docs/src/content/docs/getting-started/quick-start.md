@@ -23,8 +23,8 @@ a source admin of one workspace, `local`. Bring your own data first:
 
 1. Open **Data sources**, choose **Add source**, then **or enter
    configuration manually** and **Upload files**.
-2. Pick a CSV file, or **Try the sample** (a household-expenses file the app
-   ships), then **Upload**. Its table is discovered for you; check it and
+2. Pick a CSV or JSON file, or try a sample the app ships (**household
+   expenses**, a CSV, or **workouts**, JSON lines), then **Upload**. Its table is discovered for you; check it and
    **Create source**.
 3. Ask for a dashboard over it on **New dashboard**, once a model is
    configured (below), or write a panel's SQL yourself in the editor.
@@ -33,7 +33,7 @@ One container holds TimescaleDB, the app, the demo seeder and the
 self-monitoring collector. It needs no `.env`, no Keycloak and no key. The
 seeder writes six hours of demo history before streaming, so the seeded
 dashboards (the service health demo, the self-monitoring dashboard and the
-**Demo files** dashboard over Parquet and CSV files) are full within seconds.
+**Demo files** dashboard over Parquet, CSV and JSON files) are full within seconds.
 
 | Option | Effect |
 | --- | --- |
@@ -88,7 +88,7 @@ source, so the stack has SQL and PromQL sources to compare.
 every container's log lines to it; the seeder registers that Loki as
 `loki-self`, with a **Holotable logs** dashboard over the app's own JSON log
 lines, for LogQL beside the other two. The seeder also writes a small
-directory of Parquet and CSV files, which the app mounts read-only, and
+directory of Parquet, CSV and JSON-lines files, which the app mounts read-only, and
 registers it as the **Demo files** DuckDB source. Sign in at
 `http://localhost:3000` as **`demo` / `demo`**, a source-admin in the `demo`
 workspace and a platform admin; see [the local realm](/admin/keycloak/#the-local-realm). The `seed` service

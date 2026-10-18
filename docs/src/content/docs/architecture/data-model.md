@@ -76,13 +76,14 @@ A `duckdb` source (#572) is the second SQL kind: its panels carry the same
 `query.sql`, checked by the same guard, planned by the same
 `buildExecutablePlan` with the kind's dialect (the window bound as UTC
 `TIMESTAMP`s). What differs is where the rows come from. `path` names a
-directory of Parquet and CSV files (one view per file directly under it,
-named by its stem, not recursive) or a `.duckdb` file, opened `READ_ONLY`. It
+directory of Parquet, CSV and JSON files (one view per file directly under
+it, named by its stem, not recursive; Parquet, then CSV, then JSON when two
+share a stem) or a `.duckdb` file, opened `READ_ONLY`. It
 is resolved by the path guard (`src/lib/duckdb/path.ts`) against
 `DUCKDB_SOURCES_DIR`, both through `realpath`, and refused unless it lands
 inside the root; unset, the variable refuses every DuckDB config, so the kind
 is closed until an operator chooses what it may read. A path under `uploads/`
-(CSV files a source admin uploaded from the browser, #595,
+(CSV and JSON files a source admin uploaded from the browser, #595, #596,
 `src/lib/duckdb/uploads.ts`) must be one of the source's own workspace's,
 `uploads/<workspaceId>/<id>`, as typed and as resolved. The guard runs when a
 source is saved and again on every open. Each source gets one in-process

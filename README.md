@@ -48,7 +48,7 @@ docker run -p 3000:3000 ghcr.io/jbouder/holotable:quickstart
 ```
 
 Then open <http://localhost:3000>: you are its owner, so **Data sources → Add
-source → Upload files** takes a CSV straight away. Keep it on your own
+source → Upload files** takes a CSV or JSON file straight away. Keep it on your own
 machine; everyone who can reach the port is signed in the same way. With
 Docker Compose instead (Keycloak, real
 sign-in as `demo` / `demo`, your own `.env`):
