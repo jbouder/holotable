@@ -14,16 +14,22 @@ import { config } from "@/lib/config";
 import { DuckDbPathError, resolveSourcePath, SOURCES_DIR_UNSET } from "@/lib/duckdb/path";
 import { log } from "@/lib/log";
 import { MultipartError, multipartBoundary, readMultipart } from "@/lib/multipart";
-import { UPLOADS_DIR, uploadScopeProblem } from "@/lib/sources/kinds/duckdb";
+import {
+  UPLOAD_EXTENSIONS,
+  UPLOADS_DIR,
+  uploadScopeProblem,
+} from "@/lib/sources/kinds/duckdb";
 
 /**
- * CSV files uploaded from the browser as a DuckDB source (#595).
+ * CSV and JSON files uploaded from the browser as a DuckDB source (#595,
+ * #596).
  *
  * An upload is a DuckDB source whose directory the server wrote: each file
- * lands at `DUCKDB_SOURCES_DIR/uploads/<workspaceId>/<sourceDir>/<name>.csv`,
+ * lands at `DUCKDB_SOURCES_DIR/uploads/<workspaceId>/<sourceDir>/<name><ext>`,
  * under the one root, and the source stores the relative directory like any
  * other. `sourceDir` is a fresh random id; `name` is the file's own stem,
- * reduced to an identifier, because it becomes the table's name.
+ * reduced to an identifier, because it becomes the table's name; `ext` is
+ * {@link uploadExtension}'s, because the directory's reader is chosen by it.
  *
  * Every request is all or nothing: a file over the byte cap, one too many, a
  * file that is not text, an empty one, a stem that reduces to nothing or two
@@ -87,6 +93,19 @@ export function uploadStem(filename: string): string | null {
   if (!name) return null;
   if (/^[0-9]/.test(name)) name = `t_${name}`;
   return name.slice(0, MAX_UPLOAD_STEM).replace(/_+$/, "");
+}
+
+/**
+ * The extension a file is stored with (#596): its own last extension,
+ * lowercased, when it is one of {@link UPLOAD_EXTENSIONS} (`.json`, `.jsonl`
+ * and `.ndjson` are read as JSON), and `.csv` for any other name, which is
+ * how #595 read every file.
+ */
+export function uploadExtension(filename: string): string {
+  const base = filename.split(/[\\/]/).pop() ?? "";
+  const dot = base.lastIndexOf(".");
+  const ext = dot > 0 ? base.slice(dot).toLowerCase() : "";
+  return (UPLOAD_EXTENSIONS as readonly string[]).includes(ext) ? ext : ".csv";
 }
 
 /**
@@ -156,7 +175,7 @@ function storageFailure(err: unknown): UploadError {
 
 /**
  * Take one upload: a `multipart/form-data` body whose `files` parts are CSV
- * files, written to a fresh directory under `uploads/<workspaceId>/`. Throws
+ * or JSON files, written to a fresh directory under `uploads/<workspaceId>/`. Throws
  * an {@link UploadError} (or a {@link DuckDbPathError} when uploads are off)
  * with nothing left on disk. `workspaceId` is the one the request was
  * authorized in. `root` is for tests.
@@ -246,7 +265,11 @@ export async function receiveUpload(input: {
         }
         stems.add(stem);
         try {
-          handle = await open(join(dir, `${stem}.csv`), "wx", 0o640);
+          handle = await open(
+            join(dir, `${stem}${uploadExtension(part.filename)}`),
+            "wx",
+            0o640,
+          );
         } catch (err) {
           throw storageFailure(err);
         }
@@ -304,7 +327,7 @@ export async function receiveUpload(input: {
       { maxParts: maxFiles + 1 },
     );
     if (files.length === 0)
-      throw new UploadError("choose at least one CSV file to upload.");
+      throw new UploadError("choose at least one CSV or JSON file to upload.");
     // The finished directory resolves like any saved source would.
     await resolveSourcePath(path, input.workspaceId, root);
   } catch (err) {

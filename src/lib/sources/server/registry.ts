@@ -130,7 +130,7 @@ export async function duckdbPathMenu(): Promise<
 }
 
 /**
- * Take CSV files uploaded from the browser as a DuckDB source's directory
+ * Take CSV and JSON files uploaded from the browser as a DuckDB source's directory
  * (#595), under `uploads/<workspaceId>/`, all or nothing. A refusal is an
  * answer, not a throw, with a message naming the variable or the person's
  * own file and never a server path.

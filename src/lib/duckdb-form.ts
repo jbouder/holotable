@@ -140,9 +140,17 @@ export async function listDuckDbPaths(
 /* Uploads (#595)                                                             */
 /* -------------------------------------------------------------------------- */
 
-/** The sample the upload form offers, served by the app itself. */
-export const SAMPLE_UPLOAD_URL = "/samples/household-expenses.csv";
-export const SAMPLE_UPLOAD_NAME = "household-expenses.csv";
+/**
+ * The samples the upload form offers, served by the app itself from
+ * `public/samples/`: a CSV (#595) and a JSON-lines file with a nested object
+ * (#596).
+ */
+export const UPLOAD_SAMPLES = {
+  expenses: { url: "/samples/household-expenses.csv", type: "text/csv" },
+  workouts: { url: "/samples/workouts.jsonl", type: "application/x-ndjson" },
+} as const;
+
+export type UploadSample = keyof typeof UPLOAD_SAMPLES;
 
 /** One file the server stored: its table name and size. */
 export interface UploadedFile {
@@ -176,7 +184,7 @@ export function uploadFilesProblem(
   files: readonly { name: string; size: number }[],
   limits: { maxBytes: number; maxFiles: number },
 ): { error: string; file?: string } | null {
-  if (files.length === 0) return { error: "Choose at least one CSV file." };
+  if (files.length === 0) return { error: "Choose at least one CSV or JSON file." };
   if (files.length > limits.maxFiles) {
     return { error: `An upload holds at most ${limits.maxFiles} files.` };
   }
@@ -278,12 +286,13 @@ export function uploadDuckDbFiles(
   return { done, abort: () => xhr.abort() };
 }
 
-/** The sample file, fetched from the app's own URL, as a file to upload. */
-export async function sampleUploadFile(): Promise<File | null> {
+/** A sample file, fetched from the app's own URL, as a file to upload. */
+export async function sampleUploadFile(sample: UploadSample): Promise<File | null> {
+  const { url, type } = UPLOAD_SAMPLES[sample];
   try {
-    const res = await fetch(SAMPLE_UPLOAD_URL);
+    const res = await fetch(url);
     if (!res.ok) return null;
-    return new File([await res.blob()], SAMPLE_UPLOAD_NAME, { type: "text/csv" });
+    return new File([await res.blob()], url.split("/").pop() ?? sample, { type });
   } catch {
     return null;
   }

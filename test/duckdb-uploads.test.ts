@@ -17,9 +17,12 @@ import {
   removeUpload,
   textProblem,
   UploadError,
+  uploadExtension,
   uploadsAvailability,
   uploadStem,
 } from "@/lib/duckdb/uploads";
+import { readerFor } from "@/lib/duckdb/client";
+import { UPLOAD_ACCEPT, UPLOAD_EXTENSIONS } from "@/lib/sources/kinds/duckdb";
 import { SOURCES_DIR_UNSET } from "@/lib/duckdb/path";
 import {
   MultipartError,
@@ -31,7 +34,8 @@ import {
 /**
  * Uploads from the browser as a DuckDB source (#595): the multipart reader
  * (a parser of untrusted input), and the rules an upload is held to: the
- * byte and file caps, the text check, the stem rules, all-or-nothing on
+ * byte and file caps, the text check, the stem rules, the stored extension
+ * that picks the reader (#596), all-or-nothing on
  * every refusal and on a cancelled request, messages that name no server
  * path, and that only an upload directory is ever removed.
  */
@@ -239,19 +243,44 @@ test("text is UTF-8 without a NUL, judged on the first chunk", () => {
   assert.match(String(textProblem(cut, true)), /UTF-8/);
 });
 
-test("an upload lands under uploads/<workspace>/<fresh id>/, one CSV per file", async () => {
+test("a stored file keeps a JSON extension, so the directory reads it as JSON (#596)", () => {
+  assert.equal(uploadExtension("orders.csv"), ".csv");
+  assert.equal(uploadExtension("Takeout.JSON"), ".json");
+  assert.equal(uploadExtension("history.jsonl"), ".jsonl");
+  assert.equal(uploadExtension("C:\\exports\\events.NDJSON"), ".ndjson");
+  // Any other name is stored, and read, as CSV, as every upload was in #595.
+  for (const name of ["notes.txt", "export", "a.json.gz", "a.parquet", ".json"]) {
+    assert.equal(uploadExtension(name), ".csv", name);
+  }
+  // Every extension an upload is stored with is one a directory source reads,
+  // and one the form's picker offers.
+  const accept = UPLOAD_ACCEPT.split(",");
+  for (const ext of UPLOAD_EXTENSIONS) {
+    assert.ok(readerFor(ext), `no directory reader for ${ext}`);
+    assert.ok(accept.includes(ext), `the picker does not offer ${ext}`);
+  }
+  assert.equal(readerFor(".json"), "read_json_auto");
+});
+
+test("an upload lands under uploads/<workspace>/<fresh id>/, one file per file, by its extension", async () => {
   const dir = root();
   const result = await upload(dir, [
     { name: "Orders.csv", body: "id,amount\n1,5\n" },
     { name: "my customers.txt", body: "id,name\n1,ada\n" },
+    { name: "Workouts.JSONL", body: '{"a":1}\n' },
   ]);
   assert.match(result.path, /^uploads\/ops\/[0-9a-f]{16}$/);
   assert.deepEqual(result.files, [
     { name: "orders", bytes: 14 },
     { name: "my_customers", bytes: 14 },
+    { name: "workouts", bytes: 8 },
   ]);
   const stored = join(dir, result.path);
-  assert.deepEqual(readdirSync(stored).sort(), ["my_customers.csv", "orders.csv"]);
+  assert.deepEqual(readdirSync(stored).sort(), [
+    "my_customers.csv",
+    "orders.csv",
+    "workouts.jsonl",
+  ]);
   assert.equal(readFileSync(join(stored, "orders.csv"), "utf8"), "id,amount\n1,5\n");
   // Two uploads never share a directory.
   const again = await upload(dir, [{ name: "orders.csv", body: "id\n1\n" }]);
@@ -307,7 +336,23 @@ test("the byte cap, the file cap, the text check and the stem rules each refuse 
       ],
       /both be the table "sales"/,
     );
-    await refused(dir, [], /at least one CSV file/);
+    // A JSON file is held to the same text check, and shares the stem rule
+    // with CSV: one table per stem, whatever the extension.
+    await refused(
+      dir,
+      [{ name: "dump.json", body: Buffer.from([0x7b, 0x00, 0x7d]) }],
+      /"dump\.json" is not a text file/,
+      "dump.json",
+    );
+    await refused(
+      dir,
+      [
+        { name: "events.csv", body: "a\n" },
+        { name: "events.jsonl", body: '{"a":1}\n' },
+      ],
+      /both be the table "events"/,
+    );
+    await refused(dir, [], /at least one CSV or JSON file/);
     await refused(
       dir,
       [{ name: "a.csv", body: "a\n", field: "other" }],

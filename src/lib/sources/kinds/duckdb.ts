@@ -11,8 +11,8 @@ import {
 import type { SourceKind } from "@/lib/sources/types";
 
 /**
- * DuckDB (#572): a directory of Parquet and CSV files, or a `.duckdb`
- * database file, under the operator's `DUCKDB_SOURCES_DIR`, queried in
+ * DuckDB (#572): a directory of Parquet, CSV and JSON files (#596), or a
+ * `.duckdb` database file, under the operator's `DUCKDB_SOURCES_DIR`, queried in
  * process. Its panels carry SQL, checked by the same guard as TimescaleDB's.
  *
  * Everything here is what a source of this kind *is* and what may be shown of
@@ -55,10 +55,25 @@ export function duckdbPathProblem(path: string): string | null {
 
 /**
  * The directory under `DUCKDB_SOURCES_DIR` that browser uploads land in
- * (#595): `uploads/<workspaceId>/<sourceDir>/<name>.csv`. One root, never a
- * second one; the path guard resolves an upload path like any other.
+ * (#595): `uploads/<workspaceId>/<sourceDir>/<name>.<ext>`. One root, never
+ * a second one; the path guard resolves an upload path like any other.
  */
 export const UPLOADS_DIR = "uploads";
+
+/**
+ * The extensions an upload is stored with (#595, #596): CSV, and JSON as an
+ * array or one object per line. Each is a file a directory source reads
+ * (`src/lib/duckdb/client.ts`); any other name is stored, and read, as CSV.
+ */
+export const UPLOAD_EXTENSIONS = [".csv", ".json", ".jsonl", ".ndjson"] as const;
+
+/** What the upload form's file picker offers: the extensions and their types. */
+export const UPLOAD_ACCEPT = [
+  ...UPLOAD_EXTENSIONS,
+  "text/csv",
+  "application/json",
+  "application/x-ndjson",
+].join(",");
 
 /**
  * Why a source in `workspaceId` may not name `path`, or null (#595): a path
