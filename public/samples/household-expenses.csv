@@ -1,0 +1,307 @@
+date,merchant,category,amount,payment_method
+2026-04-01,Family Dental,Health,58.61,cash
+2026-04-02,Northside Foods,Groceries,68.15,cash
+2026-04-03,City Fuel,Transport,18.04,debit
+2026-04-03,Fresh Market,Groceries,101.9,cash
+2026-04-03,Power & Light,Utilities,98.99,debit
+2026-04-05,Corner Grocer,Groceries,117.51,debit
+2026-04-05,Fiber Net,Utilities,65.0,debit
+2026-04-06,Corner Grocer,Groceries,117.9,debit
+2026-04-06,Metro Transit,Transport,8.83,debit
+2026-04-08,Blue Door Cafe,Dining,45.92,cash
+2026-04-08,Fresh Market,Groceries,117.65,cash
+2026-04-10,Blue Door Cafe,Dining,18.42,credit
+2026-04-10,Main St Pharmacy,Health,56.52,credit
+2026-04-11,Taqueria Sol,Dining,65.89,debit
+2026-04-12,Garden Supply,Home,67.13,debit
+2026-04-12,Metro Transit,Transport,-19.9,credit
+2026-04-12,Metro Transit,Transport,39.8,credit
+2026-04-12,Northside Foods,Groceries,94.79,cash
+2026-04-13,Linen & Co,Home,52.07,credit
+2026-04-13,Pizza Lane,Dining,12.92,cash
+2026-04-14,City Fuel,Transport,16.2,debit
+2026-04-15,Water District,Utilities,44.62,debit
+2026-04-16,Ride Share,Transport,46.76,cash
+2026-04-17,Metro Transit,Transport,13.97,cash
+2026-04-18,Blue Door Cafe,Dining,38.19,cash
+2026-04-18,Northside Foods,Groceries,80.39,cash
+2026-04-19,Ride Share,Transport,5.64,cash
+2026-04-20,Metro Transit,Transport,56.14,cash
+2026-04-21,Corner Grocer,Groceries,98.89,credit
+2026-04-21,Taqueria Sol,Dining,42.69,credit
+2026-04-22,Pho Street,Dining,14.96,credit
+2026-04-22,Ride Share,Transport,40.29,cash
+2026-04-22,StreamBox,Entertainment,24.37,cash
+2026-04-24,Northside Foods,Groceries,129.57,debit
+2026-04-24,Pizza Lane,Dining,53.75,debit
+2026-04-25,City Fuel,Transport,25.83,debit
+2026-04-26,Cinema 9,Entertainment,44.51,cash
+2026-04-26,Corner Grocer,Groceries,82.88,cash
+2026-04-27,Northside Foods,Groceries,88.93,cash
+2026-04-27,Taqueria Sol,Dining,50.24,credit
+2026-04-28,Fresh Market,Groceries,43.25,debit
+2026-04-28,Pizza Lane,Dining,53.76,credit
+2026-04-29,Family Dental,Health,62.46,cash
+2026-04-29,Fresh Market,Groceries,110.88,cash
+2026-05-01,Ride Share,Transport,64.16,cash
+2026-05-02,City Fuel,Transport,34.14,cash
+2026-05-02,Northside Foods,Groceries,21.37,cash
+2026-05-03,Northside Foods,Groceries,137.5,cash
+2026-05-03,Power & Light,Utilities,99.21,debit
+2026-05-03,Ride Share,Transport,17.86,cash
+2026-05-03,StreamBox,Entertainment,33.55,credit
+2026-05-04,Blue Door Cafe,Dining,55.29,credit
+2026-05-04,Corner Grocer,Groceries,-40.01,cash
+2026-05-04,Corner Grocer,Groceries,80.01,cash
+2026-05-04,Ride Share,Transport,44.84,credit
+2026-05-05,Fiber Net,Utilities,65.0,debit
+2026-05-05,Fresh Market,Groceries,20.4,credit
+2026-05-05,Metro Transit,Transport,42.57,debit
+2026-05-05,Pizza Lane,Dining,14.25,debit
+2026-05-06,Corner Grocer,Groceries,131.42,cash
+2026-05-07,Fresh Market,Groceries,89.96,debit
+2026-05-07,Metro Transit,Transport,58.48,credit
+2026-05-08,Blue Door Cafe,Dining,61.77,cash
+2026-05-08,Fresh Market,Groceries,85.56,cash
+2026-05-09,City Fuel,Transport,53.14,credit
+2026-05-10,Fresh Market,Groceries,66.25,debit
+2026-05-11,Pizza Lane,Dining,35.35,credit
+2026-05-12,Metro Transit,Transport,49.32,credit
+2026-05-13,Corner Grocer,Groceries,48.11,credit
+2026-05-13,Family Dental,Health,79.34,credit
+2026-05-13,Pho Street,Dining,30.94,cash
+2026-05-13,Ride Share,Transport,18.44,debit
+2026-05-14,Corner Grocer,Groceries,22.88,credit
+2026-05-14,Ride Share,Transport,37.2,cash
+2026-05-15,Main St Pharmacy,Health,46.85,credit
+2026-05-15,Pizza Lane,Dining,22.47,credit
+2026-05-15,Water District,Utilities,50.71,debit
+2026-05-16,Ride Share,Transport,4.53,credit
+2026-05-17,Metro Transit,Transport,64.4,debit
+2026-05-17,Taqueria Sol,Dining,29.01,credit
+2026-05-18,Linen & Co,Home,108.15,cash
+2026-05-18,Ride Share,Transport,61.74,credit
+2026-05-19,Corner Grocer,Groceries,84.82,cash
+2026-05-19,Hardware Hub,Home,199.21,cash
+2026-05-19,Metro Transit,Transport,6.73,debit
+2026-05-20,Northside Foods,Groceries,47.26,credit
+2026-05-20,Ride Share,Transport,53.64,debit
+2026-05-23,Metro Transit,Transport,21.78,debit
+2026-05-23,Northside Foods,Groceries,126.26,credit
+2026-05-24,City Fuel,Transport,59.29,cash
+2026-05-25,Fresh Market,Groceries,57.89,credit
+2026-05-25,Pho Street,Dining,46.32,credit
+2026-05-26,Corner Grocer,Groceries,87.28,debit
+2026-05-26,Ride Share,Transport,35.42,cash
+2026-05-27,Main St Pharmacy,Health,50.21,debit
+2026-05-27,Northside Foods,Groceries,47.14,cash
+2026-05-28,City Fuel,Transport,39.62,debit
+2026-05-28,Fresh Market,Groceries,134.44,cash
+2026-05-29,Fresh Market,Groceries,19.5,credit
+2026-05-29,Pho Street,Dining,36.21,cash
+2026-05-30,Ride Share,Transport,61.38,credit
+2026-05-31,Corner Grocer,Groceries,21.06,credit
+2026-06-01,Corner Grocer,Groceries,136.05,debit
+2026-06-01,Pizza Lane,Dining,39.17,cash
+2026-06-02,Blue Door Cafe,Dining,40.0,cash
+2026-06-02,Fresh Market,Groceries,92.06,credit
+2026-06-03,Power & Light,Utilities,114.88,debit
+2026-06-04,Blue Door Cafe,Dining,44.7,debit
+2026-06-04,Corner Grocer,Groceries,128.78,debit
+2026-06-05,Fiber Net,Utilities,65.0,debit
+2026-06-06,City Fuel,Transport,6.96,debit
+2026-06-07,Northside Foods,Groceries,68.36,debit
+2026-06-08,Pizza Lane,Dining,60.33,debit
+2026-06-09,Garden Supply,Home,108.3,credit
+2026-06-09,Northside Foods,Groceries,79.36,debit
+2026-06-11,Ride Share,Transport,5.14,debit
+2026-06-13,Cinema 9,Entertainment,7.7,debit
+2026-06-13,Corner Grocer,Groceries,77.9,debit
+2026-06-13,Family Dental,Health,14.43,cash
+2026-06-14,Garden Supply,Home,60.34,credit
+2026-06-14,Northside Foods,Groceries,92.48,cash
+2026-06-14,Taqueria Sol,Dining,42.82,cash
+2026-06-15,Linen & Co,Home,63.2,cash
+2026-06-15,Pizza Lane,Dining,14.59,debit
+2026-06-15,Water District,Utilities,52.89,debit
+2026-06-16,Northside Foods,Groceries,81.02,cash
+2026-06-17,Fresh Market,Groceries,115.85,credit
+2026-06-18,Family Dental,Health,191.8,debit
+2026-06-18,Metro Transit,Transport,58.36,cash
+2026-06-19,Fresh Market,Groceries,113.53,cash
+2026-06-19,Ride Share,Transport,19.56,debit
+2026-06-20,City Fuel,Transport,32.17,debit
+2026-06-20,Northside Foods,Groceries,102.05,debit
+2026-06-20,Taqueria Sol,Dining,42.73,debit
+2026-06-21,Family Dental,Health,163.94,cash
+2026-06-21,Northside Foods,Groceries,89.25,debit
+2026-06-21,Ride Share,Transport,54.37,debit
+2026-06-22,Fresh Market,Groceries,32.51,cash
+2026-06-22,Pho Street,Dining,21.37,cash
+2026-06-23,City Fuel,Transport,32.47,debit
+2026-06-23,Corner Grocer,Groceries,85.75,cash
+2026-06-24,Taqueria Sol,Dining,35.48,cash
+2026-06-25,Metro Transit,Transport,15.3,cash
+2026-06-25,Northside Foods,Groceries,106.72,credit
+2026-06-25,Taqueria Sol,Dining,36.08,debit
+2026-06-26,Fresh Market,Groceries,118.73,credit
+2026-06-26,Metro Transit,Transport,62.37,credit
+2026-06-26,Pho Street,Dining,21.82,credit
+2026-06-26,StreamBox,Entertainment,43.66,credit
+2026-06-27,Corner Grocer,Groceries,78.43,credit
+2026-06-28,Hardware Hub,Home,220.19,cash
+2026-06-28,Northside Foods,Groceries,100.91,cash
+2026-06-28,Pho Street,Dining,52.12,debit
+2026-06-29,Pizza Lane,Dining,17.95,cash
+2026-06-30,Blue Door Cafe,Dining,48.15,cash
+2026-06-30,City Fuel,Transport,61.26,cash
+2026-07-01,Corner Grocer,Groceries,47.72,credit
+2026-07-01,Pizza Lane,Dining,14.22,cash
+2026-07-02,Cinema 9,Entertainment,38.45,credit
+2026-07-02,Fresh Market,Groceries,83.34,debit
+2026-07-02,Pizza Lane,Dining,51.28,cash
+2026-07-03,Pho Street,Dining,23.77,credit
+2026-07-03,Power & Light,Utilities,95.89,debit
+2026-07-03,Ride Share,Transport,10.98,cash
+2026-07-04,Hardware Hub,Home,185.32,credit
+2026-07-04,Ride Share,Transport,3.53,debit
+2026-07-05,Fiber Net,Utilities,65.0,debit
+2026-07-06,Fresh Market,Groceries,55.36,debit
+2026-07-07,Linen & Co,Home,94.72,credit
+2026-07-07,Record Shop,Entertainment,-4.01,cash
+2026-07-07,Record Shop,Entertainment,8.03,cash
+2026-07-07,Ride Share,Transport,52.56,credit
+2026-07-08,Ride Share,Transport,3.38,debit
+2026-07-08,StreamBox,Entertainment,30.97,debit
+2026-07-09,Metro Transit,Transport,49.16,cash
+2026-07-10,City Fuel,Transport,64.02,debit
+2026-07-10,Corner Grocer,Groceries,107.81,credit
+2026-07-10,Pizza Lane,Dining,64.3,debit
+2026-07-11,Family Dental,Health,105.63,debit
+2026-07-11,Northside Foods,Groceries,105.2,cash
+2026-07-14,Cinema 9,Entertainment,41.2,debit
+2026-07-14,Fresh Market,Groceries,20.41,cash
+2026-07-14,Metro Transit,Transport,10.25,credit
+2026-07-15,Northside Foods,Groceries,31.45,debit
+2026-07-15,Ride Share,Transport,48.84,cash
+2026-07-15,Water District,Utilities,30.53,debit
+2026-07-16,Hardware Hub,Home,178.04,credit
+2026-07-16,Pho Street,Dining,34.78,debit
+2026-07-16,Ride Share,Transport,17.78,debit
+2026-07-17,Pho Street,Dining,67.47,cash
+2026-07-18,Blue Door Cafe,Dining,29.56,cash
+2026-07-18,Fresh Market,Groceries,95.0,cash
+2026-07-20,Cinema 9,Entertainment,7.63,cash
+2026-07-20,Pho Street,Dining,65.26,cash
+2026-07-21,Blue Door Cafe,Dining,49.64,credit
+2026-07-22,Northside Foods,Groceries,42.72,debit
+2026-07-22,Taqueria Sol,Dining,15.37,credit
+2026-07-23,Corner Grocer,Groceries,48.92,debit
+2026-07-24,Record Shop,Entertainment,43.11,cash
+2026-07-25,Fresh Market,Groceries,114.6,debit
+2026-07-26,Corner Grocer,Groceries,88.83,credit
+2026-07-26,Metro Transit,Transport,24.63,cash
+2026-07-27,Ride Share,Transport,7.66,credit
+2026-07-28,City Fuel,Transport,6.34,credit
+2026-07-29,Metro Transit,Transport,16.83,cash
+2026-07-29,Northside Foods,Groceries,45.3,cash
+2026-07-30,Hardware Hub,Home,140.41,cash
+2026-07-30,Ride Share,Transport,6.12,cash
+2026-07-31,Corner Grocer,Groceries,42.82,debit
+2026-08-01,Corner Grocer,Groceries,133.94,cash
+2026-08-02,Northside Foods,Groceries,68.04,cash
+2026-08-02,Pho Street,Dining,52.31,cash
+2026-08-03,Hardware Hub,Home,102.23,cash
+2026-08-03,Power & Light,Utilities,96.24,debit
+2026-08-04,Corner Grocer,Groceries,81.0,debit
+2026-08-05,Corner Grocer,Groceries,100.34,cash
+2026-08-05,Fiber Net,Utilities,65.0,debit
+2026-08-05,Linen & Co,Home,184.37,debit
+2026-08-06,Corner Grocer,Groceries,45.41,cash
+2026-08-07,Blue Door Cafe,Dining,45.49,debit
+2026-08-09,Blue Door Cafe,Dining,30.82,cash
+2026-08-09,City Fuel,Transport,43.97,debit
+2026-08-09,Corner Grocer,Groceries,116.16,credit
+2026-08-10,Pizza Lane,Dining,58.67,cash
+2026-08-11,Fresh Market,Groceries,135.79,cash
+2026-08-11,Taqueria Sol,Dining,44.22,debit
+2026-08-12,Metro Transit,Transport,64.87,cash
+2026-08-12,Taqueria Sol,Dining,14.74,credit
+2026-08-13,Cinema 9,Entertainment,32.41,cash
+2026-08-14,Northside Foods,Groceries,96.35,credit
+2026-08-15,Water District,Utilities,47.39,debit
+2026-08-16,Metro Transit,Transport,36.22,credit
+2026-08-17,Northside Foods,Groceries,125.0,cash
+2026-08-18,Ride Share,Transport,40.09,credit
+2026-08-19,Northside Foods,Groceries,101.98,cash
+2026-08-20,Hardware Hub,Home,78.89,credit
+2026-08-20,Northside Foods,Groceries,29.29,debit
+2026-08-21,Taqueria Sol,Dining,10.26,credit
+2026-08-22,City Fuel,Transport,19.65,debit
+2026-08-22,Fresh Market,Groceries,-49.31,credit
+2026-08-22,Fresh Market,Groceries,98.62,credit
+2026-08-23,Fresh Market,Groceries,84.53,debit
+2026-08-24,Fresh Market,Groceries,20.04,cash
+2026-08-24,Pizza Lane,Dining,47.68,credit
+2026-08-25,City Fuel,Transport,33.98,credit
+2026-08-25,Corner Grocer,Groceries,53.78,credit
+2026-08-26,Pho Street,Dining,15.29,cash
+2026-08-27,Garden Supply,Home,33.23,cash
+2026-08-28,Fresh Market,Groceries,129.8,debit
+2026-08-28,Pho Street,Dining,25.9,cash
+2026-08-29,Blue Door Cafe,Dining,43.55,cash
+2026-08-29,Corner Grocer,Groceries,63.91,debit
+2026-08-29,Ride Share,Transport,14.44,cash
+2026-08-30,Northside Foods,Groceries,34.98,cash
+2026-08-31,Record Shop,Entertainment,45.69,cash
+2026-09-01,Cinema 9,Entertainment,47.32,credit
+2026-09-01,Fresh Market,Groceries,84.85,debit
+2026-09-01,Taqueria Sol,Dining,19.6,credit
+2026-09-02,Taqueria Sol,Dining,37.95,debit
+2026-09-03,Corner Grocer,Groceries,89.88,cash
+2026-09-03,Power & Light,Utilities,97.74,debit
+2026-09-04,Corner Grocer,Groceries,105.21,debit
+2026-09-04,Metro Transit,Transport,9.19,credit
+2026-09-04,Pizza Lane,Dining,39.52,credit
+2026-09-05,Family Dental,Health,91.06,credit
+2026-09-05,Fiber Net,Utilities,65.0,debit
+2026-09-05,Northside Foods,Groceries,31.64,cash
+2026-09-06,Ride Share,Transport,37.75,credit
+2026-09-07,Garden Supply,Home,177.62,cash
+2026-09-08,Northside Foods,Groceries,42.66,credit
+2026-09-08,Ride Share,Transport,27.66,cash
+2026-09-09,Fresh Market,Groceries,20.96,debit
+2026-09-10,City Fuel,Transport,53.57,debit
+2026-09-10,Fresh Market,Groceries,61.33,cash
+2026-09-12,Fresh Market,Groceries,23.02,cash
+2026-09-13,Corner Grocer,Groceries,40.9,credit
+2026-09-13,Pizza Lane,Dining,44.16,debit
+2026-09-14,Pho Street,Dining,50.86,cash
+2026-09-15,Corner Grocer,Groceries,29.76,cash
+2026-09-15,Ride Share,Transport,54.04,debit
+2026-09-15,Water District,Utilities,48.66,debit
+2026-09-16,Corner Grocer,Groceries,85.99,debit
+2026-09-17,Fresh Market,Groceries,57.31,cash
+2026-09-17,Taqueria Sol,Dining,59.25,debit
+2026-09-18,Family Dental,Health,166.07,credit
+2026-09-19,Corner Grocer,Groceries,126.87,credit
+2026-09-20,Cinema 9,Entertainment,16.93,cash
+2026-09-20,Garden Supply,Home,171.59,cash
+2026-09-20,Ride Share,Transport,48.81,debit
+2026-09-22,Blue Door Cafe,Dining,-7.41,cash
+2026-09-22,Blue Door Cafe,Dining,14.81,cash
+2026-09-22,Northside Foods,Groceries,135.39,cash
+2026-09-22,Ride Share,Transport,4.1,cash
+2026-09-23,Corner Grocer,Groceries,137.0,debit
+2026-09-23,Record Shop,Entertainment,6.12,cash
+2026-09-24,Northside Foods,Groceries,132.51,cash
+2026-09-25,Northside Foods,Groceries,84.42,credit
+2026-09-26,Fresh Market,Groceries,102.02,debit
+2026-09-26,Hardware Hub,Home,213.42,cash
+2026-09-27,City Fuel,Transport,38.01,debit
+2026-09-28,Fresh Market,Groceries,-44.02,cash
+2026-09-28,Fresh Market,Groceries,88.04,cash
+2026-09-29,Corner Grocer,Groceries,108.24,debit
+2026-09-29,Metro Transit,Transport,42.0,credit
+2026-09-29,Taqueria Sol,Dining,63.39,credit
+2026-09-30,Fresh Market,Groceries,27.55,credit
