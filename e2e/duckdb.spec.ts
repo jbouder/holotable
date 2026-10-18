@@ -1,6 +1,9 @@
+import { existsSync, readFileSync } from "node:fs";
+import { join } from "node:path";
 import { expect, test } from "@playwright/test";
 import { expectNoA11yViolations, setAppearance } from "./support/a11y";
 import { dashboardId, waitForPanels } from "./support/app";
+import { DUCKDB_DIR } from "./env";
 
 /*
  * A DuckDB source end to end (#573), against the Parquet file `prepare.ts`
@@ -132,6 +135,112 @@ test("a DuckDB source: path picker, discovery, test, generate, render", async ({
   if (id) await request.delete(`/api/dashboards/${id}`);
   const removed = await request.delete(`/api/sources/${sourceId}`);
   expect(removed.ok(), await removed.text()).toBe(true);
+});
+
+/*
+ * Uploading CSV files from the browser (#595): the sample the app ships,
+ * read from disk the way a person's file would be picked, uploaded with
+ * progress, its table discovered and allowlisted, a dashboard generated over
+ * it with the recorded model, and a panel rendered from the uploaded rows.
+ */
+test("an uploaded CSV: progress, discovery, create, generate, render", async ({
+  page,
+  request,
+}) => {
+  test.setTimeout(180_000);
+  const sourceId = `e2e-upload-${Date.now().toString(36)}`;
+  const sourceName = `E2E upload ${sourceId}`;
+  const sample = readFileSync(
+    join(process.cwd(), "public/samples/household-expenses.csv"),
+  );
+
+  await test.step("upload the sample and create a source over it", async () => {
+    await page.goto("/data-sources");
+    await page.getByRole("button", { name: "Add source" }).first().click();
+    const dialog = page.getByRole("dialog", { name: "Add source" });
+    await dialog.getByRole("button", { name: "or enter configuration manually" }).click();
+    await dialog.getByRole("radio", { name: "Upload files" }).click();
+    await dialog.getByLabel("Source id").fill(sourceId);
+    await dialog.getByLabel("Name").fill(sourceName);
+    // The form offers the sample by URL; the journey picks the same file
+    // from disk, as a person would.
+    await expect(dialog.getByRole("button", { name: "Try the sample" })).toBeVisible();
+    await dialog.getByLabel("Files", { exact: true }).setInputFiles({
+      name: "household-expenses.csv",
+      mimeType: "text/csv",
+      buffer: sample,
+    });
+    const bar = dialog.getByRole("progressbar", { name: "household-expenses.csv" });
+    await expect(bar).toBeVisible();
+    await dialog.getByRole("button", { name: "Upload", exact: true }).click();
+    await expect(
+      dialog.getByText("Stored as the table household_expenses"),
+    ).toBeVisible();
+    await expect(dialog.getByText("Done", { exact: true })).toBeVisible();
+    await dialog.getByRole("checkbox", { name: /^household_expenses\b/ }).check();
+    await expectNoA11yViolations(page);
+    await dialog.getByRole("button", { name: "Create source" }).click();
+    await expect(dialog).toBeHidden();
+    await expect(page.locator(`#source-${sourceId}`)).toBeVisible();
+  });
+
+  let uploaded = "";
+  await test.step("its path is an ordinary relative path under its own uploads", async () => {
+    const listing = await request.get("/api/sources?workspaceId=demo");
+    const row = (await listing.json()).sources.find(
+      (s: { id: string }) => s.id === sourceId,
+    );
+    expect(row?.config?.path).toMatch(/^uploads\/demo\/[0-9a-f]{16}$/);
+    uploaded = row.config.path;
+    expect(existsSync(join(DUCKDB_DIR, uploaded, "household_expenses.csv"))).toBe(true);
+  });
+
+  await test.step("refresh, then generate a dashboard against it", async () => {
+    await page.getByRole("button", { name: `Refresh ${sourceName}` }).click();
+    const refresh = page.getByRole("dialog");
+    await refresh
+      .getByRole("button", { name: /^(Mark as refreshed|Apply changes)$/ })
+      .click();
+    await expect(refresh).toBeHidden();
+
+    await page.goto("/dashboards/new");
+    await page.getByRole("button", { name: /^Data source:/ }).click();
+    const sources = page.getByRole("menu");
+    const pick = sources.getByRole("menuitemcheckbox", { name: new RegExp(sourceName) });
+    if ((await pick.getAttribute("aria-checked")) !== "true") await pick.click();
+    const others = sources
+      .getByRole("menuitemcheckbox", { checked: true })
+      .filter({ hasNotText: sourceName });
+    while ((await others.count()) > 0) await others.first().click();
+    await page.keyboard.press("Escape");
+    await page.getByLabel("Describe the dashboard").fill("Where the money goes");
+    await page.getByRole("button", { name: "Generate" }).click();
+    // The recorded answer for an uploaded expenses file (src/lib/ai/stub.ts).
+    const preview = page.getByRole("region", { name: "Dashboard preview" });
+    await expect(preview.getByText("Household spending").first()).toBeVisible();
+    await preview.getByRole("button", { name: "Save dashboard" }).click();
+    const save = page.getByRole("dialog", { name: "Save dashboard" });
+    await save.getByRole("button", { name: "Save dashboard" }).click();
+    await page.waitForURL(/\/dashboards\/[0-9a-f-]{36}$/);
+  });
+
+  const dashboardUrl = page.url();
+  await test.step("a panel renders from the uploaded rows", async () => {
+    await waitForPanels(page);
+    const table = page.locator('[data-panel-id="by-month"]');
+    await expect(table).toHaveAttribute("data-status", "live", { timeout: 30_000 });
+    await expect(page.locator('[data-panel-id="by-category"]')).toHaveAttribute(
+      "data-status",
+      "live",
+    );
+  });
+
+  const id = dashboardUrl.split("/").at(-1);
+  if (id) await request.delete(`/api/dashboards/${id}`);
+  const removed = await request.delete(`/api/sources/${sourceId}`);
+  expect(removed.ok(), await removed.text()).toBe(true);
+  // Deleting an upload source takes its files with it.
+  expect(existsSync(join(DUCKDB_DIR, uploaded))).toBe(false);
 });
 
 test("the seeded Demo files dashboard renders from its Parquet and CSV files", async ({

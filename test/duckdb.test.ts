@@ -207,10 +207,10 @@ test("a DuckDB source names no secret_ref, and its listing names no path", () =>
 
 test("checkConfig refuses every DuckDB config while DUCKDB_SOURCES_DIR is unset", async () => {
   const kind = serverKind("duckdb");
-  assert.equal(await kind.checkConfig(lakeSource().config), null);
+  assert.equal(await kind.checkConfig(lakeSource().config, "ws"), null);
   writable.duckdbSourcesDir = "";
   try {
-    const problem = await kind.checkConfig(lakeSource().config);
+    const problem = await kind.checkConfig(lakeSource().config, "ws");
     assert.match(problem ?? "", /DUCKDB_SOURCES_DIR/);
     const result = await kind.test(lakeSource());
     assert.equal(result.ok, false);
@@ -220,7 +220,42 @@ test("checkConfig refuses every DuckDB config while DUCKDB_SOURCES_DIR is unset"
   }
   // A path that resolves out of the root is refused on save.
   const escaping = { ...lakeSource().config, path: "missing" };
-  assert.match((await kind.checkConfig(escaping)) ?? "", /does not exist/);
+  assert.match((await kind.checkConfig(escaping, "ws")) ?? "", /does not exist/);
+});
+
+test("another workspace's upload directory is refused on save and on every execution (#595)", async () => {
+  const theirs = join(root, "uploads", "fin", "f00d");
+  mkdirSync(theirs, { recursive: true });
+  writeFileSync(join(theirs, "ledger.csv"), "ts,amount\n2026-01-01 00:06:00,5\n");
+  const cfg = {
+    kind: "duckdb",
+    path: "uploads/fin/f00d",
+    tables: [{ name: "ledger", columns: [{ name: "amount", type: "BIGINT" }] }],
+  };
+  const kind = serverKind("duckdb");
+  // Saved in "fin" it is fine; in "ws" (the record's workspace) it is not.
+  assert.equal(await kind.checkConfig(DuckDbConfig.parse(cfg), "fin"), null);
+  assert.match(
+    (await kind.checkConfig(DuckDbConfig.parse(cfg), "ws")) ?? "",
+    /upload directory of this workspace/,
+  );
+  // A row that got past the save (written before, or by hand) still cannot
+  // run: the guard runs again on every open, against the record's workspace.
+  const smuggled = record("smuggled", cfg);
+  await assert.rejects(
+    run(smuggled, "SELECT amount FROM ledger"),
+    (err) =>
+      err instanceof QueryExecutionError &&
+      /upload directory of this workspace/.test(err.message),
+  );
+  const tested = await kind.test(smuggled);
+  assert.equal(tested.ok, false);
+  await assert.rejects(duckdbDiscovery("uploads/fin/f00d", "ws").tables());
+  assert.equal(
+    (await duckdbDiscovery("uploads/fin/f00d", "fin").tables())[0]?.name,
+    "ledger",
+  );
+  await kind.dispose("smuggled");
 });
 
 test("the locked engine refuses the escapes itself: another file, ATTACH, INSTALL, SET", async () => {
@@ -576,7 +611,7 @@ test("the path route is source-admin only, rate limited, and answers the menu al
 });
 
 test("discovery reads a path's tables and columns into the allowlist menu, naming no path (#573)", async () => {
-  const lake = await duckdbDiscovery("lake").tables();
+  const lake = await duckdbDiscovery("lake", "ws").tables();
   assert.deepEqual(
     lake.map((t) => [t.name, t.columns.map((c) => c.name)]),
     [
@@ -585,7 +620,7 @@ test("discovery reads a path's tables and columns into the allowlist menu, namin
     ],
   );
   assert.equal(lake.find((t) => t.name === "metrics")?.columns[0]?.type, "TIMESTAMP");
-  const app = await duckdbDiscovery("app.duckdb").tables();
+  const app = await duckdbDiscovery("app.duckdb", "ws").tables();
   assert.deepEqual(
     app.map((t) => t.name),
     ["requests"],
@@ -600,7 +635,7 @@ test("discovery reads a path's tables and columns into the allowlist menu, namin
     "../root/lake",
     "broken.duckdb",
   ]) {
-    await assert.rejects(duckdbDiscovery(path).tables(), (err: Error) => {
+    await assert.rejects(duckdbDiscovery(path, "ws").tables(), (err: Error) => {
       assertNoPath(err.message);
       return true;
     });
@@ -616,8 +651,15 @@ test("discovery reads a path's tables and columns into the allowlist menu, namin
 test("the Add source dialog offers DuckDB only when the server can hold one (#573)", async () => {
   const offered = async () =>
     Object.fromEntries((await sourceKindAvailability()).map((k) => [k.kind, k]));
-  // Set up: offered, with no reason.
-  assert.deepEqual((await offered()).duckdb, { kind: "duckdb", available: true });
+  // Set up: offered, with no reason, and uploads on (#595) with their bounds.
+  const limits = { maxBytes: 50 * 1024 * 1024, maxFiles: 20 };
+  assert.deepEqual((await offered()).duckdb, {
+    kind: "duckdb",
+    available: true,
+    uploads: { available: true, ...limits },
+  });
+  // Only the kind that takes uploads says anything about them.
+  assert.equal((await offered()).timescaledb?.uploads, undefined);
   // The other kinds need nothing of the server.
   assert.equal((await offered()).timescaledb?.available, true);
   assert.equal((await offered()).prometheus?.available, true);
@@ -628,6 +670,7 @@ test("the Add source dialog offers DuckDB only when the server can hold one (#57
       kind: "duckdb",
       available: false,
       reason: SOURCES_DIR_UNSET,
+      uploads: { available: false, reason: SOURCES_DIR_UNSET, ...limits },
     });
   } finally {
     writable.duckdbSourcesDir = root;
@@ -641,6 +684,7 @@ test("the Add source dialog offers DuckDB only when the server can hold one (#57
       kind: "duckdb",
       available: false,
       reason: DUCKDB_UNAVAILABLE,
+      uploads: { available: false, reason: DUCKDB_UNAVAILABLE, ...limits },
     });
   } finally {
     setDuckDbLoaderForTests(null);
@@ -662,7 +706,7 @@ test("without the binding the kind says so, and nothing else breaks", async () =
   try {
     const source = record("busy", { ...lakeSource().config });
     const kind = serverKind(source);
-    assert.equal(await kind.checkConfig(source.config), DUCKDB_UNAVAILABLE);
+    assert.equal(await kind.checkConfig(source.config, "ws"), DUCKDB_UNAVAILABLE);
     const result = await kind.test(source);
     assert.equal(result.ok, false);
     assert.equal(result.message, DUCKDB_UNAVAILABLE);

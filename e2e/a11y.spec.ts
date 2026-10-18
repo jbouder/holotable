@@ -181,6 +181,24 @@ for (const { theme, palette, name } of APPEARANCES) {
       await expectNoA11yViolations(page);
     });
 
+    test("the upload form, finished, with its progress bars (#595)", async ({ page }) => {
+      // Each run stores an upload (rate limited per user), so the default
+      // palette in both schemes, not every named theme.
+      test.skip(palette !== "holotable", "scanned in the default palette's two schemes");
+      await page.goto("/data-sources");
+      await page.getByRole("button", { name: "Add source" }).first().click();
+      const dialog = page.getByRole("dialog", { name: "Add source" });
+      await dialog
+        .getByRole("button", { name: "or enter configuration manually" })
+        .click();
+      await dialog.getByRole("radio", { name: "Upload files" }).click();
+      await dialog.getByRole("button", { name: "Try the sample" }).click();
+      await expect(dialog.getByRole("progressbar")).toBeVisible();
+      await dialog.getByRole("button", { name: "Upload", exact: true }).click();
+      await expect(dialog.getByText("Done", { exact: true })).toBeVisible();
+      await expectNoA11yViolations(page);
+    });
+
     test("data sources, the Loki form and its discovered labels (#563)", async ({
       page,
     }) => {

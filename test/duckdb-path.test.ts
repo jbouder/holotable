@@ -9,8 +9,17 @@ import {
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { DuckDbPathError, resolveSourcePath, SOURCES_DIR_UNSET } from "@/lib/duckdb/path";
-import { DuckDbConfig, duckdbPathProblem } from "@/lib/sources/kinds/duckdb";
+import {
+  DuckDbPathError,
+  listSourcePaths,
+  resolveSourcePath,
+  SOURCES_DIR_UNSET,
+} from "@/lib/duckdb/path";
+import {
+  DuckDbConfig,
+  duckdbPathProblem,
+  uploadScopeProblem,
+} from "@/lib/sources/kinds/duckdb";
 
 /**
  * The DuckDB path guard (#572): a source's path is as untrusted as a URL, so
@@ -35,8 +44,13 @@ function tree() {
   return { base, root, outside };
 }
 
-const refused = async (path: string, root: string, message: RegExp) => {
-  await assert.rejects(resolveSourcePath(path, root), (err: unknown) => {
+const refused = async (
+  path: string,
+  root: string,
+  message: RegExp,
+  workspaceId = "ws",
+) => {
+  await assert.rejects(resolveSourcePath(path, workspaceId, root), (err: unknown) => {
     assert.ok(err instanceof DuckDbPathError, String(err));
     assert.match(err.message, message);
     // A refusal never says where on the server anything is.
@@ -47,14 +61,17 @@ const refused = async (path: string, root: string, message: RegExp) => {
 
 test("a directory or a .duckdb file inside the root resolves", async () => {
   const { root } = tree();
-  const dir = await resolveSourcePath("sales", root);
+  const dir = await resolveSourcePath("sales", "ws", root);
   assert.equal(dir.layout, "directory");
   assert.equal(dir.absolute, join(root, "sales"));
   assert.equal(dir.root, root);
-  const db = await resolveSourcePath("metrics.duckdb", root);
+  const db = await resolveSourcePath("metrics.duckdb", "ws", root);
   assert.equal(db.layout, "database");
   // A symlink that stays inside the root is followed to where it lands.
-  assert.equal((await resolveSourcePath("alias", root)).absolute, join(root, "sales"));
+  assert.equal(
+    (await resolveSourcePath("alias", "ws", root)).absolute,
+    join(root, "sales"),
+  );
 });
 
 test("..  and absolute paths are refused before the filesystem is asked", async () => {
@@ -87,7 +104,7 @@ test("a path must be what it says: a directory, or a .duckdb file", async () => 
 });
 
 test("with DUCKDB_SOURCES_DIR unset every path is refused, naming the variable", async () => {
-  await assert.rejects(resolveSourcePath("sales", ""), (err: unknown) => {
+  await assert.rejects(resolveSourcePath("sales", "ws", ""), (err: unknown) => {
     assert.ok(err instanceof DuckDbPathError);
     assert.equal(err.message, SOURCES_DIR_UNSET);
     assert.match(err.message, /DUCKDB_SOURCES_DIR/);
@@ -110,4 +127,60 @@ test("the config refuses the same paths the guard refuses lexically", () => {
     DuckDbConfig.safeParse({ kind: "duckdb", path: "x", tables, host: "h" }).success,
     false,
   );
+});
+
+/**
+ * Uploads (#595) land under `uploads/<workspaceId>/<dir>`, and a source may
+ * name only its own workspace's. The guard holds that on the path as typed
+ * and on where it resolves, and the guard is what both the save check and
+ * every open run (`duckdbConfigProblem`, `prepare` in the client), so this is
+ * the rule on save and on execution alike; test/duckdb.test.ts runs both.
+ */
+function uploadsTree() {
+  const { base, root } = tree();
+  mkdirSync(join(root, "uploads", "ops", "a1"), { recursive: true });
+  mkdirSync(join(root, "uploads", "fin", "b2"), { recursive: true });
+  writeFileSync(join(root, "uploads", "ops", "a1", "orders.csv"), "a\n1\n");
+  writeFileSync(join(root, "uploads", "fin", "b2", "ledger.csv"), "a\n1\n");
+  // An operator's symlink elsewhere under the root, into a workspace's uploads.
+  symlinkSync(join(root, "uploads", "fin", "b2"), join(root, "shortcut"));
+  return { base, root };
+}
+
+test("a source names only its own workspace's upload directories, as typed (#595)", () => {
+  assert.equal(uploadScopeProblem("uploads/ops/a1", "ops"), null);
+  assert.equal(uploadScopeProblem("sales", "ops"), null);
+  for (const path of [
+    "uploads/fin/b2",
+    "uploads/ops",
+    "uploads",
+    "uploads/ops/a1/deeper",
+    "Uploads/fin/b2",
+    "UPLOADS/fin/b2/",
+  ]) {
+    assert.notEqual(uploadScopeProblem(path, "ops"), null, path);
+  }
+  // It names no path, only the rule.
+  assert.doesNotMatch(String(uploadScopeProblem("uploads/fin/b2", "ops")), /fin|b2/);
+});
+
+test("the guard refuses another workspace's uploads, however the path gets there (#595)", async () => {
+  const { root } = uploadsTree();
+  const own = await resolveSourcePath("uploads/ops/a1", "ops", root);
+  assert.equal(own.absolute, join(root, "uploads", "ops", "a1"));
+  await refused("uploads/fin/b2", root, /upload directory of this workspace/, "ops");
+  await refused("uploads/ops", root, /upload directory of this workspace/, "ops");
+  await refused("uploads", root, /upload directory of this workspace/, "ops");
+  // The same directory is fine for its own workspace...
+  await resolveSourcePath("uploads/fin/b2", "fin", root);
+  // ...and a symlink that lands in it is judged by where it lands.
+  await refused("shortcut", root, /outside this workspace's own upload/, "ops");
+});
+
+test("the path picker never offers uploads, nor a link into them (#595)", async () => {
+  const { root } = uploadsTree();
+  const names = (await listSourcePaths(root)).map((p) => p.name);
+  assert.ok(names.includes("sales"));
+  assert.ok(!names.includes("uploads"), names.join());
+  assert.ok(!names.includes("shortcut"), names.join());
 });

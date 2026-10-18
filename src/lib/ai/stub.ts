@@ -141,6 +141,45 @@ export function recordedDuckDbDashboard(sourceId: string) {
   };
 }
 
+/**
+ * The recorded dashboard for an uploaded expenses file (#595): the sample at
+ * `public/samples/household-expenses.csv`, uploaded as a DuckDB source, is
+ * the table `household_expenses`. No time field: the file is six months of
+ * history, and these panels read all of it.
+ */
+export function recordedExpensesDashboard(sourceId: string) {
+  return {
+    title: "Household spending",
+    timeRange: { from: "now-1h", to: "now" },
+    refreshIntervalMs: 60000,
+    panels: [
+      {
+        id: "by-category",
+        title: "Spend by category",
+        description: "Total spent per category across the file.",
+        viz: "bar",
+        query: {
+          sourceId,
+          sql: "SELECT category, sum(amount) AS spend FROM household_expenses GROUP BY category ORDER BY spend DESC",
+        },
+        format: "number",
+        layout: { x: 0, y: 0, w: 6, h: 4 },
+      },
+      {
+        id: "by-month",
+        title: "Spend by month",
+        description: "Total spent per calendar month.",
+        viz: "table",
+        query: {
+          sourceId,
+          sql: "SELECT date_trunc('month', date) AS month, sum(amount) AS spend, count(*) AS payments FROM household_expenses GROUP BY month ORDER BY month",
+        },
+        layout: { x: 6, y: 0, w: 6, h: 4 },
+      },
+    ],
+  };
+}
+
 /** The recorded Explore answer for a Prometheus source (#387). */
 export function recordedPromqlExplorePanel(sourceId: string) {
   return {
@@ -372,7 +411,10 @@ export function stubAnswer(options: CallOptions): string {
           : promql
             ? recordedPromqlDashboard(sourceId)
             : duckdb
-              ? recordedDuckDbDashboard(sourceId)
+              ? // An uploaded expenses file (#595) gets its own recording.
+                /^- household_expenses\b/m.test(system)
+                ? recordedExpensesDashboard(sourceId)
+                : recordedDuckDbDashboard(sourceId)
               : recordedDashboard(sourceId),
       );
     }

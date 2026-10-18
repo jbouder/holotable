@@ -125,10 +125,14 @@ export async function refreshDuckDbCatalog(
  * (#573): what **Discover tables** offers as a menu, capped as an allowlist
  * is so the menu can never exceed what a config could hold. A name too long
  * for the catalog is left out and a type too long is cut, rather than failing
- * the whole menu. The path goes through the same guard an execution's does.
+ * the whole menu. The path goes through the same guard an execution's does,
+ * against the workspace the discovery was authorized in.
  */
-export async function discoverDuckDbTables(path: string): Promise<CatalogTable[]> {
-  const found = await introspect({ config: { path } });
+export async function discoverDuckDbTables(
+  path: string,
+  workspaceId: string,
+): Promise<CatalogTable[]> {
+  const found = await introspect({ workspaceId, config: { path } });
   const tables: CatalogTable[] = [];
   for (const table of found.tables) {
     if (tables.length >= MAX_TABLES) break;

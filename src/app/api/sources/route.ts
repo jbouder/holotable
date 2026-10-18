@@ -56,7 +56,10 @@ export const POST = route("sources.create", async (req: Request) => {
   if (body.secretRef !== undefined)
     requireGrantedSecretRef(body.secretRef, body.workspaceId);
   assertRowFilterSavable(body.config);
-  const unreachable = await serverKind(body.config).checkConfig(body.config);
+  const unreachable = await serverKind(body.config).checkConfig(
+    body.config,
+    body.workspaceId,
+  );
   if (unreachable) throw new HttpError(400, unreachable, {}, "validation");
 
   const source = await createSource({

@@ -14,7 +14,11 @@ import { type LokiCatalog, loki } from "@/lib/sources/kinds/loki";
 import { type DuckDbFacts, duckdb } from "@/lib/sources/kinds/duckdb";
 import { type PrometheusCatalog, prometheus } from "@/lib/sources/kinds/prometheus";
 import { type TimescaleDbFacts, timescaledb } from "@/lib/sources/kinds/timescaledb";
-import type { KindAvailability, RowFilterTarget } from "@/lib/sources/types";
+import type {
+  KindAvailability,
+  RowFilterTarget,
+  UploadAvailability,
+} from "@/lib/sources/types";
 
 /**
  * The source kinds (#382): what a source may be, as `src/lib/panels/registry.ts`
@@ -238,4 +242,16 @@ export function isKindAvailable(
   kind: SourceKindName,
 ): boolean {
   return kinds.some((k) => k.kind === kind && k.available);
+}
+
+/**
+ * The uploads a kind takes on this server (#595), when it takes them now,
+ * or null: what the Add source dialog's "Upload files" card is shown for.
+ */
+export function availableUploads(
+  kinds: readonly KindAvailability[],
+  kind: SourceKindName,
+): UploadAvailability | null {
+  const uploads = kinds.find((k) => k.kind === kind)?.uploads;
+  return uploads?.available ? uploads : null;
 }

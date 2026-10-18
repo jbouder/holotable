@@ -1,7 +1,12 @@
 import { readdir, realpath, stat } from "node:fs/promises";
 import { isAbsolute, join, relative, sep } from "node:path";
 import { config } from "@/lib/config";
-import { duckdbLayout, duckdbPathProblem } from "@/lib/sources/kinds/duckdb";
+import {
+  duckdbLayout,
+  duckdbPathProblem,
+  UPLOADS_DIR,
+  uploadScopeProblem,
+} from "@/lib/sources/kinds/duckdb";
 
 /**
  * The path guard for DuckDB sources (#572). A source names a path, which is
@@ -44,22 +49,40 @@ export function isInside(root: string, child: string): boolean {
 }
 
 /**
+ * Whether a resolved path, relative to the resolved root, is somewhere a
+ * source in `workspaceId` may not read (#595): anything under `uploads/`
+ * other than one of its own workspace's upload directories. Judged on where
+ * the path landed, so a symlink elsewhere under the root cannot lead a
+ * source into another workspace's uploads.
+ */
+function landsInOtherUploads(rel: string, workspaceId: string): boolean {
+  const segments = rel.split(sep);
+  if (segments[0]?.toLowerCase() !== UPLOADS_DIR) return false;
+  return segments.length !== 3 || segments[1] !== workspaceId;
+}
+
+/**
  * Resolve a source's path inside the root, or throw a {@link DuckDbPathError}.
  *
- * The lexical rules (`duckdbPathProblem`) run first, so a path the config
- * would refuse never reaches the filesystem. Then both the root and the
- * joined path are `realpath`ed, which follows every symlink on the way, and
- * the result must be inside the resolved root and be what the path says it
- * is: a directory, or a regular `.duckdb` file.
+ * The lexical rules (`duckdbPathProblem`, and the upload workspace rule) run
+ * first, so a path the config would refuse never reaches the filesystem.
+ * Then both the root and the joined path are `realpath`ed, which follows
+ * every symlink on the way, and the result must be inside the resolved root,
+ * outside every other workspace's uploads, and be what the path says it is:
+ * a directory, or a regular `.duckdb` file.
  *
- * `root` is for tests; everything else reads `DUCKDB_SOURCES_DIR`.
+ * `workspaceId` is the workspace of the source the path belongs to (or is
+ * about to): the one from the stored record or the authorized request, never
+ * from the path. `root` is for tests; everything else reads
+ * `DUCKDB_SOURCES_DIR`.
  */
 export async function resolveSourcePath(
   path: string,
+  workspaceId: string,
   root: string = config.duckdbSourcesDir,
 ): Promise<ResolvedSourcePath> {
   if (!root) throw new DuckDbPathError(SOURCES_DIR_UNSET);
-  const problem = duckdbPathProblem(path);
+  const problem = duckdbPathProblem(path) ?? uploadScopeProblem(path, workspaceId);
   if (problem) throw new DuckDbPathError(`the source path ${problem}`);
 
   let resolvedRoot: string;
@@ -80,6 +103,11 @@ export async function resolveSourcePath(
   }
   if (!isInside(resolvedRoot, absolute) || absolute === resolvedRoot) {
     throw new DuckDbPathError("the source path resolves outside DUCKDB_SOURCES_DIR.");
+  }
+  if (landsInOtherUploads(relative(resolvedRoot, absolute), workspaceId)) {
+    throw new DuckDbPathError(
+      `the source path resolves into ${UPLOADS_DIR}/ outside this workspace's own upload directories.`,
+    );
   }
 
   const layout = duckdbLayout(path);
@@ -111,7 +139,8 @@ export interface ListedSourcePath {
  * absolute path, nothing hidden (a leading `.`), and nothing the path guard
  * would refuse: a symlink counts only when it resolves inside the root, and
  * an entry only when its name says what it is (a directory not ending in
- * `.duckdb`, a regular file that does). A listing is a menu; saving still runs
+ * `.duckdb`, a regular file that does). Never `uploads/` (#595), nor
+ * anything that resolves into it. A listing is a menu; saving still runs
  * {@link resolveSourcePath}.
  *
  * Throws a {@link DuckDbPathError}, naming the variable and never a path, when
@@ -134,7 +163,10 @@ export async function listSourcePaths(
   const listed: ListedSourcePath[] = [];
   for (const name of names.sort()) {
     if (listed.length >= MAX_LISTED_PATHS) break;
+    // Uploads (#595) are each workspace's own, reached through their
+    // source, never offered as a path to pick.
     if (name.startsWith(".") || duckdbPathProblem(name)) continue;
+    if (name.toLowerCase() === UPLOADS_DIR) continue;
     let absolute: string;
     try {
       absolute = await realpath(join(resolvedRoot, name));
@@ -142,6 +174,9 @@ export async function listSourcePaths(
       continue;
     }
     if (!isInside(resolvedRoot, absolute) || absolute === resolvedRoot) continue;
+    if (relative(resolvedRoot, absolute).split(sep)[0]?.toLowerCase() === UPLOADS_DIR) {
+      continue;
+    }
     const info = await stat(absolute).catch(() => null);
     const layout = duckdbLayout(name);
     if (layout === "directory" ? info?.isDirectory() : info?.isFile()) {

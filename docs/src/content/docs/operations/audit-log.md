@@ -32,6 +32,7 @@ configure.
 | `query.execute` | A statement run from preview (`via: "preview"`), by a chat (`via: "chat"`, with `conversationId` and `panelId` for Explore) or by an MCP client's `run_query` (`via: "mcp"`) | source |
 | `source.create`, `source.update`, `source.delete` | Source changes, including hiding a column (`fields: ["catalog"]`) | source |
 | `source.test`, `source.refresh`, `source.discover`, `source.draft` | Connection test, applied catalog refresh, table discovery, drafted source | source, or — before one exists |
+| `source.upload` | CSV files uploaded from the browser as a DuckDB source (`files`: a count, `bytes`: the total); `failure` with the refusal (`reason`, which names the person's file, never a server path) | — (before a source exists) |
 | `template.create`, `template.delete` | Workspace templates | template |
 | `workspace.limits.update` | A platform admin changes a workspace's LLM limits (`before`, `after`) | workspace |
 | `workspace.prompt.update` | A source-admin saves a workspace's prompt customization (`glossaryChars`, `metricDefinitions`, `examples`: sizes, not the text) | workspace |

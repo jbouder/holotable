@@ -128,7 +128,7 @@ test("the listing and the editor's catalog never carry the URL, the auth mode or
 
 test("a source URL is checked against SOURCE_URL_ALLOWLIST when it is saved", async () => {
   const check = (url: string) =>
-    serverKind("prometheus").checkConfig(SourceConfig.parse(config({ url })));
+    serverKind("prometheus").checkConfig(SourceConfig.parse(config({ url })), "ws");
   assert.equal(await check("http://127.0.0.1:9090"), null); // allowlisted by the test env
   assert.match(
     (await check("http://10.0.0.5:9090")) ?? "",

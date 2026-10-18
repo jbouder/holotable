@@ -139,7 +139,9 @@ const DISCOVER: { [K in Body["kind"]]: Discover<Extract<Body, { kind: K }>> } = 
       ? { values: await discovery.values(body.valuesFor) }
       : { labels: await discovery.labels() };
   },
-  duckdb: async (body) => ({ tables: await duckdbDiscovery(body.path).tables() }),
+  duckdb: async (body) => ({
+    tables: await duckdbDiscovery(body.path, body.workspaceId).tables(),
+  }),
 };
 
 /**

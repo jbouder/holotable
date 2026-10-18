@@ -14,6 +14,7 @@ import type { ServerSourceKind } from "@/lib/sources/server/types";
 import type { KindAvailability } from "@/lib/sources/types";
 import { discoverDuckDbTables } from "@/lib/duckdb/catalog";
 import { DuckDbPathError, listSourcePaths } from "@/lib/duckdb/path";
+import { receiveUpload, UploadError, type UploadResult } from "@/lib/duckdb/uploads";
 
 export type { ServerSourceKind } from "@/lib/sources/server/types";
 
@@ -104,10 +105,11 @@ export function lokiDiscovery(input: {
 /**
  * Discovery for a DuckDB source about to be created (#573): the tables and
  * columns under a path relative to `DUCKDB_SOURCES_DIR`, read on a freshly
- * opened, locked engine after the path guard. Errors name no path.
+ * opened, locked engine after the path guard, which holds a path under
+ * `uploads/` to `workspaceId`'s own (#595). Errors name no path.
  */
-export function duckdbDiscovery(path: string) {
-  return { tables: () => discoverDuckDbTables(path) };
+export function duckdbDiscovery(path: string, workspaceId: string) {
+  return { tables: () => discoverDuckDbTables(path, workspaceId) };
 }
 
 /**
@@ -128,17 +130,52 @@ export async function duckdbPathMenu(): Promise<
 }
 
 /**
+ * Take CSV files uploaded from the browser as a DuckDB source's directory
+ * (#595), under `uploads/<workspaceId>/`, all or nothing. A refusal is an
+ * answer, not a throw, with a message naming the variable or the person's
+ * own file and never a server path.
+ */
+export async function duckdbUpload(input: {
+  workspaceId: string;
+  contentType: string | null;
+  contentLength: number | null;
+  body: ReadableStream<Uint8Array> | null;
+}): Promise<({ ok: true } & UploadResult) | { ok: false; error: string; file?: string }> {
+  try {
+    return { ok: true, ...(await receiveUpload(input)) };
+  } catch (err) {
+    if (err instanceof UploadError) {
+      return { ok: false, error: err.message, ...(err.file ? { file: err.file } : {}) };
+    }
+    if (err instanceof DuckDbPathError) return { ok: false, error: err.message };
+    throw err;
+  }
+}
+
+/**
  * Which kinds this server can hold a source of (#573), in registry order:
  * what the Add source dialog offers. A kind with no `availability` is always
- * available.
+ * available. A kind that takes uploads (#595) says whether it can now.
  */
 export async function sourceKindAvailability(): Promise<KindAvailability[]> {
   return Promise.all(
     Object.values(SERVER_KINDS).map(async (server) => {
       const reason = (await server.availability?.()) ?? null;
-      return reason === null
-        ? { kind: server.kind, available: true }
-        : { kind: server.kind, available: false, reason };
+      const base: KindAvailability =
+        reason === null
+          ? { kind: server.kind, available: true }
+          : { kind: server.kind, available: false, reason };
+      if (!server.uploads) return base;
+      // A kind that is off takes no uploads either, for the same reason.
+      const uploadsOff = reason ?? (await server.uploads.availability());
+      return {
+        ...base,
+        uploads: {
+          available: uploadsOff === null,
+          ...(uploadsOff === null ? {} : { reason: uploadsOff }),
+          ...server.uploads.limits(),
+        },
+      };
     }),
   );
 }

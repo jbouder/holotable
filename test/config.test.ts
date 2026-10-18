@@ -6,10 +6,12 @@ import {
   config,
   cookieSecure,
   formatConfigProblems,
+  MAX_UPLOAD_FILES,
   validateConfig,
   type ConfigProblem,
   type Environment,
 } from "@/lib/config";
+import { MAX_TABLES } from "@/lib/sources/catalog";
 import { runStartupChecks } from "@/lib/startup";
 
 /** Parse a dotenv file the simple way: `KEY=value` lines, `#` comments. */
@@ -713,6 +715,58 @@ test("DuckDB sources are closed until DUCKDB_SOURCES_DIR is set, and its bounds 
   );
   assert.deepEqual(variables(warnings(ignored)).includes("DUCKDB_MEMORY_LIMIT"), true);
   assert.equal(variables(errors(ignored)).includes("DUCKDB_MEMORY_LIMIT"), false);
+});
+
+test("the DuckDB upload bounds warn in development and stop a production boot when malformed (#595)", () => {
+  const dir = { DUCKDB_SOURCES_DIR: "/srv/holotable/files" };
+  const upload = (p: { variable: string }) => p.variable.startsWith("DUCKDB_UPLOAD_");
+  assert.deepEqual(
+    validateConfig(
+      {
+        ...VALID_PRODUCTION,
+        ...dir,
+        DUCKDB_UPLOAD_MAX_BYTES: "104857600",
+        DUCKDB_UPLOAD_MAX_FILES: "200",
+      },
+      { production: true },
+    ).filter(upload),
+    [],
+  );
+  const bad = {
+    ...dir,
+    DUCKDB_UPLOAD_MAX_BYTES: "50MB",
+    DUCKDB_UPLOAD_MAX_FILES: String(MAX_UPLOAD_FILES + 1),
+  };
+  const prod = validateConfig({ ...VALID_PRODUCTION, ...bad }, { production: true });
+  assert.deepEqual(
+    variables(errors(prod))
+      .filter((v) => v.startsWith("DUCKDB_UPLOAD_"))
+      .sort(),
+    ["DUCKDB_UPLOAD_MAX_BYTES", "DUCKDB_UPLOAD_MAX_FILES"],
+  );
+  const dev = validateConfig(bad, { production: false });
+  assert.deepEqual(
+    dev.filter(upload).map((p) => p.severity),
+    ["warning", "warning"],
+  );
+  for (const zero of ["0", "-1", "1.5"]) {
+    assert.equal(
+      validateConfig(
+        { ...VALID_PRODUCTION, ...dir, DUCKDB_UPLOAD_MAX_BYTES: zero },
+        { production: true },
+      ).filter(upload).length,
+      1,
+      zero,
+    );
+  }
+  // Every uploaded file is a table: the file cap cannot outgrow an allowlist.
+  assert.equal(MAX_UPLOAD_FILES, MAX_TABLES);
+  // Bounds for uploads that can never land are said, not fatal.
+  const ignored = validateConfig(
+    { ...VALID_PRODUCTION, DUCKDB_UPLOAD_MAX_FILES: "5" },
+    { production: true },
+  );
+  assert.ok(variables(warnings(ignored)).includes("DUCKDB_UPLOAD_MAX_FILES"));
 });
 
 test("the report lists every problem, errors first, with a verdict", () => {
