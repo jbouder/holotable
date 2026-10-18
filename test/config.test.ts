@@ -1465,8 +1465,10 @@ test("the quick-start image defaults to local mode, and the hosted demo says dem
   // Both run the same image (#600). The image is for one person on their own
   // machine; the public demo must never inherit that default, where every
   // visitor would be a source-admin.
-  const dockerfile = readFileSync("deploy/quickstart/Dockerfile", "utf8");
-  // The ENV instruction's lines, not the comments that mention the demo.
+  // The quick-start target of the one Dockerfile (#612); no other target sets
+  // AUTH_MODE. The ENV instruction's lines, not the comments that mention
+  // the demo.
+  const dockerfile = readFileSync("Dockerfile", "utf8");
   const modes = [...dockerfile.matchAll(/^\s+AUTH_MODE=(\w+) \\$/gm)].map((m) => m[1]);
   assert.deepEqual(modes, ["local"]);
   assert.match(dockerfile, /\bDUCKDB_SOURCES_DIR=\/var\/lib\/holotable\/files\b/);

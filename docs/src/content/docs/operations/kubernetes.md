@@ -29,9 +29,9 @@ obvious.
 
 ## Images
 
-CI publishes both targets of the repository `Dockerfile` to
-`ghcr.io/jbouder/holotable`, for `linux/amd64` and `linux/arm64`, once every
-check has passed. `runtime` is the Next.js standalone server; `migrate` is the
+CI publishes the `runtime` and `migrate` targets of the repository
+`Dockerfile` to `ghcr.io/jbouder/holotable`, for `linux/amd64` and
+`linux/arm64`, once every check has passed. `runtime` is the Next.js standalone server; `migrate` is the
 one-shot job image that carries `tsx`, `scripts/`, and `migrations/`. Both live
 under one image name, told apart by a `-migrate` suffix:
 
@@ -43,8 +43,8 @@ under one image name, told apart by a `-migrate` suffix:
 `latest` moves only on a release, never on a merge. Every image reports its
 commit from `GET /api/health`.
 
-The all-in-one quick-start image, which is not for Kubernetes, is published
-under the same name with a `-quickstart` suffix. Its floating `quickstart` tag
+The all-in-one quick-start image, which is not for Kubernetes, is the same
+`Dockerfile`'s `quickstart` target, and is published under the same name with a `-quickstart` suffix. Its floating `quickstart` tag
 follows `main`, so `docker run` and the hosted demo show the newest build.
 
 The chart defaults both tags to its `appVersion`, which is the release tag. To
