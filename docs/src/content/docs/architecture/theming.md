@@ -117,7 +117,10 @@ re-read their colors when either attribute changes.
 `CONTRAST_PAIRS` in each one on top of Holotable's values for the same scheme.
 Text is held to AA, and a chart series to the 3:1 non-text floor. The table
 on [Accessibility](/architecture/accessibility/) is generated from the same
-code, and `e2e/a11y.spec.ts` scans every shipped theme in both schemes.
+code. In a browser, `e2e/a11y.spec.ts` scans every surface in Holotable's
+two schemes and the live dashboard in every other shipped theme's two
+schemes: the measuring is done here, and the browser proves the theme
+switch reaches a real page.
 
 ## Quality bar
 

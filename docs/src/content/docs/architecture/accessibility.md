@@ -499,14 +499,21 @@ color directly. axe-core cannot measure contrast in that mode.
 ## Automated checks
 
 - `npm test`: the contrast table above, the chart table and description
-  (`test/chart-accessibility.test.ts`), and the editor's Delete keys.
+  (`test/chart-accessibility.test.ts`), the editor's arrow and Delete keys
+  (`test/panel-layout-grid.test.tsx`), and every palette's pairings and
+  quality bar (`test/theme-quality.test.ts`).
 - `npm run e2e`: axe-core over every main surface, an open dialog, an open
-  menu and the chat panel, in both themes (`e2e/a11y.spec.ts`). Serious and
-  critical violations fail; moderate and minor are reported on the test.
+  menu and the chat panel, in the default palette's dark and light, and the
+  live dashboard in each other palette's two schemes (`e2e/a11y.spec.ts`).
+  That every pairing meets AA in every palette is the unit tests' job
+  (`test/contrast.test.ts`, `test/theme-quality.test.ts`); the browser
+  proves each surface is built right, which does not change with the
+  palette. Serious and critical violations fail; moderate and minor are
+  reported on the test.
   Exclusions are named in `e2e/support/a11y.ts` with the reason. What axe
   cannot see is asserted as behavior in `e2e/keyboard.spec.ts`: the focus
   trap and its return, the skip link, a visible focus indicator on every Tab
-  stop, and the editor keys.
+  stop, and the theme gallery's arrow keys.
 
 A manual pass with a screen reader is still the maintainer's, per release.
 

@@ -245,8 +245,12 @@ Checked, not hoped for:
   `ButtonLink` (never `<Link><Button>`); an icon-only control has an
   `aria-label`; every input has a label; focus is visible and keyboard order
   follows the page.
-- `npm run e2e` scans every main surface with axe in both themes; a new page,
-  dialog or menu adds itself to `e2e/a11y.spec.ts`.
+- A palette is proven by those unit tests, not the browser. `npm run e2e`
+  scans every main surface with axe in the default palette's dark and light,
+  and each other palette on one page (the live dashboard) in both schemes
+  (#610); a new page, dialog or menu adds itself to the default palette's
+  scans in `e2e/a11y.spec.ts`, and a new palette is scanned there by being
+  in `PALETTE_INFO`.
 
 ### Charts
 
@@ -354,6 +358,13 @@ npm run load:stream      # many viewers of one dashboard stream, some stalled (a
   a seeded dashboard `npm run smoke` already runs, or a shape the typechecker
   holds. Extend the named test that holds the rule before adding a file, and
   a change that only moves or restyles UI needs no new unit test.
+- **End-to-end specs run in parallel.** `e2e/playwright.config.ts` has a
+  `parallel` project and, after it, a `serial` one. A test makes its own
+  records under a name no other test uses (`unique()` in
+  `e2e/support/app.ts`) and never counts a shared list; one that changes
+  state the workspace or the person shares (uploads, the DuckDB root, a
+  default model, a preference) is tagged `@serial` and says why. A journey
+  does not walk a step another journey or a unit test already holds.
 - **Biome** is the linter and formatter (`npm run lint:fix`); there is no
   ESLint or Prettier. `noFloatingPromises`, `useExhaustiveDependencies`,
   `noExplicitAny` and `noConsole` are errors: fix them rather than suppress.
