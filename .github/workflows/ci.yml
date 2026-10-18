@@ -5,8 +5,11 @@ name: CI
 # path filter never reports a conclusion — GitHub then blocks the pull request
 # forever waiting for a run that will not happen. docs.yml can filter by path
 # precisely because none of its jobs are required.
-# The fuzz, which is not required either, skips itself on a pull request
-# that touches no guard path (`guard-paths` below).
+# Jobs skip themselves instead, with a job-level `if`, which reports
+# "skipped" and satisfies a required check: the fuzz on a pull request that
+# touches no guard path (`guard-paths` below), and the build, database, Helm,
+# end-to-end and image jobs on one that changes only documentation
+# (`code-paths` below).
 #
 # A `v*` tag runs the whole pipeline too: `publish` below releases the images,
 # and it only runs once every check has passed on that exact commit.
@@ -84,6 +87,8 @@ jobs:
 
   build:
     name: Build
+    needs: code-paths
+    if: github.event_name != 'pull_request' || needs.code-paths.outputs.changed == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -191,6 +196,48 @@ jobs:
             echo "No guard path changed, fuzz skipped." >> "$GITHUB_STEP_SUMMARY"
           fi
 
+  # Whether a pull request changes anything but documentation, the same way
+  # `guard-paths` above asks about the guards. A pull request that changes
+  # only the docs site, the root markdown files or the GitHub issue and pull
+  # request templates skips the jobs that build and run the app; `Static
+  # checks` and `Test` still run, since test/docs-drift.test.ts and
+  # test/contrast.test.ts read the docs. Any other event (a push to main, a
+  # tag) always runs everything: the demo deploy pins the image CI publishes
+  # for that exact commit.
+  code-paths:
+    name: Code changed?
+    runs-on: ubuntu-latest
+    outputs:
+      changed: ${{ steps.filter.outputs.changed }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        if: github.event_name == 'pull_request'
+        with:
+          fetch-depth: 2
+
+      # Keep this list and the one in CONTRIBUTING.md together.
+      - id: filter
+        name: Compare against the base branch
+        env:
+          EVENT: ${{ github.event_name }}
+        run: |
+          if [ "$EVENT" != "pull_request" ]; then
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+            echo "A ${EVENT} always runs every job." >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          files=$(git diff --name-only HEAD^1 HEAD)
+          code=$(printf '%s\n' "$files" | grep -vE \
+            '^(docs/|[^/]+\.md$|\.github/ISSUE_TEMPLATE/|\.github/pull_request_template\.md$)' || true)
+          if [ -n "$code" ]; then
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+            echo "More than documentation changed, so every job runs." >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+            echo "::notice title=Docs only::Only documentation changed: build, database, Helm, end-to-end and image jobs skipped."
+            echo "Only documentation changed: build, database, Helm, end-to-end and image jobs skipped." >> "$GITHUB_STEP_SUMMARY"
+          fi
+
   fuzz:
     name: Fuzz the SQL guard
     needs: guard-paths
@@ -217,6 +264,8 @@ jobs:
 
   database:
     name: Database
+    needs: code-paths
+    if: github.event_name != 'pull_request' || needs.code-paths.outputs.changed == 'true'
     runs-on: ubuntu-latest
     env:
       # The migration checks run on a bare database, as they always have:
@@ -313,7 +362,8 @@ jobs:
     # itself, and waits for the test job rather than spending a stack
     # bring-up on a failing unit test. Not a required check yet: a browser
     # suite earns that after it has been quiet on main for a while.
-    needs: [test, build]
+    needs: [code-paths, test, build]
+    if: github.event_name != 'pull_request' || needs.code-paths.outputs.changed == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -362,6 +412,8 @@ jobs:
 
   helm:
     name: Helm chart
+    needs: code-paths
+    if: github.event_name != 'pull_request' || needs.code-paths.outputs.changed == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -468,7 +520,8 @@ jobs:
     # smoke test brings the whole compose stack up, so this waits for the cheaper
     # jobs to have their say first: a type error or a failing unit test should
     # not cost an image build and a stack bring-up to discover.
-    needs: [test, build]
+    needs: [code-paths, test, build]
+    if: github.event_name != 'pull_request' || needs.code-paths.outputs.changed == 'true'
     runs-on: ubuntu-latest
     env:
       # What docker-compose.yml names its images, with the tag below picked
