@@ -9,7 +9,8 @@ The **Models** page lists every model generation, Explore and chat can use
 some workspace, and in [demo mode](/admin/demo-mode/), where it lists the
 server's models only.
 
-The page has three sections.
+The page has three sections, and a fourth where the server looks for a model
+on this machine.
 
 ## Server
 
@@ -20,6 +21,23 @@ credentials come from, such as "From ANTHROPIC_API_KEY". A model whose
 variable is not set says which one. The server's default is marked. The
 section is read-only: an operator changes it by editing the file and
 restarting.
+
+## Detected on this machine
+
+Where the server looks for a model running beside it (by default in [local
+mode](/admin/demo-mode/#a-model-on-your-machine)), this section lists what the
+last scan found: Ollama, LM Studio, or anything else answering the OpenAI-style
+model list at the endpoints the operator listed. Each model is named
+`local:<host>:<port>/<model>`, needs no key, and can be used wherever a server
+model can. The section says when it last scanned and which endpoints answered,
+by host, with how many models each.
+
+**Re-scan** asks every endpoint again, for someone who manages a workspace:
+start Ollama, pull a model, then choose it. When nothing was found in local
+mode, the section says just that. When exactly one endpoint answered and the
+server has no model of its own, its first model is the default (marked); when
+more than one did, none is, and you pick one in the [model
+chip](#picking-a-model), which is remembered for the workspace.
 
 ## Each workspace
 

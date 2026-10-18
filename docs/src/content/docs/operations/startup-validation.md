@@ -75,6 +75,12 @@ or `false`. Setting it to `true` in production is a **warning** on every boot:
 the [Content-Security-Policy](/operations/security-headers/) is then logged,
 not enforced. `AI_BASE_URL_ALLOWLIST` must be a comma-separated list of host
 names, addresses and CIDR ranges; one entry that is none of those is an error.
+`LOCAL_MODEL_DETECT` must be `auto`, `on` or `off`, and every entry of
+`LOCAL_MODEL_ENDPOINTS` an `http` or `https` base URL with a host and no user
+name or password (at most 16); a bad entry is an error that names its position
+in the list, never the entry, which may hold a password. `LOCAL_MODEL_ENDPOINTS`
+set while detection is off is a **warning**; see [A model on this
+machine](/admin/models/#a-model-on-this-machine).
 The full list of variables is in
 [Configuration](/reference/configuration/).
 
