@@ -115,7 +115,11 @@ runs the self-monitoring smoke test against them (`Images and smoke`), runs
 the `End-to-end and accessibility` suite, and fuzzes the guards for longer;
 those report on a pull request without gating it, so look at them too. The
 fuzz runs on a pull request only when it touches a guard path (see below);
-otherwise it shows as skipped.
+otherwise it shows as skipped. A pull request that changes only documentation
+(`docs/`, the root markdown files, the issue and pull request templates)
+skips `Build`, `Database`, the Helm chart, `End-to-end and accessibility` and
+`Images and smoke`; `Static checks` and `Test` still run, because some unit
+tests read the docs. A push to `main` or a tag always runs every job.
 
 ```bash
 npm run lint         # biome check (lint + format, no writes)
