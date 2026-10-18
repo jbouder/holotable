@@ -173,7 +173,7 @@ and `can()` as a session's.
    not put a client's own id in its access tokens' `aud` by default, and the
    server requires it.
 4. Set `OIDC_MCP_CLIENT_ID=holotable-mcp`. Until it is set, `/api/mcp` and the
-   metadata are a `404`; demo mode refuses it like every other `OIDC_*`
+   metadata are a `404`; demo and local mode refuse it like every other `OIDC_*`
    variable.
 5. Optionally set the same **Backchannel logout URL** as on the browser client,
    so that a realm session ended in Keycloak ends the MCP session at once

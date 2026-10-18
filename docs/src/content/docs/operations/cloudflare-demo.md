@@ -58,7 +58,12 @@ The provider's credit limit is the only cap that holds if everything else
 fails; set one.
 
 The demo can never register a data source: demo mode refuses to start with
-groups above editor. See [Demo mode](/admin/demo-mode/).
+groups above editor. The quick-start image defaults to
+[local mode](/admin/demo-mode/#local-mode), whose owner is a source admin, so
+the Worker sets `AUTH_MODE=demo` on the container itself
+(`deploy/cloudflare/demo/src/worker.ts`), and the deploy's smoke test fails
+unless a visitor comes back a `demo:` subject with no source-admin role. See
+[Demo mode](/admin/demo-mode/#demo-mode).
 
 ## Cost
 

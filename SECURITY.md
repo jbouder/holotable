@@ -319,6 +319,19 @@ report that demo mode lets a visitor do what its documented editor role
 allows is not a vulnerability; one that lets a visitor exceed that role, or
 reach a demo session from an `oidc` deployment, is.
 
+**Local mode is outside this trust model too.** `AUTH_MODE=local`, the
+quick-start image's default, signs in everyone who can reach the server as
+its one owner, `local:owner`, holding the `LOCAL_GROUPS` roles: by default a
+source-admin of the `local` workspace, who can register a source pointing at
+any host the server can reach and upload files to it. It is for one person on
+their own machine. The server refuses to boot it beside any OIDC configuration
+or with `/platform-admins` in `LOCAL_GROUPS`, but it cannot tell whether the
+port is reachable from elsewhere; the banner and the docs say so. Never run it
+on a host others can reach, or with a real credential. A report that local
+mode lets whoever reaches it do what its documented roles allow is not a
+vulnerability; one that reaches a local session from an `oidc` or `demo`
+deployment, or a platform-admin power from local mode, is.
+
 **The server environment.** Database credentials live only in environment
 variables (or files in `SOURCE_SECRETS_DIR`) and are resolved at execution
 through a `secret_ref` name — `TS_METRICS` resolves `TS_METRICS_USERNAME` /
