@@ -1332,6 +1332,23 @@ test("local mode's allowances never reach demo mode: source-admin DEMO_GROUPS st
   assert.ok(variables(errors(problems)).includes("DEMO_GROUPS"));
 });
 
+test("the quick-start image defaults to local mode, and the hosted demo says demo itself", () => {
+  // Both run the same image (#600). The image is for one person on their own
+  // machine; the public demo must never inherit that default, where every
+  // visitor would be a source-admin.
+  const dockerfile = readFileSync("deploy/quickstart/Dockerfile", "utf8");
+  // The ENV instruction's lines, not the comments that mention the demo.
+  const modes = [...dockerfile.matchAll(/^\s+AUTH_MODE=(\w+) \\$/gm)].map((m) => m[1]);
+  assert.deepEqual(modes, ["local"]);
+  assert.match(dockerfile, /\bDUCKDB_SOURCES_DIR=\/var\/lib\/holotable\/files\b/);
+
+  const worker = readFileSync("deploy/cloudflare/demo/src/worker.ts", "utf8");
+  const envVars = worker.slice(worker.indexOf("this.envVars"));
+  assert.match(envVars, /^\s*AUTH_MODE: "demo",$/m);
+  const smoke = readFileSync("deploy/cloudflare/demo/scripts/smoke.ts", "utf8");
+  assert.match(smoke, /startsWith\("demo:"\)/, "the demo's smoke proves the mode");
+});
+
 /* -------------------------------------------------------------------------- */
 /* SESSION_COOKIE_SECURE (#253)                                                */
 /* -------------------------------------------------------------------------- */

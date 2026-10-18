@@ -68,6 +68,18 @@ await waitForReady();
 console.log(`smoke: ${base} ready after ${Math.round((Date.now() - started) / 1000)} s`);
 
 const cookie = await enter();
+// The image defaults to local mode (#600); the demo must have said demo. A
+// visitor is a fresh demo subject who can manage no source.
+const me = await json<{ sub: string; workspaces: { id: string; role: string }[] }>(
+  "/api/me",
+  cookie,
+);
+if (!me.sub.startsWith("demo:")) fail(`signed in as ${me.sub}: is AUTH_MODE=demo set?`);
+const admin = me.workspaces.find((w) => w.role === "source-admin");
+if (admin) fail(`a demo visitor is source-admin of "${admin.id}"`);
+console.log(
+  `smoke: signed in as a demo visitor (${me.workspaces.map((w) => `${w.id}:${w.role}`).join(", ")})`,
+);
 const list = await json<{ dashboards: { id: string; title: string }[] }>(
   "/api/dashboards",
   cookie,

@@ -3,10 +3,12 @@
 #   docker run -p 3000:3000 ghcr.io/jbouder/holotable:quickstart
 #
 # TimescaleDB, the Next.js server, the seeder and the self-monitoring collector
-# in one container, supervised by entrypoint.sh, signed in with AUTH_MODE=demo
-# and no `.env`. It is an evaluation and demo topology: one instance, no
-# backups, no Keycloak. The same image runs the hosted demo (#254). Production
-# is the runtime image and the Helm chart.
+# in one container, supervised by entrypoint.sh, signed in with AUTH_MODE=local
+# (#600: the one person running it is its owner, and can add sources and upload
+# files) and no `.env`. It is an evaluation topology: one instance, no backups,
+# no Keycloak. The same image runs the hosted demo (#254), which sets
+# AUTH_MODE=demo itself (deploy/cloudflare/demo/src/policy.ts). Production is
+# the runtime image and the Helm chart.
 #
 # Build from the repository root:
 #   docker build -f deploy/quickstart/Dockerfile -t holotable:quickstart .
@@ -55,6 +57,14 @@ COPY migrations ./migrations
 COPY src ./src
 RUN mkdir -p .next/cache && chown -R holotable:holotable .next/cache
 
+# DUCKDB_SOURCES_DIR (#600): uploads land under uploads/, the seeder writes the
+# files demo under demo/, and a directory of your own mounts read-only beside
+# them (-v "$PWD/files:/var/lib/holotable/files/mine:ro"). Owned by the app's
+# user, which every Node process runs as, so both can create their
+# subdirectories; a named volume mounted here starts from this ownership.
+RUN mkdir -p /var/lib/holotable/files \
+  && chown -R holotable:holotable /var/lib/holotable
+
 # Runs once, on an empty data directory, after the image's own TimescaleDB
 # install and tuning scripts: the metrics schema and the read-only role.
 COPY timescaledb/init/ /docker-entrypoint-initdb.d/
@@ -64,7 +74,9 @@ COPY deploy/quickstart/entrypoint.sh /usr/local/bin/holotable-quickstart
 # 127.0.0.1 alone (entrypoint.sh), so its password guards nothing reachable from
 # outside the container. SESSION_SECRET and METRICS_TOKEN are generated at boot
 # when unset. The model is optional: pass AI_MODEL and OPENAI_API_KEY (and
-# OPENAI_BASE_URL / OPENAI_API) with -e to turn on generation.
+# OPENAI_BASE_URL / OPENAI_API) with -e to turn on generation, or add one on
+# the Models page. TS_METRICS is granted to both workspaces the seeder may
+# fill: `local` here, `demo` when the hosted demo sets AUTH_MODE=demo.
 #
 # NO_TS_TUNE skips the base image's 001_timescaledb_tune.sh. On a host that
 # advertises cgroup v2 without a memory.max file (Cloudflare Containers), the
@@ -79,7 +91,7 @@ ENV NODE_ENV=production \
     NEXT_MANUAL_SIG_HANDLE=true \
     PORT=3000 \
     HOSTNAME=0.0.0.0 \
-    AUTH_MODE=demo \
+    AUTH_MODE=local \
     SESSION_COOKIE_SECURE=false \
     POSTGRES_USER=holotable \
     POSTGRES_PASSWORD=holotable \
@@ -87,7 +99,8 @@ ENV NODE_ENV=production \
     TIMESCALEDB_TELEMETRY=off \
     DATABASE_URL=postgresql://holotable:holotable@127.0.0.1:5432/holotable \
     TIMESCALEDB_URL=postgresql://holotable:holotable@127.0.0.1:5432/holotable \
-    SOURCE_SECRET_REFS=TS_METRICS:demo \
+    SOURCE_SECRET_REFS=TS_METRICS:demo,local \
+    DUCKDB_SOURCES_DIR=/var/lib/holotable/files \
     TS_METRICS_HOST=127.0.0.1 \
     TS_METRICS_PORT=5432 \
     TS_METRICS_USERNAME=metrics_ro \
