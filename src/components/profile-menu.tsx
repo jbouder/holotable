@@ -46,11 +46,16 @@ export function ProfileMenu({ account }: { account: ProfileMenuAccount }) {
       panelClassName="w-64"
       trigger={
         <>
+          {/* The initials are a picture of the person, like an avatar image,
+              so they are drawn by CSS rather than written as text: the
+              trigger's text is then only the name, which its accessible name
+              holds (WCAG 2.5.3, Label in Name). */}
           <span
             aria-hidden
-            className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-border bg-surface-2 text-xs font-semibold"
+            data-initials={letters ?? undefined}
+            className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-border bg-surface-2 text-xs font-semibold before:content-[attr(data-initials)]"
           >
-            {letters ?? <UserRound className="h-4 w-4" />}
+            {letters ? null : <UserRound className="h-4 w-4" />}
           </span>
           {/* The name is the point of the pill, but below `sm` it would push
               the bar onto two lines (#78); there the initials carry it. */}

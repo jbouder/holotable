@@ -71,7 +71,7 @@ export async function expectNoA11yViolations(
       .slice(0, 5)
       .map(
         (n) =>
-          `    ${n.target.join(" ")}\n      ${n.failureSummary?.split("\n").join("\n      ")}`,
+          `    ${n.target.join(" ")}\n      ${n.html}\n      ${n.failureSummary?.split("\n").join("\n      ")}`,
       )
       .join("\n")}`;
 

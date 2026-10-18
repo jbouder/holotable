@@ -51,6 +51,13 @@ updates:
       # TypeScript 7+ breaks Next 16's build and typegen; see the header.
       - dependency-name: typescript
         versions: [">=7"]
+      # @grafana/lezer-logql 0.4.x declares an exact peer, `@lezer/lr` 1.4.10,
+      # so `npm ci` fails with ERESOLVE beside the 1.4.11 the other grammars
+      # share. It is also the LogQL guard's parser, so moving it is a guard
+      # change (run the fuzzer). Remove when a release takes `@lezer/lr` as a
+      # range again.
+      - dependency-name: "@grafana/lezer-logql"
+        versions: [">=0.4"]
     open-pull-requests-limit: 5
     commit-message:
       # `chore(deps): …` for dependencies, `chore(deps-dev): …` for

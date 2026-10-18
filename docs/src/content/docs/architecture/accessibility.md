@@ -34,6 +34,13 @@ keep them from regressing (#77, #91).
 - **Links are links.** Something that navigates is one `<a>` styled as a
   button (`ButtonLink`), never a `<button>` inside a link: that was two tab
   stops for one action.
+- **A control's name holds what it shows.** A trigger with an `aria-label`
+  that adds context, such as the model, source and time range chips, the
+  account menu and a status tile's link, starts from or contains its visible
+  text, word for word and in order, so a voice-control user can say what they
+  see (WCAG 2.5.3, Label in Name). axe checks it by joining the text nodes
+  inside the control, so sibling spans keep a space between them, and the
+  account menu's initials are drawn by CSS, like an avatar picture.
 
 ## Charts
 

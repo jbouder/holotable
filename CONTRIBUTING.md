@@ -403,7 +403,9 @@ line, and never 25 or later (the `node` base images and `@types/node` are
 ignored from 25): take a Node major in one pull request that moves both of
 the Dockerfile's Node bases, CI's `node-version` and `@types/node` together. The app's
 TypeScript is held below 7 until Next supports it, because 7 drops the
-JavaScript compiler API that `next build` and `next typegen` load.
+JavaScript compiler API that `next build` and `next typegen` load. And
+`@grafana/lezer-logql` stays below 0.4, whose releases pin `@lezer/lr` to one
+exact version that the other grammars have moved past.
 
 ### Releasing
 
@@ -531,7 +533,9 @@ Match the surrounding code rather than importing conventions from elsewhere.
   high contrast can make it solid. A new color token also goes in
   `THEME_FILE_TOKENS`, which an operator's `THEME_FILE` must set. A chart goes
   through `AccessibleChart`, a link styled as a button is
-  `ButtonLink`, and an icon-only control has an `aria-label`.
+  `ButtonLink`, and an icon-only control has an `aria-label`. A control
+  that shows text and also has an `aria-label` keeps that text in the label,
+  in the same order (WCAG 2.5.3, Label in Name).
 - This is Next.js 16 and React 19. Check the installed docs in
   `node_modules/next/dist/docs/` or the existing repository patterns before
   relying on behavior you remember from an older version, and do not introduce
