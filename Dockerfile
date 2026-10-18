@@ -99,7 +99,7 @@ CMD ["node", "node_modules/.bin/tsx", "scripts/migrate.ts"]
 # server does not use (sharp and `@img/*`, #498), and the glibc DuckDB
 # bindings, which npm installs beside the musl ones because their packages
 # declare no `libc` and which the binding's loader never picks on musl.
-FROM node:24-alpine3.21@sha256:b8f7c9056af700568c1ce76173f1c93743fb64ca1343e18cdf3a6ded8985ad3d AS quickstart-deps
+FROM node:24-alpine3.23@sha256:e44c87c7dd212720eb00469aeac89504ca2be77b8f0d6dbffb30665d5fcc59e1 AS quickstart-deps
 WORKDIR /app
 COPY package.json package-lock.json ./
 RUN npm ci --omit=dev \
@@ -109,12 +109,12 @@ RUN npm ci --omit=dev \
 
 FROM timescale/timescaledb:2.30.2-pg16@sha256:6f139d56042989bd35f50ba5986e492cd32e35cc6778c50be2659add298dc09f AS quickstart
 
-# Node 22 from the same Alpine release `quickstart-deps` uses. `--upgrade` with
+# Node 24 from the same Alpine release `quickstart-deps` uses (3.23). `--upgrade` with
 # sqlite-libs because Alpine's node links SQLite's session extension, which the
 # older sqlite-libs already in the base image lacks ("Error relocating
 # /usr/bin/node: sqlite3session_*"). Then the unprivileged user every Node
 # process runs as; Postgres keeps the image's own `postgres`.
-RUN apk add --no-cache --upgrade "nodejs~22" sqlite-libs \
+RUN apk add --no-cache --upgrade "nodejs~24" sqlite-libs \
   && addgroup -S -g 1001 holotable \
   && adduser -S -D -H -u 1001 -G holotable holotable
 

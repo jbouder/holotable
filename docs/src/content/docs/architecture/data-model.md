@@ -114,7 +114,7 @@ kind's save check, Test and every execution say "DuckDB is not available on
 this server". The quick-start image stays on Alpine: the pinned binding ships
 musl builds for `linux-x64` and `linux-arm64` beside the glibc ones, and the
 binding was checked loading and answering on the image's base
-(`timescale/timescaledb:2.17.2-pg16` with Alpine's Node 22) on both. The
+(`timescale/timescaledb:2.30.2-pg16` with Alpine's Node 24) on both. The
 production image (`node:24-bookworm-slim`) is glibc.
 
 Both images are targets of the one repository `Dockerfile` and share one
