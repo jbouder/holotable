@@ -21,7 +21,7 @@ container, which holds TimescaleDB, the server and the demo jobs.
 
 The container sleeps after 30 minutes without a request, and its disk does not
 survive a sleep. The next visit starts a fresh container: a new database, the
-seeded dashboards and six hours of backfilled history. Anything a visitor built
+four seeded dashboards and six hours of backfilled history. Anything a visitor built
 is gone. The demo banner says so.
 
 An open live stream counts as a request in flight, so a dashboard tab keeps the

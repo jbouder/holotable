@@ -159,7 +159,10 @@ services:
       TS_METRICS_HOST: postgres
       TS_METRICS_PORT: "5432"
       SEED_INTERVAL_MS: "2000"
-      PROMETHEUS_SELF_URL: http://prometheus:9090
+      # The `prometheus` profile's Prometheus (#390). The seeder registers
+      # `prometheus-self` and the PromQL self-monitoring dashboard once it
+      # answers, so a stack without the profile has neither.
+      PROMETHEUS_SELF_URL: ${PROMETHEUS_SELF_URL-http://prometheus:9090}
       # The `logs` profile's Loki (#567). The seeder registers `loki-self` and
       # the Holotable logs dashboard once it answers, so a stack without the
       # profile has neither.
@@ -169,6 +172,8 @@ services:
       # Where the seeder writes the files demo's Parquet and CSV files (#574)
       # and registers the `duckdb-demo` source over them. The only writer.
       DUCKDB_SOURCES_DIR: /data/duckdb
+      # The files demo is opt-in: SEED_DEMO_FILES=true docker compose up.
+      SEED_DEMO_FILES: ${SEED_DEMO_FILES:-}
     volumes:
       - duckdb-files:/data/duckdb
     depends_on:
@@ -180,9 +185,10 @@ services:
   # The self-monitoring demo (#54). Scrapes the app's own /api/metrics and
   # lands the samples in metrics.holotable_self, which `seed` registers as the
   # `holotable-self` source — so the shipped demo is Holotable reading guarded
-  # SQL over data it produced itself. Prometheus below scrapes the same
-  # endpoint, and `seed` registers it as `prometheus-self`, so the second
-  # self-monitoring dashboard asks the same questions in PromQL (#390).
+  # SQL over data it produced itself. With the `prometheus` profile,
+  # Prometheus below scrapes the same endpoint, and `seed` registers it as
+  # `prometheus-self`, so a second self-monitoring dashboard asks the same
+  # questions in PromQL (#390).
   self-metrics:
     image: *migrate-image
     build:
@@ -206,7 +212,8 @@ services:
   #   docker compose --profile smoke run --rm smoke
   # Waits for the self-monitoring dashboard to answer with real rows through
   # the same guard and executor POST /api/query uses, and fails otherwise;
-  # then asks the app itself for one files-demo panel (#615).
+  # then, with SEED_DEMO_FILES=true, asks the app itself for one files-demo
+  # panel (#615).
   smoke:
     profiles: ["smoke"]
     image: *migrate-image
@@ -224,16 +231,19 @@ services:
       # The Prometheus and Loki sources' endpoints, allowed exactly as the app
       # allows them.
       SOURCE_URL_ALLOWLIST: ${SOURCE_URL_ALLOWLIST:-prometheus,loki}
-      # The PromQL self-monitoring dashboard is smoked where the seeder
-      # registered it, which is wherever this names a Prometheus (#600).
-      PROMETHEUS_SELF_URL: http://prometheus:9090
+      # The PromQL self-monitoring dashboard is smoked too, so the
+      # `prometheus` profile has to be up (#390). Set PROMETHEUS_SELF_URL
+      # empty to smoke a stack without it.
+      PROMETHEUS_SELF_URL: ${PROMETHEUS_SELF_URL-http://prometheus:9090}
       # The Holotable logs dashboard is smoked too, so the `logs` profile has
       # to be up (#567). Set LOKI_SELF_URL empty to smoke a stack without it.
       LOKI_SELF_URL: ${LOKI_SELF_URL-http://loki:3100}
       SMOKE_TIMEOUT_MS: ${SMOKE_TIMEOUT_MS:-180000}
       LOG_LEVEL: ${LOG_LEVEL:-warn}
-      # The files demo (#574), read-only, as the app reads it.
+      # The files demo (#574), read-only, as the app reads it, and smoked
+      # where the seeder wrote it (SEED_DEMO_FILES=true).
       DUCKDB_SOURCES_DIR: /data/duckdb
+      SEED_DEMO_FILES: ${SEED_DEMO_FILES:-}
       # One files-demo panel also runs through the app's own POST /api/query
       # (#615), so DuckDB is proved inside the runtime image, not only here.
       SMOKE_APP_URL: http://app:3000
@@ -247,11 +257,14 @@ services:
       app:
         condition: service_healthy
 
+  # Prometheus, off by default (#390):
+  #   docker compose --profile prometheus up
   # Scrapes the app's /api/metrics, and answers the `prometheus-self` source
-  # the seeder registers (#390): the PromQL self-monitoring dashboard reads
-  # it. Unauthenticated on the compose network; the app reaches it because
-  # SOURCE_URL_ALLOWLIST names `prometheus`.
+  # the seeder registers once it does: the PromQL self-monitoring dashboard
+  # reads it. Unauthenticated on the compose network; the app reaches it
+  # because SOURCE_URL_ALLOWLIST names `prometheus`.
   prometheus:
+    profiles: ["prometheus"]
     image: prom/prometheus:v3.1.0
     command:
       - --config.file=/etc/prometheus/prometheus.yml

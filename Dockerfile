@@ -137,7 +137,7 @@ COPY src ./src
 RUN mkdir -p .next/cache && chown -R holotable:holotable .next/cache
 
 # DUCKDB_SOURCES_DIR (#600): uploads land under uploads/, the seeder writes the
-# files demo under demo/, and a directory of your own mounts read-only beside
+# files demo under demo/ when -e SEED_DEMO_FILES=true opts in, and a directory of your own mounts read-only beside
 # them (-v "$PWD/files:/var/lib/holotable/files/mine:ro"). Owned by the app's
 # user, which every Node process runs as, so both can create their
 # subdirectories; a named volume mounted here starts from this ownership.

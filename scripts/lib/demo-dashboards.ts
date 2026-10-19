@@ -8,11 +8,15 @@ import { SERVICES } from "./seed-data";
  * SQL guard against the seeded catalogs.
  *
  * Three dashboards, each answering one question with whichever panel kinds
- * answer it best, and between them every kind there is:
+ * answer it best, and between them every kind there is. With Holotable
+ * self-monitoring (`src/lib/self-monitoring/dashboard.ts`) they are the four
+ * a default install opens on; the dashboards that show off a source kind
+ * (Demo files, the PromQL self-monitoring, Holotable logs) are opt-in.
  *
  * - **Demo service health**: is the API serving well? Error rate, latency and
- *   availability first, then where traffic and failures come from, then the
- *   log lines behind them.
+ *   availability first, then where its requests go (the service map and the
+ *   request flow), then how traffic and latency moved, then the log lines
+ *   behind them.
  * - **Demo fleet**: which hosts need attention, and why? Status first, then
  *   load over time, then where capacity goes. Every host leads to its detail.
  * - **Demo host detail**: one host up close, the target of the fleet's links.
@@ -94,10 +98,10 @@ export function demoSpec() {
           content: [
             "## Service health",
             "",
-            "How the demo API is serving: **error rate**, **latency** and **availability** at the top, where traffic and failures come from below them, the map of which service calls which, and the gateway's own log at the bottom. The SLO is 300 ms: amber means slower than that, red slower than a second.",
+            "How the demo API is serving: **error rate**, **latency** and **availability** at the top, then where its requests go (the map of which service calls which, and the flow from service to route to status), how traffic and latency moved over the hour, and the gateway's own log at the bottom. The SLO is 300 ms: amber means slower than that, red slower than a second. Click a service on the map or in the flow to show only it.",
           ].join("\n"),
         },
-        layout: { x: 0, y: 0, w: 12, h: 3 },
+        layout: { x: 0, y: 0, w: 12, h: 2 },
       },
       {
         id: "error-rate",
@@ -122,7 +126,7 @@ export function demoSpec() {
             { value: 5, color: "danger" },
           ],
         },
-        layout: { x: 0, y: 3, w: 3, h: 3 },
+        layout: { x: 0, y: 2, w: 3, h: 3 },
       },
       {
         id: "p95",
@@ -147,7 +151,7 @@ export function demoSpec() {
             { value: 1000, color: "danger" },
           ],
         },
-        layout: { x: 3, y: 3, w: 3, h: 3 },
+        layout: { x: 3, y: 2, w: 3, h: 3 },
       },
       {
         id: "slow-share",
@@ -173,7 +177,7 @@ export function demoSpec() {
             { value: 25, color: "danger" },
           ],
         },
-        layout: { x: 6, y: 3, w: 3, h: 3 },
+        layout: { x: 6, y: 2, w: 3, h: 3 },
       },
       {
         id: "availability",
@@ -200,52 +204,7 @@ export function demoSpec() {
             { value: 99, color: "success" },
           ],
         },
-        layout: { x: 9, y: 3, w: 3, h: 3 },
-      },
-      {
-        id: "traffic",
-        title: "Requests per minute, by outcome",
-        viz: "area",
-        query: {
-          sourceId: "ts-metrics",
-          timeField: "minute",
-          sql: perMinute(
-            "count(*) FILTER (WHERE status < 400) AS ok, count(*) FILTER (WHERE status >= 400 AND status < 500) AS client_errors, count(*) FILTER (WHERE status >= 500) AS server_errors",
-            "http_requests",
-            BY_SERVICE,
-          ),
-        },
-        format: "number",
-        options: { stacked: true, legend: "top" },
-        layout: { x: 0, y: 6, w: 8, h: 4 },
-      },
-      {
-        id: "request-flow",
-        title: "Request flow",
-        description:
-          "Where requests go: from each service to the routes it served, then to their status codes, each band as wide as its count over the window. The thin bands into 404 and 500 are the failures.",
-        viz: "sankey",
-        query: {
-          sourceId: "ts-metrics",
-          timeField: "period",
-          sql: "SELECT time_bucket('5 minutes', ts) AS period, service, route, status::text AS status, count(*) AS requests FROM http_requests WHERE service = ANY(:service) GROUP BY period, service, route, status ORDER BY period",
-        },
-        format: "number",
-        options: {
-          path: ["service", "route", "status"],
-          value: "requests",
-          compact: true,
-        },
-        // A click on a service, or on a band leaving one, shows that service
-        // on this dashboard. A route or a status reads no `service`, so it
-        // offers nothing.
-        links: [
-          {
-            title: "Show this service",
-            set: { service: { column: "service" } },
-          },
-        ],
-        layout: { x: 8, y: 6, w: 4, h: 4 },
+        layout: { x: 9, y: 2, w: 3, h: 3 },
       },
       {
         id: "service-map",
@@ -291,7 +250,52 @@ export function demoSpec() {
             set: { service: { column: "service" } },
           },
         ],
-        layout: { x: 0, y: 10, w: 12, h: 4 },
+        layout: { x: 0, y: 5, w: 7, h: 4 },
+      },
+      {
+        id: "request-flow",
+        title: "Request flow",
+        description:
+          "Where requests go: from each service to the routes it served, then to their status codes, each band as wide as its count over the window. The thin bands into 404 and 500 are the failures.",
+        viz: "sankey",
+        query: {
+          sourceId: "ts-metrics",
+          timeField: "period",
+          sql: "SELECT time_bucket('5 minutes', ts) AS period, service, route, status::text AS status, count(*) AS requests FROM http_requests WHERE service = ANY(:service) GROUP BY period, service, route, status ORDER BY period",
+        },
+        format: "number",
+        options: {
+          path: ["service", "route", "status"],
+          value: "requests",
+          compact: true,
+        },
+        // A click on a service, or on a band leaving one, shows that service
+        // on this dashboard. A route or a status reads no `service`, so it
+        // offers nothing.
+        links: [
+          {
+            title: "Show this service",
+            set: { service: { column: "service" } },
+          },
+        ],
+        layout: { x: 7, y: 5, w: 5, h: 4 },
+      },
+      {
+        id: "traffic",
+        title: "Requests per minute, by outcome",
+        viz: "area",
+        query: {
+          sourceId: "ts-metrics",
+          timeField: "minute",
+          sql: perMinute(
+            "count(*) FILTER (WHERE status < 400) AS ok, count(*) FILTER (WHERE status >= 400 AND status < 500) AS client_errors, count(*) FILTER (WHERE status >= 500) AS server_errors",
+            "http_requests",
+            BY_SERVICE,
+          ),
+        },
+        format: "number",
+        options: { stacked: true, legend: "top" },
+        layout: { x: 0, y: 9, w: 6, h: 4 },
       },
       {
         id: "latency-band",
@@ -336,7 +340,7 @@ export function demoSpec() {
             ],
           },
         },
-        layout: { x: 0, y: 14, w: 6, h: 4 },
+        layout: { x: 6, y: 9, w: 6, h: 4 },
       },
       {
         id: "latency-distribution",
@@ -361,7 +365,7 @@ export function demoSpec() {
             { value: 1000, color: "danger" },
           ],
         },
-        layout: { x: 6, y: 14, w: 6, h: 4 },
+        layout: { x: 0, y: 13, w: 4, h: 4 },
       },
       {
         id: "slowest-routes",
@@ -386,20 +390,7 @@ export function demoSpec() {
             },
           ],
         },
-        layout: { x: 0, y: 18, w: 5, h: 4 },
-      },
-      {
-        id: "errors-by-route",
-        title: "Server errors by route",
-        description: "Over all retained requests, not only the window.",
-        viz: "bar",
-        query: {
-          sourceId: "ts-metrics",
-          sql: "SELECT route, count(*) FILTER (WHERE status >= 500) AS server_errors FROM http_requests WHERE service = ANY(:service) GROUP BY route ORDER BY server_errors DESC",
-        },
-        format: "number",
-        options: { legend: "none", thresholds: [{ value: 0, color: "danger" }] },
-        layout: { x: 5, y: 18, w: 4, h: 4 },
+        layout: { x: 4, y: 13, w: 5, h: 4 },
       },
       {
         id: "by-service",
@@ -412,7 +403,7 @@ export function demoSpec() {
         },
         format: "number",
         options: { legend: "bottom", compact: true },
-        layout: { x: 9, y: 18, w: 3, h: 4 },
+        layout: { x: 9, y: 13, w: 3, h: 4 },
       },
       {
         id: "recent-problems",
@@ -426,7 +417,7 @@ export function demoSpec() {
           sql: "SELECT ts, level, message, host, route, request_id FROM app_logs WHERE level IN ('error', 'warn') ORDER BY ts DESC LIMIT 200",
         },
         options: { message: "message", level: "level" },
-        layout: { x: 0, y: 22, w: 12, h: 5 },
+        layout: { x: 0, y: 17, w: 12, h: 5 },
       },
     ],
   };
@@ -459,10 +450,10 @@ export function fleetSpec(targets: DemoLinkTargets) {
             "",
             "Where each demo host stands **now** at the top, how its load has moved below that, and where the capacity goes at the bottom. CPU is **busy** from 70% and **hot** from 85%; disk is a warning from 80%.",
             "",
-            "Click a host anywhere (a tile, a bar, a lane or a row) to open its detail.",
+            "Click a host anywhere (a tile, a bar, a lane or a row) to open its detail; the heatmap's panel menu opens it too.",
           ].join("\n"),
         },
-        layout: { x: 0, y: 0, w: 12, h: 3 },
+        layout: { x: 0, y: 0, w: 12, h: 2 },
       },
       {
         id: "cpu-now",
@@ -484,7 +475,7 @@ export function fleetSpec(targets: DemoLinkTargets) {
         },
         format: "percent",
         links: openHost,
-        layout: { x: 0, y: 3, w: 6, h: 2 },
+        layout: { x: 0, y: 2, w: 6, h: 2 },
       },
       {
         id: "disk-now",
@@ -507,22 +498,21 @@ export function fleetSpec(targets: DemoLinkTargets) {
         },
         format: "percent",
         links: openHost,
-        layout: { x: 6, y: 3, w: 6, h: 2 },
+        layout: { x: 6, y: 2, w: 6, h: 2 },
       },
       {
-        id: "cpu",
-        title: "CPU % by host",
-        viz: "line",
+        id: "cpu-heat",
+        title: "CPU heat, by host and minute",
+        viz: "heatmap",
         query: {
           sourceId: "ts-system",
           timeField: "minute",
-          sql: "SELECT time_bucket('1 minute', ts) AS minute, avg(cpu_pct) FILTER (WHERE host = 'host-01') AS \"host-01\", avg(cpu_pct) FILTER (WHERE host = 'host-02') AS \"host-02\", avg(cpu_pct) FILTER (WHERE host = 'host-03') AS \"host-03\", avg(cpu_pct) FILTER (WHERE host = 'host-04') AS \"host-04\" FROM system_metrics GROUP BY minute ORDER BY minute",
+          sql: perHost("avg(cpu_pct) AS cpu"),
         },
         format: "percent",
-        options: { legend: "top", yAxis: { min: 0, max: 100 } },
-        // A line is a host: a click on one opens it (#373).
-        links: openHost,
-        layout: { x: 0, y: 5, w: 8, h: 4 },
+        // A menu item rather than a click: a cell is a host and a minute.
+        links: [{ title: "Open host detail", dashboard: targets.hostDetail }],
+        layout: { x: 0, y: 4, w: 8, h: 4 },
       },
       {
         id: "memory",
@@ -546,21 +536,7 @@ export function fleetSpec(targets: DemoLinkTargets) {
         },
         format: "percent",
         links: openHost,
-        layout: { x: 8, y: 5, w: 4, h: 4 },
-      },
-      {
-        id: "cpu-heat",
-        title: "CPU heat, by host and minute",
-        viz: "heatmap",
-        query: {
-          sourceId: "ts-system",
-          timeField: "minute",
-          sql: perHost("avg(cpu_pct) AS cpu"),
-        },
-        format: "percent",
-        // A menu item rather than a click: a cell is a host and a minute.
-        links: [{ title: "Open host detail", dashboard: targets.hostDetail }],
-        layout: { x: 0, y: 9, w: 12, h: 3 },
+        layout: { x: 8, y: 4, w: 4, h: 4 },
       },
       {
         id: "load-state",
@@ -583,7 +559,7 @@ export function fleetSpec(targets: DemoLinkTargets) {
           ],
         },
         links: openHost,
-        layout: { x: 0, y: 12, w: 12, h: 3 },
+        layout: { x: 0, y: 8, w: 12, h: 3 },
       },
       {
         id: "network-share",
@@ -597,7 +573,7 @@ export function fleetSpec(targets: DemoLinkTargets) {
         },
         format: "bytes",
         options: { path: ["region", "host"], value: "bytes" },
-        layout: { x: 0, y: 15, w: 6, h: 4 },
+        layout: { x: 0, y: 11, w: 6, h: 4 },
       },
       {
         id: "cpu-vs-memory",
@@ -611,44 +587,7 @@ export function fleetSpec(targets: DemoLinkTargets) {
           sql: "SELECT time_bucket('5 minutes', ts) AS period, avg(cpu_pct) AS cpu, avg(mem_pct) AS memory FROM system_metrics GROUP BY period, host ORDER BY period",
         },
         format: "percent",
-        layout: { x: 6, y: 15, w: 6, h: 4 },
-      },
-      {
-        id: "cpu-ticks",
-        title: "Every 5-minute CPU reading, per host",
-        description:
-          "Where each host usually sits, and how far it strays, against the 85% line.",
-        viz: "vega",
-        query: {
-          sourceId: "ts-system",
-          timeField: "period",
-          sql: "SELECT time_bucket('5 minutes', ts) AS period, host, avg(cpu_pct) AS cpu FROM system_metrics GROUP BY period, host ORDER BY period",
-        },
-        options: {
-          spec: {
-            data: { name: "rows" },
-            layer: [
-              {
-                mark: { type: "tick", opacity: 0.7, tooltip: true },
-                encoding: {
-                  x: {
-                    field: "cpu",
-                    type: "quantitative",
-                    title: "CPU %",
-                    scale: { domain: [0, 100] },
-                  },
-                  y: { field: "host", type: "nominal", title: null },
-                  color: { value: "info" },
-                },
-              },
-              {
-                mark: "rule",
-                encoding: { x: { datum: 85 }, color: { value: "danger" } },
-              },
-            ],
-          },
-        },
-        layout: { x: 0, y: 19, w: 6, h: 4 },
+        layout: { x: 6, y: 11, w: 6, h: 4 },
       },
       {
         id: "hosts",
@@ -687,7 +626,7 @@ export function fleetSpec(targets: DemoLinkTargets) {
             set: { host: { column: "host" } },
           },
         ],
-        layout: { x: 6, y: 19, w: 6, h: 4 },
+        layout: { x: 0, y: 15, w: 12, h: 3 },
       },
     ],
   };

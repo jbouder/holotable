@@ -119,18 +119,19 @@ outage, so:
 
 ## Scraping from Docker Compose
 
-`docker-compose.yml` runs a Prometheus service with the default
-`docker compose up` (#390). It scrapes the app with `METRICS_TOKEN`, the same
-value the app checks:
+`docker-compose.yml` runs a Prometheus service with its `prometheus` profile
+(#390). It scrapes the app with `METRICS_TOKEN`, the same value the app
+checks:
 
 ```bash
 echo "METRICS_TOKEN=$(openssl rand -hex 32)" >> .env
-docker compose up -d
+docker compose --profile prometheus up -d
 ```
 
 Prometheus is then on `http://localhost:9090`, scraping `app:3000/api/metrics`
 every 15s with 6 hours of retention. The seeder registers it as the
-`prometheus-self` source, which the PromQL self-monitoring dashboard reads.
+`prometheus-self` source once it answers, which the PromQL self-monitoring
+dashboard reads.
 
 If `METRICS_TOKEN` is unset, compose falls back to a checked-in local default so
 that the self-monitoring collector below still works out of the box. That
@@ -142,8 +143,9 @@ for anything reachable from outside it.
 The default `docker compose up` also runs `self-metrics`, which scrapes this
 endpoint into a TimescaleDB hypertable and registers it as an ordinary source,
 so the shipped **Holotable self-monitoring** dashboard is guarded SQL over the
-metrics above. Its twin, **Holotable self-monitoring (Prometheus)**, asks the
-compose Prometheus the same questions in PromQL through the `prometheus-self`
+metrics above. With the `prometheus` profile, its twin, **Holotable
+self-monitoring (Prometheus)**, asks the compose Prometheus the same
+questions in PromQL through the `prometheus-self`
 [Prometheus source](/concepts/prometheus-sources/). See
 [Demo data](/operations/demo-data/) for the collector, both dashboards,
 and the end-to-end smoke test built on them.

@@ -34,12 +34,14 @@ import { DEMO_FILES_DASHBOARD_TITLE, demoFilesSpec } from "./lib/demo-files";
 import { seedWorkspace } from "./lib/seed-workspace";
 
 /**
- * End-to-end smoke test for the self-monitoring demo (#54), its PromQL twin
- * (#390), which asks the compose stack's Prometheus the same questions, the
- * Holotable logs dashboard (#567), which reads the app's own log lines from
- * the `logs` profile's Loki while LOKI_SELF_URL is set, the service health
- * demo, whose custom visual (#405) must also compile, and the files demo
- * (#574), which reads Parquet, CSV and JSON files through DuckDB.
+ * End-to-end smoke test for the self-monitoring demo (#54) and the service
+ * health demo, whose custom visual (#405) must also compile, and for each
+ * opt-in dashboard that is on: the PromQL twin (#390), which asks the
+ * `prometheus` profile's Prometheus the same questions while
+ * PROMETHEUS_SELF_URL is set, the Holotable logs dashboard (#567), which
+ * reads the app's own log lines from the `logs` profile's Loki while
+ * LOKI_SELF_URL is set, and the files demo (#574), which reads Parquet, CSV
+ * and JSON files through DuckDB with SEED_DEMO_FILES=true.
  *
  * Brings no stack up of its own — `docker compose` does that, or the
  * quick-start image, inside which it runs as well (#600) — and instead
@@ -102,15 +104,16 @@ const TARGETS: Target[] = [
     committed: selfMonitoringSpec,
     feeds: "the collector needs a scrape or two",
   },
-  // Only where the seeder registered it: compose names its Prometheus, and
-  // the quick-start image, which has none, does not (#600).
+  // Only where the seeder registers it: compose names the `prometheus`
+  // profile's Prometheus, and the quick-start image, which has none, does
+  // not (#600).
   ...(process.env.PROMETHEUS_SELF_URL
     ? [
         {
           title: PROMETHEUS_SELF_DASHBOARD_TITLE,
           committed: prometheusSelfMonitoringSpec,
           feeds:
-            "Prometheus needs a scrape or two (PROMETHEUS_SELF_URL empty skips this dashboard)",
+            "the seeder registers it once Prometheus answers, and Prometheus needs a scrape or two (is the `prometheus` profile up? PROMETHEUS_SELF_URL empty skips this dashboard)",
         },
       ]
     : []),
@@ -131,9 +134,9 @@ const TARGETS: Target[] = [
   },
   // The files demo (#574): a DuckDB source over the Parquet, CSV and JSON files
   // the seeder writes under DUCKDB_SOURCES_DIR, which compose mounts here
-  // read-only, as it does for the app. The seeder registers it only where
-  // that is set.
-  ...(process.env.DUCKDB_SOURCES_DIR
+  // read-only, as it does for the app. Opt-in: the seeder registers it only
+  // with SEED_DEMO_FILES=true as well.
+  ...(process.env.SEED_DEMO_FILES === "true" && process.env.DUCKDB_SOURCES_DIR
     ? [
         {
           title: DEMO_FILES_DASHBOARD_TITLE,

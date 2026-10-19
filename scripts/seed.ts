@@ -7,12 +7,14 @@ import {
   selfMonitoringSpec,
 } from "@/lib/self-monitoring/dashboard";
 import {
+  LOKI_SELF_DASHBOARD_TITLE,
   LOKI_SELF_SOURCE_ID,
   lokiSelfConfig,
   lokiSelfLabels,
   lokiSelfMonitoringSpec,
 } from "@/lib/self-monitoring/loki";
 import {
+  PROMETHEUS_SELF_DASHBOARD_TITLE,
   PROMETHEUS_SELF_SOURCE_ID,
   prometheusSelfConfig,
   prometheusSelfMonitoringSpec,
@@ -40,6 +42,7 @@ import {
   RETIRED_DEMO_DASHBOARDS,
 } from "./lib/demo-dashboards";
 import {
+  DEMO_FILES_DASHBOARD_TITLE,
   DEMO_FILES_REFRESH_MS,
   DEMO_FILES_SOURCE_ID,
   DEMO_FILES_SOURCE_NAME,
@@ -52,21 +55,30 @@ import { seedWorkspace } from "./lib/seed-workspace";
 /**
  * Looping seeder.
  *
- * 1. (once) ensures a demo workspace source + dashboard exist in Postgres so the
- *    app has something to show.
+ * 1. (once) ensures the four default dashboards (Demo service health, Demo
+ *    fleet, Demo host detail and Holotable self-monitoring) and their sources
+ *    exist in Postgres so the app has something to show.
  * 2. (once, with SEED_BACKFILL) inserts the history the loop would have
  *    written across that window, so a fresh database does not start with
  *    empty charts (#252).
  * 3. (loop) continuously inserts synthetic http_requests rows (and the other
  *    demo tables', the service map's once a minute) into TimescaleDB so the
  *    live dashboard streams fresh data.
- * 4. (loop, with LOKI_SELF_URL) registers the `loki-self` source and the
- *    Holotable logs dashboard once that Loki answers (#567), which it does
- *    only when the compose `logs` profile is up.
+ * 4. (loop) registers each opt-in dashboard whose source answers: the
+ *    `prometheus-self` source and the PromQL self-monitoring dashboard once
+ *    the Prometheus at PROMETHEUS_SELF_URL does (the compose `prometheus`
+ *    profile), and the `loki-self` source and the Holotable logs dashboard
+ *    once the Loki at LOKI_SELF_URL does (#567, the `logs` profile).
  *
- * With `DUCKDB_SOURCES_DIR` set, it also writes the files demo's Parquet,
- * CSV and JSON-lines files under `<dir>/demo/` before anything else, and rewrites them every
- * minute (#574, `scripts/lib/demo-files.ts`).
+ * With `SEED_DEMO_FILES=true` and `DUCKDB_SOURCES_DIR` set, it also writes the
+ * files demo's Parquet, CSV and JSON-lines files under `<dir>/demo/` before
+ * anything else, rewrites them every minute, and seeds the Demo files
+ * dashboard over them (#574, `scripts/lib/demo-files.ts`).
+ *
+ * An opt-in dashboard whose source is off is never seeded, and one an earlier
+ * seed wrote is retired while the seeder still owns it: at once for the files
+ * demo or an unset URL, and after OPT_IN_GRACE_MS of an endpoint that never
+ * answers. Turned back on, it is restored under the same id.
  *
  * Uses the privileged TimescaleDB connection for inserts — distinct
  * from the app's read-only query user.
@@ -235,29 +247,12 @@ async function ensureDemo() {
       config: selfMonitoringConfig(demoConnection()),
     });
 
-    // The same instruments through the compose stack's Prometheus (#390),
-    // which scrapes /api/metrics itself. Unauthenticated on the compose
-    // network, so no secret_ref; the app reaches it only because
-    // SOURCE_URL_ALLOWLIST names its host. Only where there is a Prometheus
-    // to ask: compose and `.env.example` set PROMETHEUS_SELF_URL, and the
-    // quick-start image, which has none, does not.
-    const promUrl = process.env.PROMETHEUS_SELF_URL;
-    if (promUrl) {
-      const promConfig = prometheusSelfConfig(promUrl);
-      await upsertSource(pg, {
-        id: PROMETHEUS_SELF_SOURCE_ID,
-        name: "Holotable self-monitoring (Prometheus)",
-        kind: promConfig.kind,
-        config: promConfig,
-        secretRef: null,
-      });
-    }
-
     // The files demo (#574): a DuckDB source over the Parquet, CSV and JSON files
-    // the loop writes under DUCKDB_SOURCES_DIR. Only where that is set:
-    // compose and the quick-start image (#600) set it. No secret_ref: a
-    // DuckDB source has nothing to log in to.
-    if (process.env.DUCKDB_SOURCES_DIR) {
+    // the loop writes under DUCKDB_SOURCES_DIR. Opt-in, with SEED_DEMO_FILES:
+    // compose and the quick-start image (#600) set the directory for uploads,
+    // which is no reason to seed a fifth dashboard. No secret_ref: a DuckDB
+    // source has nothing to log in to.
+    if (demoFilesOn()) {
       const filesConfig = demoFilesConfig();
       await upsertSource(pg, {
         id: DEMO_FILES_SOURCE_ID,
@@ -274,11 +269,53 @@ async function ensureDemo() {
     await ensureDashboard(pg, fleetSpec(targets));
     for (const title of RETIRED_DEMO_DASHBOARDS) await retireDashboard(pg, title);
     await ensureDashboard(pg, selfMonitoringSpec());
-    if (promUrl) await ensureDashboard(pg, prometheusSelfMonitoringSpec());
-    if (process.env.DUCKDB_SOURCES_DIR) await ensureDashboard(pg, demoFilesSpec(targets));
+    if (demoFilesOn()) await ensureDashboard(pg, demoFilesSpec(targets));
+    else await retireOptIn(pg, DEMO_FILES_DASHBOARD_TITLE, DEMO_FILES_SOURCE_ID);
   } finally {
     await pg.end();
   }
+}
+
+/** Is the files demo on? Opt-in (SEED_DEMO_FILES), and only with a directory. */
+function demoFilesOn(): boolean {
+  return (
+    process.env.SEED_DEMO_FILES === "true" && Boolean(process.env.DUCKDB_SOURCES_DIR)
+  );
+}
+
+/**
+ * The PromQL self-monitoring source and dashboard (#390), once the Prometheus
+ * at `url` answers: the compose `prometheus` profile's, which scrapes the
+ * app's /api/metrics itself. Unauthenticated on the compose network, so no
+ * secret_ref; the app reaches it only because SOURCE_URL_ALLOWLIST names its
+ * host. Returns whether it registered, so the loop asks again until it does.
+ */
+async function ensurePrometheusSelf(url: string): Promise<boolean> {
+  try {
+    const res = await fetch(new URL("/-/ready", url), {
+      signal: AbortSignal.timeout(5_000),
+    });
+    if (!res.ok) return false;
+  } catch {
+    return false;
+  }
+  const pg = new Client({ connectionString: process.env.DATABASE_URL });
+  await pg.connect();
+  try {
+    const config = prometheusSelfConfig(url);
+    await upsertSource(pg, {
+      id: PROMETHEUS_SELF_SOURCE_ID,
+      name: "Holotable self-monitoring (Prometheus)",
+      kind: config.kind,
+      config,
+      secretRef: null,
+    });
+    await ensureDashboard(pg, prometheusSelfMonitoringSpec());
+  } finally {
+    await pg.end();
+  }
+  console.log(`registered ${PROMETHEUS_SELF_SOURCE_ID} at ${url}`);
+  return true;
 }
 
 /**
@@ -359,6 +396,29 @@ async function retireDashboard(pg: Client, title: string): Promise<void> {
   for (const { id } of rows) console.log(`retired demo dashboard ${id} (${title})`);
 }
 
+/**
+ * Retire an opt-in demo that is off: its dashboard as {@link retireDashboard}
+ * does, then its source, tombstoned as the app tombstones a deleted one, but
+ * only while the seeder wrote it and no live dashboard still reads it. A
+ * dashboard a person saved keeps the source it reads.
+ */
+async function retireOptIn(pg: Client, title: string, sourceId: string): Promise<void> {
+  await retireDashboard(pg, title);
+  const { rowCount } = await pg.query(
+    `UPDATE sources s SET tombstoned_at = now(), updated_at = now()
+      WHERE s.id = $1 AND s.workspace_id = $2 AND s.created_by = 'seed'
+        AND s.tombstoned_at IS NULL
+        AND NOT EXISTS (
+          SELECT 1 FROM dashboards d
+            JOIN dashboard_versions dv ON dv.id = d.current_version_id
+            CROSS JOIN LATERAL jsonb_array_elements(dv.spec->'panels') AS panel
+           WHERE d.workspace_id = $2 AND d.deleted_at IS NULL
+             AND panel->'query'->>'sourceId' = $1)`,
+    [sourceId, WORKSPACE],
+  );
+  if (rowCount) console.log(`retired demo source ${sourceId}`);
+}
+
 async function ensureDashboard(pg: Client, input: unknown): Promise<string> {
   const spec: Dashboard = parseDashboard(input);
   const json = JSON.stringify(spec);
@@ -378,6 +438,26 @@ async function ensureDashboard(pg: Client, input: unknown): Promise<string> {
     [spec.title, json, WORKSPACE],
   );
   const found = existing.rows[0];
+  if (!found) {
+    // An opt-in demo turned back on: the one the seeder retired comes back
+    // under its own id, so a link or bookmark to it still works.
+    const restored = await pg.query<{ id: string }>(
+      `UPDATE dashboards SET deleted_at = NULL, updated_at = now()
+        WHERE id = (
+          SELECT d.id FROM dashboards d
+            JOIN dashboard_versions v ON v.id = d.current_version_id
+           WHERE d.workspace_id = $2 AND d.title = $1 AND d.deleted_at IS NOT NULL
+             AND v.created_by = 'seed'
+           ORDER BY d.deleted_at DESC
+           LIMIT 1)
+        RETURNING id`,
+      [spec.title, WORKSPACE],
+    );
+    if (restored.rows[0]) {
+      console.log(`restored demo dashboard ${restored.rows[0].id} (${spec.title})`);
+      return ensureDashboard(pg, spec);
+    }
+  }
   if (found) {
     if (found.created_by === "seed" && found.same === false && found.latest !== null) {
       await writeVersion(
@@ -624,12 +704,12 @@ async function ensureMetricsTables(client: Client) {
 
 /**
  * Rewrite the files demo under `DUCKDB_SOURCES_DIR` (#574), so its newest
- * minute is the last one. A no-op when the variable is unset. A failure is
+ * minute is the last one. A no-op unless the files demo is on. A failure is
  * logged and the loop carries on: the database demo does not depend on it.
  */
 async function refreshDemoFiles(): Promise<void> {
   const root = process.env.DUCKDB_SOURCES_DIR;
-  if (!root) return;
+  if (!root || !demoFilesOn()) return;
   try {
     const dir = await writeDemoFiles(root);
     if (!demoFilesWritten) console.log(`files demo: wrote ${dir}`);
@@ -639,6 +719,98 @@ async function refreshDemoFiles(): Promise<void> {
   }
 }
 let demoFilesWritten = false;
+
+/** How long an opt-in's endpoint may stay silent before its demo is retired. */
+const OPT_IN_GRACE_MS = 3 * 60_000;
+/** How often the loop asks an opt-in's endpoint whether it answers. */
+const OPT_IN_ASK_MS = 10_000;
+
+/**
+ * A demo dashboard seeded only once its source answers: the PromQL
+ * self-monitoring (the compose `prometheus` profile) and Holotable logs (the
+ * `logs` profile). Unset, its URL retires it at once; set, it is registered
+ * the first time the endpoint answers, and retired if it has not within
+ * OPT_IN_GRACE_MS of the seeder starting, so an install upgraded with the
+ * profile off ends without it. Both are unauthenticated on the compose
+ * network, and reached by the app only because SOURCE_URL_ALLOWLIST names
+ * their hosts.
+ */
+interface OptInDemo {
+  name: string;
+  url: string | undefined;
+  title: string;
+  sourceId: string;
+  register: (url: string) => Promise<boolean>;
+  done: boolean;
+  retired: boolean;
+  askedAt: number;
+}
+
+const seederStartedAt = Date.now();
+
+function optInDemos(): OptInDemo[] {
+  if (!process.env.DATABASE_URL || process.env.SEED_DEMO === "false") return [];
+  const demo = (
+    name: string,
+    url: string | undefined,
+    title: string,
+    sourceId: string,
+    register: (url: string) => Promise<boolean>,
+  ): OptInDemo => ({
+    name,
+    url: url || undefined,
+    title,
+    sourceId,
+    register,
+    done: false,
+    retired: false,
+    askedAt: Number.NEGATIVE_INFINITY,
+  });
+  return [
+    demo(
+      "prometheus",
+      process.env.PROMETHEUS_SELF_URL,
+      PROMETHEUS_SELF_DASHBOARD_TITLE,
+      PROMETHEUS_SELF_SOURCE_ID,
+      ensurePrometheusSelf,
+    ),
+    demo(
+      "loki",
+      process.env.LOKI_SELF_URL,
+      LOKI_SELF_DASHBOARD_TITLE,
+      LOKI_SELF_SOURCE_ID,
+      ensureLokiSelf,
+    ),
+  ];
+}
+
+/** One pass of the loop over an opt-in demo: register it, or retire it. */
+async function tickOptIn(demo: OptInDemo): Promise<void> {
+  if (demo.done) return;
+  const now = Date.now();
+  if (now - demo.askedAt < OPT_IN_ASK_MS) return;
+  demo.askedAt = now;
+  try {
+    if (demo.url && (await demo.register(demo.url))) {
+      demo.done = true;
+      return;
+    }
+    if (!demo.retired && (!demo.url || now - seederStartedAt >= OPT_IN_GRACE_MS)) {
+      const pg = new Client({ connectionString: process.env.DATABASE_URL });
+      await pg.connect();
+      try {
+        await retireOptIn(pg, demo.title, demo.sourceId);
+      } finally {
+        await pg.end();
+      }
+      demo.retired = true;
+      // Nothing to ask without a URL.
+      if (!demo.url) demo.done = true;
+    }
+  } catch (err) {
+    console.warn(`\n${demo.name} seed failed:`, err instanceof Error ? err.message : err);
+  }
+}
 
 async function main() {
   // Checked before anything is written, so a typo fails fast and loudly
@@ -666,15 +838,11 @@ async function main() {
       console.warn("backfill failed:", e instanceof Error ? e.message : e),
     );
   }
+  // Asked once before the loop is announced, so an endpoint already up (the
+  // end-to-end stack's Prometheus) has its source before anything reads it.
+  const optIns = optInDemos();
+  for (const demo of optIns) await tickOptIn(demo);
   console.log(`seeding metrics every ${intervalMs}ms — Ctrl+C to stop`);
-  // Unauthenticated on the compose network, so no secret_ref, and reached by
-  // the app only because SOURCE_URL_ALLOWLIST names its host.
-  const lokiUrl =
-    process.env.DATABASE_URL && process.env.SEED_DEMO !== "false"
-      ? process.env.LOKI_SELF_URL
-      : undefined;
-  let lokiPending = Boolean(lokiUrl);
-  let lokiAskedAt = 0;
   let filesAt = Date.now();
   // The service map's last minute written; the first pass writes the current one.
   let callsAt = Number.NEGATIVE_INFINITY;
@@ -683,14 +851,7 @@ async function main() {
       filesAt = Date.now();
       await refreshDemoFiles();
     }
-    if (lokiUrl && lokiPending && Date.now() - lokiAskedAt >= 10_000) {
-      lokiAskedAt = Date.now();
-      try {
-        lokiPending = !(await ensureLokiSelf(lokiUrl));
-      } catch (err) {
-        console.warn("\nloki seed failed:", err instanceof Error ? err.message : err);
-      }
-    }
+    for (const demo of optIns) await tickOptIn(demo);
     try {
       const now = Date.now();
       await insertHttpRows(client, httpRequestRows(now));

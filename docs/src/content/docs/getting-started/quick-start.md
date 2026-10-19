@@ -37,29 +37,31 @@ a source admin of one workspace, `local`. Bring your own data first:
 
 One container holds TimescaleDB, the app, the demo seeder and the
 self-monitoring collector. It needs no `.env`, no Keycloak and no key. The
-seeder writes six hours of demo history before streaming, so the seeded
-dashboards (the service health demo, the self-monitoring dashboard and the
-**Demo files** dashboard over Parquet, CSV and JSON files) are full within seconds.
+seeder writes six hours of demo history before streaming, so the four seeded
+dashboards (**Demo service health**, **Demo fleet**, **Demo host detail** and
+**Holotable self-monitoring**) are full within seconds.
 
 | Option | Effect |
 | --- | --- |
 | `-e AI_MODEL=… -e OPENAI_API_KEY=…` (and `OPENAI_BASE_URL`, `OPENAI_API`) | Turns on generation and chat. Not needed with Ollama or LM Studio running on your machine: their models are found on their own and listed under **Detected on this machine** on the **Models** page ([A model on your machine](/admin/demo-mode/#a-model-on-your-machine)). Without any, those pages say what to do; you can also add a model on the **Models** page. |
 | `-v holotable-data:/var/lib/postgresql/data` | Keeps the data: dashboards, sources, and your favorites and chats. A restart fills only the history it missed. |
 | `-v holotable-files:/var/lib/holotable/files` | Keeps uploaded files across runs. Without it an upload's source outlives its files. |
-| `-v "$PWD/files:/var/lib/holotable/files/mine:ro"` | Reads a directory of your own as well: the DuckDB path picker offers `mine` beside the files demo ([DuckDB files](/admin/duckdb/)). |
+| `-v "$PWD/files:/var/lib/holotable/files/mine:ro"` | Reads a directory of your own as well: the DuckDB path picker offers `mine` beside your uploads ([DuckDB files](/admin/duckdb/)). |
 | `-e SESSION_SECRET=<32+ random characters>` | Keeps your session across restarts. Unset, one is generated per run, and a restart signs you in again without a word; nothing you saved is lost. |
 | `-e SEED_BACKFILL=1d` | More or less history on a fresh start, at most `7d`. |
+| `-e SEED_DEMO_FILES=true` | Adds the **Demo files** dashboard and DuckDB source over Parquet, CSV and JSON files the seeder writes ([The files demo](/operations/demo-data/#the-files-demo)). |
 
 `docker stop` shuts it down cleanly within Docker's default ten seconds. The
 image follows `main`; `ghcr.io/jbouder/holotable:<version>-quickstart` pins a
 release.
 
-The quick-start image has no Prometheus and no Loki, so it shows the SQL and
-DuckDB demo sources only. The [Prometheus self-monitoring
-dashboard](/operations/demo-data/#the-prometheus-twin) and a Prometheus
-source to try PromQL against come with Docker Compose, below, and the
-[Holotable logs dashboard](/operations/demo-data/#the-logs-profile) and a Loki
-source to try LogQL against with its `logs` profile.
+The quick-start image has no Prometheus and no Loki, so it shows the SQL
+demo sources, and the DuckDB one with `SEED_DEMO_FILES=true`. The [Prometheus
+self-monitoring dashboard](/operations/demo-data/#the-prometheus-twin) and a
+Prometheus source to try PromQL against come with Docker Compose's
+`prometheus` profile, below, and the [Holotable logs
+dashboard](/operations/demo-data/#the-logs-profile) and a Loki source to try
+LogQL against with its `logs` profile.
 
 :::danger
 Everyone who can reach this container is signed in as its owner and can manage
@@ -77,7 +79,7 @@ cp .env.example .env
 #   SESSION_SECRET        32+ random characters (openssl rand -hex 32)
 #   AI_MODEL + its key    see AI provider; AI_PROVIDER defaults to openai-compatible
 #   OIDC_CLIENT_SECRET=holotable-dev-secret   the local realm's client secret
-docker compose up                  # timescaledb, keycloak, migrate, app, seed, prometheus
+docker compose up                  # timescaledb, keycloak, migrate, app, seed, self-metrics
 ```
 
 The app service runs with `NODE_ENV=production`, so
@@ -87,15 +89,24 @@ an error: the placeholder `SESSION_SECRET`, an empty `AI_MODEL` or an empty
 which.
 
 This brings up TimescaleDB, Keycloak, a one-shot migration job, the app, the
-seeder and a Prometheus that scrapes the app, as separate services, with real
-OIDC sign-in. The seeder registers that Prometheus as the `prometheus-self`
-source, so the stack has SQL and PromQL sources to compare.
-`docker compose --profile logs up` adds a Loki and a Grafana Alloy that ships
-every container's log lines to it; the seeder registers that Loki as
-`loki-self`, with a **Holotable logs** dashboard over the app's own JSON log
-lines, for LogQL beside the other two. The seeder also writes a small
-directory of Parquet, CSV and JSON-lines files, which the app mounts read-only, and
-registers it as the **Demo files** DuckDB source. Sign in at
+seeder and the self-monitoring collector, as separate services, with real
+OIDC sign-in, and the same four seeded dashboards as the quick-start image.
+Each of the others shows off a source kind and is opt-in:
+
+- `docker compose --profile prometheus up` adds a Prometheus that scrapes the
+  app; the seeder registers it as the `prometheus-self` source, with the
+  **Holotable self-monitoring (Prometheus)** dashboard, so the stack has SQL
+  and PromQL sources to compare.
+- `docker compose --profile logs up` adds a Loki and a Grafana Alloy that
+  ships every container's log lines to it; the seeder registers that Loki as
+  `loki-self`, with a **Holotable logs** dashboard over the app's own JSON log
+  lines, for LogQL.
+- `SEED_DEMO_FILES=true docker compose up` has the seeder write a small
+  directory of Parquet, CSV and JSON-lines files and register it as the
+  **Demo files** DuckDB source, with its dashboard.
+
+Profiles combine: `docker compose --profile prometheus --profile logs up`.
+Sign in at
 `http://localhost:3000` as **`demo` / `demo`**, a source-admin in the `demo`
 workspace and a platform admin; see [the local realm](/admin/keycloak/#the-local-realm). The `seed` service
 continuously inserts demo metrics and, once, creates the demo `demo`

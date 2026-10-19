@@ -141,11 +141,9 @@ The walk's issues show under it as you type, because they are schema issues,
 and the kind's `check` runs after them, so a spec that does not compile shows
 the compiler's message there too, before a save would be refused with it.
 
-The demo dashboards each carry one: **Demo service health** a latency band
-with the SLO as a rule, and **Demo fleet** every five-minute CPU reading as a
-tick per host. The smoke test checks the service health dashboard on the
-built images, including that its spec compiles, and the end-to-end suite
-scans the fleet dashboard with axe in both themes.
+**Demo service health** carries one: a latency band with the SLO as a rule.
+The smoke test checks that dashboard on the built images, including that its
+spec compiles, and the end-to-end suite scans it with axe in both themes.
 
 ## Phases
 
