@@ -57,6 +57,13 @@ async function json<T>(path: string, cookie: string, init: RequestInit = {}): Pr
   return (await res.json()) as T;
 }
 
+/** A dashboard variable, as far as its default needs (#623). */
+interface Variable {
+  name: string;
+  values?: string[];
+  default?: string | string[];
+}
+
 interface Panel {
   title: string;
   /** Absent on a panel that runs no query, such as the dashboard's text panel. */
@@ -87,13 +94,19 @@ const list = await json<{ dashboards: { id: string; title: string }[] }>(
 const seeded = list.dashboards.find((d) => d.title === "Demo service health");
 if (!seeded) fail(`no "Demo service health" dashboard among ${list.dashboards.length}`);
 
-const { dashboard } = await json<{ dashboard: { spec: { panels: Panel[] } } }>(
-  `/api/dashboards/${seeded.id}`,
-  cookie,
-);
+const { dashboard } = await json<{
+  dashboard: { spec: { panels: Panel[]; variables?: Variable[] } };
+}>(`/api/dashboards/${seeded.id}`, cookie);
 const panel = dashboard.spec.panels.find((p) => p.query?.sql && p.query.timeField);
 if (!panel?.query) fail("the seeded dashboard has no SQL time-series panel");
 const query = panel.query;
+// The dashboard's variables at their defaults, as a viewer first sees it.
+const variables = Object.fromEntries(
+  (dashboard.spec.variables ?? []).flatMap((v) => {
+    const value = v.default ?? v.values?.[0];
+    return value === undefined ? [] : [[v.name, value]];
+  }),
+);
 
 // The seeder runs beside the server rather than before it, so /api/ready can
 // answer before the backfill's first rows land. Poll until they do.
@@ -106,6 +119,7 @@ while (true) {
       sql: query.sql,
       timeField: query.timeField,
       timeRange: { from: "now-1h", to: "now" },
+      variables,
     }),
   });
   rows = result.rows.length;

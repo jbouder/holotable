@@ -2,7 +2,13 @@ import "./lib/env";
 import { apiTokenHash, generateApiToken } from "@/lib/auth/api-token";
 import { pgApiTokenStore } from "@/lib/db/api-tokens";
 import { getDashboardById, getSourceById, listDashboards } from "@/lib/db/repo";
-import { hasQuery, panelTimeRange, parseDashboard, type QueryPanel } from "@/lib/ir";
+import {
+  declaredVariables,
+  hasQuery,
+  panelTimeRange,
+  parseDashboard,
+  type QueryPanel,
+} from "@/lib/ir";
 import { panelKind } from "@/lib/panels/registry";
 import type { Dashboard } from "@/lib/ir";
 import {
@@ -19,7 +25,9 @@ import {
 } from "@/lib/self-monitoring/prometheus";
 import { bindSourceRowFilter } from "@/lib/row-scope";
 import type { SourcePlan } from "@/lib/sources/server/types";
+import type { VariableValues } from "@/lib/sql/variables";
 import { resolveTimeRange } from "@/lib/time";
+import { resolveSelection } from "@/lib/variable-selection";
 import { serverKind } from "@/lib/sources/server/registry";
 import { demoSpec } from "./lib/demo-dashboards";
 import { DEMO_FILES_DASHBOARD_TITLE, demoFilesSpec } from "./lib/demo-files";
@@ -150,6 +158,7 @@ async function findDashboard(title: string) {
 async function runPanel(
   panel: QueryPanel,
   range: { from: string; to: string },
+  values: { declared: ReadonlySet<string>; variables: VariableValues },
 ): Promise<PanelOutcome> {
   const source = await getSourceById(panel.query.sourceId);
   if (!source || source.tombstonedAt) {
@@ -158,7 +167,7 @@ async function runPanel(
 
   const query = panel.query;
   const kind = serverKind(source);
-  const check = await kind.check(source, query);
+  const check = await kind.check(source, query, values.declared);
   if (!check.ok) return { panel, rows: 0, error: `guard refused: ${check.error}` };
 
   const resolved = resolveTimeRange({ from: range.from, to: range.to });
@@ -169,6 +178,7 @@ async function runPanel(
       to: resolved.to,
       // A script has no viewer, so a row-filtered source refuses here.
       rowFilter: bindSourceRowFilter(source.config, () => undefined),
+      variables: values.variables,
     });
   } catch (err) {
     return { panel, rows: 0, error: err instanceof Error ? err.message : String(err) };
@@ -192,18 +202,29 @@ async function waitForData(target: Target, deadline: number) {
     });
 
     if (dashboard) {
+      // The dashboard's variables at their defaults, as a viewer first sees it.
+      // Only an enum's values are known without a query; the seeded
+      // dashboards smoked here declare no other kind.
+      const values = {
+        declared: declaredVariables(dashboard.spec),
+        variables: await resolveSelection(
+          dashboard.spec.variables ?? [],
+          {},
+          async (v) => v.values ?? [],
+        ),
+      };
       const outcomes = await Promise.all(
         dashboard.spec.panels
           .filter(hasQuery)
           // A panel's own window when it has one (#114), as the poller runs it.
           .map((panel) =>
-            runPanel(panel, panelTimeRange(panel, dashboard.spec.timeRange)),
+            runPanel(panel, panelTimeRange(panel, dashboard.spec.timeRange), values),
           ),
       );
       const refused = outcomes.filter((o) => o.error);
       // A refusal is a real failure, not something more waiting would fix.
-      if (refused.length > 0) return { dashboard, outcomes };
-      if (outcomes.some((o) => o.rows > 0)) return { dashboard, outcomes };
+      if (refused.length > 0) return { dashboard, outcomes, values };
+      if (outcomes.some((o) => o.rows > 0)) return { dashboard, outcomes, values };
       lastReason = `no panel has rows yet (${target.feeds})`;
     }
 
@@ -250,6 +271,7 @@ async function runThroughApp(
   appUrl: string,
   panel: QueryPanel,
   timeRange: { from: string; to: string },
+  variables: VariableValues,
 ): Promise<boolean> {
   const token = generateApiToken();
   const record = await pgApiTokenStore.create({
@@ -264,7 +286,8 @@ async function runThroughApp(
     const res = await fetch(`${appUrl}/api/query`, {
       method: "POST",
       headers: { authorization: `Bearer ${token}`, "content-type": "application/json" },
-      body: JSON.stringify({ ...panel.query, timeRange }),
+      // The dashboard's variables, as the editor's preview sends them.
+      body: JSON.stringify({ ...panel.query, timeRange, variables }),
     });
     const text = await res.text();
     if (!res.ok) {
@@ -288,7 +311,7 @@ async function runThroughApp(
 /** One dashboard's smoke: true when it passed. */
 async function smokeOne(target: Target, deadline: number): Promise<boolean> {
   console.log(`smoke: ${target.title}`);
-  const { dashboard, outcomes } = await waitForData(target, deadline);
+  const { dashboard, outcomes, values } = await waitForData(target, deadline);
   assertCommittedSpec(target, dashboard.spec);
 
   let failed = false;
@@ -320,7 +343,7 @@ async function smokeOne(target: Target, deadline: number): Promise<boolean> {
   if (!failed && target.throughApp && APP_URL) {
     const { panel } = populated[0];
     const range = panelTimeRange(panel, dashboard.spec.timeRange);
-    if (!(await runThroughApp(APP_URL, panel, range))) failed = true;
+    if (!(await runThroughApp(APP_URL, panel, range, values.variables))) failed = true;
   }
   return !failed;
 }
