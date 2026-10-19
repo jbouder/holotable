@@ -310,21 +310,20 @@ export interface ServiceCallRow {
 }
 
 /**
- * The demo's service map (#623), one edge a row: the gateway calls four
- * services, and each service calls its own store. A tree, so the graph
- * panel's tree layout draws it. `share` is the edge's part of the gateway's
- * traffic (a store is called per request of its service, `share` times), and
- * `p95` the latency range of the call, in ms.
+ * The demo's service map (#623), one edge a row: the gateway calls the API's
+ * three services (the `service` values of `http_requests`, so a click on
+ * one filters the request panels to it), and each service calls its own
+ * store. A tree, so the graph panel's tree layout draws it. `share` is the
+ * edge's part of its caller's traffic, and `p95` the latency range of the
+ * call, in ms.
  */
 export const SERVICE_CALLS = [
-  { caller: "gateway", callee: "auth", tier: "service", share: 0.3, p95: [120, 220] },
-  { caller: "gateway", callee: "orders", tier: "service", share: 0.3, p95: [180, 320] },
-  { caller: "gateway", callee: "search", tier: "service", share: 0.25, p95: [300, 650] },
-  { caller: "gateway", callee: "billing", tier: "service", share: 0.15, p95: [200, 380] },
-  { caller: "auth", callee: "auth-db", tier: "store", share: 1, p95: [4, 12] },
-  { caller: "orders", callee: "orders-db", tier: "store", share: 1.5, p95: [6, 20] },
-  { caller: "search", callee: "search-index", tier: "store", share: 1.2, p95: [20, 90] },
-  { caller: "billing", callee: "billing-db", tier: "store", share: 0.8, p95: [5, 15] },
+  { caller: "gateway", callee: "api", tier: "service", share: 1 / 3, p95: [180, 320] },
+  { caller: "gateway", callee: "web", tier: "service", share: 1 / 3, p95: [120, 220] },
+  { caller: "gateway", callee: "worker", tier: "service", share: 1 / 3, p95: [300, 650] },
+  { caller: "api", callee: "api-db", tier: "database", share: 1.5, p95: [6, 20] },
+  { caller: "web", callee: "web-cache", tier: "cache", share: 2, p95: [1, 4] },
+  { caller: "worker", callee: "worker-queue", tier: "queue", share: 0.8, p95: [3, 12] },
 ] as const satisfies readonly {
   caller: string;
   callee: string;

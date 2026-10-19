@@ -416,6 +416,23 @@ test("clicking a slice opens the host dashboard with that host picked (#373)", a
   await page.waitForURL(new RegExp(`/dashboards/${target}\\?.*var-host=`));
 });
 
+test("a store on the demo's service map shows its service in place (#623)", async ({
+  page,
+  request,
+}) => {
+  await page.goto(`/dashboards/${await dashboardId(request, DEMO_DASHBOARD)}`);
+  await waitForPanels(page);
+  // The map's edge table offers each child's link to the keyboard, as a click
+  // on the node does: a store's shows the service that calls it.
+  const show = page
+    .locator('[data-panel-id="service-map"]')
+    .getByRole("button", { name: "api-db: Show this service" });
+  await show.focus();
+  await page.keyboard.press("Enter");
+  await expect(page).toHaveURL(/[?&]var-service=api(&|$)/);
+  expect(new URL(page.url()).searchParams.getAll("var-service")).toEqual(["api"]);
+});
+
 test("a slice with two links lists them, and the self link filters in place (#373)", async ({
   page,
   request,

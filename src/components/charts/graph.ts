@@ -145,6 +145,8 @@ function ingestEdges(
   const parent = new Map<string, string>();
   const value = new Map<string, number>();
   const group = new Map<string, string>();
+  /** The first row each node is the child (or the only end) of. */
+  const own = new Map<string, Record<string, unknown>>();
   for (const row of data.rows) {
     const s = toText(row[sourceKey]);
     const t = toText(row[targetKey]);
@@ -163,6 +165,7 @@ function ingestEdges(
     } else {
       see(node);
     }
+    if (!own.has(node)) own.set(node, row);
     if (valueKey) {
       const v = toNumber(row[valueKey]);
       if (Number.isFinite(v)) value.set(node, (value.get(node) ?? 0) + v);
@@ -180,15 +183,46 @@ function ingestEdges(
     group,
     row: (id) => {
       const p = parent.get(id);
-      const row: Record<string, unknown> =
-        p === undefined ? { [sourceKey]: id } : { [sourceKey]: p, [targetKey]: id };
+      // The other columns of the node's own row (a root that is only ever a
+      // parent has none), then what the node is, over them.
+      const row: Record<string, unknown> = { ...own.get(id) };
+      if (p === undefined) {
+        row[sourceKey] = id;
+        delete row[targetKey];
+      } else {
+        row[sourceKey] = p;
+        row[targetKey] = id;
+      }
       const v = value.get(id);
-      if (valueKey && v !== undefined) row[valueKey] = v;
+      if (valueKey) {
+        if (v !== undefined) row[valueKey] = v;
+        else delete row[valueKey];
+      }
       const g = group.get(id);
       if (groupKey && g !== undefined) row[groupKey] = g;
-      return row;
+      return withNode(row, id, p, g, v);
     },
   };
+}
+
+/**
+ * A node's datum row with what every node carries (#623), over any result
+ * column of the same name: `node` (its name), and where it has them `parent`
+ * (its parent's name), `group` and `value`. A link reads `{ column: "node" }`
+ * on any graph, whatever its columns are called.
+ */
+function withNode(
+  row: Record<string, unknown>,
+  node: string,
+  parent: string | undefined,
+  group: string | undefined,
+  value: number | undefined,
+): Record<string, unknown> {
+  const out: Record<string, unknown> = { ...row, node };
+  if (parent !== undefined) out.parent = parent;
+  if (group !== undefined) out.group = group;
+  if (value !== undefined) out.value = value;
+  return out;
 }
 
 /** Path rows, as the treemap reads them: a parent is the sum of its leaves. */
@@ -236,7 +270,10 @@ function ingestPath(
       );
       const v = value.get(id);
       if (valueKey && v !== undefined) row[valueKey] = v;
-      return row;
+      const g = group.get(id);
+      if (groupKey && g !== undefined) row[groupKey] = g;
+      const p = parent.get(id);
+      return withNode(row, path.at(-1) ?? id, p && labels.get(p)?.at(-1), g, v);
     },
   };
 }
@@ -290,7 +327,11 @@ function assemble(ingest: Ingest, base: GraphTree): GraphTree {
       (base.shape === "edges" && !ingest.parent.has(id)
         ? sumOf(node.children)
         : undefined);
-    if (value !== undefined) node.value = value;
+    if (value !== undefined) {
+      node.value = value;
+      // A root's value is worked out here, so its datum learns it here.
+      if (!("value" in node.row)) node.row = { ...node.row, value };
+    }
     return node;
   };
   return {
@@ -380,6 +421,8 @@ export function graphTable(
         : []),
     ]),
     datums: shown.map(([, child]) => graphDatum(child)),
+    // A row's links are the child's, so they are named for it.
+    labels: shown.map(([, child]) => child.name),
   };
 }
 

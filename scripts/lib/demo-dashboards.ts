@@ -1,4 +1,5 @@
 import { SPEC_VERSION } from "@/lib/ir";
+import { SERVICES } from "./seed-data";
 
 /**
  * The demo dashboards the seeder writes, as plain specs. Kept apart from
@@ -51,6 +52,24 @@ const HOST_VARIABLE = {
   },
 } as const;
 
+/**
+ * The demo API's services, one value a service of `http_requests` and a
+ * service node of the service map (#623). Multi, and all of them by default,
+ * since a variable has no "all": the dashboard shows everything until a click
+ * on the map, or the picker, narrows it.
+ */
+const SERVICE_VARIABLE = {
+  name: "service",
+  label: "Service",
+  type: "enum",
+  values: [...SERVICES],
+  multi: true,
+  default: [...SERVICES],
+} as const;
+
+/** The `http_requests` panels' filter by {@link SERVICE_VARIABLE}. */
+const BY_SERVICE = "service = ANY(:service)";
+
 /** One row per minute, the window applied through `minute`. */
 const perMinute = (select: string, from: string, where = "") =>
   `SELECT time_bucket('1 minute', ts) AS minute, ${select} FROM ${from}${where ? ` WHERE ${where}` : ""} GROUP BY minute ORDER BY minute`;
@@ -62,6 +81,7 @@ export function demoSpec() {
     title: "Demo service health",
     timeRange: { from: "now-1h", to: "now" },
     refreshIntervalMs: 15000,
+    variables: [SERVICE_VARIABLE],
     panels: [
       {
         id: "about",
@@ -86,6 +106,7 @@ export function demoSpec() {
           sql: perMinute(
             "100.0 * count(*) FILTER (WHERE status >= 500) / count(*) AS error_pct",
             "http_requests",
+            BY_SERVICE,
           ),
         },
         format: "percent",
@@ -110,6 +131,7 @@ export function demoSpec() {
           sql: perMinute(
             "percentile_cont(0.95) WITHIN GROUP (ORDER BY duration_ms) AS p95",
             "http_requests",
+            BY_SERVICE,
           ),
         },
         format: "ms",
@@ -135,6 +157,7 @@ export function demoSpec() {
           sql: perMinute(
             "100.0 * count(*) FILTER (WHERE duration_ms > 300) / count(*) AS slow_pct",
             "http_requests",
+            BY_SERVICE,
           ),
         },
         format: "percent",
@@ -160,6 +183,7 @@ export function demoSpec() {
           sql: perMinute(
             "100.0 * count(*) FILTER (WHERE status < 500) / count(*) AS availability",
             "http_requests",
+            BY_SERVICE,
           ),
         },
         format: "percent",
@@ -185,6 +209,7 @@ export function demoSpec() {
           sql: perMinute(
             "count(*) FILTER (WHERE status < 400) AS ok, count(*) FILTER (WHERE status >= 400 AND status < 500) AS client_errors, count(*) FILTER (WHERE status >= 500) AS server_errors",
             "http_requests",
+            BY_SERVICE,
           ),
         },
         format: "number",
@@ -200,7 +225,7 @@ export function demoSpec() {
         query: {
           sourceId: "ts-metrics",
           timeField: "period",
-          sql: "SELECT time_bucket('5 minutes', ts) AS period, route, status, count(*) AS requests FROM http_requests GROUP BY period, route, status ORDER BY period",
+          sql: "SELECT time_bucket('5 minutes', ts) AS period, route, status, count(*) AS requests FROM http_requests WHERE service = ANY(:service) GROUP BY period, route, status ORDER BY period",
         },
         format: "number",
         options: {
@@ -220,7 +245,9 @@ export function demoSpec() {
         query: {
           sourceId: "ts-metrics",
           timeField: "period",
-          sql: "SELECT time_bucket('5 minutes', ts) AS period, caller, callee, tier, sum(requests) AS requests FROM service_calls GROUP BY period, caller, callee, tier ORDER BY period",
+          // `service` is the service a node stands for: a service's own
+          // name, a store's caller. The gateway, called by nothing, has none.
+          sql: "SELECT time_bucket('5 minutes', ts) AS period, caller, callee, tier, CASE WHEN tier = 'service' THEN callee ELSE caller END AS service, sum(requests) AS requests FROM service_calls GROUP BY period, caller, callee, tier ORDER BY period",
         },
         format: "number",
         options: {
@@ -232,9 +259,22 @@ export function demoSpec() {
           // The gateway is the one node no row calls, so it has no tier and
           // takes the default symbol.
           symbol: "loadBalancer",
-          symbols: { service: "server", store: "database" },
+          symbols: {
+            service: "server",
+            database: "database",
+            cache: "cache",
+            queue: "queue",
+          },
           compact: true,
         },
+        // A click on a service, or on its store, shows that service on this
+        // dashboard. The gateway reads no `service`, so it offers nothing.
+        links: [
+          {
+            title: "Show this service",
+            set: { service: { column: "service" } },
+          },
+        ],
         layout: { x: 0, y: 10, w: 12, h: 4 },
       },
       {
@@ -247,6 +287,7 @@ export function demoSpec() {
           sql: perMinute(
             "percentile_cont(0.05) WITHIN GROUP (ORDER BY duration_ms) AS p5, percentile_cont(0.5) WITHIN GROUP (ORDER BY duration_ms) AS p50, percentile_cont(0.95) WITHIN GROUP (ORDER BY duration_ms) AS p95",
             "http_requests",
+            BY_SERVICE,
           ),
         },
         options: {
@@ -290,7 +331,7 @@ export function demoSpec() {
         query: {
           sourceId: "ts-metrics",
           timeField: "period",
-          sql: "SELECT time_bucket('5 minutes', ts) AS period, floor(duration_ms / 50) * 50 AS bucket, count(*) AS requests FROM http_requests GROUP BY period, bucket ORDER BY period, bucket",
+          sql: "SELECT time_bucket('5 minutes', ts) AS period, floor(duration_ms / 50) * 50 AS bucket, count(*) AS requests FROM http_requests WHERE service = ANY(:service) GROUP BY period, bucket ORDER BY period, bucket",
         },
         format: "ms",
         options: {
@@ -313,7 +354,7 @@ export function demoSpec() {
         viz: "table",
         query: {
           sourceId: "ts-metrics",
-          sql: "SELECT route, percentile_cont(0.95) WITHIN GROUP (ORDER BY duration_ms) AS p95_ms, count(*) AS requests, 100.0 * count(*) FILTER (WHERE status >= 500) / count(*) AS error_pct FROM http_requests GROUP BY route ORDER BY p95_ms DESC",
+          sql: "SELECT route, percentile_cont(0.95) WITHIN GROUP (ORDER BY duration_ms) AS p95_ms, count(*) AS requests, 100.0 * count(*) FILTER (WHERE status >= 500) / count(*) AS error_pct FROM http_requests WHERE service = ANY(:service) GROUP BY route ORDER BY p95_ms DESC",
         },
         options: {
           columns: [
@@ -338,7 +379,7 @@ export function demoSpec() {
         viz: "bar",
         query: {
           sourceId: "ts-metrics",
-          sql: "SELECT route, count(*) FILTER (WHERE status >= 500) AS server_errors FROM http_requests GROUP BY route ORDER BY server_errors DESC",
+          sql: "SELECT route, count(*) FILTER (WHERE status >= 500) AS server_errors FROM http_requests WHERE service = ANY(:service) GROUP BY route ORDER BY server_errors DESC",
         },
         format: "number",
         options: { legend: "none", thresholds: [{ value: 0, color: "danger" }] },
@@ -351,7 +392,7 @@ export function demoSpec() {
         viz: "pie",
         query: {
           sourceId: "ts-metrics",
-          sql: "SELECT service, count(*) AS requests FROM http_requests GROUP BY service ORDER BY requests DESC",
+          sql: "SELECT service, count(*) AS requests FROM http_requests WHERE service = ANY(:service) GROUP BY service ORDER BY requests DESC",
         },
         format: "number",
         options: { legend: "bottom", compact: true },

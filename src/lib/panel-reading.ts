@@ -375,6 +375,8 @@ export interface ChartTable {
  */
 export interface ChartRows extends ChartTable {
   datums: readonly (Datum | null)[];
+  /** What each row's links are named for; by default its first cell. */
+  labels?: readonly string[];
 }
 
 /**

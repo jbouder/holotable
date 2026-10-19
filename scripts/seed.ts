@@ -26,6 +26,7 @@ import {
   httpRequestRows,
   parseBackfill,
   SERVICE_CALL_INTERVAL_MS,
+  SERVICE_CALLS,
   type ServiceCallRow,
   serviceCallRows,
   type SystemMetricRow,
@@ -611,6 +612,13 @@ async function ensureMetricsTables(client: Client) {
     )`);
   await client.query(
     `SELECT create_hypertable('metrics.service_calls', by_range('ts'), if_not_exists => TRUE)`,
+  );
+  // Rows an earlier seeder wrote for edges the map no longer has would draw
+  // nodes whose links set a service the variable does not allow (#623).
+  await client.query(
+    `DELETE FROM metrics.service_calls
+      WHERE (caller || '>' || callee) <> ALL($1::text[])`,
+    [SERVICE_CALLS.map((e) => `${e.caller}>${e.callee}`)],
   );
 }
 

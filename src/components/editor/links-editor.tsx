@@ -12,6 +12,7 @@ import {
   formFromLink,
   type LinkForm,
   type LinkSetRow,
+  columnPickNames,
   labelPickNames,
   linkFromForm,
   moveLink,
@@ -184,7 +185,7 @@ export function LinksEditor({
           workspaceId={workspaceId}
           dashboardId={dashboardId}
           ownVariables={ownVariables}
-          resultColumns={resultColumns}
+          resultColumns={columnPickNames(panel, resultColumns)}
           labelNames={labelPickNames(panel, resultColumns)}
           otherTitles={links.filter((_, j) => j !== editing.index).map((l) => l.title)}
           onCancel={() => setEditing(null)}

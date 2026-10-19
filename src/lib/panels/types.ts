@@ -116,6 +116,12 @@ export interface PanelKind<K extends string = string> {
    * it. Undefined asks for the cap.
    */
   readonly rowLimit?: (options: Record<string, unknown>) => number | undefined;
+  /**
+   * Columns a click on the kind's marks carries beyond the result's own
+   * (#623): a graph node's `node` and `parent`. The link editor offers them
+   * beside the result's columns.
+   */
+  readonly datumColumns?: readonly string[];
 }
 
 /**

@@ -15,7 +15,10 @@ says how a section gets here.
   group column and can be drawn as network icons (server, database, load
   balancer, …). Data that is not a tree is refused with the node named. Demo
   service health gains a service map over a new `metrics.service_calls`
-  table, which the seeder creates, backfills and writes once a minute.
+  table, which the seeder creates, backfills and writes once a minute; a
+  click on a service (or its store) filters the dashboard to it through a new
+  `service` variable. A graph node's datum carries `node`, `parent`, `group`
+  and `value` for links.
 
 ## 0.2.0 — 2026-10-11
 

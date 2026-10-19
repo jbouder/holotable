@@ -252,8 +252,13 @@ export function datumLinkItems(
   context: LinkContext,
   datum: Datum,
 ): MenuLinkItem[] {
-  return usableDatumLinks(panel, targets).map((link) =>
-    linkItem(link, targets, context, datum),
+  return (
+    usableDatumLinks(panel, targets)
+      .map((link) => linkItem(link, targets, context, datum))
+      // A self link that reads nothing from this datum would change nothing
+      // (#623): a graph's root has no column a node's link reads. It is left
+      // out rather than offered as a click that goes nowhere.
+      .filter((item) => item.kind !== "self" || Object.keys(item.picks).length > 0)
   );
 }
 

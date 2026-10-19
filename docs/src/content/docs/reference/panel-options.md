@@ -387,9 +387,13 @@ fetch an image.
   AA on it.
 - A click on a node's symbol opens or closes its branch, and what a reader
   closed stays closed as the panel refreshes. A click on its label follows a
-  [datum link](/guide/drilldown/), carrying the node's columns: an edge row's
-  parent and child (a root's name in the parent column), or its path, with its
-  value and group.
+  [datum link](/guide/drilldown/). The datum is the node's own edge row (the
+  first row whose child it is, with its value summed; a root has only its
+  name in the parent column), or its path columns, and on every graph four
+  more: `node` (its name), `parent` (its parent's name), `group` (its group
+  value) and `value`. A link reads `{ "column": "node" }` whatever the edge
+  columns are called. ECharts reports no click on an edge, so an edge is not a
+  datum.
 - The table a screen reader is given lists one row per edge: parent, child
   and value.
 
@@ -400,7 +404,7 @@ fetch an image.
   "query": {
     "sourceId": "ts-metrics",
     "timeField": "period",
-    "sql": "SELECT time_bucket('5 minutes', ts) AS period, caller, callee, tier, sum(requests) AS requests FROM service_calls GROUP BY period, caller, callee, tier ORDER BY period"
+    "sql": "SELECT time_bucket('5 minutes', ts) AS period, caller, callee, tier, CASE WHEN tier = 'service' THEN callee ELSE caller END AS service, sum(requests) AS requests FROM service_calls GROUP BY period, caller, callee, tier ORDER BY period"
   },
   "options": {
     "orient": "LR",
@@ -409,9 +413,17 @@ fetch an image.
     "value": "requests",
     "group": "tier",
     "symbol": "loadBalancer",
-    "symbols": { "service": "server", "store": "database" },
+    "symbols": {
+      "service": "server",
+      "database": "database",
+      "cache": "cache",
+      "queue": "queue"
+    },
     "compact": true
-  }
+  },
+  "links": [
+    { "title": "Show this service", "set": { "service": { "column": "service" } } }
+  ]
 }
 ```
 
