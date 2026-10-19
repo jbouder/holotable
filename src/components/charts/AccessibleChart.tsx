@@ -117,7 +117,7 @@ export function AccessibleChart({
                         data={data}
                         index={offset + i}
                         datum={own?.datums[i]}
-                        label={row[0] ?? ""}
+                        label={own?.labels?.[i] ?? row[0] ?? ""}
                       />
                     </td>
                   )}

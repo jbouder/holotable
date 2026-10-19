@@ -61,7 +61,8 @@ A link whose `set` reads a `column` (`{ "column": "host" }`), the series
 is a **datum link**. It needs to know what was clicked,
 so it is not in the panel's menu. Instead the panel's data is clickable:
 
-- **A chart.** Click a point, bar, slice, cell, span or gauge. With one link,
+- **A chart.** Click a point, bar, slice, cell, span, gauge or a graph
+  node's label (its symbol opens and closes its branch instead). With one link,
   the click follows it. With several, a small list opens at the point, and
   Escape or a click outside closes it. A click that ends a time brush never
   follows a link.
@@ -102,8 +103,19 @@ form, a label pick on a LogQL panel lists the labels the last preview
 returned. A LogQL metric query's series are named as PromQL's are, and a
 `label` pick reads them the same way.
 
+On a graph (#623), a node's row is its own edge row's columns (the first
+row whose child it is; a root has none), with the parent and child columns
+set to its edge, and four more under the same names on every graph: `node`
+(its name), `parent` (its parent's), `group` and `value`. So
+`{ "service": { "column": "node" } }` carries the clicked node's name, whatever
+the edge columns are called, and the link form lists those four beside the
+preview's columns. The root drawn above several roots is no datum.
+
 A **self datum link** filters in place: clicking a host's slice sets `host` on
 this dashboard, the picker and the URL follow, and the picker puts it back.
+A self link that would read nothing from what was clicked, every one of its
+picks a column, series or label the datum lacks, is not offered for that
+click: it would change nothing.
 
 ## Who decides where a link may lead
 

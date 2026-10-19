@@ -12,10 +12,12 @@ import {
   parseBackfill,
   requestLatency,
   SERVICE_CALLS,
+  SERVICES,
   serviceCallRows,
   systemMetricRows,
 } from "../scripts/lib/seed-data";
-import { graphNodes, graphTree } from "@/components/charts/graph";
+import { graphDatum, graphNodes, graphTree } from "@/components/charts/graph";
+import { datumLinkItems } from "@/lib/drilldown";
 import { parseDashboard } from "@/lib/ir";
 import { demoSpec } from "../scripts/lib/demo-dashboards";
 
@@ -209,7 +211,7 @@ test("log lines cover every level, each with a route and a request id", () => {
   assert.ok(errors > 0.01 && errors < 0.1, `errors ${errors}`);
 });
 
-test("the service map is a tree the demo's graph panel draws, every edge every minute (#623)", () => {
+test("the service map is a tree the demo's graph panel draws, and its link shows a service (#623)", () => {
   const random = seeded(7);
   const rows = Array.from({ length: 12 }, (_, i) =>
     serviceCallRows(NOW + i * 60_000, random),
@@ -219,15 +221,19 @@ test("the service map is a tree the demo's graph panel draws, every edge every m
     assert.ok(row.requests > 0 && row.errors >= 0 && row.errors < row.requests);
     assert.ok(row.p95_ms > 0);
   }
-  const panel = parseDashboard(demoSpec()).panels.find((p) => p.id === "service-map");
+  const spec = parseDashboard(demoSpec());
+  const panel = spec.panels.find((p) => p.id === "service-map");
   assert.ok(panel);
+  // The rows as the panel's SQL returns them: `service` is a service's own
+  // name, or a store's caller.
   const tree = graphTree(panel, {
-    columns: ["period", "caller", "callee", "tier", "requests"],
+    columns: ["period", "caller", "callee", "tier", "service", "requests"],
     rows: rows.map(({ ts, caller, callee, tier, requests }) => ({
       period: ts.toISOString(),
       caller,
       callee,
       tier,
+      service: tier === "service" ? callee : caller,
       requests,
     })),
   });
@@ -237,5 +243,20 @@ test("the service map is a tree the demo's graph panel draws, every edge every m
     ["gateway"],
   );
   assert.equal(graphNodes(tree).length, SERVICE_CALLS.length + 1);
-  assert.deepEqual(tree.groups, ["service", "store"]);
+  // Every node but the gateway shows a service the variable allows; the
+  // gateway shows none, so its click offers nothing rather than a dead link.
+  const allowed = spec.variables?.find((v) => v.name === "service")?.values ?? [];
+  assert.deepEqual([...allowed].sort(), [...SERVICES].sort());
+  const context = { timeRange: spec.timeRange, selection: {} };
+  for (const node of graphNodes(tree)) {
+    const items = datumLinkItems(panel, {}, context, graphDatum(node));
+    if (node.name === "gateway") {
+      assert.deepEqual(items, [], "the gateway");
+      continue;
+    }
+    assert.equal(items.length, 1, node.name);
+    const picks = items[0]?.kind === "self" ? items[0].picks.service : undefined;
+    assert.equal(picks?.length, 1, node.name);
+    assert.ok(allowed.includes(picks?.[0] as string), `${node.name}: ${picks}`);
+  }
 });

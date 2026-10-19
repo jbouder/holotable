@@ -10,6 +10,7 @@ import {
   selfLinkProblems,
   VariableName,
 } from "@/lib/ir";
+import { panelKind } from "@/lib/panels/registry";
 
 /**
  * The panel inspector's link form (#374), as data: what the author is
@@ -196,4 +197,19 @@ export function labelPickNames(panel: Panel, resultColumns: readonly string[]): 
   return resultColumns.filter(
     (c) => c !== PROMQL_TIME_FIELD && c !== LOGQL_MESSAGE_FIELD,
   );
+}
+
+/**
+ * The columns a `column` pick may name on this panel: its last preview's,
+ * and once there is one, what a click on the kind's marks adds to them (#623),
+ * such as a graph node's `node`. Empty before a preview, when the editor asks
+ * for the name as text.
+ */
+export function columnPickNames(
+  panel: Panel,
+  resultColumns: readonly string[],
+): string[] {
+  if (resultColumns.length === 0) return [];
+  const extra = panelKind(panel.viz).datumColumns ?? [];
+  return [...resultColumns, ...extra.filter((c) => !resultColumns.includes(c))];
 }

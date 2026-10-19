@@ -59,6 +59,12 @@ export const GraphOptions = z
   .strict();
 export type GraphOptions = z.infer<typeof GraphOptions>;
 
+/**
+ * What a click on a node carries besides its row's columns (#623): its name,
+ * its parent's, its group and its value, under these names on any graph.
+ */
+export const GRAPH_DATUM_COLUMNS = ["node", "parent", "group", "value"] as const;
+
 /** Structure: what points at what, drawn as a tree of nodes and edges (#623). */
 export const graph = definePanelKind({
   kind: "graph",
@@ -74,4 +80,5 @@ export const graph = definePanelKind({
   query: "required",
   options: GraphOptions,
   optionGroups: ["graph", "number"],
+  datumColumns: GRAPH_DATUM_COLUMNS,
 });

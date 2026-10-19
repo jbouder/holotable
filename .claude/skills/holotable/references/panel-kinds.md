@@ -232,6 +232,10 @@ symbol is one of the shapes `circle`, `rect`, `roundRect`, `triangle`,
 `user`, `service`; never a `path://` or `image://` string. Use the icons for
 an infrastructure or service map. At most 500 nodes are drawn.
 
+A click on a node's label is a datum for a link: its own edge row's columns
+plus `node`, `parent`, `group` and `value`, so `{ "column": "node" }` carries
+the clicked node's name.
+
 With PromQL: an instant query aggregated by both ends of an edge, `sum by (job, instance) (rate(http_requests_total[5m]))`, with `source: "job"`, `target: "instance"` and `value: "value"`.
 
 ### `vega`

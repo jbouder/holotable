@@ -53,7 +53,13 @@ panel kind:
   memory, disk and network, its own log lines and their levels, and the other
   hosts.
 
-They show [drilldown](/guide/drilldown/) too. On **Demo fleet**, a click on a
+They show [drilldown](/guide/drilldown/) too. **Demo service health** has a
+`service` variable, the API's three services, all of them picked by default
+(a variable has no "all" value, so a multi-select defaulting to every value
+is how the dashboard shows everything until it is narrowed), and every panel
+over `http_requests` filters by it. A click on a service on the service map
+shows that service; a click on a store shows the service that calls it; the
+gateway, which is no one service, offers nothing. On **Demo fleet**, a click on a
 host anywhere (a tile, a line, a bar, a lane or a row of the hosts table)
 opens **Demo host detail** for that host, and the heatmap has an *Open host
 detail* item in its panel menu. On **Demo host detail**, a click on a row of
@@ -162,9 +168,10 @@ hypertables in the same file.
 
 `metrics.service_calls` (`ts`, `caller`, `callee`, `tier`, `requests`,
 `errors`, `p95_ms`) is the service map's: one row per caller and callee a
-minute. Its topology is a tree, `gateway` calling `auth`, `orders`, `search`
-and `billing` (tier `service`), each of those calling its own store
-(`auth-db`, `orders-db`, `search-index`, `billing-db`; tier `store`). The
+minute. Its topology is a tree: `gateway` calls the API's three services,
+`api`, `web` and `worker` (tier `service`, the same names as
+`http_requests.service`), and each calls its own store, `api-db` (tier
+`database`), `web-cache` (`cache`) and `worker-queue` (`queue`). The
 gateway's requests follow `http_requests`' rhythm at the default cadence, and
 about 3% of calls fail, as its 5xx do. A **read-only** role is created by
 `timescaledb/init/002_readonly_user.sh`; the app only ever connects as this user

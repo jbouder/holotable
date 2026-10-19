@@ -81,10 +81,15 @@ test("edge rows are one tree: a repeated edge sums, a root shows what leaves it"
   assert.deepEqual(tree.groups, ["service", "store"]);
   const db = graphNodes(tree).find((n) => n.name === "orders-db");
   assert.deepEqual(db?.row, {
+    period: "t1",
     caller: "orders",
     callee: "orders-db",
     requests: 30,
     tier: "store",
+    node: "orders-db",
+    parent: "orders",
+    group: "store",
+    value: 30,
   });
 });
 
@@ -132,6 +137,9 @@ test("path columns are a tree as the treemap reads them, parents the sum of thei
     table: "http",
     column: "ts",
     bytes: 8,
+    node: "ts",
+    parent: "http",
+    value: 8,
   });
 });
 
@@ -315,6 +323,7 @@ test("the screen-reader table is one row per edge, each the child's datum", () =
   ]);
   assert.equal(table.caption, "Edges of Service map: 3 edges.");
   assert.equal(table.datums[2]?.series, "orders-db");
+  assert.deepEqual(table.labels, ["auth", "orders", "orders-db"]);
 });
 
 test("a node's symbol opens and closes its branch; its label is a datum (#373)", () => {

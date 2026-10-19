@@ -1,7 +1,8 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import type { Panel, PanelLink } from "@/lib/ir";
+import { Panel, type PanelLink } from "@/lib/ir";
 import {
+  columnPickNames,
   emptyLinkForm,
   formFromLink,
   type LinkForm,
@@ -225,4 +226,26 @@ test("a label pick round-trips and names the label it needs (#388)", () => {
     describeLink(link),
     "to this dashboard; sets host from the clicked series' instance label",
   );
+});
+
+test("a graph's link may read a node's own columns beside the result's (#623)", () => {
+  const graph = Panel.parse({
+    id: "g",
+    title: "Map",
+    viz: "graph",
+    query: { sourceId: "s", sql: "SELECT 1" },
+    layout: { x: 0, y: 0, w: 6, h: 4 },
+  });
+  assert.deepEqual(columnPickNames(graph, ["caller", "callee", "value"]), [
+    "caller",
+    "callee",
+    "value",
+    "node",
+    "parent",
+    "group",
+  ]);
+  // Before a preview the column is typed, so nothing is listed.
+  assert.deepEqual(columnPickNames(graph, []), []);
+  const bar = Panel.parse({ ...graph, viz: "bar" });
+  assert.deepEqual(columnPickNames(bar, ["host", "cpu"]), ["host", "cpu"]);
 });

@@ -213,10 +213,20 @@ const CASES: Record<VizType, Case> = {
         { caller: "gateway", callee: "orders", tier: "service", requests: 2 },
       ],
     },
-    // A node is its edge in: both ends, the summed value and its group.
+    // A node is its edge in: both ends, the summed value and its group, and
+    // under the same names on any graph, its node, parent, group and value.
     click: { id: "orders" },
     expect: {
-      row: { caller: "gateway", callee: "orders", requests: 6, tier: "service" },
+      row: {
+        caller: "gateway",
+        callee: "orders",
+        requests: 6,
+        tier: "service",
+        node: "orders",
+        parent: "gateway",
+        group: "service",
+        value: 6,
+      },
       series: "orders",
     },
   },
@@ -390,6 +400,49 @@ test("a click offers only the datum links the viewer can follow; the menu offers
   assert.deepEqual(
     menuLinks(p, targets, context).map((i) => i.title),
     ["Panel link"],
+  );
+});
+
+test("a graph's root is a datum with no parent; a store carries its own row's columns (#623)", () => {
+  const p = panel("graph", {
+    options: { source: "caller", target: "callee", value: "requests", group: "tier" },
+  });
+  const data = {
+    columns: ["caller", "callee", "tier", "service", "requests"],
+    rows: [
+      { caller: "gateway", callee: "api", tier: "service", service: "api", requests: 4 },
+      { caller: "api", callee: "api-db", tier: "database", service: "api", requests: 6 },
+    ],
+  };
+  assert.deepEqual(datumOf(p, data, { id: "gateway" }), {
+    row: { caller: "gateway", node: "gateway", value: 4 },
+    series: "gateway",
+  });
+  assert.deepEqual(datumOf(p, data, { id: "api-db" })?.row, {
+    caller: "api",
+    callee: "api-db",
+    tier: "database",
+    service: "api",
+    requests: 6,
+    node: "api-db",
+    parent: "api",
+    group: "database",
+    value: 6,
+  });
+  // The root drawn above several roots, and a click on no node, are none.
+  assert.equal(datumOf(p, data, { id: "\u001froot" }), null);
+  assert.equal(datumOf(p, data, {}), null);
+});
+
+test("a self link that reads nothing from the clicked datum is not offered (#623)", () => {
+  const p = panel("graph", {
+    links: [{ title: "Show this service", set: { service: { column: "service" } } }],
+  });
+  const context = { timeRange: { from: "now-1h", to: "now" }, selection: {} };
+  assert.deepEqual(datumLinkItems(p, {}, context, { row: { node: "gateway" } }), []);
+  assert.deepEqual(
+    datumLinkItems(p, {}, context, { row: { node: "api-db", service: "api" } }),
+    [{ kind: "self", title: "Show this service", picks: { service: ["api"] } }],
   );
 });
 
