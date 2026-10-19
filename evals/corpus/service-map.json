@@ -1,0 +1,12 @@
+{
+  "name": "service-map",
+  "mode": "dashboard",
+  "catalog": "services",
+  "prompt": "Draw a map of which service calls which, with the number of requests on each call, as a tree with server and database icons.",
+  "expect": {
+    "tables": ["service_calls"],
+    "plausibleViz": ["graph"],
+    "requiredViz": ["graph"],
+    "minPanels": 1
+  }
+}

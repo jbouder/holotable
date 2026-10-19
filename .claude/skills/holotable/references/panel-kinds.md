@@ -204,6 +204,36 @@ drawn, and at most 500 leaves are, the largest.
 
 With PromQL: an instant query aggregated by the levels, `sum by (job, instance) (rate(http_requests_total[5m]))`, with `path: ["job", "instance"]` and `value: "value"`.
 
+### `graph`
+
+Structure: what points at what, drawn as a tree. A service and what it calls,
+a schema's tables and their columns, a folder tree. Return one row per edge,
+the parent and the child columns, with an optional number and an optional
+category; a repeated edge is one edge, its value summed, so a coarse time
+bucket as `query.timeField` (`time_bucket('5 minutes', ts) AS period`) applies
+the window. Or return one row per leaf with path columns, top level first, as
+for a `treemap`. Every node needs exactly one parent: a node with two parents,
+or a cycle, is refused with the node named, not drawn. Use `treemap` when the
+question is share, not structure.
+
+Options: number (how values are written), `layout` (`"tree"`, the default),
+`orient` (`"LR"`, the default, `"TB"`, `"RL"`, `"BT"` or `"radial"`), `source`
+and `target` (the parent and child columns of an edge row; default the first
+two text columns), `value` (a numeric column shown on each node: its incoming
+edge's, or for a root what leaves it), `group` (a text column that colors each
+edge's target by category), `path` (1–8 columns, instead of `source` and
+`target`), `collapseDepth` (1–32 levels open at first draw; default all),
+`symbol` (every node's symbol, `"circle"` by default), `symbols` (a group
+value to a symbol, `{ "service": "server", "store": "database" }`, which beats
+`symbol`), `symbolSize` (6–48; default 10 for a shape, 24 for an icon). A
+symbol is one of the shapes `circle`, `rect`, `roundRect`, `triangle`,
+`diamond`, `pin`, `arrow`, or the icons `server`, `database`, `cloud`,
+`router`, `switch`, `firewall`, `loadBalancer`, `queue`, `cache`, `storage`,
+`user`, `service`; never a `path://` or `image://` string. Use the icons for
+an infrastructure or service map. At most 500 nodes are drawn.
+
+With PromQL: an instant query aggregated by both ends of an edge, `sum by (job, instance) (rate(http_requests_total[5m]))`, with `source: "job"`, `target: "instance"` and `value: "value"`.
+
 ### `vega`
 
 A custom visual: a view no other kind draws (a band with a rule, small

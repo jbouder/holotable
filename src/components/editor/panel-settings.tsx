@@ -17,7 +17,9 @@ import {
   REFRESH_PRESETS_MS,
   withOptions,
 } from "@/lib/panel-options";
+import { GRAPH_SYMBOLS } from "@/lib/graph/symbols";
 import { COLOR_TOKENS, type ColorToken } from "@/lib/panels/colors";
+import { GRAPH_LAYOUTS } from "@/lib/panels/kinds/graph";
 import {
   type OptionGroup,
   type TableColumn,
@@ -158,6 +160,7 @@ const GROUP_TITLES: Record<OptionGroup, string> = {
   legend: "Legend",
   thresholds: "Thresholds",
   table: "Columns",
+  graph: "Graph",
 };
 
 /**
@@ -253,6 +256,65 @@ function OptionGroupFields({
       return <ThresholdsField panel={panel} onChange={onChange} />;
     case "table":
       return <TableFields panel={panel} onChange={onChange} />;
+    case "graph":
+      return (
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <SelectOption
+            {...field("layout")}
+            label="Layout"
+            options={[
+              { value: "", label: "tree (default)" },
+              ...GRAPH_LAYOUTS.filter((l) => l !== "tree").map((l) => ({
+                value: l,
+                label: l,
+              })),
+            ]}
+            parse={(v) => (v === "" ? undefined : v)}
+          />
+          <SelectOption
+            {...field("orient")}
+            label="Orientation"
+            options={[
+              { value: "", label: "left to right (default)" },
+              { value: "TB", label: "top to bottom" },
+              { value: "RL", label: "right to left" },
+              { value: "BT", label: "bottom to top" },
+              { value: "radial", label: "radial" },
+            ]}
+            parse={(v) => (v === "" ? undefined : v)}
+          />
+          <TextOption
+            {...field("source")}
+            label="Parent column"
+            placeholder="automatic"
+          />
+          <TextOption {...field("target")} label="Child column" placeholder="automatic" />
+          <TextOption {...field("value")} label="Value column" placeholder="none" />
+          <TextOption {...field("group")} label="Group column" placeholder="none" />
+          <SelectOption
+            {...field("symbol")}
+            label="Node symbol"
+            options={[
+              { value: "", label: "circle (default)" },
+              ...GRAPH_SYMBOLS.filter((s) => s !== "circle").map((s) => ({
+                value: s,
+                label: s,
+              })),
+            ]}
+            parse={(v) => (v === "" ? undefined : v)}
+          />
+          <NumberOption
+            {...field("symbolSize")}
+            label="Symbol size"
+            placeholder="automatic"
+          />
+          <NumberOption
+            {...field("collapseDepth")}
+            label="Levels open at first"
+            placeholder="all"
+          />
+        </div>
+      );
   }
 }
 
@@ -343,6 +405,42 @@ function TextOption({
         value={typeof value === "string" ? value : undefined}
         parse={parseOptionalText}
         show={(v) => v ?? ""}
+        commit={(v) =>
+          commitOptions(
+            panel,
+            onChange,
+            { [optionKey]: v },
+            {
+              action: `edit ${label.toLowerCase()}`,
+              key: `${panel.id}:opt:${optionKey}`,
+            },
+          )
+        }
+      />
+    </div>
+  );
+}
+
+/** A number option, typed; empty is unset. */
+function NumberOption({
+  panel,
+  onChange,
+  optionKey,
+  label,
+  placeholder,
+}: OptionFieldProps & { label: string; placeholder?: string }) {
+  const id = `p-opt-${optionKey}`;
+  const value = panel.options?.[optionKey];
+  return (
+    <div>
+      <Label htmlFor={id}>{label}</Label>
+      <DraftInput
+        id={id}
+        inputMode="decimal"
+        placeholder={placeholder}
+        value={typeof value === "number" ? value : undefined}
+        parse={parseOptionalNumber}
+        show={(v) => (v === undefined ? "" : String(v))}
         commit={(v) =>
           commitOptions(
             panel,

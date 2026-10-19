@@ -477,5 +477,44 @@
         "values": ["dev"]
       }
     ]
+  },
+  "ts-service-calls": {
+    "schema": "metrics",
+    "tables": [
+      {
+        "name": "service_calls",
+        "timeField": "ts",
+        "columns": [
+          {
+            "name": "ts",
+            "type": "timestamp with time zone"
+          },
+          {
+            "name": "caller",
+            "type": "text"
+          },
+          {
+            "name": "callee",
+            "type": "text"
+          },
+          {
+            "name": "tier",
+            "type": "text"
+          },
+          {
+            "name": "requests",
+            "type": "integer"
+          },
+          {
+            "name": "errors",
+            "type": "integer"
+          },
+          {
+            "name": "p95_ms",
+            "type": "double precision"
+          }
+        ]
+      }
+    ]
   }
 }

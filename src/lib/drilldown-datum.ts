@@ -1,5 +1,6 @@
 import { panelTimeField } from "@/lib/ir";
 import { gaugeOptions, gaugeReadings } from "@/components/charts/gauge";
+import { graphDatum, graphNodes, graphTree } from "@/components/charts/graph";
 import { histogramBars } from "@/components/charts/histogram";
 import { treemapNodes, treemapTree } from "@/components/charts/treemap";
 import {
@@ -180,6 +181,16 @@ const nodeDatum: DatumMapper = (panel, data, click) => {
   return { row, series: node.name };
 };
 
+/**
+ * A graph's node is a datum carrying its columns (#623): an edge row's parent
+ * and child (a root, its own name in the parent column), or its path, with
+ * its value and group. The root drawn above several roots is none.
+ */
+const graphNodeDatum: DatumMapper = (panel, data, click) => {
+  const node = graphNodes(graphTree(panel, data)).find((n) => n.id === click.id);
+  return node ? graphDatum(node) : null;
+};
+
 export const DATUM_MAPPERS = {
   line: byRowIndex,
   area: byRowIndex,
@@ -196,6 +207,7 @@ export const DATUM_MAPPERS = {
   histogram: barDatum,
   logs: lineDatum,
   treemap: nodeDatum,
+  graph: graphNodeDatum,
   // A custom visual's marks are the spec's own, not rows the kind can name (#405).
   vega: () => null,
   // A text panel has no rows and takes no links.

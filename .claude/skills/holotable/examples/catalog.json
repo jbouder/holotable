@@ -53,6 +53,19 @@
       ]
     },
     {
+      "name": "service_calls",
+      "description": "Calls between services, one row per caller and callee a minute.",
+      "timeField": "ts",
+      "columns": [
+        { "name": "ts", "type": "timestamp with time zone" },
+        { "name": "caller", "type": "text" },
+        { "name": "callee", "type": "text" },
+        { "name": "tier", "type": "text" },
+        { "name": "requests", "type": "integer" },
+        { "name": "errors", "type": "integer" }
+      ]
+    },
+    {
       "name": "app_logs",
       "description": "One row per log line the services write.",
       "timeField": "ts",

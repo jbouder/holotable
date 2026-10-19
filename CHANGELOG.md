@@ -5,6 +5,18 @@ release page carries the matching section below, followed by the list of
 pull requests merged since the previous tag. `CONTRIBUTING.md` ("Releasing")
 says how a section gets here.
 
+## Unreleased
+
+### Added
+
+- **A graph panel.** `viz: "graph"` draws what points at what as a tree, left
+  to right, top to bottom or radial, from one row per edge or from path
+  columns, with branches that collapse and expand. Nodes are colored by a
+  group column and can be drawn as network icons (server, database, load
+  balancer, …). Data that is not a tree is refused with the node named. Demo
+  service health gains a service map over a new `metrics.service_calls`
+  table, which the seeder creates, backfills and writes once a minute.
+
 ## 0.2.0 — 2026-10-11
 
 Two milestones since 0.1.0: scale and render (M17, #484), which closes the

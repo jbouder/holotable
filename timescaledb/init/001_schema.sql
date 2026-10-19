@@ -94,6 +94,32 @@ SELECT add_retention_policy(
     if_not_exists => TRUE
 );
 
+-- The service map (#623): calls between the demo's services, one row per
+-- caller and callee a minute. The seeder creates the same table on a volume
+-- that predates it.
+CREATE TABLE IF NOT EXISTS metrics.service_calls
+(
+    ts       TIMESTAMPTZ NOT NULL DEFAULT now(),
+    caller   TEXT NOT NULL,
+    callee   TEXT NOT NULL,
+    tier     TEXT NOT NULL,
+    requests INTEGER NOT NULL,
+    errors   INTEGER NOT NULL,
+    p95_ms   DOUBLE PRECISION NOT NULL
+);
+
+SELECT create_hypertable(
+    'metrics.service_calls',
+    by_range('ts'),
+    if_not_exists => TRUE
+);
+
+SELECT add_retention_policy(
+    'metrics.service_calls',
+    drop_after => INTERVAL '7 days',
+    if_not_exists => TRUE
+);
+
 -- Third demo source: Holotable's own Prometheus instruments (#54).
 --
 -- `scripts/self-metrics.ts` scrapes GET /api/metrics and lands one row per

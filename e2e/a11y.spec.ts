@@ -86,6 +86,10 @@ for (const theme of THEMES) {
       // the truncation badge (#486) is scanned too, and its popover.
       const cut = page.getByRole("button", { name: /some rows are not shown/ }).first();
       await expect(cut).toBeVisible();
+      // The service map (#623) is scanned with the rest: its edge table and links.
+      await expect(
+        page.getByRole("img", { name: /^Service map, graph chart\./ }),
+      ).toBeVisible();
       await expectNoA11yViolations(page);
       await cut.click();
       await expect(page.getByText(/MAX_WINDOW_POINTS rows/)).toBeVisible();
@@ -464,6 +468,10 @@ for (const palette of PALETTE_INFO.filter((p) => p.name !== "holotable")) {
       await waitForPanels(page);
       const cut = page.getByRole("button", { name: /some rows are not shown/ }).first();
       await expect(cut).toBeVisible();
+      // The service map (#623) is scanned with the rest: its edge table and links.
+      await expect(
+        page.getByRole("img", { name: /^Service map, graph chart\./ }),
+      ).toBeVisible();
       await expectNoA11yViolations(page);
       await cut.click();
       await expect(page.getByText(/MAX_WINDOW_POINTS rows/)).toBeVisible();

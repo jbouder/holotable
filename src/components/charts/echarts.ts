@@ -7,6 +7,7 @@ import {
   PieChart,
   ScatterChart,
   SunburstChart,
+  TreeChart,
   TreemapChart,
 } from "echarts/charts";
 import {
@@ -37,8 +38,8 @@ import { CanvasRenderer } from "echarts/renderers";
  * adds one line here; nothing else changes.
  *
  * - Series: the chart kinds in `src/components/panels/registry.ts` and their
- *   builders (a donut is a pie; the treemap's sunburst layout; the state
- *   timeline is a custom series).
+ *   builders (a donut is a pie; the treemap's sunburst layout; the graph's
+ *   tree; the state timeline is a custom series).
  * - Components: the grid and both axes, the tooltip and its axis pointer
  *   (crosshair sync), the legend (plain and scroll), the brush (brush to
  *   zoom), thresholds as a visual map, annotations as mark lines and areas,
@@ -62,6 +63,7 @@ use([
   PieChart,
   ScatterChart,
   SunburstChart,
+  TreeChart,
   TreemapChart,
   AriaComponent,
   AxisPointerComponent,

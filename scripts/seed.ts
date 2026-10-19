@@ -25,6 +25,9 @@ import {
   type HttpRequestRow,
   httpRequestRows,
   parseBackfill,
+  SERVICE_CALL_INTERVAL_MS,
+  type ServiceCallRow,
+  serviceCallRows,
   type SystemMetricRow,
   systemMetricRows,
 } from "./lib/seed-data";
@@ -53,8 +56,9 @@ import { seedWorkspace } from "./lib/seed-workspace";
  * 2. (once, with SEED_BACKFILL) inserts the history the loop would have
  *    written across that window, so a fresh database does not start with
  *    empty charts (#252).
- * 3. (loop) continuously inserts synthetic http_requests rows into TimescaleDB
- *    so the live dashboard streams fresh data.
+ * 3. (loop) continuously inserts synthetic http_requests rows (and the other
+ *    demo tables', the service map's once a minute) into TimescaleDB so the
+ *    live dashboard streams fresh data.
  * 4. (loop, with LOKI_SELF_URL) registers the `loki-self` source and the
  *    Holotable logs dashboard once that Loki answers (#567), which it does
  *    only when the compose `logs` profile is up.
@@ -152,6 +156,21 @@ async function ensureDemo() {
               { name: "status", type: "smallint" },
               { name: "duration_ms", type: "double precision" },
               { name: "bytes", type: "bigint" },
+            ],
+          },
+          {
+            name: "service_calls",
+            description:
+              "calls between services, one row per caller and callee a minute (the service map)",
+            timeField: "ts",
+            columns: [
+              { name: "ts", type: "timestamp with time zone" },
+              { name: "caller", type: "text" },
+              { name: "callee", type: "text" },
+              { name: "tier", type: "text", description: "service or store" },
+              { name: "requests", type: "integer" },
+              { name: "errors", type: "integer" },
+              { name: "p95_ms", type: "double precision" },
             ],
           },
         ],
@@ -447,6 +466,17 @@ const insertSystemRows = (client: Client, rows: readonly SystemMetricRow[]) =>
 const LOG_COLUMNS = ["ts", "host", "level", "route", "message", "request_id"] as const;
 const insertLogRows = (client: Client, rows: readonly AppLogRow[]) =>
   insertRows(client, "metrics.app_logs", LOG_COLUMNS, rows);
+const CALL_COLUMNS = [
+  "ts",
+  "caller",
+  "callee",
+  "tier",
+  "requests",
+  "errors",
+  "p95_ms",
+] as const;
+const insertCallRows = (client: Client, rows: readonly ServiceCallRow[]) =>
+  insertRows(client, "metrics.service_calls", CALL_COLUMNS, rows);
 
 /** The newest row's time in a demo table, or null when it is empty. */
 async function newestRow(client: Client, table: string): Promise<number | null> {
@@ -457,8 +487,9 @@ async function newestRow(client: Client, table: string): Promise<number | null> 
 }
 
 /**
- * Fill `metrics.http_requests` and `metrics.system_metrics` back across the
- * window, at the live cadence, in chunks of at most 5 000 rows (#252).
+ * Fill `metrics.http_requests`, `metrics.system_metrics`, `metrics.app_logs`
+ * and `metrics.service_calls` back across the window, at the live cadence (a
+ * minute for the service map), in chunks of at most 5 000 rows (#252).
  *
  * Each table starts at the window start or just after its newest existing
  * row, whichever is later, so a second start on a mounted volume fills only
@@ -487,6 +518,12 @@ async function backfill(client: Client, windowMs: number, intervalMs: number) {
   await backfillTable(client, "metrics.app_logs", appLogRows, insertLogRows, {
     windowMs,
     intervalMs,
+    now,
+  });
+  // The service map is a minute a row, whatever the loop's cadence (#623).
+  await backfillTable(client, "metrics.service_calls", serviceCallRows, insertCallRows, {
+    windowMs,
+    intervalMs: SERVICE_CALL_INTERVAL_MS,
     now,
   });
   if (httpFrom === null) return;
@@ -562,6 +599,19 @@ async function ensureMetricsTables(client: Client) {
   await client.query(
     `SELECT create_hypertable('metrics.app_logs', by_range('ts'), if_not_exists => TRUE)`,
   );
+  await client.query(`
+    CREATE TABLE IF NOT EXISTS metrics.service_calls (
+      ts       TIMESTAMPTZ NOT NULL DEFAULT now(),
+      caller   TEXT NOT NULL,
+      callee   TEXT NOT NULL,
+      tier     TEXT NOT NULL,
+      requests INTEGER NOT NULL,
+      errors   INTEGER NOT NULL,
+      p95_ms   DOUBLE PRECISION NOT NULL
+    )`);
+  await client.query(
+    `SELECT create_hypertable('metrics.service_calls', by_range('ts'), if_not_exists => TRUE)`,
+  );
 }
 
 /**
@@ -618,6 +668,8 @@ async function main() {
   let lokiPending = Boolean(lokiUrl);
   let lokiAskedAt = 0;
   let filesAt = Date.now();
+  // The service map's last minute written; the first pass writes the current one.
+  let callsAt = Number.NEGATIVE_INFINITY;
   for (;;) {
     if (Date.now() - filesAt >= DEMO_FILES_REFRESH_MS) {
       filesAt = Date.now();
@@ -636,6 +688,10 @@ async function main() {
       await insertHttpRows(client, httpRequestRows(now));
       await insertSystemRows(client, systemMetricRows(now));
       await insertLogRows(client, appLogRows(now));
+      if (now - callsAt >= SERVICE_CALL_INTERVAL_MS) {
+        await insertCallRows(client, serviceCallRows(now));
+        callsAt = now;
+      }
       process.stdout.write(".");
     } catch (err) {
       console.warn("\ninsert failed:", err instanceof Error ? err.message : err);

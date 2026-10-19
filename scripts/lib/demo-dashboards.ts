@@ -71,7 +71,7 @@ export function demoSpec() {
           content: [
             "## Service health",
             "",
-            "How the demo API is serving: **error rate**, **latency** and **availability** at the top, where traffic and failures come from below them, and the gateway's own log at the bottom. The SLO is 300 ms: amber means slower than that, red slower than a second.",
+            "How the demo API is serving: **error rate**, **latency** and **availability** at the top, where traffic and failures come from below them, the map of which service calls which, and the gateway's own log at the bottom. The SLO is 300 ms: amber means slower than that, red slower than a second.",
           ].join("\n"),
         },
         layout: { x: 0, y: 0, w: 12, h: 3 },
@@ -212,6 +212,32 @@ export function demoSpec() {
         layout: { x: 8, y: 6, w: 4, h: 4 },
       },
       {
+        id: "service-map",
+        title: "Service map",
+        description:
+          "Who calls whom over the window: an arrow runs from a caller to what it calls, the gateway to each service and each service to its store, and each node shows the requests it received (the gateway, all it sent on).",
+        viz: "graph",
+        query: {
+          sourceId: "ts-metrics",
+          timeField: "period",
+          sql: "SELECT time_bucket('5 minutes', ts) AS period, caller, callee, tier, sum(requests) AS requests FROM service_calls GROUP BY period, caller, callee, tier ORDER BY period",
+        },
+        format: "number",
+        options: {
+          orient: "LR",
+          source: "caller",
+          target: "callee",
+          value: "requests",
+          group: "tier",
+          // The gateway is the one node no row calls, so it has no tier and
+          // takes the default symbol.
+          symbol: "loadBalancer",
+          symbols: { service: "server", store: "database" },
+          compact: true,
+        },
+        layout: { x: 0, y: 10, w: 12, h: 4 },
+      },
+      {
         id: "latency-band",
         title: "Latency, p5 to p95, against the SLO",
         viz: "vega",
@@ -253,7 +279,7 @@ export function demoSpec() {
             ],
           },
         },
-        layout: { x: 0, y: 10, w: 6, h: 4 },
+        layout: { x: 0, y: 14, w: 6, h: 4 },
       },
       {
         id: "latency-distribution",
@@ -278,7 +304,7 @@ export function demoSpec() {
             { value: 1000, color: "danger" },
           ],
         },
-        layout: { x: 6, y: 10, w: 6, h: 4 },
+        layout: { x: 6, y: 14, w: 6, h: 4 },
       },
       {
         id: "slowest-routes",
@@ -303,7 +329,7 @@ export function demoSpec() {
             },
           ],
         },
-        layout: { x: 0, y: 14, w: 5, h: 4 },
+        layout: { x: 0, y: 18, w: 5, h: 4 },
       },
       {
         id: "errors-by-route",
@@ -316,7 +342,7 @@ export function demoSpec() {
         },
         format: "number",
         options: { legend: "none", thresholds: [{ value: 0, color: "danger" }] },
-        layout: { x: 5, y: 14, w: 4, h: 4 },
+        layout: { x: 5, y: 18, w: 4, h: 4 },
       },
       {
         id: "by-service",
@@ -329,7 +355,7 @@ export function demoSpec() {
         },
         format: "number",
         options: { legend: "bottom", compact: true },
-        layout: { x: 9, y: 14, w: 3, h: 4 },
+        layout: { x: 9, y: 18, w: 3, h: 4 },
       },
       {
         id: "recent-problems",
@@ -343,7 +369,7 @@ export function demoSpec() {
           sql: "SELECT ts, level, message, host, route, request_id FROM app_logs WHERE level IN ('error', 'warn') ORDER BY ts DESC LIMIT 200",
         },
         options: { message: "message", level: "level" },
-        layout: { x: 0, y: 18, w: 12, h: 5 },
+        layout: { x: 0, y: 22, w: 12, h: 5 },
       },
     ],
   };

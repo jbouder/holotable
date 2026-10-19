@@ -1,4 +1,5 @@
 import { gauge } from "@/lib/panels/kinds/gauge";
+import { graph } from "@/lib/panels/kinds/graph";
 import { heatmap } from "@/lib/panels/kinds/heatmap";
 import { histogram } from "@/lib/panels/kinds/histogram";
 import { logs } from "@/lib/panels/kinds/logs";
@@ -45,6 +46,7 @@ export const PANEL_KINDS = [
   histogram,
   logs,
   treemap,
+  graph,
   vega,
   text,
 ] as const satisfies readonly PanelKind[];

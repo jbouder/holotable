@@ -7,6 +7,7 @@ import {
   toText,
 } from "@/components/charts/options";
 import { formatValue } from "@/lib/format";
+import type { Datum } from "@/lib/drilldown";
 import type { Panel } from "@/lib/ir";
 import { type ColorToken, defaultStateToken } from "@/lib/panels/colors";
 import { LogsOptions } from "@/lib/panels/kinds/logs";
@@ -366,6 +367,14 @@ export interface ChartTable {
   columns: string[];
   /** Every cell already written as text. */
   rows: string[][];
+}
+
+/**
+ * A kind's own table for its chart (#623), where its marks are not one per
+ * row: each row's datum, for the links a keyboard reaches through it.
+ */
+export interface ChartRows extends ChartTable {
+  datums: readonly (Datum | null)[];
 }
 
 /**

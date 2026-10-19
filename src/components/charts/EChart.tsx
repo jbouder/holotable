@@ -145,6 +145,9 @@ export function EChart({
   const patterns = useChartPatterns();
   const patternsRef = React.useRef(patterns);
   patternsRef.current = patterns;
+  // The branches a reader opened or closed on a tree (#623), by node id, so a
+  // poll's merged option keeps them as they were left. A remount forgets them.
+  const treeStateRef = React.useRef<TreeState>(new Map());
 
   React.useEffect(() => {
     if (!containerRef.current) return;
@@ -167,8 +170,10 @@ export function EChart({
     const brush: BrushState = { active: false, endedAt: 0 };
     const detachBrush = brushing ? attachBrush(chart, onBrushRef, brush) : undefined;
     const detachDatum = clicking ? attachDatum(chart, onDatumRef, brush) : undefined;
+    const detachTree = attachTreeToggle(chart, treeStateRef.current);
 
     return () => {
+      detachTree();
       detachDatum?.();
       detachBrush?.();
       detachCrosshair();
@@ -198,7 +203,10 @@ export function EChart({
     const chart = chartRef.current;
     if (!chart) return;
     // Merge update — no recreation.
-    chart.setOption(option, { notMerge: false, lazyUpdate: true });
+    chart.setOption(withTreeState(option, treeStateRef.current), {
+      notMerge: false,
+      lazyUpdate: true,
+    });
     if (brushing) {
       // A merged option re-reads the brush component, which drops the global
       // cursor with it, so the drag-to-select has to be re-armed after every
@@ -367,6 +375,8 @@ function attachDatum(
 ): () => void {
   const onClick = (params: unknown) => {
     if (isBrushClick(brush, Date.now())) return;
+    // A tree node's symbol opens and closes its branch; only its label is a datum.
+    if (treeClickPart(params) === "toggle") return;
     const click = datumClick(params);
     if (!click) return;
     // A sampled series (#491) numbers its points among the ones it kept; the
@@ -403,6 +413,80 @@ function rawDataIndex(chart: echarts.ECharts, params: unknown): number | undefin
   } catch {
     return undefined;
   }
+}
+
+/** Whether each tree node a reader toggled is now collapsed, by its id (#623). */
+export type TreeState = Map<string, boolean>;
+
+/**
+ * Which part of a tree node a click landed on (#623): its label is a datum
+ * (#373), anything else on it (the symbol) opens or closes its branch. Null
+ * for a click on any other series. The label is a text element, or a part of
+ * one (its background, a span), which is how the two are told apart.
+ */
+export function treeClickPart(params: unknown): "toggle" | "datum" | null {
+  if (typeof params !== "object" || params === null) return null;
+  const p = params as { seriesType?: unknown; event?: { target?: unknown } };
+  if (p.seriesType !== "tree") return null;
+  let el = p.event?.target as { type?: unknown; parent?: unknown } | undefined;
+  for (let depth = 0; el && depth < 4; depth++) {
+    if (el.type === "text") return "datum";
+    el = el.parent as typeof el;
+  }
+  return "toggle";
+}
+
+/**
+ * Open or close a tree node's branch when its symbol is clicked, and remember
+ * it. The series turns ECharts' own toggle off (it fires on the label too),
+ * so this is the only one.
+ */
+function attachTreeToggle(chart: echarts.ECharts, state: TreeState): () => void {
+  const onClick = (params: unknown) => {
+    if (treeClickPart(params) !== "toggle") return;
+    const p = params as {
+      seriesIndex?: number;
+      dataIndex?: number;
+      collapsed?: boolean;
+      data?: { id?: unknown; children?: unknown };
+    };
+    if (typeof p.data?.id !== "string" || !Array.isArray(p.data.children)) return;
+    state.set(p.data.id, !p.collapsed);
+    chart.dispatchAction({
+      type: "treeExpandAndCollapse",
+      seriesIndex: p.seriesIndex,
+      dataIndex: p.dataIndex,
+    });
+  };
+  chart.on("click", onClick);
+  return () => chart.off("click", onClick);
+}
+
+/**
+ * The option with every toggled tree node as the reader left it: a merged
+ * update re-reads `collapsed` from the data, which would otherwise undo it.
+ */
+export function withTreeState(option: EChartsOption, state: TreeState): EChartsOption {
+  if (state.size === 0 || !Array.isArray(option.series)) return option;
+  const visit = (item: unknown): unknown => {
+    if (typeof item !== "object" || item === null) return item;
+    const node = item as { id?: unknown; children?: unknown };
+    const collapsed = typeof node.id === "string" ? state.get(node.id) : undefined;
+    return {
+      ...node,
+      ...(collapsed !== undefined ? { collapsed } : {}),
+      ...(Array.isArray(node.children) ? { children: node.children.map(visit) } : {}),
+    };
+  };
+  return {
+    ...option,
+    series: option.series.map((series) =>
+      (series as { type?: unknown }).type === "tree" &&
+      Array.isArray((series as { data?: unknown }).data)
+        ? { ...series, data: (series as { data: unknown[] }).data.map(visit) }
+        : series,
+    ),
+  } as EChartsOption;
 }
 
 /** The fields of an ECharts click a datum needs, read defensively. */

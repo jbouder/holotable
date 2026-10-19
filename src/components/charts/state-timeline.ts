@@ -187,7 +187,8 @@ function duration(ms: number): string {
   return `${Math.floor(h / 24)}d ${h % 24}h`;
 }
 
-function escapeHtml(text: string): string {
+/** Text as HTML an ECharts tooltip can show, never markup. */
+export function escapeHtml(text: string): string {
   return text.replace(
     /[&<>"']/g,
     (c) =>

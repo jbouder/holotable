@@ -187,7 +187,7 @@ export const PROMQL_RULES = `PromQL rules (STRICT) — for a source whose catalo
   lists for the metric.
 - Latency percentiles: histogram_quantile(0.95, sum by (le) (rate(<name>_bucket[5m])))
   over a *_bucket metric with an "le" label.
-- Set "instant": true for a stat, gauge, pie, donut, status-grid, histogram, treemap or table panel (one value per
+- Set "instant": true for a stat, gauge, pie, donut, status-grid, histogram, treemap, graph or table panel (one value per
   series, at the end of the window). Leave it out for a time series: its rows
   carry a "time" column, and the chart draws one line per series.
 - A dashboard variable appears ONLY as a whole label-matcher value: {host=":host"},
@@ -224,7 +224,7 @@ export const LOGQL_RULES = `LogQL rules (STRICT) — for a source whose catalog 
 - Filter or group on a field inside the line only after parsing it with
   | json or | logfmt: {app="api"} | json | status >= 500.
 - Set "instant": true only on a metric query, for a stat, gauge, pie, donut,
-  status-grid, histogram, treemap or table panel. A log query is NEVER instant:
+  status-grid, histogram, treemap, graph or table panel. A log query is NEVER instant:
   it is refused.
 - A log query's rows are each line's time, its text as "message" and its labels,
   so leave options.message out. When the catalog lists a level label, or the
@@ -370,6 +370,7 @@ export const PRESENTATION_GUIDE = `Optional per-panel settings; omit each unless
 - 'options' on histogram: bucket, count (the columns), cumulative (true for Prometheus "le" buckets), log (true for a long tail), thresholds (colors bars from a bucket bound, e.g. an SLO), decimals, unit, compact (for the bucket labels).
 - 'options' on logs: message, level (the columns), levels [{state, color}], wrap, order ("newest"|"oldest"), showTime.
 - 'options' on treemap: path (columns, top level first), value, variant ("treemap"|"sunburst"), decimals, unit, compact.
+- 'options' on graph: layout ("tree"), orient ("LR"|"TB"|"RL"|"BT"|"radial"), source and target (the parent and child columns of an edge row), value, group (a text column that colors nodes), path (columns, top level first, instead of source/target), collapseDepth (levels open at first), symbol (circle, rect, roundRect, triangle, diamond, pin, arrow, or an icon: server, database, cloud, router, switch, firewall, loadBalancer, queue, cache, storage, user, service; use icons for infrastructure and service maps), symbols ({group value: symbol}), symbolSize (6-48), decimals, unit, compact.
 - 'options' on vega: spec, a Vega-Lite spec with "data": {"name": "rows"}, encoding the query's columns; colors only as token names or palette-0..palette-5; no url, href, image, datasets, values, config or scheme. Use it only when no other kind draws the view.
 - 'options' on table: columns [{name, label, hidden, format, decimals, unit, align}] (listed first, in order), sort {column, order: "asc"|"desc"}.
 - Colors are tokens only: success, warning, danger, info, neutral, orange, purple, teal.

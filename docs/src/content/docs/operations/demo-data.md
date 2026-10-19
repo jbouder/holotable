@@ -25,7 +25,7 @@ the compose stack's own Prometheus, which scrapes the app. A sixth, the
 
 | Source id | Table | Demo dashboard |
 | --- | --- | --- |
-| `ts-metrics` | `metrics.http_requests` — per-request events | **Demo service health** |
+| `ts-metrics` | `metrics.http_requests` — per-request events; `metrics.service_calls` — calls between services, a minute a row | **Demo service health** |
 | `ts-system` | `metrics.system_metrics` — per-host infra metrics | **Demo fleet** and **Demo host detail** |
 | `ts-logs` | `metrics.app_logs` — gateway log lines | The logs on **Demo service health** and **Demo host detail** |
 | `holotable-self` | `metrics.holotable_self` — the app's own instruments | **Holotable self-monitoring**, below |
@@ -38,7 +38,9 @@ panel kind:
 - **Demo service health**: is the API serving well? The 5xx error rate, p95
   latency and the share of requests over the 300 ms SLO as stats with
   sparklines, availability as a gauge, requests per minute by outcome, a
-  sunburst of requests by route and status, the latency band against the SLO
+  sunburst of requests by route and status, a service map of which service
+  calls which (a [graph](/reference/panel-options/#graph)), the latency band
+  against the SLO
   (a [custom visual](/architecture/custom-visuals/)) beside the latency
   histogram, the slowest routes, server errors by route, requests by service,
   and the gateway's recent errors and warnings.
@@ -82,8 +84,9 @@ With `SEED_BACKFILL` set to a duration such as `6h`, the seeder first writes
 the history it would have produced across that window, at the same
 `SEED_INTERVAL_MS` cadence and with the same row shapes as the loop. A fresh
 database then opens on full charts instead of filling in over the first
-minutes. It writes `metrics.http_requests` and `metrics.system_metrics` in
-multi-row inserts of at most 5 000 rows, logging once per insert. Then it
+minutes. It writes `metrics.http_requests`, `metrics.system_metrics`,
+`metrics.app_logs` and `metrics.service_calls` (a minute a row, whatever the
+cadence) in multi-row inserts of at most 5 000 rows, logging once per insert. Then it
 refreshes the `metrics.http_requests_1m` continuous aggregate over the same
 range, so the aggregate has data at once rather than after its policy's first
 run. Six hours at the default cadence is about 540 000 request rows and takes
@@ -100,8 +103,9 @@ of that source.
 
 ## 3. Loop
 
-Every `SEED_INTERVAL_MS` it inserts a fresh batch of synthetic rows into both
-tables so the live dashboards stream. It connects with the privileged metrics
+Every `SEED_INTERVAL_MS` it inserts a fresh batch of synthetic rows into the
+demo tables so the live dashboards stream, and once a minute a row per edge
+of the service map. It connects with the privileged metrics
 user and ensures the demo hypertables exist first, so it also works against a
 database whose volume predates a table.
 
@@ -152,8 +156,17 @@ production data.
 `metrics.http_requests` is a hypertable of raw request events (see
 `timescaledb/init/001_schema.sql`). A continuous aggregate pre-aggregates
 per-minute request, error, duration, and byte statistics, and a seven-day
-retention policy removes old raw chunks. `metrics.system_metrics` and
-`metrics.holotable_self` are hypertables in the same file. A **read-only** role is created by
+retention policy removes old raw chunks. `metrics.system_metrics`,
+`metrics.app_logs`, `metrics.service_calls` and `metrics.holotable_self` are
+hypertables in the same file.
+
+`metrics.service_calls` (`ts`, `caller`, `callee`, `tier`, `requests`,
+`errors`, `p95_ms`) is the service map's: one row per caller and callee a
+minute. Its topology is a tree, `gateway` calling `auth`, `orders`, `search`
+and `billing` (tier `service`), each of those calling its own store
+(`auth-db`, `orders-db`, `search-index`, `billing-db`; tier `store`). The
+gateway's requests follow `http_requests`' rhythm at the default cadence, and
+about 3% of calls fail, as its 5xx do. A **read-only** role is created by
 `timescaledb/init/002_readonly_user.sh`; the app only ever connects as this user
 via the source's `secret_ref`.
 

@@ -74,6 +74,7 @@
               "histogram",
               "logs",
               "treemap",
+              "graph",
               "vega",
               "text"
             ]
@@ -922,6 +923,129 @@
                   "variant": {
                     "type": "string",
                     "enum": ["treemap", "sunburst"]
+                  },
+                  "decimals": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 6
+                  },
+                  "unit": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 16
+                  },
+                  "compact": {
+                    "type": "boolean"
+                  }
+                },
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "layout": {
+                    "type": "string",
+                    "enum": ["tree"]
+                  },
+                  "orient": {
+                    "type": "string",
+                    "enum": ["LR", "TB", "RL", "BT", "radial"]
+                  },
+                  "source": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 128
+                  },
+                  "target": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 128
+                  },
+                  "value": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 128
+                  },
+                  "group": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 128
+                  },
+                  "path": {
+                    "minItems": 1,
+                    "maxItems": 8,
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 128
+                    }
+                  },
+                  "collapseDepth": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 32
+                  },
+                  "symbol": {
+                    "type": "string",
+                    "enum": [
+                      "circle",
+                      "rect",
+                      "roundRect",
+                      "triangle",
+                      "diamond",
+                      "pin",
+                      "arrow",
+                      "server",
+                      "database",
+                      "cloud",
+                      "router",
+                      "switch",
+                      "firewall",
+                      "loadBalancer",
+                      "queue",
+                      "cache",
+                      "storage",
+                      "user",
+                      "service"
+                    ]
+                  },
+                  "symbols": {
+                    "type": "object",
+                    "propertyNames": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 128
+                    },
+                    "additionalProperties": {
+                      "type": "string",
+                      "enum": [
+                        "circle",
+                        "rect",
+                        "roundRect",
+                        "triangle",
+                        "diamond",
+                        "pin",
+                        "arrow",
+                        "server",
+                        "database",
+                        "cloud",
+                        "router",
+                        "switch",
+                        "firewall",
+                        "loadBalancer",
+                        "queue",
+                        "cache",
+                        "storage",
+                        "user",
+                        "service"
+                      ]
+                    }
+                  },
+                  "symbolSize": {
+                    "type": "number",
+                    "minimum": 6,
+                    "maximum": 48
                   },
                   "decimals": {
                     "type": "integer",

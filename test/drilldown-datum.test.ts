@@ -201,6 +201,25 @@ const CASES: Record<VizType, Case> = {
     click: { id: "eu" },
     expect: { row: { region: "eu", disk: 15 }, series: "eu" },
   },
+  graph: {
+    panel: panel("graph", {
+      options: { source: "caller", target: "callee", value: "requests", group: "tier" },
+    }),
+    data: {
+      columns: ["caller", "callee", "tier", "requests"],
+      rows: [
+        { caller: "gateway", callee: "orders", tier: "service", requests: 4 },
+        { caller: "orders", callee: "orders-db", tier: "store", requests: 3 },
+        { caller: "gateway", callee: "orders", tier: "service", requests: 2 },
+      ],
+    },
+    // A node is its edge in: both ends, the summed value and its group.
+    click: { id: "orders" },
+    expect: {
+      row: { caller: "gateway", callee: "orders", requests: 6, tier: "service" },
+      series: "orders",
+    },
+  },
   "status-grid": {
     panel: panel("status-grid", { options: { sort: "value" } }),
     data: BY_HOST,
