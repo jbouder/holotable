@@ -64,7 +64,15 @@ export default defineConfig({
         baseUrl: "https://github.com/jbouder/holotable/edit/main/docs/",
       },
       lastUpdated: true,
-      customCss: ["./src/styles/custom.css"],
+      // The app's faces (src/app/layout.tsx), self-hosted, then the theme.
+      customCss: [
+        "@fontsource/chakra-petch/400.css",
+        "@fontsource/chakra-petch/500.css",
+        "@fontsource/chakra-petch/600.css",
+        "@fontsource/chakra-petch/700.css",
+        "@fontsource-variable/jetbrains-mono",
+        "./src/styles/custom.css",
+      ],
       // The app's header mark (lucide LayoutDashboard in --primary), beside
       // the title rather than replacing it, as the app's nav bar has it.
       logo: {

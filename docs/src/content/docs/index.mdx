@@ -7,7 +7,8 @@ head:
   - tag: title
     content: Holotable — Dashboards from plain English
 hero:
-  tagline: Describe the dashboard you want. A language model authors a validated spec — never the data — and Holotable runs its guarded queries against TimescaleDB, Prometheus, Loki or your own files, and streams the results live.
+  title: Dashboards from plain English.
+  tagline: Describe what you want to see. A language model writes a validated spec — never the data — and Holotable runs its guarded queries against TimescaleDB, Prometheus, Loki or your own files, and streams the results live.
   actions:
     - text: Quick start
       link: /getting-started/quick-start/
@@ -15,7 +16,7 @@ hero:
     - text: View on GitHub
       link: https://github.com/jbouder/holotable
       icon: external
-      variant: minimal
+      variant: secondary
 ---
 
 import { Card, CardGrid, LinkCard } from '@astrojs/starlight/components';
@@ -24,7 +25,7 @@ import dashboardView from '../../../public/images/dashboard-view.png';
 
 {/* Not hero.image: Starlight renders that as a 400×400 crop, which suits a
     logo but cuts a wide screenshot down to an illegible square. */}
-<figure class="hero-screenshot">
+<figure class="home-stage not-content">
   <Image
     src={dashboardView}
     widths={[720, 1440, 2160, 2880]}
@@ -34,28 +35,63 @@ import dashboardView from '../../../public/images/dashboard-view.png';
   />
 </figure>
 
+<section class="home-section not-content">
+
 ## From a sentence to a live dashboard
 
+<p class="lede">Holotable reads your source's catalog — tables and columns, metric names, log labels — so the model writes against what is really there.</p>
+
 <ol class="home-steps">
-  <li>
-    <strong>Describe it</strong>
-    <span>“p95 latency by route for the last hour, red past 300 ms.”
-    Holotable reads your source's catalog — tables and columns, metric names,
-    log labels — so the model writes against what is really there.</span>
+  <li class="panel">
+    <div class="panel-head">
+      <span class="step-n" aria-hidden="true">1</span>
+      <h3>Describe it</h3>
+      <span class="badge">Prompt</span>
+    </div>
+    <div class="panel-body">
+      <div class="mock" aria-hidden="true">
+        <p class="mock-input">p95 latency by route for the last hour, red past 300 ms</p>
+        <div class="mock-actions"><span>checkout-db · 14 tables</span><span class="mock-button">Generate</span></div>
+      </div>
+      <p>Pick a source, say what you want to see, and the model answers with a spec: a layout of panels, each with its query, unit and thresholds.</p>
+    </div>
   </li>
-  <li>
-    <strong>Refine it</strong>
-    <span>Ask for changes in the same chat — “make the third one a bar chart” —
-    or edit any panel's query, layout and thresholds by hand. Every save is a
-    version you can diff and restore.</span>
+  <li class="panel">
+    <div class="panel-head">
+      <span class="step-n" aria-hidden="true">2</span>
+      <h3>Refine it</h3>
+      <span class="badge">Chat</span>
+    </div>
+    <div class="panel-body">
+      <div class="mock" aria-hidden="true">
+        <p class="mock-turn you">make the third one a bar chart</p>
+        <p class="mock-turn app">Changed <code>Requests per minute</code> to a bar chart. Saved as version 5.</p>
+      </div>
+      <p>Ask for changes in the same chat, or edit any panel's query, layout and thresholds by hand. Every save is a version you can diff and restore.</p>
+    </div>
   </li>
-  <li>
-    <strong>Watch it live</strong>
-    <span>Panels stream fresh rows over one connection, each on its own
-    refresh cadence, with a shared time picker, variables and annotations
-    across the whole dashboard.</span>
+  <li class="panel">
+    <div class="panel-head">
+      <span class="step-n" aria-hidden="true">3</span>
+      <h3>Watch it live</h3>
+      <span class="badge badge-live">Live</span>
+    </div>
+    <div class="panel-body">
+      <div class="mock mock-stat" aria-hidden="true">
+        <svg viewBox="0 0 200 60" preserveAspectRatio="none">
+          <path d="M0 42 L12 36 L24 40 L36 28 L48 34 L60 22 L72 30 L84 18 L96 26 L108 14 L120 24 L132 10 L144 20 L156 8 L168 16 L180 6 L192 12 L200 4 V60 H0 Z" fill="currentColor" opacity="0.18" />
+          <path d="M0 42 L12 36 L24 40 L36 28 L48 34 L60 22 L72 30 L84 18 L96 26 L108 14 L120 24 L132 10 L144 20 L156 8 L168 16 L180 6 L192 12 L200 4" fill="none" stroke="currentColor" stroke-width="1.5" vector-effect="non-scaling-stroke" />
+        </svg>
+        <span class="value">312 ms</span>
+      </div>
+      <p>Panels stream fresh rows over one connection, each on its own cadence, with a shared time picker, variables and annotations across the dashboard.</p>
+    </div>
   </li>
 </ol>
+
+</section>
+
+<section class="home-section home-features not-content">
 
 ## Everything a monitoring team needs
 
@@ -104,35 +140,69 @@ import dashboardView from '../../../public/images/dashboard-view.png';
   </Card>
 </CardGrid>
 
+</section>
+
+<section class="home-section not-content">
+
 ## Safe by construction
 
-The model writes a **spec**, never the data. Every query it proposes, whether
-SQL, PromQL or LogQL, is parsed and checked — read-only, catalog allowlist,
-server-owned time window, row and point limits, and per-viewer row filters —
-before it runs, and again on every save.
-Connection details and credentials never leave the server.
+<div class="home-safe">
+  <div>
+    <p>
+      The model writes a <strong>spec</strong>, never the data. Every query it
+      proposes, whether SQL, PromQL or LogQL, is parsed and checked before it
+      runs, and again on every save: read-only, on the catalog allowlist, in a
+      time window the server owns, under row and point limits, and behind each
+      viewer's row filters. Connection details and credentials never leave the
+      server.
+    </p>
+    <LinkCard
+      title="The invariants"
+      description="The rules every change to Holotable preserves, and where each is enforced."
+      href="/architecture/invariants/"
+    />
+    <LinkCard
+      title="How a panel executes"
+      description="From a stored spec to a guarded SQL, PromQL or LogQL query."
+      href="/concepts/executing-a-panel/"
+    />
+  </div>
+  <div class="panel" aria-label="A query passing the guard">
+    <div class="panel-head">
+      <h3>Before it runs</h3>
+      <span class="badge badge-live">Passed</span>
+    </div>
+    <pre class="guard-query"><span class="kw">SELECT</span> time_bucket(<span class="str">'1 minute'</span>, ts) <span class="kw">AS</span> t,
+       route,
+       percentile_cont(<span class="num">0.95</span>)
+         <span class="kw">WITHIN GROUP</span> (<span class="kw">ORDER BY</span> latency_ms) <span class="kw">AS</span> p95
+<span class="kw">FROM</span> http_requests
+<span class="kw">GROUP BY</span> t, route
+<span class="kw">ORDER BY</span> t</pre>
+    <ul class="guard-checks">
+      <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5" /></svg><span>One <code>SELECT</code>, run read-only</span></li>
+      <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5" /></svg><span><code>http_requests</code> and its columns are on the source's allowlist</span></li>
+      <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5" /></svg><span>Wrapped in the dashboard's window, <code>t &gt;= $1 AND t &lt; $2</code>, resolved by the server</span></li>
+      <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5" /></svg><span><code>http_requests</code> narrowed to the viewer's rows, <code>team = $3</code>, as a bound parameter</span></li>
+      <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5" /></svg><span>Row and point limits applied; a cut is shown on the panel</span></li>
+    </ul>
+  </div>
+</div>
 
-<CardGrid>
-  <LinkCard
-    title="The invariants"
-    description="The rules every change to Holotable preserves, and where each is enforced."
-    href="/architecture/invariants/"
-  />
-  <LinkCard
-    title="How a panel executes"
-    description="From a stored spec to a guarded SQL, PromQL or LogQL query."
-    href="/concepts/executing-a-panel/"
-  />
-</CardGrid>
+</section>
+
+<section class="home-section home-try not-content">
 
 ## Try it in one command
+
+<p class="lede">A demo database, live sample metrics and ready-made dashboards, with no account to create.</p>
 
 ```sh
 docker run -p 3000:3000 ghcr.io/jbouder/holotable:quickstart
 ```
 
-Open `http://localhost:3000`: a demo database, live sample
-metrics and ready-made dashboards, with no account to create. Upload a CSV,
-JSON or Excel file of your own and, when its columns fit, get a starter
-dashboard built from them before you configure a model.
-[Quick start](/getting-started/quick-start/)
+Open `http://localhost:3000`. Upload a CSV, JSON or Excel file of your own and,
+when its columns fit, get a starter dashboard built from them before you
+configure a model. [Quick start](/getting-started/quick-start/)
+
+</section>

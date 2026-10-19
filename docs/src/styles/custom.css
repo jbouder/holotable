@@ -1,29 +1,230 @@
-/* Starlight's accent set to the app's --primary (src/app/globals.css), so the
-   buttons, links and the logo share one blue. Dark first, as Starlight does. */
+/*
+ * The docs site in the app's clothes.
+ *
+ * Every value here is taken from src/app/globals.css: the OKLCH surfaces,
+ * the blue primary, Chakra Petch and JetBrains Mono, and a radius of zero.
+ * The `--ht-*` tokens are the app's, one block per scheme; the Starlight
+ * `--sl-*` variables are then pointed at them, so Starlight's own components
+ * (sidebar, search, asides, pagination) pick the palette up without being
+ * restyled one by one. Rules in this file are unlayered, so they outrank
+ * Starlight's layered styles whatever their specificity.
+ *
+ * The second half is the home page (src/content/docs/index.mdx), which draws
+ * its sections as dashboard panels.
+ */
+
+/* ---------------------------------------------------------------------------
+ * Tokens. Dark first, as Starlight does.
+ * ------------------------------------------------------------------------- */
+
 :root {
-  --sl-color-accent-low: #0c2149;
-  --sl-color-accent: #428eff;
-  --sl-color-accent-high: #428eff;
+  --ht-background: oklch(0.16 0.02 265);
+  --ht-surface: oklch(0.21 0.02 265);
+  --ht-surface-2: oklch(0.26 0.02 265);
+  --ht-surface-3: oklch(0.31 0.02 265);
+  --ht-foreground: oklch(0.96 0.01 265);
+  --ht-text: oklch(0.84 0.015 265);
+  --ht-muted: oklch(0.7 0.02 265);
+  --ht-border: oklch(0.35 0.02 265);
+  --ht-border-strong: oklch(0.55 0.02 265);
+  --ht-ring: oklch(0.99 0 0);
+  --ht-selection: oklch(0.4 0.08 259);
+  --ht-primary: oklch(0.66 0.19 259);
+  --ht-primary-foreground: oklch(0.16 0.02 265);
+  --ht-danger: oklch(0.72 0.19 20);
+  --ht-warning: oklch(0.78 0.16 75);
+  --ht-success: oklch(0.78 0.16 160);
+  --ht-purple: oklch(0.66 0.2 300);
+  --ht-shadow-stage: 0 32px 64px -24px oklch(0 0 0 / 0.7), 0 12px 24px -12px oklch(0 0 0 / 0.5);
+
+  /* Starlight's palette, mapped. */
+  --sl-color-white: var(--ht-foreground);
+  --sl-color-gray-1: oklch(0.9 0.012 265);
+  --sl-color-gray-2: var(--ht-text);
+  --sl-color-gray-3: var(--ht-muted);
+  --sl-color-gray-4: oklch(0.5 0.02 265);
+  --sl-color-gray-5: var(--ht-border);
+  --sl-color-gray-6: var(--ht-surface);
+  --sl-color-black: var(--ht-background);
+
+  --sl-color-accent-low: oklch(0.3 0.08 259);
+  --sl-color-accent: var(--ht-primary);
+  --sl-color-accent-high: oklch(0.82 0.1 259);
+  --sl-color-text-accent: var(--ht-primary);
+  --sl-color-text-invert: var(--ht-primary-foreground);
+
+  --sl-color-blue-low: color-mix(in oklch, var(--ht-primary) 14%, var(--ht-background));
+  --sl-color-blue: var(--ht-primary);
+  --sl-color-blue-high: oklch(0.82 0.1 259);
+  --sl-color-green-low: color-mix(in oklch, var(--ht-success) 14%, var(--ht-background));
+  --sl-color-green: var(--ht-success);
+  --sl-color-green-high: oklch(0.88 0.1 160);
+  --sl-color-orange-low: color-mix(in oklch, var(--ht-warning) 14%, var(--ht-background));
+  --sl-color-orange: var(--ht-warning);
+  --sl-color-orange-high: oklch(0.9 0.09 80);
+  --sl-color-red-low: color-mix(in oklch, var(--ht-danger) 14%, var(--ht-background));
+  --sl-color-red: var(--ht-danger);
+  --sl-color-red-high: oklch(0.88 0.08 20);
+  --sl-color-purple-low: color-mix(in oklch, var(--ht-purple) 14%, var(--ht-background));
+  --sl-color-purple: var(--ht-purple);
+  --sl-color-purple-high: oklch(0.86 0.09 300);
+
+  --sl-color-bg: var(--ht-background);
+  --sl-color-bg-nav: var(--ht-surface);
+  --sl-color-bg-sidebar: var(--ht-surface);
+  --sl-color-bg-inline-code: var(--ht-surface-2);
+  --sl-color-bg-accent: var(--ht-primary);
+  --sl-color-hairline-light: var(--ht-border);
+  --sl-color-hairline: color-mix(in oklch, var(--ht-border) 60%, transparent);
+  --sl-color-hairline-shade: var(--ht-border);
+  --sl-color-backdrop-overlay: oklch(0.16 0.02 265 / 0.7);
+
+  --sl-font: "Chakra Petch";
+  --sl-font-mono: "JetBrains Mono Variable";
+  --sl-line-height: 1.65;
+
+  /* Starlight's search dialog reads these for its corners. */
+  --sl-search-corners: 0px;
+  --pagefind-ui-border-radius: 0px;
 }
 
 :root[data-theme="light"] {
-  --sl-color-accent-low: #d5e5ff;
-  --sl-color-accent: #0260d9;
-  --sl-color-accent-high: #00347a;
+  --ht-background: oklch(0.98 0.005 265);
+  --ht-surface: oklch(1 0 0);
+  --ht-surface-2: oklch(0.94 0.01 265);
+  --ht-surface-3: oklch(0.9 0.01 265);
+  --ht-foreground: oklch(0.2 0.02 265);
+  --ht-text: oklch(0.34 0.02 265);
+  --ht-muted: oklch(0.5 0.02 265);
+  --ht-border: oklch(0.84 0.02 265);
+  --ht-border-strong: oklch(0.55 0.02 265);
+  --ht-ring: oklch(0.12 0.02 265);
+  --ht-selection: oklch(0.88 0.06 259);
+  --ht-primary: oklch(0.52 0.2 259);
+  --ht-primary-foreground: oklch(0.98 0.01 265);
+  --ht-danger: oklch(0.5 0.2 20);
+  --ht-warning: oklch(0.44 0.14 75);
+  --ht-success: oklch(0.46 0.14 160);
+  --ht-purple: oklch(0.5 0.2 300);
+  --ht-shadow-stage: 0 32px 64px -24px oklch(0.2 0.02 265 / 0.35), 0 12px 24px -12px oklch(0.2 0.02 265 / 0.2);
+
+  --sl-color-white: var(--ht-foreground);
+  --sl-color-gray-1: oklch(0.27 0.02 265);
+  --sl-color-gray-2: var(--ht-text);
+  --sl-color-gray-3: var(--ht-muted);
+  --sl-color-gray-4: oklch(0.68 0.02 265);
+  --sl-color-gray-5: var(--ht-border);
+  --sl-color-gray-6: var(--ht-surface-2);
+  --sl-color-gray-7: oklch(0.97 0.005 265);
+  --sl-color-black: var(--ht-surface);
+
+  --sl-color-accent-low: oklch(0.9 0.05 259);
+  --sl-color-accent: var(--ht-primary);
+  --sl-color-accent-high: oklch(0.36 0.15 259);
+  --sl-color-text-accent: var(--ht-primary);
+  --sl-color-text-invert: var(--ht-primary-foreground);
+
+  --sl-color-blue-low: color-mix(in oklch, var(--ht-primary) 10%, var(--ht-surface));
+  --sl-color-blue-high: oklch(0.36 0.15 259);
+  --sl-color-green-low: color-mix(in oklch, var(--ht-success) 10%, var(--ht-surface));
+  --sl-color-green-high: oklch(0.34 0.12 160);
+  --sl-color-orange-low: color-mix(in oklch, var(--ht-warning) 10%, var(--ht-surface));
+  --sl-color-orange-high: oklch(0.36 0.12 75);
+  --sl-color-red-low: color-mix(in oklch, var(--ht-danger) 10%, var(--ht-surface));
+  --sl-color-red-high: oklch(0.38 0.16 20);
+  --sl-color-purple-low: color-mix(in oklch, var(--ht-purple) 10%, var(--ht-surface));
+  --sl-color-purple-high: oklch(0.38 0.16 300);
+
+  --sl-color-bg: var(--ht-background);
+  --sl-color-bg-nav: var(--ht-surface);
+  --sl-color-bg-sidebar: var(--ht-surface);
+  --sl-color-bg-inline-code: var(--ht-surface-2);
+  --sl-color-hairline-light: var(--ht-border);
+  --sl-color-hairline: color-mix(in oklch, var(--ht-border) 60%, transparent);
+  --sl-color-hairline-shade: var(--ht-border);
+  --sl-color-backdrop-overlay: oklch(0.2 0.02 265 / 0.4);
 }
 
-/* The home page's dashboard screenshot, full width under the hero. */
-.hero-screenshot {
-  margin: 0 0 3rem;
+/* ---------------------------------------------------------------------------
+ * Site-wide: the app's edges, type, and browser surfaces.
+ * ------------------------------------------------------------------------- */
+
+/* The app's radius is zero. One rule, so every Starlight corner follows. */
+*,
+*::before,
+*::after {
+  border-radius: 0;
 }
 
-.hero-screenshot img {
-  display: block;
-  width: 100%;
-  height: auto;
-  border: 1px solid var(--sl-color-gray-5);
-  border-radius: 0.75rem;
-  box-shadow: var(--sl-shadow-lg);
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--ht-border) transparent;
+}
+
+::selection {
+  background-color: var(--ht-selection);
+  color: var(--ht-foreground);
+}
+
+:focus-visible {
+  outline-color: var(--ht-ring);
+}
+
+body {
+  font-weight: 400;
+}
+
+.sl-markdown-content :is(h1, h2, h3, h4, h5, h6) {
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  text-wrap: balance;
+}
+
+.sl-markdown-content code:not(:where(pre *)) {
+  border: 1px solid var(--ht-border);
+  padding: 0.1em 0.35em;
+}
+
+/* Buttons: the app's primary / secondary / ghost, in Starlight's LinkButton. */
+.sl-link-button {
+  height: 2.5rem;
+  padding: 0 1.25rem;
+  font-size: var(--sl-text-sm);
+  font-weight: 500;
+  line-height: 1;
+  transition:
+    background-color 200ms cubic-bezier(0.4, 0, 0.2, 1),
+    opacity 200ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.sl-link-button.primary {
+  background: var(--ht-primary);
+  border-color: var(--ht-primary);
+  color: var(--ht-primary-foreground);
+}
+
+.sl-link-button.primary:hover {
+  opacity: 0.9;
+  color: var(--ht-primary-foreground);
+}
+
+.sl-link-button.secondary {
+  background: var(--ht-surface-2);
+  border-color: var(--ht-border);
+  color: var(--ht-foreground);
+}
+
+.sl-link-button.secondary:hover {
+  background: var(--ht-surface);
+}
+
+.sl-link-button.minimal {
+  padding: 0 1rem;
+  color: var(--ht-foreground);
+}
+
+.sl-link-button.minimal:hover {
+  background: var(--ht-surface-2);
 }
 
 /* The header brand matches the app's nav bar: icon in the accent, the name
@@ -38,13 +239,286 @@
   height: 1.5rem;
 }
 
-/* The home page's three numbered steps. */
+/* Sidebar: the current page is a tint of the primary, like the app's "Live"
+   badge, not a solid fill. */
+.sidebar-content a[aria-current="page"],
+.sidebar-content a[aria-current="page"]:hover,
+.sidebar-content a[aria-current="page"]:focus {
+  background-color: color-mix(in oklch, var(--ht-primary) 15%, transparent);
+  color: var(--ht-primary);
+  font-weight: 500;
+}
+
+/* Asides: the app's tinted notice, a 1px border in the status at low alpha. */
+.starlight-aside {
+  border: 1px solid color-mix(in oklch, var(--sl-color-asides-border) 40%, transparent);
+  border-inline-start-width: 1px;
+}
+
+/* Cards: the app's Card (surface, 1px border), with its icon in the primary
+   mark the sign-in card uses. */
+.card {
+  background-color: var(--ht-surface);
+  border-color: var(--ht-border);
+  padding: 1.25rem;
+  gap: 0.75rem;
+}
+
+.card .title {
+  font-size: var(--sl-text-lg);
+  gap: 0.75rem;
+}
+
+.card .icon {
+  color: var(--ht-primary);
+  border-color: color-mix(in oklch, var(--ht-primary) 40%, transparent);
+  background-color: color-mix(in oklch, var(--ht-primary) 10%, transparent);
+  padding: 0.25em;
+}
+
+.card .body {
+  font-size: var(--sl-text-sm);
+  color: var(--ht-text);
+}
+
+.sl-link-card {
+  background-color: var(--ht-surface);
+  box-shadow: none;
+  transition: border-color 200ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.sl-link-card:hover {
+  background-color: var(--ht-surface);
+  border-color: var(--ht-border-strong);
+}
+
+/* ---------------------------------------------------------------------------
+ * Home page. Only the splash page has a hero, so `[data-has-hero]` scopes it.
+ * ------------------------------------------------------------------------- */
+
+[data-has-hero] main {
+  position: relative;
+  isolation: isolate;
+}
+
+/* The dashboard grid behind the hero: panel edges on a 4rem module, fading
+   out before the first section, with a little of the primary in the air. */
+[data-has-hero] main::before {
+  content: "";
+  position: absolute;
+  inset: 0 0 auto;
+  height: 64rem;
+  z-index: -1;
+  pointer-events: none;
+  --grid: color-mix(in oklch, var(--ht-border) 55%, transparent);
+  background-image:
+    radial-gradient(
+      70rem 32rem at 50% -6rem,
+      color-mix(in oklch, var(--ht-primary) 12%, transparent),
+      transparent 70%
+    ),
+    linear-gradient(to right, var(--grid) 1px, transparent 1px),
+    linear-gradient(to bottom, var(--grid) 1px, transparent 1px);
+  background-size:
+    100% 100%,
+    4rem 4rem,
+    4rem 4rem;
+  mask-image: linear-gradient(to bottom, black 35%, transparent 100%);
+}
+
+[data-has-hero] .content-panel + .content-panel {
+  border-top: 0;
+}
+
+[data-has-hero] .hero {
+  padding-block: clamp(3rem, 2rem + 6vmin, 6.5rem) clamp(1rem, 2vmin, 2rem);
+  grid-template-columns: 100%;
+}
+
+[data-has-hero] .hero .stack {
+  align-items: center;
+  text-align: center;
+  gap: 2rem;
+}
+
+[data-has-hero] .hero .copy {
+  align-items: center;
+  gap: 1.25rem;
+}
+
+[data-has-hero] .hero h1 {
+  max-width: 16ch;
+  font-size: clamp(2.5rem, 1.25rem + 5.5vw, 5.25rem);
+  font-weight: 600;
+  line-height: 1.02;
+  letter-spacing: -0.03em;
+  text-wrap: balance;
+}
+
+[data-has-hero] .hero .tagline {
+  max-width: 58ch;
+  font-size: clamp(1.0625rem, 0.95rem + 0.5vw, 1.25rem);
+  line-height: 1.6;
+  color: var(--ht-text);
+  text-wrap: pretty;
+}
+
+[data-has-hero] .hero .actions {
+  justify-content: center;
+  gap: 0.75rem;
+}
+
+/* The product, on stage: the screenshot in the app's own panel border, with
+   a real shadow under it. It rises into place once, on load. */
+.home-stage {
+  margin: 1rem 0 0;
+  border: 1px solid var(--ht-border);
+  background: var(--ht-surface);
+  box-shadow: var(--ht-shadow-stage);
+}
+
+.home-stage img {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+@keyframes home-stage-rise {
+  from {
+    opacity: 0;
+    transform: translateY(1.5rem);
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .home-stage {
+    animation: home-stage-rise 700ms cubic-bezier(0.2, 0, 0, 1) both;
+  }
+}
+
+/* Sections: generous space, a hairline between them, as between panels. */
+.home-section {
+  padding-block: clamp(3rem, 2rem + 4vw, 5.5rem);
+}
+
+.home-section + .home-section {
+  border-top: 1px solid var(--ht-border);
+}
+
+/* Starlight wraps each heading and its anchor link in .sl-heading-wrapper. */
+.home-section > .sl-heading-wrapper {
+  margin: 0;
+}
+
+.home-section > .sl-heading-wrapper h2 {
+  margin: 0;
+  font-size: clamp(1.75rem, 1.25rem + 2vw, 2.5rem);
+  letter-spacing: -0.02em;
+  line-height: 1.1;
+}
+
+.home-section > .lede {
+  max-width: 62ch;
+  margin-top: 0.75rem;
+  font-size: var(--sl-text-lg);
+  color: var(--ht-muted);
+  text-wrap: pretty;
+}
+
+.home-section > .sl-heading-wrapper + :not(.lede),
+.home-section > .lede + * {
+  margin-top: 2rem;
+}
+
+/* A panel: the app's Card with a title row, as every dashboard panel has. */
+.panel {
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--ht-border);
+  background: var(--ht-surface);
+}
+
+.panel-head {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  min-height: 3rem;
+  padding: 0 1rem;
+  border-bottom: 1px solid var(--ht-border);
+}
+
+.panel-head h3 {
+  margin: 0;
+  flex: 1;
+  font-size: var(--sl-text-sm);
+  font-weight: 600;
+  letter-spacing: 0;
+  color: var(--ht-foreground);
+}
+
+.panel-body {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  padding: 1rem;
+  flex: 1;
+}
+
+.panel-body > p {
+  margin: 0;
+  font-size: var(--sl-text-sm);
+  line-height: 1.6;
+  color: var(--ht-text);
+}
+
+/* The app's Badge: a tint of its status, with the status as its text. */
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  padding: 0.125rem 0.5rem;
+  border: 1px solid var(--ht-border);
+  background: var(--ht-surface-2);
+  font-size: var(--sl-text-2xs);
+  font-weight: 500;
+  line-height: 1.4;
+  color: var(--ht-muted);
+  white-space: nowrap;
+}
+
+.badge-live {
+  border-color: color-mix(in oklch, var(--ht-success) 40%, transparent);
+  background: color-mix(in oklch, var(--ht-success) 15%, transparent);
+  color: var(--ht-success);
+}
+
+.badge-live::before {
+  content: "";
+  width: 0.375rem;
+  height: 0.375rem;
+  border-radius: 999px;
+  background: currentColor;
+}
+
+@keyframes home-live-pulse {
+  50% {
+    opacity: 0.35;
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .badge-live::before {
+    animation: home-live-pulse 2s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+  }
+}
+
+/* The three steps: each a panel showing the product at that moment. */
 .home-steps {
   display: grid;
   gap: 1rem;
   padding: 0;
+  margin: 0;
   list-style: none;
-  counter-reset: step;
 }
 
 @media (min-width: 50rem) {
@@ -54,33 +528,251 @@
 }
 
 .home-steps > li {
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
   margin: 0;
-  padding: 1.25rem;
-  border: 1px solid var(--sl-color-gray-5);
-  border-radius: 0.75rem;
-  counter-increment: step;
+  padding: 0;
 }
 
-.home-steps > li::before {
-  content: counter(step);
+.step-n {
   display: grid;
   place-items: center;
-  width: 2rem;
-  height: 2rem;
-  border-radius: 999px;
-  background-color: var(--sl-color-accent-low);
-  color: var(--sl-color-text-accent);
+  width: 1.5rem;
+  height: 1.5rem;
+  border: 1px solid color-mix(in oklch, var(--ht-primary) 40%, transparent);
+  background: color-mix(in oklch, var(--ht-primary) 10%, transparent);
+  color: var(--ht-primary);
+  font-family: var(--__sl-font-mono);
+  font-size: var(--sl-text-2xs);
   font-weight: 600;
 }
 
-.home-steps strong {
-  color: var(--sl-color-white);
-  font-size: var(--sl-text-lg);
+/* Mocks: a prompt box, a chat turn, a stat. Drawn with the app's tokens. */
+.mock {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  font-size: var(--sl-text-sm);
 }
 
-.home-steps span {
-  color: var(--sl-color-gray-2);
+.mock-input {
+  margin: 0;
+  padding: 0.625rem 0.75rem;
+  border: 1px solid var(--ht-border-strong);
+  background: var(--ht-background);
+  color: var(--ht-foreground);
+  line-height: 1.5;
+}
+
+.mock-input::after {
+  content: "";
+  display: inline-block;
+  width: 1px;
+  height: 1em;
+  margin-inline-start: 0.125rem;
+  background: var(--ht-foreground);
+  vertical-align: -0.15em;
+}
+
+@keyframes home-caret {
+  50% {
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .mock-input::after {
+    animation: home-caret 1.1s steps(1) infinite;
+  }
+}
+
+.mock-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  color: var(--ht-muted);
+  font-size: var(--sl-text-2xs);
+}
+
+.mock-button {
+  display: inline-flex;
+  align-items: center;
+  height: 2rem;
+  padding: 0 0.75rem;
+  background: var(--ht-primary);
+  color: var(--ht-primary-foreground);
+  font-weight: 500;
+  font-size: var(--sl-text-xs);
+}
+
+.mock-turn {
+  margin: 0;
+  max-width: 85%;
+  padding: 0.5rem 0.75rem;
+  line-height: 1.5;
+}
+
+.mock-turn.you {
+  align-self: flex-end;
+  background: color-mix(in oklch, var(--ht-primary) 15%, transparent);
+  border: 1px solid color-mix(in oklch, var(--ht-primary) 40%, transparent);
+  color: var(--ht-foreground);
+}
+
+.mock-turn.app {
+  align-self: flex-start;
+  border: 1px solid var(--ht-border);
+  background: var(--ht-surface-2);
+  color: var(--ht-text);
+}
+
+.mock-turn.app code {
+  font-size: 0.9em;
+  color: var(--ht-foreground);
+}
+
+.mock-stat {
+  position: relative;
+  display: grid;
+  place-items: center;
+  min-height: 7rem;
+  overflow: hidden;
+}
+
+.mock-stat svg {
+  position: absolute;
+  inset: auto 0 0;
+  width: 100%;
+  height: 60%;
+  color: var(--ht-danger);
+}
+
+.mock-stat .value {
+  position: relative;
+  font-size: 2.25rem;
+  font-weight: 600;
+  line-height: 1;
+  letter-spacing: -0.02em;
+  color: var(--ht-danger);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Features: the app's panel wall, four across on a wide screen. */
+.home-features .card-grid {
+  gap: 1rem;
+}
+
+@media (min-width: 72rem) {
+  .home-features .card-grid {
+    grid-template-columns: repeat(4, 1fr);
+  }
+
+  .home-features .card {
+    padding: 1rem;
+  }
+
+  .home-features .card-grid > *:nth-child(2n) {
+    margin-top: 0;
+  }
+}
+
+/* Safe by construction: the statement beside the guard at work. */
+.home-safe {
+  display: grid;
+  gap: 2rem;
+  align-items: start;
+}
+
+@media (min-width: 60rem) {
+  .home-safe {
+    grid-template-columns: minmax(0, 5fr) minmax(0, 6fr);
+    gap: 3rem;
+  }
+}
+
+.home-safe p {
+  margin: 0;
+  color: var(--ht-text);
+  text-wrap: pretty;
+}
+
+.home-safe .sl-link-card + .sl-link-card,
+.home-safe p + .sl-link-card {
+  margin-top: 1rem;
+}
+
+.guard-query {
+  margin: 0;
+  padding: 1rem;
+  border-bottom: 1px solid var(--ht-border);
+  background: var(--ht-background);
+  font-family: var(--__sl-font-mono);
+  font-size: var(--sl-text-xs);
+  line-height: 1.6;
+  color: var(--ht-text);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.guard-query .kw {
+  color: var(--ht-primary);
+}
+
+.guard-query .str {
+  color: var(--ht-success);
+}
+
+.guard-query .num {
+  color: var(--ht-warning);
+}
+
+.guard-checks {
+  display: grid;
+  gap: 0.625rem;
+  margin: 0;
+  padding: 1rem;
+  list-style: none;
+}
+
+.guard-checks li {
+  display: flex;
+  align-items: baseline;
+  gap: 0.625rem;
+  margin: 0;
+  font-size: var(--sl-text-sm);
+  color: var(--ht-text);
+}
+
+.guard-checks svg {
+  flex: none;
+  width: 1rem;
+  height: 1rem;
+  align-self: center;
+  color: var(--ht-success);
+}
+
+.guard-checks code {
+  font-size: 0.9em;
+  color: var(--ht-foreground);
+}
+
+/* Try it: the command, centered and alone. */
+.home-try {
+  text-align: center;
+}
+
+.home-try > .lede {
+  margin-inline: auto;
+}
+
+.home-try .expressive-code {
+  max-width: 44rem;
+  margin: 2rem auto 0;
+  text-align: start;
+}
+
+.home-try > p:last-child {
+  max-width: 60ch;
+  margin: 1.5rem auto 0;
+  color: var(--ht-text);
+  text-wrap: pretty;
 }
