@@ -1,11 +1,13 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { test } from "node:test";
-import { treeClickPart, withTreeState } from "@/components/charts/EChart";
+import { ctrlZoomSeries, treeClickPart, withTreeState } from "@/components/charts/EChart";
 import {
   GRAPH_EDGES_MAX,
   GRAPH_NODES_MAX,
   GRAPH_ROOT_ID,
+  FORCE_LABELS_MAX,
+  forceSpacing,
   graphChart,
   graphClickDatum,
   graphEdgeId,
@@ -31,7 +33,9 @@ import { LOCAL_TIME_DISPLAY } from "@/lib/time-display";
  * their node's color and symbols only from the allowlist. The `dag` layout
  * (#624): the same rows as a layered directed graph, placed by a layout that
  * is deterministic, places every node and runs every edge with the flow but
- * the cycle's it marks; a tree that is not one falls back to it.
+ * the cycle's it marks; a tree that is not one falls back to it. The `force`
+ * layout (#625): the same net as a cloud that settles once and keeps its
+ * place across polls.
  */
 
 const LAYOUT = { x: 0, y: 0, w: 12, h: 4 };
@@ -650,5 +654,132 @@ test("a layout or direction change remounts the chart", () => {
     true,
   );
   assert.equal(accepts({ direction: "RL" }), false);
-  assert.equal(accepts({ layout: "force" }), false);
+  assert.notEqual(
+    graphShape(graph({ layout: "dag" })),
+    graphShape(graph({ layout: "force" })),
+  );
+  assert.equal(accepts({ layout: "force" }), true);
+  assert.equal(accepts({ layout: "sankey" }), false);
+});
+
+const FORCE = { layout: "force", source: "from", target: "to", value: "calls" };
+
+interface ForceSeries {
+  type: string;
+  layout: string;
+  roam: unknown;
+  draggable: boolean;
+  edgeSymbol: string[];
+  force: {
+    layoutAnimation: boolean;
+    initLayout: string;
+    repulsion: number;
+    edgeLength: number;
+  };
+  label: { show: boolean };
+  emphasis: { label: { show: boolean } };
+  data: (Record<string, unknown> & {
+    id: string;
+    symbolSize: number;
+    itemStyle: { color: string };
+    label: { color: string; backgroundColor: string };
+  })[];
+  links: { id: string; source: string; target: string }[];
+}
+
+const forceSeries = (panel: Panel, data: PanelData) =>
+  (graphChart(panel, data, CTX).series as ForceSeries[])[0] as ForceSeries;
+
+test("a force graph settles at once and keeps its place on a poll, rather than jittering", () => {
+  const series = forceSeries(graph(FORCE), DEPS);
+  assert.equal(series.type, "graph");
+  assert.equal(series.layout, "force");
+  // Settled in one go, not animated in view; the same rows start the same way.
+  assert.equal(series.force.layoutAnimation, false);
+  assert.equal(series.force.initLayout, "circular");
+  // ECharts keeps the positions it settled on by node id on the merged
+  // series: so the ids are the rows' names, the same on every poll, and no
+  // node is pinned or placed by the option, which would override them.
+  const poll = forceSeries(graph(FORCE), {
+    ...DEPS,
+    rows: DEPS.rows.map((r) => ({ ...r, calls: (r.calls as number) + 1 })),
+  });
+  assert.deepEqual(
+    poll.data.map((n) => n.id),
+    series.data.map((n) => n.id),
+  );
+  assert.deepEqual(
+    series.data.map((n) => n.id),
+    ["web", "api", "auth", "db", "replica"],
+  );
+  for (const node of series.data) {
+    for (const key of ["x", "y", "fixed", "value"]) {
+      assert.ok(!(key in node), `${node.id} has no ${key}`);
+    }
+  }
+  // A drag would restart the layout; the view pans, and a Ctrl-wheel zooms it.
+  assert.equal(series.draggable, false);
+  assert.equal(series.roam, "move");
+  assert.deepEqual(ctrlZoomSeries(graphChart(graph(FORCE), DEPS, CTX)), [0]);
+  assert.deepEqual(ctrlZoomSeries(graphChart(graph(DAG), DEPS, CTX)), []);
+  // Undirected: no arrows, and nothing falls back or needs a notice.
+  assert.deepEqual(series.edgeSymbol, ["none", "none"]);
+  assert.equal(graphNotice(graph(FORCE), DEPS), undefined);
+  for (const node of series.data) {
+    assert.equal(node.label.backgroundColor, node.itemStyle.color);
+    assert.equal(node.label.color, inkOn(node.itemStyle.color));
+  }
+});
+
+test("a force graph spreads by its node count, thins its labels when dense, and sizes nodes by value", () => {
+  // Fewer nodes push harder and sit further apart.
+  const few = forceSpacing(5);
+  const many = forceSpacing(300);
+  assert.ok(few.repulsion > many.repulsion && few.edgeLength > many.edgeLength);
+  assert.deepEqual(
+    (({ repulsion, edgeLength }) => ({ repulsion, edgeLength }))(
+      forceSeries(graph(FORCE), DEPS).force,
+    ),
+    forceSpacing(5),
+  );
+  // Past the cap, labels show on hover only.
+  const ring = (n: number) => ({
+    columns: ["from", "to"],
+    rows: Array.from({ length: n }, (_, i) => ({ from: `n${i}`, to: `n${(i + 1) % n}` })),
+  });
+  const sparse = forceSeries(graph({ layout: "force" }), ring(FORCE_LABELS_MAX));
+  assert.equal(sparse.label.show, true);
+  const dense = forceSeries(graph({ layout: "force" }), ring(FORCE_LABELS_MAX + 1));
+  assert.equal(dense.label.show, false);
+  assert.equal(dense.emphasis.label.show, true);
+  // By value: the largest twice the symbol's size, the smallest no less
+  // than 60% of it; without a value, every node the symbol's size.
+  const sized = forceSeries(graph({ ...FORCE, symbolSize: 20 }), DEPS);
+  const sizes = sized.data.map((n) => n.symbolSize);
+  assert.equal(Math.max(...sizes), 40);
+  assert.ok(Math.min(...sizes) >= 12);
+  const db = sized.data.find((n) => n.id === "db");
+  assert.equal(db?.symbolSize, 40, "db takes the most calls");
+  const plain = forceSeries(
+    graph({ layout: "force", source: "from", target: "to" }),
+    DEPS,
+  );
+  assert.ok(plain.data.every((n) => n.symbolSize === 10));
+});
+
+test("a force graph's nodes and edges are datums, and its table is its edges", () => {
+  const panel = graph(FORCE);
+  assert.deepEqual(graphClickDatum(panel, DEPS, graphEdgeId("api", "db")), {
+    row: { from: "api", to: "db", calls: 25, source: "api", target: "db", value: 25 },
+    series: "api → db",
+  });
+  assert.equal(graphClickDatum(panel, DEPS, "db")?.row.node, "db");
+  const table = graphTable(panel, DEPS);
+  assert.deepEqual(table.columns, ["from", "to", "calls"]);
+  assert.equal(table.caption, "Edges of Service map: 8 edges.");
+  assert.deepEqual(
+    table.rows.find((r) => r[0] === "api" && r[1] === "db"),
+    ["api", "db", "25"],
+  );
+  assert.equal(table.datums[0]?.series, "api");
 });

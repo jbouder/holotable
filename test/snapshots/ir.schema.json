@@ -75,6 +75,7 @@
               "logs",
               "treemap",
               "graph",
+              "sankey",
               "vega",
               "text"
             ]
@@ -945,7 +946,7 @@
                 "properties": {
                   "layout": {
                     "type": "string",
-                    "enum": ["tree", "dag"]
+                    "enum": ["tree", "dag", "force"]
                   },
                   "orient": {
                     "type": "string",
@@ -1071,6 +1072,60 @@
                     "type": "boolean"
                   }
                 },
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "orient": {
+                    "type": "string",
+                    "enum": ["LR", "TB"]
+                  },
+                  "source": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 128
+                  },
+                  "target": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 128
+                  },
+                  "value": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 128
+                  },
+                  "group": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 128
+                  },
+                  "path": {
+                    "minItems": 2,
+                    "maxItems": 8,
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 128
+                    }
+                  },
+                  "decimals": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 6
+                  },
+                  "unit": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 16
+                  },
+                  "compact": {
+                    "type": "boolean"
+                  }
+                },
+                "required": ["value"],
                 "additionalProperties": false
               },
               {

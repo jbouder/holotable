@@ -187,6 +187,7 @@ export const OPTION_GROUPS = {
     "symbol",
     "symbolSize",
   ],
+  sankey: ["orient", "source", "target", "value", "group"],
 } as const satisfies Record<string, readonly string[]>;
 export type OptionGroup = keyof typeof OPTION_GROUPS;
 

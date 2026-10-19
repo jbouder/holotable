@@ -206,8 +206,8 @@ With PromQL: an instant query aggregated by the levels, `sum by (job, instance) 
 
 ### `graph`
 
-Structure: what points at what, drawn as a tree or as a layered directed
-graph. A service and what it calls, a schema's tables and their columns, a
+Structure: what points at what, drawn as a tree, as a layered directed
+graph or as a force-directed cloud. A service and what it calls, a schema's tables and their columns, a
 folder tree, a dependency graph, a data lineage. Return one row per edge,
 the parent and the child columns, with an optional number and an optional
 category; a repeated edge is one edge, its value summed, so a coarse time
@@ -227,15 +227,24 @@ Pick the layout from the data, not the wording:
   edge dashed. A tree whose rows turn out not to be one is drawn this way
   anyway, with a "Not a tree" badge, so say `"dag"` whenever shared children
   or cycles are possible.
+- `layout: "force"` when the edges have no useful direction and the question
+  is what clusters with what: which hosts talk to each other, which services
+  share a network, which tags occur together. Nodes settle into a cloud, no
+  arrows, sized by `value`; drag pans, Ctrl and the wheel zooms. Past 60
+  nodes, labels show on hover only.
+- Not a graph at all when the question is *how much* flows where (requests
+  from service to route to status, bytes from source to sink): that is a
+  `sankey`, which needs a volume on every edge and no cycles.
 
-Options: number (how values are written), `layout` (`"tree"`, the default, or
-`"dag"`), `orient` (the tree's: `"LR"`, the default, `"TB"`, `"RL"`, `"BT"`
+Options: number (how values are written), `layout` (`"tree"`, the default,
+`"dag"` or `"force"`), `orient` (the tree's: `"LR"`, the default, `"TB"`, `"RL"`, `"BT"`
 or `"radial"`), `direction` (the dag's: `"LR"`, the default, or `"TB"`),
-`edgeLabels` (`true` writes each edge's value on a dag), `curve` (`false`
+`edgeLabels` (`true` writes each edge's value on a dag or a force graph), `curve` (`false`
 draws a dag's edges straight), `source`
 and `target` (the parent and child columns of an edge row; default the first
 two text columns), `value` (a numeric column shown on each node: its incoming
-edge's, or for a root what leaves it), `group` (a text column that colors each
+edge's, or for a root what leaves it; on a force graph it also sizes the node,
+from 60% of `symbolSize` for the smallest to twice it for the largest), `group` (a text column that colors each
 edge's target by category), `path` (1–8 columns, instead of `source` and
 `target`), `collapseDepth` (1–32 levels open at first draw; default all),
 `symbol` (every node's symbol, `"circle"` by default), `symbols` (a group
@@ -246,16 +255,48 @@ symbol is one of the shapes `circle`, `rect`, `roundRect`, `triangle`,
 `router`, `switch`, `firewall`, `loadBalancer`, `queue`, `cache`, `storage`,
 `user`, `service`; never a `path://` or `image://` string. Use the icons for
 an infrastructure or service map. At most 500 nodes are drawn, and on a dag
-1,500 edges.
+or a force graph 1,500 edges.
 
 A click on a node's label is a datum for a link: its own edge row's columns
 plus `node`, `parent` (on a dag, the first parent), `group` and `value`, so
-`{ "column": "node" }` carries the clicked node's name. On a dag a click on an
-edge is a datum too, with `source`, `target` and `value`. A link that reads a
+`{ "column": "node" }` carries the clicked node's name. On a dag or a force
+graph a click on an edge is a datum too, with `source`, `target` and `value`. A link that reads a
 column the clicked node's row has no value for is not offered, so compute a
 column that is null where a link should not apply (a router has no `host`).
 
 With PromQL: an instant query aggregated by both ends of an edge, `sum by (job, instance) (rate(http_requests_total[5m]))`, with `source: "job"`, `target: "instance"` and `value: "value"`.
+
+### `sankey`
+
+How much flows where: requests from service to route to status, bytes from
+source to sink, users through the steps of a funnel, cost from team to
+service to resource. Bands as wide as their volume run between nodes in
+stages, left to right or top to bottom. Return one row per path, one text
+column per stage and one numeric volume, already aggregated; or one row per
+edge, the from and to columns and the volume, as for a `graph`. Rows with the
+same ends are summed, so return counts and totals, not averages, and a coarse
+time bucket as `query.timeField` (`time_bucket('5 minutes', ts) AS period`)
+applies the window. In a path, each column is its own stage: `200` under
+every route is one node.
+
+Flows must not cycle: a cycle is refused, naming a node on it. When an edge
+can point back (a state machine, retries), use a `graph` with
+`layout: "dag"`. A row whose volume is not a positive number is left out, and
+a badge on the panel counts it. Use a `graph` when the question is structure
+or who talks to whom, not volume.
+
+Options: number (how values are written), `value` (required: the volume
+column), `path` (2–8 columns, one stage each, first stage first; instead of
+`source` and `target`), `source` and `target` (the from and to columns of an
+edge row; default the first two text columns), `group` (a text column that
+colors each flow's target by category), `orient` (`"LR"`, the default, or
+`"TB"`). No symbols: a node is a bar.
+
+A click on a node is a datum with `node`, `group` and `value` (the larger of
+what enters and what leaves it); a click on a flow is one with `source`,
+`target` and `value`, as on a graph's edge.
+
+With PromQL: an instant query aggregated by both ends, `sum by (job, instance) (rate(http_requests_total[5m]))`, with `source: "job"`, `target: "instance"` and `value: "value"`.
 
 ### `vega`
 

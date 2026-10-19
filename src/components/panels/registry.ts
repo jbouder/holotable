@@ -16,6 +16,13 @@ import {
   graphTable,
 } from "@/components/charts/graph";
 import { histogramChart, histogramShape } from "@/components/charts/histogram";
+import {
+  sankeyChart,
+  sankeyNotice,
+  sankeyProblem,
+  sankeyShape,
+  sankeyTable,
+} from "@/components/charts/sankey";
 import { treemapChart, treemapShape } from "@/components/charts/treemap";
 import {
   stateTimelineChart,
@@ -64,6 +71,14 @@ export const PANEL_RENDERERS = {
     shape: graphShape,
     notice: graphNotice,
     table: graphTable,
+  },
+  sankey: {
+    type: "chart",
+    option: sankeyChart,
+    shape: sankeyShape,
+    problem: sankeyProblem,
+    notice: sankeyNotice,
+    table: sankeyTable,
   },
   vega: { type: "view", Body: VegaView },
   text: { type: "html", Body: TextView },

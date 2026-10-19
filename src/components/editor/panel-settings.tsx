@@ -161,6 +161,7 @@ const GROUP_TITLES: Record<OptionGroup, string> = {
   thresholds: "Thresholds",
   table: "Columns",
   graph: "Graph",
+  sankey: "Sankey",
 };
 
 /**
@@ -333,6 +334,24 @@ function OptionGroupFields({
             label="Levels open at first"
             placeholder="all"
           />
+        </div>
+      );
+    case "sankey":
+      return (
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <SelectOption
+            {...field("orient")}
+            label="Direction"
+            options={[
+              { value: "", label: "left to right (default)" },
+              { value: "TB", label: "top to bottom" },
+            ]}
+            parse={(v) => (v === "" ? undefined : v)}
+          />
+          <TextOption {...field("value")} label="Value column" placeholder="required" />
+          <TextOption {...field("source")} label="From column" placeholder="automatic" />
+          <TextOption {...field("target")} label="To column" placeholder="automatic" />
+          <TextOption {...field("group")} label="Group column" placeholder="none" />
         </div>
       );
   }

@@ -8,7 +8,8 @@ sidebar:
 A panel's `options` belong to its kind. The IR validates them against that
 kind's schema (`src/lib/panels/kinds/` and `src/lib/panels/presentation.ts`),
 so a gauge's options on a pie panel are refused, and so is a field a kind does
-not know. `heatmap` and `scatter` take no options. Every option is optional,
+not know. `heatmap` and `scatter` take no options. Every option is optional
+but a `sankey`'s `value` and a `vega` spec or `text` content,
 and a panel without `options` renders exactly as it did before they existed
 ([#115](https://github.com/jbouder/holotable/issues/115)).
 
@@ -348,24 +349,28 @@ columns, a folder tree, drawn as a tree
 several parents or the edges form a cycle (a dependency graph, a data lineage,
 tables sharing a dimension, a state machine, a network with redundant links),
 as a layered directed graph
-([#624](https://github.com/jbouder/holotable/issues/624)).
+([#624](https://github.com/jbouder/holotable/issues/624)); or, where the
+edges have no useful direction and the question is what clusters with what
+(which hosts talk to each other, which services share a network), as a
+force-directed cloud ([#625](https://github.com/jbouder/holotable/issues/625)).
+How *much* flows where is a [`sankey`](#sankey), not a graph.
 
 | Option | Type | Default | Meaning |
 | --- | --- | --- | --- |
-| `layout` | `"tree"` \| `"dag"` | `"tree"` | How the graph is drawn: a tree, or a layered directed graph. The force layout joins them on the same options. |
+| `layout` | `"tree"` \| `"dag"` \| `"force"` | `"tree"` | How the graph is drawn: a tree, a layered directed graph, or a force-directed cloud. |
 | `orient` | `"LR"` \| `"TB"` \| `"RL"` \| `"BT"` \| `"radial"` | `"LR"` | Which way the tree grows: left to right, top to bottom, right to left, bottom to top, or out from its root. |
 | `direction` | `"LR"` \| `"TB"` | `orient`'s nearer one, else `"LR"` | Which way a directed graph's layers run: left to right or top to bottom. |
-| `edgeLabels` | boolean | `false` | A directed graph writes each edge's value on it. |
+| `edgeLabels` | boolean | `false` | A directed or force graph writes each edge's value on it. |
 | `curve` | boolean | `true` | A directed graph's edges are gently curved; `false` draws them straight. |
 | `source` | column name | the first text column | An edge row's parent. |
 | `target` | column name | the second text column | An edge row's child. |
-| `value` | column name | none | A number shown on each node: its incoming edge's, summed over rows; a root shows what leaves it. |
+| `value` | column name | none | A number shown on each node: its incoming edge's, summed over rows; a root shows what leaves it. On a force graph it also sizes the node. |
 | `group` | column name | none | A text column that colors each edge's target by category, and picks its symbol from `symbols`. |
 | `path` | 1 to 8 column names | none | The levels, top first, one row per leaf, as a treemap takes them. Read instead of `source` and `target`. |
 | `collapseDepth` | integer, 1 to 32 | every level | Levels open at first draw. |
 | `symbol` | a symbol, below | `"circle"` | Every node's symbol, unless `symbols` names its group's. |
 | `symbols` | `{ group value: symbol }` | none | A symbol per group value, which beats `symbol`: `{ "service": "server", "store": "database" }`. At most 32. |
-| `symbolSize` | number, 6 to 48 | 10 for a shape, 24 for an icon | The symbol's size in pixels. |
+| `symbolSize` | number, 6 to 48 | 10 for a shape, 24 for an icon | The symbol's size in pixels. On a force graph with a `value`, nodes run from 60% of it (the smallest value) to twice it (the largest). |
 | `decimals`, `unit`, `compact` | see [Numbers](#numbers) | none | How a value is written on a node and in its tooltip, with `panel.format`. |
 
 A symbol is one of ECharts' shapes, `circle`, `rect`, `roundRect`, `triangle`,
@@ -398,8 +403,17 @@ fetch an image.
   wide as its value against the largest; a node's value is its incoming
   edges' summed, or a root's, its outgoing ones'. Drag to pan; pinch, or hold
   Ctrl and scroll, to zoom, so the page still scrolls past the panel.
+- **The force graph** (`layout: "force"`) lets ECharts' force layout settle
+  the nodes into a cloud: linked nodes pull together, every node pushes the
+  others away, harder and further apart the fewer there are. Edges have no
+  arrows and are as wide as their value; a node is sized by its value when
+  the graph has one. It settles once rather than animating, and a refresh
+  starts from where the nodes already are, so a poll does not shake the
+  picture; only a new node finds its place. Past 60 nodes, labels show only
+  on the node under the pointer. Drag to pan; hold Ctrl and scroll, or pinch
+  on a trackpad, to zoom. Nodes and edges are datums exactly as on a directed graph.
 - At most 500 nodes are drawn, breadth first from the roots, and on a directed
-  graph at most 1,500 edges; a note in the corner says how many more there
+  or force graph at most 1,500 edges; a note in the corner says how many more there
   are.
 - A node is colored by its group, or without one by its branch below the
   root (on a directed graph, all in the first series color). Its label sits
@@ -420,6 +434,7 @@ fetch an image.
 - The table a screen reader is given lists one row per edge: parent, child
   and value, each row offering the child's links. A directed graph's adds the
   layers each edge runs between, and says which edge is a cycle's back edge.
+  A force graph's is the edges and their values alone.
 
 ```json
 {
@@ -445,6 +460,74 @@ fetch an image.
       "queue": "queue",
       "store": "storage"
     },
+    "compact": true
+  },
+  "links": [
+    { "title": "Show this service", "set": { "service": { "column": "service" } } }
+  ]
+}
+```
+
+## `sankey`
+
+How much flows where: requests from service to route to status, bytes from
+source to sink, users through a funnel
+([#625](https://github.com/jbouder/holotable/issues/625)). Bands as wide as
+their volume run between nodes in stages. It reads the [`graph`](#graph)'s
+rows, edges or path columns, through the same normalization, but is a kind of
+its own because it asks two things of them a graph does not: every flow has a
+volume, and the flows never cycle.
+
+| Option | Type | Default | Meaning |
+| --- | --- | --- | --- |
+| `value` | column name | **required** | Each flow's volume, summed over rows with the same ends. |
+| `path` | 2 to 8 column names | none | The stages, first first, one row per path; a flow runs between each pair of neighboring columns. Read instead of `source` and `target`. |
+| `source` | column name | the first text column | An edge row's from end. |
+| `target` | column name | the second text column | An edge row's to end. |
+| `group` | column name | none | A text column that colors each flow's target by category. |
+| `orient` | `"LR"` \| `"TB"` | `"LR"` | Which way the flows run: left to right, or top to bottom. |
+| `decimals`, `unit`, `compact` | see [Numbers](#numbers) | none | How a value is written on a node and in its tooltip, with `panel.format`. |
+
+- **Path columns**: each column is a stage, and its values are the stage's
+  nodes: `200` under every route is one node, so its band in is all the 200s.
+  A value that appears in two columns is two nodes, one per stage.
+- **Edges**: one row per flow, as a graph's edge rows; a repeated edge is one
+  flow, its volume summed, so a coarse time bucket as `query.timeField`
+  applies the window.
+- **A volume on every flow.** A row whose value is not a positive number has
+  nothing to draw and is left out; a **Rows left out** badge beside the title
+  counts them. A `value` column the rows do not have is refused in the
+  panel's error state.
+- **No cycles.** A Sankey flows one way, so rows whose flows loop back are
+  refused, naming a node on the loop and the loop itself (`"b" is on a cycle
+  (a → b → c → a)`). Draw such rows as a `graph` with `layout: "dag"`.
+- Nodes are aligned so the last stage sits at the far edge. A node is colored
+  by its group, or without one by its own place in the chart palette, and a
+  band shades from its source's color to its target's. Labels sit on their
+  node's color, black or white, whichever meets WCAG AA on it.
+- A click on a node follows a [datum link](/guide/drilldown/) with its stage
+  column, `node`, `group` and `value` (the larger of what enters and what
+  leaves it); a click on a band, with the flow's columns, `source`, `target`
+  and `value`. A link that finds nothing it reads in what was clicked is not
+  offered.
+- The table a screen reader is given lists one row per flow: its ends, its
+  volume, everything leaving its source and everything entering its target,
+  so every node's totals in and out are read. Each row offers the flow's
+  links.
+- At most 500 nodes and 1,500 flows are drawn.
+
+```json
+{
+  "viz": "sankey",
+  "format": "number",
+  "query": {
+    "sourceId": "ts-metrics",
+    "timeField": "period",
+    "sql": "SELECT time_bucket('5 minutes', ts) AS period, service, route, status::text AS status, count(*) AS requests FROM http_requests WHERE service = ANY(:service) GROUP BY period, service, route, status ORDER BY period"
+  },
+  "options": {
+    "path": ["service", "route", "status"],
+    "value": "requests",
     "compact": true
   },
   "links": [

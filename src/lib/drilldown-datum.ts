@@ -2,6 +2,7 @@ import { panelTimeField } from "@/lib/ir";
 import { gaugeOptions, gaugeReadings } from "@/components/charts/gauge";
 import { graphClickDatum } from "@/components/charts/graph";
 import { histogramBars } from "@/components/charts/histogram";
+import { sankeyClickDatum } from "@/components/charts/sankey";
 import { treemapNodes, treemapTree } from "@/components/charts/treemap";
 import {
   asInstant,
@@ -190,6 +191,13 @@ const nodeDatum: DatumMapper = (panel, data, click) => {
 const graphNodeDatum: DatumMapper = (panel, data, click) =>
   click.id === undefined ? null : graphClickDatum(panel, data, click.id);
 
+/**
+ * A Sankey's node is a datum with its `node`, `group` and `value`, and a flow
+ * is one with its `source`, `target` and value, as a graph's edge (#625).
+ */
+const sankeyDatum: DatumMapper = (panel, data, click) =>
+  click.id === undefined ? null : sankeyClickDatum(panel, data, click.id);
+
 export const DATUM_MAPPERS = {
   line: byRowIndex,
   area: byRowIndex,
@@ -207,6 +215,7 @@ export const DATUM_MAPPERS = {
   logs: lineDatum,
   treemap: nodeDatum,
   graph: graphNodeDatum,
+  sankey: sankeyDatum,
   // A custom visual's marks are the spec's own, not rows the kind can name (#405).
   vega: () => null,
   // A text panel has no rows and takes no links.

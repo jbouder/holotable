@@ -171,8 +171,10 @@ export function EChart({
     const detachBrush = brushing ? attachBrush(chart, onBrushRef, brush) : undefined;
     const detachDatum = clicking ? attachDatum(chart, onDatumRef, brush) : undefined;
     const detachTree = attachTreeToggle(chart, treeStateRef.current);
+    const detachZoom = attachCtrlZoom(chart);
 
     return () => {
+      detachZoom();
       detachTree();
       detachDatum?.();
       detachBrush?.();
@@ -487,6 +489,54 @@ export function withTreeState(option: EChartsOption, state: TreeState): EChartsO
         : series,
     ),
   } as EChartsOption;
+}
+
+/**
+ * The series a Ctrl-wheel zooms (#625): a force graph's, which pans with a
+ * drag (`roam: "move"`) but would take the page's scroll if ECharts zoomed it
+ * on every wheel, as its own `roam: true` does.
+ */
+export function ctrlZoomSeries(option: unknown): number[] {
+  const series = (option as { series?: unknown } | null)?.series;
+  if (!Array.isArray(series)) return [];
+  return series.flatMap((s, i) => {
+    const { type, layout, roam } = (s ?? {}) as Record<string, unknown>;
+    return type === "graph" && layout === "force" && roam === "move" ? [i] : [];
+  });
+}
+
+/**
+ * Zoom a force graph on Ctrl and the wheel, or a trackpad's pinch (which the
+ * browser reports as one), about the pointer, as the directed graph's inside
+ * zoom does; a plain wheel scrolls the page.
+ */
+function attachCtrlZoom(chart: echarts.ECharts): () => void {
+  const zr = chart.getZr();
+  const onWheel = (e: {
+    wheelDelta?: number;
+    offsetX?: number;
+    offsetY?: number;
+    event?: WheelEvent;
+  }) => {
+    if (!e.event?.ctrlKey || !e.wheelDelta) return;
+    const indices = ctrlZoomSeries(chart.getOption());
+    if (indices.length === 0) return;
+    e.event.preventDefault();
+    // ECharts' own steps: a mouse wheel's notch is larger than a trackpad's.
+    const delta = Math.abs(e.wheelDelta);
+    const factor = delta > 3 ? 1.4 : delta > 1 ? 1.2 : 1.1;
+    for (const seriesIndex of indices) {
+      chart.dispatchAction({
+        type: "graphRoam",
+        seriesIndex,
+        zoom: e.wheelDelta > 0 ? factor : 1 / factor,
+        originX: e.offsetX,
+        originY: e.offsetY,
+      });
+    }
+  };
+  zr.on("mousewheel", onWheel);
+  return () => zr.off("mousewheel", onWheel);
 }
 
 /** The fields of an ECharts click a datum needs, read defensively. */

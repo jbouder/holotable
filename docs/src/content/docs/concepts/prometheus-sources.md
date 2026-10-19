@@ -81,7 +81,8 @@ source of the other kind restarts its query from that source's starter.
 **`instant`** asks for one sample per series at the window's end instead of a
 range. It is for kinds that draw one value per series: a stat, a gauge, a
 table, a pie or donut, a status grid, a histogram, a treemap, a graph (where
-`sum by (caller, callee) (…)` is an edge list), and a bar compared across a
+`sum by (caller, callee) (…)` is an edge list), a Sankey (the same edge list,
+its value the volume), and a bar compared across a
 label. **`minStep`** is a
 floor on the step. The server picks the step and only ever raises it.
 

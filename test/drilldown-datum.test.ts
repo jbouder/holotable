@@ -230,6 +230,26 @@ const CASES: Record<VizType, Case> = {
       series: "orders",
     },
   },
+  sankey: {
+    panel: panel("sankey", {
+      options: { path: ["service", "route", "status"], value: "requests" },
+    }),
+    data: {
+      columns: ["service", "route", "status", "requests"],
+      rows: [
+        { service: "api", route: "/login", status: 200, requests: 4 },
+        { service: "web", route: "/login", status: 200, requests: 2 },
+        { service: "api", route: "/login", status: 500, requests: 1 },
+      ],
+    },
+    // A stage's node is one node whatever led to it: every 200 is one, its
+    // value all that reached it (#625).
+    click: { id: "2\u001f200" },
+    expect: {
+      row: { status: "200", node: "200", requests: 6, value: 6 },
+      series: "200",
+    },
+  },
   "status-grid": {
     panel: panel("status-grid", { options: { sort: "value" } }),
     data: BY_HOST,

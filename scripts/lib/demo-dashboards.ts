@@ -220,23 +220,31 @@ export function demoSpec() {
         layout: { x: 0, y: 6, w: 8, h: 4 },
       },
       {
-        id: "route-status",
-        title: "Requests by route and status",
+        id: "request-flow",
+        title: "Request flow",
         description:
-          "Each route, then its status codes: the failures are a thin outer slice.",
-        viz: "treemap",
+          "Where requests go: from each service to the routes it served, then to their status codes, each band as wide as its count over the window. The thin bands into 404 and 500 are the failures.",
+        viz: "sankey",
         query: {
           sourceId: "ts-metrics",
           timeField: "period",
-          sql: "SELECT time_bucket('5 minutes', ts) AS period, route, status, count(*) AS requests FROM http_requests WHERE service = ANY(:service) GROUP BY period, route, status ORDER BY period",
+          sql: "SELECT time_bucket('5 minutes', ts) AS period, service, route, status::text AS status, count(*) AS requests FROM http_requests WHERE service = ANY(:service) GROUP BY period, service, route, status ORDER BY period",
         },
         format: "number",
         options: {
-          variant: "sunburst",
-          path: ["route", "status"],
+          path: ["service", "route", "status"],
           value: "requests",
           compact: true,
         },
+        // A click on a service, or on a band leaving one, shows that service
+        // on this dashboard. A route or a status reads no `service`, so it
+        // offers nothing.
+        links: [
+          {
+            title: "Show this service",
+            set: { service: { column: "service" } },
+          },
+        ],
         layout: { x: 8, y: 6, w: 4, h: 4 },
       },
       {
