@@ -83,6 +83,7 @@ export default defineConfig({
       favicon: "/favicon.svg",
       components: {
         Header: "./src/components/Header.astro",
+        ThemeProvider: "./src/components/ThemeProvider.astro",
         ThemeSelect: "./src/components/ThemeSelect.astro",
         SocialIcons: "./src/components/SocialIcons.astro",
       },

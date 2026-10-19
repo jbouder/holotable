@@ -1,0 +1,32 @@
+---
+/**
+ * Starlight's ThemeProvider with the app's default: dark, not the system
+ * scheme (DEFAULT_THEME in src/lib/theme.ts). It keeps Starlight's storage
+ * contract, `starlight-theme` in localStorage with an empty string for system,
+ * so only a visitor who has stored nothing changes: they get dark. A stored
+ * light, dark or system choice is honored as before.
+ *
+ * Inline so it runs before first paint, with no flash of the wrong theme.
+ * ThemeSelect.astro reads the same key with the same fallback.
+ */
+---
+
+<script is:inline>
+	window.StarlightThemeProvider = (() => {
+		let storedTheme = null;
+		try {
+			storedTheme = localStorage.getItem('starlight-theme');
+		} catch {}
+		const theme =
+			storedTheme === null
+				? 'dark'
+				: storedTheme === 'light' || storedTheme === 'dark'
+					? storedTheme
+					: window.matchMedia('(prefers-color-scheme: light)').matches
+						? 'light'
+						: 'dark';
+		document.documentElement.dataset.theme = theme;
+		// Starlight's own picker calls this; ours (ThemeSelect.astro) does not.
+		return { updatePickers() {} };
+	})();
+</script>
