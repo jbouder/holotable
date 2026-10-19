@@ -606,6 +606,8 @@ jobs:
           # Four scrapes a minute is the shipped default; CI has no time for it.
           SELF_METRICS_INTERVAL_MS=5000
           SMOKE_TIMEOUT_MS=240000
+          # The opt-in files demo (#574), so the smoke runs it, through the app too.
+          SEED_DEMO_FILES=true
           EOF
 
       # No `--build`: the images above are already in the runner's Docker
@@ -613,10 +615,12 @@ jobs:
       # `--wait` holds until the app reports healthy, which is its own
       # liveness probe, so a server that exited on a bad configuration fails
       # here with its logs rather than 4 minutes later as a smoke timeout.
-      # With the `logs` profile, so Loki and Alloy hold the stack's own log
-      # lines for the third self-monitoring dashboard (#567).
+      # With every opt-in demo on: the `prometheus` profile for the PromQL
+      # self-monitoring dashboard (#390), the `logs` profile, so Loki and
+      # Alloy hold the stack's own log lines for Holotable logs (#567), and
+      # the files demo through SEED_DEMO_FILES in the .env above.
       - name: Bring the stack up
-        run: docker compose --profile logs up -d --wait app seed self-metrics prometheus loki alloy
+        run: docker compose --profile prometheus --profile logs up -d --wait app seed self-metrics prometheus loki alloy
 
       # The assertion: the three seeded self-monitoring dashboards answer with
       # rows, the SQL one from what the collector scraped out of the running
@@ -631,7 +635,7 @@ jobs:
 
       - name: Logs
         if: failure()
-        run: docker compose --profile logs logs --no-color --tail 200
+        run: docker compose --profile prometheus --profile logs logs --no-color --tail 200
 
       # The quick-start image with no flags at all (#600), as the docs tell
       # people to run it: local mode, so the visitor is the owner and can
@@ -641,7 +645,7 @@ jobs:
       # it, query it. The compose stack is down first, for the port.
       - name: Quick-start image
         run: |
-          docker compose --profile logs down --volumes --remove-orphans
+          docker compose --profile prometheus --profile logs down --volumes --remove-orphans
           docker run -d --name quickstart -p 3000:3000 "${IMAGE}:${TAG}-quickstart"
           for _ in $(seq 1 90); do
             status="$(docker inspect -f '{{.State.Health.Status}}' quickstart)"
@@ -659,7 +663,7 @@ jobs:
 
       - name: Tear down
         if: always()
-        run: docker compose --profile logs down --volumes --remove-orphans
+        run: docker compose --profile prometheus --profile logs down --volumes --remove-orphans
 
   # Publishes ghcr.io/<owner>/holotable (#250). Each target is built natively
   # on an amd64 and an arm64 runner and pushed by digest, then

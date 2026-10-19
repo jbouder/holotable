@@ -70,10 +70,15 @@ real data the app produced. It needs `METRICS_TOKEN` set to the same value the
 app has, or the scrape is refused with a 404. Under `docker compose` it runs on
 its own and the token has a local default;
 `docker compose --profile smoke run --rm smoke` then checks the whole path end
-to end. `docker compose --profile logs up` adds a Loki and a Grafana Alloy that
+to end. A default stack seeds four dashboards (Demo service health, Demo
+fleet, Demo host detail and Holotable self-monitoring); the ones that show off
+a source kind are opt-in. `docker compose --profile prometheus up` adds a
+Prometheus and the PromQL twin of the self-monitoring dashboard (#390);
+`docker compose --profile logs up` adds a Loki and a Grafana Alloy that
 ships the stack's container logs to it, and the seeder then registers the
-**Holotable logs** dashboard over the app's own JSON log lines (#567); the
-smoke checks that one too while `LOKI_SELF_URL` is set.
+**Holotable logs** dashboard over the app's own JSON log lines (#567); and
+`SEED_DEMO_FILES=true` seeds the **Demo files** DuckDB dashboard (#574). The
+smoke checks each one that is on.
 
 Authentication is OIDC-only for real users — there is no local or dev login
 path — so you need the Keycloak from `docker compose` (or your own realm) when

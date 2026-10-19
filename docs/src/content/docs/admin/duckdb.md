@@ -251,8 +251,8 @@ with them on, the server's mount is read-write. To keep the operator's files
 read-only all the same, mount the root read-only and a writable volume at
 `<root>/uploads` on top of it. The repository's `docker-compose.yml` mounts
 the [files demo](/operations/demo-data/#the-files-demo) volume read-write
-for the app, so uploads work there; the seeder writes `demo/` and the smoke
-test mounts it `:ro`.
+for the app, so uploads work there; the seeder writes `demo/` when the files
+demo is on and the smoke test mounts it `:ro`.
 
 Whatever else writes the files (a batch job, a sync from object storage) runs
 outside Holotable, with its own credentials.
@@ -301,18 +301,19 @@ dependencies `next build` traces; the tracer copies the binding's
 so `next.config.ts` adds it with `outputFileTracingIncludes`, for the glibc
 bindings only (#615). CI holds this twice: the Build job fails if
 `libduckdb.so` is missing from the standalone server, and the Compose smoke
-test runs a **Demo files** panel through the production image's own
+test, with the files demo on, runs a **Demo files** panel through the production image's own
 `POST /api/query` ([the smoke test](/operations/demo-data/#the-smoke-test)).
 The quick-start image installs its own dependencies on Alpine instead.
 **The quick-start image** sets
 `DUCKDB_SOURCES_DIR=/var/lib/holotable/files`, writable by its app user, and
 runs in [local mode](/admin/demo-mode/#local-mode), whose owner is a source
-admin, so **Upload files** works out of the box and the seeder writes the
+admin, so **Upload files** works out of the box, and with
+`-e SEED_DEMO_FILES=true` the seeder writes the
 [files demo](/operations/demo-data/#the-files-demo) under `demo/`. Keep uploads
 across runs with a volume at the root
 (`-v holotable-files:/var/lib/holotable/files`). To read a directory of your
 own as well, mount it read-only *under* the root, where the path picker offers
-it beside the files demo:
+it beside your uploads:
 `docker run -v "$PWD/files:/var/lib/holotable/files/mine:ro" …`.
 
 ## What is out of scope

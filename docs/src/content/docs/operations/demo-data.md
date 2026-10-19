@@ -6,51 +6,59 @@ sidebar:
 ---
 
 `npm run seed` (`scripts/seed.ts`) is a long-running seeder that gives a fresh
-install something to show. It does three things, and a fourth when there is a
-Loki to ask.
+install something to show. It does three things, and a fourth for each
+opt-in demo that is on.
 
 ## 1. Bootstrap, once
 
-It registers five demo sources and their demo dashboards in the `demo`
-workspace, if they do not already exist (the fifth only when
-`PROMETHEUS_SELF_URL` is set). Under `AUTH_MODE=local` they go to the local
-owner's workspace instead, the first `LOCAL_GROUPS` names (`local` by
-default), so the [quick start](/getting-started/quick-start/) opens on them
-([local mode](/admin/demo-mode/#local-mode)); the smoke test reads the same
-workspace. Four are TimescaleDB sources that point
-at the `metrics` schema and share the read-only `TS_METRICS` secret reference;
-they differ only in the tables they expose. The fifth is a Prometheus source:
-the compose stack's own Prometheus, which scrapes the app. A sixth, the
-`logs` profile's Loki, is registered by the loop once it answers (below).
+It registers four demo sources and the **four default dashboards** in the
+`demo` workspace, if they do not already exist. Under `AUTH_MODE=local` they
+go to the local owner's workspace instead, the first `LOCAL_GROUPS` names
+(`local` by default), so the [quick start](/getting-started/quick-start/)
+opens on them ([local mode](/admin/demo-mode/#local-mode)); the smoke test
+reads the same workspace. The four sources are TimescaleDB sources that point
+at the `metrics` schema and share the read-only `TS_METRICS` secret
+reference; they differ only in the tables they expose.
 
-| Source id | Table | Demo dashboard |
+| Source id | Table | Default dashboard |
 | --- | --- | --- |
 | `ts-metrics` | `metrics.http_requests` — per-request events; `metrics.service_calls` — calls between services, a minute a row | **Demo service health** |
 | `ts-system` | `metrics.system_metrics` — per-host infra metrics | **Demo fleet** and **Demo host detail** |
 | `ts-logs` | `metrics.app_logs` — gateway log lines | The logs on **Demo service health** and **Demo host detail** |
 | `holotable-self` | `metrics.holotable_self` — the app's own instruments | **Holotable self-monitoring**, below |
-| `prometheus-self` | Prometheus at `PROMETHEUS_SELF_URL` — the same instruments, scraped | **Holotable self-monitoring (Prometheus)**, below |
-| `loki-self` | Loki at `LOKI_SELF_URL` — the stack's container log lines, the app's among them | **Holotable logs**, below |
 
-Three demo dashboards each answer one question, and between them use every
-panel kind:
+A default install, `docker compose up` or the quick-start image, opens on
+those four and nothing else. Three more dashboards exist to show off a source
+kind, and each is **opt-in**: seeded only when its source is on, never
+pointing at a source that is not there.
+
+| Opt-in dashboard | Source | Turn it on |
+| --- | --- | --- |
+| **Holotable self-monitoring (Prometheus)** | `prometheus-self`, the Prometheus at `PROMETHEUS_SELF_URL` | `docker compose --profile prometheus up`. Registered once that Prometheus answers ([The Prometheus twin](#the-prometheus-twin)). |
+| **Holotable logs** | `loki-self`, the Loki at `LOKI_SELF_URL` | `docker compose --profile logs up`. Registered once that Loki answers ([The logs profile](#the-logs-profile)). |
+| **Demo files** | `duckdb-demo`, files under `DUCKDB_SOURCES_DIR` | `SEED_DEMO_FILES=true`, with `DUCKDB_SOURCES_DIR` set ([The files demo](#the-files-demo)). |
+
+The quick-start image has no Prometheus and no Loki, so of the three only the
+files demo can be turned on there (`-e SEED_DEMO_FILES=true`).
+
+The three default demo dashboards each answer one question, and with
+**Holotable self-monitoring** they use every panel kind, so a first look sees
+all of them:
 
 - **Demo service health**: is the API serving well? The 5xx error rate, p95
   latency and the share of requests over the 300 ms SLO as stats with
-  sparklines, availability as a gauge, requests per minute by outcome, the
-  request flow from service to route to status (a
-  [Sankey](/reference/panel-options/#sankey)), a service map of which service
-  calls which (a [graph](/reference/panel-options/#graph), drawn as a
-  directed graph), the latency band
-  against the SLO
-  (a [custom visual](/architecture/custom-visuals/)) beside the latency
-  histogram, the slowest routes, server errors by route, requests by service,
-  and the gateway's recent errors and warnings.
+  sparklines and availability as a gauge; then where requests go: a service
+  map of which service calls which (a [graph](/reference/panel-options/#graph),
+  drawn as a directed graph) beside the request flow from service to route to
+  status (a [Sankey](/reference/panel-options/#sankey)); then requests per
+  minute by outcome beside the latency band against the SLO (a [custom
+  visual](/architecture/custom-visuals/)); then the latency histogram, the
+  slowest routes and requests by service; and the gateway's recent errors and
+  warnings at the bottom.
 - **Demo fleet**: which hosts need attention, and why? Status grids of CPU and
-  disk now, CPU by host over time, memory as gauge bars, a CPU heatmap by host
-  and minute, the load-state timeline, network in as a region-then-host
-  treemap, CPU against memory as a scatter, every five-minute CPU reading as a
-  tick plot (a custom visual), and a table of hosts.
+  disk now, a CPU heatmap by host and minute beside memory as gauge bars, the
+  load-state timeline, network in as a region-then-host treemap beside CPU
+  against memory as a scatter, and a table of hosts.
 - **Demo host detail**: one host, picked with a `host` variable: its CPU,
   memory, disk and network, its own log lines and their levels, and the other
   hosts.
@@ -64,7 +72,7 @@ shows that service; a click on a store shows the service that calls it; the
 gateway, which is no one service, and the `redis` two services share offer
 nothing. A click on a service in the request flow, or on a band leaving one,
 shows that service too; a route or a status offers nothing. On **Demo fleet**, a click on a
-host anywhere (a tile, a line, a bar, a lane or a row of the hosts table)
+host anywhere (a tile, a bar, a lane or a row of the hosts table)
 opens **Demo host detail** for that host, and the heatmap has an *Open host
 detail* item in its panel menu. On **Demo files**, where the seeder writes it,
 a click on a host in the network topology opens **Demo host detail** for that
@@ -78,6 +86,16 @@ the current demo spec on the next start, as a new version noted *Updated by
 the demo seeder*. That is how an install seeded before the drilldown links
 gets them. Once a person saves one of these dashboards, the seeder leaves it
 alone.
+
+An opt-in dashboard that is off is retired the same way: the seeder deletes
+it while it still owns it, and tombstones its source once no live dashboard
+reads it. The files demo is retired on the next start without
+`SEED_DEMO_FILES=true`; the Prometheus and Loki ones at once when their URL
+is unset, and otherwise once their endpoint has not answered for three
+minutes, so an install upgraded with the profile off ends on the four
+defaults. Turned back on, the dashboard returns under the same id, so a link
+or a bookmark to it still works. One a person has saved is theirs, and stays,
+with its source.
 
 Earlier seeds wrote more demo dashboards (*Demo infrastructure*, *Demo fleet
 status*, *Demo fleet grid*, *Demo gateway logs* and *Demo custom visuals*),
@@ -121,11 +139,15 @@ of the service map. It connects with the privileged metrics
 user and ensures the demo hypertables exist first, so it also works against a
 database whose volume predates a table.
 
-With `LOKI_SELF_URL` set, the loop also asks that Loki's `/ready` every ten
-seconds until it answers, then registers the `loki-self` source and the
-**Holotable logs** dashboard, once. A stack without the `logs` profile has no
-Loki, so it never gets either, and a profile brought up later gets both within
-seconds. See [The logs profile](#the-logs-profile).
+With `PROMETHEUS_SELF_URL` or `LOKI_SELF_URL` set, the loop also asks that
+Prometheus's `/-/ready` or that Loki's `/ready` every ten seconds until it
+answers, then registers its source and dashboard (`prometheus-self` and
+**Holotable self-monitoring (Prometheus)**, or `loki-self` and **Holotable
+logs**), once. It asks once before the loop starts, too, so an endpoint
+already up has its source at once. A stack without the `prometheus` or `logs`
+profile has no such endpoint, so it never gets either, and a profile brought
+up later gets both within seconds. See [The Prometheus
+twin](#the-prometheus-twin) and [The logs profile](#the-logs-profile).
 
 ## Running it
 
@@ -147,14 +169,15 @@ database.
 | `SEED_INTERVAL_MS` | `2000` | Delay between insert batches (Docker dev override: `1000`). |
 | `SEED_DEMO` | — | Set to `false` to skip the one-time bootstrap and only stream metrics. |
 | `SEED_BACKFILL` | — | History to write before streaming: `30m`, `6h`, `1d`, at most `7d`. Unset writes none. An invalid value exits 1. |
+| `SEED_DEMO_FILES` | — | Set to `true` to write the files demo under `DUCKDB_SOURCES_DIR` and seed the **Demo files** source and dashboard. Unset, neither is seeded, and one an earlier seed wrote is retired. Smoke test too: with it, the smoke checks **Demo files**. |
 | `TS_METRICS_HOST` / `TS_METRICS_PORT` | `localhost` / `5432` | Host and port written into the seeded source configs. |
 | `POSTGRES_DB` | `holotable` | Database name written into the seeded source configs. |
-| `PROMETHEUS_SELF_URL` | — | Where the seeded `prometheus-self` source asks: `http://prometheus:9090` in compose, `http://localhost:9090` in `.env.example`. Unset, the Prometheus source and its dashboard are not seeded, as in the quick-start image. The app reaches it only if `SOURCE_URL_ALLOWLIST` names its host. Smoke test too: set, it checks the PromQL self-monitoring dashboard; unset, it skips it. |
+| `PROMETHEUS_SELF_URL` | — | Where the seeded `prometheus-self` source asks, once it answers: `http://prometheus:9090` in compose, which only the `prometheus` profile runs, `http://localhost:9090` in `.env.example`. Unset, the Prometheus source and its dashboard are not seeded, as in the quick-start image. The app reaches it only if `SOURCE_URL_ALLOWLIST` names its host. Smoke test too: set, it checks the PromQL self-monitoring dashboard; empty, it skips it. |
 | `LOKI_SELF_URL` | — | Where the seeded `loki-self` source asks, once it answers: `http://loki:3100` in compose, `http://localhost:3100` in `.env.example`. Unset, the Loki source and the Holotable logs dashboard are not seeded, as in the quick-start image. Smoke test too: set, it checks the Holotable logs dashboard; empty, it skips it. |
 | `SELF_METRICS_INTERVAL_MS` | `15000` | Collector only: delay between scrapes of `/api/metrics`. |
 | `METRICS_URL` | `http://app:3000/api/metrics` | Collector only: what to scrape. |
 | `SMOKE_TIMEOUT_MS` | `180000` | Smoke test only: how long to wait for the first panel with rows. |
-| `SMOKE_APP_URL` | — | Smoke test only: where the app answers (`http://app:3000` in compose). Set, one **Demo files** panel also runs through the app's own `POST /api/query`. |
+| `SMOKE_APP_URL` | — | Smoke test only: where the app answers (`http://app:3000` in compose). Set, with the files demo on, one **Demo files** panel also runs through the app's own `POST /api/query`. |
 
 :::caution
 The seeder is for demos and local development. It uses a **privileged**
@@ -189,8 +212,8 @@ via the source's `secret_ref`.
 
 ## The self-monitoring demo
 
-The first two demo sources show the mechanism on synthetic rows. The third shows
-the point: Holotable watching itself.
+The first three demo sources show the mechanism on synthetic rows. The fourth
+shows the point: Holotable watching itself.
 
 `scripts/self-metrics.ts` scrapes the app's own `GET /api/metrics` every
 `SELF_METRICS_INTERVAL_MS` and lands one row per series per scrape in the
@@ -211,8 +234,10 @@ collector is: a loop, a text-format parser
 
 ### The Prometheus twin
 
-The compose stack also runs Prometheus, which scrapes the same `/api/metrics`
-every 15 seconds. The seeder registers it as `prometheus-self`, a
+With the `prometheus` profile (`docker compose --profile prometheus up`), the
+compose stack also runs Prometheus, which scrapes the same `/api/metrics`
+every 15 seconds. The seeder registers it, once it answers, as
+`prometheus-self`, a
 [Prometheus source](/concepts/prometheus-sources/) with `auth: none` at
 `PROMETHEUS_SELF_URL` (`http://prometheus:9090` inside the stack,
 `http://localhost:9090` from the host), and the app reaches it because
@@ -233,8 +258,8 @@ app  ◀──scrape──  prometheus  ◀──query_range──  prometheus-s
 
 ### The logs profile
 
-The SQL and PromQL dashboards read what the app counts. The third reads what
-it says. `docker compose --profile logs up` adds two services:
+The self-monitoring dashboards read what the app counts. The logs profile's
+reads what it says. `docker compose --profile logs up` adds two services:
 
 - **Loki** (`grafana/loki`, single binary, no volume), published on `3100`.
 - **Grafana Alloy** (`grafana/alloy`), which lists this compose project's
@@ -267,8 +292,7 @@ app  ──stdout──▶  alloy  ──push──▶  loki  ◀──query_ran
 An idle stack has lines from boot (the configuration report) and few after:
 `/api/health` and `/api/metrics` log at `debug`. Open a dashboard, or ask for
 something that fails, and the request panels fill. The [quick-start
-image](/getting-started/quick-start/) stays TimescaleDB-only and has none of
-this, as it has no Prometheus.
+image](/getting-started/quick-start/) has no Loki, and so none of this.
 
 ### The table
 
@@ -314,16 +338,19 @@ seeder, which is what lets `npm test` hold them to the contract:
 docker compose --profile smoke run --rm smoke
 ```
 
-`scripts/smoke.ts` waits for the seeder, the collector, Prometheus and Loki,
-then runs every panel of the three self-monitoring dashboards and **Demo
-service health** through the source kind's check, plan and execute: the same
-functions in the same order as `POST /api/query`. It fails unless at least one
-panel of each comes back with rows, which can only happen if the collector and
-Prometheus really scraped the running app, and Alloy really shipped its lines
-to Loki. The Holotable logs dashboard is checked while `LOKI_SELF_URL` is set,
-which compose does by default, so bring the stack up with `--profile logs`
-first (`LOKI_SELF_URL= docker compose --profile smoke run --rm smoke` smokes a
-stack without it).
+`scripts/smoke.ts` waits for the seeder and the collector, then runs every
+panel of **Holotable self-monitoring** and **Demo service health**, and of
+each opt-in dashboard that is on, through the source kind's check, plan and
+execute: the same functions in the same order as `POST /api/query`. It fails
+unless at least one panel of each comes back with rows, which can only happen
+if the collector really scraped the running app (and, for the opt-in ones,
+Prometheus scraped it, Alloy shipped its lines to Loki, the seeder wrote the
+files). The PromQL dashboard is checked while `PROMETHEUS_SELF_URL` is set,
+and Holotable logs while `LOKI_SELF_URL` is, which compose does by default,
+so bring the stack up with `--profile prometheus --profile logs` first, or
+empty them to smoke a stack without
+(`PROMETHEUS_SELF_URL= LOKI_SELF_URL= docker compose --profile smoke run --rm smoke`).
+**Demo files** is checked with `SEED_DEMO_FILES=true`. CI turns all three on.
 
 It asserts "at least one" because an idle stack has nobody viewing a dashboard,
 so there are no pollers, no live viewers, and no model calls; resident memory is
@@ -333,8 +360,8 @@ browser session.
 
 Those functions run in the smoke container, which has every dependency
 installed; the app's image has only what `next build` traced. So, with
-`SMOKE_APP_URL` set (compose sets it), the smoke test also sends one
-**Demo files** panel to the app's own `POST /api/query` and fails unless it
+`SMOKE_APP_URL` set (compose sets it) and the files demo on, the smoke test
+also sends one **Demo files** panel to the app's own `POST /api/query` and fails unless it
 answers with rows. It signs that request with a
 [service-account token](/integrations/api-tokens/) it creates in the database for the
 purpose, an editor of the seeded workspace for ten minutes, and revokes it
@@ -344,11 +371,14 @@ native, and a runtime image missing part of it answers every DuckDB source
 
 ## The files demo
 
-With `DUCKDB_SOURCES_DIR` set, the seeder also shows a
-[DuckDB source](/concepts/duckdb-sources/): data that lives in files rather
-than in a database. Docker Compose and the quick-start image set it
-([#600](https://github.com/jbouder/holotable/issues/600)). Before anything
-else, the seeder writes five files under `<DUCKDB_SOURCES_DIR>/demo/` with the binding itself
+With `SEED_DEMO_FILES=true` and `DUCKDB_SOURCES_DIR` set, the seeder also
+shows a [DuckDB source](/concepts/duckdb-sources/): data that lives in files
+rather than in a database. Docker Compose and the quick-start image set the
+directory, for [uploads](/admin/duckdb/#uploads)
+([#600](https://github.com/jbouder/holotable/issues/600)), so
+`SEED_DEMO_FILES=true docker compose up` or
+`docker run -e SEED_DEMO_FILES=true …` turns it on. Before anything else, the
+seeder writes five files under `<DUCKDB_SOURCES_DIR>/demo/` with the binding itself
 (`scripts/lib/demo-files.ts`), so nothing binary is ever committed:
 
 | File | Table | What it holds |
@@ -377,15 +407,16 @@ forward without the history changing under a dashboard. The app's engine reads
 the new file on its next query, with no refresh needed.
 
 In Compose, the files are a named volume, `duckdb-files`, mounted at
-`/data/duckdb`. The seeder mounts it read-write and writes `demo/`. The app
+`/data/duckdb`. The seeder mounts it read-write and writes `demo/` when the files demo is on. The app
 mounts it read-write too, because it writes `uploads/`, the CSV and JSON files source
 admins [upload from the browser](/admin/duckdb/#uploads); the smoke test
 mounts it **read-only**. For
 the host loop (`npm run seed` with `npm run dev`), point
 `DUCKDB_SOURCES_DIR` at an absolute path, such as this checkout's
-`data/duckdb`, which is gitignored, and give the app the same value.
+`data/duckdb`, which is gitignored, give the app the same value, and set
+`SEED_DEMO_FILES=true` for the seeder.
 
-The [smoke test](#the-smoke-test) runs **Demo files** too, through the DuckDB
+With it on, the [smoke test](#the-smoke-test) runs **Demo files** too, through the DuckDB
 kind's check, plan and execute, and fails unless one of its panels comes back
 with rows, both in its own process and through the app. `npm test` holds the spec to the IR and the SQL guard against the
 seeded catalog, and the end-to-end suite opens the dashboard and waits for its

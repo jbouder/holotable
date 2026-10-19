@@ -201,5 +201,6 @@ A drilldown can read a clicked line's label or a series' label with
 
 `docker compose --profile logs up` adds a Loki and a Grafana Alloy that ships
 every compose container's log lines to it. The seeder registers that Loki as
-`loki-self` and seeds the **Holotable logs** dashboard, which reads the app's
+`loki-self` once it answers and seeds the **Holotable logs** dashboard,
+which reads the app's
 own JSON log lines. See [Demo data](/operations/demo-data/#the-logs-profile).

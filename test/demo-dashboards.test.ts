@@ -12,6 +12,7 @@ import type { CatalogTable, SqlSourceConfig } from "@/lib/registry";
 import { validateSql } from "@/lib/sql/safety";
 import { compileVegaLite } from "@/lib/vega/compile";
 import { PANEL_KIND_NAMES } from "@/lib/panels/registry";
+import { selfMonitoringSpec } from "@/lib/self-monitoring/dashboard";
 import {
   type DemoLinkTargets,
   demoSpec,
@@ -267,21 +268,23 @@ test("every custom visual on a demo dashboard compiles (#405)", async () => {
   const visuals = Object.values(SPECS).flatMap((spec) =>
     spec.panels.filter((panel) => panel.viz === "vega"),
   );
-  assert.ok(visuals.length >= 2, "the demo shows custom visuals");
+  assert.ok(visuals.length >= 1, "the demo shows a custom visual");
   for (const panel of visuals) {
     const result = await compileVegaLite((panel.options as { spec: unknown }).spec);
     assert.ok(result.ok, `${panel.id}: ${result.ok ? "" : result.error}`);
   }
 });
 
-test("between them, the demo dashboards show every panel kind", () => {
-  const used = new Set(
-    Object.values(SPECS).flatMap((spec) => spec.panels.map((p) => p.viz)),
-  );
+test("between them, the four default dashboards show every panel kind", () => {
+  // What a default install opens on: the files demo, like the PromQL and
+  // LogQL self-monitoring, is opt-in, so a kind shown only there is a kind a
+  // first look never sees.
+  const defaults = [SPECS.demo, SPECS.fleet, SPECS.hostDetail, selfMonitoringSpec()];
+  const used = new Set(defaults.flatMap((spec) => spec.panels.map((p) => p.viz)));
   assert.deepEqual(
     PANEL_KIND_NAMES.filter((kind) => !used.has(kind)),
     [],
-    "add a panel of each missing kind to a demo dashboard",
+    "add a panel of each missing kind to a default demo dashboard",
   );
 });
 

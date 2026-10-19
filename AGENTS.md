@@ -351,7 +351,7 @@ npm run migrate:verify   # after adding a migration: round-trips every one on a 
 npm run config:check     # after adding an environment variable
 npm run eval             # after a prompt change: grades recorded generations (--live --record re-records)
 npm run fixture:capture  # adds a stored spec to the IR fixture library
-npm run smoke            # checks both self-monitoring dashboards end to end
+npm run smoke            # checks the seeded dashboards end to end, and each opt-in one that is on
 npm run load:stream      # many viewers of one dashboard stream, some stalled (against dev:demo)
 ```
 

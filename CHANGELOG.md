@@ -43,6 +43,21 @@ says how a section gets here.
   the loop. Nodes and bands are datums for links. On Demo service health a
   request-flow Sankey replaces the route-then-status sunburst.
 
+### Changed
+
+- **Four default dashboards.** A default install (`docker compose up` or the
+  quick-start image) now seeds exactly four: Demo service health, Demo fleet,
+  Demo host detail and Holotable self-monitoring, which between them still
+  show every panel kind. The dashboards that show off a source kind are
+  opt-in and seeded only when their source is on: the PromQL self-monitoring
+  with the new compose `prometheus` profile, Holotable logs with the `logs`
+  profile, and Demo files with `SEED_DEMO_FILES=true`. On an upgraded
+  install the seeder retires an opt-in dashboard that is off while it still
+  owns it, and restores it under the same id when turned back on. Demo
+  service health puts the service map and the request flow under its stats
+  and drops the server-errors-by-route bar; Demo fleet drops the CPU line and
+  the CPU tick plot, which repeated its heatmap.
+
 ## 0.2.0 — 2026-10-11
 
 Two milestones since 0.1.0: scale and render (M17, #484), which closes the

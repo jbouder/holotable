@@ -90,23 +90,26 @@ for (const theme of THEMES) {
       await expect(
         page.getByRole("img", { name: /^Service map, graph chart\./ }),
       ).toBeVisible();
+      // And the custom visual, named by its panel, not by Vega's own label (#405).
+      await expect(
+        page.getByRole("img", {
+          name: /^Latency, p5 to p95, against the SLO, vega chart/,
+        }),
+      ).toBeVisible();
       await expectNoA11yViolations(page);
       await cut.click();
       await expect(page.getByText(/MAX_WINDOW_POINTS rows/)).toBeVisible();
       await expectNoA11yViolations(page);
     });
 
-    test("the fleet demo: every kind of chart, a custom visual among them", async ({
+    test("the fleet demo: status grids, heatmap, timeline, treemap and scatter", async ({
       page,
       request,
     }) => {
       await page.goto(`/dashboards/${await dashboardId(request, "Demo fleet")}`);
       await waitForPanels(page);
-      // The custom visual is named by its panel, not by Vega's own label (#405).
       await expect(
-        page.getByRole("img", {
-          name: /^Every 5-minute CPU reading, per host, vega chart/,
-        }),
+        page.getByRole("img", { name: /^CPU heat, by host and minute, heatmap chart/ }),
       ).toBeVisible();
       await expectNoA11yViolations(page);
     });
