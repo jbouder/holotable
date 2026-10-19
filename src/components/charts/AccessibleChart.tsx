@@ -12,7 +12,9 @@ import {
 import { datumOf, datumOfRow } from "@/lib/drilldown-datum";
 import { useTimeDisplay } from "@/components/time-display";
 import type { Panel } from "@/lib/ir";
-import { chartDescription, chartTable } from "@/lib/panel-reading";
+import type { Datum } from "@/lib/drilldown";
+import { type ChartRows, chartDescription, chartTable } from "@/lib/panel-reading";
+import type { TimeDisplay } from "@/lib/time-display";
 import { cn } from "@/lib/utils";
 
 /**
@@ -27,13 +29,17 @@ import { cn } from "@/lib/utils";
 export function AccessibleChart({
   panel,
   data,
+  table: readTable,
   ...chart
-}: { panel: Panel; data: PanelData } & Omit<
-  React.ComponentProps<typeof EChart>,
-  "description"
->) {
+}: {
+  panel: Panel;
+  data: PanelData;
+  /** The kind's own table, where its marks are not one per row (#623). */
+  table?: (panel: Panel, data: PanelData, display: TimeDisplay) => ChartRows;
+} & Omit<React.ComponentProps<typeof EChart>, "description">) {
   const display = useTimeDisplay();
-  const table = chartTable(panel, data, display);
+  const own = readTable?.(panel, data, display);
+  const table = own ?? chartTable(panel, data, display);
   // Datum links (#373): a click on a point follows them, and each row of the
   // table below offers the same, so a keyboard reaches whatever a mouse can.
   const links = useDatumLinks();
@@ -110,6 +116,7 @@ export function AccessibleChart({
                         panel={panel}
                         data={data}
                         index={offset + i}
+                        datum={own?.datums[i]}
                         label={row[0] ?? ""}
                       />
                     </td>
@@ -128,13 +135,16 @@ function RowLinks({
   panel,
   data,
   index,
+  datum: own,
   label,
 }: {
   panel: Panel;
   data: PanelData;
   index: number;
+  /** The row's datum, when the kind's own table says it (#623). */
+  datum?: Datum | null;
   label: string;
 }) {
-  const datum = datumOfRow(panel, data, index);
+  const datum = own !== undefined ? own : datumOfRow(panel, data, index);
   return datum ? <DatumLinksControl datum={datum} label={label || panel.title} /> : null;
 }

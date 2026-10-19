@@ -9,7 +9,10 @@ Every panel kind is a decision made at build time: a module in the panel
 registry, its renderer, its tests. That keeps each kind safe and consistent,
 and it means a view the registry does not have waits for a release. A custom
 visual is the escape hatch for that long tail: a slope chart, a band with a
-rule, small multiples, a dot plot. It is being built in phases under
+rule, small multiples, a dot plot. Tree and graph layouts are not in that
+tail: Vega-Lite has none (they are full Vega transforms this path does not
+expose), so they are a kind, `graph`
+([#623](https://github.com/jbouder/holotable/issues/623)). It is being built in phases under
 [#405](https://github.com/jbouder/holotable/issues/405). This page records
 the decision and what the first phase measured.
 

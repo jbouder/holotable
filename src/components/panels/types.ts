@@ -2,6 +2,8 @@ import type * as React from "react";
 import type { EChartHandle } from "@/components/charts/EChart";
 import type { ChartOptionBuilder, PanelData } from "@/components/charts/options";
 import type { Panel } from "@/lib/ir";
+import type { ChartRows } from "@/lib/panel-reading";
+import type { TimeDisplay } from "@/lib/time-display";
 
 /**
  * How a panel kind is drawn: the browser half of the panel registry (#61).
@@ -25,6 +27,17 @@ export type PanelRenderer =
        * never change it, so they still merge (invariant 11).
        */
       shape?: (panel: Panel) => string;
+      /**
+       * Why these rows cannot be drawn, naming what is wrong (#623): a graph
+       * whose rows are not a tree. The panel shows it in the shared error
+       * state rather than drawing the rows wrongly.
+       */
+      problem?: (panel: Panel, data: PanelData) => string | undefined;
+      /**
+       * The kind's own screen-reader table (#77), where its marks are not one
+       * per row (a graph's edges); by default the rows as they came.
+       */
+      table?: (panel: Panel, data: PanelData, display: TimeDisplay) => ChartRows;
     }
   | { type: "html"; Body: React.ComponentType<PanelBodyProps> }
   | { type: "view"; Body: React.ComponentType<PanelViewProps> };

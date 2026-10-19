@@ -173,6 +173,17 @@ export const OPTION_GROUPS = {
   thresholds: ["thresholds"],
   stat: ["value", "sparkline"],
   table: ["columns", "sort"],
+  graph: [
+    "layout",
+    "orient",
+    "source",
+    "target",
+    "value",
+    "group",
+    "collapseDepth",
+    "symbol",
+    "symbolSize",
+  ],
 } as const satisfies Record<string, readonly string[]>;
 export type OptionGroup = keyof typeof OPTION_GROUPS;
 

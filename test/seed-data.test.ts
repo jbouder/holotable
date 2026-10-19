@@ -11,8 +11,13 @@ import {
   httpRequestRows,
   parseBackfill,
   requestLatency,
+  SERVICE_CALLS,
+  serviceCallRows,
   systemMetricRows,
 } from "../scripts/lib/seed-data";
+import { graphNodes, graphTree } from "@/components/charts/graph";
+import { parseDashboard } from "@/lib/ir";
+import { demoSpec } from "../scripts/lib/demo-dashboards";
 
 const NOW = Date.UTC(2026, 9, 4, 12);
 const HOUR = 3_600_000;
@@ -202,4 +207,35 @@ test("log lines cover every level, each with a route and a request id", () => {
   }
   const errors = lines.filter((l) => l.level === "error").length / lines.length;
   assert.ok(errors > 0.01 && errors < 0.1, `errors ${errors}`);
+});
+
+test("the service map is a tree the demo's graph panel draws, every edge every minute (#623)", () => {
+  const random = seeded(7);
+  const rows = Array.from({ length: 12 }, (_, i) =>
+    serviceCallRows(NOW + i * 60_000, random),
+  ).flat();
+  assert.equal(rows.length, 12 * SERVICE_CALLS.length);
+  for (const row of rows) {
+    assert.ok(row.requests > 0 && row.errors >= 0 && row.errors < row.requests);
+    assert.ok(row.p95_ms > 0);
+  }
+  const panel = parseDashboard(demoSpec()).panels.find((p) => p.id === "service-map");
+  assert.ok(panel);
+  const tree = graphTree(panel, {
+    columns: ["period", "caller", "callee", "tier", "requests"],
+    rows: rows.map(({ ts, caller, callee, tier, requests }) => ({
+      period: ts.toISOString(),
+      caller,
+      callee,
+      tier,
+      requests,
+    })),
+  });
+  assert.equal(tree.problem, undefined);
+  assert.deepEqual(
+    tree.roots.map((r) => r.name),
+    ["gateway"],
+  );
+  assert.equal(graphNodes(tree).length, SERVICE_CALLS.length + 1);
+  assert.deepEqual(tree.groups, ["service", "store"]);
 });

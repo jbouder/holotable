@@ -303,8 +303,8 @@ module under `src/lib/panels/kinds/` that says, in plain data:
 | `check` | A server-side check of the options beyond their schema, run wherever a dashboard is saved. A custom visual's spec must compile. |
 
 How a kind is drawn is the browser half, `PANEL_RENDERERS` in
-`src/components/panels/registry.ts`: `{ type: "chart", option, shape? }`,
-an ECharts option builder; `{ type: "html", Body }`, a component; or
+`src/components/panels/registry.ts`: `{ type: "chart", option, shape?,
+problem?, table? }`, an ECharts option builder; `{ type: "html", Body }`, a component; or
 `{ type: "view", Body }`, a component that draws its own image and is handed
 the PNG export handle a chart is (a custom visual). An option
 builder is given the rows and a context: the viewer's time display, and the
@@ -312,7 +312,11 @@ window the server resolved for the rows (sent with every `tick`, and returned
 by `/api/query`), so a chart that runs to "now" ends where the server's window
 does. `shape` names a layout of the kind, such as a gauge's dial or bars.
 `PanelView` keys the chart by it, so switching layouts remounts the chart.
-Data updates never change it, so they still merge (invariant 11). It is kept
+Data updates never change it, so they still merge (invariant 11). `problem`
+says why a result cannot be drawn, naming what is wrong (a graph whose rows
+are not a tree, #623), and the panel shows it in the shared error state
+instead of the chart; `table` is the kind's own screen-reader table where its
+marks are not one per row (a graph's edges). It is kept
 apart because `src/lib/ir.ts` imports the registry, and the server and the
 prompt must not pull React in with it. The renderer map is typed as
 `Record<VizType, PanelRenderer>`, so a kind registered without a renderer does
@@ -324,7 +328,8 @@ Adding a kind is therefore:
 2. its renderer (an option builder, or a component under
    `src/components/panels/`) and one line in `PANEL_RENDERERS`.
 3. if its option builder uses an ECharts series or component no other kind
-   does, one line in `src/components/charts/echarts.ts`. That module loads
+   does, one line in `src/components/charts/echarts.ts` (the graph's
+   `TreeChart`, #623, is one). That module loads
    `echarts/core` with only what the panels draw (#488), and it is the only
    one that imports ECharts at runtime (`test/echarts-runtime.test.ts`). A
    missing registration draws nothing in production and warns only in

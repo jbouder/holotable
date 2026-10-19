@@ -63,6 +63,7 @@ test("every kind there was before the registry is still registered, in the same 
     "histogram",
     "logs",
     "treemap",
+    "graph",
     "vega",
     "text",
   ]);

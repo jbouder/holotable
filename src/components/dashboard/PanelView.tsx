@@ -476,6 +476,12 @@ function PanelContent({
   if (renderer.type === "view") {
     return <renderer.Body panel={panel} data={data} handle={chartRef} />;
   }
+  // Rows the kind cannot draw (a graph that is not a tree, #623) are said in
+  // the shared error state, naming what is wrong, rather than drawn wrongly.
+  const problem = renderer.problem?.(panel, data);
+  if (problem) {
+    return <ErrorDisplay layout="block" error={{ error: problem, kind: "statement" }} />;
+  }
   return (
     // Shaped like the panel while ECharts arrives (#497); a page loads it once.
     <React.Suspense fallback={<PanelSkeleton viz={panel.viz} />}>
@@ -486,6 +492,7 @@ function PanelContent({
         // a data update never changes this, so it still merges (invariant 11).
         key={`${panel.viz}:${renderer.shape?.(panel) ?? ""}`}
         ref={chartRef}
+        table={renderer.table}
         option={renderer.option(panel, data, {
           display,
           theme,

@@ -1,0 +1,88 @@
+{
+  "specVersion": 1,
+  "title": "Who calls whom",
+  "timeRange": {
+    "from": "now-1h",
+    "to": "now"
+  },
+  "refreshIntervalMs": 30000,
+  "panels": [
+    {
+      "id": "service-map",
+      "title": "Service map",
+      "viz": "graph",
+      "format": "number",
+      "query": {
+        "sourceId": "ts-service-calls",
+        "timeField": "period",
+        "sql": "SELECT time_bucket('5 minutes', ts) AS period, caller, callee, tier, sum(requests) AS requests FROM service_calls GROUP BY period, caller, callee, tier ORDER BY period"
+      },
+      "options": {
+        "layout": "tree",
+        "orient": "LR",
+        "source": "caller",
+        "target": "callee",
+        "value": "requests",
+        "group": "tier",
+        "symbol": "loadBalancer",
+        "symbols": {
+          "service": "server",
+          "store": "database"
+        },
+        "symbolSize": 20,
+        "collapseDepth": 2,
+        "compact": true
+      },
+      "layout": {
+        "x": 0,
+        "y": 0,
+        "w": 12,
+        "h": 4
+      }
+    },
+    {
+      "id": "jobs",
+      "title": "Request rate by job and instance",
+      "viz": "graph",
+      "query": {
+        "sourceId": "prom-metrics",
+        "promql": "sum by (job, instance) (rate(http_requests_total[5m]))",
+        "instant": true
+      },
+      "options": {
+        "orient": "radial",
+        "source": "job",
+        "target": "instance",
+        "value": "value",
+        "unit": "/s",
+        "decimals": 1
+      },
+      "layout": {
+        "x": 0,
+        "y": 4,
+        "w": 6,
+        "h": 4
+      }
+    },
+    {
+      "id": "callers",
+      "title": "Callers by tier",
+      "viz": "graph",
+      "query": {
+        "sourceId": "ts-service-calls",
+        "sql": "SELECT tier, caller, callee FROM service_calls GROUP BY tier, caller, callee"
+      },
+      "options": {
+        "orient": "TB",
+        "path": ["tier", "caller", "callee"],
+        "symbol": "roundRect"
+      },
+      "layout": {
+        "x": 6,
+        "y": 4,
+        "w": 6,
+        "h": 4
+      }
+    }
+  ]
+}

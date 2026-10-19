@@ -71,6 +71,7 @@ test("every chart kind is covered", () => {
       "state-timeline",
       "histogram",
       "treemap",
+      "graph",
     ],
   );
 });

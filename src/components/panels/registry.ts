@@ -9,6 +9,12 @@ import {
   scatterChart,
 } from "@/components/charts/options";
 import { gaugeChart, gaugeShape } from "@/components/charts/gauge";
+import {
+  graphChart,
+  graphProblem,
+  graphShape,
+  graphTable,
+} from "@/components/charts/graph";
 import { histogramChart, histogramShape } from "@/components/charts/histogram";
 import { treemapChart, treemapShape } from "@/components/charts/treemap";
 import {
@@ -52,6 +58,13 @@ export const PANEL_RENDERERS = {
   histogram: { type: "chart", option: histogramChart, shape: histogramShape },
   logs: { type: "html", Body: LogsView },
   treemap: { type: "chart", option: treemapChart, shape: treemapShape },
+  graph: {
+    type: "chart",
+    option: graphChart,
+    shape: graphShape,
+    problem: graphProblem,
+    table: graphTable,
+  },
   vega: { type: "view", Body: VegaView },
   text: { type: "html", Body: TextView },
 } as const satisfies Record<VizType, PanelRenderer>;

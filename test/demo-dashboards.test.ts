@@ -76,7 +76,23 @@ const APP_LOGS: CatalogTable = {
   ],
 };
 
-function source(table: CatalogTable): SqlSourceConfig {
+const SERVICE_CALLS: CatalogTable = {
+  name: "service_calls",
+  description:
+    "calls between services, one row per caller and callee a minute (the service map)",
+  timeField: "ts",
+  columns: [
+    { name: "ts", type: "timestamp with time zone" },
+    { name: "caller", type: "text" },
+    { name: "callee", type: "text" },
+    { name: "tier", type: "text", description: "service or store" },
+    { name: "requests", type: "integer" },
+    { name: "errors", type: "integer" },
+    { name: "p95_ms", type: "double precision" },
+  ],
+};
+
+function source(...tables: CatalogTable[]): SqlSourceConfig {
   return {
     kind: "timescaledb",
     host: "localhost",
@@ -84,12 +100,12 @@ function source(table: CatalogTable): SqlSourceConfig {
     database: "holotable",
     schema: "metrics",
     ssl: false,
-    tables: [table],
+    tables,
   };
 }
 
 const SOURCES: Record<string, SqlSourceConfig> = {
-  "ts-metrics": source(HTTP_REQUESTS),
+  "ts-metrics": source(HTTP_REQUESTS, SERVICE_CALLS),
   "ts-system": source(SYSTEM_METRICS),
   "ts-logs": source(APP_LOGS),
   // The files demo (#574): the catalog the seeder registers, which is what

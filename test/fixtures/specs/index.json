@@ -88,5 +88,10 @@
     "authoredAt": 1,
     "digest": "3027de6925553d281dbf2853cfab61bf4d3631d0e48d8d5d1c996021589e1223",
     "origin": "committed (#567): dashboard \"Holotable logs\", the LogQL self-monitoring demo the seeder stores"
+  },
+  "v1-graph.json": {
+    "authoredAt": 1,
+    "digest": "c6723de3ea3aad87d27eba5135863ad44e73dd7f092eef3b4cd57db09bbf748f",
+    "origin": "hand-written (#623): a SQL service map from edge rows with icons by tier, a PromQL radial tree from an instant query, and a top-to-bottom tree from path columns"
   }
 }

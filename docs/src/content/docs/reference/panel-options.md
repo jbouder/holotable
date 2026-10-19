@@ -24,7 +24,7 @@ They resolve through the same OKLCH values as the theme (invariant 13).
 ### Numbers
 
 Taken by `line`, `area`, `bar`, `stat`, `pie`, `donut`, `gauge`,
-`status-grid`, `histogram` and `treemap`, and by each
+`status-grid`, `histogram`, `treemap` and `graph`, and by each
 entry of a table's `columns`.
 
 | Option | Type | Default | Meaning |
@@ -337,6 +337,81 @@ What a whole is made of, level by level
     "sql": "SELECT time_bucket('5 minutes', ts) AS period, region, host, sum(net_in_bytes) AS bytes FROM system_metrics GROUP BY period, region, host ORDER BY period"
   },
   "options": { "path": ["region", "host"], "value": "bytes" }
+}
+```
+
+## `graph`
+
+What points at what, drawn as a tree: a service and what it calls, a schema's
+tables and columns, a folder tree
+([#623](https://github.com/jbouder/holotable/issues/623)).
+
+| Option | Type | Default | Meaning |
+| --- | --- | --- | --- |
+| `layout` | `"tree"` | `"tree"` | How the graph is drawn. The directed-graph, force and Sankey layouts join it on the same options. |
+| `orient` | `"LR"` \| `"TB"` \| `"RL"` \| `"BT"` \| `"radial"` | `"LR"` | Which way the tree grows: left to right, top to bottom, right to left, bottom to top, or out from its root. |
+| `source` | column name | the first text column | An edge row's parent. |
+| `target` | column name | the second text column | An edge row's child. |
+| `value` | column name | none | A number shown on each node: its incoming edge's, summed over rows; a root shows what leaves it. |
+| `group` | column name | none | A text column that colors each edge's target by category, and picks its symbol from `symbols`. |
+| `path` | 1 to 8 column names | none | The levels, top first, one row per leaf, as a treemap takes them. Read instead of `source` and `target`. |
+| `collapseDepth` | integer, 1 to 32 | every level | Levels open at first draw. |
+| `symbol` | a symbol, below | `"circle"` | Every node's symbol, unless `symbols` names its group's. |
+| `symbols` | `{ group value: symbol }` | none | A symbol per group value, which beats `symbol`: `{ "service": "server", "store": "database" }`. At most 32. |
+| `symbolSize` | number, 6 to 48 | 10 for a shape, 24 for an icon | The symbol's size in pixels. |
+| `decimals`, `unit`, `compact` | see [Numbers](#numbers) | none | How a value is written on a node and in its tooltip, with `panel.format`. |
+
+A symbol is one of ECharts' shapes, `circle`, `rect`, `roundRect`, `triangle`,
+`diamond`, `pin` and `arrow`, or one of Holotable's network-diagram icons,
+`server`, `database`, `cloud`, `router`, `switch`, `firewall`, `loadBalancer`,
+`queue`, `cache`, `storage`, `user` and `service`. An icon is a path Holotable
+ships, filled with the node's chart color; a spec names one and never carries
+a `path://` or `image://` of its own, so nothing in a spec makes the browser
+fetch an image.
+
+- **Edges**: one row per edge. A repeated edge is one edge, its value summed,
+  so a coarse time bucket as `query.timeField` (`time_bucket('5 minutes',
+  ts)`) applies the window. A node that is never a target is a root; a row
+  whose parent is empty names one. Several roots hang under one node named
+  for the panel.
+- **Path columns**: each row is a leaf at the end of its path, and a parent's
+  value is the sum of its leaves, as in a treemap.
+- Every node needs one parent. A node with two parents, or a cycle, is not a
+  tree: the panel says so in its error state, naming the node (`"orders-db"
+  has two parents ("orders" and "auth"); a tree needs one`), rather than
+  drawing it wrongly.
+- At most 500 nodes are drawn, breadth first from the roots; a note in the
+  corner says how many more there are.
+- A node is colored by its group, or without one by its branch below the
+  root. Its label sits on that color, black or white, whichever meets WCAG
+  AA on it.
+- A click on a node's symbol opens or closes its branch, and what a reader
+  closed stays closed as the panel refreshes. A click on its label follows a
+  [datum link](/guide/drilldown/), carrying the node's columns: an edge row's
+  parent and child (a root's name in the parent column), or its path, with its
+  value and group.
+- The table a screen reader is given lists one row per edge: parent, child
+  and value.
+
+```json
+{
+  "viz": "graph",
+  "format": "number",
+  "query": {
+    "sourceId": "ts-metrics",
+    "timeField": "period",
+    "sql": "SELECT time_bucket('5 minutes', ts) AS period, caller, callee, tier, sum(requests) AS requests FROM service_calls GROUP BY period, caller, callee, tier ORDER BY period"
+  },
+  "options": {
+    "orient": "LR",
+    "source": "caller",
+    "target": "callee",
+    "value": "requests",
+    "group": "tier",
+    "symbol": "loadBalancer",
+    "symbols": { "service": "server", "store": "database" },
+    "compact": true
+  }
 }
 ```
 

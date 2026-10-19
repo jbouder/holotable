@@ -236,6 +236,29 @@
           "timeField": "period"
         },
         "layout": { "x": 0, "y": 29, "w": 12, "h": 4 }
+      },
+      {
+        "id": "service-map",
+        "title": "Service map",
+        "description": "An arrow from each caller to what it calls, sized by requests in the window.",
+        "viz": "graph",
+        "format": "number",
+        "options": {
+          "orient": "LR",
+          "source": "caller",
+          "target": "callee",
+          "value": "requests",
+          "group": "tier",
+          "symbol": "loadBalancer",
+          "symbols": { "service": "server", "store": "database" },
+          "compact": true
+        },
+        "query": {
+          "sourceId": "ts-metrics",
+          "sql": "SELECT time_bucket('5 minutes', ts) AS period, caller, callee, tier, sum(requests) AS requests FROM service_calls GROUP BY period, caller, callee, tier ORDER BY period",
+          "timeField": "period"
+        },
+        "layout": { "x": 0, "y": 33, "w": 12, "h": 4 }
       }
     ]
   }

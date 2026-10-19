@@ -298,3 +298,79 @@ export function appLogRows(
     };
   });
 }
+
+export interface ServiceCallRow {
+  ts: Date;
+  caller: string;
+  callee: string;
+  tier: string;
+  requests: number;
+  errors: number;
+  p95_ms: number;
+}
+
+/**
+ * The demo's service map (#623), one edge a row: the gateway calls four
+ * services, and each service calls its own store. A tree, so the graph
+ * panel's tree layout draws it. `share` is the edge's part of the gateway's
+ * traffic (a store is called per request of its service, `share` times), and
+ * `p95` the latency range of the call, in ms.
+ */
+export const SERVICE_CALLS = [
+  { caller: "gateway", callee: "auth", tier: "service", share: 0.3, p95: [120, 220] },
+  { caller: "gateway", callee: "orders", tier: "service", share: 0.3, p95: [180, 320] },
+  { caller: "gateway", callee: "search", tier: "service", share: 0.25, p95: [300, 650] },
+  { caller: "gateway", callee: "billing", tier: "service", share: 0.15, p95: [200, 380] },
+  { caller: "auth", callee: "auth-db", tier: "store", share: 1, p95: [4, 12] },
+  { caller: "orders", callee: "orders-db", tier: "store", share: 1.5, p95: [6, 20] },
+  { caller: "search", callee: "search-index", tier: "store", share: 1.2, p95: [20, 90] },
+  { caller: "billing", callee: "billing-db", tier: "store", share: 0.8, p95: [5, 15] },
+] as const satisfies readonly {
+  caller: string;
+  callee: string;
+  tier: string;
+  share: number;
+  p95: readonly [number, number];
+}[];
+
+/** `metrics.service_calls` is written once a minute, live and in a backfill. */
+export const SERVICE_CALL_INTERVAL_MS = 60_000;
+
+/**
+ * The gateway's requests a minute: `http_requests`' rhythm at the default
+ * cadence (a batch every 2 s), so the map and the request stats agree.
+ */
+const GATEWAY_REQUESTS_PER_MINUTE = HTTP_ROWS_PER_BATCH * 30;
+
+/**
+ * One minute of the service map at `at`: a row per edge. A service's
+ * requests are its share of the gateway's, and its store's are a share of
+ * those; about 3% fail, as `http_requests`' 5xx do.
+ */
+export function serviceCallRows(
+  at: number,
+  random: Random = Math.random,
+  floor = Number.NEGATIVE_INFINITY,
+): ServiceCallRow[] {
+  const ts = new Date(Math.max(floor, at));
+  const total = GATEWAY_REQUESTS_PER_MINUTE * (0.85 + random() * 0.3);
+  const served = new Map<string, number>();
+  return SERVICE_CALLS.map((edge) => {
+    const upstream = served.get(edge.caller) ?? total;
+    const requests = Math.max(
+      1,
+      Math.round(upstream * edge.share * (0.9 + random() * 0.2)),
+    );
+    served.set(edge.callee, requests);
+    const errors = Math.round(requests * (0.01 + random() * 0.04));
+    return {
+      ts,
+      caller: edge.caller,
+      callee: edge.callee,
+      tier: edge.tier,
+      requests,
+      errors,
+      p95_ms: within(edge.p95, random),
+    };
+  });
+}
