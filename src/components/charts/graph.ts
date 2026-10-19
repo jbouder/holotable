@@ -422,6 +422,15 @@ function colorer(tree: GraphTree, theme: ChartTheme) {
   return (_node: GraphNode, branch: number) => seriesColor(theme, branch);
 }
 
+/** The one node drawn for rows with no tree in them: invisible, and no datum. */
+const NOTHING = {
+  id: GRAPH_ROOT_ID,
+  name: "",
+  text: "",
+  symbol: "none",
+  label: { show: false },
+};
+
 export const graphChart: ChartOptionBuilder = normalized((panel, data, { theme }) => {
   const tree = graphTree(panel, data);
   const o = readOptions(GraphOptions, panel.options);
@@ -529,7 +538,9 @@ export const graphChart: ChartOptionBuilder = normalized((panel, data, { theme }
         // tells the two apart and keeps what a reader collapsed across polls.
         expandAndCollapse: false,
         symbolKeepAspect: true,
-        data: tree.roots.length > 0 ? [root] : [],
+        // ECharts' tree cannot lay out no nodes at all (it throws), so rows
+        // with no tree in them draw one node that shows nothing.
+        data: tree.roots.length > 0 ? [root] : [NOTHING],
         itemStyle: { borderColor: theme.background, borderWidth: 1 },
         lineStyle: { color: theme.line, width: 1.5, curveness: 0.5 },
         label: {

@@ -180,6 +180,15 @@ test("past the cap, the deepest nodes are left out and counted", () => {
   assert.equal((option.title as { text: string }).text, "+11 more nodes not shown");
 });
 
+test("rows with no tree in them draw one invisible node, since ECharts' tree throws on none", () => {
+  const option = graphChart(graph(), { columns: ["n"], rows: [{ n: 1 }] }, CTX);
+  const data = (option.series as { data: { id: string; symbol: string }[] }[])[0]?.data;
+  assert.deepEqual(
+    data?.map((d) => [d.id, d.symbol]),
+    [[GRAPH_ROOT_ID, "none"]],
+  );
+});
+
 test("odd rows draw an empty or partial tree rather than throwing", () => {
   assert.deepEqual(graphTree(graph(), { columns: [], rows: [] }).roots, []);
   assert.deepEqual(graphTree(graph(), { columns: ["n"], rows: [{ n: 1 }] }).roots, []);
