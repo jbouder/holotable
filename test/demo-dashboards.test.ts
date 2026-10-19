@@ -33,6 +33,7 @@ import {
   graphEdgeId,
   graphView,
 } from "@/components/charts/graph";
+import { sankeyClickDatum, sankeyNet } from "@/components/charts/sankey";
 import { datumLinkItems } from "@/lib/drilldown";
 import { queryOf } from "./support/panels";
 
@@ -222,6 +223,38 @@ test("the network topology is a directed graph whose hosts, and only they, open 
   assert.equal(back?.row.source, "core-2");
   assert.equal(back?.row.target, "core-1");
   assert.equal(back?.row.value, 400);
+});
+
+test("the request flow is a Sankey whose services, and only they, show that service (#625)", () => {
+  const panel = SPECS.demo?.panels.find((p) => p.id === "request-flow");
+  assert.ok(panel?.viz === "sankey");
+  // It answers to the service picker, as every http_requests panel does.
+  assert.match(queryOf(panel).sql, /service = ANY\(:service\)/);
+  const data = {
+    columns: ["period", "service", "route", "status", "requests"],
+    rows: [
+      { period: "t1", service: "api", route: "/login", status: "200", requests: 9 },
+      { period: "t1", service: "web", route: "/login", status: "500", requests: 1 },
+    ],
+  };
+  const net = sankeyNet(panel, data);
+  assert.equal(net.problem, undefined);
+  const context = {
+    timeRange: SPECS.demo?.timeRange ?? { from: "now-1h", to: "now" },
+    selection: {},
+  };
+  const offers = (datum: Parameters<typeof datumLinkItems>[3]) =>
+    datumLinkItems(panel, {}, context, datum).length;
+  for (const node of net.nodes) {
+    const isService = node.id.startsWith("0\u001f");
+    assert.equal(offers(graphDatum(node)), isService ? 1 : 0, node.name);
+  }
+  // A band leaving a service carries it; a band from a route to a status does not.
+  for (const edge of net.edges) {
+    const datum = sankeyClickDatum(panel, data, edge.id);
+    assert.ok(datum);
+    assert.equal(offers(datum), edge.source.startsWith("0\u001f") ? 1 : 0, edge.id);
+  }
 });
 
 test("the host detail dashboard filters itself from its host table", () => {

@@ -31,6 +31,17 @@ says how a section gets here.
   service map gains a `redis` that `api` and `web` share and is drawn as a
   directed graph, and Demo files gains `links.csv` and a network topology
   whose hosts open Demo host detail.
+- **Force graphs and Sankey panels.** `layout: "force"` on a graph panel
+  draws edges with no useful direction (who talks to whom, what shares a
+  network) as a cloud, nodes sized by value, that settles once and keeps its
+  place across refreshes; past 60 nodes its labels show on hover. A new
+  `viz: "sankey"` draws how much flows where (requests from service to route
+  to status, bytes from source to sink) as bands as wide as their volume,
+  left to right or top to bottom, from path columns or edge rows. Its `value`
+  is required, duplicate flows are summed, rows with no volume are left out
+  with a badge saying so, and flows that cycle are refused naming a node on
+  the loop. Nodes and bands are datums for links. On Demo service health a
+  request-flow Sankey replaces the route-then-status sunburst.
 
 ## 0.2.0 — 2026-10-11
 

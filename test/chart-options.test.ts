@@ -72,6 +72,7 @@ test("every chart kind is covered", () => {
       "histogram",
       "treemap",
       "graph",
+      "sankey",
     ],
   );
 });

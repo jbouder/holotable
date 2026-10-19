@@ -4,6 +4,7 @@ import { heatmap } from "@/lib/panels/kinds/heatmap";
 import { histogram } from "@/lib/panels/kinds/histogram";
 import { logs } from "@/lib/panels/kinds/logs";
 import { donut, pie } from "@/lib/panels/kinds/pie";
+import { sankey } from "@/lib/panels/kinds/sankey";
 import { scatter } from "@/lib/panels/kinds/scatter";
 import { area, bar, line } from "@/lib/panels/kinds/series";
 import { stat } from "@/lib/panels/kinds/stat";
@@ -47,6 +48,7 @@ export const PANEL_KINDS = [
   logs,
   treemap,
   graph,
+  sankey,
   vega,
   text,
 ] as const satisfies readonly PanelKind[];

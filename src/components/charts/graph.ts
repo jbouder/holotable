@@ -13,7 +13,12 @@ import { type ChartTheme, inkOn, seriesColor } from "@/lib/color/chart-theme";
 import type { Datum } from "@/lib/drilldown";
 import { formatValue } from "@/lib/format";
 import { type GraphDirection, graphLayout } from "@/lib/graph/layout";
-import { echartsSymbol, type GraphSymbol, symbolSizeFor } from "@/lib/graph/symbols";
+import {
+  echartsSymbol,
+  type GraphSymbol,
+  SYMBOL_SIZE_MIN,
+  symbolSizeFor,
+} from "@/lib/graph/symbols";
 import { type Panel, panelTimeField } from "@/lib/ir";
 import { GraphOptions } from "@/lib/panels/kinds/graph";
 import { numberDisplay, readOptions } from "@/lib/panels/presentation";
@@ -40,8 +45,10 @@ import type { TimeDisplay } from "@/lib/time-display";
  * {@link graphNet} reads them as nodes and edges, any number of parents and
  * cycles allowed, and `graphLayout` (`src/lib/graph/layout.ts`) places them.
  * A `tree` whose rows are not a tree falls back to it, and says so through
- * {@link graphNotice} rather than refusing. {@link graphView} is where a
- * panel's layout is decided; every export here dispatches on it.
+ * {@link graphNotice} rather than refusing. The `force` layout (#625) draws
+ * the same net as a relationship cloud, placed by ECharts' force layout.
+ * {@link graphView} is where a panel's layout is decided; every export here
+ * dispatches on it.
  *
  * Every node's label sits on its own color, in whichever ink reads on it
  * (`inkOn`), so `test/graph.test.ts` holds every series color to AA against
@@ -54,7 +61,8 @@ export const GRAPH_NODES_MAX = 500;
 export const GRAPH_EDGES_MAX = 1500;
 
 /** Joins a path into a node's id; a character no label contains. */
-const SEP = "\u001f";
+export const GRAPH_SEP = "\u001f";
+const SEP = GRAPH_SEP;
 /** The id of the root drawn above several roots, which ECharts' tree needs. */
 export const GRAPH_ROOT_ID = `${SEP}root`;
 
@@ -104,7 +112,7 @@ function empty(tree: Partial<GraphTree> & Pick<GraphTree, "shape">): GraphTree {
 }
 
 /** The columns a graph reads, by its options or by default. */
-interface GraphColumns {
+export interface GraphColumns {
   shape: "edges" | "path";
   sourceKey?: string;
   targetKey?: string;
@@ -497,8 +505,11 @@ export function graphNet(panel: Panel, data: PanelData): GraphNet {
   });
 }
 
-/** Edge rows as nodes and edges: the tree's reading without its refusals. */
-function ingestNet(
+/**
+ * Edge rows as nodes and edges: the tree's reading without its refusals. The
+ * Sankey (#625) reads its edge rows through it too.
+ */
+export function ingestNet(
   data: PanelData,
   sourceKey: string,
   targetKey: string,
@@ -596,7 +607,7 @@ function ingestNet(
  * cycle reaches, up to {@link GRAPH_NODES_MAX}; the edges between those, up
  * to {@link GRAPH_EDGES_MAX}.
  */
-function capNet(net: GraphNet): GraphNet {
+export function capNet(net: GraphNet): GraphNet {
   const children = new Map<string, string[]>();
   for (const e of net.edges) {
     children.set(e.source, [...(children.get(e.source) ?? []), e.target]);
@@ -644,11 +655,14 @@ function capNet(net: GraphNet): GraphNet {
  */
 export type GraphView =
   | { layout: "tree"; tree: GraphTree }
-  | { layout: "dag"; net: GraphNet; direction: GraphDirection; fallback?: string };
+  | { layout: "dag"; net: GraphNet; direction: GraphDirection; fallback?: string }
+  | { layout: "force"; net: GraphNet };
 
 export function graphView(panel: Panel, data: PanelData): GraphView {
   const o = readOptions(GraphOptions, panel.options);
   const direction = graphDirection(o);
+  // A cloud has no direction to keep and takes any edges: nothing falls back.
+  if (o.layout === "force") return { layout: "force", net: graphNet(panel, data) };
   if (o.layout === "dag") return { layout: "dag", net: graphNet(panel, data), direction };
   const tree = graphTree(panel, data);
   if (tree.problem === undefined) return { layout: "tree", tree };
@@ -736,9 +750,44 @@ export function graphTable(
   _display?: TimeDisplay,
 ): ChartRows {
   const view = graphView(panel, data);
-  return view.layout === "tree"
-    ? treeTable(panel, view.tree)
-    : dagTable(panel, view.net, view.direction);
+  if (view.layout === "tree") return treeTable(panel, view.tree);
+  if (view.layout === "force") return forceTable(panel, view.net);
+  return dagTable(panel, view.net, view.direction);
+}
+
+/** How many edges, or the first so many of them, for a table's caption. */
+function edgeCount(shown: number, total: number): string {
+  return shown === total
+    ? `${total} ${total === 1 ? "edge" : "edges"}`
+    : `the first ${shown} of ${total} edges`;
+}
+
+/**
+ * A force graph's table (#625): its edges and their values, each offering the
+ * links of the node it reaches, as the other layouts' tables do. A cloud's
+ * positions mean nothing, so nothing else is said.
+ */
+function forceTable(panel: Panel, net: GraphNet): ChartRows {
+  const o = readOptions(GraphOptions, panel.options);
+  const display = numberDisplay(o);
+  const byId = new Map(net.nodes.map((n) => [n.id, n]));
+  const shown = net.edges.slice(0, CHART_TABLE_ROWS_MAX);
+  return {
+    caption: `Edges of ${panel.title}: ${edgeCount(shown.length, net.edges.length)}.`,
+    columns: edgeColumns(net),
+    rows: shown.map((e) => [
+      byId.get(e.source)?.name ?? e.source,
+      byId.get(e.target)?.name ?? e.target,
+      ...(net.valueKey
+        ? [e.value === undefined ? "" : formatValue(e.value, panel.format, display)]
+        : []),
+    ]),
+    datums: shown.map((e) => {
+      const node = byId.get(e.target);
+      return node ? graphDatum(node) : null;
+    }),
+    labels: shown.map((e) => byId.get(e.target)?.name ?? e.target),
+  };
 }
 
 function treeTable(panel: Panel, tree: GraphTree): ChartRows {
@@ -880,9 +929,9 @@ const NOTHING = {
 
 export const graphChart: ChartOptionBuilder = normalized((panel, data, { theme }) => {
   const view = graphView(panel, data);
-  return view.layout === "tree"
-    ? treeOption(panel, view.tree, theme)
-    : dagOption(panel, view.net, view.direction, theme);
+  if (view.layout === "tree") return treeOption(panel, view.tree, theme);
+  if (view.layout === "force") return forceOption(panel, view.net, theme);
+  return dagOption(panel, view.net, view.direction, theme);
 });
 
 /** The symbol a node is drawn with: its group's, the default, or a circle. */
@@ -1115,42 +1164,7 @@ function dagOption(
 
   return {
     backgroundColor: "transparent",
-    tooltip: {
-      trigger: "item",
-      borderRadius: 0,
-      formatter: (p: unknown) => {
-        const { dataType, data: item } = p as {
-          dataType?: string;
-          data?: {
-            name?: string;
-            source?: string;
-            target?: string;
-            value?: number;
-            amount?: number;
-            group?: string;
-            parents?: string[];
-            reversed?: boolean;
-            loop?: boolean;
-          };
-        };
-        if (!item) return "";
-        const lines: string[] = [];
-        if (dataType === "edge") {
-          lines.push(`${nameOf(item.source ?? "")} → ${nameOf(item.target ?? "")}`);
-          if (item.value !== undefined) lines.push(text(item.value));
-          if (item.reversed) lines.push("Back edge: closes a cycle");
-        } else {
-          lines.push(item.name ?? "");
-          if (item.amount !== undefined) lines.push(text(item.amount));
-          if (item.group) lines.push(item.group);
-          if (item.parents && item.parents.length > 0) {
-            lines.push(`From ${item.parents.join(", ")}`);
-          }
-          if (item.loop) lines.push("Points at itself");
-        }
-        return lines.map(escapeHtml).join("<br/>");
-      },
-    },
+    tooltip: netTooltip(nameOf, text),
     title: overflowTitle(theme, net.overflow, net.edgeOverflow),
     // Room for the labels beside the nodes at the edges of the layout: below
     // them when the layers run across, to their right when they run down.
@@ -1204,6 +1218,217 @@ function dagOption(
           },
         },
         emphasis: { focus: "adjacency", lineStyle: { opacity: 1 } },
+      },
+    ],
+  } as EChartsOption;
+}
+
+/**
+ * The tooltip of a graph drawn from its net, a dag's or a force graph's: an
+ * edge's ends and value, a node's name, value, group and where it is from.
+ */
+function netTooltip(nameOf: (id: string) => string, text: (v: number) => string) {
+  return {
+    trigger: "item" as const,
+    borderRadius: 0,
+    formatter: (p: unknown) => {
+      const { dataType, data: item } = p as {
+        dataType?: string;
+        data?: {
+          name?: string;
+          source?: string;
+          target?: string;
+          value?: number;
+          amount?: number;
+          group?: string;
+          parents?: string[];
+          reversed?: boolean;
+          loop?: boolean;
+        };
+      };
+      if (!item) return "";
+      const lines: string[] = [];
+      if (dataType === "edge") {
+        lines.push(`${nameOf(item.source ?? "")} → ${nameOf(item.target ?? "")}`);
+        if (item.value !== undefined) lines.push(text(item.value));
+        if (item.reversed) lines.push("Back edge: closes a cycle");
+      } else {
+        lines.push(item.name ?? "");
+        if (item.amount !== undefined) lines.push(text(item.amount));
+        if (item.group) lines.push(item.group);
+        if (item.parents && item.parents.length > 0) {
+          lines.push(`From ${item.parents.join(", ")}`);
+        }
+        if (item.loop) lines.push("Points at itself");
+      }
+      return lines.map(escapeHtml).join("<br/>");
+    },
+  };
+}
+
+/** Past this many nodes, a force graph's labels show on hover only (#625). */
+export const FORCE_LABELS_MAX = 60;
+
+/**
+ * How hard a force graph's nodes push apart and how long its edges are, from
+ * its node count (#625): a handful spread across the panel, hundreds pack
+ * close enough to stay in it.
+ */
+export function forceSpacing(nodes: number): { repulsion: number; edgeLength: number } {
+  const n = Math.max(1, nodes);
+  const clamp = (v: number, lo: number, hi: number) =>
+    Math.round(Math.min(hi, Math.max(lo, v)));
+  return {
+    repulsion: clamp(900 / Math.sqrt(n), 25, 350),
+    edgeLength: clamp(210 / Math.sqrt(n), 15, 90),
+  };
+}
+
+/** The most a force graph's node is drawn at, whatever its value and size. */
+const FORCE_SYMBOL_MAX = 64;
+
+/**
+ * A force graph's node size (#625): with a value, by its area, from 60% of
+ * the symbol's size for the smallest to twice it for the largest; without
+ * one, the symbol's size.
+ */
+export function forceNodeSize(
+  base: number,
+  value: number | undefined,
+  largest: number,
+): number {
+  if (value === undefined || !(largest > 0)) return base;
+  const share = Math.sqrt(Math.max(0, value) / largest);
+  const size = base * 0.6 + base * 1.4 * share;
+  return Math.min(FORCE_SYMBOL_MAX, Math.max(SYMBOL_SIZE_MIN, Math.round(size)));
+}
+
+/**
+ * A relationship cloud (#625): an ECharts `graph` series with ECharts' own
+ * force layout, for edges whose direction says nothing, so no arrows. Nodes
+ * are colored by group and sized by value; edges are as wide as their value.
+ *
+ * A force layout moves, and a poll is a merge (invariant 11), so the layout
+ * must not start over on every one: `layoutAnimation: false` settles it in
+ * one go rather than drifting in view, and ECharts keeps the positions it
+ * settled on per node id on the series, which a merged option keeps, so a
+ * poll starts from where the nodes are and only a new node is placed. Node
+ * ids are the rows' own names, so they stay the same between polls; no node
+ * carries `x` or `y`, which would pin it. The first layout starts from a
+ * circle, not at random, so the same rows draw the same cloud.
+ *
+ * The view is ECharts' own, which scales symbols evenly here (a force layout
+ * has no positions of its own to stretch to the panel, unlike the dag's);
+ * drag pans, and Ctrl and the wheel or a pinch zooms (`EChart`'s
+ * `attachCtrlZoom`), so the page still scrolls past the panel.
+ */
+function forceOption(panel: Panel, net: GraphNet, theme: ChartTheme): EChartsOption {
+  const o = readOptions(GraphOptions, panel.options);
+  const display = numberDisplay(o);
+  const text = (v: number) => formatValue(v, panel.format, display);
+  const loops = new Set(
+    net.edges.filter((e) => e.source === e.target).map((e) => e.source),
+  );
+  const byId = new Map(net.nodes.map((n) => [n.id, n]));
+  const nameOf = (id: string) => byId.get(id)?.name ?? id;
+  const colorOf = (node: GraphVertex) =>
+    seriesColor(
+      theme,
+      node.group === undefined ? net.groups.length : net.groups.indexOf(node.group),
+    );
+  const widest = Math.max(0, ...net.edges.map((e) => Math.abs(e.value ?? 0)));
+  const widthOf = (e: GraphEdge) =>
+    widest > 0 && e.value !== undefined
+      ? EDGE_WIDTH[0] + ((EDGE_WIDTH[1] - EDGE_WIDTH[0]) * Math.abs(e.value)) / widest
+      : 1.5;
+  const largest = Math.max(0, ...net.nodes.map((n) => n.value ?? 0));
+  const labels = net.nodes.length <= FORCE_LABELS_MAX;
+  const label = {
+    fontSize: 11,
+    padding: [2, 4],
+    borderRadius: 2,
+    distance: 4,
+    position: "right",
+    formatter: (p: unknown) => (p as { data?: { text?: string } }).data?.text ?? "",
+  };
+
+  const nodes = net.nodes.map((node) => {
+    const color = colorOf(node);
+    const symbol = symbolFor(o, node.group);
+    const name = loops.has(node.id) ? `${node.name} ↻` : node.name;
+    return {
+      id: node.id,
+      name: node.name,
+      // The node's own value is `amount`: a `value` would weigh its repulsion.
+      ...(node.value !== undefined ? { amount: node.value } : {}),
+      text: node.value === undefined ? name : `${name}  ${text(node.value)}`,
+      group: node.group,
+      parents: node.parents.map(nameOf),
+      loop: loops.has(node.id),
+      symbol: echartsSymbol(symbol),
+      symbolSize: forceNodeSize(
+        symbolSizeFor(symbol, o.symbolSize),
+        o.value === undefined ? undefined : node.value,
+        largest,
+      ),
+      itemStyle: { color },
+      label: { backgroundColor: color, color: inkOn(color) },
+    };
+  });
+  const links = net.edges
+    .filter((e) => e.source !== e.target)
+    .map((e) => ({
+      id: e.id,
+      source: e.source,
+      target: e.target,
+      ...(e.value !== undefined ? { value: e.value } : {}),
+      lineStyle: { width: widthOf(e) },
+    }));
+
+  return {
+    backgroundColor: "transparent",
+    tooltip: netTooltip(nameOf, text),
+    title: overflowTitle(theme, net.overflow, net.edgeOverflow),
+    series: [
+      {
+        type: "graph",
+        layout: "force",
+        force: {
+          ...forceSpacing(net.nodes.length),
+          initLayout: "circular",
+          gravity: 0.15,
+          layoutAnimation: false,
+        },
+        left: 24,
+        right: 24,
+        top: 20,
+        bottom: 20,
+        roam: "move",
+        draggable: false,
+        symbolKeepAspect: true,
+        data: nodes,
+        links,
+        edgeSymbol: ["none", "none"],
+        itemStyle: { borderColor: theme.background, borderWidth: 1 },
+        lineStyle: { color: theme.line, opacity: 0.7, curveness: 0 },
+        // Past the cap, a label shows only on the node under the pointer.
+        label: { show: labels, ...label },
+        edgeLabel: {
+          show: o.edgeLabels === true,
+          fontSize: 10,
+          color: theme.text,
+          backgroundColor: theme.background,
+          padding: [1, 3],
+          formatter: (p: unknown) => {
+            const v = (p as { data?: { value?: number } }).data?.value;
+            return v === undefined ? "" : text(v);
+          },
+        },
+        emphasis: {
+          focus: "adjacency",
+          label: { show: true },
+          lineStyle: { opacity: 1 },
+        },
       },
     ],
   } as EChartsOption;

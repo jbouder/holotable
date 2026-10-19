@@ -37,8 +37,9 @@ panel kind:
 
 - **Demo service health**: is the API serving well? The 5xx error rate, p95
   latency and the share of requests over the 300 ms SLO as stats with
-  sparklines, availability as a gauge, requests per minute by outcome, a
-  sunburst of requests by route and status, a service map of which service
+  sparklines, availability as a gauge, requests per minute by outcome, the
+  request flow from service to route to status (a
+  [Sankey](/reference/panel-options/#sankey)), a service map of which service
   calls which (a [graph](/reference/panel-options/#graph), drawn as a
   directed graph), the latency band
   against the SLO
@@ -61,7 +62,8 @@ is how the dashboard shows everything until it is narrowed), and every panel
 over `http_requests` filters by it. A click on a service on the service map
 shows that service; a click on a store shows the service that calls it; the
 gateway, which is no one service, and the `redis` two services share offer
-nothing. On **Demo fleet**, a click on a
+nothing. A click on a service in the request flow, or on a band leaving one,
+shows that service too; a route or a status offers nothing. On **Demo fleet**, a click on a
 host anywhere (a tile, a line, a bar, a lane or a row of the hosts table)
 opens **Demo host detail** for that host, and the heatmap has an *Open host
 detail* item in its panel menu. On **Demo files**, where the seeder writes it,

@@ -260,6 +260,24 @@
           "timeField": "period"
         },
         "layout": { "x": 0, "y": 33, "w": 12, "h": 4 }
+      },
+      {
+        "id": "request-flow",
+        "title": "Request flow",
+        "description": "Requests from each service to its routes to their status codes, as wide as their count in the window.",
+        "viz": "sankey",
+        "format": "number",
+        "options": {
+          "path": ["service", "route", "status"],
+          "value": "requests",
+          "compact": true
+        },
+        "query": {
+          "sourceId": "ts-metrics",
+          "sql": "SELECT time_bucket('5 minutes', ts) AS period, service, route, status::text AS status, count(*) AS requests FROM http_requests GROUP BY period, service, route, status ORDER BY period",
+          "timeField": "period"
+        },
+        "layout": { "x": 0, "y": 37, "w": 12, "h": 4 }
       }
     ]
   }

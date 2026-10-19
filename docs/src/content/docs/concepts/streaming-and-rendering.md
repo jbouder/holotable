@@ -317,7 +317,8 @@ says why a result cannot be drawn, naming what is wrong, and the panel shows
 it in the shared error state instead of the chart; `notice` says the rows were
 drawn other than the spec asked, and the panel shows it as a badge beside its
 title, as it shows a truncation (a graph's tree drawn as a directed graph
-because its rows are not a tree, #624); `table` is the kind's own
+because its rows are not a tree, #624, or a Sankey's rows left out for
+having no volume, #625; a Sankey whose flows cycle is a `problem`); `table` is the kind's own
 screen-reader table where its marks are not one per row (a graph's edges). It is kept
 apart because `src/lib/ir.ts` imports the registry, and the server and the
 prompt must not pull React in with it. The renderer map is typed as
@@ -331,8 +332,9 @@ Adding a kind is therefore:
    `src/components/panels/`) and one line in `PANEL_RENDERERS`.
 3. if its option builder uses an ECharts series or component no other kind
    does, one line in `src/components/charts/echarts.ts` (the graph's
-   `TreeChart`, #623, and its directed graph's `GraphChart` and inside
-   `DataZoom`, #624, are). That module loads
+   `TreeChart`, #623, its directed graph's `GraphChart` and inside
+   `DataZoom`, #624, and the Sankey's `SankeyChart`, #625, are; the graph's
+   force layout, #625, is `GraphChart` again). That module loads
    `echarts/core` with only what the panels draw (#488), and it is the only
    one that imports ECharts at runtime (`test/echarts-runtime.test.ts`). A
    missing registration draws nothing in production and warns only in

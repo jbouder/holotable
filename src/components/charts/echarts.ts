@@ -6,6 +6,7 @@ import {
   HeatmapChart,
   LineChart,
   PieChart,
+  SankeyChart,
   ScatterChart,
   SunburstChart,
   TreeChart,
@@ -41,8 +42,8 @@ import { CanvasRenderer } from "echarts/renderers";
  *
  * - Series: the chart kinds in `src/components/panels/registry.ts` and their
  *   builders (a donut is a pie; the treemap's sunburst layout; the graph's
- *   tree, and its directed graph as a `graph` series; the state timeline is
- *   a custom series).
+ *   tree, and its directed and force graphs as a `graph` series; the Sankey;
+ *   the state timeline is a custom series).
  * - Components: the grid and both axes, the tooltip and its axis pointer
  *   (crosshair sync), the legend (plain and scroll), the brush (brush to
  *   zoom), the inside data zoom (a directed graph's pan and zoom), thresholds as a visual map, annotations as mark lines and areas,
@@ -65,6 +66,7 @@ use([
   HeatmapChart,
   LineChart,
   PieChart,
+  SankeyChart,
   ScatterChart,
   SunburstChart,
   TreeChart,

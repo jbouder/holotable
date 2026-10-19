@@ -60,9 +60,10 @@ the wheel to zoom, so the wheel still scrolls the page past the panel.
 - **`elkjs`.** Over 1 MB, for options (ports, orthogonal routing, nested
   graphs) a dashboard panel does not use.
 - **ECharts' `force` layout** for these data. It reads as a cloud, not a flow,
-  and moves on every update; it is the `force` layout of
-  [#625](https://github.com/jbouder/holotable/issues/625), for data with no
-  direction.
+  and left alone it moves on every update; it is the graph's `layout:
+  "force"` ([#625](https://github.com/jbouder/holotable/issues/625)), for
+  data with no direction, which settles once and starts each refresh from the
+  positions it settled on rather than moving.
 
 ## What was measured
 

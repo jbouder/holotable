@@ -1,0 +1,113 @@
+{
+  "specVersion": 1,
+  "title": "Flows and clouds",
+  "timeRange": {
+    "from": "now-1h",
+    "to": "now"
+  },
+  "refreshIntervalMs": 30000,
+  "panels": [
+    {
+      "id": "request-flow",
+      "title": "Request flow",
+      "viz": "sankey",
+      "format": "number",
+      "query": {
+        "sourceId": "ts-metrics",
+        "timeField": "period",
+        "sql": "SELECT time_bucket('5 minutes', ts) AS period, service, route, status::text AS status, count(*) AS requests FROM http_requests WHERE service = ANY(:service) GROUP BY period, service, route, status ORDER BY period"
+      },
+      "options": {
+        "path": ["service", "route", "status"],
+        "value": "requests",
+        "compact": true
+      },
+      "links": [
+        {
+          "title": "Show this service",
+          "set": {
+            "service": {
+              "column": "node"
+            }
+          }
+        }
+      ],
+      "layout": {
+        "x": 0,
+        "y": 0,
+        "w": 12,
+        "h": 5
+      }
+    },
+    {
+      "id": "job-flow",
+      "title": "Request rate from job to instance",
+      "viz": "sankey",
+      "query": {
+        "sourceId": "prom-metrics",
+        "promql": "sum by (job, instance) (rate(http_requests_total[5m]))",
+        "instant": true
+      },
+      "options": {
+        "orient": "TB",
+        "source": "job",
+        "target": "instance",
+        "value": "value",
+        "unit": "/s",
+        "decimals": 1
+      },
+      "layout": {
+        "x": 0,
+        "y": 5,
+        "w": 6,
+        "h": 5
+      }
+    },
+    {
+      "id": "call-cloud",
+      "title": "Who calls whom",
+      "viz": "graph",
+      "format": "number",
+      "query": {
+        "sourceId": "ts-service-calls",
+        "timeField": "period",
+        "sql": "SELECT time_bucket('5 minutes', ts) AS period, caller, callee, tier, sum(requests) AS requests FROM service_calls GROUP BY period, caller, callee, tier ORDER BY period"
+      },
+      "options": {
+        "layout": "force",
+        "source": "caller",
+        "target": "callee",
+        "value": "requests",
+        "group": "tier",
+        "edgeLabels": true,
+        "symbolSize": 16,
+        "compact": true
+      },
+      "links": [
+        {
+          "title": "Show this node",
+          "set": {
+            "service": {
+              "column": "node"
+            }
+          }
+        }
+      ],
+      "layout": {
+        "x": 6,
+        "y": 5,
+        "w": 6,
+        "h": 5
+      }
+    }
+  ],
+  "variables": [
+    {
+      "name": "service",
+      "type": "enum",
+      "values": ["api", "web", "worker"],
+      "multi": true,
+      "default": ["api", "web", "worker"]
+    }
+  ]
+}

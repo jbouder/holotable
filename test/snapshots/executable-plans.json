@@ -360,6 +360,31 @@
     "maxRows": 5000,
     "ranked": true
   },
+  "v1-graph-force-sankey.json#request-flow": {
+    "sql": "SELECT * FROM (SELECT _holo.*, row_number() OVER () AS _holo_pos, count(*) OVER () AS _holo_total\nFROM (SELECT time_bucket('5 minutes', ts) AS period, service, route, status::text AS status, count(*) AS requests FROM http_requests WHERE service = ANY($3) GROUP BY period, service, route, status ORDER BY period) AS _holo\nWHERE _holo.period >= $1::timestamptz\n  AND _holo.period < $2::timestamptz\nORDER BY _holo.period DESC, _holo_pos DESC\nLIMIT 5000) AS _holo_kept\nORDER BY _holo_kept._holo_pos",
+    "params": [
+      "2026-01-01T00:00:00.000Z",
+      "2026-01-01T01:00:00.000Z",
+      ["api", "web", "worker"]
+    ],
+    "timeField": "period",
+    "variables": ["service"],
+    "maxRows": 5000,
+    "ranked": true
+  },
+  "v1-graph-force-sankey.json#job-flow": {
+    "instant": true,
+    "expr": "sum by (job, instance) (rate(http_requests_total{tenant=\"fixture-tenant\"}[5m]))",
+    "time": "2026-01-01T01:00:00.000Z",
+    "timeoutMs": 20000
+  },
+  "v1-graph-force-sankey.json#call-cloud": {
+    "sql": "SELECT * FROM (SELECT _holo.*, row_number() OVER () AS _holo_pos, count(*) OVER () AS _holo_total\nFROM (SELECT time_bucket('5 minutes', ts) AS period, caller, callee, tier, sum(requests) AS requests FROM service_calls GROUP BY period, caller, callee, tier ORDER BY period) AS _holo\nWHERE _holo.period >= $1::timestamptz\n  AND _holo.period < $2::timestamptz\nORDER BY _holo.period DESC, _holo_pos DESC\nLIMIT 5000) AS _holo_kept\nORDER BY _holo_kept._holo_pos",
+    "params": ["2026-01-01T00:00:00.000Z", "2026-01-01T01:00:00.000Z"],
+    "timeField": "period",
+    "maxRows": 5000,
+    "ranked": true
+  },
   "v1-graph.json#service-map": {
     "sql": "SELECT * FROM (SELECT _holo.*, row_number() OVER () AS _holo_pos, count(*) OVER () AS _holo_total\nFROM (SELECT time_bucket('5 minutes', ts) AS period, caller, callee, tier, sum(requests) AS requests FROM service_calls GROUP BY period, caller, callee, tier ORDER BY period) AS _holo\nWHERE _holo.period >= $1::timestamptz\n  AND _holo.period < $2::timestamptz\nORDER BY _holo.period DESC, _holo_pos DESC\nLIMIT 5000) AS _holo_kept\nORDER BY _holo_kept._holo_pos",
     "params": ["2026-01-01T00:00:00.000Z", "2026-01-01T01:00:00.000Z"],
