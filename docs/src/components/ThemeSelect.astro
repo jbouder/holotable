@@ -2,8 +2,9 @@
 /**
  * A segmented light / dark / system switch in place of Starlight's select.
  * It keeps Starlight's storage contract (`starlight-theme` in localStorage,
- * empty for system) and `data-theme` on <html>, which ThemeProvider's inline
- * script sets before first paint, so there is no flash.
+ * empty for system, nothing stored for the default) and `data-theme` on
+ * <html>, which ThemeProvider.astro's inline script sets before first paint,
+ * so there is no flash. The default is dark, as in the app.
  */
 import { Icon } from "@astrojs/starlight/components";
 
@@ -34,11 +35,13 @@ const options = [
   const parseTheme = (theme: unknown): Theme =>
     theme === "dark" || theme === "light" ? theme : "auto";
 
+  // Nothing stored means the default, dark; an empty string is system.
   function loadTheme(): Theme {
     try {
-      return parseTheme(localStorage.getItem(storageKey));
+      const stored = localStorage.getItem(storageKey);
+      return stored === null ? "dark" : parseTheme(stored);
     } catch {
-      return "auto";
+      return "dark";
     }
   }
 
