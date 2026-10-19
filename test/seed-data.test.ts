@@ -16,7 +16,7 @@ import {
   serviceCallRows,
   systemMetricRows,
 } from "../scripts/lib/seed-data";
-import { graphDatum, graphNodes, graphTree } from "@/components/charts/graph";
+import { graphDatum, graphNotice, graphView } from "@/components/charts/graph";
 import { datumLinkItems } from "@/lib/drilldown";
 import { parseDashboard } from "@/lib/ir";
 import { demoSpec } from "../scripts/lib/demo-dashboards";
@@ -211,7 +211,7 @@ test("log lines cover every level, each with a route and a request id", () => {
   assert.ok(errors > 0.01 && errors < 0.1, `errors ${errors}`);
 });
 
-test("the service map is a tree the demo's graph panel draws, and its link shows a service (#623)", () => {
+test("the service map is a directed graph the demo's graph panel draws, and its link shows a service (#623, #624)", () => {
   const random = seeded(7);
   const rows = Array.from({ length: 12 }, (_, i) =>
     serviceCallRows(NOW + i * 60_000, random),
@@ -225,33 +225,42 @@ test("the service map is a tree the demo's graph panel draws, and its link shows
   const panel = spec.panels.find((p) => p.id === "service-map");
   assert.ok(panel);
   // The rows as the panel's SQL returns them: `service` is a service's own
-  // name, or a store's caller.
-  const tree = graphTree(panel, {
+  // name, or a store's caller; a shared store (tier `store`) has none.
+  const data = {
     columns: ["period", "caller", "callee", "tier", "service", "requests"],
     rows: rows.map(({ ts, caller, callee, tier, requests }) => ({
       period: ts.toISOString(),
       caller,
       callee,
       tier,
-      service: tier === "service" ? callee : caller,
+      service: tier === "service" ? callee : tier === "store" ? null : caller,
       requests,
     })),
-  });
-  assert.equal(tree.problem, undefined);
-  assert.deepEqual(
-    tree.roots.map((r) => r.name),
-    ["gateway"],
-  );
-  assert.equal(graphNodes(tree).length, SERVICE_CALLS.length + 1);
-  // Every node but the gateway shows a service the variable allows; the
-  // gateway shows none, so its click offers nothing rather than a dead link.
+  };
+  const view = graphView(panel, data);
+  assert.equal(view.layout, "dag");
+  assert.ok(view.layout === "dag");
+  assert.equal(view.fallback, undefined, "the spec asks for the dag itself");
+  const callees = new Set(SERVICE_CALLS.map((e) => e.callee));
+  assert.equal(view.net.nodes.length, callees.size + 1);
+  assert.deepEqual(view.net.nodes.find((n) => n.name === "redis")?.parents, [
+    "api",
+    "web",
+  ]);
+  // As a tree, the same rows fall back to the directed graph and say why.
+  const asTree = { ...panel, options: { ...panel.options, layout: "tree" } };
+  assert.equal(graphView(asTree, data).layout, "dag");
+  assert.match(graphNotice(asTree, data)?.detail ?? "", /^"redis" has two parents/);
+  // Every node but the gateway and the shared redis shows a service the
+  // variable allows; those two show none, so a click offers nothing rather
+  // than a dead link.
   const allowed = spec.variables?.find((v) => v.name === "service")?.values ?? [];
   assert.deepEqual([...allowed].sort(), [...SERVICES].sort());
   const context = { timeRange: spec.timeRange, selection: {} };
-  for (const node of graphNodes(tree)) {
+  for (const node of view.net.nodes) {
     const items = datumLinkItems(panel, {}, context, graphDatum(node));
-    if (node.name === "gateway") {
-      assert.deepEqual(items, [], "the gateway");
+    if (node.name === "gateway" || node.name === "redis") {
+      assert.deepEqual(items, [], node.name);
       continue;
     }
     assert.equal(items.length, 1, node.name);

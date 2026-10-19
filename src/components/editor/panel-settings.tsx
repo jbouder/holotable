@@ -283,6 +283,26 @@ function OptionGroupFields({
             ]}
             parse={(v) => (v === "" ? undefined : v)}
           />
+          <SelectOption
+            {...field("direction")}
+            label="Direction (dag)"
+            options={[
+              { value: "", label: "from the orientation (default)" },
+              { value: "LR", label: "left to right" },
+              { value: "TB", label: "top to bottom" },
+            ]}
+            parse={(v) => (v === "" ? undefined : v)}
+          />
+          <SelectOption
+            {...field("curve")}
+            label="Edges (dag)"
+            options={[
+              { value: "", label: "curved (default)" },
+              { value: "false", label: "straight" },
+            ]}
+            parse={(v) => (v === "" ? undefined : false)}
+          />
+          <BooleanOption {...field("edgeLabels")} label="Values on edges (dag)" />
           <TextOption
             {...field("source")}
             label="Parent column"

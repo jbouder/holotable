@@ -183,6 +183,7 @@ export default defineConfig({
             { label: "Accessibility", slug: "architecture/accessibility" },
             { label: "Theming", slug: "architecture/theming" },
             { label: "Custom visuals", slug: "architecture/custom-visuals" },
+            { label: "Graph layout", slug: "architecture/graph-layout" },
           ],
         },
         {

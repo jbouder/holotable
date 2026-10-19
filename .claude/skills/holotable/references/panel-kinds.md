@@ -206,18 +206,33 @@ With PromQL: an instant query aggregated by the levels, `sum by (job, instance) 
 
 ### `graph`
 
-Structure: what points at what, drawn as a tree. A service and what it calls,
-a schema's tables and their columns, a folder tree. Return one row per edge,
+Structure: what points at what, drawn as a tree or as a layered directed
+graph. A service and what it calls, a schema's tables and their columns, a
+folder tree, a dependency graph, a data lineage. Return one row per edge,
 the parent and the child columns, with an optional number and an optional
 category; a repeated edge is one edge, its value summed, so a coarse time
 bucket as `query.timeField` (`time_bucket('5 minutes', ts) AS period`) applies
 the window. Or return one row per leaf with path columns, top level first, as
-for a `treemap`. Every node needs exactly one parent: a node with two parents,
-or a cycle, is refused with the node named, not drawn. Use `treemap` when the
-question is share, not structure.
+for a `treemap`. Use `treemap` when the question is share, not structure.
 
-Options: number (how values are written), `layout` (`"tree"`, the default),
-`orient` (`"LR"`, the default, `"TB"`, `"RL"`, `"BT"` or `"radial"`), `source`
+Pick the layout from the data, not the wording:
+
+- `layout: "tree"` (the default) when every node has exactly one parent: a
+  hierarchy, a folder tree, a call tree with no shared callee. Branches
+  collapse and expand, and `orient` turns it.
+- `layout: "dag"` when a node can have several parents or the edges can form
+  a cycle: two services calling one store, tables sharing a dimension, a
+  lineage where a model reads several sources, a state machine, a network
+  with redundant links. Nodes sit in layers with arrows, a cycle's closing
+  edge dashed. A tree whose rows turn out not to be one is drawn this way
+  anyway, with a "Not a tree" badge, so say `"dag"` whenever shared children
+  or cycles are possible.
+
+Options: number (how values are written), `layout` (`"tree"`, the default, or
+`"dag"`), `orient` (the tree's: `"LR"`, the default, `"TB"`, `"RL"`, `"BT"`
+or `"radial"`), `direction` (the dag's: `"LR"`, the default, or `"TB"`),
+`edgeLabels` (`true` writes each edge's value on a dag), `curve` (`false`
+draws a dag's edges straight), `source`
 and `target` (the parent and child columns of an edge row; default the first
 two text columns), `value` (a numeric column shown on each node: its incoming
 edge's, or for a root what leaves it), `group` (a text column that colors each
@@ -230,11 +245,15 @@ symbol is one of the shapes `circle`, `rect`, `roundRect`, `triangle`,
 `diamond`, `pin`, `arrow`, or the icons `server`, `database`, `cloud`,
 `router`, `switch`, `firewall`, `loadBalancer`, `queue`, `cache`, `storage`,
 `user`, `service`; never a `path://` or `image://` string. Use the icons for
-an infrastructure or service map. At most 500 nodes are drawn.
+an infrastructure or service map. At most 500 nodes are drawn, and on a dag
+1,500 edges.
 
 A click on a node's label is a datum for a link: its own edge row's columns
-plus `node`, `parent`, `group` and `value`, so `{ "column": "node" }` carries
-the clicked node's name.
+plus `node`, `parent` (on a dag, the first parent), `group` and `value`, so
+`{ "column": "node" }` carries the clicked node's name. On a dag a click on an
+edge is a datum too, with `source`, `target` and `value`. A link that reads a
+column the clicked node's row has no value for is not offered, so compute a
+column that is null where a link should not apply (a router has no `host`).
 
 With PromQL: an instant query aggregated by both ends of an edge, `sum by (job, instance) (rate(http_requests_total[5m]))`, with `source: "job"`, `target: "instance"` and `value: "value"`.
 

@@ -342,14 +342,21 @@ What a whole is made of, level by level
 
 ## `graph`
 
-What points at what, drawn as a tree: a service and what it calls, a schema's
-tables and columns, a folder tree
-([#623](https://github.com/jbouder/holotable/issues/623)).
+What points at what: a service and what it calls, a schema's tables and
+columns, a folder tree, drawn as a tree
+([#623](https://github.com/jbouder/holotable/issues/623)); or, where a node has
+several parents or the edges form a cycle (a dependency graph, a data lineage,
+tables sharing a dimension, a state machine, a network with redundant links),
+as a layered directed graph
+([#624](https://github.com/jbouder/holotable/issues/624)).
 
 | Option | Type | Default | Meaning |
 | --- | --- | --- | --- |
-| `layout` | `"tree"` | `"tree"` | How the graph is drawn. The directed-graph, force and Sankey layouts join it on the same options. |
+| `layout` | `"tree"` \| `"dag"` | `"tree"` | How the graph is drawn: a tree, or a layered directed graph. The force layout joins them on the same options. |
 | `orient` | `"LR"` \| `"TB"` \| `"RL"` \| `"BT"` \| `"radial"` | `"LR"` | Which way the tree grows: left to right, top to bottom, right to left, bottom to top, or out from its root. |
+| `direction` | `"LR"` \| `"TB"` | `orient`'s nearer one, else `"LR"` | Which way a directed graph's layers run: left to right or top to bottom. |
+| `edgeLabels` | boolean | `false` | A directed graph writes each edge's value on it. |
+| `curve` | boolean | `true` | A directed graph's edges are gently curved; `false` draws them straight. |
 | `source` | column name | the first text column | An edge row's parent. |
 | `target` | column name | the second text column | An edge row's child. |
 | `value` | column name | none | A number shown on each node: its incoming edge's, summed over rows; a root shows what leaves it. |
@@ -376,15 +383,27 @@ fetch an image.
   for the panel.
 - **Path columns**: each row is a leaf at the end of its path, and a parent's
   value is the sum of its leaves, as in a treemap.
-- Every node needs one parent. A node with two parents, or a cycle, is not a
-  tree: the panel says so in its error state, naming the node (`"orders-db"
-  has two parents ("orders" and "auth"); a tree needs one`), rather than
-  drawing it wrongly.
-- At most 500 nodes are drawn, breadth first from the roots; a note in the
-  corner says how many more there are.
+- A tree needs every node to have one parent. Rows with a node of two
+  parents, or a cycle, are not a tree, and `layout: "tree"` draws them as the
+  directed graph instead, with a **Not a tree** badge beside the title whose
+  popover names the node (`"orders-db" has two parents ("orders" and
+  "auth"); a tree needs one`). Set `layout: "dag"` to draw it that way on
+  purpose, without the badge.
+- **The directed graph** (`layout: "dag"`) places nodes in layers, every edge
+  pointing on with the flow, by a layout Holotable owns
+  ([Graph layout](/architecture/graph-layout/) has the measurements behind
+  that). A cycle is broken at the edge that closes it, which is drawn against
+  the flow, dashed and bowed out, so the loop is visible; a node that points
+  at itself has a ↻ beside its name. Each edge carries an arrow and is as
+  wide as its value against the largest; a node's value is its incoming
+  edges' summed, or a root's, its outgoing ones'. Drag to pan; pinch, or hold
+  Ctrl and scroll, to zoom, so the page still scrolls past the panel.
+- At most 500 nodes are drawn, breadth first from the roots, and on a directed
+  graph at most 1,500 edges; a note in the corner says how many more there
+  are.
 - A node is colored by its group, or without one by its branch below the
-  root. Its label sits on that color, black or white, whichever meets WCAG
-  AA on it.
+  root (on a directed graph, all in the first series color). Its label sits
+  on that color, black or white, whichever meets WCAG AA on it.
 - A click on a node's symbol opens or closes its branch, and what a reader
   closed stays closed as the panel refreshes. A click on its label follows a
   [datum link](/guide/drilldown/). The datum is the node's own edge row (the
@@ -392,10 +411,15 @@ fetch an image.
   name in the parent column), or its path columns, and on every graph four
   more: `node` (its name), `parent` (its parent's name), `group` (its group
   value) and `value`. A link reads `{ "column": "node" }` whatever the edge
-  columns are called. ECharts reports no click on an edge, so an edge is not a
-  datum.
+  columns are called. On a directed graph `parent` is a node's first parent,
+  and a click on an edge is a datum too: the edge's first row, its value
+  summed, with `source`, `target` and `value` (a cycle's reversed edge keeps
+  its real ends). A link that finds nothing it reads in what was clicked (a
+  root has no `service`, a switch no `host`) is not offered, so no click
+  opens a target as if nothing had been clicked.
 - The table a screen reader is given lists one row per edge: parent, child
-  and value.
+  and value, each row offering the child's links. A directed graph's adds the
+  layers each edge runs between, and says which edge is a cycle's back edge.
 
 ```json
 {
@@ -404,10 +428,11 @@ fetch an image.
   "query": {
     "sourceId": "ts-metrics",
     "timeField": "period",
-    "sql": "SELECT time_bucket('5 minutes', ts) AS period, caller, callee, tier, CASE WHEN tier = 'service' THEN callee ELSE caller END AS service, sum(requests) AS requests FROM service_calls GROUP BY period, caller, callee, tier ORDER BY period"
+    "sql": "SELECT time_bucket('5 minutes', ts) AS period, caller, callee, tier, CASE WHEN tier = 'service' THEN callee WHEN tier = 'store' THEN NULL ELSE caller END AS service, sum(requests) AS requests FROM service_calls GROUP BY period, caller, callee, tier ORDER BY period"
   },
   "options": {
-    "orient": "LR",
+    "layout": "dag",
+    "direction": "LR",
     "source": "caller",
     "target": "callee",
     "value": "requests",
@@ -417,7 +442,8 @@ fetch an image.
       "service": "server",
       "database": "database",
       "cache": "cache",
-      "queue": "queue"
+      "queue": "queue",
+      "store": "storage"
     },
     "compact": true
   },

@@ -304,7 +304,7 @@ module under `src/lib/panels/kinds/` that says, in plain data:
 
 How a kind is drawn is the browser half, `PANEL_RENDERERS` in
 `src/components/panels/registry.ts`: `{ type: "chart", option, shape?,
-problem?, table? }`, an ECharts option builder; `{ type: "html", Body }`, a component; or
+problem?, notice?, table? }`, an ECharts option builder; `{ type: "html", Body }`, a component; or
 `{ type: "view", Body }`, a component that draws its own image and is handed
 the PNG export handle a chart is (a custom visual). An option
 builder is given the rows and a context: the viewer's time display, and the
@@ -313,10 +313,12 @@ by `/api/query`), so a chart that runs to "now" ends where the server's window
 does. `shape` names a layout of the kind, such as a gauge's dial or bars.
 `PanelView` keys the chart by it, so switching layouts remounts the chart.
 Data updates never change it, so they still merge (invariant 11). `problem`
-says why a result cannot be drawn, naming what is wrong (a graph whose rows
-are not a tree, #623), and the panel shows it in the shared error state
-instead of the chart; `table` is the kind's own screen-reader table where its
-marks are not one per row (a graph's edges). It is kept
+says why a result cannot be drawn, naming what is wrong, and the panel shows
+it in the shared error state instead of the chart; `notice` says the rows were
+drawn other than the spec asked, and the panel shows it as a badge beside its
+title, as it shows a truncation (a graph's tree drawn as a directed graph
+because its rows are not a tree, #624); `table` is the kind's own
+screen-reader table where its marks are not one per row (a graph's edges). It is kept
 apart because `src/lib/ir.ts` imports the registry, and the server and the
 prompt must not pull React in with it. The renderer map is typed as
 `Record<VizType, PanelRenderer>`, so a kind registered without a renderer does
@@ -329,7 +331,8 @@ Adding a kind is therefore:
    `src/components/panels/`) and one line in `PANEL_RENDERERS`.
 3. if its option builder uses an ECharts series or component no other kind
    does, one line in `src/components/charts/echarts.ts` (the graph's
-   `TreeChart`, #623, is one). That module loads
+   `TreeChart`, #623, and its directed graph's `GraphChart` and inside
+   `DataZoom`, #624, are). That module loads
    `echarts/core` with only what the panels draw (#488), and it is the only
    one that imports ECharts at runtime (`test/echarts-runtime.test.ts`). A
    missing registration draws nothing in production and warns only in
@@ -368,6 +371,14 @@ track — is the page's own `--muted`, `--border`, `--surface-2` and
 in, so a chart's text is the same gray as the text beside it in either theme
 and no chart is recreated. `test/chart-theme.test.ts` holds every chart kind
 to this: none may draw a color that suits only one theme.
+
+One layout is Holotable's own rather than ECharts': the graph kind's directed
+graph (`layout: "dag"`, #624). ECharts' `graph` series lays nodes out only by
+force or in a circle, so `graphLayout` (`src/lib/graph/layout.ts`) places
+them in layers, pure and deterministic, and the builder in
+`src/components/charts/graph.ts` hands ECharts the positions. Why that is not
+`dagre`, and what was measured to decide it, is
+[Graph layout](/architecture/graph-layout/).
 
 What the viewer does with the stream once it arrives — the time picker, pausing,
 fullscreen, exports, the command palette and the dashboard chat — is

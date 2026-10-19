@@ -11,7 +11,7 @@ import {
 import { gaugeChart, gaugeShape } from "@/components/charts/gauge";
 import {
   graphChart,
-  graphProblem,
+  graphNotice,
   graphShape,
   graphTable,
 } from "@/components/charts/graph";
@@ -62,7 +62,7 @@ export const PANEL_RENDERERS = {
     type: "chart",
     option: graphChart,
     shape: graphShape,
-    problem: graphProblem,
+    notice: graphNotice,
     table: graphTable,
   },
   vega: { type: "view", Body: VegaView },

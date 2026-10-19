@@ -1,4 +1,5 @@
 import { z } from "zod";
+import type { GraphDirection } from "@/lib/graph/layout";
 import { GRAPH_SYMBOLS, SYMBOL_SIZE_MAX, SYMBOL_SIZE_MIN } from "@/lib/graph/symbols";
 import { NumberFields } from "@/lib/panels/presentation";
 import { definePanelKind } from "@/lib/panels/types";
@@ -11,10 +12,13 @@ export const GRAPH_PATH_MAX = 8;
 export const GRAPH_SYMBOL_GROUPS_MAX = 32;
 
 /**
- * How a graph is laid out. `tree` is the first (#623); the directed-graph,
- * force and Sankey layouts join this list on the same options (#624, #625).
+ * How a graph is laid out: `tree` (#623), and `dag`, a layered directed graph
+ * for a node with several parents or a cycle (#624). The force layout joins
+ * this list on the same options (#625).
  */
-export const GRAPH_LAYOUTS = ["tree"] as const;
+export const GRAPH_LAYOUTS = ["tree", "dag"] as const;
+/** Which way a directed graph's layers run (#624). */
+export const GRAPH_DIRECTIONS = ["LR", "TB"] as const satisfies readonly GraphDirection[];
 /** Which way a tree grows: left to right, top to bottom, …, or out from its root. */
 export const GRAPH_ORIENTS = ["LR", "TB", "RL", "BT", "radial"] as const;
 
@@ -27,6 +31,15 @@ export const GraphOptions = z
     layout: z.enum(GRAPH_LAYOUTS).optional(),
     /** Which way the tree grows; `LR` by default. */
     orient: z.enum(GRAPH_ORIENTS).optional(),
+    /**
+     * Which way a directed graph's layers run, left to right or top to
+     * bottom; by default `orient`'s nearer one, else `LR`.
+     */
+    direction: z.enum(GRAPH_DIRECTIONS).optional(),
+    /** A directed graph writes each edge's value on it. */
+    edgeLabels: z.boolean().optional(),
+    /** A directed graph's edges are gently curved; `true` by default. */
+    curve: z.boolean().optional(),
     /** The parent column of an edge row; by default the first text column. */
     source: Column.optional(),
     /** The child column of an edge row; by default the second text column. */
@@ -60,18 +73,26 @@ export const GraphOptions = z
 export type GraphOptions = z.infer<typeof GraphOptions>;
 
 /**
- * What a click on a node carries besides its row's columns (#623): its name,
- * its parent's, its group and its value, under these names on any graph.
+ * What a click carries besides its row's columns, under these names on any
+ * graph: on a node (#623) its name, its (first) parent's, its group and its
+ * value; on a directed graph's edge (#624) its `source`, `target` and value.
  */
-export const GRAPH_DATUM_COLUMNS = ["node", "parent", "group", "value"] as const;
+export const GRAPH_DATUM_COLUMNS = [
+  "node",
+  "parent",
+  "group",
+  "value",
+  "source",
+  "target",
+] as const;
 
 /** Structure: what points at what, drawn as a tree of nodes and edges (#623). */
 export const graph = definePanelKind({
   kind: "graph",
   summary:
-    "Structure: nodes and edges drawn as a tree, from one row per edge (`options.source` → `options.target`) or from path columns, left to right, top to bottom or radial, with collapsible branches and network icons as symbols.",
+    "Structure: nodes and edges drawn as a tree, or as a layered directed graph where a node has several parents or edges form a cycle, from one row per edge (`options.source` → `options.target`) or from path columns, with collapsible branches, arrows and network icons as symbols.",
   promptHint:
-    'what points at what (a service and what it calls, a schema\'s tables and their columns, a folder tree): return one row per edge, parent and child columns, named in options.source and options.target, with an optional numeric options.value and a text options.group that colors nodes by category; or one row per leaf with options.path columns, top level first, as for a treemap. Every node needs one parent: a node with two parents or a cycle is refused. options.orient "LR" (default), "TB", "RL", "BT" or "radial". For an infrastructure or service map, give nodes icons: options.symbol (one of circle, rect, roundRect, triangle, diamond, pin, arrow, server, database, cloud, router, switch, firewall, loadBalancer, queue, cache, storage, user, service) and options.symbols mapping a group value to one, e.g. {"service": "server", "store": "database"}. Use \'treemap\' when the question is share, not structure.',
+    'what points at what (a service and what it calls, a schema\'s tables and their columns, a folder tree): return one row per edge, parent and child columns, named in options.source and options.target, with an optional numeric options.value and a text options.group that colors nodes by category; or one row per leaf with options.path columns, top level first, as for a treemap. options.layout "tree" (default) when every node has one parent, with options.orient "LR" (default), "TB", "RL", "BT" or "radial"; options.layout "dag" when a node has several parents or the edges can form a cycle (a dependency graph, a data lineage, tables sharing a dimension, a state machine, a network with redundant links), with options.direction "LR" (default) or "TB", options.edgeLabels true to write each edge\'s value on it, and options.curve false for straight edges. A tree whose rows turn out not to be one is drawn as a dag with a notice. For an infrastructure or service map, give nodes icons: options.symbol (one of circle, rect, roundRect, triangle, diamond, pin, arrow, server, database, cloud, router, switch, firewall, loadBalancer, queue, cache, storage, user, service) and options.symbols mapping a group value to one, e.g. {"service": "server", "store": "database"}. Use \'treemap\' when the question is share, not structure.',
   promqlHint:
     'an instant query aggregated by both ends of an edge, \'sum by (caller, callee) (rate(calls_total[5m]))\', with options.source "caller", options.target "callee" and options.value "value".',
   canvas: true,

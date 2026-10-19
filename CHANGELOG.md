@@ -19,6 +19,18 @@ says how a section gets here.
   click on a service (or its store) filters the dashboard to it through a new
   `service` variable. A graph node's datum carries `node`, `parent`, `group`
   and `value` for links.
+- **Directed graphs.** `layout: "dag"` on a graph panel draws data where a
+  node has several parents or edges form a cycle (a dependency graph, a data
+  lineage, a network with redundant links) as layers, left to right or top to
+  bottom, with arrows, edges as wide as their value, and a cycle's closing
+  edge dashed. A tree whose rows are not a tree now falls back to it with a
+  "Not a tree" badge instead of an error. A click on an edge is a datum with
+  `source`, `target` and `value`, and a link that finds nothing to read in
+  what was clicked is no longer offered. The layout is Holotable's own, not
+  `dagre`; the docs' Graph layout page has the measurements. The demo's
+  service map gains a `redis` that `api` and `web` share and is drawn as a
+  directed graph, and Demo files gains `links.csv` and a network topology
+  whose hosts open Demo host detail.
 
 ## 0.2.0 — 2026-10-11
 

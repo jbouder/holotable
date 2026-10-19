@@ -17,7 +17,7 @@ dashboard readable during an incident.
 | What does it look like, not just its p95? (latency, sizes) | `histogram` | A bucket (lower bound) + a count, with a coarse time bucket; `cumulative` for a Prometheus `le`. |
 | What did it say? (errors, audit entries, recent events) | `logs` | Raw time + message (+ level), newest first, `LIMIT 200`. |
 | What is the whole made of, level by level? (disk, cost, traffic) | `treemap` | Path columns + a summable value; `variant: "sunburst"` for rings. |
-| What points at what? (service calls, schema, hierarchy) | `graph` | One row per edge (parent, child) or path columns; one parent per node; icons by `group` for a service map. |
+| What points at what? (service calls, schema, hierarchy, lineage) | `graph` | One row per edge (parent, child) or path columns; `layout: "tree"` when every node has one parent, `"dag"` when a node can have several or edges can cycle; icons by `group` for a service map. |
 | Which of these is unhealthy? (hosts, services, targets) | `status-grid` | One row per entity, a label + a value (or a state); thresholds color it. |
 | Where is the load concentrated over time? | `heatmap` | Time bucket, a dimension, a count. |
 | Do two measures move together? (size vs latency) | `scatter` | Two numeric columns, optionally a label. |

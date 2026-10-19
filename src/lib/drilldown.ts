@@ -254,12 +254,22 @@ export function datumLinkItems(
 ): MenuLinkItem[] {
   return (
     usableDatumLinks(panel, targets)
+      // A link that reads nothing from this datum is left out (#623, #624): a
+      // graph's root has no column a node's link reads, and a router in a
+      // network map has no `host` for a link to host detail. In place, it
+      // would change nothing; elsewhere, it would open the target as if no
+      // point had been clicked.
+      .filter((link) => readsFrom(link, datum))
       .map((link) => linkItem(link, targets, context, datum))
-      // A self link that reads nothing from this datum would change nothing
-      // (#623): a graph's root has no column a node's link reads. It is left
-      // out rather than offered as a click that goes nowhere.
-      .filter((item) => item.kind !== "self" || Object.keys(item.picks).length > 0)
   );
+}
+
+/** Whether a datum link finds anything in the datum to set. */
+function readsFrom(link: PanelLink, datum: Datum): boolean {
+  const reads = Object.fromEntries(
+    Object.entries(link.set ?? {}).filter(([, v]) => !("value" in v)),
+  );
+  return Object.keys(linkPicks({ ...link, set: reads }, datum)).length > 0;
 }
 
 /** Whether a panel leads anywhere the viewer can go: what the header's glyph says. */

@@ -8,9 +8,11 @@ import {
   toText,
 } from "@/components/charts/options";
 import { escapeHtml } from "@/components/charts/state-timeline";
+import type { PanelNotice } from "@/components/panels/types";
 import { type ChartTheme, inkOn, seriesColor } from "@/lib/color/chart-theme";
 import type { Datum } from "@/lib/drilldown";
 import { formatValue } from "@/lib/format";
+import { type GraphDirection, graphLayout } from "@/lib/graph/layout";
 import { echartsSymbol, type GraphSymbol, symbolSizeFor } from "@/lib/graph/symbols";
 import { type Panel, panelTimeField } from "@/lib/ir";
 import { GraphOptions } from "@/lib/panels/kinds/graph";
@@ -31,10 +33,15 @@ import type { TimeDisplay } from "@/lib/time-display";
  *   with each node's value the sum of the leaves under it.
  *
  * The builder is pure and never throws on odd rows. Data that is not a tree
- * (a node with two parents, a cycle) comes back as a `problem` naming the
- * node, which the panel shows in its error state rather than drawing it
- * wrongly. That refusal lives in {@link graphTree}; the directed-graph layout
- * (#624) is where it becomes a fallback.
+ * (a node with two parents, a cycle) comes back from {@link graphTree} as a
+ * `problem` naming the node.
+ *
+ * The `dag` layout (#624) draws the same rows as a layered directed graph:
+ * {@link graphNet} reads them as nodes and edges, any number of parents and
+ * cycles allowed, and `graphLayout` (`src/lib/graph/layout.ts`) places them.
+ * A `tree` whose rows are not a tree falls back to it, and says so through
+ * {@link graphNotice} rather than refusing. {@link graphView} is where a
+ * panel's layout is decided; every export here dispatches on it.
  *
  * Every node's label sits on its own color, in whichever ink reads on it
  * (`inkOn`), so `test/graph.test.ts` holds every series color to AA against
@@ -43,6 +50,8 @@ import type { TimeDisplay } from "@/lib/time-display";
 
 /** The most nodes drawn; nodes past it (the deepest, then the latest) are left out. */
 export const GRAPH_NODES_MAX = 500;
+/** The most edges a directed graph draws; edges past it (the latest) are left out. */
+export const GRAPH_EDGES_MAX = 1500;
 
 /** Joins a path into a node's id; a character no label contains. */
 const SEP = "\u001f";
@@ -94,8 +103,17 @@ function empty(tree: Partial<GraphTree> & Pick<GraphTree, "shape">): GraphTree {
   return { roots: [], pathKeys: [], groups: [], overflow: 0, ...tree };
 }
 
-/** The rows as a tree, or why they are not one. Pure, and never throws on odd rows. */
-export function graphTree(panel: Panel, data: PanelData): GraphTree {
+/** The columns a graph reads, by its options or by default. */
+interface GraphColumns {
+  shape: "edges" | "path";
+  sourceKey?: string;
+  targetKey?: string;
+  pathKeys: string[];
+  valueKey?: string;
+  groupKey?: string;
+}
+
+function graphColumns(panel: Panel, data: PanelData): GraphColumns {
   const o = readOptions(GraphOptions, panel.options);
   const timeField = panelTimeField(panel);
   const has = (c: string | undefined) =>
@@ -104,11 +122,7 @@ export function graphTree(panel: Panel, data: PanelData): GraphTree {
   const groupKey = has(o.group);
   if (o.path) {
     const pathKeys = o.path.filter((c) => data.columns.includes(c));
-    if (pathKeys.length === 0) return empty({ shape: "path", valueKey, groupKey });
-    return assemble(
-      ingestPath(data, pathKeys, valueKey, groupKey),
-      empty({ shape: "path", pathKeys, valueKey, groupKey }),
-    );
+    return { shape: "path", pathKeys, valueKey, groupKey };
   }
   const text = data.columns.filter(
     (c) =>
@@ -116,9 +130,33 @@ export function graphTree(panel: Panel, data: PanelData): GraphTree {
   );
   const sourceKey = has(o.source) ?? text[0];
   const targetKey = has(o.target) ?? text.find((c) => c !== sourceKey);
+  return { shape: "edges", sourceKey, targetKey, pathKeys: [], valueKey, groupKey };
+}
+
+/** Whether the columns name two different ends of an edge. */
+function hasEnds(
+  c: GraphColumns,
+): c is GraphColumns & { sourceKey: string; targetKey: string } {
+  return (
+    c.sourceKey !== undefined && c.targetKey !== undefined && c.sourceKey !== c.targetKey
+  );
+}
+
+/** The rows as a tree, or why they are not one. Pure, and never throws on odd rows. */
+export function graphTree(panel: Panel, data: PanelData): GraphTree {
+  const c = graphColumns(panel, data);
+  const { valueKey, groupKey } = c;
+  if (c.shape === "path") {
+    if (c.pathKeys.length === 0) return empty({ shape: "path", valueKey, groupKey });
+    return assemble(
+      ingestPath(data, c.pathKeys, valueKey, groupKey),
+      empty({ shape: "path", pathKeys: c.pathKeys, valueKey, groupKey }),
+    );
+  }
+  const { sourceKey, targetKey } = c;
   const base = empty({ shape: "edges", sourceKey, targetKey, valueKey, groupKey });
-  if (!sourceKey || !targetKey || sourceKey === targetKey) return base;
-  const ingest = ingestEdges(data, sourceKey, targetKey, valueKey, groupKey);
+  if (!hasEnds(c)) return base;
+  const ingest = ingestEdges(data, c.sourceKey, c.targetKey, valueKey, groupKey);
   if (typeof ingest === "string") return { ...base, problem: ingest };
   return assemble(ingest, base);
 }
@@ -360,32 +398,350 @@ export function graphNodes(tree: GraphTree): GraphNode[] {
   return out;
 }
 
-/** Why the panel cannot draw these rows, for its error state. */
-export function graphProblem(panel: Panel, data: PanelData): string | undefined {
-  return graphTree(panel, data).problem;
+/** A node of a directed graph (#624): any number of parents, a cycle allowed. */
+export interface GraphVertex {
+  /** Its id in the chart: its name, or its path joined. */
+  id: string;
+  name: string;
+  /** Its incoming edges' values summed; a node with none, its outgoing ones'. */
+  value?: number;
+  group?: string;
+  /** Its parents' ids, in the order the rows first name them. */
+  parents: string[];
+  /** Its datum's row, as a tree node's, its first parent the `parent`. */
+  row: Record<string, unknown>;
 }
 
-/** A node as a datum (#373): the columns it stands for, its name the series. */
-export function graphDatum(node: GraphNode): Datum {
-  return { row: node.row, series: node.name };
-}
-
-/** A layout or orientation change remounts; a data update merges (invariant 11). */
-export function graphShape(panel: Panel): string {
-  const o = readOptions(GraphOptions, panel.options);
-  return JSON.stringify([o.layout ?? "tree", o.orient ?? "LR"]);
+/** An edge, once however many rows name it, its value summed over them. */
+export interface GraphEdge {
+  /** Its id in the chart, which a click on it carries. */
+  id: string;
+  source: string;
+  target: string;
+  value?: number;
+  /** The first row that names it, its value the sum: its datum's columns. */
+  row: Record<string, unknown>;
 }
 
 /**
- * The tree's edges as the screen-reader table (#77): one row per edge,
- * parent, child and value, each offering the child's datum links.
+ * The rows as nodes and edges (#624), the shape every layout but the tree
+ * draws: the edge normalization. A repeated edge is one, its value summed; a
+ * self-edge is kept (the table lists it, the chart marks its node).
+ */
+export interface GraphNet extends GraphColumns {
+  /** Roots first, breadth first, then any only a cycle reaches; up to the cap. */
+  nodes: GraphVertex[];
+  /** Between nodes kept, in the order the rows first name them; up to the cap. */
+  edges: GraphEdge[];
+  groups: string[];
+  /** Nodes past {@link GRAPH_NODES_MAX}, left out with their edges. */
+  overflow: number;
+  /** Edges past {@link GRAPH_EDGES_MAX}, or to a node left out. */
+  edgeOverflow: number;
+}
+
+/** The id an edge carries in the chart; no node's id starts with it. */
+export function graphEdgeId(source: string, target: string): string {
+  return `${SEP}edge${SEP}${source}${SEP}${target}`;
+}
+
+/** The rows as nodes and edges, whatever their shape. Pure, and never throws. */
+export function graphNet(panel: Panel, data: PanelData): GraphNet {
+  const c = graphColumns(panel, data);
+  const base: GraphNet = {
+    ...c,
+    nodes: [],
+    edges: [],
+    groups: [],
+    overflow: 0,
+    edgeOverflow: 0,
+  };
+  if (c.shape === "path") {
+    if (c.pathKeys.length === 0) return base;
+    // Path rows are always a tree; its edges are the net's.
+    const ingest = ingestPath(data, c.pathKeys, c.valueKey, c.groupKey);
+    const edges = ingest.order.flatMap((id) => {
+      const p = ingest.parent.get(id);
+      if (p === undefined) return [];
+      const value = ingest.value.get(id);
+      const row = ingest.row(id);
+      return [
+        {
+          id: graphEdgeId(p, id),
+          source: p,
+          target: id,
+          ...(value !== undefined ? { value } : {}),
+          row,
+        },
+      ];
+    });
+    const nodes = ingest.order.map((id) => {
+      const p = ingest.parent.get(id);
+      const value = ingest.value.get(id);
+      const group = ingest.group.get(id);
+      return {
+        id,
+        name: ingest.name(id),
+        parents: p === undefined ? [] : [p],
+        row: ingest.row(id),
+        ...(value !== undefined ? { value } : {}),
+        ...(group !== undefined ? { group } : {}),
+      };
+    });
+    return capNet({ ...base, nodes, edges });
+  }
+  if (!hasEnds(c)) return base;
+  return capNet({
+    ...base,
+    ...ingestNet(data, c.sourceKey, c.targetKey, c.valueKey, c.groupKey),
+  });
+}
+
+/** Edge rows as nodes and edges: the tree's reading without its refusals. */
+function ingestNet(
+  data: PanelData,
+  sourceKey: string,
+  targetKey: string,
+  valueKey: string | undefined,
+  groupKey: string | undefined,
+): Pick<GraphNet, "nodes" | "edges"> {
+  const order: string[] = [];
+  const parents = new Map<string, string[]>();
+  const see = (id: string) => {
+    if (!parents.has(id)) {
+      parents.set(id, []);
+      order.push(id);
+    }
+  };
+  const own = new Map<string, Record<string, unknown>>();
+  const group = new Map<string, string>();
+  /** Values that came in on a node: its incoming edges', or its own row's. */
+  const inValue = new Map<string, number>();
+  const outValue = new Map<string, number>();
+  const edges = new Map<string, GraphEdge>();
+  const add = (m: Map<string, number>, k: string, v: number) =>
+    m.set(k, (m.get(k) ?? 0) + v);
+  for (const row of data.rows) {
+    const s = toText(row[sourceKey]);
+    const t = toText(row[targetKey]);
+    const node = t || s;
+    if (!node) continue;
+    const v = valueKey ? toNumber(row[valueKey]) : Number.NaN;
+    if (s && t) {
+      see(s);
+      see(t);
+      // A self-edge is an edge, not a parent: a node pointing only at itself
+      // is still a root.
+      const ps = parents.get(t) as string[];
+      if (s !== t && !ps.includes(s)) ps.push(s);
+      const id = graphEdgeId(s, t);
+      const edge = edges.get(id) ?? { id, source: s, target: t, row };
+      if (Number.isFinite(v)) {
+        edge.value = (edge.value ?? 0) + v;
+        add(outValue, s, v);
+      }
+      edges.set(id, edge);
+    } else {
+      see(node);
+    }
+    if (!own.has(node)) own.set(node, row);
+    if (Number.isFinite(v)) add(inValue, node, v);
+    if (groupKey && !group.has(node)) {
+      const g = toText(row[groupKey]);
+      if (g) group.set(node, g);
+    }
+  }
+  const nodes = order.map((id): GraphVertex => {
+    const ps = parents.get(id) as string[];
+    const value = inValue.get(id) ?? (ps.length === 0 ? outValue.get(id) : undefined);
+    const g = group.get(id);
+    const first = ps[0];
+    // As a tree node's row: its own row's columns, its first parent and itself.
+    const row: Record<string, unknown> = { ...own.get(id) };
+    if (first === undefined) {
+      row[sourceKey] = id;
+      delete row[targetKey];
+    } else {
+      row[sourceKey] = first;
+      row[targetKey] = id;
+    }
+    if (valueKey) {
+      if (value !== undefined) row[valueKey] = value;
+      else delete row[valueKey];
+    }
+    if (groupKey && g !== undefined) row[groupKey] = g;
+    return {
+      id,
+      name: id,
+      parents: ps,
+      row: withNode(row, id, first, g, value),
+      ...(value !== undefined ? { value } : {}),
+      ...(g !== undefined ? { group: g } : {}),
+    };
+  });
+  return {
+    nodes,
+    edges: [...edges.values()].map((e) => ({
+      ...e,
+      row: {
+        ...e.row,
+        ...(valueKey && e.value !== undefined ? { [valueKey]: e.value } : {}),
+      },
+    })),
+  };
+}
+
+/**
+ * The net within its caps: roots first and breadth first, then what only a
+ * cycle reaches, up to {@link GRAPH_NODES_MAX}; the edges between those, up
+ * to {@link GRAPH_EDGES_MAX}.
+ */
+function capNet(net: GraphNet): GraphNet {
+  const children = new Map<string, string[]>();
+  for (const e of net.edges) {
+    children.set(e.source, [...(children.get(e.source) ?? []), e.target]);
+  }
+  const order: string[] = [];
+  const reached = new Set<string>();
+  const reach = (from: string) => {
+    if (reached.has(from)) return;
+    reached.add(from);
+    order.push(from);
+    for (let i = order.length - 1; i < order.length; i++) {
+      for (const c of children.get(order[i] as string) ?? []) {
+        if (!reached.has(c)) {
+          reached.add(c);
+          order.push(c);
+        }
+      }
+    }
+  };
+  for (const n of net.nodes) if (n.parents.length === 0) reach(n.id);
+  for (const n of net.nodes) reach(n.id);
+  const kept = new Set(order.slice(0, GRAPH_NODES_MAX));
+  const nodes = net.nodes.filter((n) => kept.has(n.id));
+  const between = net.edges.filter((e) => kept.has(e.source) && kept.has(e.target));
+  const edges = between.slice(0, GRAPH_EDGES_MAX);
+  const groups: string[] = [];
+  for (const n of nodes) {
+    if (n.group !== undefined && !groups.includes(n.group)) groups.push(n.group);
+  }
+  return {
+    ...net,
+    nodes,
+    edges,
+    groups,
+    overflow: net.nodes.length - nodes.length,
+    edgeOverflow: net.edges.length - edges.length,
+  };
+}
+
+/**
+ * How a panel's rows are drawn (#624): as a tree when the layout is `tree`
+ * (the default) and they are one; as a directed graph when the layout is
+ * `dag`, or when a tree's rows are not a tree, with why as the `fallback`.
+ * Every layout's builder, table, datum and notice dispatch here.
+ */
+export type GraphView =
+  | { layout: "tree"; tree: GraphTree }
+  | { layout: "dag"; net: GraphNet; direction: GraphDirection; fallback?: string };
+
+export function graphView(panel: Panel, data: PanelData): GraphView {
+  const o = readOptions(GraphOptions, panel.options);
+  const direction = graphDirection(o);
+  if (o.layout === "dag") return { layout: "dag", net: graphNet(panel, data), direction };
+  const tree = graphTree(panel, data);
+  if (tree.problem === undefined) return { layout: "tree", tree };
+  return { layout: "dag", net: graphNet(panel, data), direction, fallback: tree.problem };
+}
+
+/** Which way a directed graph's layers run: its `direction`, else the tree's `orient`. */
+function graphDirection(o: GraphOptions): GraphDirection {
+  if (o.direction) return o.direction;
+  return o.orient === "TB" || o.orient === "BT" ? "TB" : "LR";
+}
+
+/**
+ * What the panel says beside its title when its tree fell back to a directed
+ * graph (#624): why, naming the node. Nothing when it drew what it was asked.
+ */
+export function graphNotice(panel: Panel, data: PanelData): PanelNotice | undefined {
+  const view = graphView(panel, data);
+  if (view.layout !== "dag" || view.fallback === undefined) return undefined;
+  return {
+    label: "Not a tree",
+    detail: `${view.fallback}, so it is drawn as a directed graph. Set the layout to "dag" to draw it that way on purpose.`,
+  };
+}
+
+/** A node as a datum (#373): the columns it stands for, its name the series. */
+export function graphDatum(node: GraphNode | GraphVertex): Datum {
+  return { row: node.row, series: node.name };
+}
+
+/**
+ * An edge as a datum (#624): its first row's columns, its value the sum, and
+ * `source`, `target` and `value` over any of the same name. A reversed edge
+ * (a cycle's) carries its real ends, not the way it was laid out.
+ */
+export function graphEdgeDatum(net: GraphNet, edge: GraphEdge): Datum {
+  const name = (id: string) => net.nodes.find((n) => n.id === id)?.name ?? id;
+  const source = name(edge.source);
+  const target = name(edge.target);
+  return {
+    row: {
+      ...edge.row,
+      source,
+      target,
+      ...(edge.value !== undefined ? { value: edge.value } : {}),
+    },
+    series: `${source} → ${target}`,
+  };
+}
+
+/**
+ * What a click on the item with this id is (#373): a node's datum, or on a
+ * directed graph an edge's. The root drawn above several roots is none.
+ */
+export function graphClickDatum(panel: Panel, data: PanelData, id: string): Datum | null {
+  const view = graphView(panel, data);
+  if (view.layout === "tree") {
+    const node = graphNodes(view.tree).find((n) => n.id === id);
+    return node ? graphDatum(node) : null;
+  }
+  const node = view.net.nodes.find((n) => n.id === id);
+  if (node) return graphDatum(node);
+  const edge = view.net.edges.find((e) => e.id === id);
+  return edge ? graphEdgeDatum(view.net, edge) : null;
+}
+
+/**
+ * A layout, orientation or direction change remounts; a data update merges
+ * (invariant 11), and so does a tree falling back to a directed graph on a
+ * poll, which ECharts takes as a new series in the same place.
+ */
+export function graphShape(panel: Panel): string {
+  const o = readOptions(GraphOptions, panel.options);
+  return JSON.stringify([o.layout ?? "tree", o.orient ?? "LR", o.direction ?? ""]);
+}
+
+/**
+ * The graph's edges as the screen-reader table (#77): one row per edge,
+ * parent, child and value, each offering the child's datum links. A directed
+ * graph's rows also say each end's layer, since there position is meaning.
  */
 export function graphTable(
   panel: Panel,
   data: PanelData,
   _display?: TimeDisplay,
 ): ChartRows {
-  const tree = graphTree(panel, data);
+  const view = graphView(panel, data);
+  return view.layout === "tree"
+    ? treeTable(panel, view.tree)
+    : dagTable(panel, view.net, view.direction);
+}
+
+function treeTable(panel: Panel, tree: GraphTree): ChartRows {
   const o = readOptions(GraphOptions, panel.options);
   const display = numberDisplay(o);
   const edges: [GraphNode, GraphNode][] = [];
@@ -397,11 +753,7 @@ export function graphTable(
   };
   for (const root of tree.roots) walk(root);
   const shown = edges.slice(0, CHART_TABLE_ROWS_MAX);
-  const columns =
-    tree.shape === "edges"
-      ? [tree.sourceKey ?? "parent", tree.targetKey ?? "child"]
-      : ["parent", "child"];
-  if (tree.valueKey) columns.push(tree.valueKey);
+  const columns = edgeColumns(tree);
   const count =
     shown.length === edges.length
       ? `${edges.length} ${edges.length === 1 ? "edge" : "edges"}`
@@ -423,6 +775,58 @@ export function graphTable(
     datums: shown.map(([, child]) => graphDatum(child)),
     // A row's links are the child's, so they are named for it.
     labels: shown.map(([, child]) => child.name),
+  };
+}
+
+/** Edge columns as the table heads them: the edge columns, or the path's. */
+function edgeColumns(c: GraphColumns): string[] {
+  const columns =
+    c.shape === "edges"
+      ? [c.sourceKey ?? "parent", c.targetKey ?? "child"]
+      : ["parent", "child"];
+  if (c.valueKey) columns.push(c.valueKey);
+  return columns;
+}
+
+function dagTable(panel: Panel, net: GraphNet, direction: GraphDirection): ChartRows {
+  const o = readOptions(GraphOptions, panel.options);
+  const display = numberDisplay(o);
+  const layout = graphLayout(
+    net.nodes.map((n) => n.id),
+    net.edges,
+    direction,
+  );
+  const placed = new Map(layout.nodes.map((n) => [n.id, n.layer]));
+  const back = new Set(
+    layout.edges.filter((e) => e.reversed).map((e) => graphEdgeId(e.source, e.target)),
+  );
+  const byId = new Map(net.nodes.map((n) => [n.id, n]));
+  const shown = net.edges.slice(0, CHART_TABLE_ROWS_MAX);
+  const count =
+    shown.length === net.edges.length
+      ? `${net.edges.length} ${net.edges.length === 1 ? "edge" : "edges"}`
+      : `the first ${shown.length} of ${net.edges.length} edges`;
+  const layers = `${layout.layers} ${layout.layers === 1 ? "layer" : "layers"}`;
+  const layerOf = (id: string) => ((placed.get(id) ?? 0) + 1).toString();
+  return {
+    caption: `Edges of ${panel.title}: ${count}, in ${layers}.`,
+    columns: [...edgeColumns(net), "layers"],
+    rows: shown.map((e) => [
+      byId.get(e.source)?.name ?? e.source,
+      byId.get(e.target)?.name ?? e.target,
+      ...(net.valueKey
+        ? [e.value === undefined ? "" : formatValue(e.value, panel.format, display)]
+        : []),
+      e.source === e.target
+        ? `${layerOf(e.source)}, to itself`
+        : `${layerOf(e.source)} → ${layerOf(e.target)}${back.has(e.id) ? ", back edge" : ""}`,
+    ]),
+    // As the tree's: a row offers the links of the node it reaches.
+    datums: shown.map((e) => {
+      const node = byId.get(e.target);
+      return node ? graphDatum(node) : null;
+    }),
+    labels: shown.map((e) => byId.get(e.target)?.name ?? e.target),
   };
 }
 
@@ -475,16 +879,38 @@ const NOTHING = {
 };
 
 export const graphChart: ChartOptionBuilder = normalized((panel, data, { theme }) => {
-  const tree = graphTree(panel, data);
+  const view = graphView(panel, data);
+  return view.layout === "tree"
+    ? treeOption(panel, view.tree, theme)
+    : dagOption(panel, view.net, view.direction, theme);
+});
+
+/** The symbol a node is drawn with: its group's, the default, or a circle. */
+function symbolFor(o: GraphOptions, group: string | undefined): GraphSymbol {
+  return (group !== undefined ? o.symbols?.[group] : undefined) ?? o.symbol ?? "circle";
+}
+
+/** Nodes past a cap, said in the corner; always set, so a count that drops clears. */
+function overflowTitle(theme: ChartTheme, nodes: number, edges = 0) {
+  const parts = [
+    ...(nodes > 0 ? [`+${nodes} more ${nodes === 1 ? "node" : "nodes"}`] : []),
+    ...(edges > 0 ? [`+${edges} more ${edges === 1 ? "edge" : "edges"}`] : []),
+  ];
+  return {
+    text: parts.length > 0 ? `${parts.join(", ")} not shown` : "",
+    right: 0,
+    bottom: 0,
+    textStyle: { color: theme.text, fontSize: 11, fontWeight: "normal" as const },
+  };
+}
+
+function treeOption(panel: Panel, tree: GraphTree, theme: ChartTheme): EChartsOption {
   const o = readOptions(GraphOptions, panel.options);
   const orient = o.orient ?? "LR";
   const display = numberDisplay(o);
   const text = (v: number) => formatValue(v, panel.format, display);
   const colorOf = colorer(tree, theme);
-  const symbolOf = (node: GraphNode): GraphSymbol =>
-    (node.group !== undefined ? o.symbols?.[node.group] : undefined) ??
-    o.symbol ??
-    "circle";
+  const symbolOf = (node: GraphNode): GraphSymbol => symbolFor(o, node.group);
   const open = o.collapseDepth ?? Number.POSITIVE_INFINITY;
 
   // Without groups, a branch keeps one color down from where it starts: below
@@ -562,13 +988,7 @@ export const graphChart: ChartOptionBuilder = normalized((panel, data, { theme }
         return lines.join("<br/>");
       },
     },
-    // Always set, so a count that drops to zero clears rather than lingers.
-    title: {
-      text: tree.overflow > 0 ? `+${tree.overflow} more nodes not shown` : "",
-      right: 0,
-      bottom: 0,
-      textStyle: { color: theme.text, fontSize: 11, fontWeight: "normal" },
-    },
+    title: overflowTitle(theme, tree.overflow),
     series: [
       {
         type: "tree",
@@ -598,4 +1018,193 @@ export const graphChart: ChartOptionBuilder = normalized((panel, data, { theme }
       },
     ],
   } as EChartsOption;
-});
+}
+
+/** The thinnest and widest an edge is drawn, by its value against the largest. */
+const EDGE_WIDTH = [1, 6] as const;
+/** How far a curved edge bows, and a reversed (cycle) edge, so it reads as one. */
+const CURVENESS = 0.1;
+const BACK_CURVENESS = 0.4;
+
+/**
+ * A directed graph (#624): an ECharts `graph` series with `layout: "none"`,
+ * placed by `graphLayout`, an arrow on each edge, its width from its value,
+ * a cycle's reversed edge dashed and bowed. A self-edge is not drawn
+ * (ECharts draws none); its node's label says it with a ↻.
+ *
+ * The nodes sit on hidden value axes rather than ECharts' own `view`, which
+ * scales a node's symbol by the width alone and so squashes it in a panel
+ * whose shape is not the layout's. Pan and zoom, since a wide dependency
+ * graph does not fit a panel, are the axes' inside zoom: drag to pan, pinch
+ * or Ctrl and the wheel to zoom, so the page still scrolls past the panel.
+ */
+function dagOption(
+  panel: Panel,
+  net: GraphNet,
+  direction: GraphDirection,
+  theme: ChartTheme,
+): EChartsOption {
+  const o = readOptions(GraphOptions, panel.options);
+  const display = numberDisplay(o);
+  const text = (v: number) => formatValue(v, panel.format, display);
+  const layout = graphLayout(
+    net.nodes.map((n) => n.id),
+    net.edges,
+    direction,
+  );
+  const placed = new Map(layout.nodes.map((n) => [n.id, n]));
+  const back = new Set(
+    layout.edges.filter((e) => e.reversed).map((e) => graphEdgeId(e.source, e.target)),
+  );
+  const loops = new Set(
+    net.edges.filter((e) => e.source === e.target).map((e) => e.source),
+  );
+  const byId = new Map(net.nodes.map((n) => [n.id, n]));
+  const nameOf = (id: string) => byId.get(id)?.name ?? id;
+  const colorOf = (node: GraphVertex) =>
+    seriesColor(
+      theme,
+      node.group === undefined ? net.groups.length : net.groups.indexOf(node.group),
+    );
+  const widest = Math.max(0, ...net.edges.map((e) => Math.abs(e.value ?? 0)));
+  const widthOf = (e: GraphEdge) =>
+    widest > 0 && e.value !== undefined
+      ? EDGE_WIDTH[0] + ((EDGE_WIDTH[1] - EDGE_WIDTH[0]) * Math.abs(e.value)) / widest
+      : 1.5;
+  const curve = o.curve ?? true;
+
+  const nodes = net.nodes.map((node) => {
+    const at = placed.get(node.id);
+    const color = colorOf(node);
+    const symbol = symbolFor(o, node.group);
+    const name = loops.has(node.id) ? `${node.name} ↻` : node.name;
+    return {
+      id: node.id,
+      name: node.name,
+      // The place on the hidden axes; the node's own value is `amount`.
+      value: [at?.x ?? 0, at?.y ?? 0],
+      ...(node.value !== undefined ? { amount: node.value } : {}),
+      text: node.value === undefined ? name : `${name}  ${text(node.value)}`,
+      group: node.group,
+      parents: node.parents.map(nameOf),
+      loop: loops.has(node.id),
+      symbol: echartsSymbol(symbol),
+      symbolSize: symbolSizeFor(symbol, o.symbolSize),
+      itemStyle: { color },
+      label: { backgroundColor: color, color: inkOn(color) },
+    };
+  });
+  const links = net.edges
+    .filter((e) => e.source !== e.target)
+    .map((e) => {
+      const reversed = back.has(e.id);
+      return {
+        id: e.id,
+        source: e.source,
+        target: e.target,
+        ...(e.value !== undefined ? { value: e.value } : {}),
+        reversed,
+        lineStyle: {
+          width: widthOf(e),
+          ...(reversed
+            ? { type: "dashed", curveness: BACK_CURVENESS }
+            : { curveness: curve ? CURVENESS : 0 }),
+        },
+      };
+    });
+
+  return {
+    backgroundColor: "transparent",
+    tooltip: {
+      trigger: "item",
+      borderRadius: 0,
+      formatter: (p: unknown) => {
+        const { dataType, data: item } = p as {
+          dataType?: string;
+          data?: {
+            name?: string;
+            source?: string;
+            target?: string;
+            value?: number;
+            amount?: number;
+            group?: string;
+            parents?: string[];
+            reversed?: boolean;
+            loop?: boolean;
+          };
+        };
+        if (!item) return "";
+        const lines: string[] = [];
+        if (dataType === "edge") {
+          lines.push(`${nameOf(item.source ?? "")} → ${nameOf(item.target ?? "")}`);
+          if (item.value !== undefined) lines.push(text(item.value));
+          if (item.reversed) lines.push("Back edge: closes a cycle");
+        } else {
+          lines.push(item.name ?? "");
+          if (item.amount !== undefined) lines.push(text(item.amount));
+          if (item.group) lines.push(item.group);
+          if (item.parents && item.parents.length > 0) {
+            lines.push(`From ${item.parents.join(", ")}`);
+          }
+          if (item.loop) lines.push("Points at itself");
+        }
+        return lines.map(escapeHtml).join("<br/>");
+      },
+    },
+    title: overflowTitle(theme, net.overflow, net.edgeOverflow),
+    // Room for the labels beside the nodes at the edges of the layout: below
+    // them when the layers run across, to their right when they run down.
+    grid:
+      direction === "LR"
+        ? { left: 56, right: 56, top: 20, bottom: 36 }
+        : { left: 24, right: "18%", top: 20, bottom: 20 },
+    // Hidden: they only place the nodes. The first layer, and the first node
+    // of a layer, at the top.
+    xAxis: { type: "value", show: false, min: "dataMin", max: "dataMax" },
+    yAxis: { type: "value", show: false, min: "dataMin", max: "dataMax", inverse: true },
+    dataZoom: [0, 1].map((axis) => ({
+      type: "inside",
+      ...(axis === 0 ? { xAxisIndex: 0 } : { yAxisIndex: 0 }),
+      // A node panned out of view keeps its edges.
+      filterMode: "none",
+      zoomOnMouseWheel: "ctrl",
+      moveOnMouseWheel: false,
+      moveOnMouseMove: true,
+    })),
+    series: [
+      {
+        type: "graph",
+        coordinateSystem: "cartesian2d",
+        layout: "none",
+        symbolKeepAspect: true,
+        data: nodes,
+        links,
+        edgeSymbol: ["none", "arrow"],
+        edgeSymbolSize: 8,
+        itemStyle: { borderColor: theme.background, borderWidth: 1 },
+        lineStyle: { color: theme.line, opacity: 0.9 },
+        label: {
+          show: true,
+          position: direction === "LR" ? "bottom" : "right",
+          fontSize: 11,
+          padding: [2, 4],
+          borderRadius: 2,
+          distance: 4,
+          formatter: (p: unknown) => (p as { data?: { text?: string } }).data?.text ?? "",
+        },
+        edgeLabel: {
+          show: o.edgeLabels === true,
+          fontSize: 10,
+          color: theme.text,
+          backgroundColor: theme.background,
+          padding: [1, 3],
+          formatter: (p: unknown) => {
+            const v = (p as { data?: { value?: number } }).data?.value;
+            return v === undefined ? "" : text(v);
+          },
+        },
+        emphasis: { focus: "adjacency", lineStyle: { opacity: 1 } },
+      },
+    ],
+  } as EChartsOption;
+}

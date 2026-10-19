@@ -21,9 +21,19 @@ import {
 } from "../scripts/lib/demo-dashboards";
 import {
   DEMO_FILES_SOURCE_ID,
+  DEMO_HOSTS,
+  DEMO_LINKS,
   demoFilesConfig,
   demoFilesSpec,
 } from "../scripts/lib/demo-files";
+import { HOSTS } from "../scripts/lib/seed-data";
+import {
+  graphClickDatum,
+  graphDatum,
+  graphEdgeId,
+  graphView,
+} from "@/components/charts/graph";
+import { datumLinkItems } from "@/lib/drilldown";
 import { queryOf } from "./support/panels";
 
 /**
@@ -119,7 +129,7 @@ const SPECS: Record<string, Dashboard> = {
   demo: parseDashboard(demoSpec()),
   fleet: parseDashboard(fleetSpec(TARGETS)),
   hostDetail: parseDashboard(hostDetailSpec()),
-  files: parseDashboard(demoFilesSpec()),
+  files: parseDashboard(demoFilesSpec(TARGETS)),
 };
 
 for (const [name, spec] of Object.entries(SPECS)) {
@@ -144,8 +154,10 @@ for (const [name, spec] of Object.entries(SPECS)) {
 
 test("the demo links lead to the host detail dashboard and set only its host", () => {
   const hostVariables = declaredVariables(SPECS.hostDetail);
-  const links = (SPECS.fleet?.panels ?? []).flatMap((panel) => panel.links ?? []);
-  assert.ok(links.length >= 3, "the fleet dashboard links out");
+  const links = [SPECS.fleet, SPECS.files]
+    .flatMap((spec) => spec?.panels ?? [])
+    .flatMap((panel) => (panel.links ?? []).filter((link) => !isSelfLink(link)));
+  assert.ok(links.length >= 4, "the fleet and files dashboards link out");
   for (const link of links) {
     assert.equal(link.dashboard, TARGETS.hostDetail);
     for (const name of Object.keys(link.set ?? {})) {
@@ -155,6 +167,61 @@ test("the demo links lead to the host detail dashboard and set only its host", (
   // Both flavors are on show: a click on a datum, and an item in the menu.
   assert.ok(links.some(isDatumLink));
   assert.ok(links.some((link) => !isDatumLink(link)));
+});
+
+test("the network topology is a directed graph whose hosts, and only they, open host detail (#624)", () => {
+  const panel = SPECS.files?.panels.find((p) => p.id === "network");
+  assert.ok(panel);
+  // The hosts it names are the inventory's, and host detail's picker's.
+  const inventory = DEMO_HOSTS.map(([host]) => host);
+  assert.deepEqual(inventory, HOSTS);
+  // The rows as the panel's SQL returns them: the links, each child joined
+  // to the inventory, so only a host has a `host`.
+  const data = {
+    columns: ["parent", "child", "tier", "bandwidth_gbps", "host", "role"],
+    rows: DEMO_LINKS.map(([parent, child, tier, gbps]) => {
+      const host = DEMO_HOSTS.find(([h]) => h === child);
+      return {
+        parent,
+        child,
+        tier,
+        bandwidth_gbps: gbps,
+        host: host?.[0] ?? null,
+        role: host?.[2] ?? null,
+      };
+    }),
+  };
+  const view = graphView(panel, data);
+  assert.ok(view.layout === "dag" && view.fallback === undefined);
+  // Dual-homed hosts have two parents, and the core routers loop.
+  assert.deepEqual(view.net.nodes.find((n) => n.id === "host-02")?.parents, [
+    "access-1",
+    "access-2",
+  ]);
+  const targets = { [TARGETS.hostDetail]: { title: "Demo host detail" } };
+  const context = {
+    timeRange: SPECS.files?.timeRange ?? { from: "now-1h", to: "now" },
+    selection: {},
+  };
+  for (const node of view.net.nodes) {
+    const items = datumLinkItems(panel, targets, context, graphDatum(node));
+    if (!inventory.includes(node.id)) {
+      assert.deepEqual(items, [], `${node.id} offers no link`);
+      continue;
+    }
+    assert.equal(items.length, 1, node.id);
+    const item = items[0];
+    assert.ok(item?.kind === "navigate");
+    assert.match(
+      item.href,
+      new RegExp(`^/dashboards/${TARGETS.hostDetail}\\?.*host=${node.id}`),
+    );
+  }
+  // The loop's edge back keeps its real ends when clicked.
+  const back = graphClickDatum(panel, data, graphEdgeId("core-2", "core-1"));
+  assert.equal(back?.row.source, "core-2");
+  assert.equal(back?.row.target, "core-1");
+  assert.equal(back?.row.value, 400);
 });
 
 test("the host detail dashboard filters itself from its host table", () => {

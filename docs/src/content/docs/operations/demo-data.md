@@ -39,7 +39,8 @@ panel kind:
   latency and the share of requests over the 300 ms SLO as stats with
   sparklines, availability as a gauge, requests per minute by outcome, a
   sunburst of requests by route and status, a service map of which service
-  calls which (a [graph](/reference/panel-options/#graph)), the latency band
+  calls which (a [graph](/reference/panel-options/#graph), drawn as a
+  directed graph), the latency band
   against the SLO
   (a [custom visual](/architecture/custom-visuals/)) beside the latency
   histogram, the slowest routes, server errors by route, requests by service,
@@ -59,10 +60,13 @@ They show [drilldown](/guide/drilldown/) too. **Demo service health** has a
 is how the dashboard shows everything until it is narrowed), and every panel
 over `http_requests` filters by it. A click on a service on the service map
 shows that service; a click on a store shows the service that calls it; the
-gateway, which is no one service, offers nothing. On **Demo fleet**, a click on a
+gateway, which is no one service, and the `redis` two services share offer
+nothing. On **Demo fleet**, a click on a
 host anywhere (a tile, a line, a bar, a lane or a row of the hosts table)
 opens **Demo host detail** for that host, and the heatmap has an *Open host
-detail* item in its panel menu. On **Demo host detail**, a click on a row of
+detail* item in its panel menu. On **Demo files**, where the seeder writes it,
+a click on a host in the network topology opens **Demo host detail** for that
+host; a router or a switch offers nothing. On **Demo host detail**, a click on a row of
 the host table switches the page to that host in place. A link names its
 target by dashboard id, so the seeder writes **Demo host detail** before the
 dashboard that links to it.
@@ -168,11 +172,15 @@ hypertables in the same file.
 
 `metrics.service_calls` (`ts`, `caller`, `callee`, `tier`, `requests`,
 `errors`, `p95_ms`) is the service map's: one row per caller and callee a
-minute. Its topology is a tree: `gateway` calls the API's three services,
-`api`, `web` and `worker` (tier `service`, the same names as
-`http_requests.service`), and each calls its own store, `api-db` (tier
-`database`), `web-cache` (`cache`) and `worker-queue` (`queue`). The
-gateway's requests follow `http_requests`' rhythm at the default cadence, and
+minute. `gateway` calls the API's three services, `api`, `web` and `worker`
+(tier `service`, the same names as `http_requests.service`), each calls its
+own store, `api-db` (tier `database`), `web-cache` (`cache`) and
+`worker-queue` (`queue`), and `api` and `web` share a `redis` (tier `store`,
+[#624](https://github.com/jbouder/holotable/issues/624)). With a node of two
+parents the map is not a tree, so the panel draws it with `layout: "dag"`,
+the layered directed graph; its SQL gives the shared store no `service`, so
+its click is no dead link. The seeder deletes rows an earlier topology wrote
+for edges the map no longer has. The gateway's requests follow `http_requests`' rhythm at the default cadence, and
 about 3% of calls fail, as its 5xx do. A **read-only** role is created by
 `timescaledb/init/002_readonly_user.sh`; the app only ever connects as this user
 via the source's `secret_ref`.
@@ -338,13 +346,14 @@ With `DUCKDB_SOURCES_DIR` set, the seeder also shows a
 [DuckDB source](/concepts/duckdb-sources/): data that lives in files rather
 than in a database. Docker Compose and the quick-start image set it
 ([#600](https://github.com/jbouder/holotable/issues/600)). Before anything
-else, the seeder writes four files under `<DUCKDB_SOURCES_DIR>/demo/` with the binding itself
+else, the seeder writes five files under `<DUCKDB_SOURCES_DIR>/demo/` with the binding itself
 (`scripts/lib/demo-files.ts`), so nothing binary is ever committed:
 
 | File | Table | What it holds |
 | --- | --- | --- |
 | `http_requests.parquet` | `http_requests` | Per-request events for the last seven days: `ts`, `service`, `route`, `host`, `status`, `duration_ms`, `bytes`. The demo's request shape, three to six requests a minute, busier in the afternoon (UTC). |
 | `hosts.csv` | `hosts` | The host inventory: `host`, `region`, `role`, `cores`. |
+| `links.csv` | `links` | The network under the hosts ([#624](https://github.com/jbouder/holotable/issues/624)), one row per link from the device above to the one below: `parent`, `child`, `tier` (the child's: `router`, `switch` or `server`) and `bandwidth_gbps`. Two core routers linked to each other, each to both distribution switches, those to three access switches, and those to the hosts of `hosts.csv` by name, two of them dual-homed. Several parents and a cycle, so not a tree. |
 | `daily_revenue.parquet` | `daily_revenue` | Orders and revenue per region per day for the last 90 days, ending yesterday: `day`, `region`, `orders`, `revenue`. |
 | `deploys.jsonl` | `deploys` | One JSON object per deploy for the last seven days ([#596](https://github.com/jbouder/holotable/issues/596)): `ts`, `service`, `version`, `ok`, and a nested `actor` object, read as `actor STRUCT("name" VARCHAR, team VARCHAR)`. |
 
@@ -353,9 +362,11 @@ no `secret_ref`) with that catalog, and seeds the **Demo files** dashboard.
 Requests per minute and the 5xx rate come from `time_bucket` panels over the
 Parquet file. Daily revenue by region comes from a `date_trunc` panel with
 its own 30-day window. Requests by region joins the Parquet file to the CSV,
-a table of revenue by region covers the whole file, and a table of deploys
+a table of revenue by region covers the whole file, a table of deploys
 reads the JSON-lines file, its nested object as `actor.name` and
-`actor.team`.
+`actor.team`, and a network topology draws `links.csv` joined to the host
+inventory as a top-to-bottom directed graph, routers, switches and servers as
+icons, each link as wide as its bandwidth, the core routers' loop dashed.
 
 Every value in the files is a function of its minute or day, so the seeder
 can rewrite them every minute, and does. Each file is written beside its

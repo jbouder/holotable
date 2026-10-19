@@ -93,5 +93,10 @@
     "authoredAt": 1,
     "digest": "c6723de3ea3aad87d27eba5135863ad44e73dd7f092eef3b4cd57db09bbf748f",
     "origin": "hand-written (#623): a SQL service map from edge rows with icons by tier, a PromQL radial tree from an instant query, and a top-to-bottom tree from path columns"
+  },
+  "v1-graph-dag.json": {
+    "authoredAt": 1,
+    "digest": "78132102d12acf5ce62db127d652a0d6e1b7ae64664f00ac03766ee08b73e087",
+    "origin": "hand-written (#624): directed graphs, a SQL service map left to right with edge labels and node and edge links, a PromQL graph top to bottom with straight edges, and a tree whose rows may fall back to one"
   }
 }

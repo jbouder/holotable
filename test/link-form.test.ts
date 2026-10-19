@@ -228,7 +228,7 @@ test("a label pick round-trips and names the label it needs (#388)", () => {
   );
 });
 
-test("a graph's link may read a node's own columns beside the result's (#623)", () => {
+test("a graph's link may read a node's or an edge's own columns beside the result's (#623, #624)", () => {
   const graph = Panel.parse({
     id: "g",
     title: "Map",
@@ -243,6 +243,8 @@ test("a graph's link may read a node's own columns beside the result's (#623)", 
     "node",
     "parent",
     "group",
+    "source",
+    "target",
   ]);
   // Before a preview the column is typed, so nothing is listed.
   assert.deepEqual(columnPickNames(graph, []), []);
