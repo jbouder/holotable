@@ -945,11 +945,21 @@
                 "properties": {
                   "layout": {
                     "type": "string",
-                    "enum": ["tree"]
+                    "enum": ["tree", "dag"]
                   },
                   "orient": {
                     "type": "string",
                     "enum": ["LR", "TB", "RL", "BT", "radial"]
+                  },
+                  "direction": {
+                    "type": "string",
+                    "enum": ["LR", "TB"]
+                  },
+                  "edgeLabels": {
+                    "type": "boolean"
+                  },
+                  "curve": {
+                    "type": "boolean"
                   },
                   "source": {
                     "type": "string",

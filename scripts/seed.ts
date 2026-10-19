@@ -275,7 +275,7 @@ async function ensureDemo() {
     for (const title of RETIRED_DEMO_DASHBOARDS) await retireDashboard(pg, title);
     await ensureDashboard(pg, selfMonitoringSpec());
     if (promUrl) await ensureDashboard(pg, prometheusSelfMonitoringSpec());
-    if (process.env.DUCKDB_SOURCES_DIR) await ensureDashboard(pg, demoFilesSpec());
+    if (process.env.DUCKDB_SOURCES_DIR) await ensureDashboard(pg, demoFilesSpec(targets));
   } finally {
     await pg.end();
   }

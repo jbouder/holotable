@@ -22,6 +22,9 @@ import { SERVICES } from "./seed-data";
  * ids they link to and the seeder writes the targets first.
  */
 
+/** The host detail dashboard's title, which the smoke finds it by. */
+export const HOST_DETAIL_TITLE = "Demo host detail";
+
 /** What the linking dashboards need to know about the ones they link to. */
 export interface DemoLinkTargets {
   /** "Demo host detail". */
@@ -240,18 +243,21 @@ export function demoSpec() {
         id: "service-map",
         title: "Service map",
         description:
-          "Who calls whom over the window: an arrow runs from a caller to what it calls, the gateway to each service and each service to its store, and each node shows the requests it received (the gateway, all it sent on).",
+          "Who calls whom over the window: an arrow runs from a caller to what it calls, the gateway to each service, each service to its store, and api and web to the redis they share. Each node shows the requests it received (the gateway, all it sent on), and an arrow's width its share.",
         viz: "graph",
         query: {
           sourceId: "ts-metrics",
           timeField: "period",
           // `service` is the service a node stands for: a service's own
-          // name, a store's caller. The gateway, called by nothing, has none.
-          sql: "SELECT time_bucket('5 minutes', ts) AS period, caller, callee, tier, CASE WHEN tier = 'service' THEN callee ELSE caller END AS service, sum(requests) AS requests FROM service_calls GROUP BY period, caller, callee, tier ORDER BY period",
+          // name, a store's caller. The gateway, called by nothing, has none,
+          // and nor does a store more than one service shares (tier `store`).
+          sql: "SELECT time_bucket('5 minutes', ts) AS period, caller, callee, tier, CASE WHEN tier = 'service' THEN callee WHEN tier = 'store' THEN NULL ELSE caller END AS service, sum(requests) AS requests FROM service_calls GROUP BY period, caller, callee, tier ORDER BY period",
         },
         format: "number",
         options: {
-          orient: "LR",
+          // A store two services share has two parents: a directed graph.
+          layout: "dag",
+          direction: "LR",
           source: "caller",
           target: "callee",
           value: "requests",
@@ -264,11 +270,13 @@ export function demoSpec() {
             database: "database",
             cache: "cache",
             queue: "queue",
+            store: "storage",
           },
           compact: true,
         },
-        // A click on a service, or on its store, shows that service on this
-        // dashboard. The gateway reads no `service`, so it offers nothing.
+        // A click on a service, or on its own store, shows that service on
+        // this dashboard. The gateway and the shared redis read no
+        // `service`, so they offer nothing.
         links: [
           {
             title: "Show this service",
@@ -684,7 +692,7 @@ export function fleetSpec(targets: DemoLinkTargets) {
 export function hostDetailSpec() {
   return {
     specVersion: SPEC_VERSION,
-    title: "Demo host detail",
+    title: HOST_DETAIL_TITLE,
     timeRange: { from: "now-1h", to: "now" },
     refreshIntervalMs: 15000,
     variables: [HOST_VARIABLE],

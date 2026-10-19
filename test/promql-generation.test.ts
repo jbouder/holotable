@@ -120,14 +120,14 @@ test("a single-source SQL or PromQL prompt is what it was before LogQL existed (
     dashboardChat: promptDigest(buildSystemPrompt(board(source.id), [source])),
   });
   // Byte for byte as they were on the commit before #564, but for what a new
-  // panel kind adds to every prompt (the graph, #623).
+  // panel kind adds to every prompt (the graph, #623, and its dag, #624).
   assert.deepEqual(digests(sql), {
-    generation: "1b032aee1dc34a22a57b8e721a91329ba02a3403c80156082017ab82ec835509",
-    chat: "efd5221a308060b4963a6727482a8c32c7001ec4a18493657a8251cdecfef54b",
+    generation: "c5651bb824892a9e6857eed57faf502240845ea8de4d5fc583c4b777f76d66ec",
+    chat: "cc05e7580a99e8e2ecd7bfbabef4b43f2b2a35d95d593d23670cc450a0b669e0",
     dashboardChat: "479960869c34a70a899dc471b2e471cc05f3218ab49b17f50eb9f4e99d25b8ae",
   });
   assert.deepEqual(digests(prom), {
-    generation: "56b2981624ec134a6e123179bcc82b0ad877887eeb2cd4e1d9e2dfed1eaef364",
+    generation: "581adf59c2eea2d60558932091ed7d4044c65213edbb8b608f6d068be7372093",
     chat: "f94b68d794e98703a2584e16fc0440edb9d298c61b267bdeaeef934579ade61e",
     dashboardChat: "ec6c18eadf07a2d3e18981dcf27113b8354270856c70f8e4c4b611c5fa7b2585",
   });

@@ -312,10 +312,11 @@ export interface ServiceCallRow {
 /**
  * The demo's service map (#623), one edge a row: the gateway calls the API's
  * three services (the `service` values of `http_requests`, so a click on
- * one filters the request panels to it), and each service calls its own
- * store. A tree, so the graph panel's tree layout draws it. `share` is the
- * edge's part of its caller's traffic, and `p95` the latency range of the
- * call, in ms.
+ * one filters the request panels to it), each service calls its own store,
+ * and `api` and `web` share a `redis` (#624). The shared store has two
+ * parents, so the map is a directed graph, not a tree, and the graph panel
+ * draws it with the `dag` layout. `share` is the edge's part of its caller's
+ * traffic, and `p95` the latency range of the call, in ms.
  */
 export const SERVICE_CALLS = [
   { caller: "gateway", callee: "api", tier: "service", share: 1 / 3, p95: [180, 320] },
@@ -324,6 +325,8 @@ export const SERVICE_CALLS = [
   { caller: "api", callee: "api-db", tier: "database", share: 1.5, p95: [6, 20] },
   { caller: "web", callee: "web-cache", tier: "cache", share: 2, p95: [1, 4] },
   { caller: "worker", callee: "worker-queue", tier: "queue", share: 0.8, p95: [3, 12] },
+  { caller: "api", callee: "redis", tier: "store", share: 0.6, p95: [1, 3] },
+  { caller: "web", callee: "redis", tier: "store", share: 0.4, p95: [1, 3] },
 ] as const satisfies readonly {
   caller: string;
   callee: string;

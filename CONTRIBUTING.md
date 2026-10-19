@@ -450,6 +450,7 @@ request:
 | --- | --- |
 | `src/lib/ir.ts`, `src/lib/ir/` (the IR, `SPEC_VERSION`, an upgrader) | `concepts/the-shared-ir.md`, invariant 3 in `architecture/invariants.md` |
 | `src/components/charts/vega-runtime.ts`, `src/lib/vega/` (custom visuals) | `architecture/custom-visuals.md` |
+| `src/lib/graph/layout.ts` (the graph kind's directed-graph layout) | `architecture/graph-layout.md`, and its measurements if the algorithm changes |
 | `src/components/charts/echarts.ts` (the ECharts series and components registered) | "Panel kinds" in `concepts/streaming-and-rendering.md` |
 | `src/components/charts/` (an option builder), `src/lib/color/` (the palette, the chart theme) | "A rendering detail worth knowing" in `concepts/streaming-and-rendering.md` |
 | `src/lib/panels/` (a panel kind or its options) | `reference/panel-options.md`, "Panel kinds" in `concepts/streaming-and-rendering.md`. The visualization list is generated |

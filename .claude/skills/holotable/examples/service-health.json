@@ -240,11 +240,12 @@
       {
         "id": "service-map",
         "title": "Service map",
-        "description": "An arrow from each caller to what it calls, sized by requests in the window.",
+        "description": "An arrow from each caller to what it calls, sized by requests in the window; a store two services share has two parents, so it is a directed graph.",
         "viz": "graph",
         "format": "number",
         "options": {
-          "orient": "LR",
+          "layout": "dag",
+          "direction": "LR",
           "source": "caller",
           "target": "callee",
           "value": "requests",

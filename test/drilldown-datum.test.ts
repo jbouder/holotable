@@ -434,6 +434,32 @@ test("a graph's root is a datum with no parent; a store carries its own row's co
   assert.equal(datumOf(p, data, {}), null);
 });
 
+test("a link to another dashboard that reads nothing from the clicked datum is not offered (#624)", () => {
+  const target = "00000000-0000-4000-8000-000000000001";
+  const p = panel("graph", {
+    links: [
+      {
+        title: "Open host detail",
+        dashboard: target,
+        set: { host: { column: "host" }, view: { value: "cpu" } },
+      },
+    ],
+  });
+  const targets = { [target]: { title: "Host detail" } };
+  const context = { timeRange: { from: "now-1h", to: "now" }, selection: {} };
+  // A switch in a network map has no host: no link, rather than host detail
+  // opened as if nothing had been clicked. A literal pick does not count.
+  assert.deepEqual(
+    datumLinkItems(p, targets, context, { row: { node: "core-1", host: null } }),
+    [],
+  );
+  const [item] = datumLinkItems(p, targets, context, {
+    row: { node: "host-01", host: "host-01" },
+  });
+  assert.equal(item?.kind, "navigate");
+  assert.match(item?.kind === "navigate" ? item.href : "", /host=host-01/);
+});
+
 test("a self link that reads nothing from the clicked datum is not offered (#623)", () => {
   const p = panel("graph", {
     links: [{ title: "Show this service", set: { service: { column: "service" } } }],

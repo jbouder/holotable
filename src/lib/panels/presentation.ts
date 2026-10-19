@@ -176,6 +176,9 @@ export const OPTION_GROUPS = {
   graph: [
     "layout",
     "orient",
+    "direction",
+    "edgeLabels",
+    "curve",
     "source",
     "target",
     "value",

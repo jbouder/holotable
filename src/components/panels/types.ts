@@ -5,6 +5,12 @@ import type { Panel } from "@/lib/ir";
 import type { ChartRows } from "@/lib/panel-reading";
 import type { TimeDisplay } from "@/lib/time-display";
 
+/** A panel's note on how it drew its rows: a short label, and why. */
+export interface PanelNotice {
+  label: string;
+  detail: string;
+}
+
 /**
  * How a panel kind is drawn: the browser half of the panel registry (#61).
  *
@@ -28,11 +34,17 @@ export type PanelRenderer =
        */
       shape?: (panel: Panel) => string;
       /**
-       * Why these rows cannot be drawn, naming what is wrong (#623): a graph
-       * whose rows are not a tree. The panel shows it in the shared error
-       * state rather than drawing the rows wrongly.
+       * Why these rows cannot be drawn, naming what is wrong (#623). The
+       * panel shows it in the shared error state rather than drawing the
+       * rows wrongly.
        */
       problem?: (panel: Panel, data: PanelData) => string | undefined;
+      /**
+       * What the panel says beside its title about how these rows were drawn,
+       * when that is not what its spec asked for (#624): a graph's tree drawn
+       * as a directed graph because its rows are not a tree.
+       */
+      notice?: (panel: Panel, data: PanelData) => PanelNotice | undefined;
       /**
        * The kind's own screen-reader table (#77), where its marks are not one
        * per row (a graph's edges); by default the rows as they came.

@@ -3,17 +3,24 @@ import { readFileSync } from "node:fs";
 import { test } from "node:test";
 import { treeClickPart, withTreeState } from "@/components/charts/EChart";
 import {
+  GRAPH_EDGES_MAX,
   GRAPH_NODES_MAX,
   GRAPH_ROOT_ID,
   graphChart,
+  graphClickDatum,
+  graphEdgeId,
+  graphNet,
   graphNodes,
+  graphNotice,
   graphShape,
   graphTable,
   graphTree,
+  graphView,
 } from "@/components/charts/graph";
 import type { PanelData } from "@/components/charts/options";
 import { DEFAULT_CHART_THEME, inkOn } from "@/lib/color/chart-theme";
 import { AA_TEXT, contrastRatio, hexToRgb, parseThemeTokens } from "@/lib/color/contrast";
+import { graphLayout } from "@/lib/graph/layout";
 import { GRAPH_SYMBOLS, ICON_PATHS, isIcon } from "@/lib/graph/symbols";
 import { Panel } from "@/lib/ir";
 import { LOCAL_TIME_DISPLAY } from "@/lib/time-display";
@@ -21,7 +28,10 @@ import { LOCAL_TIME_DISPLAY } from "@/lib/time-display";
 /*
  * The graph kind (#623): edge rows or path columns as one tree, refused with
  * the node named when they are not a tree, drawn with labels that read on
- * their node's color and symbols only from the allowlist.
+ * their node's color and symbols only from the allowlist. The `dag` layout
+ * (#624): the same rows as a layered directed graph, placed by a layout that
+ * is deterministic, places every node and runs every edge with the flow but
+ * the cycle's it marks; a tree that is not one falls back to it.
  */
 
 const LAYOUT = { x: 0, y: 0, w: 12, h: 4 };
@@ -143,7 +153,7 @@ test("path columns are a tree as the treemap reads them, parents the sum of thei
   });
 });
 
-test("a node with two parents is refused, naming it", () => {
+test("a node with two parents is no tree, naming it", () => {
   const tree = graphTree(graph(EDGES), {
     columns: CALLS.columns,
     rows: [
@@ -158,7 +168,7 @@ test("a node with two parents is refused, naming it", () => {
   assert.deepEqual(tree.roots, []);
 });
 
-test("a cycle is refused, naming a node on it, and so is a node pointing at itself", () => {
+test("a cycle is no tree, naming a node on it, and nor is a node pointing at itself", () => {
   const cycle = graphTree(graph(EDGES), {
     columns: ["caller", "callee"],
     rows: [
@@ -351,4 +361,294 @@ test("a node's symbol opens and closes its branch; its label is a datum (#373)",
   );
   assert.equal(orders?.collapsed, true);
   assert.equal(withTreeState(option, new Map()), option);
+});
+
+/** A dependency graph: a shared child, a skipped layer, and a cycle. */
+const DEPS: PanelData = {
+  columns: ["from", "to", "calls"],
+  rows: [
+    { from: "web", to: "api", calls: 10 },
+    { from: "web", to: "auth", calls: 4 },
+    { from: "api", to: "auth", calls: 6 },
+    { from: "api", to: "db", calls: 20 },
+    { from: "auth", to: "db", calls: 2 },
+    { from: "web", to: "db", calls: 1 },
+    { from: "db", to: "replica", calls: 3 },
+    { from: "replica", to: "api", calls: 1 },
+    { from: "api", to: "db", calls: 5 },
+  ],
+};
+const DAG = { layout: "dag", source: "from", target: "to", value: "calls" };
+
+test("the layout places every node, runs every edge with the flow but the reversed, and is deterministic", () => {
+  const ids = ["web", "api", "auth", "db", "replica", "lonely"];
+  const edges = DEPS.rows.map((r) => ({
+    source: r.from as string,
+    target: r.to as string,
+  }));
+  for (const direction of ["LR", "TB"] as const) {
+    const layout = graphLayout(ids, edges, direction);
+    assert.deepEqual(
+      layout.nodes.map((n) => n.id),
+      ids,
+      "every node, in the order given",
+    );
+    for (const n of layout.nodes) {
+      assert.ok(Number.isFinite(n.x) && Number.isFinite(n.y), n.id);
+      // The layer runs along the direction.
+      assert.equal(direction === "LR" ? n.x : n.y, n.layer, n.id);
+    }
+    const layer = new Map(layout.nodes.map((n) => [n.id, n.layer]));
+    // A repeated edge is one.
+    assert.equal(layout.edges.length, 8);
+    for (const e of layout.edges) {
+      const [s, t] = [layer.get(e.source) as number, layer.get(e.target) as number];
+      assert.ok(e.reversed ? s > t : s < t, `${e.source} → ${e.target}`);
+    }
+    // The cycle api → db → replica → api is broken at one edge, and only one.
+    assert.equal(layout.reversed, 1);
+    assert.deepEqual(
+      layout.edges.filter((e) => e.reversed).map((e) => [e.source, e.target]),
+      [["replica", "api"]],
+    );
+    // No two nodes share a place.
+    const places = new Set(layout.nodes.map((n) => `${n.x},${n.y}`));
+    assert.equal(places.size, ids.length);
+    assert.deepEqual(graphLayout(ids, edges, direction), layout, "the same again");
+  }
+  // A cycle with nothing above it, a self-edge, an unknown end and no nodes.
+  const ring = graphLayout(
+    ["a", "b", "c"],
+    [
+      { source: "a", target: "b" },
+      { source: "b", target: "c" },
+      { source: "c", target: "a" },
+      { source: "a", target: "a" },
+      { source: "a", target: "nowhere" },
+    ],
+  );
+  assert.equal(ring.reversed, 1);
+  assert.equal(ring.edges.length, 3);
+  assert.deepEqual(graphLayout([], []), {
+    nodes: [],
+    edges: [],
+    reversed: 0,
+    layers: 0,
+    crossings: 0,
+  });
+});
+
+test("the layout untangles what it can: a crossing the input order makes is undone", () => {
+  // a's child listed second and b's first: drawn in input order, they cross.
+  const layout = graphLayout(
+    ["a", "b", "y", "x"],
+    [
+      { source: "a", target: "x" },
+      { source: "b", target: "y" },
+    ],
+  );
+  assert.equal(layout.crossings, 0);
+  const at = new Map(layout.nodes.map((n) => [n.id, n.order]));
+  assert.equal(at.get("a") === 0, at.get("x") === 0);
+});
+
+test("a directed graph's rows are nodes with every parent and edges once, their values summed", () => {
+  const net = graphNet(graph(DAG), DEPS);
+  assert.deepEqual(
+    net.nodes.map((n) => [n.id, n.parents, n.value]),
+    [
+      ["web", [], 15],
+      ["api", ["web", "replica"], 11],
+      ["auth", ["web", "api"], 10],
+      ["db", ["api", "auth", "web"], 28],
+      ["replica", ["db"], 3],
+    ],
+  );
+  assert.equal(net.edges.length, 8);
+  assert.equal(net.edges.find((e) => e.id === graphEdgeId("api", "db"))?.value, 25);
+  // A node's datum is a tree node's: its first parent is the `parent`, so a
+  // link that reads `node` works on either layout.
+  assert.deepEqual(net.nodes.find((n) => n.id === "db")?.row, {
+    from: "api",
+    to: "db",
+    calls: 28,
+    node: "db",
+    parent: "api",
+    value: 28,
+  });
+});
+
+test("a tree that is not one falls back to the directed graph, with a notice naming why", () => {
+  const twoParents = {
+    columns: CALLS.columns,
+    rows: [
+      ...CALLS.rows,
+      { caller: "auth", callee: "orders-db", tier: "store", requests: 1 },
+    ],
+  };
+  const view = graphView(graph(EDGES), twoParents);
+  assert.equal(view.layout, "dag");
+  assert.deepEqual(graphNotice(graph(EDGES), twoParents), {
+    label: "Not a tree",
+    detail:
+      '"orders-db" has two parents ("orders" and "auth"); a tree needs one, so it is drawn as a directed graph. Set the layout to "dag" to draw it that way on purpose.',
+  });
+  const option = graphChart(graph(EDGES), twoParents, CTX);
+  assert.equal((option.series as { type: string }[])[0]?.type, "graph");
+  // A cycle falls back too; a tree draws as one and says nothing; a dag
+  // asked for says nothing either.
+  const cycle = {
+    columns: ["caller", "callee"],
+    rows: [
+      { caller: "a", callee: "b" },
+      { caller: "b", callee: "a" },
+    ],
+  };
+  assert.match(graphNotice(graph(), cycle)?.detail ?? "", /is on a cycle/);
+  assert.equal(graphNotice(graph(EDGES), CALLS), undefined);
+  assert.equal(graphView(graph(EDGES), CALLS).layout, "tree");
+  assert.equal(graphNotice(graph({ ...EDGES, layout: "dag" }), twoParents), undefined);
+  // A tree's orientation carries over as the nearer direction.
+  const tb = graphView(graph({ ...EDGES, orient: "BT" }), twoParents);
+  assert.equal(tb.layout === "dag" && tb.direction, "TB");
+});
+
+test("a directed graph draws arrows, the cycle's edge dashed, widths by value, and labels that read", () => {
+  const option = graphChart(graph({ ...DAG, edgeLabels: true }), DEPS, CTX);
+  const series = (option.series as Record<string, unknown>[])[0] as {
+    type: string;
+    layout: string;
+    edgeSymbol: string[];
+    edgeLabel: { show: boolean };
+    coordinateSystem: string;
+    data: {
+      id: string;
+      value: number[];
+      itemStyle: { color: string };
+      label: { color: string; backgroundColor: string };
+    }[];
+    links: {
+      id: string;
+      source: string;
+      target: string;
+      reversed: boolean;
+      lineStyle: { width: number; type?: string; curveness: number };
+    }[];
+  };
+  assert.equal(series.type, "graph");
+  assert.equal(series.layout, "none");
+  assert.deepEqual(series.edgeSymbol, ["none", "arrow"]);
+  assert.equal(series.edgeLabel.show, true);
+  assert.equal(series.data.length, 5);
+  // On hidden axes, so a symbol keeps its shape whatever the panel's.
+  assert.equal(series.coordinateSystem, "cartesian2d");
+  for (const node of series.data) {
+    assert.ok(node.value.length === 2 && node.value.every(Number.isFinite));
+    assert.equal(node.label.backgroundColor, node.itemStyle.color);
+    assert.equal(node.label.color, inkOn(node.itemStyle.color));
+  }
+  const back = series.links.filter((l) => l.reversed);
+  assert.deepEqual(
+    back.map((l) => [l.source, l.target]),
+    [["replica", "api"]],
+  );
+  assert.equal(back[0]?.lineStyle.type, "dashed");
+  const widths = new Map(series.links.map((l) => [l.id, l.lineStyle.width]));
+  assert.equal(widths.get(graphEdgeId("api", "db")), 6, "the busiest edge is the widest");
+  assert.ok((widths.get(graphEdgeId("web", "db")) as number) < 2);
+  // Straight on request.
+  const straight = graphChart(graph({ ...DAG, curve: false }), DEPS, CTX);
+  const links =
+    (
+      straight.series as {
+        links: { reversed: boolean; lineStyle: { curveness: number } }[];
+      }[]
+    )[0]?.links ?? [];
+  assert.ok(links.filter((l) => !l.reversed).every((l) => l.lineStyle.curveness === 0));
+});
+
+test("a click on a directed graph's edge is a datum with its source, target and value", () => {
+  const panel = graph(DAG);
+  assert.deepEqual(graphClickDatum(panel, DEPS, graphEdgeId("api", "db")), {
+    row: { from: "api", to: "db", calls: 25, source: "api", target: "db", value: 25 },
+    series: "api → db",
+  });
+  // The cycle's reversed edge keeps its real ends.
+  assert.deepEqual(graphClickDatum(panel, DEPS, graphEdgeId("replica", "api"))?.row, {
+    from: "replica",
+    to: "api",
+    calls: 1,
+    source: "replica",
+    target: "api",
+    value: 1,
+  });
+  assert.equal(graphClickDatum(panel, DEPS, "db")?.row.node, "db");
+  assert.equal(graphClickDatum(panel, DEPS, "nothing"), null);
+});
+
+test("a directed graph's table is its edges, with each end's layer and the back edge said", () => {
+  const table = graphTable(graph(DAG), DEPS);
+  assert.deepEqual(table.columns, ["from", "to", "calls", "layers"]);
+  assert.equal(table.rows.length, 8);
+  assert.match(table.caption, /^Edges of Service map: 8 edges, in \d layers\.$/);
+  const back = table.rows.find((r) => r[0] === "replica");
+  assert.match(back?.[3] ?? "", /^\d → \d, back edge$/);
+  assert.deepEqual(
+    table.rows.find((r) => r[0] === "web" && r[1] === "api")?.slice(0, 3),
+    ["web", "api", "10"],
+  );
+  // A row offers the links of the node it reaches, as the tree's does.
+  assert.equal(table.datums[0]?.series, "api");
+});
+
+test("a self-edge is listed, not drawn, and its node says it; past the caps, edges are counted", () => {
+  const data = {
+    columns: ["from", "to"],
+    rows: [
+      { from: "a", to: "a" },
+      { from: "a", to: "b" },
+    ],
+  };
+  const option = graphChart(graph({ layout: "dag" }), data, CTX);
+  const series = (
+    option.series as { data: { id: string; text: string }[]; links: unknown[] }[]
+  )[0];
+  assert.equal(series?.links.length, 1);
+  assert.equal(series?.data.find((n) => n.id === "a")?.text, "a ↻");
+  assert.match(
+    graphTable(graph({ layout: "dag" }), data).rows[0]?.[2] ?? "",
+    /to itself/,
+  );
+  // Nodes past the cap and edges past theirs are counted in the corner.
+  const rows = Array.from({ length: GRAPH_EDGES_MAX + 5 }, (_, i) => ({
+    from: `n${i % 40}`,
+    to: `n${(i * 7 + 1) % 40}x${Math.floor(i / 40)}`,
+  }));
+  const big = graphNet(graph({ layout: "dag" }), { columns: ["from", "to"], rows });
+  assert.equal(big.nodes.length, GRAPH_NODES_MAX);
+  assert.ok(big.overflow > 0 && big.edgeOverflow > 0);
+  assert.ok(big.edges.length <= GRAPH_EDGES_MAX);
+  const title = (
+    graphChart(graph({ layout: "dag" }), { columns: ["from", "to"], rows }, CTX)
+      .title as { text: string }
+  ).text;
+  assert.match(title, /^\+\d+ more nodes, \+\d+ more edges not shown$/);
+  // No rows draw nothing, and do not throw.
+  assert.doesNotThrow(() =>
+    graphChart(graph({ layout: "dag" }), { columns: [], rows: [] }, CTX),
+  );
+});
+
+test("a layout or direction change remounts the chart", () => {
+  assert.notEqual(graphShape(graph()), graphShape(graph({ layout: "dag" })));
+  assert.notEqual(
+    graphShape(graph({ layout: "dag" })),
+    graphShape(graph({ layout: "dag", direction: "TB" })),
+  );
+  assert.equal(
+    accepts({ layout: "dag", direction: "TB", edgeLabels: true, curve: false }),
+    true,
+  );
+  assert.equal(accepts({ direction: "RL" }), false);
+  assert.equal(accepts({ layout: "force" }), false);
 });

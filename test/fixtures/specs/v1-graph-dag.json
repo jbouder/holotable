@@ -1,0 +1,119 @@
+{
+  "specVersion": 1,
+  "title": "Dependencies",
+  "timeRange": {
+    "from": "now-1h",
+    "to": "now"
+  },
+  "refreshIntervalMs": 30000,
+  "panels": [
+    {
+      "id": "service-dag",
+      "title": "Service dependencies",
+      "viz": "graph",
+      "format": "number",
+      "query": {
+        "sourceId": "ts-service-calls",
+        "timeField": "period",
+        "sql": "SELECT time_bucket('5 minutes', ts) AS period, caller, callee, tier, sum(requests) AS requests FROM service_calls GROUP BY period, caller, callee, tier ORDER BY period"
+      },
+      "options": {
+        "layout": "dag",
+        "direction": "LR",
+        "source": "caller",
+        "target": "callee",
+        "value": "requests",
+        "group": "tier",
+        "edgeLabels": true,
+        "symbol": "loadBalancer",
+        "symbols": {
+          "service": "server",
+          "store": "storage"
+        },
+        "compact": true
+      },
+      "links": [
+        {
+          "title": "Show this node",
+          "set": {
+            "service": {
+              "column": "node"
+            }
+          }
+        },
+        {
+          "title": "Show the caller",
+          "set": {
+            "service": {
+              "column": "source"
+            }
+          }
+        }
+      ],
+      "layout": {
+        "x": 0,
+        "y": 0,
+        "w": 12,
+        "h": 5
+      }
+    },
+    {
+      "id": "job-dag",
+      "title": "Request rate between jobs",
+      "viz": "graph",
+      "query": {
+        "sourceId": "prom-metrics",
+        "promql": "sum by (job, instance) (rate(http_requests_total[5m]))",
+        "instant": true
+      },
+      "options": {
+        "layout": "dag",
+        "direction": "TB",
+        "curve": false,
+        "source": "job",
+        "target": "instance",
+        "value": "value",
+        "unit": "/s",
+        "decimals": 1
+      },
+      "layout": {
+        "x": 0,
+        "y": 5,
+        "w": 6,
+        "h": 5
+      }
+    },
+    {
+      "id": "tree-falls-back",
+      "title": "Calls as a tree",
+      "viz": "graph",
+      "query": {
+        "sourceId": "ts-service-calls",
+        "timeField": "period",
+        "sql": "SELECT time_bucket('5 minutes', ts) AS period, caller, callee, sum(requests) AS requests FROM service_calls GROUP BY period, caller, callee ORDER BY period"
+      },
+      "options": {
+        "layout": "tree",
+        "orient": "BT",
+        "source": "caller",
+        "target": "callee",
+        "value": "requests"
+      },
+      "layout": {
+        "x": 6,
+        "y": 5,
+        "w": 6,
+        "h": 5
+      }
+    }
+  ],
+  "variables": [
+    {
+      "name": "service",
+      "type": "enum",
+      "values": ["api", "web", "worker"],
+      "multi": true,
+      "default": ["api", "web", "worker"]
+    }
+  ]
+}

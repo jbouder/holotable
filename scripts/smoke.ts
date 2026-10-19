@@ -29,7 +29,7 @@ import type { VariableValues } from "@/lib/sql/variables";
 import { resolveTimeRange } from "@/lib/time";
 import { resolveSelection } from "@/lib/variable-selection";
 import { serverKind } from "@/lib/sources/server/registry";
-import { demoSpec } from "./lib/demo-dashboards";
+import { demoSpec, HOST_DETAIL_TITLE } from "./lib/demo-dashboards";
 import { DEMO_FILES_DASHBOARD_TITLE, demoFilesSpec } from "./lib/demo-files";
 import { seedWorkspace } from "./lib/seed-workspace";
 
@@ -85,7 +85,8 @@ interface PanelOutcome {
 /** One self-monitoring dashboard: its title and the spec committed for it. */
 interface Target {
   title: string;
-  committed: () => Dashboard;
+  /** The committed spec, given the seeded dashboards' ids its links name. */
+  committed: () => Dashboard | Promise<Dashboard>;
   /** What has to happen before a panel can have rows. */
   feeds: string;
   /** Also run a panel that had rows through the app (SMOKE_APP_URL). */
@@ -136,7 +137,13 @@ const TARGETS: Target[] = [
     ? [
         {
           title: DEMO_FILES_DASHBOARD_TITLE,
-          committed: () => parseDashboard(demoFilesSpec()),
+          // Its network map links to host detail by the id it was seeded at (#624).
+          committed: async () =>
+            parseDashboard(
+              demoFilesSpec({
+                hostDetail: (await findDashboard(HOST_DETAIL_TITLE))?.id ?? "",
+              }),
+            ),
           feeds: "the seeder writes the files under DUCKDB_SOURCES_DIR first",
           throughApp: true,
         },
@@ -254,8 +261,8 @@ function canonical(value: unknown): string {
   );
 }
 
-function assertCommittedSpec(target: Target, stored: unknown) {
-  if (canonical(stored) !== canonical(target.committed())) {
+async function assertCommittedSpec(target: Target, stored: unknown) {
+  if (canonical(stored) !== canonical(await target.committed())) {
     throw new Error(
       `the stored spec of "${target.title}" is not the committed one — the committed spec and the seeded dashboard have drifted. Re-seed, or delete the demo dashboard and let the seeder recreate it.`,
     );
@@ -312,7 +319,7 @@ async function runThroughApp(
 async function smokeOne(target: Target, deadline: number): Promise<boolean> {
   console.log(`smoke: ${target.title}`);
   const { dashboard, outcomes, values } = await waitForData(target, deadline);
-  assertCommittedSpec(target, dashboard.spec);
+  await assertCommittedSpec(target, dashboard.spec);
 
   let failed = false;
   // A kind's own check, as a save runs it: a custom visual must compile.

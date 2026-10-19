@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { Clock, Info, Link2, Scissors } from "lucide-react";
+import { Clock, Info, Link2, Network, Scissors } from "lucide-react";
 import { hasQuery, type Panel, type TimeRange, panelTimeField } from "@/lib/ir";
 import { type Datum, hasUsableLinks, type MenuLinkItem } from "@/lib/drilldown";
 import type { Selection } from "@/lib/variable-selection";
@@ -171,6 +171,7 @@ export const PanelView = React.memo(function PanelView({
           <div className="flex shrink-0 items-center gap-1">
             <OverrideBadge panel={panel} />
             {queried && data.truncated && <TruncationBadge truncated={data.truncated} />}
+            <DrawnAsBadge panel={panel} data={data} />
             {showBadge && <StatusBadge status={status} updatedAt={state?.updatedAt} />}
             {!embedded && links && hasUsableLinks(links) && (
               <span className="inline-flex h-7 w-5 items-center justify-center text-muted">
@@ -591,6 +592,35 @@ function TruncationBadge({ truncated }: { truncated: Truncation }) {
       }
     >
       {detail}
+    </Popover>
+  );
+}
+
+/**
+ * Rows drawn other than as the spec asked (#624): a graph's tree drawn as a
+ * directed graph because its rows are not one. Said beside the title, as a
+ * truncation is, so the chart does not pass for what was asked; the popover
+ * says why and what to change.
+ */
+function DrawnAsBadge({ panel, data }: { panel: Panel; data: PanelData }) {
+  const notice = React.useMemo(() => {
+    const renderer = panelRenderer(panel.viz);
+    return renderer.type === "chart" ? renderer.notice?.(panel, data) : undefined;
+  }, [panel, data]);
+  if (!notice) return null;
+  return (
+    <Popover
+      label={`${notice.label}: ${notice.detail}`}
+      align="end"
+      className="h-auto w-auto max-w-40 gap-1 bg-surface-2 px-2 py-0.5 text-xs font-medium"
+      trigger={
+        <>
+          <Network className="h-3 w-3 shrink-0" aria-hidden />
+          <span className="truncate">{notice.label}</span>
+        </>
+      }
+    >
+      {notice.detail}
     </Popover>
   );
 }

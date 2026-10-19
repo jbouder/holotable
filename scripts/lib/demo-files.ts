@@ -1,6 +1,7 @@
 import { rename, mkdir } from "node:fs/promises";
 import { join } from "node:path";
 import { SPEC_VERSION } from "@/lib/ir";
+import type { DemoLinkTargets } from "./demo-dashboards";
 
 /**
  * The files demo (#574): a small directory of Parquet, CSV and JSON-lines
@@ -59,6 +60,21 @@ export const DEMO_FILES_TABLES = [
     ],
   },
   {
+    name: "links",
+    description:
+      "the network's links, one row per link from the device above to the one below, routers to switches to the hosts in hosts.csv (links.csv)",
+    columns: [
+      { name: "parent", type: "VARCHAR" },
+      { name: "child", type: "VARCHAR" },
+      {
+        name: "tier",
+        type: "VARCHAR",
+        description: "the child's: router, switch or server",
+      },
+      { name: "bandwidth_gbps", type: "BIGINT" },
+    ],
+  },
+  {
     name: "deploys",
     description:
       "one JSON object per deploy, the last seven days, with a nested actor (deploys.jsonl)",
@@ -94,11 +110,36 @@ export function demoFilesConfig() {
   return { kind: "duckdb" as const, path: DEMO_FILES_PATH, tables: DEMO_FILES_TABLES };
 }
 
-const HOSTS: [string, string, string, number][] = [
+export const DEMO_HOSTS: [string, string, string, number][] = [
   ["host-01", "us-east", "api", 8],
   ["host-02", "us-west", "api", 8],
   ["host-03", "eu-central", "web", 4],
   ["host-04", "us-east", "worker", 16],
+];
+
+/**
+ * The network under the hosts (#624): two core routers linked to each other,
+ * each to both distribution switches, those to three access switches, and
+ * the access switches to the hosts of {@link DEMO_HOSTS}, two of them dual-homed.
+ * Several parents and a cycle, so not a tree: the graph panel's `dag`.
+ */
+export const DEMO_LINKS: [string, string, "router" | "switch" | "server", number][] = [
+  ["core-1", "core-2", "router", 400],
+  ["core-2", "core-1", "router", 400],
+  ["core-1", "dist-1", "switch", 100],
+  ["core-1", "dist-2", "switch", 100],
+  ["core-2", "dist-1", "switch", 100],
+  ["core-2", "dist-2", "switch", 100],
+  ["dist-1", "access-1", "switch", 40],
+  ["dist-1", "access-2", "switch", 40],
+  ["dist-2", "access-2", "switch", 40],
+  ["dist-2", "access-3", "switch", 40],
+  ["access-1", "host-01", "server", 10],
+  ["access-1", "host-02", "server", 10],
+  ["access-2", "host-02", "server", 10],
+  ["access-2", "host-03", "server", 10],
+  ["access-3", "host-03", "server", 10],
+  ["access-3", "host-04", "server", 10],
 ];
 
 const MINUTE_US = 60_000_000;
@@ -115,7 +156,7 @@ export function demoFileQueries(now: number): Record<string, string> {
   const toMinute = Math.floor(now / 60_000);
   const fromMinute = toMinute - DEMO_REQUEST_DAYS * 1440;
   const today = Math.floor(now / DAY_MS);
-  const hosts = HOSTS.map(
+  const hosts = DEMO_HOSTS.map(
     ([host, region, role, cores]) => `('${host}', '${region}', '${role}', ${cores})`,
   ).join(", ");
   return {
@@ -137,6 +178,10 @@ export function demoFileQueries(now: number): Record<string, string> {
                WHERE k < 3 + floor(3 * (1 + sin(2 * pi() * ((m % 1440) - 600) / 1440.0)) / 2)) t
        ORDER BY ts`,
     "hosts.csv": `SELECT * FROM (VALUES ${hosts}) v(host, region, role, cores) ORDER BY host`,
+    "links.csv": `SELECT parent, child, tier, bandwidth_gbps FROM (VALUES ${DEMO_LINKS.map(
+      ([parent, child, tier, gbps], i) =>
+        `(${i}, '${parent}', '${child}', '${tier}', ${gbps})`,
+    ).join(", ")}) v(i, parent, child, tier, bandwidth_gbps) ORDER BY i`,
     // A deploy in about one hour in four, per service; one in ten rolled
     // back. One object per line, the person who shipped it nested.
     "deploys.jsonl": `
@@ -213,7 +258,7 @@ const REGIONS = ["us-east", "us-west", "eu-central"];
  * What the files say: traffic from one file, money from another, joined to a
  * CSV, and deploys from JSON lines with a nested object.
  */
-export function demoFilesSpec() {
+export function demoFilesSpec(targets: DemoLinkTargets) {
   return {
     specVersion: SPEC_VERSION,
     title: DEMO_FILES_DASHBOARD_TITLE,
@@ -228,7 +273,7 @@ export function demoFilesSpec() {
           content: [
             "## Files, not a database",
             "",
-            "Every panel here reads a file through the **Demo files** DuckDB source: `http_requests.parquet`, `hosts.csv`, `daily_revenue.parquet` and `deploys.jsonl`, which the seeder writes under `DUCKDB_SOURCES_DIR` and rewrites every minute. The same SQL guard and server-owned window as a database source, run in process.",
+            "Every panel here reads a file through the **Demo files** DuckDB source: `http_requests.parquet`, `hosts.csv`, `links.csv`, `daily_revenue.parquet` and `deploys.jsonl`, which the seeder writes under `DUCKDB_SOURCES_DIR` and rewrites every minute. The same SQL guard and server-owned window as a database source, run in process.",
           ].join("\n"),
         },
         layout: { x: 0, y: 0, w: 12, h: 3 },
@@ -375,6 +420,38 @@ export function demoFilesSpec() {
           ],
         },
         layout: { x: 0, y: 14, w: 12, h: 4 },
+      },
+      {
+        id: "network",
+        title: "Network topology",
+        description:
+          "The links CSV joined to the host inventory (#624): core routers to distribution and access switches to the hosts, two of them dual-homed. An arrow runs from the device above to the one below, as wide as its bandwidth; the dashed one closes the loop between the core routers. A host opens its detail.",
+        viz: "graph",
+        query: {
+          sourceId: DEMO_FILES_SOURCE_ID,
+          // `host` is a host's own name, from the inventory; a router or a
+          // switch has none, so it offers no link.
+          sql: "SELECT l.parent, l.child, l.tier, l.bandwidth_gbps, h.host, h.role FROM links l LEFT JOIN hosts h ON h.host = l.child ORDER BY CASE l.tier WHEN 'router' THEN 0 WHEN 'switch' THEN 1 ELSE 2 END, l.parent, l.child",
+        },
+        format: "number",
+        options: {
+          layout: "dag",
+          direction: "TB",
+          source: "parent",
+          target: "child",
+          value: "bandwidth_gbps",
+          group: "tier",
+          symbols: { router: "router", switch: "switch", server: "server" },
+          unit: "Gbps",
+        },
+        links: [
+          {
+            title: "Open host detail",
+            dashboard: targets.hostDetail,
+            set: { host: { column: "host" } },
+          },
+        ],
+        layout: { x: 0, y: 18, w: 12, h: 6 },
       },
     ],
   };

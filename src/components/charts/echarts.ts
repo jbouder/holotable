@@ -2,6 +2,7 @@ import {
   BarChart,
   CustomChart,
   GaugeChart,
+  GraphChart,
   HeatmapChart,
   LineChart,
   PieChart,
@@ -14,6 +15,7 @@ import {
   AriaComponent,
   AxisPointerComponent,
   BrushComponent,
+  DataZoomInsideComponent,
   GridComponent,
   LegendComponent,
   MarkAreaComponent,
@@ -39,10 +41,11 @@ import { CanvasRenderer } from "echarts/renderers";
  *
  * - Series: the chart kinds in `src/components/panels/registry.ts` and their
  *   builders (a donut is a pie; the treemap's sunburst layout; the graph's
- *   tree; the state timeline is a custom series).
+ *   tree, and its directed graph as a `graph` series; the state timeline is
+ *   a custom series).
  * - Components: the grid and both axes, the tooltip and its axis pointer
  *   (crosshair sync), the legend (plain and scroll), the brush (brush to
- *   zoom), thresholds as a visual map, annotations as mark lines and areas,
+ *   zoom), the inside data zoom (a directed graph's pan and zoom), thresholds as a visual map, annotations as mark lines and areas,
  *   the state timeline's "more not shown" title, aria (the chart's
  *   accessible name and decal patterns), and the toolbox, which the brush's
  *   own preprocessor always adds an option for.
@@ -58,6 +61,7 @@ use([
   BarChart,
   CustomChart,
   GaugeChart,
+  GraphChart,
   HeatmapChart,
   LineChart,
   PieChart,
@@ -68,6 +72,7 @@ use([
   AriaComponent,
   AxisPointerComponent,
   BrushComponent,
+  DataZoomInsideComponent,
   GridComponent,
   LegendComponent,
   MarkAreaComponent,
