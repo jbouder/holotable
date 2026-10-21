@@ -64,26 +64,19 @@ const PAGE_HEADERS = {
 } as const;
 
 /**
- * The app's default palette (src/app/globals.css), dark first and light under
- * the visitor's preference. These pages are served before the app is up, so
- * they carry their own copy; the CSP allows no fonts, so the type is the
- * system's.
+ * The app's default dark palette (src/app/globals.css), whatever the
+ * visitor's preference: the demo's first impression is the dark theme. These
+ * pages are served before the app is up, so they carry their own copy; the
+ * CSP allows no fonts, so the type is the system's.
  */
 const TOKENS = `
-  :root { color-scheme: dark light;
+  :root { color-scheme: dark;
     --background: oklch(0.16 0.02 265); --surface: oklch(0.21 0.02 265);
     --surface-2: oklch(0.26 0.02 265); --border: oklch(0.35 0.02 265);
     --foreground: oklch(0.96 0.01 265); --muted: oklch(0.7 0.02 265);
     --primary: oklch(0.66 0.19 259); --success: oklch(0.78 0.16 160);
     --chart-1: oklch(0.66 0.19 259); --chart-2: oklch(0.7 0.16 160);
     --chart-3: oklch(0.74 0.17 70); --chart-4: oklch(0.68 0.21 20); }
-  @media (prefers-color-scheme: light) { :root {
-    --background: oklch(0.98 0.005 265); --surface: oklch(1 0 0);
-    --surface-2: oklch(0.94 0.01 265); --border: oklch(0.84 0.02 265);
-    --foreground: oklch(0.2 0.02 265); --muted: oklch(0.5 0.02 265);
-    --primary: oklch(0.52 0.2 259); --success: oklch(0.46 0.14 160);
-    --chart-1: oklch(0.52 0.19 259); --chart-2: oklch(0.52 0.16 160);
-    --chart-3: oklch(0.5 0.15 70); --chart-4: oklch(0.54 0.21 20); } }
   body { margin: 0; min-height: 100vh; display: grid; place-items: center;
          font: 16px/1.5 ui-sans-serif, system-ui, sans-serif;
          background: var(--background); color: var(--foreground); }
@@ -97,7 +90,7 @@ function page(title: string, body: string, style = ""): string {
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="color-scheme" content="dark light">
+<meta name="color-scheme" content="dark">
 <title>${title}</title>
 <style>${TOKENS}${style}</style>
 </head>
