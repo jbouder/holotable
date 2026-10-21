@@ -211,7 +211,7 @@ npm run smoke          # check the self-monitoring dashboard answers with scrape
 
 | Path | Purpose | Min role |
 | --- | --- | --- |
-| `/dashboards` | List dashboards in a workspace | viewer |
+| `/` | List dashboards in a workspace; `/dashboards` redirects here | viewer |
 | `/dashboards/new` | Prompt → preview → save, with starter prompts built from the selected source's catalog | editor |
 | `/dashboards/[id]` | Live viewer (SSE) with Live/Pause and a read-only chat assistant | viewer |
 | `/dashboards/[id]/edit` | Panel CRUD/layout, single-panel NL edits, version save | editor |

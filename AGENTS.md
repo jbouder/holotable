@@ -42,7 +42,7 @@ Component boundaries, route handlers, streaming and config. App Router only;
 `"use client"` only where hooks, browser APIs or interaction need it.
 A client module that pulls in zod or the AI SDK for something a page opens
 on demand (a dialog, the dashboard chat) loads through `next/dynamic` or
-`import()`; `test/client-bundle.test.ts` holds `/`, `/dashboards`,
+`import()`; `test/client-bundle.test.ts` holds `/` (the dashboard list),
 `/settings` and the dashboard view to that.
 
 ## Where things are

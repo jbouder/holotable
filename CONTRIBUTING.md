@@ -242,7 +242,7 @@ reading, and prints the bytes per cycle and who was dropped. Flags:
 manual tool for a change to the stream or the poller, not a CI job.
 
 `test/client-bundle.test.ts` walks a route's imports to the client boundary
-and fails when `/`, `/dashboards` or `/settings` would load zod, or the
+and fails when `/` (the dashboard list) or `/settings` would load zod, or the
 dashboard view the AI SDK. When it fails, import the type with `import type`,
 move a constant out of the schema module, or load the dialog that needs the
 schema with `next/dynamic` when it opens.

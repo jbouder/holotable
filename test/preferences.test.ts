@@ -17,6 +17,7 @@ import {
   loadPreferences,
   type PreferenceStore,
   savePreferences,
+  signInLanding,
   startHref,
 } from "@/lib/preferences-server";
 
@@ -147,28 +148,33 @@ test("a start dashboard must be one the caller can view", async () => {
 
 test("the start page resolves, and a vanished or unreadable dashboard falls back with a notice", async () => {
   const base = { ...DEFAULT_PREFERENCES };
-  assert.equal(await startHref(viewer, base), "/dashboards");
+  assert.equal(await startHref(viewer, base), "/");
   assert.equal(await startHref(viewer, { ...base, startPage: "chat" }), "/explore");
   const start = { ...base, startPage: `dashboard:${DASH}` as const };
   assert.equal(
     await startHref(viewer, start, lookup({ [DASH]: "w" })),
     `/dashboards/${DASH}`,
   );
-  assert.equal(
-    await startHref(viewer, start, lookup({})),
-    "/dashboards?notice=start-unavailable",
-  );
+  assert.equal(await startHref(viewer, start, lookup({})), "/?notice=start-unavailable");
   assert.equal(
     await startHref(viewer, start, lookup({ [DASH]: "other" })),
-    "/dashboards?notice=start-unavailable",
+    "/?notice=start-unavailable",
   );
   const failing: DashboardLookup = async () => {
     throw new Error("database down");
   };
-  assert.equal(
-    await startHref(viewer, start, failing),
-    "/dashboards?notice=start-unavailable",
-  );
+  assert.equal(await startHref(viewer, start, failing), "/?notice=start-unavailable");
+});
+
+test("only a sign-in that started at / goes to the start page; any other page is kept", async () => {
+  const { store } = memoryStore({ u1: { startPage: `dashboard:${DASH}` } });
+  const deps = { store, lookup: lookup({ [DASH]: "w" }) };
+  assert.equal(await signInLanding(viewer, "/", deps), `/dashboards/${DASH}`);
+  // `/?sort=name` is a list someone asked for, not the root.
+  for (const next of ["/?sort=name", "/explore", `/dashboards/${DASH}/edit`]) {
+    assert.equal(await signInLanding(viewer, next, deps), next);
+  }
+  assert.equal(await signInLanding(viewer, "/", { store: memoryStore().store }), "/");
 });
 
 test("history and Explore defaults: on and as before unless the person says otherwise", () => {

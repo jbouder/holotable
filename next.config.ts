@@ -49,8 +49,11 @@ const nextConfig: NextConfig = {
   // SSE stream under /api/dashboards/[id]/stream is not buffered or altered.
   // Chat (#416) is called Explore and lives at /explore (#431); a /chat
   // link or bookmark from the weeks between lands on the same conversation.
+  // The dashboard list moved from /dashboards to / (the dashboards themselves
+  // stay under /dashboards/<id>); the query string comes along.
   async redirects() {
     return [
+      { source: "/dashboards", destination: "/", permanent: true },
       { source: "/chat", destination: "/explore", permanent: true },
       { source: "/chat/:id", destination: "/explore/:id", permanent: true },
     ];

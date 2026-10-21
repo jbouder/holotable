@@ -85,7 +85,7 @@ test("Next's searchParams object reads the same as URLSearchParams", () => {
 
 test("defaults are omitted, so the plain list has one URL", () => {
   assert.equal(dashboardQueryString(EMPTY_QUERY), "");
-  assert.equal(dashboardListHref(EMPTY_QUERY), "/dashboards");
+  assert.equal(dashboardListHref(EMPTY_QUERY), "/");
 });
 
 test("a query survives the round trip through a URL", () => {
@@ -228,9 +228,9 @@ test("explicit query parameters win over the saved defaults", () => {
 
 test("links leave out whatever equals the saved defaults, and keep what differs", () => {
   const saved = parseDashboardQuery(new URLSearchParams(""), SAVED);
-  assert.equal(dashboardListHref(saved, SAVED), "/dashboards");
+  assert.equal(dashboardListHref(saved, SAVED), "/");
   const all = { ...saved, sort: "updated" as const, favorites: false };
-  assert.equal(dashboardListHref(all, SAVED), "/dashboards?sort=updated&favorites=0");
+  assert.equal(dashboardListHref(all, SAVED), "/?sort=updated&favorites=0");
   assert.deepEqual(
     parseDashboardQuery(new URLSearchParams(dashboardQueryString(all, SAVED)), SAVED),
     all,

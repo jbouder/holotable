@@ -151,7 +151,7 @@ export function useDeleteDashboard(
       setDeleting(false);
       return;
     }
-    router.push("/dashboards");
+    router.push("/");
     router.refresh();
   }
 

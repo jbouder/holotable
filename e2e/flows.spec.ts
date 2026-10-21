@@ -26,10 +26,10 @@ import {
 /** Runs in the serial project, one at a time after the parallel ones. */
 const SERIAL = { tag: "@serial" };
 
-test("Explore is in the main nav, and an old /chat link lands there", async ({
+test("Explore is in the main nav, and old /chat and /dashboards links land", async ({
   page,
 }) => {
-  await page.goto("/dashboards");
+  await page.goto("/");
   await page
     .getByRole("navigation", { name: "Main" })
     .getByRole("link", { name: "Explore" })
@@ -38,6 +38,10 @@ test("Explore is in the main nav, and an old /chat link lands there", async ({
   await expect(page.getByRole("heading", { level: 1, name: "Explore" })).toBeVisible();
   await page.goto("/chat");
   await expect(page).toHaveURL(/\/explore$/);
+  // The list moved to the root; a bookmark keeps its query.
+  await page.goto("/dashboards?sort=name");
+  await expect(page).toHaveURL(/\/\?sort=name$/);
+  await expect(page.getByRole("heading", { level: 1, name: "Dashboards" })).toBeVisible();
 });
 
 test("a chat panel is added to a new dashboard as the ordinary save", async ({
@@ -503,7 +507,7 @@ test(
     // Serial: while it is the workspace's default, every generation that has
     // no pick of its own runs on it, and it is deleted at the end.
     const name = `E2E stub ${unique()}`;
-    await page.goto("/dashboards");
+    await page.goto("/");
     await page
       .getByRole("navigation", { name: "Main" })
       .getByRole("link", { name: "Models" })

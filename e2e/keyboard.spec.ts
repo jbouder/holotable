@@ -103,7 +103,7 @@ test("the share dialog keeps focus while it creates a link", async ({
 });
 
 test("the account menu returns focus to its trigger on Escape", async ({ page }) => {
-  await page.goto("/dashboards");
+  await page.goto("/");
   const trigger = page.getByRole("button", { name: /account menu/i });
   await trigger.focus();
   await page.keyboard.press("Enter");
@@ -114,7 +114,7 @@ test("the account menu returns focus to its trigger on Escape", async ({ page })
 });
 
 test("the first Tab offers a skip link that lands on the page", async ({ page }) => {
-  await page.goto("/dashboards");
+  await page.goto("/");
   await page.keyboard.press("Tab");
   const skip = page.getByRole("link", { name: "Skip to content" });
   await expect(skip).toBeFocused();
@@ -123,7 +123,7 @@ test("the first Tab offers a skip link that lands on the page", async ({ page })
   await expect(page.locator("main#main")).toBeFocused();
 });
 
-for (const path of ["/dashboards", "/data-sources", "/explore"]) {
+for (const path of ["/", "/data-sources", "/explore"]) {
   test(`every Tab stop on ${path} shows where focus is`, async ({ page }) => {
     await page.goto(path);
     await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
