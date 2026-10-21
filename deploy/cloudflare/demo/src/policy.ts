@@ -54,36 +54,37 @@ export function forContainer(request: Request): Request {
   return new Request(request, { headers });
 }
 
-const PAGE_HEADERS = {
-  "content-type": "text/html; charset=utf-8",
-  "cache-control": "no-store",
-  "content-security-policy":
-    "default-src 'none'; style-src 'unsafe-inline'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'",
-  "x-content-type-options": "nosniff",
-  "referrer-policy": "no-referrer",
-} as const;
+/** The pages' headers. The one script a page runs is let in by its nonce. */
+function pageHeaders(nonce: string): Record<string, string> {
+  return {
+    "content-type": "text/html; charset=utf-8",
+    "cache-control": "no-store",
+    "content-security-policy": `default-src 'none'; script-src 'nonce-${nonce}'; style-src 'unsafe-inline'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'`,
+    "x-content-type-options": "nosniff",
+    "referrer-policy": "no-referrer",
+  };
+}
 
 /**
- * The app's default palette (src/app/globals.css), dark first and light under
- * the visitor's preference. These pages are served before the app is up, so
- * they carry their own copy; the CSP allows no fonts, so the type is the
- * system's.
+ * The app's default palette (src/app/globals.css): dark, and light under
+ * `data-theme="light"`. These pages are served before the app is up, so they
+ * carry their own copy; the CSP allows no fonts, so the type is the system's.
  */
 const TOKENS = `
-  :root { color-scheme: dark light;
+  :root { color-scheme: dark;
     --background: oklch(0.16 0.02 265); --surface: oklch(0.21 0.02 265);
     --surface-2: oklch(0.26 0.02 265); --border: oklch(0.35 0.02 265);
     --foreground: oklch(0.96 0.01 265); --muted: oklch(0.7 0.02 265);
     --primary: oklch(0.66 0.19 259); --success: oklch(0.78 0.16 160);
     --chart-1: oklch(0.66 0.19 259); --chart-2: oklch(0.7 0.16 160);
     --chart-3: oklch(0.74 0.17 70); --chart-4: oklch(0.68 0.21 20); }
-  @media (prefers-color-scheme: light) { :root {
+  :root[data-theme="light"] { color-scheme: light;
     --background: oklch(0.98 0.005 265); --surface: oklch(1 0 0);
     --surface-2: oklch(0.94 0.01 265); --border: oklch(0.84 0.02 265);
     --foreground: oklch(0.2 0.02 265); --muted: oklch(0.5 0.02 265);
     --primary: oklch(0.52 0.2 259); --success: oklch(0.46 0.14 160);
     --chart-1: oklch(0.52 0.19 259); --chart-2: oklch(0.52 0.16 160);
-    --chart-3: oklch(0.5 0.15 70); --chart-4: oklch(0.54 0.21 20); } }
+    --chart-3: oklch(0.5 0.15 70); --chart-4: oklch(0.54 0.21 20); }
   body { margin: 0; min-height: 100vh; display: grid; place-items: center;
          font: 16px/1.5 ui-sans-serif, system-ui, sans-serif;
          background: var(--background); color: var(--foreground); }
@@ -91,18 +92,36 @@ const TOKENS = `
   h1 { font-size: 1.25rem; margin: 0 0 .5rem; }
   p { margin: .5rem 0; color: var(--muted); }`;
 
-function page(title: string, body: string, style = ""): string {
-  return `<!doctype html>
+/**
+ * The scheme and motion the app would use, before first paint: these pages
+ * share the app's origin, so they read what it stored (src/lib/theme.ts,
+ * src/lib/motion.ts, resolved like src/lib/bootstrap.ts) and fall back to its
+ * defaults, dark and the browser's motion setting. "system" follows the
+ * browser. Constant text, nothing from the request.
+ */
+const PREFERENCES_SCRIPT = `(function(){var d=document.documentElement;try{var p=localStorage.getItem("theme");if(p!=="dark"&&p!=="light"&&p!=="system")p="dark";d.dataset.theme=p==="system"?(matchMedia("(prefers-color-scheme: dark)").matches?"dark":"light"):p}catch(e){}try{var m=localStorage.getItem("motion");if(m!=="system"&&m!=="reduce"&&m!=="allow")m="system";d.dataset.motion=m==="system"?(matchMedia("(prefers-reduced-motion: reduce)").matches?"reduce":"allow"):m}catch(e){}})()`;
+
+function page(
+  title: string,
+  body: string,
+  init: { status: number; headers: Record<string, string> },
+  style = "",
+): Response {
+  const nonce = crypto.randomUUID();
+  return new Response(
+    `<!doctype html>
 <html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="color-scheme" content="dark light">
+<script nonce="${nonce}">${PREFERENCES_SCRIPT}</script>
 <title>${title}</title>
 <style>${TOKENS}${style}</style>
 </head>
 <body><main>${body}</main></body>
-</html>`;
+</html>`,
+    { status: init.status, headers: { ...pageHeaders(nonce), ...init.headers } },
+  );
 }
 
 /** What a boot does, and roughly when each step starts, as a share of the boot. */
@@ -121,8 +140,8 @@ const MAX_SHOWN = 0.95;
  * The starting page's look. It reloads every few seconds, so every animation
  * is offset by `--t`, the seconds since the boot began: a reload picks each
  * one up where the last page left it instead of starting over. Only opacity
- * and transform move, and a visitor who asks for reduced motion gets still
- * frames.
+ * and transform move, and a visitor who asks for reduced motion (in the app or,
+ * failing that, the browser) gets still frames.
  */
 const STARTING_STYLE = `
   main { max-width: 30rem; }
@@ -173,9 +192,10 @@ const STARTING_STYLE = `
   @keyframes blink { 0%, 100% { opacity: .25; transform: scale(.8); } 50% { opacity: 1; transform: scale(1); } }
   @keyframes fill { to { transform: scaleX(var(--to)); } }
   @keyframes spin { to { transform: rotate(1turn); } }
-  @media (prefers-reduced-motion: reduce) {
-    *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; }
-  }`;
+  :root[data-motion="reduce"] *, :root[data-motion="reduce"] *::before, :root[data-motion="reduce"] *::after {
+    animation-duration: .01ms !important; animation-iteration-count: 1 !important; }
+  @media (prefers-reduced-motion: reduce) { :root:not([data-motion]) * {
+    animation-duration: .01ms !important; animation-iteration-count: 1 !important; } }`;
 
 const LOGO = `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect width="7" height="9" x="3" y="3" rx="1"/><rect width="7" height="5" x="14" y="3" rx="1"/><rect width="7" height="9" x="14" y="12" rx="1"/><rect width="7" height="5" x="3" y="16" rx="1"/></svg>`;
 const DONE = `<svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="8" cy="8" r="7"/><path d="m5 8 2 2 4-4"/></svg>`;
@@ -227,10 +247,9 @@ export function startingResponse(
   }).join("");
   const percent = Math.round(from * 100);
   const overdue = t > seconds;
-  return new Response(
-    page(
-      "Starting the Holotable demo",
-      `<div class="brand">${LOGO}Holotable <span>demo</span></div>
+  return page(
+    "Starting the Holotable demo",
+    `<div class="brand">${LOGO}Holotable <span>demo</span></div>
 ${BOARD}
 <h1>Spinning up your demo</h1>
 <p>The demo was asleep, so it is waking up with a fresh database, its migrations and six hours of demo history. It takes about ${seconds} seconds.</p>
@@ -238,9 +257,8 @@ ${BOARD}
 <div class="meta"><span>${t}s elapsed</span><span>This page refreshes on its own</span></div>
 <ol>${stages}</ol>
 ${overdue ? `<p class="note">Taking longer than usual. The first start after a deploy pulls a fresh image, which can add a minute or two.</p>` : ""}`,
-      `:root { --t: ${t}s; }${STARTING_STYLE}`,
-    ),
-    { status: 503, headers: { ...PAGE_HEADERS, refresh: retry, "retry-after": retry } },
+    { status: 503, headers: { refresh: retry, "retry-after": retry } },
+    `:root { --t: ${t}s; }${STARTING_STYLE}`,
   );
 }
 
@@ -257,13 +275,11 @@ export function limitedResponse(request: Request, bucket: Bucket): Response {
       { status: 429, headers: { "retry-after": retry, "cache-control": "no-store" } },
     );
   }
-  return new Response(
-    page(
-      "Slow down",
-      `<h1>Too many requests</h1>
+  return page(
+    "Slow down",
+    `<h1>Too many requests</h1>
 <p>Your address has sent more requests than the public demo allows. Wait a minute and reload.</p>`,
-    ),
-    { status: 429, headers: { ...PAGE_HEADERS, "retry-after": retry } },
+    { status: 429, headers: { "retry-after": retry } },
   );
 }
 

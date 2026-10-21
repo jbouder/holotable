@@ -102,7 +102,20 @@ test("the starting page refreshes itself and is never cached", async () => {
   assert.equal(page.status, 503);
   assert.equal(page.headers.get("refresh"), "3");
   assert.equal(page.headers.get("cache-control"), "no-store");
-  assert.match(page.headers.get("content-security-policy") ?? "", /default-src 'none'/);
+  // One script runs: the inline one that reads the app's stored theme, let in
+  // by a nonce that is new on every page.
+  const csp = page.headers.get("content-security-policy") ?? "";
+  assert.match(csp, /default-src 'none'/);
+  const nonce = /script-src 'nonce-([^']+)'/.exec(csp)?.[1];
+  assert.ok(nonce);
+  const html = await page.clone().text();
+  assert.equal(html.match(/<script/g)?.length, 1);
+  assert.match(html, new RegExp(`<script nonce="${nonce}">`));
+  const again = startingResponse(
+    req("/", { headers: { "sec-fetch-dest": "document" } }),
+    30,
+  );
+  assert.notEqual(again.headers.get("content-security-policy"), csp);
   assert.match(await page.text(), /about 30 seconds/);
 
   // Progress carries on across refreshes, and only the app answering finishes it.
