@@ -33,7 +33,9 @@ of the last visitor walking away. A script can still hold a stream open;
 `max_instances: 1` caps what that costs.
 
 A cold start serves a page that refreshes every three seconds until the app
-answers. Locally it takes about 10 seconds; Cloudflare adds the image pull on a
+answers. It shows the boot's progress and steps, estimated from how long the
+start has been running (the Worker can't see inside the container), and the
+bar stops short of the end until the app itself answers. Locally it takes about 10 seconds; Cloudflare adds the image pull on a
 new host.
 
 ## Limits
