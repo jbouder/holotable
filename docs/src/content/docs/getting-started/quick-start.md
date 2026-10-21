@@ -37,9 +37,10 @@ a source admin of one workspace, `local`. Bring your own data first:
 
 One container holds TimescaleDB, the app, the demo seeder and the
 self-monitoring collector. It needs no `.env`, no Keycloak and no key. The
-seeder writes six hours of demo history before streaming, so the four seeded
-dashboards (**Demo service health**, **Demo fleet**, **Demo host detail** and
-**Holotable self-monitoring**) are full within seconds.
+seeder writes six hours of demo history before streaming, so the five seeded
+dashboards (**Demo service health**, **Demo fleet**, **Demo host detail**,
+**Demo project allocations** and **Holotable self-monitoring**) are full
+within seconds.
 
 | Option | Effect |
 | --- | --- |
@@ -90,7 +91,7 @@ which.
 
 This brings up TimescaleDB, Keycloak, a one-shot migration job, the app, the
 seeder and the self-monitoring collector, as separate services, with real
-OIDC sign-in, and the same four seeded dashboards as the quick-start image.
+OIDC sign-in, and the same five seeded dashboards as the quick-start image.
 Each of the others shows off a source kind and is opt-in:
 
 - `docker compose --profile prometheus up` adds a Prometheus that scrapes the

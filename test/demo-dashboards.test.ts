@@ -29,6 +29,17 @@ import {
 } from "../scripts/lib/demo-files";
 import { HOSTS } from "../scripts/lib/seed-data";
 import {
+  ALLOCATION_TABLES,
+  ALLOCATION_WEEKS_AHEAD,
+  ALLOCATION_WEEKS_BACK,
+  ALLOCATIONS_SOURCE_ID,
+  allocationRows,
+  allocationsSpec,
+  PEOPLE,
+  PROJECTS,
+  weekStart,
+} from "../scripts/lib/demo-allocations";
+import {
   graphClickDatum,
   graphDatum,
   graphEdgeId,
@@ -120,6 +131,7 @@ const SOURCES: Record<string, SqlSourceConfig> = {
   "ts-metrics": source(HTTP_REQUESTS, SERVICE_CALLS),
   "ts-system": source(SYSTEM_METRICS),
   "ts-logs": source(APP_LOGS),
+  [ALLOCATIONS_SOURCE_ID]: source(...ALLOCATION_TABLES),
   // The files demo (#574): the catalog the seeder registers, which is what
   // Discover tables finds in the files it writes.
   [DEMO_FILES_SOURCE_ID]: demoFilesConfig(),
@@ -132,6 +144,7 @@ const SPECS: Record<string, Dashboard> = {
   fleet: parseDashboard(fleetSpec(TARGETS)),
   hostDetail: parseDashboard(hostDetailSpec()),
   files: parseDashboard(demoFilesSpec(TARGETS)),
+  allocations: parseDashboard(allocationsSpec()),
 };
 
 for (const [name, spec] of Object.entries(SPECS)) {
@@ -293,4 +306,32 @@ test("the seeded dashboards and the retired ones never share a title", () => {
   for (const retired of RETIRED_DEMO_DASHBOARDS) {
     assert.ok(!titles.includes(retired), retired);
   }
+});
+
+test("the staffing demo has everyone every week, and actuals only for past weeks", () => {
+  // A Wednesday afternoon: its week started on Monday the 19th.
+  const now = Date.parse("2026-10-21T15:30:00Z");
+  const thisWeek = weekStart(now);
+  assert.equal(new Date(thisWeek).toISOString(), "2026-10-19T00:00:00.000Z");
+  const rows = allocationRows(now);
+  const people = new Set(PEOPLE.map(([person]) => person));
+  const projects = new Set(PROJECTS.map(([project]) => project));
+  const weeks = new Map<number, Set<string>>();
+  const keys = new Set<string>();
+  for (const row of rows) {
+    const week = row.week.getTime();
+    const key = `${week}:${row.person}:${row.project}`;
+    assert.ok(!keys.has(key), `one row per person, project and week: ${key}`);
+    keys.add(key);
+    assert.equal(weekStart(week), week, "a week is a Monday at 00:00 UTC");
+    assert.ok(people.has(row.person), row.person);
+    assert.ok(projects.has(row.project), row.project);
+    assert.equal(row.actual_hours === null, week >= thisWeek);
+    weeks.set(week, (weeks.get(week) ?? new Set()).add(row.person));
+  }
+  // Every person has a row every week, so the status grid shows everyone.
+  assert.equal(weeks.size, ALLOCATION_WEEKS_BACK + 1 + ALLOCATION_WEEKS_AHEAD);
+  for (const present of weeks.values()) assert.equal(present.size, people.size);
+  // The same week writes the same rows.
+  assert.deepEqual(allocationRows(now + 3_600_000), rows);
 });

@@ -5,7 +5,7 @@
 #      which runs initdb and /docker-entrypoint-initdb.d only on an empty
 #      data directory, so a mounted volume boots straight to step 2.
 #   2. scripts/migrate.ts         applies pending migrations, idempotent
-#   3. scripts/seed.ts            the four default demo dashboards and their
+#   3. scripts/seed.ts            the five default demo dashboards and their
 #                                 sources in the local owner's workspace (the
 #                                 demo's, under AUTH_MODE=demo), the files
 #                                 demo under DUCKDB_SOURCES_DIR only with

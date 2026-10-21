@@ -70,8 +70,9 @@ real data the app produced. It needs `METRICS_TOKEN` set to the same value the
 app has, or the scrape is refused with a 404. Under `docker compose` it runs on
 its own and the token has a local default;
 `docker compose --profile smoke run --rm smoke` then checks the whole path end
-to end. A default stack seeds four dashboards (Demo service health, Demo
-fleet, Demo host detail and Holotable self-monitoring); the ones that show off
+to end. A default stack seeds five dashboards (Demo service health, Demo
+fleet, Demo host detail, Demo project allocations and Holotable
+self-monitoring); the ones that show off
 a source kind are opt-in. `docker compose --profile prometheus up` adds a
 Prometheus and the PromQL twin of the self-monitoring dashboard (#390);
 `docker compose --profile logs up` adds a Loki and a Grafana Alloy that

@@ -50,20 +50,35 @@ import {
   demoFilesSpec,
   writeDemoFiles,
 } from "./lib/demo-files";
+import {
+  ALLOCATION_TABLES,
+  ALLOCATIONS_SOURCE_ID,
+  ALLOCATIONS_SOURCE_NAME,
+  type AllocationRow,
+  allocationRows,
+  allocationsSpec,
+  type PersonRow,
+  type ProjectRow,
+  personRows,
+  projectRows,
+  weekStart,
+} from "./lib/demo-allocations";
 import { seedWorkspace } from "./lib/seed-workspace";
 
 /**
  * Looping seeder.
  *
- * 1. (once) ensures the four default dashboards (Demo service health, Demo
- *    fleet, Demo host detail and Holotable self-monitoring) and their sources
- *    exist in Postgres so the app has something to show.
+ * 1. (once) ensures the five default dashboards (Demo service health, Demo
+ *    fleet, Demo host detail, Demo project allocations and Holotable
+ *    self-monitoring) and their sources exist in Postgres so the app has
+ *    something to show.
  * 2. (once, with SEED_BACKFILL) inserts the history the loop would have
  *    written across that window, so a fresh database does not start with
  *    empty charts (#252).
  * 3. (loop) continuously inserts synthetic http_requests rows (and the other
  *    demo tables', the service map's once a minute) into TimescaleDB so the
- *    live dashboard streams fresh data.
+ *    live dashboard streams fresh data, and rewrites the staffing tables
+ *    when the week turns over.
  * 4. (loop) registers each opt-in dashboard whose source answers: the
  *    `prometheus-self` source and the PromQL self-monitoring dashboard once
  *    the Prometheus at PROMETHEUS_SELF_URL does (the compose `prometheus`
@@ -238,6 +253,13 @@ async function ensureDemo() {
       },
     });
 
+    // Who is staffed on what, by week: `scripts/lib/demo-allocations.ts`.
+    await upsertSource(pg, {
+      id: ALLOCATIONS_SOURCE_ID,
+      name: ALLOCATIONS_SOURCE_NAME,
+      config: { ...demoConnection(), tables: ALLOCATION_TABLES },
+    });
+
     // Holotable's own instruments, landed by scripts/self-metrics.ts. Seeded
     // whether or not the collector is running: an empty table is a dashboard
     // with empty panels, while a missing source is a broken one.
@@ -267,6 +289,7 @@ async function ensureDemo() {
     // Link targets first: a link names its target by id (#371).
     const targets = { hostDetail: await ensureDashboard(pg, hostDetailSpec()) };
     await ensureDashboard(pg, fleetSpec(targets));
+    await ensureDashboard(pg, allocationsSpec());
     for (const title of RETIRED_DEMO_DASHBOARDS) await retireDashboard(pg, title);
     await ensureDashboard(pg, selfMonitoringSpec());
     if (demoFilesOn()) await ensureDashboard(pg, demoFilesSpec(targets));
@@ -559,6 +582,66 @@ const CALL_COLUMNS = [
 const insertCallRows = (client: Client, rows: readonly ServiceCallRow[]) =>
   insertRows(client, "metrics.service_calls", CALL_COLUMNS, rows);
 
+const PERSON_COLUMNS = [
+  "person",
+  "name",
+  "team",
+  "role",
+  "location",
+  "capacity_hours",
+] as const;
+const PROJECT_COLUMNS = [
+  "project",
+  "name",
+  "client",
+  "status",
+  "billable",
+  "budget_hours",
+] as const;
+const ALLOCATION_COLUMNS = [
+  "week",
+  "person",
+  "project",
+  "allocation_pct",
+  "planned_hours",
+  "actual_hours",
+] as const;
+
+/**
+ * Replace the staffing tables with the rows as of `now`, in one transaction
+ * so a panel never reads them half written. They are a function of the
+ * current week, so the loop calls this again when the week turns over.
+ */
+async function writeAllocations(client: Client, now: number): Promise<void> {
+  const allocations = allocationRows(now);
+  await client.query("BEGIN");
+  try {
+    await client.query(
+      "DELETE FROM metrics.allocations; DELETE FROM metrics.people; DELETE FROM metrics.projects",
+    );
+    await insertRows<PersonRow>(client, "metrics.people", PERSON_COLUMNS, personRows());
+    await insertRows<ProjectRow>(
+      client,
+      "metrics.projects",
+      PROJECT_COLUMNS,
+      projectRows(),
+    );
+    for (let i = 0; i < allocations.length; i += 1_000) {
+      await insertRows<AllocationRow>(
+        client,
+        "metrics.allocations",
+        ALLOCATION_COLUMNS,
+        allocations.slice(i, i + 1_000),
+      );
+    }
+    await client.query("COMMIT");
+  } catch (err) {
+    await client.query("ROLLBACK");
+    throw err;
+  }
+  console.log(`staffing: wrote ${allocations.length} allocation rows`);
+}
+
 /** The newest row's time in a demo table, or null when it is empty. */
 async function newestRow(client: Client, table: string): Promise<number | null> {
   const { rows } = await client.query<{ newest: Date | null }>(
@@ -693,6 +776,35 @@ async function ensureMetricsTables(client: Client) {
   await client.query(
     `SELECT create_hypertable('metrics.service_calls', by_range('ts'), if_not_exists => TRUE)`,
   );
+  // The staffing demo: plain tables, rewritten whole, so no hypertable.
+  await client.query(`
+    CREATE TABLE IF NOT EXISTS metrics.people (
+      person         TEXT PRIMARY KEY,
+      name           TEXT NOT NULL,
+      team           TEXT NOT NULL,
+      role           TEXT NOT NULL,
+      location       TEXT NOT NULL,
+      capacity_hours INTEGER NOT NULL
+    )`);
+  await client.query(`
+    CREATE TABLE IF NOT EXISTS metrics.projects (
+      project      TEXT PRIMARY KEY,
+      name         TEXT NOT NULL,
+      client       TEXT NOT NULL,
+      status       TEXT NOT NULL,
+      billable     BOOLEAN NOT NULL,
+      budget_hours INTEGER
+    )`);
+  await client.query(`
+    CREATE TABLE IF NOT EXISTS metrics.allocations (
+      week           TIMESTAMPTZ NOT NULL,
+      person         TEXT NOT NULL,
+      project        TEXT NOT NULL,
+      allocation_pct DOUBLE PRECISION NOT NULL,
+      planned_hours  DOUBLE PRECISION NOT NULL,
+      actual_hours   DOUBLE PRECISION,
+      PRIMARY KEY (week, person, project)
+    )`);
   // Rows an earlier seeder wrote for edges the map no longer has would draw
   // nodes whose links set a service the variable does not allow (#623).
   await client.query(
@@ -838,6 +950,18 @@ async function main() {
       console.warn("backfill failed:", e instanceof Error ? e.message : e),
     );
   }
+  let allocationsWeek = Number.NaN;
+  const refreshAllocations = async () => {
+    const week = weekStart(Date.now());
+    if (week === allocationsWeek) return;
+    try {
+      await writeAllocations(client, Date.now());
+      allocationsWeek = week;
+    } catch (err) {
+      console.warn("staffing write failed:", err instanceof Error ? err.message : err);
+    }
+  };
+  await refreshAllocations();
   // Asked once before the loop is announced, so an endpoint already up (the
   // end-to-end stack's Prometheus) has its source before anything reads it.
   const optIns = optInDemos();
@@ -852,6 +976,7 @@ async function main() {
       await refreshDemoFiles();
     }
     for (const demo of optIns) await tickOptIn(demo);
+    await refreshAllocations();
     try {
       const now = Date.now();
       await insertHttpRows(client, httpRequestRows(now));

@@ -11,12 +11,12 @@ opt-in demo that is on.
 
 ## 1. Bootstrap, once
 
-It registers four demo sources and the **four default dashboards** in the
+It registers five demo sources and the **five default dashboards** in the
 `demo` workspace, if they do not already exist. Under `AUTH_MODE=local` they
 go to the local owner's workspace instead, the first `LOCAL_GROUPS` names
 (`local` by default), so the [quick start](/getting-started/quick-start/)
 opens on them ([local mode](/admin/demo-mode/#local-mode)); the smoke test
-reads the same workspace. The four sources are TimescaleDB sources that point
+reads the same workspace. The five sources are TimescaleDB sources that point
 at the `metrics` schema and share the read-only `TS_METRICS` secret
 reference; they differ only in the tables they expose.
 
@@ -25,10 +25,11 @@ reference; they differ only in the tables they expose.
 | `ts-metrics` | `metrics.http_requests` — per-request events; `metrics.service_calls` — calls between services, a minute a row | **Demo service health** |
 | `ts-system` | `metrics.system_metrics` — per-host infra metrics | **Demo fleet** and **Demo host detail** |
 | `ts-logs` | `metrics.app_logs` — gateway log lines | The logs on **Demo service health** and **Demo host detail** |
+| `ts-people` | `metrics.people`, `metrics.projects` and `metrics.allocations` — who is staffed on what, by week | **Demo project allocations** |
 | `holotable-self` | `metrics.holotable_self` — the app's own instruments | **Holotable self-monitoring**, below |
 
 A default install, `docker compose up` or the quick-start image, opens on
-those four and nothing else. Three more dashboards exist to show off a source
+those five and nothing else. Three more dashboards exist to show off a source
 kind, and each is **opt-in**: seeded only when its source is on, never
 pointing at a source that is not there.
 
@@ -62,6 +63,15 @@ all of them:
 - **Demo host detail**: one host, picked with a `host` variable: its CPU,
   memory, disk and network, its own log lines and their levels, and the other
   hosts.
+- **Demo project allocations**: who is staffed on what, and who is over or
+  under? Over twelve weeks, with a multi-select `team` variable: headcount,
+  utilization, billable share and the people double-booked as stats; planned
+  hours by project as stacked bars beside utilization by team as gauge bars;
+  load by person and week as a heatmap beside this week's load as a status
+  grid; planned against logged hours, where each team's hours go (a Sankey)
+  and hours by client and project (a treemap); and tables of who is on what
+  this week, project budgets against logged hours, and the plan from this
+  week on. See [The staffing demo](#the-staffing-demo).
 
 They show [drilldown](/guide/drilldown/) too. **Demo service health** has a
 `service` variable, the API's three services, all of them picked by default
@@ -92,7 +102,7 @@ it while it still owns it, and tombstones its source once no live dashboard
 reads it. The files demo is retired on the next start without
 `SEED_DEMO_FILES=true`; the Prometheus and Loki ones at once when their URL
 is unset, and otherwise once their endpoint has not answered for three
-minutes, so an install upgraded with the profile off ends on the four
+minutes, so an install upgraded with the profile off ends on the five
 defaults. Turned back on, the dashboard returns under the same id, so a link
 or a bookmark to it still works. One a person has saved is theirs, and stays,
 with its source.
@@ -210,10 +220,45 @@ about 3% of calls fail, as its 5xx do. A **read-only** role is created by
 `timescaledb/init/002_readonly_user.sh`; the app only ever connects as this user
 via the source's `secret_ref`.
 
+## The staffing demo
+
+`ts-people` is a demo that is not about machines: personnel project
+allocations, from `scripts/lib/demo-allocations.ts`. Three plain tables, not
+hypertables:
+
+- `metrics.people` (`person`, `name`, `team`, `role`, `location`,
+  `capacity_hours`): twenty people in five teams, two of them part-time at
+  32 hours a week.
+- `metrics.projects` (`project`, `name`, `client`, `status`, `billable`,
+  `budget_hours`): seven projects for three clients and internal work, and
+  *Internal & admin*, which has no budget.
+- `metrics.allocations` (`week`, `person`, `project`, `allocation_pct`,
+  `planned_hours`, `actual_hours`): one row per person, project and week,
+  each week a Monday at 00:00 UTC, from 26 weeks before the current one to 12
+  after it. `allocation_pct` is a share of the person's own capacity. Past
+  weeks carry the hours logged, within 15% of the plan, with an occasional
+  week off; the current week and later have `actual_hours` null.
+
+The staffing is written out by hand so the dashboard has something to find:
+an engineer double-booked while Delta ramps up, a pilot that ends next week
+and leaves a data scientist on the bench, an engineer between projects for
+five weeks. Everyone spends 10% on internal work every week, so everyone
+has a row every week.
+
+`allocations` has `week` as its time field, so the dashboard's window applies
+to it; `people` and `projects` have none. Since the server owns time and a
+window cannot reach past now, the panels about the future read the rows with
+no logged hours yet (`actual_hours IS NULL`) rather than a date.
+
+The rows are a function of the current week, so the seeder rewrites all
+three tables, in one transaction, when it starts and again when the week
+turns over. They are never backfilled and have no retention policy.
+
 ## The self-monitoring demo
 
-The first three demo sources show the mechanism on synthetic rows. The fourth
-shows the point: Holotable watching itself.
+The first three demo sources show the mechanism on synthetic rows, and the
+staffing demo on rows of another kind. The fifth shows the point: Holotable
+watching itself.
 
 `scripts/self-metrics.ts` scrapes the app's own `GET /api/metrics` every
 `SELF_METRICS_INTERVAL_MS` and lands one row per series per scrape in the

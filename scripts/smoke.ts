@@ -29,6 +29,7 @@ import type { VariableValues } from "@/lib/sql/variables";
 import { resolveTimeRange } from "@/lib/time";
 import { resolveSelection } from "@/lib/variable-selection";
 import { serverKind } from "@/lib/sources/server/registry";
+import { ALLOCATIONS_DASHBOARD_TITLE, allocationsSpec } from "./lib/demo-allocations";
 import { demoSpec, HOST_DETAIL_TITLE } from "./lib/demo-dashboards";
 import { DEMO_FILES_DASHBOARD_TITLE, demoFilesSpec } from "./lib/demo-files";
 import { seedWorkspace } from "./lib/seed-workspace";
@@ -131,6 +132,11 @@ const TARGETS: Target[] = [
     title: "Demo service health",
     committed: () => parseDashboard(demoSpec()),
     feeds: "the seeder writes demo rows every few seconds",
+  },
+  {
+    title: ALLOCATIONS_DASHBOARD_TITLE,
+    committed: () => parseDashboard(allocationsSpec()),
+    feeds: "the seeder writes the staffing tables when it starts",
   },
   // The files demo (#574): a DuckDB source over the Parquet, CSV and JSON files
   // the seeder writes under DUCKDB_SOURCES_DIR, which compose mounts here

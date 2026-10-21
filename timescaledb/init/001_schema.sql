@@ -120,6 +120,41 @@ SELECT add_retention_policy(
     if_not_exists => TRUE
 );
 
+-- The staffing demo: who is planned on what, by week
+-- (scripts/lib/demo-allocations.ts). Plain tables, since the seeder rewrites
+-- them whole when the week turns over; it creates the same tables on a volume
+-- that predates them.
+CREATE TABLE IF NOT EXISTS metrics.people
+(
+    person         TEXT PRIMARY KEY,
+    name           TEXT NOT NULL,
+    team           TEXT NOT NULL,
+    role           TEXT NOT NULL,
+    location       TEXT NOT NULL,
+    capacity_hours INTEGER NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS metrics.projects
+(
+    project      TEXT PRIMARY KEY,
+    name         TEXT NOT NULL,
+    client       TEXT NOT NULL,
+    status       TEXT NOT NULL,
+    billable     BOOLEAN NOT NULL,
+    budget_hours INTEGER
+);
+
+CREATE TABLE IF NOT EXISTS metrics.allocations
+(
+    week           TIMESTAMPTZ NOT NULL,
+    person         TEXT NOT NULL,
+    project        TEXT NOT NULL,
+    allocation_pct DOUBLE PRECISION NOT NULL,
+    planned_hours  DOUBLE PRECISION NOT NULL,
+    actual_hours   DOUBLE PRECISION,
+    PRIMARY KEY (week, person, project)
+);
+
 -- Third demo source: Holotable's own Prometheus instruments (#54).
 --
 -- `scripts/self-metrics.ts` scrapes GET /api/metrics and lands one row per
