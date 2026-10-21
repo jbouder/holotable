@@ -37,6 +37,8 @@ export class HolotableDemo extends Container<Env> {
 
   /** In-memory, per Durable Object instance: one start at a time. */
   private starting: Promise<void> | null = null;
+  /** When the current start began, for the starting page's progress. */
+  private startedAt = 0;
 
   constructor(ctx: ConstructorParameters<typeof Container<Env>>[0], env: Env) {
     super(ctx, env);
@@ -71,11 +73,12 @@ export class HolotableDemo extends Container<Env> {
     // image opens its port only after Postgres, migrations and the server
     // are up, so "healthy" here means the app can answer.
     this.ensureStarting();
-    return startingResponse(request, BOOT_SECONDS);
+    return startingResponse(request, BOOT_SECONDS, (Date.now() - this.startedAt) / 1000);
   }
 
   private ensureStarting(): void {
     if (this.starting) return;
+    this.startedAt = Date.now();
     this.starting = this.startAndWaitForPorts({
       cancellationOptions: {
         // A first start pulls a ~1 GB image; the library defaults (8 s to get

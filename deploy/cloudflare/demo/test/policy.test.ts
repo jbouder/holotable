@@ -105,6 +105,18 @@ test("the starting page refreshes itself and is never cached", async () => {
   assert.match(page.headers.get("content-security-policy") ?? "", /default-src 'none'/);
   assert.match(await page.text(), /about 30 seconds/);
 
+  // Progress carries on across refreshes, and only the app answering finishes it.
+  const doc = { headers: { "sec-fetch-dest": "document" } };
+  const at = async (elapsed: number) =>
+    Number(
+      /aria-valuenow="(\d+)"/.exec(
+        await startingResponse(req("/", doc), 30, elapsed).text(),
+      )?.[1],
+    );
+  assert.equal(await at(0), 0);
+  assert.equal(await at(15), 50);
+  assert.ok((await at(600)) < 100);
+
   const api = startingResponse(req("/api/dashboards"), 30);
   assert.equal(api.status, 503);
   assert.equal(api.headers.get("retry-after"), "3");
