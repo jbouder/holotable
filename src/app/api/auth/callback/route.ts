@@ -4,6 +4,7 @@ import { identityFromPayload, realmJwks } from "@/lib/auth/session";
 import { completeSignIn, SignInRefused } from "@/lib/auth/sign-in";
 import { setSessionCookie, setSessionIdCookie } from "@/lib/auth/cookie";
 import { safeNextPath } from "@/lib/auth/next-path";
+import { signInLanding } from "@/lib/preferences-server";
 import { startSession } from "@/lib/auth/renewal";
 import { renewalDeps } from "@/lib/auth/session-store";
 import { HttpError } from "@/lib/auth/authorize";
@@ -95,8 +96,8 @@ export const GET = route("auth.callback", async (req: Request) => {
   // browser off the host the session cookie was just set on (localhost),
   // dropping the cookie and bouncing back to login.
   //
-  // `next` is the page the sign-in started from; with none it is `/`, where
-  // the home route sends the new session to the person's chosen start page
-  // (#215), with the same fallbacks either way.
-  return new Response(null, { status: 302, headers: { Location: next } });
+  // `next` is the page the sign-in started from; with none, or `/`, it is the
+  // person's chosen start page (#215).
+  const location = await signInLanding(identity, next);
+  return new Response(null, { status: 302, headers: { Location: location } });
 });

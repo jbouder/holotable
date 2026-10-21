@@ -44,7 +44,7 @@ export interface DashboardQuery {
 /**
  * How the list opens when the URL says nothing: the reader's saved defaults
  * (#215), or these. A URL parameter always wins over them, and a value equal
- * to them is left out of the URL, so the reader's own plain `/dashboards` is
+ * to them is left out of the URL, so the reader's own plain `/` is
  * the list they chose.
  */
 export interface ListDefaults {
@@ -109,8 +109,8 @@ export function parseDashboardQuery(
  * Write a query back into a URL query string, omitting everything that is at
  * its default.
  *
- * The omission matters more than it looks: `/dashboards` and
- * `/dashboards?q=&sort=updated&page=1` are the same list, and only one of them
+ * The omission matters more than it looks: `/` and
+ * `/?q=&sort=updated&page=1` are the same list, and only one of them
  * should ever appear in someone's history.
  */
 export function dashboardQueryString(
@@ -128,13 +128,13 @@ export function dashboardQueryString(
   return params.toString();
 }
 
-/** `/dashboards`, or `/dashboards?…` when anything is set. */
+/** `/`, or `/?…` when anything is set. */
 export function dashboardListHref(
   query: DashboardQuery,
   defaults: ListDefaults = DEFAULT_LIST,
 ): string {
   const qs = dashboardQueryString(query, defaults);
-  return qs ? `/dashboards?${qs}` : "/dashboards";
+  return qs ? `/?${qs}` : "/";
 }
 
 /**

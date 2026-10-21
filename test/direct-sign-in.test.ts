@@ -49,7 +49,7 @@ test("a session cookie, a prefetch, a probe and an embed are left alone", async 
   }
 });
 
-test("sign-in comes back to next; sign-out sets the marker and sign-in clears it", () => {
+test("sign-in comes back to next (the start page from /); sign-out sets the marker and sign-in clears it", () => {
   const read = (path: string) =>
     readFileSync(
       new URL(`../src/app/api/auth/${path}/route.ts`, import.meta.url),
@@ -62,6 +62,6 @@ test("sign-in comes back to next; sign-out sets the marker and sign-in clears it
   const callback = read("callback");
   assert.match(callback, /safeNextPath\(store\.get\(config\.oidcNextCookieName\)/);
   assert.match(callback, /store\.delete\(config\.signedOutCookieName\)/);
-  assert.match(callback, /Location: next/);
+  assert.match(callback, /signInLanding\(identity, next\)/);
   assert.match(read("logout"), /set\(config\.signedOutCookieName/);
 });

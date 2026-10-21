@@ -80,9 +80,11 @@ Stored ranges are always UTC, and the server still decides the concrete
 window a query runs over, so two people in different zones looking at the
 same dashboard see the same data.
 
-**Start page** is the dashboard list, Explore, or one dashboard you can view.
-If that dashboard is deleted or you lose access to it, you land on the list
-with a one-time notice instead.
+**Start page** is the dashboard list, Explore, or one dashboard you can view,
+and it is where you land when you sign in from the app's root URL. Signing in
+from a link takes you to that link instead, and once you are signed in `/` is
+always the dashboard list. If the start dashboard is deleted or you lose
+access to it, you land on the list with a one-time notice instead.
 
 **Dashboard list** defaults set the sort order and whether only your
 favorites are shown. A link that names a sort or filter still wins.

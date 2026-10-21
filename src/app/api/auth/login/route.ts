@@ -9,6 +9,7 @@ import {
   setSessionIdCookie,
 } from "@/lib/auth/cookie";
 import { safeNextPath } from "@/lib/auth/next-path";
+import { signInLanding } from "@/lib/preferences-server";
 import { renewSession } from "@/lib/auth/renewal";
 import { renewalDeps } from "@/lib/auth/session-store";
 import { verifySessionToken } from "@/lib/auth/session";
@@ -88,12 +89,13 @@ function redirectTo(location: string): Response {
 
 async function mintedSession(req: Request, mode: MintingMode): Promise<Response> {
   const store = await cookies();
-  const { location, session } = await mintedLogin(
+  const { location: next, session } = await mintedLogin(
     mode,
     new URL(req.url).searchParams.get("next"),
     store.get(config.sessionCookieName)?.value,
     mode === "local" ? config.localGroups : config.demoGroups,
   );
+  let location = next;
   if (session) {
     await setSessionCookie(session);
     // Only a session minted here is a sign-in; a visitor who still held one
@@ -106,6 +108,8 @@ async function mintedSession(req: Request, mode: MintingMode): Promise<Response>
         workspaceId: null,
         detail: { mode },
       });
+      // A sign-in, so `/` is the start page, as the OIDC callback has it.
+      location = await signInLanding(identity, location);
     }
   }
   // Relative, for the same reason as the OIDC callback: behind a container

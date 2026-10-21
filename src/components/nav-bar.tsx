@@ -18,16 +18,21 @@ import { NavSlot } from "@/components/nav-slot";
 import { ProfileMenu, type ProfileMenuAccount } from "@/components/profile-menu";
 
 const LINKS = [
-  { href: "/dashboards", label: "Dashboards", Icon: LayoutDashboard },
+  // The list is the root; the dashboards themselves live under /dashboards.
+  { href: "/", section: "/dashboards", label: "Dashboards", Icon: LayoutDashboard },
   { href: "/explore", label: "Explore", Icon: Compass },
   { href: "/data-sources", label: "Data sources", Icon: Database },
   // Only for someone who may generate somewhere (#441); the page 404s otherwise.
   { href: "/models", label: "Models", Icon: Cpu, gated: true },
 ] as const;
 
-/** A link is current on its page and on every page under it (`/explore/<id>`). */
-function isCurrent(pathname: string, href: string): boolean {
-  return pathname === href || pathname.startsWith(`${href}/`);
+/**
+ * A link is current on its page and on every page under its section
+ * (`/explore/<id>`), which is its own path unless it names another.
+ */
+function isCurrent(pathname: string, link: (typeof LINKS)[number]): boolean {
+  const section = "section" in link ? link.section : link.href;
+  return pathname === link.href || pathname.startsWith(`${section}/`);
 }
 
 /**
@@ -86,21 +91,21 @@ export function NavBar({
       <div className="flex h-14 items-center justify-between gap-2 px-4 sm:px-6">
         <nav className="flex min-w-0 items-center gap-6" aria-label="Main">
           <Link
-            href="/dashboards"
+            href="/"
             className="tap-target flex shrink-0 items-center gap-2 font-semibold"
           >
             <LayoutDashboard className="h-5 w-5 text-primary" />
             Holotable
           </Link>
           <div className="hidden items-center gap-6 md:flex">
-            {links.map(({ href, label, Icon }) => (
+            {links.map((link) => (
               <Link
-                key={href}
-                href={href}
-                aria-current={isCurrent(pathname, href) ? "page" : undefined}
+                key={link.href}
+                href={link.href}
+                aria-current={isCurrent(pathname, link) ? "page" : undefined}
                 className="tap-target flex items-center gap-1.5 text-sm text-muted hover:text-foreground aria-[current=page]:text-foreground"
               >
-                <Icon className="h-4 w-4" /> {label}
+                <link.Icon className="h-4 w-4" /> {link.label}
               </Link>
             ))}
           </div>
@@ -138,14 +143,14 @@ export function NavBar({
         className="h-(--collapsible-panel-height) overflow-hidden transition-[height,opacity] duration-(--duration-base) ease-emphasized data-starting-style:h-0 data-starting-style:opacity-0 data-ending-style:h-0 data-ending-style:opacity-0 md:hidden"
       >
         <div className="flex flex-col border-t border-border px-2 py-1">
-          {links.map(({ href, label, Icon }) => (
+          {links.map((link) => (
             <Link
-              key={href}
-              href={href}
-              aria-current={isCurrent(pathname, href) ? "page" : undefined}
+              key={link.href}
+              href={link.href}
+              aria-current={isCurrent(pathname, link) ? "page" : undefined}
               className="tap-target flex items-center gap-2 px-3 py-3 text-sm text-muted hover:bg-surface-2 hover:text-foreground aria-[current=page]:text-foreground"
             >
-              <Icon className="h-4 w-4" /> {label}
+              <link.Icon className="h-4 w-4" /> {link.label}
             </Link>
           ))}
         </div>

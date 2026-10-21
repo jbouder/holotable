@@ -69,7 +69,7 @@ export const STATIC_COMMANDS: Command[] = [
     kind: "page",
     title: "Dashboards",
     keywords: "list home",
-    action: { type: "navigate", href: "/dashboards" },
+    action: { type: "navigate", href: "/" },
   },
   {
     id: "page:explore",

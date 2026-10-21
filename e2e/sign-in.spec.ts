@@ -19,18 +19,18 @@ async function realmSignIn(page: Page) {
 test("a link opened without a session signs in at the realm and lands on it", async ({
   page,
 }) => {
-  await page.goto("/dashboards?sort=name");
+  await page.goto("/?sort=name");
   // The realm's login form, not the app's sign-in card.
   await expect(page.locator("#kc-login")).toBeVisible();
   await realmSignIn(page);
-  await expect(page).toHaveURL(/\/dashboards\?sort=name$/);
+  await expect(page).toHaveURL(/\/\?sort=name$/);
   await expect(page.getByRole("button", { name: /account/i })).toBeVisible();
 });
 
 test("signing out stays signed out, and Sign in goes back through the realm", async ({
   page,
 }) => {
-  await page.goto("/dashboards");
+  await page.goto("/");
   await realmSignIn(page);
   await page.getByRole("button", { name: /account/i }).click();
   await page.getByRole("menuitem", { name: "Sign out" }).click();

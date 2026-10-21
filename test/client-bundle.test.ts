@@ -104,10 +104,9 @@ function clientChains(entries: string[], banned: RegExp): string[] {
 
 const ROOT_LAYOUT = ["src/app/layout.tsx", "src/app/template.tsx"];
 
-test("the start page, the dashboard list and settings load no zod", () => {
+test("the dashboard list and settings load no zod", () => {
   for (const [route, entries] of Object.entries({
-    "/": [...ROOT_LAYOUT, "src/app/page.tsx"],
-    "/dashboards": [...ROOT_LAYOUT, "src/app/dashboards/page.tsx"],
+    "/": [...ROOT_LAYOUT, "src/app/(home)/page.tsx"],
     "/settings": [
       ...ROOT_LAYOUT,
       "src/app/settings/layout.tsx",

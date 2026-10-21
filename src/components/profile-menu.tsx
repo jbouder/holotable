@@ -36,7 +36,7 @@ export function ProfileMenu({ account }: { account: ProfileMenuAccount }) {
   // leave nothing of the signed-in page behind in the router cache.
   async function logout() {
     await fetch("/api/auth/logout", { method: "POST" });
-    window.location.assign("/dashboards");
+    window.location.assign("/");
   }
 
   return (

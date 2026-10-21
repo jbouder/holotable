@@ -105,7 +105,7 @@ export async function savePreferences(
 export const START_UNAVAILABLE_NOTICE = "start-unavailable";
 
 /**
- * Where to send someone who has just signed in, or who opened `/`. A start
+ * The person's start page: the list at `/`, Explore, or one dashboard. A start
  * dashboard that has been deleted, or that they can no longer view, falls back
  * to the list with a notice rather than a 404.
  */
@@ -116,7 +116,7 @@ export async function startHref(
 ): Promise<string> {
   if (prefs.startPage === "chat") return "/explore";
   const id = startDashboardId(prefs.startPage);
-  if (!id) return "/dashboards";
+  if (!id) return "/";
   try {
     const find = lookup ?? databaseLookup;
     const target = await find(id);
@@ -126,5 +126,19 @@ export async function startHref(
   } catch (err) {
     log.warn("preferences.start_lookup_failed", { err });
   }
-  return `/dashboards?notice=${START_UNAVAILABLE_NOTICE}`;
+  return `/?notice=${START_UNAVAILABLE_NOTICE}`;
+}
+
+/**
+ * Where a sign-in lands: back where it started, or the start page when it
+ * started at `/` (or nowhere). Only a sign-in goes to the start page; `/`
+ * itself is always the list, so the nav's link to it never bounces.
+ */
+export async function signInLanding(
+  identity: Identity,
+  next: string,
+  deps: { store?: PreferenceStore; lookup?: DashboardLookup } = {},
+): Promise<string> {
+  if (next !== "/") return next;
+  return startHref(identity, await loadPreferences(identity, deps.store), deps.lookup);
 }

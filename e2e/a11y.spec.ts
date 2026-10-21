@@ -59,7 +59,7 @@ for (const theme of THEMES) {
     });
 
     test("dashboard list", async ({ page }) => {
-      await page.goto("/dashboards");
+      await page.goto("/");
       await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
       await expectNoA11yViolations(page);
     });
@@ -401,7 +401,7 @@ for (const theme of THEMES) {
     });
 
     test("an open menu: the account menu", async ({ page }) => {
-      await page.goto("/dashboards");
+      await page.goto("/");
       await page.getByRole("button", { name: /account menu/i }).click();
       await expect(page.getByRole("menu")).toBeVisible();
       await expectNoA11yViolations(page);
@@ -413,7 +413,7 @@ for (const theme of THEMES) {
       // The account menu in a window too short for it stands in for a
       // workspace with many sources (#585).
       await page.setViewportSize({ width: 1280, height: 240 });
-      await page.goto("/dashboards");
+      await page.goto("/");
       await page.getByRole("button", { name: /account menu/i }).click();
       const menu = page.getByRole("menu");
       await expect(menu).toBeVisible();
@@ -506,7 +506,7 @@ test("signed out: the sign-in card", async ({ browser }) => {
   const page = await context.newPage();
   for (const theme of THEMES) {
     await setAppearance(page, theme);
-    await page.goto("/dashboards");
+    await page.goto("/");
     await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
     await expectNoA11yViolations(page);
   }
@@ -515,7 +515,7 @@ test("signed out: the sign-in card", async ({ browser }) => {
 
 test("the named theme is on <html> before first paint", async ({ page }) => {
   // #503: the bootstrap script writes it with the scheme, so nothing flashes.
-  await page.goto("/dashboards", { waitUntil: "domcontentloaded" });
+  await page.goto("/", { waitUntil: "domcontentloaded" });
   await expect(page.locator("html")).toHaveAttribute("data-palette", "holotable");
 });
 
@@ -542,7 +542,7 @@ test.describe("forced colors", () => {
   test("focus is drawn in the system's Highlight, as a ring even on a filled button", async ({
     page,
   }) => {
-    await page.goto("/dashboards");
+    await page.goto("/");
     await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
     const highlight = await page.evaluate(() => {
       const probe = document.createElement("span");
