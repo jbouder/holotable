@@ -67,9 +67,9 @@ function pageHeaders(nonce: string): Record<string, string> {
 
 /**
  * The app's default palette (src/app/globals.css): dark, and light under
- * `data-theme="light"`, with its 6px corners and lifted card. These pages are
- * served before the app is up, so they carry their own copy; the CSP allows
- * no fonts, so the type is the system's.
+ * `data-theme="light"`, with its square corners and lifted card. These pages
+ * are served before the app is up, so they carry their own copy; the CSP
+ * allows no fonts, so the type is the system's.
  */
 const TOKENS = `
   :root { color-scheme: dark;
@@ -79,7 +79,7 @@ const TOKENS = `
     --primary: oklch(0.72 0.13 250); --success: oklch(0.8 0.12 160);
     --chart-1: oklch(0.68 0.13 250); --chart-2: oklch(0.72 0.12 160);
     --chart-3: oklch(0.8 0.13 80); --chart-4: oklch(0.72 0.15 25);
-    --radius: 6px; --shadow-card: 0 1px 2px rgb(0 0 0 / 0.2), 0 4px 12px -4px rgb(0 0 0 / 0.35); }
+    --shadow-card: 0 1px 2px rgb(0 0 0 / 0.2), 0 4px 12px -4px rgb(0 0 0 / 0.35); }
   :root[data-theme="light"] { color-scheme: light;
     --background: oklch(0.975 0.004 260); --surface: oklch(1 0 0);
     --surface-2: oklch(0.955 0.006 260); --border: oklch(0.86 0.01 260);
@@ -155,7 +155,7 @@ const STARTING_STYLE = `
   .board { display: grid; grid-template-columns: 1fr 1fr; grid-template-rows: 3.5rem 2rem 3.5rem;
            gap: .5rem; margin-bottom: 1.75rem; }
   .tile { background: var(--surface); border: 1px solid var(--border); overflow: hidden;
-          border-radius: var(--radius); box-shadow: var(--shadow-card);
+          box-shadow: var(--shadow-card);
           position: relative; animation: rise .5s cubic-bezier(.2,0,0,1) backwards;
           animation-delay: calc(var(--i) * 90ms - var(--t)); }
   .a { grid-row: 1 / 3; } .b { grid-row: 1; } .c { grid-row: 2 / 4; } .d { grid-row: 3; }
@@ -176,8 +176,7 @@ const STARTING_STYLE = `
   .pulse i { width: .5rem; height: .5rem; border-radius: 50%; background: var(--chart-4);
              animation: blink 1.2s ease-in-out infinite;
              animation-delay: calc(var(--d) - var(--t)); }
-  .track { height: .375rem; background: var(--surface-2); margin: 1.25rem 0 .5rem; overflow: hidden;
-           border-radius: 999px; }
+  .track { height: .375rem; background: var(--surface-2); margin: 1.25rem 0 .5rem; overflow: hidden; }
   .fill { height: 100%; background: var(--primary); transform-origin: left;
           transform: scaleX(var(--from)); animation: fill var(--step) linear forwards; }
   .meta { display: flex; justify-content: space-between; font-size: .875rem; color: var(--muted);

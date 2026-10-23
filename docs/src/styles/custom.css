@@ -3,8 +3,8 @@
  *
  * Every value here is taken from the app's default palette in
  * src/app/globals.css (#648): the cool slate OKLCH surfaces at hue 260, the
- * soft blue primary, Chakra Petch and JetBrains Mono, the 6px corners
- * (`--ht-radius`) and the lifted card (`--ht-shadow-card`). The few tokens
+ * soft blue primary, Chakra Petch and JetBrains Mono, the lifted card
+ * (`--ht-shadow-card`) and a radius of zero. The few tokens
  * the app has no twin for (body text, purple, Starlight's grays and its
  * -low / -high accents) are derived in the same hue and chroma, and any
  * used as text holds AA on the surfaces it sits on.
@@ -21,14 +21,6 @@
 /* ---------------------------------------------------------------------------
  * Tokens. Dark first, as Starlight does.
  * ------------------------------------------------------------------------- */
-
-/* The app's one corner (#648), the same in both schemes. Starlight's search
-   dialog reads its own two. */
-:root {
-  --ht-radius: 6px;
-  --sl-search-corners: var(--ht-radius);
-  --pagefind-ui-border-radius: var(--ht-radius);
-}
 
 :root {
   --ht-background: oklch(0.15 0.012 260);
@@ -96,6 +88,10 @@
   --sl-font: "Chakra Petch";
   --sl-font-mono: "JetBrains Mono Variable";
   --sl-line-height: 1.65;
+
+  /* Starlight's search dialog reads these for its corners. */
+  --sl-search-corners: 0px;
+  --pagefind-ui-border-radius: 0px;
 }
 
 :root[data-theme="light"] {
@@ -160,53 +156,11 @@
  * Site-wide: the app's edges, type, and browser surfaces.
  * ------------------------------------------------------------------------- */
 
-/* Corners. Starlight rounds by its own scale (pill buttons, 0.5rem cards and
-   dialogs, 0.25rem rows); the app rounds its boxes and controls at one
-   radius and keeps navigation rows, chat turns, keys and icon marks square.
-   So each of Starlight's corners is set here to whichever the app does. */
-.card,
-.sl-link-card,
-.starlight-aside,
-.sl-link-button,
-.sl-badge,
-.pagination-links a,
-mobile-starlight-toc .toggle,
-mobile-starlight-toc .dropdown,
-.sl-menu-button,
-site-search button[data-open-modal],
-site-search dialog,
-.panel,
-.home-stage,
-.badge,
-.mock-input,
-.mock-button {
-  border-radius: var(--ht-radius);
-}
-
-.sidebar-content a,
-.sidebar-content summary,
-starlight-toc a,
-mobile-starlight-toc a,
-.card .icon,
-kbd {
+/* The app's radius is zero. One rule, so every Starlight corner follows. */
+*,
+*::before,
+*::after {
   border-radius: 0;
-}
-
-/* What the app draws round: a step's number, a status dot. */
-.step-n,
-.badge-live::before {
-  border-radius: 999px;
-}
-
-/* Code blocks: Expressive Code draws every corner from this one variable. */
-:root {
-  --ec-brdRad: var(--ht-radius);
-}
-
-/* A panel's title row and body sit on its rounded edge. */
-.panel,
-.home-stage {
-  overflow: hidden;
 }
 
 * {
