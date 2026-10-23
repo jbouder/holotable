@@ -51,6 +51,13 @@ says how a section gets here.
   in the nav bar, the sign-in page, the favicon (now with `favicon.ico` and
   an Apple touch icon beside `icon.svg`), the docs site, the README and the
   demo's starting page.
+- **Treemaps read as groups.** A treemap with levels draws each region as a
+  container on the raised surface with its name and total, and shades its
+  members by rank from the region's color, so siblings no longer share a
+  fill. Each block is labeled at its top left with its name and its value
+  (and its share of its parent), and a label that does not fit is left out
+  rather than cut. Nodes part by a gutter, the node under the pointer is
+  outlined, and a sunburst shades its rings the same way.
 - **Four default dashboards.** A default install (`docker compose up` or the
   quick-start image) now seeds exactly four: Demo service health, Demo fleet,
   Demo host detail and Holotable self-monitoring, which between them still

@@ -30,7 +30,13 @@ export interface Oklch {
   h: number; // degrees
 }
 
-export function oklchToHex({ l, c, h }: Oklch): string {
+export function oklchToHex(color: Oklch): string {
+  const [r, g, bl] = oklchToLinear(color);
+  return `#${toHexChannel(linearToSrgb(r))}${toHexChannel(linearToSrgb(g))}${toHexChannel(linearToSrgb(bl))}`;
+}
+
+/** OKLCH as linear sRGB, unclamped: a channel outside 0..1 is out of gamut. */
+function oklchToLinear({ l, c, h }: Oklch): [number, number, number] {
   const hr = (h * Math.PI) / 180;
   const a = c * Math.cos(hr);
   const b = c * Math.sin(hr);
@@ -49,7 +55,47 @@ export function oklchToHex({ l, c, h }: Oklch): string {
   const g = -1.2684380046 * l3 + 2.6097574011 * m3 - 0.3413193965 * s3;
   const bl = -0.0041960863 * l3 - 0.7034186147 * m3 + 1.707614701 * s3;
 
-  return `#${toHexChannel(linearToSrgb(r))}${toHexChannel(linearToSrgb(g))}${toHexChannel(linearToSrgb(bl))}`;
+  return [r, g, bl];
+}
+
+/**
+ * OKLCH as hex, brought into sRGB by lowering its chroma rather than by
+ * clipping each channel, which would turn its hue (a dark yellow clipped
+ * channel by channel goes olive or orange). Lightness and hue are kept.
+ */
+export function oklchToHexInGamut(color: Oklch): string {
+  const inside = (c: number) =>
+    oklchToLinear({ ...color, c }).every((v) => v >= -1e-4 && v <= 1 + 1e-4);
+  if (inside(color.c)) return oklchToHex(color);
+  let lo = 0;
+  let hi = color.c;
+  for (let i = 0; i < 20; i++) {
+    const mid = (lo + hi) / 2;
+    if (inside(mid)) lo = mid;
+    else hi = mid;
+  }
+  return oklchToHex({ ...color, c: lo });
+}
+
+function srgbToLinear(c: number): number {
+  return c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
+}
+
+/** A `#rrggbb` color as OKLCH; a gray's hue is 0. */
+export function hexToOklch(hex: string): Oklch {
+  const n = Number.parseInt(hex.replace("#", ""), 16);
+  const [r, g, b] = [(n >> 16) & 255, (n >> 8) & 255, n & 255].map((v) =>
+    srgbToLinear(v / 255),
+  );
+  const l_ = Math.cbrt(0.4122214708 * r + 0.5363325363 * g + 0.0514459929 * b);
+  const m_ = Math.cbrt(0.2119034982 * r + 0.6806995451 * g + 0.1073969566 * b);
+  const s_ = Math.cbrt(0.0883024619 * r + 0.2817188376 * g + 0.6299787005 * b);
+  const l = 0.2104542553 * l_ + 0.793617785 * m_ - 0.0040720468 * s_;
+  const a = 1.9779984951 * l_ - 2.428592205 * m_ + 0.4505937099 * s_;
+  const bb = 0.0259040371 * l_ + 0.7827717662 * m_ - 0.808675766 * s_;
+  const c = Math.hypot(a, bb);
+  const h = c < 1e-6 ? 0 : ((Math.atan2(bb, a) * 180) / Math.PI + 360) % 360;
+  return { l, c, h };
 }
 
 const OKLCH_RE =

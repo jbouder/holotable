@@ -110,6 +110,8 @@ test("the defaults are the dark scheme's tokens in globals.css", () => {
     assert.equal(d.fills[token as keyof typeof d.fills], hex(variable.slice(2)), token);
   }
   assert.equal(d.raised, hex("surface-3"));
+  assert.equal(d.container, hex("surface-2"));
+  assert.equal(d.ring, hex("ring"));
 });
 
 test("the chart style's defaults are the tokens in globals.css", () => {
@@ -193,6 +195,8 @@ const DISTINCT: ChartTheme = {
   font: "Distinct Sans",
   radius: 6,
   raised: "#070707",
+  container: "#080808",
+  ring: "#090909",
   type: { axis: 13, label: 14, tooltip: 15, value: 29 },
   lineWidth: 3,
   area: { fade: 0.4, flat: 0.2, stacked: 0.8 },
@@ -573,7 +577,14 @@ test("large areas are softened toward the surface; lines, bars and progress are 
   for (const viz of ["pie", "donut"] as const) {
     assert.deepEqual(drawnBy(viz, DISTINCT).color, DISTINCT.series.map(softened), viz);
   }
-  allSoft(fills(drawnBy("treemap", DISTINCT)), "treemap");
+  // A treemap's regions are containers and their members rank steps of the
+  // softened branch color, the largest the color itself (#657); a
+  // sunburst's inner ring is the softened branch color.
+  const leaves = (option: Record<string, unknown>) =>
+    (option.series as { data: { children: { itemStyle: { color: string } }[] }[] }[])
+      .flatMap((s) => s.data.flatMap((d) => d.children))
+      .map((d) => d.itemStyle.color);
+  allSoft(leaves(drawnBy("treemap", DISTINCT)), "treemap");
   allSoft(fills(drawnBy("treemap", DISTINCT, { variant: "sunburst" })), "sunburst");
   allSoft(fills(drawnBy("sankey", DISTINCT)), "sankey");
   allSoft(fills(drawnBy("state-timeline", DISTINCT)), "state-timeline");
