@@ -27,7 +27,7 @@ import { bindSourceRowFilter } from "@/lib/row-scope";
 import type { SourcePlan } from "@/lib/sources/server/types";
 import type { VariableValues } from "@/lib/sql/variables";
 import { resolveTimeRange } from "@/lib/time";
-import { resolveSelection } from "@/lib/variable-selection";
+import { resolveSelection, VariableSelectionError } from "@/lib/variable-selection";
 import { variableOptions } from "@/lib/variables";
 import { serverKind } from "@/lib/sources/server/registry";
 import { demoSpec, HOST_DETAIL_TITLE, hostDetailSpec } from "./lib/demo-dashboards";
@@ -220,16 +220,22 @@ async function waitForData(target: Target, deadline: number) {
       return null;
     });
 
-    if (dashboard) {
-      // The dashboard's variables at their defaults, as a viewer first sees it:
-      // an enum's own values, a query variable's from its query (host
-      // detail's `host`), read as a viewer with no row scope.
-      const values = {
-        declared: declaredVariables(dashboard.spec),
-        variables: await resolveSelection(dashboard.spec.variables ?? [], {}, (v) =>
+    // The dashboard's variables at their defaults, as a viewer first sees it:
+    // an enum's own values, a query variable's from its query (host detail's
+    // `host`), read as a viewer with no row scope. A query variable has none
+    // until the seeder's first rows land, so that is waited for too.
+    const variables = dashboard
+      ? await resolveSelection(dashboard.spec.variables ?? [], {}, (v) =>
           variableOptions(v, seedWorkspace(), {}),
-        ),
-      };
+        ).catch((err: unknown) => {
+          if (!(err instanceof VariableSelectionError)) throw err;
+          lastReason = `${err.message} (${target.feeds})`;
+          return null;
+        })
+      : null;
+
+    if (dashboard && variables) {
+      const values = { declared: declaredVariables(dashboard.spec), variables };
       const outcomes = await Promise.all(
         dashboard.spec.panels
           .filter(hasQuery)
