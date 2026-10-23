@@ -196,6 +196,59 @@ export function blockLabel(theme: ChartTheme, small = false) {
   return { fontFamily: theme.font, fontSize: theme.type.label - (small ? 1 : 0) };
 }
 
+/**
+ * A block's label of two weights (#657): its name at the label size, and its
+ * value on the line under it as the `v` rich style, in the regular weight.
+ * Each line is `lineHeight` tall, the label's size and a gap, which is what a
+ * kind measures to know whether the label fits its block.
+ */
+export function blockValueLabel(theme: ChartTheme) {
+  const px = theme.type.label;
+  return {
+    fontFamily: theme.font,
+    fontSize: px,
+    fontWeight: 600,
+    lineHeight: blockLine(theme),
+    rich: {
+      v: {
+        fontFamily: theme.font,
+        fontSize: px,
+        fontWeight: 400,
+        lineHeight: blockLine(theme),
+      },
+    },
+  };
+}
+
+/** One line of a {@link blockValueLabel}, in pixels. */
+export function blockLine(theme: ChartTheme): number {
+  return theme.type.label + 4;
+}
+
+/**
+ * A group's header written on the group (#657): its name in the foreground,
+ * and its total, as the `t` rich style, in the chart's muted text, centered
+ * in a band `height` tall.
+ */
+export function headerLabel(theme: ChartTheme, height: number) {
+  return {
+    fontFamily: theme.font,
+    fontSize: theme.type.label,
+    fontWeight: 600,
+    lineHeight: height,
+    color: theme.foreground,
+    rich: {
+      t: {
+        fontFamily: theme.font,
+        fontSize: theme.type.label,
+        fontWeight: 400,
+        lineHeight: height,
+        color: theme.text,
+      },
+    },
+  };
+}
+
 /** A label pinned to a node: its own small box with the page's corners. */
 export function pinnedLabel(theme: ChartTheme, small = false) {
   return {

@@ -57,6 +57,13 @@ export interface ChartTheme {
   radius: number;
   /** A tooltip sits on this, a step above the surface: `--surface-3`. */
   raised: string;
+  /**
+   * A group that holds other marks, a treemap's region: the panel's raised
+   * surface, `--surface-2` (#657). Text on it is `foreground` or `text`.
+   */
+  container: string;
+  /** What marks the node under the pointer: the focus ring, `--ring` (#657). */
+  ring: string;
   /** The chart type scale in CSS pixels: `--chart-font-size-*`. */
   type: Readonly<ChartTypeScale>;
   /** Every series line's width in CSS pixels: `--chart-line-width`. */
@@ -149,6 +156,8 @@ export const DEFAULT_CHART_THEME: ChartTheme = {
   font: DEFAULT_CHART_FONT,
   radius: 0,
   raised: oklchToHex({ l: 0.29, c: 0.012, h: 260 }),
+  container: oklchToHex({ l: 0.24, c: 0.012, h: 260 }),
+  ring: oklchToHex({ l: 0.99, c: 0, h: 0 }),
   type: { axis: 11, label: 11, tooltip: 12, value: 24 },
   lineWidth: 2,
   area: { fade: 0.32, flat: 0.18, stacked: 0.85 },
@@ -208,6 +217,8 @@ export function readChartTheme(
     font: readFont(style.getPropertyValue("--font-sans"), d.font),
     radius: px("--radius", d.radius),
     raised: read("--surface-3", d.raised),
+    container: read("--surface-2", d.container),
+    ring: read("--ring", d.ring),
     type: {
       axis: px("--chart-font-size-axis", d.type.axis),
       label: px("--chart-font-size-label", d.type.label),
@@ -275,6 +286,8 @@ export function forcedColorsTheme(
     font: page.font,
     radius: 0,
     raised: system("Canvas"),
+    container: system("Canvas"),
+    ring: highlight,
     type: page.type,
     lineWidth: page.lineWidth,
     // A stacked band is solid: a system color at an alpha is not one.

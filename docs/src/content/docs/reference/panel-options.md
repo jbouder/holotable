@@ -411,8 +411,27 @@ What a whole is made of, level by level
   sums correctly.
 - A zero, negative or missing value is not drawn. At most 500 leaves are, the
   largest.
-- Every node takes its top-level branch's chart color. Its label is black or
-  white, whichever meets WCAG AA on that color.
+- With more than one level, a top-level node is a container
+  ([#657](https://github.com/jbouder/holotable/issues/657)): drawn on the
+  panel's raised surface, with a header that names it and gives its total
+  through `panel.format`, and its members inside it. Its chart color goes to
+  its leaves, each a step of that color toward the surface by its rank in the
+  branch, largest strongest, so no two members share a fill. The steps are
+  even in OKLCH, so they look even in every palette.
+- A one-level treemap is one branch: its nodes are steps of the first chart
+  color by rank, so they never run out of fills and the strongest is the
+  largest.
+- A leaf's label sits at its top left: its name, and under it its value
+  through `panel.format` with its share of its parent (left out for an only
+  child). A label that does not fit its block is not drawn, never cut; the
+  tooltip and the screen-reader table still carry it. Every label is black or
+  white, whichever meets WCAG AA on its fill.
+- Nodes part by a gutter of surface, not an outline, with the palette's
+  corners (square except in Paper). The node under the pointer is outlined in
+  the focus ring color.
+- As a sunburst, the inner ring keeps the branch color and each ring after it
+  is shaded by rank the same way; a node is labeled with its name and value
+  where they fit along its ring, its name alone where only that does.
 - A click on a node follows a [datum link](/guide/drilldown/), carrying the
   node's path columns and its summed value; it never zooms.
 
