@@ -36,7 +36,10 @@ entry of a table's `columns`.
 
 `panel.format` still picks bytes, percent or milliseconds. On a chart, values
 are written per the format and these options only once the panel has one of
-them; without, the axis and tooltip show values as they always have.
+them; without, the axis and tooltip show values as they always have. A
+series chart's value axis never steps finer than `decimals` writes, so
+`decimals: 0` on a count keeps its ticks on whole numbers rather than writing
+`1` twice.
 
 ### Thresholds
 
@@ -60,11 +63,45 @@ below it.
 | `yAxis.log` | series | boolean | `false` | A log10 scale. `min`, when given, must be above zero. |
 | `yAxis.label` | series | string, up to 64 | none | The axis title. |
 | `stacked` | series | boolean | `false` | Series drawn on top of each other. |
+| `curve` | `line`, `area`, `stat` | `"straight"` \| `"smooth"` \| `"step"` | `"straight"` | How a line joins its samples; see [Curve](#curve). `bar` ignores it. |
 
 "Series" is `line`, `area` and `bar`. A chart is drawn anew when its options
 change, because a merged `setOption` cannot take back a visual map, a stack or
 an axis bound; only authoring changes them, so a data update still merges
-(invariant 11).
+(invariant 11). `curve` is the exception: every line says both of the fields
+it sets, so a new curve merges into the same chart.
+
+### Curve
+
+How a `line`, an `area` or a stat's sparkline joins its samples
+([#665](https://github.com/jbouder/holotable/issues/665)):
+
+- **`"straight"`**, the default: a segment from each sample to the next. It
+  draws only what was measured.
+- **`"step"`**: each value holds until the next sample, then the line rises or
+  falls to it (step-end). For a count, a state or anything that changes in
+  jumps: errors per minute, replica counts, a circuit breaker, a deploy.
+- **`"smooth"`**: a curve through the samples, for when the reader wants the
+  trend rather than the samples. It invents values between them, overshooting
+  a peak and dipping below zero on a counter that never does. Past 500 points
+  (where a line is sampled) it is drawn straight.
+
+Thresholds color every curve by value, and a stacked area stacks with each. On
+a stat's sparkline, `"step"` draws steps and `"smooth"` is drawn straight.
+Before #665 every line and area was smooth; a panel without `curve` is now
+straight, and `"curve": "smooth"` brings the curve back.
+
+```json
+{ "viz": "line", "options": { "curve": "straight" } }
+```
+
+```json
+{ "viz": "line", "options": { "curve": "step", "decimals": 0 } }
+```
+
+```json
+{ "viz": "area", "options": { "curve": "smooth", "stacked": true } }
+```
 
 ### Charts adapt to the panel's size
 
@@ -167,6 +204,11 @@ the axis names give their room to the plot
 | --- | --- | --- | --- |
 | `value` | column name | the last row's first numeric column that is not the time field | The column shown. A name the result lacks falls back to the default. |
 | `sparkline` | boolean | `false` | The value column across every row, drawn faintly behind the number in its color. |
+| `curve` | `"straight"` \| `"step"` \| `"smooth"` | `"straight"` | How the sparkline joins its samples; `"smooth"` is drawn straight. See [Curve](#curve). |
+
+```json
+{ "viz": "stat", "options": { "sparkline": true, "curve": "step" } }
+```
 
 Plus the number options and thresholds above.
 

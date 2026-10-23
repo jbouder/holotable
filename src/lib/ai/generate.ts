@@ -363,8 +363,8 @@ export const VIZ_GUIDE = PANEL_KINDS.map((k) => `- '${k.kind}': ${k.promptHint}`
  * produces a plain spec.
  */
 export const PRESENTATION_GUIDE = `Optional per-panel settings; omit each unless the request calls for it:
-- 'options' on line/area/bar: decimals (0-6), unit (e.g. "req/s"), compact (true for 1.2K), legend ("top"|"bottom"|"right"|"none"), yAxis {min, max, log, label}, stacked (true), thresholds [{value, color}] ascending.
-- 'options' on stat: value (the column to show), decimals, unit, compact, thresholds, sparkline (true to draw the column's history behind the number).
+- 'options' on line/area/bar: decimals (0-6), unit (e.g. "req/s"), compact (true for 1.2K), legend ("top"|"bottom"|"right"|"none"), yAxis {min, max, log, label}, stacked (true), thresholds [{value, color}] ascending, and on line/area only curve ("straight", the default, joins samples with segments; "step" holds each value until the next sample, for counters, states and anything that changes in jumps: replica counts, deploys, a circuit breaker, errors per minute; "smooth" rarely, only when the reader wants the trend rather than the samples).
+- 'options' on stat: value (the column to show), decimals, unit, compact, thresholds, sparkline (true to draw the column's history behind the number), curve ("straight"|"step", the sparkline's, as on line).
 - 'options' on pie/donut: decimals, unit, compact, legend.
 - 'options' on status-grid: entity (the label column), value, thresholds, or state with states [{state, color}], sort ("label"|"value"|"none"), decimals, unit, compact.
 - 'options' on histogram: bucket, count (the columns), cumulative (true for Prometheus "le" buckets), log (true for a long tail), thresholds (colors bars from a bucket bound, e.g. an SLO), decimals, unit, compact (for the bucket labels).

@@ -38,7 +38,7 @@ function StatBody({
 }) {
   return (
     <div className="relative flex h-full items-center justify-center">
-      {reading.spark.length > 1 && <Sparkline values={reading.spark} color={color} />}
+      {reading.sparkPoints && <Sparkline points={reading.sparkPoints} color={color} />}
       {/* Shrinks with the viewport: a 4xl number is most of a phone panel. */}
       <span
         className="relative text-3xl font-semibold tabular-nums sm:text-4xl"
@@ -53,13 +53,9 @@ function StatBody({
 /**
  * The value's history, faint, across the bottom of the panel. Drawn in the
  * threshold's chart color, so a threshold that turns the number turns it too.
+ * Its points are joined as the panel's curve says (`sparklinePoints`).
  */
-function Sparkline({ values, color }: { values: number[]; color?: string }) {
-  const min = Math.min(...values);
-  const span = Math.max(...values) - min || 1;
-  const points = values
-    .map((v, i) => `${(i / (values.length - 1)) * 100},${100 - ((v - min) / span) * 100}`)
-    .join(" ");
+function Sparkline({ points, color }: { points: string; color?: string }) {
   return (
     <svg
       viewBox="0 -4 100 108"

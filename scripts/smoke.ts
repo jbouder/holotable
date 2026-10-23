@@ -27,15 +27,17 @@ import { bindSourceRowFilter } from "@/lib/row-scope";
 import type { SourcePlan } from "@/lib/sources/server/types";
 import type { VariableValues } from "@/lib/sql/variables";
 import { resolveTimeRange } from "@/lib/time";
-import { resolveSelection } from "@/lib/variable-selection";
+import { resolveSelection, VariableSelectionError } from "@/lib/variable-selection";
+import { variableOptions } from "@/lib/variables";
 import { serverKind } from "@/lib/sources/server/registry";
-import { demoSpec, HOST_DETAIL_TITLE } from "./lib/demo-dashboards";
+import { demoSpec, HOST_DETAIL_TITLE, hostDetailSpec } from "./lib/demo-dashboards";
 import { DEMO_FILES_DASHBOARD_TITLE, demoFilesSpec } from "./lib/demo-files";
 import { seedWorkspace } from "./lib/seed-workspace";
 
 /**
  * End-to-end smoke test for the self-monitoring demo (#54) and the service
- * health demo, whose custom visual (#405) must also compile, and for each
+ * health demo, whose custom visual (#405) must also compile, the host detail
+ * demo, whose errors per minute are drawn in steps (#665), and for each
  * opt-in dashboard that is on: the PromQL twin (#390), which asks the
  * `prometheus` profile's Prometheus the same questions while
  * PROMETHEUS_SELF_URL is set, the Holotable logs dashboard (#567), which
@@ -132,6 +134,13 @@ const TARGETS: Target[] = [
     committed: () => parseDashboard(demoSpec()),
     feeds: "the seeder writes demo rows every few seconds",
   },
+  // One host up close, picked by its `host` variable; its errors per minute
+  // are the demo's line drawn in steps (#665).
+  {
+    title: HOST_DETAIL_TITLE,
+    committed: () => parseDashboard(hostDetailSpec()),
+    feeds: "the seeder writes demo rows every few seconds",
+  },
   // The files demo (#574): a DuckDB source over the Parquet, CSV and JSON files
   // the seeder writes under DUCKDB_SOURCES_DIR, which compose mounts here
   // read-only, as it does for the app. Opt-in: the seeder registers it only
@@ -211,18 +220,22 @@ async function waitForData(target: Target, deadline: number) {
       return null;
     });
 
-    if (dashboard) {
-      // The dashboard's variables at their defaults, as a viewer first sees it.
-      // Only an enum's values are known without a query; the seeded
-      // dashboards smoked here declare no other kind.
-      const values = {
-        declared: declaredVariables(dashboard.spec),
-        variables: await resolveSelection(
-          dashboard.spec.variables ?? [],
-          {},
-          async (v) => v.values ?? [],
-        ),
-      };
+    // The dashboard's variables at their defaults, as a viewer first sees it:
+    // an enum's own values, a query variable's from its query (host detail's
+    // `host`), read as a viewer with no row scope. A query variable has none
+    // until the seeder's first rows land, so that is waited for too.
+    const variables = dashboard
+      ? await resolveSelection(dashboard.spec.variables ?? [], {}, (v) =>
+          variableOptions(v, seedWorkspace(), {}),
+        ).catch((err: unknown) => {
+          if (!(err instanceof VariableSelectionError)) throw err;
+          lastReason = `${err.message} (${target.feeds})`;
+          return null;
+        })
+      : null;
+
+    if (dashboard && variables) {
+      const values = { declared: declaredVariables(dashboard.spec), variables };
       const outcomes = await Promise.all(
         dashboard.spec.panels
           .filter(hasQuery)

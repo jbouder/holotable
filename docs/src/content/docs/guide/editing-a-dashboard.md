@@ -31,7 +31,9 @@ beside the canvas then edits that panel, top to bottom:
   rather than keeping one its source cannot run. A text panel shows its
   Markdown here.
 - **Visualization**: title, kind, value format and description.
-- **Display**: the presentation options, collapsed until wanted. A custom
+- **Display**: the presentation options, collapsed until wanted. On a line,
+  an area or a stat, **Line** sets the **Curve**: straight (the default),
+  smooth or step (see [Curve](/reference/panel-options/#curve)). A custom
   visual's whole spec is edited here, as JSON: a problem the checks find
   (data other than the panel's rows, a literal color, an unknown mark) is
   named under the field as you type, and so is the compiler's message when

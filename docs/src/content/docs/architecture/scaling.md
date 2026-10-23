@@ -82,7 +82,8 @@ rather than a rewrite.
 
 Past `LARGE_SERIES_POINTS` (500) points per series, `src/components/charts/options.ts`
 makes a series cheap to paint (#491). A line or area is sampled with
-largest-triangle-three-buckets and drawn straight. Bars and scatter use
+largest-triangle-three-buckets, and a `"smooth"` one is drawn straight (a
+step stays a step, and straight is the default, #665). Bars and scatter use
 ECharts' large mode. `animationThreshold` stops a series that long from
 animating. The motion preference still turns animation off below it, because
 `EChart` applies it and the builders never turn animation on. At or under the

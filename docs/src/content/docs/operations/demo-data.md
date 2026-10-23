@@ -60,8 +60,8 @@ all of them:
   load-state timeline, network in as a region-then-host treemap beside CPU
   against memory as a scatter, and a table of hosts.
 - **Demo host detail**: one host, picked with a `host` variable: its CPU,
-  memory, disk and network, its own log lines and their levels, and the other
-  hosts.
+  memory, disk and network, its own log lines and their levels, the errors
+  it logged per minute (a line drawn in steps), and the other hosts.
 
 They show [drilldown](/guide/drilldown/) too. **Demo service health** has a
 `service` variable, the API's three services, all of them picked by default
@@ -339,7 +339,8 @@ docker compose --profile smoke run --rm smoke
 ```
 
 `scripts/smoke.ts` waits for the seeder and the collector, then runs every
-panel of **Holotable self-monitoring** and **Demo service health**, and of
+panel of **Holotable self-monitoring**, **Demo service health** and **Demo
+host detail** (its `host` at its default, the first from its query), and of
 each opt-in dashboard that is on, through the source kind's check, plan and
 execute: the same functions in the same order as `POST /api/query`. It fails
 unless at least one panel of each comes back with rows, which can only happen

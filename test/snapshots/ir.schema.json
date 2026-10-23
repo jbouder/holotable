@@ -178,6 +178,10 @@
                     "type": "string",
                     "enum": ["top", "bottom", "right", "none"]
                   },
+                  "curve": {
+                    "type": "string",
+                    "enum": ["straight", "smooth", "step"]
+                  },
                   "yAxis": {
                     "type": "object",
                     "properties": {
@@ -251,6 +255,10 @@
                     "type": "string",
                     "enum": ["top", "bottom", "right", "none"]
                   },
+                  "curve": {
+                    "type": "string",
+                    "enum": ["straight", "smooth", "step"]
+                  },
                   "yAxis": {
                     "type": "object",
                     "properties": {
@@ -323,6 +331,10 @@
                   "legend": {
                     "type": "string",
                     "enum": ["top", "bottom", "right", "none"]
+                  },
+                  "curve": {
+                    "type": "string",
+                    "enum": ["straight", "smooth", "step"]
                   },
                   "yAxis": {
                     "type": "object",
@@ -427,6 +439,10 @@
                   },
                   "sparkline": {
                     "type": "boolean"
+                  },
+                  "curve": {
+                    "type": "string",
+                    "enum": ["straight", "smooth", "step"]
                   }
                 },
                 "additionalProperties": false
