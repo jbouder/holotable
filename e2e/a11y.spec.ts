@@ -420,8 +420,9 @@ for (const theme of THEMES) {
       const box = await menu.boundingBox();
       expect(box && box.y + box.height).toBeLessThanOrEqual(240);
       expect(await menu.evaluate((el) => el.scrollHeight > el.clientHeight)).toBe(true);
-      // The first item is reachable, and the keyboard brings the last into view.
-      await expect(page.getByRole("menuitem").first()).toBeInViewport();
+      // The first item (the color scheme's first choice) is reachable, and
+      // the keyboard brings the last into view.
+      await expect(menu.getByRole("menuitemradio").first()).toBeInViewport();
       await page.keyboard.press("End");
       await expect(page.getByRole("menuitem").last()).toBeFocused();
       await expect(page.getByRole("menuitem").last()).toBeInViewport();

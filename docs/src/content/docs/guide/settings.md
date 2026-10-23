@@ -9,10 +9,10 @@ Everything that belongs to you rather than to a dashboard lives behind the
 **account menu** at the right of the top bar: your initials in a round avatar,
 with your name beside them on a wider screen. It holds four things:
 
-- **Settings**, the page described below.
-- **Keyboard shortcuts**, which opens the shortcuts section of Settings.
 - **Color scheme**: Light, Dark or System. The command palette and the
   Appearance section change the same setting, and all three stay in step.
+- **Settings**, the page described below.
+- **Keyboard shortcuts**, which opens the shortcuts section of Settings.
 - **Sign out**.
 
 The menu is the same at every screen width. Settings is also in the command
