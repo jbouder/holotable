@@ -25,6 +25,7 @@ import {
   PieOptions,
   readOptions,
   SeriesOptions,
+  type ValueFormat,
 } from "@/lib/panels/presentation";
 import type { ThresholdStep } from "@/lib/panels/thresholds";
 import { formatDateTime, type TimeDisplay } from "@/lib/time-display";
@@ -356,8 +357,8 @@ function buildSeries(type: "line" | "bar", area: boolean): ChartOptionBuilder {
 export const lineChart = normalized(buildSeries("line", false));
 export const areaChart = normalized(buildSeries("line", true));
 export const barChart = normalized(buildSeries("bar", false));
-export const scatterChart = normalized((_panel, data, { theme }) =>
-  buildScatter(data, theme),
+export const scatterChart = normalized((panel, data, { theme }) =>
+  buildScatter(panel, data, theme),
 );
 export const heatmapChart = normalized((panel, data, { display, theme }) =>
   buildHeatmap(panel, data, display, theme),
@@ -369,21 +370,62 @@ export const donutChart = normalized((panel, data, { theme }) =>
   buildPie(panel, data, true, theme),
 );
 
-function buildScatter(data: PanelData, theme: ChartTheme): EChartsOption {
+/** What a scatter's y axis is called when it carries several series of one format. */
+const FORMAT_UNIT: Partial<Record<ValueFormat, string>> = {
+  bytes: "bytes",
+  percent: "%",
+  ms: "ms",
+};
+
+/**
+ * Scatter: the first numeric column across, every other numeric column up,
+ * one series each (#640). Both axes are named in their middle: x by its
+ * column, y by its one column, or by the panel's unit when several series
+ * share it. One series needs no legend, since the y axis already says what it
+ * is; several keep theirs. The panel's format writes both axes' ticks.
+ */
+function buildScatter(panel: Panel, data: PanelData, theme: ChartTheme): EChartsOption {
   const numericColumns = data.columns.filter((column) => isNumeric(data.rows, column));
   const [x, ...seriesKeys] = numericColumns;
+  const one = seriesKeys.length === 1;
+  const yName = one ? seriesKeys[0] : panel.format && FORMAT_UNIT[panel.format];
+  const ticks = panel.format
+    ? { formatter: (v: number) => formatValue(v, panel.format) }
+    : {};
+  const name = (label: string | undefined) =>
+    label === undefined
+      ? {}
+      : {
+          name: label,
+          nameLocation: "middle" as const,
+          // From the tick labels, which ECharts moves the name clear of.
+          nameGap: 12,
+          nameTextStyle: text(theme),
+        };
   return {
     ...base(theme),
+    // The grid holds its tick labels and both names inside the chart.
+    grid: {
+      left: 8,
+      right: 16,
+      top: one ? 12 : 32,
+      bottom: 8,
+      outerBoundsMode: "same",
+      outerBoundsContain: "all",
+    },
+    ...(one ? { legend: { show: false } } : {}),
     tooltip: { ...tooltip(theme), trigger: "item" },
     xAxis: {
       ...axisStyle(theme),
       type: "value",
-      name: x,
-      nameTextStyle: text(theme),
+      ...name(x),
+      axisLabel: { ...text(theme), ...ticks },
     },
     yAxis: {
       ...axisStyle(theme),
       type: "value",
+      ...name(yName),
+      axisLabel: { ...text(theme), ...ticks },
     },
     series: seriesKeys.map((key) => ({
       name: key,
