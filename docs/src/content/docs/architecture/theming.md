@@ -99,7 +99,7 @@ colors, so a built-in theme can set it in its blocks:
 | Token | Default | Used for |
 | --- | --- | --- |
 | `--font-sans` | Chakra Petch | All chart text, ECharts and Vega |
-| `--radius` | `6px` | Tooltip corners; bars at half; slices, cells, nodes and labels up to 4px |
+| `--radius` | `0` | Tooltip corners; bars at half; slices, cells, nodes and labels up to 4px |
 | `--surface-3` | | What a tooltip sits on |
 | `--chart-font-size-axis` | `11px` | Axis labels, legend entries, pie labels, corner notes |
 | `--chart-font-size-label` | `11px` | Labels on a node, block or span (an edge's is 1px smaller) |
@@ -151,11 +151,11 @@ theme sets every color token itself, so its intent does not depend on
 Holotable's values, and inherits only the aliases (`--chart-text`, the
 `--code-*` colors).
 
-Holotable's look is its own too (#648): 6px corners (`--radius`), a card
-lifted on a two-layer shadow (`--shadow-card`, which `Card` draws), and
+Holotable's look is its own too (#648): square corners (`--radius: 0`), flat
+cards with no shadow (`--shadow-card: none`; `Card` draws the token), and
 gridlines a step below `--surface-2` (`--chart-grid`). Every other theme sets
 those three itself (square, the subtle shadow Tailwind calls `shadow-sm`, and
-`--surface-2`; Paper rounds to 4px), so a change to the default's look never
+`--surface-2`; Paper rounds to 4px, the one theme that does), so a change to the default's look never
 reaches them. A theme file gets the same: `themeCss` writes its `radius`,
 `shadow` and `chart-grid`, or the square, subtle, `--surface-2` fallbacks.
 

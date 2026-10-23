@@ -69,20 +69,17 @@ says how a section gets here.
   theme's corner radius, like the panel around them: square in a square
   palette, softened where a palette rounds its corners. They were rounded the
   same way in every theme.
-- **A new default look.** The default palette, Holotable, keeps its name and
-  its font but now has 6px corners, cards lifted off the page on a soft
-  shadow, slightly quieter surfaces and borders, and a calmer series palette
-  whose colors stay apart under every color-vision deficiency the theme checks
-  cover. In light, the warning is a burnt amber instead of brown, and a spec's
-  `orange` used as text is a shade darker than the amber series it stands
-  for. A stored palette preference, `THEME_DEFAULT_PALETTE=holotable` and
-  embed links keep working and simply look new. To keep a square, flat look,
-  choose Graphite, Fjord or High contrast, or load a `THEME_FILE` (start from
-  `npm run --silent themes:export holotable -- --as <name>`) with
-  `"radius": "0px"` and `"shadow": "none"`. A theme file gains an optional
-  `shadow` (`none`, `subtle` or `lifted`) and an optional `chart-grid` per
-  scheme; a file without them loads as before, square and subtly lifted
-  unless it says otherwise.
+- **A new default look.** The default palette, Holotable, keeps its name, its
+  font, its square corners and its flat cards, with slightly quieter surfaces
+  and borders and a calmer series palette whose colors stay apart under every
+  color-vision deficiency the theme checks cover. Cards no longer draw a
+  shadow. In light, the warning is a burnt amber instead of brown, and a
+  spec's `orange` used as text is a shade darker than the amber series it
+  stands for. A stored palette preference, `THEME_DEFAULT_PALETTE=holotable`
+  and embed links keep working and simply look new. A theme file gains an
+  optional `shadow` (`none`, `subtle` or `lifted`) and an optional
+  `chart-grid` per scheme; a file without them loads as before, square and
+  subtly lifted unless it says otherwise.
 - **Amber fills, not brown, in light.** A warning or a spec's `orange` drawn
   as an area (a gauge's arc and bands, a gauge bar, a histogram bar, a
   threshold-colored line, a stat's sparkline, a status tile, a timeline span,

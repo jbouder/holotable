@@ -147,7 +147,7 @@ export const DEFAULT_CHART_THEME: ChartTheme = {
     oklchToHex({ l: 0.72, c: 0.15, h: 25 }),
   ],
   font: DEFAULT_CHART_FONT,
-  radius: 6,
+  radius: 0,
   raised: oklchToHex({ l: 0.29, c: 0.012, h: 260 }),
   type: { axis: 11, label: 11, tooltip: 12, value: 24 },
   lineWidth: 2,
