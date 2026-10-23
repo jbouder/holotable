@@ -152,7 +152,8 @@ function isNavigation(request: NextRequest): boolean {
 
 export const config = {
   /*
-   * Everything except API routes, the well-known metadata and build assets.
+   * Everything except API routes, the well-known metadata, build assets and
+   * the icons, which a browser fetches with no session.
    * API responses are JSON or an SSE stream, neither of which a document
    * policy applies to, and leaving `/api` out keeps the proxy off the stream
    * path entirely; `/.well-known` is JSON an MCP client reads with no cookie
@@ -160,5 +161,7 @@ export const config = {
    * deliberately *not* excluded: a nonce costs nothing, and a prefetched
    * document served without a policy would be a page without one.
    */
-  matcher: ["/((?!api|\\.well-known|_next/static|_next/image|icon.svg).*)"],
+  matcher: [
+    "/((?!api|\\.well-known|_next/static|_next/image|icon\\.svg|apple-icon\\.png|favicon\\.ico).*)",
+  ],
 };
