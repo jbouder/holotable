@@ -533,6 +533,9 @@ function valueFormatter(
   return (value) => formatValue(value, panel.format, display);
 }
 
+/** The strip on a heatmap's right edge for its color scale, its handles and their values. */
+const HEATMAP_SCALE_ROOM = 72;
+
 function buildHeatmap(
   panel: Panel,
   data: PanelData,
@@ -552,16 +555,21 @@ function buildHeatmap(
   return {
     ...shared(theme),
     tooltip: { ...tooltip(theme), position: "top" },
-    grid: { left: 60, right: 16, top: 24, bottom: 40 },
+    // The color scale stands on the right edge, upright, in a strip of its
+    // own: at the bottom it shared the time labels' strip and its handles
+    // covered them (#639). The grid holds the row labels whatever they say.
+    grid: { left: 8, right: HEATMAP_SCALE_ROOM, top: 16, bottom: 8, containLabel: true },
     xAxis: { ...categoryAxis(theme), type: "category", data: xLabels },
     yAxis: { ...categoryAxis(theme), type: "category", data: ys },
     visualMap: {
       min: 0,
       max,
       calculable: true,
-      orient: "horizontal",
-      left: "center",
-      bottom: 0,
+      orient: "vertical",
+      right: 0,
+      top: "middle",
+      itemWidth: 12,
+      itemHeight: 120,
       inRange: { color: [...theme.sequential] },
       textStyle: text(theme),
     },
