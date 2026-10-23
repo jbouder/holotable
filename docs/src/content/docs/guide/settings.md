@@ -26,7 +26,7 @@ bookmark one or send it to someone.
 | Section | Address | What it holds |
 | --- | --- | --- |
 | Account | `/settings/account` | Your name, email and user id, the workspaces you can reach with your role in each, and what every role allows |
-| Appearance | `/settings/appearance` | Theme, whether the interface and charts animate, and patterns in charts |
+| Appearance | `/settings/appearance` | Color scheme, theme, whether the interface and charts animate, and patterns in charts |
 | Preferences | `/settings/preferences` | Time zone, 12 or 24 hour clock, the page you land on after signing in, how the dashboard list opens, whether dashboards draw the chat button, and Explore's live refresh, open queries and whether your conversations are kept |
 | Local data | `/settings/local-data` | What this browser remembers, with a way to clear each part |
 | Keyboard shortcuts | `/settings/shortcuts` | Every key binding, grouped by where it works |
@@ -61,14 +61,14 @@ is for.
 
 **Motion** has three choices. *Follow system* respects the operating system's
 reduced-motion setting. *Reduce* stops transitions, entrances and slides, the
-theme crossfade, loading shimmer and chart animation whatever the system says:
+crossfade when the color scheme or theme changes, loading shimmer and chart animation whatever the system says:
 every change is a cut. *Allow* keeps them on, even when the system asks for
 less. Charts update in place either way.
 
 **Patterns in charts** fills bars, pie slices, areas and other filled shapes
 with a pattern as well as a color, so series can be told apart without
-relying on color. It is off by default. Unlike theme and motion, which are
-kept in the browser, it is saved to your account and follows you to any
+relying on color. It is off by default. Unlike color scheme, theme and motion,
+which are kept in the browser, it is saved to your account and follows you to any
 device. A custom visual (a Vega-Lite panel) draws in colors only.
 
 ### Preferences
@@ -154,7 +154,7 @@ once. See [Service-account API tokens](/integrations/api-tokens/).
 | Setting | Stored | Why |
 | --- | --- | --- |
 | Time zone, clock, start page, dashboard list defaults, the dashboard chat button, Explore defaults, which recents to keep | Server, per user | They are choices about you, and should survive a new laptop or a cleared browser |
-| Theme, motion | This browser | They must apply before the page first draws, which cannot wait for the server. A device-specific choice is often what people want anyway |
+| Color scheme, theme, motion | This browser | They must apply before the page first draws, which cannot wait for the server. A device-specific choice is often what people want anyway |
 | Drafts, recents, dismissed hints | This browser | They describe what you did on this device |
 | Explore conversations | Server, per user, readable only by you | So a question can be continued on another device. Never a result row: panels run again when opened. Bounded by `CHAT_CONVERSATIONS_MAX` and the chat history limits; **Keep my conversations** off stores none and deletes what was kept |
 | Whether Explore's side panel is closed | This browser | A layout choice for this screen |

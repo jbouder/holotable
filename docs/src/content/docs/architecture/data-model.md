@@ -388,8 +388,9 @@ is logged and treated as no customization. Written only by
 
 One row per subject: `sub` (primary key), `prefs` (JSONB), `updated_at`. It
 holds the choices that follow a person between devices: time zone, clock,
-start page and dashboard list defaults, and the model last picked in each
-workspace (`modelByWorkspace`, #442, written by the server when a request
+start page and dashboard list defaults, chart patterns, whether dashboards draw
+the chat button, which recents and conversations are kept, Explore's defaults,
+and the model last picked in each workspace (`modelByWorkspace`, #442, written by the server when a request
 names a model). Keyed by `sub` alone, because a
 preference is personal and not workspace-scoped. Read through
 `parsePreferences` in `src/lib/preferences.ts`, which validates field by field

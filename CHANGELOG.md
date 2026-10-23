@@ -56,6 +56,9 @@ says how a section gets here.
   boxes never overlap; a directed graph's arrows meet their borders. A panel
   too small for them draws markers with a "Drawn as markers" badge. The
   demo's service map and network topology are drawn as blocks.
+- **A preference for the dashboard chat button.** Settings → Preferences →
+  **Dashboard chat** hides the round chat button on dashboards; the chat
+  still opens with C or a panel's "Ask about this panel".
 
 ### Changed
 
@@ -98,21 +101,21 @@ says how a section gets here.
   of surface, so a thin band (a dashboard's error share) stays visible; only
   an unstacked area fades. Custom visuals (Vega) take the same font, sizes
   and gridlines.
+- **A new default look.** The default theme, Holotable, keeps its name, its
+  font and its square corners, with slightly quieter surfaces and borders and
+  a calmer series palette whose colors stay apart under every color-vision
+  deficiency the theme checks cover. Its cards are flat now, with no shadow;
+  the other built-in themes keep the slight shadow they had. In light, the
+  warning is a burnt amber instead of brown, and a spec's `orange` used as
+  text is a shade darker than the amber series it stands for. A stored theme
+  preference, `THEME_DEFAULT_PALETTE=holotable` and embed links keep working
+  and simply look new. A theme file gains an optional `shadow` (`none`,
+  `subtle` or `lifted`) and an optional `chart-grid` per scheme; a file
+  without them loads as before, square and with the subtle shadow.
 - **Status tiles follow the theme's corners.** A status grid's tiles take the
-  theme's corner radius, like the panel around them: square in a square
-  palette, softened where a palette rounds its corners. They were rounded the
-  same way in every theme.
-- **A new default look.** The default palette, Holotable, keeps its name, its
-  font, its square corners and its flat cards, with slightly quieter surfaces
-  and borders and a calmer series palette whose colors stay apart under every
-  color-vision deficiency the theme checks cover. Cards no longer draw a
-  shadow. In light, the warning is a burnt amber instead of brown, and a
-  spec's `orange` used as text is a shade darker than the amber series it
-  stands for. A stored palette preference, `THEME_DEFAULT_PALETTE=holotable`
-  and embed links keep working and simply look new. A theme file gains an
-  optional `shadow` (`none`, `subtle` or `lifted`) and an optional
-  `chart-grid` per scheme; a file without them loads as before, square and
-  subtly lifted unless it says otherwise.
+  theme's corner radius, like the panel around them: square everywhere but
+  Paper, the one built-in theme that rounds (4px). They were rounded the same
+  way in every theme.
 - **Amber fills, not brown, in light.** A warning or a spec's `orange` drawn
   as an area (a gauge's arc and bands, a gauge bar, a histogram bar, a
   threshold-colored line, a stat's sparkline, a status tile, a timeline span,
@@ -123,7 +126,6 @@ says how a section gets here.
   unchanged. A theme file gains optional `warning-fill` and `orange-fill`
   tokens per scheme; a file without them fills in its `warning` and `orange`
   as before.
-
 - **Charts fit small panels.** A chart now knows the size it is drawn at and
   fits its text to it: on line, area, bar, histogram and scatter panels a
   value axis draws only as many ticks as fit, hides a tick label that would
@@ -135,13 +137,32 @@ says how a section gets here.
   bar gauge and a state timeline draw the rows that fit and count the rest;
   a pie's legend moves under it or gives way to slice labels, never paged;
   graph and sankey labels are drawn whole, smaller, without values, or on
-  hover only; and a narrow heatmap's color scale goes slim.
-- **Pie and donut labels no longer repeat the legend.** With a legend, a
-  slice carries no outside label or leader line; a slice large enough for
-  it shows its share (`42%`) inside, in black or white, whichever reads on
-  its fill. With `legend: "none"` (or a legend that did not fit), slices are
-  named outside, each name whole, never cut to `…`, and never a leader line
-  with nothing at its end (#638).
+  hover only; and a narrow heatmap's color scale goes slim. A pie or donut
+  with a legend no longer repeats it: a slice carries no outside label or
+  leader line, and one large enough shows its share (`42%`) inside, in black
+  or white, whichever reads on its fill. With `legend: "none"` (or a legend
+  that did not fit), slices are named outside, each name whole, never cut to
+  `…`, and never a leader line with nothing at its end.
+- **Heatmap and scatter axes.** A heatmap's color scale stands upright on the
+  right edge, clear of the time labels, and its handles still filter the
+  cells by range. A scatter names both axes in their middle, writes both
+  axes' ticks through the panel's `format`, and drops the legend when it has
+  one series.
+- **Logs and status grids fit their panel.** A log line's layout follows the
+  panel's width, not the screen's: in a narrow panel the message goes under
+  the time and level, and in a very narrow one the time is the clock alone.
+  A status grid whose tiles do not all fit says so, with a fade over its
+  bottom edge and an "N more below" that scrolls to them.
+- **The account menu says "Color scheme".** Its Light / Dark / System group,
+  headed "Theme" before, is "Color scheme", as in Settings and the command
+  palette, and it comes first, above Settings. A theme is chosen in Settings →
+  Appearance or the command palette.
+
+### Fixed
+
+- The panel editor's Numbers fields (Decimals, Unit, Compact) no longer
+  overlap in the narrow side panel, and the demo and local banners' close
+  button is centered on its line.
 
 ## 0.2.0 — 2026-10-11
 

@@ -196,16 +196,17 @@ thing and match it.
 - Tailwind v4 utilities and the tokens in `src/app/globals.css` (surfaces,
   borders, muted text, the primary accent), composed with `cn()` from
   `src/lib/utils.ts`. No literal colors, no one-off spacing scales, no new
-  fonts. Check every change in **both** themes. A chart's colors are tokens
+  fonts. Check every change in **both** color schemes (and the other themes). A chart's colors are tokens
   too (`--chart-*`, the spec's color tokens), read through `ChartTheme`
   (`src/lib/color/chart-theme.ts`); `test/color-literals.test.ts` holds
   `src/` free of color literals outside `src/lib/color/` and `globals.css`.
 - Use the primitives in `src/components/ui/` before writing markup:
-  `Button` / `ButtonLink`, `Input`, `Select`, `Autocomplete`, `Checkbox`,
+  `Button` / `ButtonLink`, `Input`, `Textarea`, `Label`, `Select`, `Autocomplete`, `Checkbox`,
   `ChoiceCard` (two to five pictured options, one chosen),
   `Menu`, `Popover`, `Dialog`, `ConfirmDialog`, `Card`, `Table`, `Badge`,
   `PageHeader`, `EmptyState`, `Skeleton`, `ErrorDisplay`, `Progress` (a bar
-  with the `progressbar` role for work with a known or unknown extent). A new kind of
+  with the `progressbar` role for work with a known or unknown extent),
+  `Logo` / `Wordmark` (the mark, never a stand-in icon). A new kind of
   control becomes a primitive there, built on Base UI and styled like its
   neighbors, not a one-off in a feature.
 - Never a native browser widget where the app has a primitive: no
@@ -228,7 +229,7 @@ thing and match it.
 
 Checked, not hoped for:
 
-- Every text/background token pairing meets WCAG AA in both themes;
+- Every text/background token pairing meets WCAG AA in every theme and both color schemes;
   `test/contrast.test.ts` measures them (`src/lib/color/contrast.ts`) and
   the table in `docs/src/content/docs/architecture/accessibility.md`. A new
   pairing goes in `CONTRAST_PAIRS`. Every theme also clears the quality bar
@@ -250,11 +251,11 @@ Checked, not hoped for:
   word for word and in order (WCAG 2.5.3, checked by axe), with a `{" "}`
   between sibling spans so their words stay apart; every input has a label;
   focus is visible and keyboard order follows the page.
-- A palette is proven by those unit tests, not the browser. `npm run e2e`
-  scans every main surface with axe in the default palette's dark and light,
-  and each other palette on one page (the live dashboard) in both schemes
-  (#610); a new page, dialog or menu adds itself to the default palette's
-  scans in `e2e/a11y.spec.ts`, and a new palette is scanned there by being
+- A theme is proven by those unit tests, not the browser. `npm run e2e`
+  scans every main surface with axe in the default theme's dark and light,
+  and each other theme on one page (the live dashboard) in both schemes
+  (#610); a new page, dialog or menu adds itself to the default theme's
+  scans in `e2e/a11y.spec.ts`, and a new theme is scanned there by being
   in `PALETTE_INFO`.
 
 ### Charts
@@ -262,9 +263,9 @@ Checked, not hoped for:
 ECharts, through the existing chart components. Charts merge new data and are
 never recreated (FLIP a panel's card, never its chart). Design tokens are
 authored in OKLCH and are converted before they reach ECharts, so chart
-colors come from the token system too: series from `chartPalette()`, and
+colors come from the token system too: series from `ctx.theme.series` (the `--chart-*` tokens), and
 axis text, lines and grid from `ctx.theme` (`useChartTheme`, read off the
-page), never a literal that suits one theme (`test/chart-theme.test.ts`).
+page), never a literal that suits one color scheme (`test/chart-theme.test.ts`).
 Every kind starts from the one chart style, `src/components/charts/style.ts`
 (`shared(theme)`, the axis, legend, label, fill and corner helpers); no other
 chart module sets a `borderRadius`, `fontFamily` or `fontSize`, and a large
@@ -304,7 +305,7 @@ before first paint (#212). The rules:
   popup uses the `fade-in` utility (enter only, it just unmounts) or, when
   the exit is worth seeing, `src/components/notice.tsx` over the `notice`
   utility, which stays mounted and toggles `data-open`. A two-branch render
-  (`DashboardChat`) runs `animateOut` before flipping its state.
+  (`DashboardChatPanel`) runs `animateOut` before flipping its state.
 - **Scope view-transition names.** `withViewTransition(update, enabled, type)`
   puts `type` on `<html data-vt>` for the life of the transition; a
   `view-transition-name` is always written as `html[data-vt="<type>"] .thing`

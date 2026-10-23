@@ -109,7 +109,9 @@ widget deletes it.
 
 ### Opening it
 
-Press **C** anywhere on the dashboard, or use the launcher in the header.
+Press **C** anywhere on the dashboard, or use the chat button at the bottom
+right (not drawn when **Dashboard chat** is off in
+[Preferences](/guide/settings/#preferences)).
 **Esc** closes it and returns focus to where you were. The expand button docks
 the chat to the right edge at full height, and this browser remembers the
 choice.
@@ -142,7 +144,7 @@ things.
 
 ### Answers
 
-- An answer that ran a query shows a **"ran this query"** footnote: the
+- An answer that ran a query shows a **"Ran this query"** footnote: the
   statement, the source, and which panels on the dashboard use that same
   query, with the range and values it was narrowed to.
 - Answers are formatted — lists, emphasis, code and small tables — and each

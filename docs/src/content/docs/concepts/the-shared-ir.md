@@ -41,6 +41,7 @@ Panel = {
   format?: "number" | "bytes" | "percent" | "ms",
   timeRange?: { from, to },   // the panel's own window, in place of the dashboard's
   refreshIntervalMs?: number, // the panel's own cadence, same bounds as the dashboard's
+  links?: PanelLink[],        // up to 5, where a click leads; see Links below
   layout: { x, y, w, h },     // position on a 12-column grid
 }
 ```
@@ -85,12 +86,9 @@ carrying two is refused.
 
 Which language a panel may use is not the panel's choice. It is a property of
 its source's kind ([Source kinds](/architecture/data-model/#source-kinds)): a
-TimescaleDB source answers SQL, a Prometheus source answers PromQL, a Loki
-source answers LogQL, and a query in another language is refused on save and at
-execution like a table the source does not have. Loki sources are being built
-in phases ([#559](https://github.com/jbouder/holotable/issues/559)): a LogQL
-panel runs against a registered Loki source (#562), and the source form and
-generation follow.
+TimescaleDB or DuckDB source answers SQL, a Prometheus source answers PromQL, a
+Loki source answers LogQL, and a query in another language is refused on save
+and at execution like a table the source does not have.
 
 A PromQL query carries no time either. The server picks `start`, `end` and
 `step` for the window it resolved, and `minStep` can only raise the step. A
@@ -175,7 +173,8 @@ URL, so there is nothing in a spec a model could point outside the app.
   is `true` when absent.
 - `set` makes picks on arrival, by variable name. A value is a literal
   (`{ "value": "api" }`), the clicked row's value in a result column
-  (`{ "column": "host" }`), or the clicked series' name (`{ "series": true }`).
+  (`{ "column": "host" }`), the clicked series' name (`{ "series": true }`), or one label of the
+  clicked series or log line (`{ "label": "instance" }`).
 - A panel takes at most 5 links, a link sets at most 10 variables, and a text
   panel takes none.
 - A link to the same dashboard must set at least one variable, and only ones

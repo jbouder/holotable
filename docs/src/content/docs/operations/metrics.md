@@ -85,6 +85,7 @@ process and Node.js collectors (`holotable_process_cpu_seconds_total`,
 | `holotable_sse_drops_total` | counter | `reason` | Streams the server closed: `slow` (behind for `SSE_SLOW_TICKS` cycles). Healthy: zero or rare. Steady: a proxy is buffering, or clients cannot keep up |
 | `holotable_result_truncations_total` | counter | `stage` | Results cut short on the server: `rows` (`MAX_QUERY_ROWS`), `points` (a PromQL step `PROMQL_MAX_POINTS` widened), `entries` (a Loki log query that returned its whole `limit`), `window` (a Chat panel held to `MAX_WINDOW_POINTS`). Each is also a badge on the panel. Steady: a query to narrow or a cap to raise |
 | `holotable_llm_in_flight` | gauge | `model` | Model requests running now. Predicts the model concurrency limit (#496) |
+| `holotable_retention_deleted_total` | counter | `table` | Rows the retention sweep deleted |
 
 `reason` comes from a fixed enum, not the error message: `empty`, `structure`,
 `comment`, `keyword`, `function`, `time`, `catalog`, `column`, `variable`

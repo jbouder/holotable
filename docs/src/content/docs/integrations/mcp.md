@@ -67,9 +67,9 @@ caller in that workspace (their [personal or the workspace's
 model](/admin/models/#models-configured-in-the-app), else the
 server's), count against the workspace's
 [model rate limit and daily budget](/admin/llm-limits/) like the routes
-do, write the same [generation log](/operations/logging/) row, and return a
+do, write the same [generation log](/architecture/data-model/#generation_log) row, and return a
 spec the IR validated — never data. The routes stream to a browser and leave
-the one [repair](/concepts/generating-a-panel/) of an answer that failed the
+the one [repair](/admin/models/#structured-output-repair) of an answer that failed the
 schema to a follow-up request; a tool call answers once, so it repairs inline,
 as a second model call that is admitted, counted and audited on its own.
 

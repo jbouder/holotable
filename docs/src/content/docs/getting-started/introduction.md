@@ -9,8 +9,8 @@ Holotable turns a natural-language prompt into a live monitoring dashboard.
 
 The one idea to hold onto: **the model authors a spec, never data.** A panel is
 a small, validated description of *what to compute and how to draw it*. Real
-metric values are only ever produced by the server executing guarded SQL against
-TimescaleDB — at author time and on every refresh tick thereafter.
+metric values are only ever produced by the server executing guarded SQL, PromQL
+or LogQL against your sources — at author time and on every refresh tick thereafter.
 
 ```
 Prompt ─▶ /api/generate ─▶ LLM (streamObject) ─▶ Zod IR spec (validated)

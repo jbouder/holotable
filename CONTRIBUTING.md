@@ -170,8 +170,8 @@ In `npm test` those tests skip themselves.
 a source, generate, save, watch rows arrive over SSE, pause, resume, edit,
 save a version), Chat, dashboard chat, a tombstoned source, a viewer kept out of the
 editor, and axe accessibility scans of every main surface in the default
-palette's dark and light, plus the live dashboard in each other palette's two
-schemes (the palettes' token pairings are measured by `test/contrast.test.ts`
+theme's dark and light, plus the live dashboard in each other theme's two
+schemes (the themes' token pairings are measured by `test/contrast.test.ts`
 and `test/theme-quality.test.ts`, not the browser). It
 brings up `e2e/compose.yml` (TimescaleDB and Keycloak on ports 55433 and 18181,
 away from your dev stack), builds the app and starts it on 3107, and signs in
@@ -271,19 +271,18 @@ than suppressing it; if a suppression is
 genuinely right, use a scoped `// biome-ignore` with a reason on the line.
 
 If you touch anything that moves (an overlay, a list, a theme or tab switch,
-a panel's fullscreen), check it by hand as well: there is no browser test
-harness, and sign-in goes through Keycloak, so the one test that would prove
-the gating (`document.getAnimations()` empty under Reduce, non-empty under
-Allow) cannot run in CI. That is a deliberate decision, revisited only if an
-end-to-end harness is wanted for more than motion. The checklist, in Chromium
+a panel's fullscreen), check it by hand as well: no end-to-end test asserts
+the gating yet (`document.getAnimations()` empty under Reduce, non-empty under
+Allow), so the checklist is the proof. The checklist, in Chromium
 and Safari, under Settings → Appearance → Motion set to *Reduce*, then *Allow*,
 then *Follow system* with the OS reduce-motion setting toggled both ways:
 
 - open and close a dialog, a card's `⋯` menu, the time-range popover and a
   select;
-- switch the theme from the account menu;
-- flip Editor/Preview in the editor;
-- reorder and delete a panel in the editor's list;
+- switch the color scheme from the account menu, and the theme in
+  Settings → Appearance;
+- switch Changes/Preview in a dashboard's version history;
+- move and delete a panel on the editor's canvas;
 - expand and collapse a panel;
 - navigate between two pages.
 
@@ -454,17 +453,26 @@ request:
 | When you change | Update |
 | --- | --- |
 | `src/lib/ir.ts`, `src/lib/ir/` (the IR, `SPEC_VERSION`, an upgrader) | `concepts/the-shared-ir.md`, invariant 3 in `architecture/invariants.md` |
-| `src/components/charts/vega-runtime.ts`, `src/lib/vega/` (custom visuals) | `architecture/custom-visuals.md` |
-| `src/lib/graph/layout.ts` (the graph kind's directed-graph layout) | `architecture/graph-layout.md`, and its measurements if the algorithm changes |
+| `src/components/charts/vega-runtime.ts`, `src/components/panels/vega.tsx` (the view's theme), `src/lib/vega/` (custom visuals) | `architecture/custom-visuals.md` |
+| `src/lib/graph/layout.ts`, `tidy-tree.ts`, `src/components/charts/graph-blocks.ts` (the graph kind's layouts and blocks) | `architecture/graph-layout.md`, and its measurements if the algorithm changes; "Blocks" under `graph` in `reference/panel-options.md` |
 | `src/components/charts/echarts.ts` (the ECharts series and components registered) | "Panel kinds" in `concepts/streaming-and-rendering.md` |
-| `src/components/charts/` (an option builder), `src/lib/color/` (the palette, the chart theme) | "A rendering detail worth knowing" in `concepts/streaming-and-rendering.md` |
+| `src/components/charts/` (an option builder), `src/lib/color/` (the chart theme) | "A rendering detail worth knowing" in `concepts/streaming-and-rendering.md` |
+| `src/components/charts/style.ts`, `src/lib/color/chart-theme.ts`, `quality.ts`, `shade.ts` (the chart style, the quality bar) | "Chart style", the token tables and "Quality bar" in `architecture/theming.md` |
+| `src/components/charts/size.ts` (a chart at its panel's size) | "Charts adapt to the panel's size" in `reference/panel-options.md` |
+| `src/components/panels/` (a renderer: stat, table, status grid, logs, text) | Its kind in `reference/panel-options.md` |
+| `src/lib/theme.ts` (`PALETTE_INFO`), a theme's blocks in `src/app/globals.css` | `guide/themes.mdx` and its screenshots, "Shipped themes" and "Reaching first paint" in `architecture/theming.md` |
+| `src/lib/color/theme-file.ts`, `scripts/themes-export.ts` (`THEME_FILE`) | `admin/themes.md` |
+| `src/lib/motion.ts`, `src/lib/view-transition.ts`, `src/components/use-flip.ts`, `src/components/notice.tsx`, the motion tokens in `globals.css` | `architecture/motion.md`, the motion rules in `AGENTS.md` |
+| `src/lib/preferences.ts`, `src/components/settings/` | `guide/settings.md`, `user_preferences` in `architecture/data-model.md` |
+| `src/components/ui/` (a primitive) | The primitives list in `AGENTS.md` |
+| `src/components/ui/logo.tsx` (`LOGO_PATH`) | Its copies: `src/app/icon.svg`, `favicon.ico`, `apple-icon.png`, `docs/src/assets/logo-dark.svg` and `logo-light.svg`, `docs/public/favicon.svg`, the demo's starting page in `deploy/cloudflare/demo/src/policy.ts` |
 | `src/lib/panels/` (a panel kind or its options) | `reference/panel-options.md`, "Panel kinds" in `concepts/streaming-and-rendering.md`. The visualization list is generated |
-| `src/lib/sql/safety.ts`, `ast.ts`, `denylist.ts` (the guard) | `concepts/executing-a-panel.md`, invariants 7 and 8, the trust model in `SECURITY.md` |
+| `src/lib/sql/safety.ts`, `ast.ts`, `denylist.ts` (the guard) | `concepts/executing-a-panel.md`, invariants 7 and 8, the trust model in `SECURITY.md`, the skill's `references/sql-rules.md` |
 | `src/lib/promql/` (the PromQL guard, its rewrites, the plan) | `concepts/executing-a-panel.md` ("The PromQL guard"), `concepts/prometheus-sources.md`, invariants 7 and 8, the trust model in `SECURITY.md`, the skill's `references/promql-rules.md` |
-| `src/lib/logql/` (the LogQL guard, its rewrites, the plan) | `concepts/executing-a-panel.md` ("The LogQL guard"), `concepts/loki-sources.md`, `operations/metrics.md` |
+| `src/lib/logql/` (the LogQL guard, its rewrites, the plan) | `concepts/executing-a-panel.md` ("The LogQL guard"), `concepts/loki-sources.md`, `operations/metrics.md`, the skill's `references/logql-rules.md` |
 | `src/lib/sources/` (a source kind, its config or its server half) | `concepts/prometheus-sources.md`, `concepts/loki-sources.md`, `architecture/data-model.md` (`sources`, "Source kinds") |
 | `src/lib/duckdb/` (the DuckDB path guard, engine, lock, uploads, adding files, the orphaned-upload sweep and the workbook conversion), `src/lib/multipart.ts` (the upload reader), `src/lib/csv-writer.ts` (a workbook's CSVs) | `architecture/data-model.md` ("DuckDB"), `concepts/duckdb-sources.md`, `admin/duckdb.md`, the `/api/sources/duckdb/uploads` and `/api/sources/[id]/uploads` rows in `reference/api-routes.md` |
-| `scripts/seed.ts`, `scripts/lib/demo-dashboards.ts`, `scripts/lib/demo-files.ts`, `scripts/smoke.ts`, `docker-compose.yml` (the demo data, the files demo, the smoke test) | `operations/demo-data.md`, the Compose steps in `getting-started/quick-start.md` |
+| `scripts/seed.ts`, `scripts/lib/demo-dashboards.ts`, `scripts/lib/demo-files.ts`, `scripts/self-metrics.ts`, `scripts/smoke.ts`, `scripts/smoke-quickstart.ts`, `src/lib/self-monitoring/`, `docker-compose.yml` (the demo data, the files demo, self-monitoring, the smoke tests) | `operations/demo-data.md`, the Compose steps in `getting-started/quick-start.md` |
 | `src/lib/prometheus/` (the client, discovery, the connection test) | `admin/prometheus.md`, `concepts/prometheus-sources.md` |
 | `src/lib/loki/` (the client, the rows, refresh and the connection test) | `admin/loki.md`, `concepts/loki-sources.md`, `architecture/data-model.md` (`sources`), "The LogQL guard" in `concepts/executing-a-panel.md` |
 | `src/app/data-sources/`, `src/components/sources/`, `src/lib/prometheus-form.ts`, `src/lib/loki-form.ts`, `src/lib/duckdb-form.ts` (the source forms, discovery, the test report, refresh and the catalog browser) | Steps 1 and 2 of `getting-started/your-first-dashboard.md`, the `/api/sources` rows in `reference/api-routes.md` |
@@ -480,7 +488,7 @@ request:
 | `src/lib/editor/`, `src/lib/panel-starter.ts`, `src/lib/preview-runs.ts` | "What the editor holds before a save" in `concepts/executing-a-panel.md` |
 | `src/components/dashboard/LiveDashboard.tsx`, `src/lib/connection.ts`, the time picker, a panel's menu | `guide/viewing-a-dashboard.md`, the viewer sections of `concepts/streaming-and-rendering.md` |
 | `src/lib/ai/chat.ts`, `src/app/api/dashboards/[id]/chat/` | "Dashboard chat" in `concepts/generating-a-panel.md` |
-| `src/lib/ai/data-chat.ts`, `src/lib/chat/`, `src/app/api/chat/`, `src/components/chat/` | `guide/explore.md`, "Chat" in `concepts/generating-a-panel.md`, the Chat rows in `reference/api-routes.md` and `operations/audit-log.md`, `architecture/data-model.md` |
+| `src/lib/ai/data-chat.ts`, `src/lib/chat/`, `src/app/api/chat/`, `src/components/chat/` | `guide/explore.md`, "Explore" in `concepts/generating-a-panel.md`, the Chat rows in `reference/api-routes.md` and `operations/audit-log.md`, `architecture/data-model.md` |
 | `src/components/command-palette.tsx`, `src/lib/command-palette.ts`, `/api/search` | `guide/viewing-a-dashboard.md`, "Search and the command palette" in `architecture/authorization.md` |
 | `src/lib/config.ts` (a variable) | The configuration reference is generated; a startup rule goes in `operations/startup-validation.md`, and the variable in `.env.example` |
 | A route under `src/app/api/` | `reference/api-routes.md` (`test/docs-drift.test.ts` fails until it has a row) |
@@ -489,17 +497,16 @@ request:
 | `src/lib/metrics.ts` (an instrument) | `operations/metrics.md` |
 | `migrations/` (a table or column) | `architecture/data-model.md` |
 | `keycloak/holotable-realm.json` | `admin/keycloak.md` (the local realm, its users, client settings) |
-| A color token in `src/app/globals.css` | The contrast table in `architecture/accessibility.md` (`test/contrast.test.ts` fails until it matches) |
+| A color token in `src/app/globals.css` | The contrast table in `architecture/accessibility.md` (`test/contrast.test.ts` fails until it matches), the token tables in `architecture/theming.md`, `THEME_FILE_TOKENS` and the token table in `admin/themes.md`, and for a spec's color token the skill's `references/ir.md` |
 | `src/lib/ai/providers/` (a provider kind, including `stub`), `src/lib/ai/server-models.ts` | `admin/models.md` |
 | `src/lib/ai/local-models.ts`, `LOCAL_MODEL_DETECT` / `LOCAL_MODEL_ENDPOINTS` in `src/lib/config.ts` | "A model on this machine" in `admin/models.md`, "A model on your machine" in `admin/demo-mode.md`, "Detected on this machine" in `guide/models.md` |
 | `src/app/models/`, `src/components/models/`, `src/components/model-chip.tsx` | `guide/models.md` |
-| `src/lib/ir.ts`, a panel kind, a color token, or a guard rule in `src/lib/sql/` or `src/lib/promql/` | The skill's `.claude/skills/holotable/references/` and `examples/` (`test/holotable-skill.test.ts` holds its examples and lists to the code) |
+| `src/lib/ir.ts`, a panel kind, a color token, or a guard rule in `src/lib/sql/`, `src/lib/promql/` or `src/lib/logql/` | The skill's `.claude/skills/holotable/references/` and `examples/` (`test/holotable-skill.test.ts` holds its examples and lists to the code) |
 | `docker-compose.yml`, `deploy/quickstart/`, the `Dockerfile`'s `quickstart` target | `getting-started/quick-start.md`, the quick start in `README.md`; the `logs` profile's Loki and Alloy also `operations/demo-data.md` and the Alloy example in `admin/loki.md`; the image's mode and files root also `admin/demo-mode.md` and "The binding and the image" in `admin/duckdb.md` |
 | The `Dockerfile`'s `build` and `runtime` stages, the trace settings in `next.config.ts` (`outputFileTracingIncludes` / `Excludes`) | "The binding and the image" in `architecture/data-model.md` and in `admin/duckdb.md` |
 | `src/lib/auth/demo.ts`, `AUTH_MODE` / `DEMO_GROUPS` / `LOCAL_GROUPS` in `src/lib/config.ts`, `src/components/demo-banner.tsx` | `admin/demo-mode.md`, the demo and local mode paragraphs in `SECURITY.md` |
 | `deploy/cloudflare/demo/` | `operations/cloudflare-demo.md` |
 | `deploy/helm/holotable/` | `operations/kubernetes.md`, the chart's own `README.md` |
-| `scripts/seed.ts`, `scripts/self-metrics.ts`, `scripts/smoke.ts`, `scripts/smoke-quickstart.ts`, `src/lib/self-monitoring/` | `operations/demo-data.md` |
 | A `package.json` script | `getting-started/quick-start.md` (Scripts), `AGENTS.md` (Checks) |
 
 Paths in the table are under `docs/src/content/docs/` unless they say
@@ -524,6 +531,13 @@ Match the surrounding code rather than importing conventions from elsewhere.
   adding new ones, and `cn()` from `src/lib/utils.ts` for composition. A
   button whose own work is running takes `busy`, not `disabled`, so it keeps
   keyboard focus.
+- No native browser widget where the app has a primitive (`<select>`,
+  `<datalist>`, `window.confirm`, a browser date picker). Every page renders
+  `PageHeader` and has a deliberate empty, loading and error state; a
+  destructive action asks through `ConfirmDialog`; layouts work from phone
+  width with no sideways scroll. Check a change in both color schemes and the
+  other themes. The full list, with the primitives, is "UI and UX" in
+  `AGENTS.md`.
 - No color literals. A chart reads its colors through `ChartTheme`
   (`src/lib/color/chart-theme.ts`), from the `--chart-*` tokens and the spec's
   color tokens; `test/color-literals.test.ts` fails on a literal outside
@@ -538,7 +552,7 @@ Match the surrounding code rather than importing conventions from elsewhere.
   Durations and curves come from the tokens in `globals.css`; the full rules
   are the "Motion rules" section of `AGENTS.md`.
 - Accessibility is checked, not hoped for. Every text/background token pairing
-  meets WCAG AA in both themes (`test/contrast.test.ts`, with the table in
+  meets WCAG AA in every theme and both color schemes (`test/contrast.test.ts`, with the table in
   [Accessibility](docs/src/content/docs/architecture/accessibility.md)), and
   every theme clears the quality bar (`test/theme-quality.test.ts`; run
   `npm run themes:check` while tuning tokens, and see

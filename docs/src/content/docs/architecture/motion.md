@@ -45,7 +45,7 @@ chart animation, entrances, slides and the theme crossfade are all still.
 | Version history Changes/Preview tabs | A `tab` view transition: the panel crossfades and the selected tab's highlight slides |
 | Cards, messages, results, alerts, icon swaps | Keyframe entrances (`stagger-in`, `drop-in`, `pop-in`) with `backwards` fill, so they share an element with hover transitions and hold nothing afterwards |
 | Inline notices and banners | `Notice` over the `notice` utility: stays mounted, toggles `data-open`, exits via `display … allow-discrete` |
-| Dashboard grid and the editor canvas, version list on `/dashboards/new`, dashboard list, command palette | `useFlip`: items marked `data-flip-id` slide to their new place with WAAPI; a delete runs `animateOut` first so the others close a real gap |
+| Dashboard grid and the editor canvas, dashboard list, command palette, Explore's conversation list, the Models table | `useFlip`: items marked `data-flip-id` slide to their new place with WAAPI; a delete runs `animateOut` first so the others close a real gap |
 | Panel fullscreen | A single-element FLIP on the same card (`translate` and `scale`), so the chart is never remounted |
 | Route changes | `app/template.tsx` re-mounts a `.page` element on each navigation with a keyframe entrance; the nav bar holds still |
 
@@ -66,7 +66,8 @@ primitive carries both the starting and ending variants, and a source scan
 for the rules (no `motion-safe:`, no literal durations, no animation
 library, every view-transition name scoped). Whether anything moves is a
 browser question, and the manual checklist in `CONTRIBUTING.md` is the
-answer until an end-to-end harness exists for other reasons.
+answer: the end-to-end suite could hold a `document.getAnimations()` check,
+but none is written yet.
 
 ---
 

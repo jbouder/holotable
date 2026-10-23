@@ -67,21 +67,25 @@ counting seconds.
 Every panel has a menu (the ⋯ in its header), and the info control beside the
 title shows the one-sentence description of what the panel computes.
 
-- **Show query** opens the panel's statement — SQL or PromQL — with its source
-  and time field, or for PromQL how it is evaluated. It is not offered on a
-  text panel or through a share link.
+- **Fullscreen** expands the panel over the whole viewport (**Exit
+  fullscreen** while it is open). Escape closes it and puts focus back where
+  it was.
+- **Show query** opens the panel's statement — SQL, PromQL or LogQL — with its
+  source and time field, or for PromQL how it is evaluated. It is not offered
+  on a text panel or through a share link.
 - **Ask about this panel** opens the [dashboard chat](/guide/explore/#beside-a-dashboard)
   with the panel attached to your question.
+- **Ask in Explore** continues on the [Explore](/guide/explore/) page with a
+  question started about the panel. It is not offered in an embed.
 - The panel's **links**, if the editor gave it any, lead to another dashboard
   carrying your window and picks; see [Drilldown](/guide/drilldown/).
-- **Fullscreen** expands the panel over the whole viewport. Escape closes it
-  and puts focus back where it was.
 - **Export CSV** saves the rows the panel is showing right now, ready for a
   spreadsheet. A text value a spreadsheet would run as a formula is escaped,
   since the values come from a database Holotable does not own; numbers are
   never changed.
-- **Export PNG** saves the chart as an image on the theme's background. Stat
-  and table panels offer CSV only.
+- **Export PNG** saves the chart as an image on the theme's background. Stat,
+  table, logs and status-grid panels offer CSV only; a text panel offers
+  neither.
 
 An export is always the window the panel already holds. It cannot reach a row
 the panel was not showing, and it is not a way to run a query.
@@ -91,7 +95,7 @@ the panel was not showing, and it is not a way to run a query.
 Press `⌘K` (`Ctrl+K` elsewhere) anywhere in the app to open the command
 palette. Start typing to find a dashboard or a data source by name, jump to one
 of the app's pages, or run an action: new dashboard, new source, switch the
-theme, or refresh a source's catalog if you administer it. The commands you
+color scheme or the theme, or refresh a source's catalog if you administer it. The commands you
 use most lead the list before you type; once you type, the best match leads.
 
 It only ever shows what you could already open from the sidebar, in the

@@ -32,7 +32,8 @@ Options: number, legend, thresholds, `yAxis` (`{ min, max, log, label }`;
 for sampled data; `"step"` holds each value until the next sample, for counts
 and states that change in jumps (errors per minute, replica counts, deploys, a
 circuit breaker); `"smooth"` rarely, when the reader wants the trend, not the
-samples, and it overshoots peaks.
+samples, and it overshoots peaks; past 500 points a smooth line is drawn
+straight.
 
 With PromQL: a range query (no `instant`); each series is a line, so aggregate to a few, `sum by (route) (rate(http_requests_total[5m]))`.
 
@@ -186,7 +187,7 @@ Requires `query.timeField`. Every line sent is shown; the list scrolls. Filter b
 with a variable for a picker (`WHERE level = ANY(:level)`).
 
 Options: `message` (default the longest text column), `level` (the level
-column; default one named `level` or `severity`), `levels` (up to 20 `{ state, color }` pairs; without one, `error` and
+column; default one named `level` or `severity`), `levels` (up to 20 `{ state, color }` pairs, each level once; without one, `error` and
 `fatal` are `danger`, `warn` is `warning`, `info` is `info`, `debug` is
 `neutral`), `wrap` (default `true`), `order` (`"newest"`, the default, or
 `"oldest"`), `showTime` (default `true`), `limit` (1–5,000).
@@ -245,7 +246,8 @@ Pick the layout from the data, not the wording:
   an icon symbol beside the name: choose it for anything read as a diagram,
   an architecture or service map, a data lineage, a pipeline, a flowchart, of
   up to a few dozen nodes. Keep the default `"marker"` for a large or dense
-  graph. Blocks that do not fit the panel are drawn as markers, with a notice.
+  graph. Blocks fit the panel whole, with no pan or zoom; blocks that do not fit
+  are drawn as markers, with a notice.
 - Not a graph at all when the question is *how much* flows where (requests
   from service to route to status, bytes from source to sink): that is a
   `sankey`, which needs a volume on every edge and no cycles.

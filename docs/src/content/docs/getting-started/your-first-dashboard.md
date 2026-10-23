@@ -223,8 +223,8 @@ generated against (or the first one); open it and tick the sources to use, up
 to three from one workspace. Describe what you want to watch in plain English.
 Until you send the first prompt, suggestions built from your own catalog (so
 they name your tables, not a demo's) sit under the bar, and **Start from a
-template…** and your recent prompts sit on the right of the page title, beside
-the model that will answer. When one of the source's tables reads as
+template…** and your recent prompts sit on the right of the page title; the
+model that will answer is the chip beside the source chip. When one of the source's tables reads as
 spending, an activity log or daily measurements, its starter dashboard leads,
 above the suggestions: **Start from** it and it opens as the first version,
 built from your columns with no model call, ready to refine or save (see
@@ -258,9 +258,9 @@ saved version you now have to clean up.
 
 ## When it doesn't work
 
-**"Generation is unavailable" or a 500 on send.** No AI provider is configured.
-`AI_PROVIDER` and `AI_MODEL` must be set, with the matching key. See
-[AI provider](/admin/models/).
+**"No model configured…" where the prompt box would be.** No model is
+configured. Set `AI_MODEL` with the matching key on the server, or add one on
+the **Models** page. See [AI provider](/admin/models/).
 
 **`credentials for secret_ref "X" are not configured on the server`.** The
 source names a secret reference the server has no values for. Set `X_USERNAME`

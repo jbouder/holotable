@@ -62,4 +62,4 @@ ever runs it.
 | SSE stream | `src/app/api/dashboards/[id]/stream/route.ts` |
 | Dashboard chat (read-only + `runQuery`) | `src/lib/ai/chat.ts`, `src/app/api/dashboards/[id]/chat/route.ts` |
 | Live client | `src/components/dashboard/LiveDashboard.tsx`, `PanelView.tsx` |
-| Charts | `src/components/charts/EChart.tsx`, `options.ts`, `src/lib/color/oklch.ts` |
+| Charts | `src/components/charts/EChart.tsx`, `options.ts`, `style.ts`, `src/lib/color/chart-theme.ts` |
