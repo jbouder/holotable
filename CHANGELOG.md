@@ -57,6 +57,9 @@ says how a section gets here.
   service health puts the service map and the request flow under its stats
   and drops the server-errors-by-route bar; Demo fleet drops the CPU line and
   the CPU tick plot, which repeated its heatmap.
+- **Square status tiles.** A status grid's tiles take the theme's corner
+  radius, like the panel around them: square in the default palette, softened
+  where a palette rounds its corners. They were rounded in every theme.
 
 ## 0.2.0 — 2026-10-11
 
