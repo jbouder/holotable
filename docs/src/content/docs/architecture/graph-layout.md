@@ -17,7 +17,7 @@ computes positions itself and hands them to a `graph` series with
 
 ## The decision
 
-The layout is `graphLayout` in `src/lib/graph/layout.ts`: pure, about 450
+The layout is `graphLayout` in `src/lib/graph/layout.ts`: pure, about 500
 lines with its comments, no dependency, and held by `test/graph.test.ts`
 without a browser. It is the classic layered (Sugiyama) layout in four steps:
 
@@ -88,6 +88,55 @@ graph at 723 crossings and the lineage at 3,722; it brought the two under or
 within 5% of dagre's, at the cost of the TPC-DS schema rising from 512 to
 557, still under dagre's 583. The cycle in the first shape is drawn as one
 dashed edge; dagre reverses the same edge.
+
+## Blocks
+
+`node: "block"` ([#649](https://github.com/jbouder/holotable/issues/649))
+draws each node as a box with its name inside, so a node is no longer a
+point. The four steps stay as they are; `graphLayout` takes each node's size
+(`LayoutSpacing`) and step 4 keeps a gap between two boxes' edges rather
+than their centers (half the gap beside a placeholder, which is an edge
+passing through), and each layer starts the layer gap past the widest box of
+the one before. Without sizes every node is a point a unit from the next, and
+the layout is exactly the one measured above. With them the coordinates are
+pixels: the panel draws the plot a pixel a unit, in the middle of the panel,
+spreads the centers (never the boxes) up to two and a half times as far
+apart to fill it, and runs each edge from the middle of the side of its box
+that faces the next layer to the middle of the side of the next box that
+faces it, so an arrow meets a border. Since the boxes keep their size when
+the plot zooms, a drawing of blocks has no zoom: it fits the panel whole, or
+it is drawn as markers with a notice.
+
+The tree and the force graph are ECharts' own layouts, so blocks there are a
+question of fit rather than placement. ECharts' tree stretches its tidy-tree
+units over the panel; `tidyTree` (`src/lib/graph/tidy-tree.ts`) computes the
+same units (`test/graph.test.ts` holds it to ECharts' own on random trees),
+and the boxes fit when each level is the widest boxes of it and the next
+apart and any two of a level are their boxes and a gap apart at the nearest
+ECharts would part them, which covers every branch a reader might close. The
+force layout pushes nodes apart in every direction alike, so each box's
+repulsion is in proportion to its half-diagonal, and the cloud at rest is
+round: about 1.2 times the square root of the node count times the largest
+box's diagonal and a gap across, as a simulation of ECharts' force step
+found, which is what has to fit the panel's shorter side.
+
+Re-measured with blocks (boxes 56 to 160 pixels wide by their names, 40
+tall, gaps of 14 in a layer and 40 between layers), against the same
+layouts as points. Ordering does not read sizes, so crossings are the same;
+no two boxes overlap in any of them. **Through a box** counts edges whose
+straight line passes inside a box that is not one of its ends, which a box
+makes likelier than a point; the 60-service and 200-node shapes here are new
+generations with a fixed seed, not those above.
+
+| Shape | Nodes, edges | Layers | Crossings | Through a node, as points | Through a box, as blocks | Blocks' extent | Time, points / blocks |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| The demo's service map | 8, 8 | 3 | 0 | 0 | 0 | 356 × 202 px | 0.03 / 0.03 ms |
+| The demo's network topology, top to bottom | 11, 16 | 5 | 0 | 2 | 2 | 374 × 360 px | 0.07 / 0.05 ms |
+| A 60-service call graph, five tiers | 60, 149 | 10 | 658 | 75 | 157 | 1,302 × 811 px | 1.9 / 1.7 ms |
+| A 200-node lineage, five tiers, some skipping one | 199, 329 | 5 | 2,876 | 779 | 1,074 | 596 × 3,389 px | 2.5 / 2.6 ms |
+
+The two large shapes are what the prompt means by "large or dense": their
+blocks do not fit a dashboard panel, so they are drawn as markers.
 
 The next measurement worth making is on a graph people find unreadable. If
 one turns up where dagre's drawing is clearly better, the swap is

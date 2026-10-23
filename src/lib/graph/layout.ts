@@ -25,6 +25,12 @@
  * Deterministic: no randomness, and every tie falls to input order.
  * Coordinates are in units (one between layers, one between nodes); ECharts
  * fits them to the panel.
+ *
+ * Given each node's size ({@link LayoutSpacing}, #649: a graph drawn as
+ * blocks), the same steps place boxes rather than points, in the sizes'
+ * units: a layer keeps the gap between its boxes' edges rather than their
+ * centers, and each layer starts the gap past the widest box of the layer
+ * before it. Without sizes every node is a point, and the units are as above.
  */
 
 /** Which way the layers run: left to right, or top to bottom. */
@@ -69,15 +75,45 @@ const ORDER_SWEEPS = 24;
 const ORDER_PATIENCE = 4;
 /** Placement sweeps, down and up alternately. */
 const PLACE_SWEEPS = 8;
-/** The least gap between two nodes in a layer, and beside a placeholder. */
+/** The least gap between two nodes in a layer, and beside a placeholder (half). */
 const NODE_GAP = 1;
-const DUMMY_GAP = 0.5;
+/** The gap from one layer to the next. */
+const LAYER_GAP = 1;
 
-/** The nodes laid out in layers, `direction` the way the layers run. */
+/** A box's size, in the units the layout is asked to place in. */
+export interface BoxSize {
+  width: number;
+  height: number;
+}
+
+/**
+ * How far apart to place boxes (#649): each node's size, the least gap
+ * between two boxes' edges in a layer (half of it beside a placeholder, which
+ * is an edge passing through), and the gap between the widest box of one
+ * layer and the next.
+ */
+export interface LayoutSpacing {
+  size: (id: string) => BoxSize;
+  nodeGap: number;
+  layerGap: number;
+}
+
+/** Points: every node no size, a unit between nodes and between layers. */
+const POINTS: LayoutSpacing = {
+  size: () => ({ width: 0, height: 0 }),
+  nodeGap: NODE_GAP,
+  layerGap: LAYER_GAP,
+};
+
+/**
+ * The nodes laid out in layers, `direction` the way the layers run, as
+ * points a unit apart, or as boxes of the sizes `spacing` gives.
+ */
 export function graphLayout(
   nodeIds: readonly string[],
   edgeList: readonly LayoutEdge[],
   direction: GraphDirection = "LR",
+  spacing: LayoutSpacing = POINTS,
 ): GraphLayout {
   const index = new Map<string, number>();
   for (const id of nodeIds) if (!index.has(id)) index.set(id, index.size);
@@ -135,16 +171,28 @@ export function graphLayout(
   }
 
   const ordered = orderLayers(layerOf, layerCount, up, down, count);
-  const cross = placeCross(ordered.layers, n, up, down);
+  // A box's extent across its layer, and along the way the layers run.
+  const sizes = ids.map((id) => spacing.size(id));
+  const crossOf = (v: number) => {
+    const s = sizes[v];
+    return s === undefined ? 0 : direction === "LR" ? s.height : s.width;
+  };
+  const alongOf = (v: number) => {
+    const s = sizes[v];
+    return s === undefined ? 0 : direction === "LR" ? s.width : s.height;
+  };
+  const cross = placeCross(ordered.layers, n, up, down, crossOf, spacing.nodeGap);
+  const at = layerPlaces(layer, layerCount, alongOf, spacing.layerGap);
 
   const nodes: PlacedNode[] = ids.map((id, i) => {
     const l = layer[i] as number;
     const c = cross[i] as number;
+    const a = at[l] as number;
     return {
       id,
       layer: l,
       order: ordered.position[i] as number,
-      ...(direction === "LR" ? { x: l, y: c } : { x: c, y: l }),
+      ...(direction === "LR" ? { x: a, y: c } : { x: c, y: a }),
     };
   });
   return {
@@ -373,14 +421,52 @@ function inversions(values: number[]): number {
 }
 
 /**
- * Each node's place across its layer: pulled toward its neighbors' mean,
- * sweeping down and up, the layer's order and gaps kept. Returns the real
- * nodes' places, the least of them 0.
+ * Where each layer is along the way the layers run: the first at 0, and each
+ * after it the gap past the widest box of the one before and its own widest
+ * box's half; a unit apart when nodes are points.
  */
-function placeCross(layers: number[][], n: number, up: number[][], down: number[][]) {
+function layerPlaces(
+  layer: number[],
+  layerCount: number,
+  alongOf: (v: number) => number,
+  layerGap: number,
+): number[] {
+  const widest = new Array<number>(layerCount).fill(0);
+  layer.forEach((l, v) => {
+    widest[l] = Math.max(widest[l] as number, alongOf(v));
+  });
+  const at: number[] = [];
+  for (let l = 0; l < layerCount; l++) {
+    at.push(
+      l === 0
+        ? 0
+        : (at[l - 1] as number) +
+            ((widest[l - 1] as number) + (widest[l] as number)) / 2 +
+            layerGap,
+    );
+  }
+  return at;
+}
+
+/**
+ * Each node's place across its layer: pulled toward its neighbors' mean,
+ * sweeping down and up, the layer's order and gaps kept, a gap being between
+ * two boxes' edges (a placeholder has no size, and half the gap). Returns
+ * the real nodes' places, the least of them 0.
+ */
+function placeCross(
+  layers: number[][],
+  n: number,
+  up: number[][],
+  down: number[][],
+  crossOf: (v: number) => number,
+  nodeGap: number,
+) {
   const total = up.length;
   const cross = new Array<number>(total).fill(0);
-  const gap = (a: number, b: number) => (a < n && b < n ? NODE_GAP : DUMMY_GAP);
+  const half = (v: number) => (v < n ? crossOf(v) / 2 : 0);
+  const gap = (a: number, b: number) =>
+    half(a) + half(b) + (a < n && b < n ? nodeGap : nodeGap / 2);
   for (const row of layers) {
     let at = 0;
     row.forEach((v, i) => {

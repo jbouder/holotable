@@ -24,6 +24,14 @@ export const GRAPH_DIRECTIONS = ["LR", "TB"] as const satisfies readonly GraphDi
 /** Which way a tree grows: left to right, top to bottom, …, or out from its root. */
 export const GRAPH_ORIENTS = ["LR", "TB", "RL", "BT", "radial"] as const;
 
+/**
+ * How a node is drawn (#649): a `marker` (a symbol with its label pinned
+ * beside it, the default) or a `block` (a box sized to its name, the name and
+ * value inside, an icon symbol beside the name), as an architecture diagram,
+ * a lineage or a pipeline is drawn.
+ */
+export const GRAPH_NODE_STYLES = ["marker", "block"] as const;
+
 /** A node symbol: a name on the allowlist, never a `path://` or `image://`. */
 export const GraphSymbolName = z.enum(GRAPH_SYMBOLS);
 
@@ -38,6 +46,12 @@ export const GraphOptions = z
      * bottom; by default `orient`'s nearer one, else `LR`.
      */
     direction: z.enum(GRAPH_DIRECTIONS).optional(),
+    /**
+     * Each node as a `block`, a box with its name inside, or a `marker`, a
+     * symbol with its name beside it; `marker` by default. Blocks that do
+     * not fit the panel are drawn as markers, with a notice.
+     */
+    node: z.enum(GRAPH_NODE_STYLES).optional(),
     /** A directed or force graph writes each edge's value on it. */
     edgeLabels: z.boolean().optional(),
     /** A directed graph's edges are gently curved; `true` by default. */
@@ -104,7 +118,7 @@ export const graph = definePanelKind({
   summary:
     "Structure: nodes and edges drawn as a tree, as a layered directed graph where a node has several parents or edges form a cycle, or as a force-directed cloud of who is connected to whom, from one row per edge (`options.source` → `options.target`) or from path columns, with collapsible branches, arrows and network icons as symbols.",
   promptHint:
-    'what points at what (a service and what it calls, a schema\'s tables and their columns, a folder tree): return one row per edge, parent and child columns, named in options.source and options.target, with an optional numeric options.value and a text options.group that colors nodes by category; or one row per leaf with options.path columns, top level first, as for a treemap. options.layout "tree" (default) when every node has one parent, with options.orient "LR" (default), "TB", "RL", "BT" or "radial"; options.layout "dag" when a node has several parents or the edges can form a cycle (a dependency graph, a data lineage, tables sharing a dimension, a state machine, a network with redundant links), with options.direction "LR" (default) or "TB", options.edgeLabels true to write each edge\'s value on it, and options.curve false for straight edges; options.layout "force" when the edges have no useful direction and the question is what clusters with what (which hosts talk to each other, which services share a network, co-occurrence), drawn as a cloud whose nodes are sized by options.value. A tree whose rows turn out not to be one is drawn as a dag with a notice. For an infrastructure or service map, give nodes icons: options.symbol (one of circle, rect, roundRect, triangle, diamond, pin, arrow, server, database, cloud, router, switch, firewall, loadBalancer, queue, cache, storage, user, service) and options.symbols mapping a group value to one, e.g. {"service": "server", "store": "database"}. Use \'treemap\' when the question is share, not structure, and \'sankey\' when it is how much flows where.',
+    'what points at what (a service and what it calls, a schema\'s tables and their columns, a folder tree): return one row per edge, parent and child columns, named in options.source and options.target, with an optional numeric options.value and a text options.group that colors nodes by category; or one row per leaf with options.path columns, top level first, as for a treemap. options.layout "tree" (default) when every node has one parent, with options.orient "LR" (default), "TB", "RL", "BT" or "radial"; options.layout "dag" when a node has several parents or the edges can form a cycle (a dependency graph, a data lineage, tables sharing a dimension, a state machine, a network with redundant links), with options.direction "LR" (default) or "TB", options.edgeLabels true to write each edge\'s value on it, and options.curve false for straight edges; options.layout "force" when the edges have no useful direction and the question is what clusters with what (which hosts talk to each other, which services share a network, co-occurrence), drawn as a cloud whose nodes are sized by options.value. A tree whose rows turn out not to be one is drawn as a dag with a notice. options.node "block" draws each node as a box with its name (and value) inside, as a diagram is drawn: choose it for an architecture or service map, a data lineage, a pipeline, a flowchart, anything read as a diagram of a few dozen nodes; leave the default markers for a large or dense graph. For an infrastructure or service map, give nodes icons (a block draws its icon beside its name; shapes such as circle are ignored there): options.symbol (one of circle, rect, roundRect, triangle, diamond, pin, arrow, server, database, cloud, router, switch, firewall, loadBalancer, queue, cache, storage, user, service) and options.symbols mapping a group value to one, e.g. {"service": "server", "store": "database"}. Use \'treemap\' when the question is share, not structure, and \'sankey\' when it is how much flows where.',
   promqlHint:
     'an instant query aggregated by both ends of an edge, \'sum by (caller, callee) (rate(calls_total[5m]))\', with options.source "caller", options.target "callee" and options.value "value".',
   canvas: true,

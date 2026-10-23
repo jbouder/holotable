@@ -95,6 +95,11 @@ export const EvalCase = z
          * a Loki line's level is a label or a parsed field, never found by name.
          */
         logsLevel: z.literal("required").optional(),
+        /**
+         * Every graph panel draws its nodes as blocks (#649): what a diagram
+         * of a service architecture or a lineage asks for.
+         */
+        graphNode: z.enum(["block", "marker"]).optional(),
         /** Every query panel sets `query.timeField` (`required`) or none does (`absent`). */
         timeField: z.enum(["required", "absent"]).optional(),
         minPanels: z.number().int().nonnegative().optional(),
@@ -556,6 +561,17 @@ export async function grade(
       const level = (panel.options as { level?: unknown } | undefined)?.level;
       if (panel.viz === "logs" && typeof level !== "string") {
         failures.push(`logs panel "${panel.id}" names no options.level`);
+      }
+    }
+  }
+  if (expect.graphNode) {
+    for (const panel of panels) {
+      if (panel.viz !== "graph") continue;
+      const node = (panel.options as { node?: unknown } | undefined)?.node ?? "marker";
+      if (node !== expect.graphNode) {
+        failures.push(
+          `graph panel "${panel.id}" draws ${String(node)}s; expected ${expect.graphNode}s`,
+        );
       }
     }
   }

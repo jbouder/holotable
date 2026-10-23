@@ -437,6 +437,7 @@ export function demoFilesSpec(targets: DemoLinkTargets) {
         options: {
           layout: "dag",
           direction: "TB",
+          node: "block",
           source: "parent",
           target: "child",
           value: "bandwidth_gbps",

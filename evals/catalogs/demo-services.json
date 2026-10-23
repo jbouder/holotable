@@ -1,0 +1,45 @@
+{
+  "host": "localhost",
+  "port": 5432,
+  "database": "holotable",
+  "schema": "metrics",
+  "ssl": false,
+  "tables": [
+    {
+      "name": "service_calls",
+      "description": "calls between services, one row per caller and callee a minute (the service map)",
+      "timeField": "ts",
+      "columns": [
+        {
+          "name": "ts",
+          "type": "timestamp with time zone"
+        },
+        {
+          "name": "caller",
+          "type": "text"
+        },
+        {
+          "name": "callee",
+          "type": "text"
+        },
+        {
+          "name": "tier",
+          "type": "text",
+          "description": "service or store"
+        },
+        {
+          "name": "requests",
+          "type": "integer"
+        },
+        {
+          "name": "errors",
+          "type": "integer"
+        },
+        {
+          "name": "p95_ms",
+          "type": "double precision"
+        }
+      ]
+    }
+  ]
+}

@@ -241,12 +241,17 @@ Pick the layout from the data, not the wording:
   share a network, which tags occur together. Nodes settle into a cloud, no
   arrows, sized by `value`; drag pans, Ctrl and the wheel zooms. Past 60
   nodes, labels show on hover only.
+- `node: "block"` draws each node as a box with its name (and value) inside,
+  an icon symbol beside the name: choose it for anything read as a diagram,
+  an architecture or service map, a data lineage, a pipeline, a flowchart, of
+  up to a few dozen nodes. Keep the default `"marker"` for a large or dense
+  graph. Blocks that do not fit the panel are drawn as markers, with a notice.
 - Not a graph at all when the question is *how much* flows where (requests
   from service to route to status, bytes from source to sink): that is a
   `sankey`, which needs a volume on every edge and no cycles.
 
 Options: number (how values are written), `layout` (`"tree"`, the default,
-`"dag"` or `"force"`), `orient` (the tree's: `"LR"`, the default, `"TB"`, `"RL"`, `"BT"`
+`"dag"` or `"force"`), `node` (`"marker"`, the default, or `"block"`), `orient` (the tree's: `"LR"`, the default, `"TB"`, `"RL"`, `"BT"`
 or `"radial"`), `direction` (the dag's: `"LR"`, the default, or `"TB"`),
 `edgeLabels` (`true` writes each edge's value on a dag or a force graph), `curve` (`false`
 draws a dag's edges straight), `source`

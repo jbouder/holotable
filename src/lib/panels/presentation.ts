@@ -192,6 +192,7 @@ export const OPTION_GROUPS = {
   table: ["columns", "sort"],
   graph: [
     "layout",
+    "node",
     "orient",
     "direction",
     "edgeLabels",

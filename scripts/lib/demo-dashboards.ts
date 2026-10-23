@@ -225,6 +225,9 @@ export function demoSpec() {
           // A store two services share has two parents: a directed graph.
           layout: "dag",
           direction: "LR",
+          // Drawn as a diagram: each node a box with its icon, name and
+          // requests inside (#649).
+          node: "block",
           source: "caller",
           target: "callee",
           value: "requests",

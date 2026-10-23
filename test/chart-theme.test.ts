@@ -435,6 +435,9 @@ test("every chart kind writes in the page's font, at the chart scale, with the s
     ["treemap", { variant: "sunburst" }],
     ["graph", { layout: "dag" }],
     ["graph", { layout: "force" }],
+    ["graph", { node: "block" }],
+    ["graph", { layout: "dag", node: "block" }],
+    ["graph", { layout: "force", node: "block" }],
   ];
   for (const [[viz, options], size] of variants.flatMap((v) =>
     SIZES.map((size) => [v, size] as const),
@@ -497,6 +500,10 @@ test("every chart kind writes in the page's font, at the chart scale, with the s
  * merge would leave behind if one option set a field and the next did not.
  */
 function fieldPaths(node: unknown, at = "", out = new Set<string>()): Set<string> {
+  // A series' data and links are replaced whole on a merge, never merged
+  // item by item, so an item cannot keep a stale field: a graph's nodes are
+  // boxes at one size and markers at another (#649).
+  if (/^\.series\[\]\.(data|links)$/.test(at)) return out;
   if (Array.isArray(node)) {
     for (const item of node) fieldPaths(item, `${at}[]`, out);
   } else if (node && typeof node === "object") {
@@ -516,6 +523,9 @@ test("a size step sets every field the last one did, so the merge never keeps a 
     ["gauge", { variant: "bar" }],
     ["graph", { layout: "dag" }],
     ["graph", { layout: "force" }],
+    ["graph", { node: "block" }],
+    ["graph", { layout: "dag", node: "block" }],
+    ["graph", { layout: "force", node: "block" }],
     ["line", { legend: "bottom" }],
     ["line", { legend: "right", yAxis: { label: "req/s" } }],
     ["line", { decimals: 0, unit: "req" }],
