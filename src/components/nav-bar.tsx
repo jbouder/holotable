@@ -13,6 +13,7 @@ import {
   X,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Wordmark } from "@/components/ui/logo";
 import { cn } from "@/lib/utils";
 import { NavSlot } from "@/components/nav-slot";
 import { ProfileMenu, type ProfileMenuAccount } from "@/components/profile-menu";
@@ -90,12 +91,8 @@ export function NavBar({
       */}
       <div className="flex h-14 items-center justify-between gap-2 px-4 sm:px-6">
         <nav className="flex min-w-0 items-center gap-6" aria-label="Main">
-          <Link
-            href="/"
-            className="tap-target flex shrink-0 items-center gap-2 font-semibold"
-          >
-            <LayoutDashboard className="h-5 w-5 text-primary" />
-            Holotable
+          <Link href="/" className="tap-target flex shrink-0 items-center">
+            <Wordmark />
           </Link>
           <div className="hidden items-center gap-6 md:flex">
             {links.map((link) => (

@@ -197,12 +197,13 @@ const STARTING_STYLE = `
   @media (prefers-reduced-motion: reduce) { :root:not([data-motion]) * {
     animation-duration: .01ms !important; animation-iteration-count: 1 !important; } }`;
 
-const LOGO = `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect width="7" height="9" x="3" y="3" rx="1"/><rect width="7" height="5" x="14" y="3" rx="1"/><rect width="7" height="9" x="14" y="12" rx="1"/><rect width="7" height="5" x="3" y="16" rx="1"/></svg>`;
+/** The Holotable mark (`src/components/ui/logo.tsx`), inline: the CSP allows no external image. */
+const LOGO = `<svg width="32" height="32" viewBox="0 0 16 16" shape-rendering="crispEdges" aria-hidden="true"><path fill="currentColor" d="M7 4h2v1H7zM5 5h6v1H5zM3 6h4v1H3zM9 6h4v1H9zM1 7h4v1H1zM11 7h4v1h-4zM3 8h4v1H3zM9 8h4v1H9zM1 9h2v1H1zM5 9h6v1H5zM13 9h2v1h-2zM3 10h2v1H3zM7 10h2v1H7zM11 10h2v1h-2zM5 11h2v1H5zM9 11h2v1H9zM7 12h2v1H7z"/></svg>`;
 const DONE = `<svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="8" cy="8" r="7"/><path d="m5 8 2 2 4-4"/></svg>`;
 const ACTIVE = `<svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M8 1a7 7 0 1 1-7 7" /></svg>`;
 const PENDING = `<svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><circle cx="8" cy="8" r="6.5" stroke-dasharray="2 2.5"/></svg>`;
 
-/** A dashboard drawing itself, shaped like the logo. Decoration only. */
+/** A dashboard drawing itself. Decoration only. */
 const BOARD = `<div class="board" aria-hidden="true">
 <div class="tile a" style="--i:0"><svg viewBox="0 0 100 60" preserveAspectRatio="none"><path class="area" d="M0 48 L14 40 L28 44 L42 26 L56 32 L70 16 L84 22 L100 8 L100 60 L0 60 Z"/><path class="line" pathLength="100" vector-effect="non-scaling-stroke" d="M0 48 L14 40 L28 44 L42 26 L56 32 L70 16 L84 22 L100 8"/></svg></div>
 <div class="tile b" style="--i:1"><div class="stat"><b></b><i></i></div></div>

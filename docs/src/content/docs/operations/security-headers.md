@@ -109,10 +109,11 @@ the browser, not collected.
 ## What is exempt
 
 The proxy runs on every path except `/api`, `/_next/static`, `/_next/image`
-and `/icon.svg`. API responses are JSON, or the SSE stream at
-`/api/dashboards/[id]/stream`, which a document policy does not apply to.
-Leaving `/api` out keeps the proxy off the stream path entirely; the static
-headers are the only thing added to it, and adding headers does not buffer or
+and the icons (`/icon.svg`, `/apple-icon.png`, `/favicon.ico`), which a
+browser fetches with no session and must not be sent to sign in. API
+responses are JSON, or the SSE stream at `/api/dashboards/[id]/stream`,
+which a document policy does not apply to. Leaving `/api` out keeps the proxy
+off the stream path entirely; the static headers are the only thing added to it, and adding headers does not buffer or
 transform the body.
 
 Embedding a page in another site's `<iframe>` is blocked by

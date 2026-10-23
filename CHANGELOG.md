@@ -45,6 +45,12 @@ says how a section gets here.
 
 ### Changed
 
+- **A new logo.** Holotable has a mark of its own, a table top with what it
+  projects rising from it, drawn on a 16-pixel grid with square corners,
+  instead of the Dashboards icon (which stays the Dashboards icon). It shows
+  in the nav bar, the sign-in page, the favicon (now with `favicon.ico` and
+  an Apple touch icon beside `icon.svg`), the docs site, the README and the
+  demo's starting page.
 - **Four default dashboards.** A default install (`docker compose up` or the
   quick-start image) now seeds exactly four: Demo service health, Demo fleet,
   Demo host detail and Holotable self-monitoring, which between them still
