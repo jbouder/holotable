@@ -1,4 +1,5 @@
 import { DatumLinksBody } from "@/components/dashboard/DatumLinks";
+import { TileScroller } from "@/components/panels/tile-scroller";
 import type { PanelBodyProps } from "@/components/panels/types";
 import { STATUS_TILE_TINT } from "@/lib/color/contrast";
 import { cn } from "@/lib/utils";
@@ -22,12 +23,8 @@ export function StatusGridView({ panel, data }: PanelBodyProps) {
   const { tiles, overflow } = statusGrid(panel, data);
   const { columns } = readOptions(StatusGridOptions, panel.options);
   return (
-    <section
-      aria-label={`${panel.title}, status grid`}
-      // biome-ignore lint/a11y/noNoninteractiveTabindex: a scroll container must be focusable to scroll by keyboard (WCAG 2.1.1)
-      tabIndex={0}
-      className="max-h-full overflow-auto focus-visible:outline-2 focus-visible:outline-ring"
-    >
+    // Scrolls when the tiles do not fit, and says how many are out of view (#645).
+    <TileScroller label={`${panel.title}, status grid`}>
       <ul
         className="grid gap-1.5"
         style={{
@@ -38,7 +35,7 @@ export function StatusGridView({ panel, data }: PanelBodyProps) {
         }}
       >
         {tiles.map((tile) => (
-          <li key={tile.label} className="min-w-0">
+          <li key={tile.label} data-tile className="min-w-0">
             <DatumLinksBody
               datum={{ row: tile.row, series: tile.label }}
               label={tileName(tile)}
@@ -53,7 +50,7 @@ export function StatusGridView({ panel, data }: PanelBodyProps) {
           {overflow} more not shown. Narrow the query to see them.
         </p>
       )}
-    </section>
+    </TileScroller>
   );
 }
 
