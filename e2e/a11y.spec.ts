@@ -114,6 +114,18 @@ for (const theme of THEMES) {
       await expectNoA11yViolations(page);
     });
 
+    test("the host detail demo: a line drawn in steps (#665)", async ({
+      page,
+      request,
+    }) => {
+      await page.goto(`/dashboards/${await dashboardId(request, "Demo host detail")}`);
+      await waitForPanels(page);
+      await expect(
+        page.getByRole("img", { name: /^Errors logged per minute, line chart/ }),
+      ).toBeVisible();
+      await expectNoA11yViolations(page);
+    });
+
     test("dashboard editor", async ({ page, request }) => {
       await page.goto(`/dashboards/${await dashboardId(request, DEMO_DASHBOARD)}/edit`);
       await expect(page.getByRole("heading", { level: 1 })).toBeVisible();

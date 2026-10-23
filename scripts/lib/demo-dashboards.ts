@@ -734,6 +734,25 @@ export function hostDetailSpec() {
         options: { legend: "right", compact: true },
         layout: { x: 8, y: 6, w: 4, h: 5 },
       },
+      {
+        id: "errors-per-minute",
+        title: "Errors logged per minute",
+        description: "A count moves in whole steps, so it is drawn as steps.",
+        viz: "line",
+        query: {
+          sourceId: "ts-logs",
+          timeField: "minute",
+          // Every minute the host logged anything, so a quiet one reads 0.
+          sql: perMinute(
+            "count(*) FILTER (WHERE level = 'error') AS errors",
+            "app_logs",
+            "host = :host",
+          ),
+        },
+        format: "number",
+        options: { curve: "step", legend: "none", decimals: 0 },
+        layout: { x: 0, y: 11, w: 12, h: 3 },
+      },
     ],
   };
 }

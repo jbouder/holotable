@@ -165,7 +165,6 @@ test("a series past the large threshold is sampled or drawn in large mode, and n
   for (const n of [200, LARGE_SERIES_POINTS]) {
     for (const s of seriesOf(lineChart(panel(), data(n), ctx))) {
       assert.equal(s.sampling, undefined, `line at ${n}`);
-      assert.equal(s.smooth, true, `line at ${n}`);
     }
     for (const s of seriesOf(barChart(panel({ viz: "bar" }), data(n), ctx))) {
       assert.equal(s.large, undefined, `bar at ${n}`);
@@ -178,7 +177,6 @@ test("a series past the large threshold is sampled or drawn in large mode, and n
   for (const build of [lineChart, areaChart]) {
     for (const s of seriesOf(build(panel(), data(big), ctx))) {
       assert.equal(s.sampling, "lttb");
-      assert.equal(s.smooth, false);
     }
   }
   for (const s of seriesOf(barChart(panel({ viz: "bar" }), data(big), ctx))) {
@@ -193,6 +191,72 @@ test("a series past the large threshold is sampled or drawn in large mode, and n
   const option = lineChart(panel(), data(big), ctx) as Record<string, unknown>;
   assert.equal(option.animationThreshold, LARGE_SERIES_POINTS);
   assert.equal(option.animation, undefined, "the builder never turns animation on");
+});
+
+/**
+ * A line's curve (#665): straight by default at every length, a smooth curve
+ * only while the series is small, a step at any length. Both fields are said
+ * on every line, so changing the curve merges into the same chart.
+ */
+test("a line joins its samples straight, smooth or in steps, as its curve says", () => {
+  const ctx = { display: LOCAL_TIME_DISPLAY, theme: DEFAULT_CHART_THEME };
+  const data = (n: number): PanelData => ({
+    columns: ["ts", "v", "w"],
+    rows: Array.from({ length: n }, (_, i) => ({
+      ts: new Date(Date.UTC(2026, 9, 11, 0, 0, i)).toISOString(),
+      v: i % 17,
+      w: i % 5,
+    })),
+  });
+  type Series = Record<string, unknown>;
+  const drawn = (
+    build: typeof lineChart,
+    options: Record<string, unknown> | undefined,
+    n: number,
+  ) =>
+    (build(panel(options ? { options } : {}), data(n), ctx).series as Series[]).map(
+      (s) => [s.smooth, s.step],
+    );
+  const big = LARGE_SERIES_POINTS + 1;
+  for (const build of [lineChart, areaChart]) {
+    for (const n of [20, big]) {
+      for (const s of drawn(build, undefined, n))
+        assert.deepEqual(s, [false, false], `${n}`);
+      for (const s of drawn(build, { curve: "straight" }, n))
+        assert.deepEqual(s, [false, false]);
+      for (const s of drawn(build, { curve: "step" }, n))
+        assert.deepEqual(s, [false, "end"]);
+    }
+    for (const s of drawn(build, { curve: "smooth" }, 20))
+      assert.deepEqual(s, [true, false]);
+    for (const s of drawn(build, { curve: "smooth" }, big))
+      assert.deepEqual(s, [false, false]);
+  }
+  // Thresholds color every curve by value, and a stacked area stacks with each.
+  for (const curve of ["straight", "smooth", "step"]) {
+    const thresholds = [
+      { value: 0, color: "success" },
+      { value: 10, color: "danger" },
+    ];
+    const lit = lineChart(panel({ options: { curve, thresholds } }), data(20), ctx);
+    assert.ok(lit.visualMap, `${curve}: thresholds map the line`);
+    const stack = seriesOf(
+      areaChart(panel({ options: { curve, stacked: true } }), data(20), ctx),
+    );
+    for (const s of stack) assert.equal(s.stack, "total", `${curve}: stacked`);
+  }
+  function seriesOf(option: { series?: unknown }) {
+    return option.series as Series[];
+  }
+  // A bar has no curve, whatever the options say.
+  for (const s of barChart(
+    panel({ viz: "bar", options: { curve: "step" } }),
+    data(20),
+    ctx,
+  ).series as Series[]) {
+    assert.equal("step" in s, false);
+    assert.equal("smooth" in s, false);
+  }
 });
 
 /*

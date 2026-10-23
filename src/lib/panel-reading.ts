@@ -13,6 +13,7 @@ import { type ColorToken, defaultStateToken } from "@/lib/panels/colors";
 import { LogsOptions } from "@/lib/panels/kinds/logs";
 import { StatusGridOptions } from "@/lib/panels/kinds/status-grid";
 import {
+  type Curve,
   numberDisplay,
   readOptions,
   StatOptions,
@@ -43,6 +44,30 @@ export interface StatReading {
   color?: ColorToken;
   /** The value column across every row, for the sparkline. Empty without one. */
   spark: number[];
+  /**
+   * The sparkline as `x,y` points in a 100 by 100 box, y down, joined as
+   * the panel's `curve` says (#665). Empty without a sparkline.
+   */
+  sparkPoints: string;
+}
+
+/**
+ * A sparkline's points (#665): straight segments between the samples, or,
+ * for `step`, a value held flat until the next sample and then a rise (step-
+ * end, as a line chart draws it). A `smooth` sparkline is drawn straight.
+ */
+export function sparklinePoints(values: readonly number[], curve?: Curve): string {
+  if (values.length < 2) return "";
+  const min = Math.min(...values);
+  const span = Math.max(...values) - min || 1;
+  const x = (i: number) => (i / (values.length - 1)) * 100;
+  const y = (v: number) => 100 - ((v - min) / span) * 100;
+  const points: string[] = [];
+  values.forEach((v, i) => {
+    if (curve === "step" && i > 0) points.push(`${x(i)},${y(values[i - 1])}`);
+    points.push(`${x(i)},${y(v)}`);
+  });
+  return points.join(" ");
 }
 
 /**
@@ -61,14 +86,16 @@ export function statReading(panel: Panel, data: PanelData): StatReading {
     data.columns[data.columns.length - 1];
   const value = last?.[valueKey];
   const n = toNumber(value);
+  const spark = o.sparkline
+    ? data.rows.map((r) => toNumber(r[valueKey])).filter(Number.isFinite)
+    : [];
   return {
     column: valueKey,
     value,
     text: value === undefined ? "—" : formatValue(value, panel.format, numberDisplay(o)),
     color: Number.isFinite(n) ? thresholdColor(o.thresholds, n) : undefined,
-    spark: o.sparkline
-      ? data.rows.map((r) => toNumber(r[valueKey])).filter(Number.isFinite)
-      : [],
+    spark,
+    sparkPoints: sparklinePoints(spark, o.curve),
   };
 }
 

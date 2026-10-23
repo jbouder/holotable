@@ -27,6 +27,7 @@ import { ANNOTATION_COLORS, type Annotation } from "@/lib/annotations";
 import { formatValue } from "@/lib/format";
 import { fillHex, tokenHex } from "@/lib/panels/colors";
 import {
+  type Curve,
   type LegendPosition,
   type NumberDisplay,
   numberDisplay,
@@ -198,8 +199,21 @@ export const LARGE_SERIES_POINTS = 500;
 /** The series fields that make a large series cheap to paint; none for a small one. */
 export function largeSeries(type: "line" | "bar" | "scatter", points: number) {
   if (points <= LARGE_SERIES_POINTS) return {};
-  if (type === "line") return { sampling: "lttb" as const, smooth: false };
+  if (type === "line") return { sampling: "lttb" as const };
   return { large: true, largeThreshold: LARGE_SERIES_POINTS };
+}
+
+/**
+ * How a line joins its samples (#665). Straight by default; a smooth curve
+ * is drawn straight past {@link LARGE_SERIES_POINTS}, where it costs and
+ * shows nothing; a step holds each value until the next sample at any
+ * length. Both fields are always said, so a change of curve merges.
+ */
+export function curveFields(curve: Curve | undefined, points: number) {
+  return {
+    smooth: curve === "smooth" && points <= LARGE_SERIES_POINTS,
+    step: curve === "step" ? ("end" as const) : false,
+  };
 }
 
 function base(theme: ChartTheme): EChartsOption {
@@ -322,10 +336,13 @@ function thresholdMap(
  * The options a series or pie chart was drawn with. When they change the chart
  * is drawn anew, because a merged `setOption` cannot take back a visual map, a
  * stack or an axis bound once set. Only authoring changes them; a data update
- * never does, so it still merges (invariant 11).
+ * never does, so it still merges (invariant 11). The curve is left out: every
+ * line says both of its fields (`curveFields`), so a new curve merges into the
+ * same chart (#665).
  */
 export function optionsShape(panel: Panel): string {
-  return JSON.stringify(panel.options ?? {});
+  const { curve: _curve, ...rest } = (panel.options ?? {}) as Record<string, unknown>;
+  return JSON.stringify(rest);
 }
 
 /** What a chart is drawn in, besides its own rows. */
@@ -415,6 +432,11 @@ function buildSeries(type: "line" | "bar", area: boolean): ChartOptionBuilder {
         type: axis?.log ? "log" : "value",
         // A log axis keeps ECharts' own steps: fewer would be decades apart.
         splitNumber: axis?.log ? undefined : density.y,
+        // Fixed decimals never write two ticks the same: no step finer than
+        // they show (whole numbers for a count with `decimals: 0`).
+        ...(o.decimals !== undefined && !axis?.log
+          ? { minInterval: 10 ** -o.decimals }
+          : {}),
         ...(axis?.min !== undefined ? { min: axis.min } : {}),
         ...(axis?.max !== undefined ? { max: axis.max } : {}),
         ...(axis?.label !== undefined
@@ -439,9 +461,11 @@ function buildSeries(type: "line" | "bar", area: boolean): ChartOptionBuilder {
         name: k,
         type,
         showSymbol: false,
-        smooth: type === "line",
         ...(type === "line"
-          ? { lineStyle: seriesLine(theme, area && o.stacked === true) }
+          ? {
+              ...curveFields(o.curve, data.rows.length),
+              lineStyle: seriesLine(theme, area && o.stacked === true),
+            }
           : {}),
         // Alone, an area fades toward the axis; in a stack, each band is
         // near solid, parted from the one above by its line (#647).

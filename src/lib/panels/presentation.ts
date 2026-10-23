@@ -72,11 +72,25 @@ export const YAxis = z
   });
 export type YAxis = z.infer<typeof YAxis>;
 
+/**
+ * How a line joins its samples (#665): `straight` segments (the default),
+ * a `smooth` curve, or a `step` that holds each value until the next sample
+ * (step-end). On `line`, `area` and a stat's sparkline; `bar` ignores it.
+ */
+export const Curve = z.enum(["straight", "smooth", "step"]);
+export type Curve = z.infer<typeof Curve>;
+
+export const CurveFields = {
+  /** Defaults to `straight`. */
+  curve: Curve.optional(),
+};
+
 /** The time-series kinds' options: `line`, `area` and `bar`. */
 export const SeriesOptions = z
   .object({
     ...NumberFields,
     ...LegendFields,
+    ...CurveFields,
     yAxis: YAxis.optional(),
     /** Series drawn on top of each other rather than side by side. */
     stacked: z.boolean().optional(),
@@ -95,6 +109,8 @@ export const StatOptions = z
     thresholds: Thresholds.optional(),
     /** The value column across every row, drawn behind the number. */
     sparkline: z.boolean().optional(),
+    /** How the sparkline joins its samples; a `smooth` one is drawn straight. */
+    ...CurveFields,
   })
   .strict();
 export type StatOptions = z.infer<typeof StatOptions>;
@@ -169,6 +185,7 @@ export type TableOptions = z.infer<typeof TableOptions>;
 export const OPTION_GROUPS = {
   number: ["decimals", "unit", "compact"],
   legend: ["legend"],
+  line: ["curve"],
   axis: ["yAxis", "stacked"],
   thresholds: ["thresholds"],
   stat: ["value", "sparkline"],

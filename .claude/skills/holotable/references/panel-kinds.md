@@ -27,14 +27,19 @@ bucket: `time_bucket('1 minute', ts) AS minute` with `query.timeField:
 "minute"`, ordered by it ascending.
 
 Options: number, legend, thresholds, `yAxis` (`{ min, max, log, label }`;
-`min` below `max`, and a `log` axis starts above zero), `stacked` (`true`).
+`min` below `max`, and a `log` axis starts above zero), `stacked` (`true`),
+`curve` (`"straight"`, the default, `"smooth"` or `"step"`). Leave it straight
+for sampled data; `"step"` holds each value until the next sample, for counts
+and states that change in jumps (errors per minute, replica counts, deploys, a
+circuit breaker); `"smooth"` rarely, when the reader wants the trend, not the
+samples, and it overshoots peaks.
 
 With PromQL: a range query (no `instant`); each series is a line, so aggregate to a few, `sum by (route) (rate(http_requests_total[5m]))`.
 
 ### `area`
 
 A filled time series, for a volume or a total over time. Same query shape and
-options as `line`.
+options as `line`, `curve` included.
 
 With PromQL: a range query drawn filled, for a volume or a total over time.
 
@@ -42,7 +47,7 @@ With PromQL: a range query drawn filled, for a volume or a total over time.
 
 Values per time bucket (with `query.timeField`), or compared across a
 categorical dimension (one label column plus numeric columns, no
-`query.timeField`). Same options as `line`.
+`query.timeField`). Same options as `line`; `curve` does nothing on a bar.
 
 With PromQL: a range query drawn as bars per step, or an instant query (`"instant": true`) compared across one label, `sum by (code) (increase(http_requests_total[1h]))`.
 
@@ -62,7 +67,9 @@ Usually omits `query.timeField`. With `options.sparkline: true` the query
 returns one row per time bucket (and then sets `query.timeField`), and the
 history is drawn behind the latest value.
 
-Options: number, thresholds, `value` (the column shown), `sparkline`.
+Options: number, thresholds, `value` (the column shown), `sparkline`,
+`curve` (the sparkline's: `"straight"` by default or `"step"`; `"smooth"` is
+drawn straight).
 
 With PromQL: an instant query returning one series, `sum(rate(http_requests_total[5m]))`.
 

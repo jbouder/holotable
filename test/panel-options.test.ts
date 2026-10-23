@@ -10,7 +10,12 @@ import {
 } from "@/components/charts/options";
 import { formatValue } from "@/lib/format";
 import { Panel } from "@/lib/ir";
-import { statReading, TABLE_ROWS_MAX, tableView } from "@/lib/panel-reading";
+import {
+  sparklinePoints,
+  statReading,
+  TABLE_ROWS_MAX,
+  tableView,
+} from "@/lib/panel-reading";
 import { withOptions } from "@/lib/panel-options";
 import { COLOR_TOKENS, tokenHex } from "@/lib/panels/colors";
 import { PRESENTATION_GUIDE } from "@/lib/ai/generate";
@@ -81,6 +86,8 @@ test("each option group is validated by the IR, and a malformed one refused", ()
     ["line", { yAxis: { colour: "red" } }, /yAxis/],
     ["line", { thresholds: [{ value: 0, color: "#ff0000" }] }, /thresholds/],
     ["stat", { sparkline: "yes" }, /sparkline/],
+    ["line", { curve: "spline" }, /curve/],
+    ["stat", { curve: true }, /curve/],
     ["stat", { legend: "top" }, /legend/],
     ["table", { columns: [{ name: "a" }, { name: "a" }] }, /listed twice/],
     ["table", { columns: [{ name: "a", width: 5 }] }, /width/],
@@ -149,6 +156,9 @@ test("a panel without options draws exactly as before", () => {
   });
   for (const s of option.series as Record<string, unknown>[]) {
     assert.equal("stack" in s, false);
+    // Straight segments since #665: a curve invents values between samples.
+    assert.equal(s.smooth, false);
+    assert.equal(s.step, false);
   }
 
   const stat = parse({ ...panel("stat"), format: "percent" });
@@ -192,6 +202,11 @@ test("number options write values on stats, axes and tooltips", () => {
   };
   assert.equal(option.tooltip.valueFormatter(3), "3.0 ms");
   assert.equal(option.yAxis.axisLabel.formatter(3), "3.0 ms");
+  // No tick finer than the decimals write, so no two read the same (#665).
+  const whole = lineChart(parse(panel("line", { decimals: 0 })), series, ctx) as {
+    yAxis: { minInterval?: number };
+  };
+  assert.equal(whole.yAxis.minInterval, 1);
 });
 
 test("axis, legend and stacking options reach the chart", () => {
@@ -338,6 +353,11 @@ test("a chart is drawn anew when its options change, and merged when only data d
   const b = parse(panel("line", { stacked: true, legend: "none" }));
   assert.notEqual(optionsShape(a), optionsShape(b));
   assert.equal(optionsShape(a), optionsShape(parse(panel("line", { stacked: true }))));
+  // A curve is two fields every line says, so changing it merges (#665).
+  for (const curve of ["smooth", "step", "straight"]) {
+    const c = parse(panel("line", { stacked: true, curve }));
+    assert.equal(optionsShape(c), optionsShape(a), curve);
+  }
 });
 
 test("the model is told every shared option and every color token", () => {
@@ -391,4 +411,26 @@ test("a table or logs panel's limit is the rows its query asks for, and no other
   // Above the server's cap is refused by the IR, not clamped quietly.
   assert.notDeepEqual(issues(panel("table", { limit: 50_000 })), []);
   assert.notDeepEqual(issues(panel("line", { limit: 50 })), [], "a chart takes no limit");
+});
+
+test("a stat's sparkline draws straight, and steps when its curve says so (#665)", () => {
+  assert.equal(sparklinePoints([0, 10, 5]), "0,100 50,0 100,50");
+  assert.equal(
+    sparklinePoints([0, 10, 5], "smooth"),
+    "0,100 50,0 100,50",
+    "drawn straight",
+  );
+  // Each value holds until the next sample, then the line rises or falls to it.
+  assert.equal(sparklinePoints([0, 10, 5], "step"), "0,100 50,100 50,0 100,0 100,50");
+  assert.equal(sparklinePoints([3]), "", "one point is no line");
+  const stat = parse(panel("stat", { sparkline: true, curve: "step" }));
+  const rows = [{ v: 1 }, { v: 2 }];
+  assert.equal(
+    statReading(stat, { columns: ["v"], rows }).sparkPoints,
+    "0,100 100,100 100,0",
+  );
+  assert.equal(
+    statReading(parse(panel("stat")), { columns: ["v"], rows }).sparkPoints,
+    "",
+  );
 });

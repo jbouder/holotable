@@ -4,12 +4,14 @@ import { definePanelKind } from "@/lib/panels/types";
 /** Numeric columns against the time field, one series per column. */
 
 const SERIES_GROUPS = ["number", "axis", "legend", "thresholds"] as const;
+/** A line and an area also say how the line joins its samples (#665); a bar has none. */
+const LINE_GROUPS = ["number", "axis", "line", "legend", "thresholds"] as const;
 
 export const line = definePanelKind({
   kind: "line",
   summary: "Time series as a continuous line. Requires `query.timeField`.",
   promptHint:
-    "a numeric trend over time; bucket the time column, alias it and set the alias as 'query.timeField'.",
+    "a numeric trend over time; bucket the time column, alias it and set the alias as 'query.timeField'. Straight by default; curve 'step' for a count or state that changes in jumps.",
   promqlHint:
     "a range query (no 'instant'); each series is a line, so aggregate to a few: sum by (route) (rate(http_requests_total[5m])).",
   canvas: true,
@@ -17,20 +19,21 @@ export const line = definePanelKind({
   skeleton: "line",
   query: "required",
   options: SeriesOptions,
-  optionGroups: SERIES_GROUPS,
+  optionGroups: LINE_GROUPS,
 });
 
 export const area = definePanelKind({
   kind: "area",
   summary: "Filled time series. Requires `query.timeField`.",
-  promptHint: "a filled time series, for a volume or a total over time.",
+  promptHint:
+    "a filled time series, for a volume or a total over time; curve as on 'line'.",
   promqlHint: "a range query drawn filled, for a volume or a total over time.",
   canvas: true,
   timeBrush: true,
   skeleton: "line",
   query: "required",
   options: SeriesOptions,
-  optionGroups: SERIES_GROUPS,
+  optionGroups: LINE_GROUPS,
 });
 
 export const bar = definePanelKind({

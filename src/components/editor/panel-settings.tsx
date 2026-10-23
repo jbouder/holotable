@@ -158,6 +158,7 @@ const GROUP_TITLES: Record<OptionGroup, string> = {
   number: "Numbers",
   axis: "Y axis",
   legend: "Legend",
+  line: "Line",
   thresholds: "Thresholds",
   table: "Columns",
   graph: "Graph",
@@ -249,6 +250,19 @@ function OptionGroupFields({
             { value: "bottom", label: "bottom" },
             { value: "right", label: "right" },
             { value: "none", label: "hidden" },
+          ]}
+          parse={(v) => (v === "" ? undefined : v)}
+        />
+      );
+    case "line":
+      return (
+        <SelectOption
+          {...field("curve")}
+          label="Curve"
+          options={[
+            { value: "", label: "straight (default)" },
+            { value: "smooth", label: "smooth" },
+            { value: "step", label: "step" },
           ]}
           parse={(v) => (v === "" ? undefined : v)}
         />

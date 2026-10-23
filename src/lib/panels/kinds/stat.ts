@@ -5,7 +5,8 @@ export const stat = definePanelKind({
   kind: "stat",
   summary:
     "A single scalar value, formatted per `panel.format`. Omits `query.timeField`.",
-  promptHint: "a single scalar value; OMIT 'query.timeField'.",
+  promptHint:
+    "a single scalar value; OMIT 'query.timeField'. A sparkline of a count that moves in jumps takes curve 'step'.",
   promqlHint:
     "an instant query ('instant': true) returning one series: sum(rate(http_requests_total[5m])).",
   canvas: false,
@@ -13,5 +14,5 @@ export const stat = definePanelKind({
   skeleton: "stat",
   query: "required",
   options: StatOptions,
-  optionGroups: ["stat", "number", "thresholds"],
+  optionGroups: ["stat", "line", "number", "thresholds"],
 });

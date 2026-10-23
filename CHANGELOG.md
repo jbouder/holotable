@@ -42,6 +42,14 @@ says how a section gets here.
   with a badge saying so, and flows that cycle are refused naming a node on
   the loop. Nodes and bands are datums for links. On Demo service health a
   request-flow Sankey replaces the route-then-status sunburst.
+- **A curve option for lines, areas and sparklines.** `options.curve` on a
+  `line`, `area` or `stat` is `"straight"` (the default), `"smooth"` or
+  `"step"`, which holds each value until the next sample, for counts and
+  states that change in jumps; it is the editor's **Line** field under
+  Display. Demo host detail gains "Errors logged per minute", drawn in steps,
+  which `npm run smoke` and the accessibility scan now check. A line, area or
+  bar chart with `decimals` set no longer writes the same tick twice: its
+  value axis steps no finer than the decimals show.
 
 ### Changed
 
@@ -58,6 +66,12 @@ says how a section gets here.
   (and its share of its parent), and a label that does not fit is left out
   rather than cut. Nodes part by a gutter, the node under the pointer is
   outlined, and a sunburst shades its rings the same way.
+- **Lines and areas are straight by default.** A `line` or `area` panel
+  without `curve` used to be drawn as a smooth curve, which overshoots peaks,
+  dips below zero on a counter that never does and makes a step change look
+  gradual; it is now drawn as straight segments between the samples, and a
+  large one is no longer drawn differently from a small one. Set
+  `"curve": "smooth"` in the panel's options to keep the curve.
 - **Four default dashboards.** A default install (`docker compose up` or the
   quick-start image) now seeds exactly four: Demo service health, Demo fleet,
   Demo host detail and Holotable self-monitoring, which between them still
