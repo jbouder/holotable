@@ -7,7 +7,8 @@ import {
   toNumber,
   toText,
 } from "@/components/charts/options";
-import { BLOCK_EDGE, inkOn, seriesColor } from "@/lib/color/chart-theme";
+import { inkOn, seriesColor, soften } from "@/lib/color/chart-theme";
+import { block, blockLabel, shared, tooltip } from "@/components/charts/style";
 import { formatValue } from "@/lib/format";
 import { type Panel, panelTimeField } from "@/lib/ir";
 import { TREEMAP_DEPTH_MAX, TreemapOptions } from "@/lib/panels/kinds/treemap";
@@ -155,11 +156,14 @@ export const treemapChart: ChartOptionBuilder = normalized((panel, data, { theme
       ? { children: node.children.map((c) => toItem(c, color)) }
       : {}),
   });
-  const items = tree.roots.map((root, i) => toItem(root, seriesColor(theme, i)));
-  const label = { fontSize: 11 };
-  const tooltip = {
+  // A node is a large area: its branch color softened toward the surface.
+  const items = tree.roots.map((root, i) =>
+    toItem(root, soften(theme, seriesColor(theme, i))),
+  );
+  const label = blockLabel(theme);
+  const tip = {
+    ...tooltip(theme),
     trigger: "item" as const,
-    borderRadius: 0,
     formatter: (p: unknown) => {
       const { name, value, treePathInfo } = p as {
         name?: string;
@@ -175,8 +179,8 @@ export const treemapChart: ChartOptionBuilder = normalized((panel, data, { theme
   };
   if (o.variant === "sunburst") {
     return {
-      backgroundColor: "transparent",
-      tooltip,
+      ...shared(theme),
+      tooltip: tip,
       series: [
         {
           type: "sunburst",
@@ -185,14 +189,15 @@ export const treemapChart: ChartOptionBuilder = normalized((panel, data, { theme
           nodeClick: false,
           data: items,
           label: { ...label, rotate: "radial", minAngle: 8 },
-          itemStyle: { borderColor: BLOCK_EDGE, borderWidth: 1 },
+          // Rings part by a hair of surface, not a dark edge.
+          itemStyle: block(theme, { edge: 2 }),
         },
       ],
     } satisfies EChartsOption;
   }
   return {
-    backgroundColor: "transparent",
-    tooltip,
+    ...shared(theme),
+    tooltip: tip,
     series: [
       {
         type: "treemap",
@@ -205,11 +210,12 @@ export const treemapChart: ChartOptionBuilder = normalized((panel, data, { theme
         breadcrumb: { show: false },
         data: items,
         label: { ...label, show: true, formatter: "{b}" },
-        upperLabel: { show: tree.pathKeys.length > 1, height: 18 },
-        itemStyle: { borderColor: BLOCK_EDGE, borderWidth: 1, gapWidth: 1 },
+        upperLabel: { show: tree.pathKeys.length > 1, height: 18, ...label },
+        // Nodes part by a gap of surface, with the page's corners.
+        itemStyle: { ...block(theme), gapWidth: 2 },
         // The first level is ECharts' own root: no border and no header band.
         levels: [
-          { upperLabel: { show: false }, itemStyle: { borderWidth: 0, gapWidth: 2 } },
+          { upperLabel: { show: false }, itemStyle: { borderWidth: 0, gapWidth: 3 } },
         ],
       },
     ],

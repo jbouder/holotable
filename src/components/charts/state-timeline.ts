@@ -11,7 +11,15 @@ import {
 } from "@/components/charts/options";
 import type { Panel } from "@/lib/ir";
 import { type ColorToken, defaultStateToken, tokenHex } from "@/lib/panels/colors";
-import { inkOn } from "@/lib/color/chart-theme";
+import { type ChartTheme, inkOn, soften } from "@/lib/color/chart-theme";
+import {
+  blockLabel,
+  categoryAxis,
+  shared,
+  spanCorner,
+  text,
+  tooltip,
+} from "@/components/charts/style";
 import { StateTimelineOptions } from "@/lib/panels/kinds/state-timeline";
 import { formatDateTime, type TimeDisplay } from "@/lib/time-display";
 
@@ -223,7 +231,7 @@ export function clipRect(rect: Rect, clip: Rect): Rect | null {
   return { x, y, width: right - x, height: bottom - y };
 }
 
-function renderSpan(timeline: StateTimeline): CustomSeriesRenderItem {
+function renderSpan(timeline: StateTimeline, theme: ChartTheme): CustomSeriesRenderItem {
   return (params, api) => {
     const lane = api.value(0) as number;
     const start = api.coord([api.value(1), lane]);
@@ -248,7 +256,8 @@ function renderSpan(timeline: StateTimeline): CustomSeriesRenderItem {
     if (!shape) return null;
     const rect = {
       type: "rect" as const,
-      shape,
+      // The page's corners on a span wide enough to carry them.
+      shape: { ...shape, r: spanCorner(theme, shape) },
       style: { fill: api.visual("color") },
     };
     const state = timeline.spans[params.dataIndex]?.state ?? "";
@@ -266,7 +275,7 @@ function renderSpan(timeline: StateTimeline): CustomSeriesRenderItem {
             y: shape.y + shape.height / 2,
             verticalAlign: "middle",
             fill: inkOn(String(api.visual("color"))),
-            fontSize: 11,
+            ...blockLabel(theme),
             width: shape.width - 12,
             overflow: "truncate",
           },
@@ -276,7 +285,7 @@ function renderSpan(timeline: StateTimeline): CustomSeriesRenderItem {
   };
 }
 
-function tooltip(timeline: StateTimeline, display: TimeDisplay) {
+function spanTooltip(timeline: StateTimeline, display: TimeDisplay) {
   return (p: unknown) => {
     const span = timeline.spans[(p as { dataIndex: number }).dataIndex];
     if (!span) return "";
@@ -293,18 +302,18 @@ function tooltip(timeline: StateTimeline, display: TimeDisplay) {
 export const stateTimelineChart: ChartOptionBuilder = normalized((panel, data, ctx) => {
   const timeline = buildStateTimeline(panel, data, ctx.window);
   return {
-    backgroundColor: "transparent",
+    ...shared(ctx.theme),
     tooltip: {
+      ...tooltip(ctx.theme),
       trigger: "item",
-      borderRadius: 0,
-      formatter: tooltip(timeline, ctx.display),
+      formatter: spanTooltip(timeline, ctx.display),
     },
     // Always set, so a count that drops to zero clears rather than lingers.
     title: {
       text: timeline.hiddenLanes > 0 ? `+${timeline.hiddenLanes} more not shown` : "",
       right: 0,
       bottom: 0,
-      textStyle: { color: ctx.theme.text, fontSize: 11, fontWeight: "normal" },
+      textStyle: { ...text(ctx.theme), fontWeight: "normal" },
     },
     // Room on the right for the last time label, which is centred on the
     // window's end.
@@ -313,31 +322,31 @@ export const stateTimelineChart: ChartOptionBuilder = normalized((panel, data, c
       type: "time",
       min: timeline.from,
       max: timeline.to,
+      ...categoryAxis(ctx.theme),
       axisLabel: {
-        color: ctx.theme.text,
+        ...text(ctx.theme),
         hideOverlap: true,
         formatter: (v: number) =>
           formatDateTime(new Date(v), ctx.display, { seconds: false }),
       },
-      axisLine: { lineStyle: { color: ctx.theme.line } },
-      splitLine: { show: false },
     },
     yAxis: {
+      ...categoryAxis(ctx.theme),
       type: "category",
       inverse: true,
       data: timeline.lanes,
-      axisLabel: { color: ctx.theme.text },
-      axisLine: { show: false },
-      axisTick: { show: false },
     },
     series: [
       {
         type: "custom",
-        renderItem: renderSpan(timeline),
+        renderItem: renderSpan(timeline, ctx.theme),
         encode: { x: [1, 2], y: 0 },
         data: timeline.spans.map((s) => ({
           value: [s.lane, s.start, s.end],
-          itemStyle: { color: tokenHex(stateColor(s.state, panel), ctx.theme) },
+          // A span is a large area: softened, as every block is.
+          itemStyle: {
+            color: soften(ctx.theme, tokenHex(stateColor(s.state, panel), ctx.theme)),
+          },
         })),
       },
     ],

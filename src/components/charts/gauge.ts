@@ -1,4 +1,11 @@
 import { type ChartTheme, withAlpha } from "@/lib/color/chart-theme";
+import {
+  barCorners,
+  shared,
+  text as textStyle,
+  tooltip,
+  valueText,
+} from "@/components/charts/style";
 import { panelTimeField } from "@/lib/ir";
 import type { EChartsOption } from "echarts";
 import {
@@ -157,7 +164,7 @@ function radial(
   const drawn = reading ? Math.min(max, Math.max(min, reading.value)) : min;
   const text = reading?.text ?? "—";
   return {
-    backgroundColor: "transparent",
+    ...shared(theme),
     tooltip: { show: false },
     series: [
       {
@@ -170,27 +177,29 @@ function radial(
         center: ["50%", "58%"],
         progress: {
           show: true,
-          width: 14,
+          width: 12,
+          roundCap: theme.radius > 0,
           itemStyle: { color: tokenHex(reading?.color ?? DEFAULT_COLOR, theme) },
         },
-        axisLine: { lineStyle: { width: 14, color: bands(panel, min, max, theme) } },
+        axisLine: {
+          roundCap: theme.radius > 0,
+          lineStyle: { width: 12, color: bands(panel, min, max, theme) },
+        },
         pointer: { show: false },
         anchor: { show: false },
         axisTick: { show: false },
         splitLine: { show: false },
         splitNumber: 1,
         axisLabel: {
-          color: theme.text,
-          distance: 20,
+          ...textStyle(theme),
+          distance: 18,
           formatter: (v: number) => formatValue(v, panel.format, gaugeOptions(panel)),
         },
         title: { show: false },
         detail: {
           valueAnimation: false,
           offsetCenter: [0, "8%"],
-          fontSize: 24,
-          fontWeight: 600,
-          color: theme.foreground,
+          ...valueText(theme),
           formatter: () => text,
         },
         data: [{ value: drawn, name: reading?.label ?? "" }],
@@ -201,11 +210,11 @@ function radial(
 
 function bars(readings: GaugeReading[], theme: ChartTheme): EChartsOption {
   return {
-    backgroundColor: "transparent",
+    ...shared(theme),
     grid: { left: 8, right: 64, top: 8, bottom: 8, containLabel: true },
     tooltip: {
+      ...tooltip(theme),
       trigger: "item",
-      borderRadius: 0,
       formatter: (p: unknown) => {
         const r = readings[(p as { dataIndex: number }).dataIndex];
         return r ? `${r.label}: ${r.text}` : "";
@@ -218,24 +227,24 @@ function bars(readings: GaugeReading[], theme: ChartTheme): EChartsOption {
       type: "category",
       inverse: true,
       data: readings.map((r) => r.label),
-      axisLabel: { color: theme.text },
+      axisLabel: textStyle(theme),
       axisLine: { show: false },
       axisTick: { show: false },
     },
     series: [
       {
         type: "bar",
-        barMaxWidth: 18,
+        barMaxWidth: 14,
         showBackground: true,
-        backgroundStyle: { color: theme.track },
+        backgroundStyle: { color: theme.track, ...barCorners(theme, true) },
         data: readings.map((r) => ({
           value: r.fraction,
-          itemStyle: { color: tokenHex(r.color, theme) },
+          itemStyle: { color: tokenHex(r.color, theme), ...barCorners(theme, true) },
         })),
         label: {
           show: true,
           position: "right",
-          color: theme.text,
+          ...textStyle(theme),
           formatter: (p: unknown) =>
             readings[(p as { dataIndex: number }).dataIndex]?.text ?? "",
         },

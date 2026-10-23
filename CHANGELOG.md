@@ -57,6 +57,14 @@ says how a section gets here.
   service health puts the service map and the request flow under its stats
   and drops the server-errors-by-route bar; Demo fleet drops the CPU line and
   the CPU tick plot, which repeated its heatmap.
+- **One chart style.** Every chart kind now draws its text in the app's font
+  at one type scale, with gridlines and no axis lines, 2px series lines, and
+  a tooltip on the raised surface with the theme's corners (it was a white
+  box in dark). Treemap, pie, donut, Sankey and timeline fills are softened
+  toward the surface. A stacked area draws near-solid bands parted by a line
+  of surface, so a thin band (a dashboard's error share) stays visible; only
+  an unstacked area fades. Custom visuals (Vega) take the same font, sizes
+  and gridlines.
 - **Square status tiles.** A status grid's tiles take the theme's corner
   radius, like the panel around them: square in the default palette, softened
   where a palette rounds its corners. They were rounded in every theme.

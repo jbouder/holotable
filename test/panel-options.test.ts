@@ -112,17 +112,35 @@ test("every group a kind lists is fields of that kind's options", () => {
 test("a panel without options draws exactly as before", () => {
   const p = parse(panel("line"));
   const option = lineChart(p, series, ctx) as Record<string, unknown>;
+  // The shared chart style (#647): the page's font at the chart scale, rounded
+  // swatches, the tooltip on the raised surface, a grid with no axis line.
+  const d = DEFAULT_CHART_THEME;
+  const text = { fontFamily: d.font, fontSize: d.type.axis, color: d.text };
   assert.deepEqual(option.legend, {
     top: 0,
-    textStyle: { color: DEFAULT_CHART_THEME.text },
+    textStyle: text,
+    icon: "roundRect",
+    itemWidth: 12,
+    itemHeight: 8,
   });
   assert.deepEqual(option.grid, { left: 44, right: 16, top: 24, bottom: 28 });
-  assert.deepEqual(option.tooltip, { trigger: "axis", borderRadius: 0 });
+  assert.deepEqual(option.tooltip, {
+    trigger: "axis",
+    borderRadius: d.radius,
+    backgroundColor: d.raised,
+    borderColor: d.line,
+    borderWidth: 1,
+    padding: [6, 10],
+    textStyle: { fontFamily: d.font, fontSize: d.type.tooltip, color: d.foreground },
+    extraCssText: "box-shadow: 0 4px 16px rgba(0, 0, 0, 0.18);",
+  });
   assert.equal(option.visualMap, undefined);
   assert.deepEqual(option.yAxis, {
     type: "value",
-    axisLabel: { color: DEFAULT_CHART_THEME.text },
-    splitLine: { lineStyle: { color: DEFAULT_CHART_THEME.grid } },
+    axisLine: { show: false },
+    axisTick: { show: false },
+    axisLabel: text,
+    splitLine: { show: true, lineStyle: { color: d.grid, width: 1 } },
   });
   for (const s of option.series as Record<string, unknown>[]) {
     assert.equal("stack" in s, false);

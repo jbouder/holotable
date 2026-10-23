@@ -25,8 +25,10 @@ import { resolveVegaColors } from "@/lib/vega/colors";
  * first custom visual on a page and not before.
  *
  * Its theme is the page's: axis and legend text in `--muted` (which
- * `CONTRAST_PAIRS` holds to AA on every surface, in both themes), lines and
- * grid in `--border`, the chart palette for categories, a transparent
+ * `CONTRAST_PAIRS` holds to AA on every surface, in both themes), written in
+ * the page's font at the chart type scale (#647), gridlines in `--chart-grid`
+ * with no axis line or ticks, the series line width and the page's corners on
+ * a bar, the chart palette for categories, a transparent
  * background, and every color the spec names resolved from the tokens. A
  * canvas cannot read a CSS variable, so they are read and converted when the
  * view is built, and the view is rebuilt when the theme changes. Like every
@@ -34,24 +36,34 @@ import { resolveVegaColors } from "@/lib/vega/colors";
  * rows in a visually hidden table beside it.
  */
 
-export function vegaConfig(font: string, theme: ChartTheme): Config {
-  const { text, line } = theme;
+export function vegaConfig(theme: ChartTheme): Config {
+  const { text, grid, font } = theme;
+  const size = theme.type.axis;
   const axis = {
     labelColor: text,
     titleColor: text,
-    domainColor: line,
-    tickColor: line,
-    gridColor: line,
-    gridOpacity: 0.6,
+    domain: false,
+    ticks: false,
+    gridColor: grid,
+    gridOpacity: 1,
     labelFont: font,
     titleFont: font,
+    labelFontSize: size,
+    titleFontSize: size,
   };
   return {
     background: "transparent",
     font,
     view: { stroke: "transparent" },
     axis,
-    legend: { labelColor: text, titleColor: text, labelFont: font, titleFont: font },
+    legend: {
+      labelColor: text,
+      titleColor: text,
+      labelFont: font,
+      titleFont: font,
+      labelFontSize: size,
+      titleFontSize: size,
+    },
     title: { color: text, font },
     header: { labelColor: text, titleColor: text, labelFont: font, titleFont: font },
     range: {
@@ -62,6 +74,8 @@ export function vegaConfig(font: string, theme: ChartTheme): Config {
       heatmap: [...theme.sequential],
     },
     mark: { color: seriesColor(theme, 0) },
+    line: { strokeWidth: theme.lineWidth },
+    bar: { cornerRadiusEnd: Math.round(theme.radius / 2) },
     autosize: { type: "fit", contains: "padding" },
   } as Config;
 }
@@ -109,7 +123,7 @@ export function VegaView({ panel, data, handle }: PanelViewProps) {
           : parsed;
         const compiled = await compileVegaLite(
           resolveVegaColors(sized, theme),
-          vegaConfig(getComputedStyle(el).fontFamily, theme),
+          vegaConfig(theme),
         );
         if (!compiled.ok) throw new Error(compiled.error);
         built = await createVegaView(compiled.spec, rows.current, {

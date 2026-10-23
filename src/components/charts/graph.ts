@@ -10,6 +10,7 @@ import {
 import { escapeHtml } from "@/components/charts/state-timeline";
 import type { PanelNotice } from "@/components/panels/types";
 import { type ChartTheme, inkOn, seriesColor } from "@/lib/color/chart-theme";
+import { edgeLabel, pinnedLabel, shared, text, tooltip } from "@/components/charts/style";
 import type { Datum } from "@/lib/drilldown";
 import { formatValue } from "@/lib/format";
 import { type GraphDirection, graphLayout } from "@/lib/graph/layout";
@@ -949,7 +950,7 @@ function overflowTitle(theme: ChartTheme, nodes: number, edges = 0) {
     text: parts.length > 0 ? `${parts.join(", ")} not shown` : "",
     right: 0,
     bottom: 0,
-    textStyle: { color: theme.text, fontSize: 11, fontWeight: "normal" as const },
+    textStyle: { ...text(theme), fontWeight: "normal" as const },
   };
 }
 
@@ -1016,10 +1017,10 @@ function treeOption(panel: Panel, tree: GraphTree, theme: ChartTheme): EChartsOp
         };
 
   return {
-    backgroundColor: "transparent",
+    ...shared(theme),
     tooltip: {
+      ...tooltip(theme),
       trigger: "item",
-      borderRadius: 0,
       formatter: (p: unknown) => {
         const { data: item, treeAncestors } = p as {
           data?: { id?: string; name?: string; value?: number; group?: string };
@@ -1057,9 +1058,7 @@ function treeOption(panel: Panel, tree: GraphTree, theme: ChartTheme): EChartsOp
         lineStyle: { color: theme.line, width: 1.5, curveness: 0.5 },
         label: {
           show: true,
-          fontSize: 11,
-          padding: [2, 4],
-          borderRadius: 2,
+          ...pinnedLabel(theme),
           distance: 6,
           formatter: (p: unknown) => (p as { data?: { text?: string } }).data?.text ?? "",
         },
@@ -1163,8 +1162,8 @@ function dagOption(
     });
 
   return {
-    backgroundColor: "transparent",
-    tooltip: netTooltip(nameOf, text),
+    ...shared(theme),
+    tooltip: netTooltip(theme, nameOf, text),
     title: overflowTitle(theme, net.overflow, net.edgeOverflow),
     // Room for the labels beside the nodes at the edges of the layout: below
     // them when the layers run across, to their right when they run down.
@@ -1200,18 +1199,13 @@ function dagOption(
         label: {
           show: true,
           position: direction === "LR" ? "bottom" : "right",
-          fontSize: 11,
-          padding: [2, 4],
-          borderRadius: 2,
+          ...pinnedLabel(theme),
           distance: 4,
           formatter: (p: unknown) => (p as { data?: { text?: string } }).data?.text ?? "",
         },
         edgeLabel: {
           show: o.edgeLabels === true,
-          fontSize: 10,
-          color: theme.text,
-          backgroundColor: theme.background,
-          padding: [1, 3],
+          ...edgeLabel(theme),
           formatter: (p: unknown) => {
             const v = (p as { data?: { value?: number } }).data?.value;
             return v === undefined ? "" : text(v);
@@ -1227,10 +1221,14 @@ function dagOption(
  * The tooltip of a graph drawn from its net, a dag's or a force graph's: an
  * edge's ends and value, a node's name, value, group and where it is from.
  */
-function netTooltip(nameOf: (id: string) => string, text: (v: number) => string) {
+function netTooltip(
+  theme: ChartTheme,
+  nameOf: (id: string) => string,
+  text: (v: number) => string,
+) {
   return {
+    ...tooltip(theme),
     trigger: "item" as const,
-    borderRadius: 0,
     formatter: (p: unknown) => {
       const { dataType, data: item } = p as {
         dataType?: string;
@@ -1344,9 +1342,7 @@ function forceOption(panel: Panel, net: GraphNet, theme: ChartTheme): EChartsOpt
   const largest = Math.max(0, ...net.nodes.map((n) => n.value ?? 0));
   const labels = net.nodes.length <= FORCE_LABELS_MAX;
   const label = {
-    fontSize: 11,
-    padding: [2, 4],
-    borderRadius: 2,
+    ...pinnedLabel(theme),
     distance: 4,
     position: "right",
     formatter: (p: unknown) => (p as { data?: { text?: string } }).data?.text ?? "",
@@ -1386,8 +1382,8 @@ function forceOption(panel: Panel, net: GraphNet, theme: ChartTheme): EChartsOpt
     }));
 
   return {
-    backgroundColor: "transparent",
-    tooltip: netTooltip(nameOf, text),
+    ...shared(theme),
+    tooltip: netTooltip(theme, nameOf, text),
     title: overflowTitle(theme, net.overflow, net.edgeOverflow),
     series: [
       {
@@ -1415,10 +1411,7 @@ function forceOption(panel: Panel, net: GraphNet, theme: ChartTheme): EChartsOpt
         label: { show: labels, ...label },
         edgeLabel: {
           show: o.edgeLabels === true,
-          fontSize: 10,
-          color: theme.text,
-          backgroundColor: theme.background,
-          padding: [1, 3],
+          ...edgeLabel(theme),
           formatter: (p: unknown) => {
             const v = (p as { data?: { value?: number } }).data?.value;
             return v === undefined ? "" : text(v);
