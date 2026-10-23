@@ -1,8 +1,12 @@
 /*
  * The docs site in the app's clothes.
  *
- * Every value here is taken from src/app/globals.css: the OKLCH surfaces,
- * the blue primary, Chakra Petch and JetBrains Mono, and a radius of zero.
+ * Every value here is taken from the app's default palette in
+ * src/app/globals.css (#648): the cool slate OKLCH surfaces at hue 260, the
+ * soft blue primary, Chakra Petch and JetBrains Mono, and a radius of zero.
+ * The few tokens the app has no twin for (body text, purple, Starlight's
+ * grays and its -low / -high accents) are derived in the same hue and
+ * chroma, and any used as text holds AA on the surfaces it sits on.
  * The `--ht-*` tokens are the app's, one block per scheme; the Starlight
  * `--sl-*` variables are then pointed at them, so Starlight's own components
  * (sidebar, search, asides, pagination) pick the palette up without being
@@ -18,56 +22,56 @@
  * ------------------------------------------------------------------------- */
 
 :root {
-  --ht-background: oklch(0.16 0.02 265);
-  --ht-surface: oklch(0.21 0.02 265);
-  --ht-surface-2: oklch(0.26 0.02 265);
-  --ht-surface-3: oklch(0.31 0.02 265);
-  --ht-foreground: oklch(0.96 0.01 265);
-  --ht-text: oklch(0.84 0.015 265);
-  --ht-muted: oklch(0.7 0.02 265);
-  --ht-border: oklch(0.35 0.02 265);
-  --ht-border-strong: oklch(0.55 0.02 265);
+  --ht-background: oklch(0.15 0.012 260);
+  --ht-surface: oklch(0.195 0.012 260);
+  --ht-surface-2: oklch(0.24 0.012 260);
+  --ht-surface-3: oklch(0.29 0.012 260);
+  --ht-foreground: oklch(0.95 0.008 260);
+  --ht-text: oklch(0.84 0.012 260);
+  --ht-muted: oklch(0.72 0.015 260);
+  --ht-border: oklch(0.33 0.012 260);
+  --ht-border-strong: oklch(0.56 0.012 260);
   --ht-ring: oklch(0.99 0 0);
-  --ht-selection: oklch(0.4 0.08 259);
-  --ht-primary: oklch(0.66 0.19 259);
-  --ht-primary-foreground: oklch(0.16 0.02 265);
-  --ht-danger: oklch(0.72 0.19 20);
-  --ht-warning: oklch(0.78 0.16 75);
-  --ht-success: oklch(0.78 0.16 160);
-  --ht-purple: oklch(0.66 0.2 300);
+  --ht-selection: oklch(0.4 0.08 255);
+  --ht-primary: oklch(0.72 0.13 250);
+  --ht-primary-foreground: oklch(0.15 0.012 260);
+  --ht-danger: oklch(0.74 0.15 22);
+  --ht-warning: oklch(0.82 0.13 82);
+  --ht-success: oklch(0.8 0.12 160);
+  --ht-purple: oklch(0.77 0.11 310);
   --ht-shadow-stage: 0 32px 64px -24px oklch(0 0 0 / 0.7), 0 12px 24px -12px oklch(0 0 0 / 0.5);
 
   /* Starlight's palette, mapped. */
   --sl-color-white: var(--ht-foreground);
-  --sl-color-gray-1: oklch(0.9 0.012 265);
+  --sl-color-gray-1: oklch(0.9 0.01 260);
   --sl-color-gray-2: var(--ht-text);
   --sl-color-gray-3: var(--ht-muted);
-  --sl-color-gray-4: oklch(0.5 0.02 265);
+  --sl-color-gray-4: oklch(0.5 0.012 260);
   --sl-color-gray-5: var(--ht-border);
   --sl-color-gray-6: var(--ht-surface);
   --sl-color-black: var(--ht-background);
 
-  --sl-color-accent-low: oklch(0.3 0.08 259);
+  --sl-color-accent-low: oklch(0.3 0.06 250);
   --sl-color-accent: var(--ht-primary);
-  --sl-color-accent-high: oklch(0.82 0.1 259);
+  --sl-color-accent-high: oklch(0.85 0.07 250);
   --sl-color-text-accent: var(--ht-primary);
   --sl-color-text-invert: var(--ht-primary-foreground);
 
   --sl-color-blue-low: color-mix(in oklch, var(--ht-primary) 14%, var(--ht-background));
   --sl-color-blue: var(--ht-primary);
-  --sl-color-blue-high: oklch(0.82 0.1 259);
+  --sl-color-blue-high: oklch(0.85 0.07 250);
   --sl-color-green-low: color-mix(in oklch, var(--ht-success) 14%, var(--ht-background));
   --sl-color-green: var(--ht-success);
-  --sl-color-green-high: oklch(0.88 0.1 160);
+  --sl-color-green-high: oklch(0.9 0.07 160);
   --sl-color-orange-low: color-mix(in oklch, var(--ht-warning) 14%, var(--ht-background));
   --sl-color-orange: var(--ht-warning);
-  --sl-color-orange-high: oklch(0.9 0.09 80);
+  --sl-color-orange-high: oklch(0.91 0.08 82);
   --sl-color-red-low: color-mix(in oklch, var(--ht-danger) 14%, var(--ht-background));
   --sl-color-red: var(--ht-danger);
-  --sl-color-red-high: oklch(0.88 0.08 20);
+  --sl-color-red-high: oklch(0.89 0.06 22);
   --sl-color-purple-low: color-mix(in oklch, var(--ht-purple) 14%, var(--ht-background));
   --sl-color-purple: var(--ht-purple);
-  --sl-color-purple-high: oklch(0.86 0.09 300);
+  --sl-color-purple-high: oklch(0.89 0.06 310);
 
   --sl-color-bg: var(--ht-background);
   --sl-color-bg-nav: var(--ht-surface);
@@ -77,7 +81,7 @@
   --sl-color-hairline-light: var(--ht-border);
   --sl-color-hairline: color-mix(in oklch, var(--ht-border) 60%, transparent);
   --sl-color-hairline-shade: var(--ht-border);
-  --sl-color-backdrop-overlay: oklch(0.16 0.02 265 / 0.7);
+  --sl-color-backdrop-overlay: oklch(0.15 0.012 260 / 0.7);
 
   --sl-font: "Chakra Petch";
   --sl-font-mono: "JetBrains Mono Variable";
@@ -89,51 +93,51 @@
 }
 
 :root[data-theme="light"] {
-  --ht-background: oklch(0.98 0.005 265);
+  --ht-background: oklch(0.975 0.004 260);
   --ht-surface: oklch(1 0 0);
-  --ht-surface-2: oklch(0.94 0.01 265);
-  --ht-surface-3: oklch(0.9 0.01 265);
-  --ht-foreground: oklch(0.2 0.02 265);
-  --ht-text: oklch(0.34 0.02 265);
-  --ht-muted: oklch(0.5 0.02 265);
-  --ht-border: oklch(0.84 0.02 265);
-  --ht-border-strong: oklch(0.55 0.02 265);
-  --ht-ring: oklch(0.12 0.02 265);
-  --ht-selection: oklch(0.88 0.06 259);
-  --ht-primary: oklch(0.52 0.2 259);
-  --ht-primary-foreground: oklch(0.98 0.01 265);
-  --ht-danger: oklch(0.5 0.2 20);
-  --ht-warning: oklch(0.44 0.14 75);
-  --ht-success: oklch(0.46 0.14 160);
-  --ht-purple: oklch(0.5 0.2 300);
+  --ht-surface-2: oklch(0.955 0.006 260);
+  --ht-surface-3: oklch(0.92 0.008 260);
+  --ht-foreground: oklch(0.22 0.02 260);
+  --ht-text: oklch(0.35 0.02 260);
+  --ht-muted: oklch(0.5 0.02 260);
+  --ht-border: oklch(0.86 0.01 260);
+  --ht-border-strong: oklch(0.55 0.015 260);
+  --ht-ring: oklch(0.2 0.02 260);
+  --ht-selection: oklch(0.9 0.05 250);
+  --ht-primary: oklch(0.5 0.17 255);
+  --ht-primary-foreground: oklch(0.99 0.004 260);
+  --ht-danger: oklch(0.48 0.2 10);
+  --ht-warning: oklch(0.5 0.17 70);
+  --ht-success: oklch(0.44 0.1 160);
+  --ht-purple: oklch(0.5 0.15 305);
   --ht-shadow-stage: 0 32px 64px -24px oklch(0.2 0.02 265 / 0.35), 0 12px 24px -12px oklch(0.2 0.02 265 / 0.2);
 
   --sl-color-white: var(--ht-foreground);
-  --sl-color-gray-1: oklch(0.27 0.02 265);
+  --sl-color-gray-1: oklch(0.28 0.02 260);
   --sl-color-gray-2: var(--ht-text);
   --sl-color-gray-3: var(--ht-muted);
-  --sl-color-gray-4: oklch(0.68 0.02 265);
+  --sl-color-gray-4: oklch(0.68 0.015 260);
   --sl-color-gray-5: var(--ht-border);
   --sl-color-gray-6: var(--ht-surface-2);
-  --sl-color-gray-7: oklch(0.97 0.005 265);
+  --sl-color-gray-7: oklch(0.985 0.003 260);
   --sl-color-black: var(--ht-surface);
 
-  --sl-color-accent-low: oklch(0.9 0.05 259);
+  --sl-color-accent-low: oklch(0.91 0.04 255);
   --sl-color-accent: var(--ht-primary);
-  --sl-color-accent-high: oklch(0.36 0.15 259);
+  --sl-color-accent-high: oklch(0.37 0.13 255);
   --sl-color-text-accent: var(--ht-primary);
   --sl-color-text-invert: var(--ht-primary-foreground);
 
   --sl-color-blue-low: color-mix(in oklch, var(--ht-primary) 10%, var(--ht-surface));
-  --sl-color-blue-high: oklch(0.36 0.15 259);
+  --sl-color-blue-high: oklch(0.37 0.13 255);
   --sl-color-green-low: color-mix(in oklch, var(--ht-success) 10%, var(--ht-surface));
-  --sl-color-green-high: oklch(0.34 0.12 160);
+  --sl-color-green-high: oklch(0.33 0.08 160);
   --sl-color-orange-low: color-mix(in oklch, var(--ht-warning) 10%, var(--ht-surface));
-  --sl-color-orange-high: oklch(0.36 0.12 75);
+  --sl-color-orange-high: oklch(0.38 0.12 70);
   --sl-color-red-low: color-mix(in oklch, var(--ht-danger) 10%, var(--ht-surface));
-  --sl-color-red-high: oklch(0.38 0.16 20);
+  --sl-color-red-high: oklch(0.37 0.16 10);
   --sl-color-purple-low: color-mix(in oklch, var(--ht-purple) 10%, var(--ht-surface));
-  --sl-color-purple-high: oklch(0.38 0.16 300);
+  --sl-color-purple-high: oklch(0.38 0.13 305);
 
   --sl-color-bg: var(--ht-background);
   --sl-color-bg-nav: var(--ht-surface);
@@ -142,7 +146,7 @@
   --sl-color-hairline-light: var(--ht-border);
   --sl-color-hairline: color-mix(in oklch, var(--ht-border) 60%, transparent);
   --sl-color-hairline-shade: var(--ht-border);
-  --sl-color-backdrop-overlay: oklch(0.2 0.02 265 / 0.4);
+  --sl-color-backdrop-overlay: oklch(0.22 0.02 260 / 0.4);
 }
 
 /* ---------------------------------------------------------------------------

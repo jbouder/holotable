@@ -72,19 +72,19 @@ function pageHeaders(nonce: string): Record<string, string> {
  */
 const TOKENS = `
   :root { color-scheme: dark;
-    --background: oklch(0.16 0.02 265); --surface: oklch(0.21 0.02 265);
-    --surface-2: oklch(0.26 0.02 265); --border: oklch(0.35 0.02 265);
-    --foreground: oklch(0.96 0.01 265); --muted: oklch(0.7 0.02 265);
-    --primary: oklch(0.66 0.19 259); --success: oklch(0.78 0.16 160);
-    --chart-1: oklch(0.66 0.19 259); --chart-2: oklch(0.7 0.16 160);
-    --chart-3: oklch(0.74 0.17 70); --chart-4: oklch(0.68 0.21 20); }
+    --background: oklch(0.15 0.012 260); --surface: oklch(0.195 0.012 260);
+    --surface-2: oklch(0.24 0.012 260); --border: oklch(0.33 0.012 260);
+    --foreground: oklch(0.95 0.008 260); --muted: oklch(0.72 0.015 260);
+    --primary: oklch(0.72 0.13 250); --success: oklch(0.8 0.12 160);
+    --chart-1: oklch(0.68 0.13 250); --chart-2: oklch(0.72 0.12 160);
+    --chart-3: oklch(0.8 0.13 80); --chart-4: oklch(0.72 0.15 25); }
   :root[data-theme="light"] { color-scheme: light;
-    --background: oklch(0.98 0.005 265); --surface: oklch(1 0 0);
-    --surface-2: oklch(0.94 0.01 265); --border: oklch(0.84 0.02 265);
-    --foreground: oklch(0.2 0.02 265); --muted: oklch(0.5 0.02 265);
-    --primary: oklch(0.52 0.2 259); --success: oklch(0.46 0.14 160);
-    --chart-1: oklch(0.52 0.19 259); --chart-2: oklch(0.52 0.16 160);
-    --chart-3: oklch(0.5 0.15 70); --chart-4: oklch(0.54 0.21 20); }
+    --background: oklch(0.975 0.004 260); --surface: oklch(1 0 0);
+    --surface-2: oklch(0.955 0.006 260); --border: oklch(0.86 0.01 260);
+    --foreground: oklch(0.22 0.02 260); --muted: oklch(0.5 0.02 260);
+    --primary: oklch(0.5 0.17 255); --success: oklch(0.44 0.1 160);
+    --chart-1: oklch(0.52 0.15 250); --chart-2: oklch(0.56 0.12 160);
+    --chart-3: oklch(0.62 0.15 70); --chart-4: oklch(0.55 0.17 25); }
   body { margin: 0; min-height: 100vh; display: grid; place-items: center;
          font: 16px/1.5 ui-sans-serif, system-ui, sans-serif;
          background: var(--background); color: var(--foreground); }
