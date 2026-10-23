@@ -9,6 +9,7 @@ import {
   lineChart,
   heatmapScale,
   pieLayout,
+  pieShares,
   type PanelData,
   pieChart,
   scatterChart,
@@ -24,6 +25,7 @@ import {
   SIZE_STEP,
   sameSize,
   sizeStep,
+  textWidth,
 } from "@/components/charts/size";
 import { PANEL_RENDERERS } from "@/components/panels/registry";
 import { DEFAULT_CHART_THEME } from "@/lib/color/chart-theme";
@@ -373,7 +375,7 @@ test("a pie's legend moves under it or gives way to labels, and is never paged",
   assert.deepEqual(pieLayout("right", undefined, names, 11), {
     position: "right",
     rows: 1,
-    labels: true,
+    labels: false,
   });
   // A right legend on a narrow pie goes underneath.
   assert.equal(
@@ -406,6 +408,92 @@ test("a pie's legend moves under it or gives way to labels, and is never paged",
     },
   ) as { legend: { type: string } };
   assert.equal(option.legend.type, "plain");
+});
+
+test("a pie with a legend has no outside labels; without one, every label is whole", () => {
+  // #638: the legend already names the slices, so outside labels repeated
+  // it, and ECharts cut the ones that did not fit to `…` and left leader
+  // lines with nothing at their end.
+  const names = ["worker", "api", "web"];
+  const data = {
+    columns: ["name", "v"],
+    rows: names.map((name, i) => ({ name, v: (i + 1) * 10 })),
+  };
+  interface Drawn {
+    legend: { show: boolean };
+    series: {
+      label: { show: boolean; position: string; overflow: string; width: number };
+      labelLine: { show: boolean };
+      data: { label: { show: boolean } }[];
+    }[];
+  }
+  const draw = (legend: string, size?: { width: number; height: number }) =>
+    pieChart(
+      panel({
+        viz: "donut",
+        query: { sourceId: "s", sql: "SELECT 1" },
+        options: { legend },
+      }),
+      data,
+      {
+        display: LOCAL_TIME_DISPLAY,
+        theme: DEFAULT_CHART_THEME,
+        size,
+      },
+    ) as unknown as Drawn;
+  for (const size of [
+    undefined,
+    { width: 600, height: 300 },
+    { width: 300, height: 240 },
+  ]) {
+    for (const legend of ["top", "bottom", "right"]) {
+      const option = draw(legend, size);
+      assert.equal(option.legend.show, true, `${legend} ${JSON.stringify(size)}`);
+      const [series] = option.series;
+      assert.equal(series.label.position, "inside", legend);
+      assert.equal(series.labelLine.show, false, legend);
+    }
+  }
+  // No legend, room beside the pie: names outside, each whole, a line to each.
+  const named = draw("none", { width: 600, height: 300 }).series[0];
+  assert.equal(named.label.position, "outside");
+  assert.equal(named.label.overflow, "none", "never cut to …");
+  assert.ok(named.label.width >= textWidth("worker", DEFAULT_CHART_THEME.type.axis));
+  assert.equal(named.labelLine.show, true);
+  // No room: no outside label, so no line, and the shares inside instead.
+  const narrow = draw("none", { width: 140, height: 80 }).series[0];
+  assert.equal(narrow.label.position, "inside");
+  assert.equal(narrow.labelLine.show, false);
+});
+
+test("a slice carries its share only where the text fits inside it", () => {
+  const size = { width: 400, height: 300 };
+  assert.deepEqual(pieShares([60, 30, 9, 1], undefined, 0.72, false, 12), [
+    true,
+    true,
+    false,
+    false,
+  ]);
+  // At a pie's middle a tenth of the whole is too short an arc for `9%`...
+  assert.deepEqual(pieShares([60, 30, 9, 1], size, 0.72, false, 12), [
+    true,
+    true,
+    false,
+    false,
+  ]);
+  // ...and further out, along a donut's ring, it is long enough.
+  assert.deepEqual(pieShares([60, 30, 9, 1], size, 0.72, true, 12), [
+    true,
+    true,
+    true,
+    false,
+  ]);
+  // Too small a ring for any: none, rather than text over the edges.
+  assert.deepEqual(pieShares([50, 50], { width: 80, height: 60 }, 0.72, true, 12), [
+    false,
+    false,
+  ]);
+  assert.deepEqual(pieShares([0, 0], size, 0.72, false, 12), [false, false]);
 });
 
 test("a heatmap's color scale shortens on a short panel and goes slim on a narrow one", () => {

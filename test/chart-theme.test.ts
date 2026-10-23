@@ -7,12 +7,20 @@ import {
   type ChartTheme,
   DEFAULT_CHART_THEME,
   forcedColorsTheme,
+  inkOn,
   readChartTheme,
   soften,
 } from "@/lib/color/chart-theme";
 import { Panel } from "@/lib/ir";
 import { readdirSync, readFileSync } from "node:fs";
-import { parseThemeTokens } from "@/lib/color/contrast";
+import {
+  AA_TEXT,
+  contrastRatio,
+  hexToRgb,
+  parseThemeBlocks,
+  parseThemeDecls,
+  parseThemeTokens,
+} from "@/lib/color/contrast";
 import { resolveColor } from "@/lib/color/oklch";
 import { COLOR_TOKENS, FILL_TOKENS } from "@/lib/panels/colors";
 import { LOCAL_TIME_DISPLAY } from "@/lib/time-display";
@@ -589,6 +597,60 @@ test("large areas are softened toward the surface; lines, bars and progress are 
     progress: { itemStyle: { color: string } };
   }[];
   allLiteral([radial[0].progress.itemStyle.color], "radial gauge");
+});
+
+test("a share written on a slice reads on its softened fill, in every theme (AA)", () => {
+  // #638: a large slice carries its share inside it, in `inkOn` of the
+  // fill the slice is drawn in, which is the softened series color.
+  for (const viz of ["pie", "donut"] as const) {
+    const option = drawnBy(
+      viz,
+      DISTINCT,
+      { legend: "bottom" },
+      { width: 600, height: 400 },
+    );
+    const fills = option.color as string[];
+    const [series] = option.series as {
+      label: { position: string };
+      data: { label: { show: boolean; color: string } }[];
+    }[];
+    assert.equal(series.label.position, "inside", viz);
+    assert.ok(
+      series.data.some((d) => d.label.show),
+      `${viz}: a large slice carries its share`,
+    );
+    for (const [i, d] of series.data.entries()) {
+      assert.equal(d.label.color, inkOn(fills[i % fills.length]), `${viz} slice ${i}`);
+    }
+  }
+  // Every series color, softened as each theme softens it toward its own
+  // surface, holds AA against the ink chosen for it.
+  const css = readFileSync("src/app/globals.css", "utf8");
+  const blocks = parseThemeBlocks(css);
+  for (const { palette, scheme, decls } of parseThemeDecls(css)) {
+    const tokens = blocks.find(
+      (b) => b.palette === palette && b.scheme === scheme,
+    )?.tokens;
+    assert.ok(tokens?.surface, `${palette} ${scheme}: --surface`);
+    const hex = (rgb: readonly number[]) =>
+      `#${rgb.map((c) => c.toString(16).padStart(2, "0")).join("")}`;
+    const amount = Number(decls["--chart-soften"] ?? DEFAULT_CHART_THEME.soften);
+    const theme = {
+      ...DEFAULT_CHART_THEME,
+      background: hex(tokens.surface),
+      soften: amount,
+    };
+    for (let i = 1; i <= 8; i++) {
+      const rgb = tokens[`chart-${i}`];
+      assert.ok(rgb, `${palette} ${scheme}: --chart-${i}`);
+      const fill = soften(theme, hex(rgb));
+      const ratio = contrastRatio(hexToRgb(inkOn(fill)), hexToRgb(fill));
+      assert.ok(
+        ratio >= AA_TEXT,
+        `${palette} ${scheme} chart-${i}: ${ratio.toFixed(2)}:1`,
+      );
+    }
+  }
 });
 
 test("a stacked area draws near-solid bands parted by a line of surface; a lone one fades", () => {

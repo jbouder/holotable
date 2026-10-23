@@ -1,11 +1,18 @@
 import { panelTimeField } from "@/lib/ir";
 import type { EChartsOption } from "echarts";
 import type { Panel } from "@/lib/ir";
-import { type ChartTheme, seriesColor, soften, withAlpha } from "@/lib/color/chart-theme";
+import {
+  type ChartTheme,
+  inkOn,
+  seriesColor,
+  soften,
+  withAlpha,
+} from "@/lib/color/chart-theme";
 import {
   areaFill,
   axis as axisStyle,
   barCorners,
+  blockLabel,
   categoryAxis,
   block,
   legend,
@@ -572,20 +579,37 @@ function buildScatter(
   };
 }
 
-/** A slice label's line and its gaps: what it takes beside the pie besides its text. */
-const PIE_LABEL_LINE_PX = 44;
-/** Below this, a pie's own slice labels give way to its legend when it has one. */
-const PIE_LABELS_MIN_PX = 200;
+/** A slice label's leader line: its two runs, as `buildPie` draws them. */
+const PIE_LINE_RUNS = [12, 10] as const;
+/**
+ * What a slice label takes beside the pie besides its text: the line, the
+ * gap between line and text (ECharts' 5) and the margin it keeps from the
+ * chart's edge (its `bleedMargin`, 10 on a pie of any size).
+ */
+const PIE_LABEL_LINE_PX = PIE_LINE_RUNS[0] + PIE_LINE_RUNS[1] + 5 + 10;
+/** The outer radius of a pie, as a share of half its shorter side, with no wrapped legend. */
+const PIE_OUTER = 0.72;
+/** A donut's inner radius as a share of its outer one. */
+const DONUT_HOLE = 48 / 72;
+/** Without a size, a slice is wide enough to carry its share at a tenth of the whole. */
+const PIE_SHARE_MIN = 0.1;
+/** The space a share keeps on each side inside its slice. */
+const PIE_SHARE_PAD_PX = 4;
 
 /**
- * Where a pie's legend goes at a size, and whether its slices are labelled
- * (#643). With room, where the panel put it. A right legend that does not
- * fit moves under the pie, and one under or over it that would take more
- * than a quarter of the height is dropped for the slices' own labels. The
- * legend is never paged. Slices are labelled with their names when there is
- * no legend, and on a small pie that has one only the legend names them;
- * either way only while the longest name fits beside the pie, never cut to
- * `er…`: below that the tooltip and the table name the slices.
+ * Where a pie's legend goes at a size, and whether its slices carry their
+ * names outside (#643, #638). With room, the legend goes where the panel put
+ * it. A right legend that does not fit moves under the pie, and one under or
+ * over it that would take more than a quarter of the height is dropped. The
+ * legend is never paged.
+ *
+ * A legend already names the slices, so a pie with one draws no outside
+ * labels and no leader lines: the legend says the names, the tooltip the
+ * values, and a large slice its share inside (`pieShares`). With no legend,
+ * asked for or dropped, the slices are named outside, but only while the
+ * longest name fits whole beside the pie: never cut to `er…`, and never a
+ * line with nothing at its end. Below that the tooltip and the table name
+ * them, and the large slices still carry their shares.
  */
 export function pieLayout(
   position: LegendPosition | undefined,
@@ -594,7 +618,10 @@ export function pieLayout(
   textPx: number,
 ): { position: LegendPosition; rows: number; labels: boolean } {
   const asked = position ?? "top";
-  if (!size) return { position: asked, rows: asked === "none" ? 0 : 1, labels: true };
+  if (!size) {
+    const none = asked === "none";
+    return { position: asked, rows: none ? 0 : 1, labels: none };
+  }
   const across = (at: "top" | "bottom") => {
     const rows = legendRows(size.width, names, textPx);
     return rows * LEGEND_ROW_PX <= size.height * 0.25 ? { position: at, rows } : null;
@@ -607,17 +634,47 @@ export function pieLayout(
           ? { position: "right" as const, rows: 1 }
           : across("bottom")
         : across(asked);
-  // The room beside the pie (72% of its half side) for a label and its line.
-  const at = placed?.position ?? "none";
-  const radius = 0.72 * (Math.min(size.width, size.height) / 2);
-  const beside = ((at === "right" ? 0.8 : 1) * size.width - 2 * radius) / 2;
+  if (placed) return { ...placed, labels: false };
+  // The room beside the pie for a label and its line.
+  const radius = PIE_OUTER * (Math.min(size.width, size.height) / 2);
+  const beside = (size.width - 2 * radius) / 2;
   const longest = names.reduce((a, b) => (b.length > a.length ? b : a), "");
-  const room = textWidth(longest, textPx) + PIE_LABEL_LINE_PX <= beside;
-  if (!placed) return { position: "none", rows: 0, labels: room };
-  return {
-    ...placed,
-    labels: room && Math.min(size.width, size.height) >= PIE_LABELS_MIN_PX,
-  };
+  const labels = textWidth(longest, textPx) + PIE_LABEL_LINE_PX <= beside;
+  return { position: "none", rows: 0, labels };
+}
+
+/**
+ * Which slices carry their share (`42%`) inside them (#638): those wide and
+ * deep enough, at the pie's drawn radius, for the text with a little room
+ * around it. ECharts writes an inside label level, halfway across the slice
+ * (the ring of a donut), so the slice has to be at least the text's width
+ * along its arc there and across its depth. Without a size, a tenth of the
+ * whole or more.
+ */
+export function pieShares(
+  values: readonly number[],
+  size: ChartSize | undefined,
+  outer: number,
+  donut: boolean,
+  textPx: number,
+): boolean[] {
+  const total = values.reduce((sum, v) => sum + (v > 0 ? v : 0), 0);
+  if (!(total > 0)) return values.map(() => false);
+  if (!size) return values.map((v) => v / total >= PIE_SHARE_MIN);
+  const r = outer * (Math.min(size.width, size.height) / 2);
+  const r0 = donut ? r * DONUT_HOLE : 0;
+  const mid = (r + r0) / 2;
+  const need = textWidth("88%", textPx) + 2 * PIE_SHARE_PAD_PX;
+  if (r - r0 < Math.max(need, textPx + 2 * PIE_SHARE_PAD_PX)) {
+    return values.map(() => false);
+  }
+  return values.map((v) => v > 0 && (v / total) * 2 * Math.PI * mid >= need);
+}
+
+/** A share as a slice carries it: whole percent. */
+function sharePercent(params: unknown): string {
+  const percent = (params as { percent?: number }).percent ?? 0;
+  return `${Math.round(percent)}%`;
 }
 
 /** A pie's legend where `pieLayout` put it, every placement field said, never paged. */
@@ -665,12 +722,44 @@ function buildPie(
       : placed.position === "bottom" || placed.position === "none"
         ? ["50%", `${Math.round(46 - share * 50)}%`]
         : ["50%", `${Math.round(56 + share * 50)}%`];
-  const outer = Math.round(72 * (1 - share));
-  const radius = donut ? [`${Math.round(outer * (48 / 72))}%`, `${outer}%`] : `${outer}%`;
+  const outer = Math.round(100 * PIE_OUTER * (1 - share));
+  const radius = donut
+    ? [`${Math.round(outer * DONUT_HOLE)}%`, `${outer}%`]
+    : `${outer}%`;
+  const values = data.rows.map((r) => toNumber(r[valueKey]) || 0);
+  // A slice's fill, as `color` hands it out: the softened palette, in turn.
+  const fills = theme.series.map((c) => soften(theme, c));
+  const fillOf = (i: number) => fills[i % fills.length] ?? theme.text;
+  const inside = blockLabel(theme);
+  const shares = placed.labels
+    ? values.map(() => false)
+    : pieShares(values, size, outer / 100, donut, inside.fontSize);
+  const longest = names.reduce((a, b) => (b.length > a.length ? b : a), "");
+  // Each field is said in both answers, since a size step merges (#643).
+  const label = placed.labels
+    ? {
+        ...text(theme),
+        show: true,
+        position: "outside" as const,
+        formatter: "{b}",
+        // Wide enough for the longest name, so ECharts never cuts one to
+        // `…`; `pieLayout` labels only when that fits beside the pie.
+        width: textWidth(longest, theme.type.axis),
+        overflow: "none" as const,
+      }
+    : {
+        ...inside,
+        color: theme.text,
+        show: false,
+        position: "inside" as const,
+        formatter: sharePercent,
+        width: textWidth("100%", inside.fontSize),
+        overflow: "none" as const,
+      };
   return {
     ...shared(theme),
     // A slice is a large area: its color is softened, as a treemap node's is.
-    color: theme.series.map((c) => soften(theme, c)),
+    color: fills,
     tooltip: {
       ...tooltip(theme),
       trigger: "item",
@@ -682,16 +771,29 @@ function buildPie(
         type: "pie",
         radius,
         center,
-        data: data.rows.map((r) => ({
+        data: data.rows.map((r, i) => ({
           name: toText(r[x]),
-          value: toNumber(r[valueKey]) || 0,
+          value: values[i],
+          // A share written on its slice reads on the softened fill (AA).
+          label: placed.labels
+            ? { show: true, color: theme.text }
+            : { show: shares[i], color: inkOn(fillOf(i)) },
         })),
         // Slices part by a hair of surface, with the page's corners.
         itemStyle: block(theme, { edge: 2 }),
-        // A label that would overlap another waits for the pointer (#643).
-        label: { ...text(theme), show: placed.labels },
-        labelLine: { show: placed.labels, lineStyle: { color: theme.line } },
+        label,
+        // A line only to a name: never one with nothing at its end.
+        labelLine: {
+          show: placed.labels,
+          length: PIE_LINE_RUNS[0],
+          length2: PIE_LINE_RUNS[1],
+          lineStyle: { color: theme.line },
+        },
+        avoidLabelOverlap: true,
+        // A label that would overlap another hides with its line (#643).
         labelLayout: { hideOverlap: true },
+        // A sliver's label would only collide with its neighbors'.
+        minShowLabelAngle: placed.labels ? 4 : 0,
       },
     ],
   };

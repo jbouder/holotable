@@ -103,6 +103,12 @@ says how a section gets here.
   a pie's legend moves under it or gives way to slice labels, never paged;
   graph and sankey labels are drawn whole, smaller, without values, or on
   hover only; and a narrow heatmap's color scale goes slim.
+- **Pie and donut labels no longer repeat the legend.** With a legend, a
+  slice carries no outside label or leader line; a slice large enough for
+  it shows its share (`42%`) inside, in black or white, whichever reads on
+  its fill. With `legend: "none"` (or a legend that did not fit), slices are
+  named outside, each name whole, never cut to `…`, and never a leader line
+  with nothing at its end (#638).
 
 ## 0.2.0 — 2026-10-11
 
