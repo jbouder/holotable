@@ -78,13 +78,6 @@ export function ProfileMenu({ account }: { account: ProfileMenuAccount }) {
         )}
       </div>
       <MenuSeparator />
-      <MenuLink href="/settings">
-        <Settings className="h-4 w-4" aria-hidden /> Settings
-      </MenuLink>
-      <MenuLink href="/settings/shortcuts">
-        <Keyboard className="h-4 w-4" aria-hidden /> Keyboard shortcuts
-      </MenuLink>
-      <MenuSeparator />
       <MenuRadioGroup<Theme> label="Color scheme" value={theme} onValueChange={setTheme}>
         {THEME_OPTIONS.map(({ value, label, Icon }) => (
           <MenuRadioItem key={value} value={value}>
@@ -92,6 +85,13 @@ export function ProfileMenu({ account }: { account: ProfileMenuAccount }) {
           </MenuRadioItem>
         ))}
       </MenuRadioGroup>
+      <MenuSeparator />
+      <MenuLink href="/settings">
+        <Settings className="h-4 w-4" aria-hidden /> Settings
+      </MenuLink>
+      <MenuLink href="/settings/shortcuts">
+        <Keyboard className="h-4 w-4" aria-hidden /> Keyboard shortcuts
+      </MenuLink>
       <MenuSeparator />
       <MenuItem onClick={() => void logout()}>
         <LogOut className="h-4 w-4" aria-hidden /> Sign out
