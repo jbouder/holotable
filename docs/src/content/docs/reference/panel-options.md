@@ -296,6 +296,11 @@ Log lines, newest first
   worked out from its name.
 - Every column that is not the time, the message or the level is shown, as
   name and value, when a line is expanded.
+- A line's layout follows the panel's width, not the screen's
+  ([#644](https://github.com/jbouder/holotable/issues/644)): in a panel
+  narrower than 28rem the message goes on its own line under the time and
+  level, and below 18rem the time is written as the clock alone (`07:07:11`),
+  with the full time among the expanded line's details.
 - The text is always the foreground color. The level's color is a stripe on
   the line's edge, and the level is written, so color is never the only
   signal.

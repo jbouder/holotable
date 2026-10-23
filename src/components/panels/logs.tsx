@@ -78,7 +78,9 @@ export function LogsView({ panel, data }: PanelBodyProps) {
       // `relative`, so each line's offsetTop is measured from the list.
       // No browser scroll anchoring (#499): the spacers around the window
       // change size as it moves; the reader's place is kept above, by hand.
-      className="relative max-h-full overflow-auto font-mono text-xs [overflow-anchor:none] focus-visible:outline-2 focus-visible:outline-ring"
+      // `@container`: a line's layout follows the panel's width, not the
+      // viewport's (#644), since a panel is often narrow on a wide screen.
+      className="@container relative max-h-full overflow-auto font-mono text-xs [overflow-anchor:none] focus-visible:outline-2 focus-visible:outline-ring"
     >
       {lines.length === 0 ? (
         <p className="p-2 text-muted">No lines in this window.</p>
@@ -128,18 +130,26 @@ function Line({
   const stripe = line.color ? { borderLeftColor: tokenCss(line.color) } : undefined;
   const text = (
     <>
+      {/* The clock alone in a panel too narrow for the date; the full time is in the details. */}
       {showTime && line.time && (
-        <span className="shrink-0 tabular-nums text-muted">{line.time}</span>
+        <>
+          <span className="shrink-0 tabular-nums text-muted @2xs:hidden">
+            {line.clock}
+          </span>
+          <span className="hidden shrink-0 tabular-nums text-muted @2xs:inline">
+            {line.time}
+          </span>
+        </>
       )}
       {line.level && (
         <span className="w-12 shrink-0 font-semibold uppercase text-foreground">
           {line.level}
         </span>
       )}
-      {/* Under the time and level on a narrow screen, beside them on a wide one. */}
+      {/* Under the time and level in a narrow panel, beside them in a wide one. */}
       <span
         className={cn(
-          "min-w-0 basis-full text-foreground sm:basis-0 sm:flex-1",
+          "min-w-0 basis-full text-foreground @md:basis-0 @md:flex-1",
           wrap ? "break-words whitespace-pre-wrap" : "truncate",
         )}
       >
@@ -148,7 +158,7 @@ function Line({
     </>
   );
   const row =
-    "flex min-w-0 flex-1 flex-wrap items-baseline gap-x-2 border-l-2 border-transparent px-2 py-1 sm:flex-nowrap";
+    "flex min-w-0 flex-1 flex-wrap items-baseline gap-x-2 border-l-2 border-transparent px-2 py-1 @md:flex-nowrap";
   if (line.details.length === 0) {
     return (
       <div className={cn(row, "pl-6")} style={stripe}>
@@ -172,7 +182,15 @@ function Line({
         {text}
       </Collapsible.Trigger>
       <Collapsible.Panel className="h-(--collapsible-panel-height) overflow-hidden transition-[height,opacity] duration-(--duration-base) ease-emphasized data-starting-style:h-0 data-starting-style:opacity-0 data-ending-style:h-0 data-ending-style:opacity-0">
-        <dl className="grid grid-cols-[max-content_1fr] gap-x-3 gap-y-0.5 bg-surface-2 py-1.5 pr-2 pl-8">
+        <dl className="grid grid-cols-1 gap-x-3 gap-y-0.5 bg-surface-2 py-1.5 pr-2 pl-6 @2xs:grid-cols-[max-content_1fr] @2xs:pl-8">
+          {showTime && line.time && (
+            <>
+              <dt className="text-muted @2xs:hidden">time</dt>
+              <dd className="min-w-0 break-words text-foreground @2xs:hidden">
+                {line.time}
+              </dd>
+            </>
+          )}
           {line.details.map(([name, value]) => (
             <React.Fragment key={name}>
               <dt className="text-muted">{name}</dt>
