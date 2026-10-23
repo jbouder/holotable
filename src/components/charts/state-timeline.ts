@@ -10,7 +10,7 @@ import {
   toText,
 } from "@/components/charts/options";
 import type { Panel } from "@/lib/ir";
-import { type ColorToken, defaultStateToken, tokenHex } from "@/lib/panels/colors";
+import { type ColorToken, defaultStateToken, fillHex } from "@/lib/panels/colors";
 import { type ChartTheme, inkOn, soften } from "@/lib/color/chart-theme";
 import {
   blockLabel,
@@ -345,7 +345,7 @@ export const stateTimelineChart: ChartOptionBuilder = normalized((panel, data, c
           value: [s.lane, s.start, s.end],
           // A span is a large area: softened, as every block is.
           itemStyle: {
-            color: soften(ctx.theme, tokenHex(stateColor(s.state, panel), ctx.theme)),
+            color: soften(ctx.theme, fillHex(stateColor(s.state, panel), ctx.theme)),
           },
         })),
       },

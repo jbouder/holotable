@@ -86,6 +86,15 @@
   --orange: var(--chart-3);
   --purple: var(--chart-5);
   --teal: var(--chart-6);
+  /* A status or spec color as a fill rather than text (#641): a gauge's arc,
+     a bar, a sparkline, a tile, a span. A fill is a graphic, held to 3:1
+     (WCAG 1.4.11) rather than the 4.5:1 text needs, so where a text-strength
+     amber reads brown a scheme draws its fills a clearly amber shade. Only
+     the amber pair is split: in dark, and for every other color, the fill is
+     the text token. Every light block sets both, so a light preview inside a
+     dark page does not inherit the dark aliases. */
+  --warning-fill: var(--warning);
+  --orange-fill: var(--orange);
   --code-keyword: var(--primary);
   --code-string: var(--success);
   --code-number: var(--warning);
@@ -174,6 +183,10 @@
   --orange: oklch(0.52 0.15 66);
   --purple: var(--chart-5);
   --teal: var(--chart-6);
+  /* Fills in the bright amber (#641): warning a shade yellower than the
+     series, and the spec's orange as the series it stands for. */
+  --warning-fill: oklch(0.66 0.15 75);
+  --orange-fill: var(--chart-3);
   --code-keyword: var(--primary);
   --code-string: var(--success);
   --code-number: var(--warning);
@@ -271,7 +284,7 @@
   --chart-1: oklch(0.48 0.18 300);
   --chart-2: oklch(0.6 0.13 245);
   --chart-3: oklch(0.5 0.09 195);
-  --chart-4: oklch(0.5 0.11 70);
+  --chart-4: oklch(0.64 0.14 72);
   --chart-5: oklch(0.54 0.18 22);
   --chart-6: oklch(0.5 0.12 145);
   --chart-7: oklch(0.52 0.18 345);
@@ -284,7 +297,14 @@
   --chart-div-low: oklch(0.5 0.15 255);
   --chart-div-mid: oklch(0.93 0.004 80);
   --chart-div-high: oklch(0.54 0.18 22);
-  --orange: var(--chart-4);
+  /* The amber series is a 3:1 graphic, so it is bright (#641); the spec's
+     orange is text as often as a fill, so it keeps the AA shade the series
+     had, and its fills take the series. */
+  --orange: oklch(0.5 0.11 70);
+  --orange-fill: var(--chart-4);
+  /* Warning text is pinned at 0.45 by its distance from danger under every
+     color-vision deficiency; its fills are free to be amber. */
+  --warning-fill: oklch(0.66 0.15 75);
   --purple: var(--chart-1);
   --teal: var(--chart-3);
   /* What Holotable's blocks set before #648, so this theme looks as it did. */
@@ -359,7 +379,7 @@
   --warning: oklch(0.38 0.09 70);
   --success: oklch(0.45 0.12 145);
   --chart-1: oklch(0.5 0.1 210);
-  --chart-2: oklch(0.46 0.11 70);
+  --chart-2: oklch(0.62 0.13 72);
   --chart-3: oklch(0.6 0.14 145);
   --chart-4: oklch(0.58 0.14 250);
   --chart-5: oklch(0.45 0.15 295);
@@ -374,7 +394,11 @@
   --chart-div-low: oklch(0.48 0.12 230);
   --chart-div-mid: oklch(0.92 0.014 212);
   --chart-div-high: oklch(0.54 0.17 30);
-  --orange: var(--chart-2);
+  /* As Graphite (#641): a bright amber series and warning fill, the AA
+     shades kept for text. */
+  --orange: oklch(0.46 0.11 70);
+  --orange-fill: var(--chart-2);
+  --warning-fill: oklch(0.64 0.14 75);
   --purple: var(--chart-5);
   --teal: var(--chart-8);
   /* What Holotable's blocks set before #648, so this theme looks as it did. */
@@ -445,7 +469,7 @@
   --success: oklch(0.45 0.11 155);
   --chart-1: oklch(0.45 0.15 262);
   --chart-2: oklch(0.47 0.12 155);
-  --chart-3: oklch(0.52 0.12 65);
+  --chart-3: oklch(0.62 0.13 70);
   --chart-4: oklch(0.44 0.17 25);
   --chart-5: oklch(0.45 0.15 305);
   --chart-6: oklch(0.4 0.07 205);
@@ -462,7 +486,11 @@
   --radius: 4px;
   /* What Holotable's blocks set before #648, so this theme looks as it did. */
   --chart-grid: var(--surface-2);
-  --orange: var(--chart-3);
+  /* As Graphite (#641): a bright amber series and warning fill, the AA
+     shades kept for text. */
+  --orange: oklch(0.52 0.12 65);
+  --orange-fill: var(--chart-3);
+  --warning-fill: oklch(0.65 0.14 75);
   --shadow-card: 0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1);
 }
 
@@ -575,6 +603,10 @@
   /* What Holotable's blocks set before #648, so this theme looks as it did. */
   --radius: 0;
   --orange: var(--chart-3);
+  /* Not split (#641): a tile here is a solid fill under white ink at 7:1, so
+     a fill can be no lighter than the text token. */
+  --warning-fill: var(--warning);
+  --orange-fill: var(--orange);
   --shadow-card: 0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1);
 }
 

@@ -1,6 +1,6 @@
 import { contrastRatio, hexToRgb } from "@/lib/color/contrast";
 import { oklchToHex, resolveColor } from "@/lib/color/oklch";
-import { COLOR_TOKENS, type ColorToken } from "@/lib/panels/colors";
+import { COLOR_TOKENS, type ColorToken, FILL_TOKENS } from "@/lib/panels/colors";
 
 /**
  * A chart's colors, as ECharts and Vega can paint them (#502).
@@ -40,8 +40,13 @@ export interface ChartTheme {
   sequential: readonly string[];
   /** Low, middle and high of a diverging scale: `--chart-div-*`. */
   diverging: readonly [string, string, string];
-  /** Each spec color token (`success`, `teal`, …), as the page paints it. */
+  /** Each spec color token (`success`, `teal`, …), as the page paints it as text. */
   tokens: Readonly<Record<ColorToken, string>>;
+  /**
+   * Each token as a fill (#641): `FILL_TOKENS`, a brighter amber than the
+   * text one in a light scheme, the token itself everywhere else.
+   */
+  fills: Readonly<Record<ColorToken, string>>;
   /**
    * The page's type: `--font-sans`, so a canvas writes in the same face the
    * page beside it is set in. A canvas cannot inherit a font any more than a
@@ -100,6 +105,17 @@ export const DEFAULT_CHART_FONT =
  * they cannot drift from the tokens. A page replaces them before a chart's
  * first option is built.
  */
+const DEFAULT_TOKENS: Readonly<Record<ColorToken, string>> = {
+  success: oklchToHex({ l: 0.8, c: 0.12, h: 160 }),
+  warning: oklchToHex({ l: 0.82, c: 0.13, h: 82 }),
+  danger: oklchToHex({ l: 0.74, c: 0.15, h: 22 }),
+  info: oklchToHex({ l: 0.72, c: 0.13, h: 250 }),
+  neutral: oklchToHex({ l: 0.72, c: 0.015, h: 260 }),
+  orange: oklchToHex({ l: 0.8, c: 0.13, h: 80 }),
+  purple: oklchToHex({ l: 0.77, c: 0.11, h: 310 }),
+  teal: oklchToHex({ l: 0.78, c: 0.09, h: 210 }),
+};
+
 export const DEFAULT_CHART_THEME: ChartTheme = {
   text: oklchToHex({ l: 0.72, c: 0.015, h: 260 }),
   line: oklchToHex({ l: 0.33, c: 0.012, h: 260 }),
@@ -137,16 +153,9 @@ export const DEFAULT_CHART_THEME: ChartTheme = {
   lineWidth: 2,
   area: { fade: 0.32, flat: 0.18, stacked: 0.85 },
   soften: 0.2,
-  tokens: {
-    success: oklchToHex({ l: 0.8, c: 0.12, h: 160 }),
-    warning: oklchToHex({ l: 0.82, c: 0.13, h: 82 }),
-    danger: oklchToHex({ l: 0.74, c: 0.15, h: 22 }),
-    info: oklchToHex({ l: 0.72, c: 0.13, h: 250 }),
-    neutral: oklchToHex({ l: 0.72, c: 0.015, h: 260 }),
-    orange: oklchToHex({ l: 0.8, c: 0.13, h: 80 }),
-    purple: oklchToHex({ l: 0.77, c: 0.11, h: 310 }),
-    teal: oklchToHex({ l: 0.78, c: 0.09, h: 210 }),
-  },
+  tokens: DEFAULT_TOKENS,
+  // In dark every fill is its token.
+  fills: DEFAULT_TOKENS,
 };
 
 /** The tokens as a computed style has them; one that is unset keeps its default. */
@@ -166,6 +175,13 @@ export function readChartTheme(
     (Object.keys(COLOR_TOKENS) as ColorToken[]).map((t) => [
       t,
       read(COLOR_TOKENS[t], d.tokens[t]),
+    ]),
+  ) as Record<ColorToken, string>;
+  // A page that sets no fill fills in the token's own color.
+  const fills = Object.fromEntries(
+    (Object.keys(FILL_TOKENS) as ColorToken[]).map((t) => [
+      t,
+      read(FILL_TOKENS[t], tokens[t]),
     ]),
   ) as Record<ColorToken, string>;
   return {
@@ -188,6 +204,7 @@ export function readChartTheme(
       read("--chart-div-high", d.diverging[2]),
     ],
     tokens,
+    fills,
     font: readFont(style.getPropertyValue("--font-sans"), d.font),
     radius: px("--radius", d.radius),
     raised: read("--surface-3", d.raised),
@@ -254,6 +271,7 @@ export function forcedColorsTheme(
     sequential: [gray, gray, link, highlight, text],
     diverging: [link, gray, highlight],
     tokens,
+    fills: tokens,
     font: page.font,
     radius: 0,
     raised: system("Canvas"),

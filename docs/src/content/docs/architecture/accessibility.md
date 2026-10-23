@@ -117,11 +117,11 @@ read as text on `surface-2` is too light to carry white at AA.
 | text-success on bg-success/20 (badges, alerts) | 6.67:1 | 5.33:1 |
 | text-primary on bg-primary/10 | 6.38:1 | 5.25:1 |
 | text-foreground on a success status tile | 9.06:1 | 11.13:1 |
-| text-foreground on a warning status tile | 9.14:1 | 11.38:1 |
+| text-foreground on a warning status tile | 9.14:1 | 12.50:1 |
 | text-foreground on a danger status tile | 10.04:1 | 10.46:1 |
 | text-foreground on a info status tile | 9.92:1 | 11.28:1 |
 | text-foreground on a neutral status tile | 9.90:1 | 11.64:1 |
-| text-foreground on a orange status tile | 9.28:1 | 11.46:1 |
+| text-foreground on a orange status tile | 9.28:1 | 12.20:1 |
 | text-foreground on a purple status tile | 9.57:1 | 11.37:1 |
 | text-foreground on a teal status tile | 9.28:1 | 11.14:1 |
 | success as text on bg-background | 11.12:1 | 6.85:1 |
@@ -159,6 +159,8 @@ read as text on `surface-2` is too light to carry white at AA.
 | chart series 6 on bg-surface | 9.40:1 | 7.40:1 |
 | chart series 7 on bg-surface | 6.37:1 | 5.28:1 |
 | chart series 8 on bg-surface | 12.41:1 | 8.43:1 |
+| warning as a fill on bg-surface | 10.35:1 | 3.17:1 |
+| orange as a fill on bg-surface | 9.68:1 | 3.75:1 |
 | primary button | 8.02:1 | 5.93:1 |
 | danger button | 8.02:1 | 6.93:1 |
 
@@ -199,11 +201,11 @@ read as text on `surface-2` is too light to carry white at AA.
 | text-success on bg-success/20 (badges, alerts) | 6.28:1 | 4.84:1 |
 | text-primary on bg-primary/10 | 5.83:1 | 5.55:1 |
 | text-foreground on a success status tile | 8.77:1 | 11.26:1 |
-| text-foreground on a warning status tile | 8.84:1 | 11.24:1 |
+| text-foreground on a warning status tile | 8.84:1 | 12.60:1 |
 | text-foreground on a danger status tile | 9.80:1 | 11.05:1 |
 | text-foreground on a info status tile | 9.70:1 | 11.35:1 |
 | text-foreground on a neutral status tile | 9.60:1 | 11.61:1 |
-| text-foreground on a orange status tile | 8.91:1 | 11.48:1 |
+| text-foreground on a orange status tile | 8.91:1 | 12.45:1 |
 | text-foreground on a purple status tile | 9.36:1 | 11.24:1 |
 | text-foreground on a teal status tile | 9.16:1 | 11.52:1 |
 | success as text on bg-background | 10.45:1 | 6.15:1 |
@@ -236,11 +238,13 @@ read as text on `surface-2` is too light to carry white at AA.
 | chart series 1 on bg-surface | 7.59:1 | 7.02:1 |
 | chart series 2 on bg-surface | 4.87:1 | 3.86:1 |
 | chart series 3 on bg-surface | 8.61:1 | 5.59:1 |
-| chart series 4 on bg-surface | 9.27:1 | 6.06:1 |
+| chart series 4 on bg-surface | 9.27:1 | 3.42:1 |
 | chart series 5 on bg-surface | 5.67:1 | 5.48:1 |
 | chart series 6 on bg-surface | 8.11:1 | 5.63:1 |
 | chart series 7 on bg-surface | 5.20:1 | 5.99:1 |
 | chart series 8 on bg-surface | 13.17:1 | 11.62:1 |
+| warning as a fill on bg-surface | 9.36:1 | 3.12:1 |
+| orange as a fill on bg-surface | 9.27:1 | 3.42:1 |
 | primary button | 7.33:1 | 6.17:1 |
 | danger button | 7.17:1 | 6.20:1 |
 
@@ -281,11 +285,11 @@ read as text on `surface-2` is too light to carry white at AA.
 | text-success on bg-success/20 (badges, alerts) | 5.82:1 | 4.88:1 |
 | text-primary on bg-primary/10 | 6.76:1 | 5.38:1 |
 | text-foreground on a success status tile | 7.95:1 | 10.24:1 |
-| text-foreground on a warning status tile | 7.33:1 | 9.76:1 |
+| text-foreground on a warning status tile | 7.33:1 | 11.29:1 |
 | text-foreground on a danger status tile | 8.94:1 | 9.90:1 |
 | text-foreground on a info status tile | 8.10:1 | 10.25:1 |
 | text-foreground on a neutral status tile | 8.43:1 | 10.43:1 |
-| text-foreground on a orange status tile | 7.33:1 | 10.19:1 |
+| text-foreground on a orange status tile | 7.33:1 | 11.19:1 |
 | text-foreground on a purple status tile | 8.98:1 | 10.09:1 |
 | text-foreground on a teal status tile | 8.94:1 | 10.02:1 |
 | success as text on bg-background | 9.86:1 | 6.01:1 |
@@ -316,13 +320,15 @@ read as text on `surface-2` is too light to carry white at AA.
 | chart text on bg-surface | 7.07:1 | 6.42:1 |
 | chart text on bg-surface-2 | 6.26:1 | 5.43:1 |
 | chart series 1 on bg-surface | 8.21:1 | 5.26:1 |
-| chart series 2 on bg-surface | 11.73:1 | 6.79:1 |
+| chart series 2 on bg-surface | 11.73:1 | 3.49:1 |
 | chart series 3 on bg-surface | 9.57:1 | 3.50:1 |
 | chart series 4 on bg-surface | 5.86:1 | 3.99:1 |
 | chart series 5 on bg-surface | 5.67:1 | 7.45:1 |
 | chart series 6 on bg-surface | 5.90:1 | 4.74:1 |
 | chart series 7 on bg-surface | 12.82:1 | 12.58:1 |
 | chart series 8 on bg-surface | 5.80:1 | 7.53:1 |
+| warning as a fill on bg-surface | 11.73:1 | 3.22:1 |
+| orange as a fill on bg-surface | 11.73:1 | 3.49:1 |
 | primary button | 9.07:1 | 6.24:1 |
 | danger button | 7.04:1 | 6.41:1 |
 
@@ -363,11 +369,11 @@ read as text on `surface-2` is too light to carry white at AA.
 | text-success on bg-success/20 (badges, alerts) | 6.10:1 | 5.00:1 |
 | text-primary on bg-primary/10 | 5.94:1 | 6.35:1 |
 | text-foreground on a success status tile | 7.93:1 | 11.80:1 |
-| text-foreground on a warning status tile | 7.97:1 | 11.39:1 |
+| text-foreground on a warning status tile | 7.97:1 | 13.14:1 |
 | text-foreground on a danger status tile | 8.87:1 | 11.60:1 |
 | text-foreground on a info status tile | 8.61:1 | 11.79:1 |
 | text-foreground on a neutral status tile | 8.52:1 | 12.12:1 |
-| text-foreground on a orange status tile | 8.06:1 | 12.20:1 |
+| text-foreground on a orange status tile | 8.06:1 | 12.96:1 |
 | text-foreground on a purple status tile | 9.00:1 | 11.69:1 |
 | text-foreground on a teal status tile | 8.49:1 | 11.48:1 |
 | success as text on bg-background | 10.42:1 | 6.40:1 |
@@ -399,12 +405,14 @@ read as text on `surface-2` is too light to carry white at AA.
 | chart text on bg-surface-2 | 6.20:1 | 5.82:1 |
 | chart series 1 on bg-surface | 7.02:1 | 7.41:1 |
 | chart series 2 on bg-surface | 8.31:1 | 6.18:1 |
-| chart series 3 on bg-surface | 8.92:1 | 5.48:1 |
+| chart series 3 on bg-surface | 8.92:1 | 3.62:1 |
 | chart series 4 on bg-surface | 5.92:1 | 8.21:1 |
 | chart series 5 on bg-surface | 6.00:1 | 7.75:1 |
 | chart series 6 on bg-surface | 7.60:1 | 8.64:1 |
 | chart series 7 on bg-surface | 5.43:1 | 6.42:1 |
 | chart series 8 on bg-surface | 12.58:1 | 12.26:1 |
+| warning as a fill on bg-surface | 9.26:1 | 3.21:1 |
+| orange as a fill on bg-surface | 8.92:1 | 3.62:1 |
 | primary button | 7.67:1 | 7.21:1 |
 | danger button | 7.26:1 | 6.23:1 |
 
@@ -487,6 +495,8 @@ read as text on `surface-2` is too light to carry white at AA.
 | chart series 6 on bg-surface | 7.03:1 | 6.04:1 |
 | chart series 7 on bg-surface | 5.87:1 | 11.46:1 |
 | chart series 8 on bg-surface | 17.64:1 | 15.51:1 |
+| warning as a fill on bg-surface | 15.98:1 | 12.57:1 |
+| orange as a fill on bg-surface | 10.61:1 | 6.06:1 |
 | primary button | 11.91:1 | 9.75:1 |
 | danger button | 8.66:1 | 8.05:1 |
 

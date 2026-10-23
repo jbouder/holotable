@@ -545,7 +545,11 @@ Match the surrounding code rather than importing conventions from elsewhere.
   [Theming](docs/src/content/docs/architecture/theming.md)). A status tint
   goes through the tint tokens (`tinted bg-tint-<status>/(--tint-<n>)`), so
   high contrast can make it solid. A new color token also goes in
-  `THEME_FILE_TOKENS`, which an operator's `THEME_FILE` must set. A chart goes
+  `THEME_FILE_TOKENS`, which an operator's `THEME_FILE` must set, or in
+  `OPTIONAL_THEME_FILE_TOKENS` with a fallback when a file written before it
+  must still load (`chart-grid`, the amber fills). A color drawn as an area
+  (an arc, a bar, a tile) takes `fillHex` / `fillCss`, held to 3:1; as text,
+  `tokenHex` / `tokenCss`, held to AA. A chart goes
   through `AccessibleChart`, a link styled as a button is
   `ButtonLink`, and an icon-only control has an `aria-label`. A control
   that shows text and also has an `aria-label` keeps that text in the label,

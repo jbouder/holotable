@@ -64,10 +64,11 @@ scheme, is refused.
 | `orange`, `purple`, `teal` | Which series a spec's `orange`, `purple` and `teal` mean |
 | `code-keyword`, `code-string`, `code-number`, `code-comment` | SQL and PromQL highlighting |
 | `chart-grid` (optional) | Chart gridlines; the scheme's `surface-2` when absent |
+| `warning-fill`, `orange-fill` (optional) | The warning and the spec's `orange` drawn as an area (a gauge's arc, a bar, a status tile), held to 3:1 rather than AA, so they can be a brighter amber than text can; `warning` and `orange` when absent |
 
 Chart text, axis lines, and status tints follow from these the same way they
-do for a built-in theme. A file written before `shadow` and `chart-grid`
-existed still loads, and looks as it did.
+do for a built-in theme. A file written before `shadow`, `chart-grid` and the
+fills existed still loads, and looks as it did.
 
 ## What it is held to
 
@@ -123,7 +124,7 @@ them. The file passes the checks unchanged.
     "chart-1": "oklch(0.48 0.18 300)",
     "chart-2": "oklch(0.6 0.13 245)",
     "chart-3": "oklch(0.5 0.09 195)",
-    "chart-4": "oklch(0.5 0.11 70)",
+    "chart-4": "oklch(0.64 0.14 72)",
     "chart-5": "oklch(0.54 0.18 22)",
     "chart-6": "oklch(0.5 0.12 145)",
     "chart-7": "oklch(0.52 0.18 345)",
@@ -142,7 +143,9 @@ them. The file passes the checks unchanged.
     "code-keyword": "oklch(0.5 0.18 300)",
     "code-string": "oklch(0.46 0.11 158)",
     "code-number": "oklch(0.45 0.11 75)",
-    "code-comment": "oklch(0.49 0.006 70)"
+    "code-comment": "oklch(0.49 0.006 70)",
+    "warning-fill": "oklch(0.66 0.15 75)",
+    "orange-fill": "oklch(0.64 0.14 72)"
   },
   "dark": {
     "background": "oklch(0.17 0.004 70)",

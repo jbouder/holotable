@@ -3,7 +3,7 @@ import { TileScroller } from "@/components/panels/tile-scroller";
 import type { PanelBodyProps } from "@/components/panels/types";
 import { STATUS_TILE_TINT } from "@/lib/color/contrast";
 import { cn } from "@/lib/utils";
-import { tokenCss } from "@/lib/panels/colors";
+import { fillCss } from "@/lib/panels/colors";
 import { StatusGridOptions } from "@/lib/panels/kinds/status-grid";
 import { readOptions } from "@/lib/panels/presentation";
 import { type StatusTile, statusGrid } from "@/lib/panel-reading";
@@ -60,7 +60,7 @@ function tileName(tile: StatusTile): string {
 }
 
 function Tile({ tile }: { tile: StatusTile }) {
-  const hex = tile.color ? tokenCss(tile.color) : undefined;
+  const hex = tile.color ? fillCss(tile.color) : undefined;
   // The text of a colored tile takes the tint ink. It goes on the text, not
   // the tile, whose fill names the status variable `.tinted` swaps.
   const ink = hex ? "tinted" : undefined;

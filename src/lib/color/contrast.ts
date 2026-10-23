@@ -1,5 +1,5 @@
 import { resolveOklchToken } from "@/lib/color/oklch";
-import { COLOR_TOKENS, type ColorToken } from "@/lib/panels/colors";
+import { COLOR_TOKENS, type ColorToken, FILL_TOKENS } from "@/lib/panels/colors";
 
 /**
  * WCAG contrast for the design tokens (#77).
@@ -92,10 +92,18 @@ function resolveDecls(decls: Record<string, string>): Record<string, Rgb> {
     const hex = resolveOklchToken(value);
     if (hex) out[name] = hexToRgb(hex);
   }
-  for (const [name, value] of Object.entries(decls)) {
-    const alias = /^var\(--([a-z0-9-]+)\)$/.exec(value);
-    const target = alias && out[alias[1]];
-    if (target) out[name] = target;
+  // Until nothing changes: an alias may name another (`--orange-fill:
+  // var(--orange)` where `--orange: var(--chart-3)`), declared in any order.
+  for (let changed = true; changed; ) {
+    changed = false;
+    for (const [name, value] of Object.entries(decls)) {
+      const alias = /^var\(--([a-z0-9-]+)\)$/.exec(value);
+      const target = alias && out[alias[1]];
+      if (target && out[name] !== target) {
+        out[name] = target;
+        changed = true;
+      }
+    }
   }
   return out;
 }
@@ -229,11 +237,12 @@ export const CONTRAST_PAIRS: readonly ContrastPair[] = [
     tint: { token: "primary", alpha: 0.1 },
     where: "text-primary on bg-primary/10",
   },
+  // A tile is tinted with the color as a fill (#641).
   ...(Object.keys(COLOR_TOKENS) as ColorToken[]).map((color) => ({
     text: "foreground",
     on: "surface-2",
     tint: {
-      token: COLOR_TOKENS[color].slice(2),
+      token: FILL_TOKENS[color].slice(2),
       alpha: STATUS_TILE_TINT,
       tokenized: true as const,
     },
@@ -255,6 +264,15 @@ export const CONTRAST_PAIRS: readonly ContrastPair[] = [
     floor: GRAPHIC,
     where: `chart series ${i + 1} on bg-surface`,
   })),
+  // The fills of their own (#641): a gauge's arc, a bar, a span, as graphics.
+  ...(Object.keys(FILL_TOKENS) as ColorToken[])
+    .filter((color) => FILL_TOKENS[color] !== COLOR_TOKENS[color])
+    .map((color) => ({
+      text: FILL_TOKENS[color].slice(2),
+      on: "surface",
+      floor: GRAPHIC,
+      where: `${color} as a fill on bg-surface`,
+    })),
   { text: "primary-foreground", on: "primary", where: "primary button" },
   { text: "primary-foreground", on: "danger", where: "danger button" },
 ];
