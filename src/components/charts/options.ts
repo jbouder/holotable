@@ -139,12 +139,16 @@ export function asInstant(value: unknown): Date | null {
  * timestamp keeps its raw text, and seconds are shown only when some row has
  * them, so a per-minute series does not read `14:05:00, 14:06:00, …`.
  */
-export function timeAxisLabels(values: unknown[], display: TimeDisplay): string[] {
+export function timeAxisLabels(
+  values: unknown[],
+  display: TimeDisplay,
+  { date = true }: { date?: boolean } = {},
+): string[] {
   const instants = values.map(asInstant);
   const seconds = instants.some((d) => d !== null && d.getUTCSeconds() !== 0);
   return values.map((v, i) => {
     const d = instants[i];
-    return d ? formatDateTime(d, display, { seconds }) : toText(v);
+    return d ? formatDateTime(d, display, { seconds, date }) : toText(v);
   });
 }
 
@@ -465,14 +469,14 @@ export const barChart = normalized(buildSeries("bar", false));
 export const scatterChart = normalized((panel, data, { theme, size }) =>
   buildScatter(panel, data, theme, size),
 );
-export const heatmapChart = normalized((panel, data, { display, theme }) =>
-  buildHeatmap(panel, data, display, theme),
+export const heatmapChart = normalized((panel, data, { display, theme, size }) =>
+  buildHeatmap(panel, data, display, theme, size),
 );
-export const pieChart = normalized((panel, data, { theme }) =>
-  buildPie(panel, data, false, theme),
+export const pieChart = normalized((panel, data, { theme, size }) =>
+  buildPie(panel, data, false, theme, size),
 );
-export const donutChart = normalized((panel, data, { theme }) =>
-  buildPie(panel, data, true, theme),
+export const donutChart = normalized((panel, data, { theme, size }) =>
+  buildPie(panel, data, true, theme, size),
 );
 
 /** What a scatter's y axis is called when it carries several series of one format. */
@@ -568,6 +572,71 @@ function buildScatter(
   };
 }
 
+/** A slice label's line and its gaps: what it takes beside the pie besides its text. */
+const PIE_LABEL_LINE_PX = 44;
+/** Below this, a pie's own slice labels give way to its legend when it has one. */
+const PIE_LABELS_MIN_PX = 200;
+
+/**
+ * Where a pie's legend goes at a size, and whether its slices are labelled
+ * (#643). With room, where the panel put it. A right legend that does not
+ * fit moves under the pie, and one under or over it that would take more
+ * than a quarter of the height is dropped for the slices' own labels. The
+ * legend is never paged. Slices are labelled with their names when there is
+ * no legend, and on a small pie that has one only the legend names them;
+ * either way only while the longest name fits beside the pie, never cut to
+ * `er…`: below that the tooltip and the table name the slices.
+ */
+export function pieLayout(
+  position: LegendPosition | undefined,
+  size: ChartSize | undefined,
+  names: readonly string[],
+  textPx: number,
+): { position: LegendPosition; rows: number; labels: boolean } {
+  const asked = position ?? "top";
+  if (!size) return { position: asked, rows: asked === "none" ? 0 : 1, labels: true };
+  const across = (at: "top" | "bottom") => {
+    const rows = legendRows(size.width, names, textPx);
+    return rows * LEGEND_ROW_PX <= size.height * 0.25 ? { position: at, rows } : null;
+  };
+  const placed =
+    asked === "none"
+      ? null
+      : asked === "right"
+        ? legendLayout("right", size, names, textPx).position === "right"
+          ? { position: "right" as const, rows: 1 }
+          : across("bottom")
+        : across(asked);
+  // The room beside the pie (72% of its half side) for a label and its line.
+  const at = placed?.position ?? "none";
+  const radius = 0.72 * (Math.min(size.width, size.height) / 2);
+  const beside = ((at === "right" ? 0.8 : 1) * size.width - 2 * radius) / 2;
+  const longest = names.reduce((a, b) => (b.length > a.length ? b : a), "");
+  const room = textWidth(longest, textPx) + PIE_LABEL_LINE_PX <= beside;
+  if (!placed) return { position: "none", rows: 0, labels: room };
+  return {
+    ...placed,
+    labels: room && Math.min(size.width, size.height) >= PIE_LABELS_MIN_PX,
+  };
+}
+
+/** A pie's legend where `pieLayout` put it, every placement field said, never paged. */
+function pieLegend(position: LegendPosition, theme: ChartTheme): EChartsOption["legend"] {
+  const at = {
+    top: { top: 0, bottom: undefined, left: "center", right: undefined },
+    bottom: { top: undefined, bottom: 0, left: "center", right: undefined },
+    right: { top: "middle", bottom: undefined, left: undefined, right: 0 },
+    none: { top: 0, bottom: undefined, left: "center", right: undefined },
+  }[position];
+  return {
+    show: position !== "none",
+    type: "plain",
+    orient: position === "right" ? "vertical" : "horizontal",
+    ...at,
+    ...legend(theme),
+  };
+}
+
 /**
  * Pie / donut: a proportional breakdown of one categorical label column against
  * one numeric value column. `donut` is a pie with an inner radius. The category
@@ -579,19 +648,25 @@ function buildPie(
   data: PanelData,
   donut: boolean,
   theme: ChartTheme,
+  size: ChartSize | undefined,
 ): EChartsOption {
   const x = xKey(panel, data);
   const valueKey = seriesKeys(panel, data)[0] ?? data.columns.find((c) => c !== x) ?? x;
-  const radius = donut ? ["48%", "72%"] : "72%";
   const o = readOptions(PieOptions, panel.options);
   const number = valueFormatter(panel, numberDisplay(o));
-  // The pie moves off the legend's side, as the series' grid does.
+  const names = data.rows.map((r) => toText(r[x]));
+  const placed = pieLayout(o.legend, size, names, theme.type.axis);
+  // The pie moves off the legend's side, as the series' grid does, and
+  // shrinks by the share of the height a wrapped legend takes.
+  const share = size && placed.rows > 1 ? (placed.rows * LEGEND_ROW_PX) / size.height : 0;
   const center =
-    o.legend === "right"
+    placed.position === "right"
       ? ["40%", "50%"]
-      : o.legend === "bottom" || o.legend === "none"
-        ? ["50%", "46%"]
-        : ["50%", "56%"];
+      : placed.position === "bottom" || placed.position === "none"
+        ? ["50%", `${Math.round(46 - share * 50)}%`]
+        : ["50%", `${Math.round(56 + share * 50)}%`];
+  const outer = Math.round(72 * (1 - share));
+  const radius = donut ? [`${Math.round(outer * (48 / 72))}%`, `${outer}%`] : `${outer}%`;
   return {
     ...shared(theme),
     // A slice is a large area: its color is softened, as a treemap node's is.
@@ -601,7 +676,7 @@ function buildPie(
       trigger: "item",
       ...(number ? { valueFormatter: number } : {}),
     },
-    legend: legendAt(o.legend, theme),
+    legend: pieLegend(placed.position, theme),
     series: [
       {
         type: "pie",
@@ -613,8 +688,10 @@ function buildPie(
         })),
         // Slices part by a hair of surface, with the page's corners.
         itemStyle: block(theme, { edge: 2 }),
-        label: text(theme),
-        labelLine: { lineStyle: { color: theme.line } },
+        // A label that would overlap another waits for the pointer (#643).
+        label: { ...text(theme), show: placed.labels },
+        labelLine: { show: placed.labels, lineStyle: { color: theme.line } },
+        labelLayout: { hideOverlap: true },
       },
     ],
   };
@@ -707,16 +784,76 @@ function valueFormatter(
 
 /** The strip on a heatmap's right edge for its color scale, its handles and their values. */
 const HEATMAP_SCALE_ROOM = 72;
+/** The color scale's bar at its longest, and its shortest. */
+const HEATMAP_SCALE_MAX = 120;
+const HEATMAP_SCALE_MIN = 32;
+/** What an upright scale spends down the chart besides its bar: a value at each end. */
+const HEATMAP_SCALE_CHROME = 56;
+/** Below this width the scale is slim, so the cells keep the width. */
+export const HEATMAP_SLIM_BELOW = 240;
+/** Below this many pixels a cell is drawn without the hair of surface parting it. */
+const HEATMAP_EDGE_MIN_CELL = 4;
+
+/** How a heatmap's color scale is drawn at a size (#643). */
+export interface HeatmapScale {
+  /** No drag handles: the range written at the bar's ends, in a narrower strip. */
+  slim: boolean;
+  /** The bar's length (`itemHeight`). */
+  length: number;
+  /** The strip on the right the grid leaves for it. */
+  strip: number;
+}
+
+/**
+ * How a heatmap's color scale is drawn at a size (#643). Upright in its strip
+ * on the right (#639), 120px long where there is room and the chart's height
+ * less the values at its ends on a short panel, never under 32px. On a narrow
+ * panel the 72px strip would leave the cells a sliver, so the scale goes slim:
+ * no drag handles, the range written above and below the bar, in a strip as
+ * wide as the largest value and as long as the height leaves after it. `maxText` is that value as the scale writes it,
+ * at `textPx`.
+ */
+export function heatmapScale(
+  size: ChartSize | undefined,
+  maxText: string,
+  textPx: number,
+): HeatmapScale {
+  const clamp = (px: number) =>
+    Math.max(HEATMAP_SCALE_MIN, Math.min(HEATMAP_SCALE_MAX, Math.round(px)));
+  if (!size) return { slim: false, length: HEATMAP_SCALE_MAX, strip: HEATMAP_SCALE_ROOM };
+  if (size.width < HEATMAP_SLIM_BELOW) {
+    // The values above and below the bar, and their gaps, come first: a
+    // short panel's slim bar goes down to 12px rather than push them out.
+    return {
+      slim: true,
+      length: Math.max(
+        12,
+        Math.min(HEATMAP_SCALE_MAX, size.height - 2 * (textPx + 10) - 12),
+      ),
+      strip: Math.max(12, textWidth(maxText, textPx)) + 18,
+    };
+  }
+  return {
+    slim: false,
+    length: clamp(size.height - HEATMAP_SCALE_CHROME),
+    strip: HEATMAP_SCALE_ROOM,
+  };
+}
 
 function buildHeatmap(
   panel: Panel,
   data: PanelData,
   display: TimeDisplay,
   theme: ChartTheme,
+  size: ChartSize | undefined,
 ): EChartsOption {
   const [xk, yk, vk] = data.columns;
   const xs = [...new Set(data.rows.map((r) => toText(r[xk])))];
-  const xLabels = panelTimeField(panel) === xk ? timeAxisLabels(xs, display) : xs;
+  const timed = panelTimeField(panel) === xk;
+  const xLabels = timed ? timeAxisLabels(xs, display) : xs;
+  // A narrow heatmap's ticks write the time alone; the tooltip keeps the day (#643).
+  const narrow = timed && size !== undefined && size.width < HEATMAP_SLIM_BELOW;
+  const ticks = narrow ? timeAxisLabels(xs, display, { date: false }) : undefined;
   const ys = [...new Set(data.rows.map((r) => toText(r[yk])))];
   const values = data.rows.map((r) => [
     xs.indexOf(toText(r[xk])),
@@ -724,24 +861,57 @@ function buildHeatmap(
     toNumber(r[vk]) || 0,
   ]);
   const max = Math.max(1, ...values.map((v) => v[2]));
+  // The scale writes its range as its handles do, to whole numbers.
+  const top = String(Math.round(max));
+  const scale = heatmapScale(size, top, theme.type.axis);
+  // A cell under a few pixels wide would be all edge: it goes (#643).
+  const plot = size
+    ? size.width -
+      16 -
+      scale.strip -
+      textWidth(
+        ys.reduce((a, b) => (b.length > a.length ? b : a), ""),
+        theme.type.axis,
+      )
+    : Number.POSITIVE_INFINITY;
+  const cell = plot / Math.max(1, xs.length);
   return {
     ...shared(theme),
     tooltip: { ...tooltip(theme), position: "top" },
     // The color scale stands on the right edge, upright, in a strip of its
     // own: at the bottom it shared the time labels' strip and its handles
     // covered them (#639). The grid holds the row labels whatever they say.
-    grid: { left: 8, right: HEATMAP_SCALE_ROOM, top: 16, bottom: 8, containLabel: true },
-    xAxis: { ...categoryAxis(theme), type: "category", data: xLabels },
+    // A narrow one's strip is as wide as its slim scale (#643). The axis
+    // labels are held inside the chart, the first and last too.
+    grid: {
+      left: 8,
+      right: scale.strip,
+      top: 16,
+      bottom: 8,
+      outerBoundsMode: "same",
+      outerBoundsContain: "all",
+    },
+    xAxis: {
+      ...categoryAxis(theme),
+      type: "category",
+      data: xLabels,
+      axisLabel: {
+        ...categoryAxis(theme).axisLabel,
+        formatter: ticks ? (_: string, i: number) => ticks[i] ?? "" : undefined,
+      },
+    },
     yAxis: { ...categoryAxis(theme), type: "category", data: ys },
     visualMap: {
       min: 0,
       max,
-      calculable: true,
+      // A slim scale writes its range at its ends instead of on handles.
+      calculable: !scale.slim,
+      text: scale.slim ? [top, "0"] : ["", ""],
       orient: "vertical",
       right: 0,
       top: "middle",
       itemWidth: 12,
-      itemHeight: 120,
+      itemHeight: scale.length,
       inRange: { color: [...theme.sequential] },
       textStyle: text(theme),
     },
@@ -751,7 +921,7 @@ function buildHeatmap(
         data: values,
         progressive: 1000,
         // Cells part by a hair of surface, with the page's corners.
-        itemStyle: block(theme, { cap: 3 }),
+        itemStyle: block(theme, { cap: 3, edge: cell < HEATMAP_EDGE_MIN_CELL ? 0 : 1 }),
       },
     ],
   };

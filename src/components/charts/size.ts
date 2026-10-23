@@ -236,3 +236,71 @@ export function legendRows(
   }
   return rows;
 }
+
+/** How a graph's or a flow's node labels are drawn at a size (#643). */
+export interface NodeLabels {
+  /** Draw them; when false they show on hover and focus only. */
+  show: boolean;
+  /** With the node's value after its name; when false, the name alone. */
+  values: boolean;
+  /** A size under the label size, the smallest the chart writes. */
+  small: boolean;
+}
+
+/** A pinned label's padding across, and the gap it keeps to the next. */
+const NODE_LABEL_PAD_PX = 14;
+
+/**
+ * Whether node labels fit a layout of `across` columns and `down` rows
+ * (a graph's layers and the most nodes in one, a flow's stages and the most
+ * nodes in one), each label needing its widest text across and a line down.
+ * Tried in order: full labels, full labels a size smaller, names alone, names
+ * a size smaller; failing all four, no labels, never half-drawn ones. `chrome`
+ * is what the chart spends around the layout in each direction.
+ *
+ * #649 reads it to decide when a graph's block nodes do not fit.
+ */
+export function nodeLabels(
+  size: ChartSize | undefined,
+  {
+    across,
+    down,
+    widest,
+    widestName,
+    textPx,
+    line = textPx + 8,
+    chrome = { width: 0, height: 0 },
+  }: {
+    across: number;
+    down: number;
+    /** The longest label as drawn with its value. */
+    widest: string;
+    /** The longest label as drawn without its value. */
+    widestName: string;
+    textPx: number;
+    /** The height a row needs: the label's line, and the node's own symbol. */
+    line?: number;
+    chrome?: { width: number; height: number };
+  },
+): NodeLabels {
+  if (!size) return { show: true, values: true, small: false };
+  const fits = (label: string, px: number) =>
+    labelBudget(size, across, {
+      along: "width",
+      need: textWidth(label, px) + NODE_LABEL_PAD_PX,
+      chrome: chrome.width,
+    }).show &&
+    labelBudget(size, down, {
+      along: "height",
+      need: line - (textPx - px),
+      chrome: chrome.height,
+    }).show;
+  for (const [values, label] of [
+    [true, widest],
+    [false, widestName],
+  ] as const) {
+    if (fits(label, textPx)) return { show: true, values, small: false };
+    if (fits(label, textPx - 1)) return { show: true, values, small: true };
+  }
+  return { show: false, values: false, small: true };
+}

@@ -2,7 +2,9 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import {
   GAUGE_BAR_MAX,
+  gaugeBarFit,
   gaugeChart,
+  gaugeScale,
   gaugeReadings,
   gaugeShape,
 } from "@/components/charts/gauge";
@@ -14,6 +16,7 @@ import {
   stateColor,
   clipRect,
   stateTimelineChart,
+  timelineLanesFit,
 } from "@/components/charts/state-timeline";
 import { Panel } from "@/lib/ir";
 import { fallbackToken, tokenHex } from "@/lib/panels/colors";
@@ -297,4 +300,124 @@ test("a span is cut to the plot, and one wholly outside it draws nothing", () =>
   });
   assert.equal(clipRect({ x: 120, y: 20, width: 10, height: 10 }, plot), null);
   assert.equal(clipRect({ x: 20, y: 60, width: 10, height: 10 }, plot), null);
+});
+
+/*
+ * Fitting the panel (#643): a dial's proportions follow its ring, a bar
+ * gauge and a timeline draw the rows that fit and count the rest.
+ */
+
+test("a dial's ring, value and limits scale with its radius, between floors and ceilings", () => {
+  const t = DEFAULT_CHART_THEME;
+  // No size: the dial as it always was.
+  assert.deepEqual(gaugeScale(undefined, t, "97.2%", "100.0%"), {
+    ring: 12,
+    value: t.type.value,
+    distance: 38,
+    limits: true,
+  });
+  const small = gaugeScale({ width: 180, height: 120 }, t, "97.2%", "100.0%");
+  const large = gaugeScale({ width: 460, height: 320 }, t, "97.2%", "100.0%");
+  // A small dial's value is smaller than the scale's and its limits go.
+  assert.ok(small.value < t.type.value && small.value >= t.type.label, `${small.value}`);
+  assert.equal(small.limits, false);
+  // A large dial's value grows with it, never past twice the scale's.
+  assert.ok(
+    large.value > t.type.value && large.value <= 2 * t.type.value,
+    `${large.value}`,
+  );
+  assert.equal(large.limits, true);
+  assert.ok(large.ring > small.ring);
+  // The ring stays between 6 and 16, the limits just inside it.
+  for (const s of [
+    small,
+    large,
+    gaugeScale({ width: 2000, height: 2000 }, t, "1", "1"),
+  ]) {
+    assert.ok(s.ring >= 6 && s.ring <= 16);
+    assert.equal(s.distance, s.ring + 8);
+  }
+  // Limits that would touch each other are not written (#643: 300×240).
+  assert.equal(
+    gaugeScale({ width: 280, height: 150 }, t, "54.69%", "100.00%").limits,
+    false,
+  );
+  // A long value is held to the inside of the ring.
+  const long = gaugeScale({ width: 460, height: 320 }, t, "1,234,567.89 ms", "100.0%");
+  assert.ok(long.value < large.value);
+  assert.ok(long.value >= t.type.label);
+});
+
+test("a bar gauge draws the largest readings that fit and counts the rest", () => {
+  assert.deepEqual(gaugeBarFit(undefined, 12), { shown: 12, thickness: 14 });
+  assert.equal(gaugeBarFit({ width: 300, height: 240 }, 4).shown, 4);
+  const small = gaugeBarFit({ width: 140, height: 80 }, 4);
+  assert.ok(small.shown >= 1 && small.shown < 4, `${small.shown}`);
+  assert.ok(small.thickness >= 4 && small.thickness <= 14);
+  // Never none, however small.
+  assert.equal(gaugeBarFit({ width: 20, height: 20 }, 4).shown, 1);
+
+  const p = Panel.parse({
+    id: "g",
+    title: "Memory",
+    viz: "gauge",
+    query: { sourceId: "s", sql: "SELECT 1" },
+    options: { variant: "bar" },
+    layout: LAYOUT,
+  });
+  const data: PanelData = {
+    columns: ["host", "used"],
+    rows: ["a", "b", "c", "d"].map((host, i) => ({ host, used: 10 * (i + 1) })),
+  };
+  const option = gaugeChart(p, data, { ...CTX, size: { width: 140, height: 80 } }) as {
+    yAxis: { data: string[] };
+    title: { text: string };
+  };
+  // The largest first: what is left out is the smallest.
+  assert.equal(option.yAxis.data[0], "d");
+  assert.equal(option.title.text, `+${4 - option.yAxis.data.length} more`);
+  const roomy = gaugeChart(p, data, CTX) as { title: { text: string } };
+  assert.equal(roomy.title.text, "");
+});
+
+test("a timeline's lanes never vanish: the ones that fit are drawn, the rest counted", () => {
+  assert.deepEqual(timelineLanesFit(undefined, 4), { shown: 4, labels: true });
+  assert.deepEqual(timelineLanesFit({ width: 400, height: 260 }, 4), {
+    shown: 4,
+    labels: true,
+  });
+  // Bars that fit without their names: the names go, the bars stay.
+  assert.deepEqual(timelineLanesFit({ width: 200, height: 90 }, 4), {
+    shown: 4,
+    labels: false,
+  });
+  const tiny = timelineLanesFit({ width: 140, height: 60 }, 4);
+  assert.ok(tiny.shown >= 1 && tiny.shown < 4);
+
+  const p = Panel.parse({
+    id: "t",
+    title: "Load",
+    viz: "state-timeline",
+    query: { sourceId: "s", sql: "SELECT 1", timeField: "ts" },
+    layout: LAYOUT,
+  });
+  const data: PanelData = {
+    columns: ["ts", "host", "state"],
+    rows: ["a", "b", "c", "d"].map((host) => ({
+      ts: "2026-10-11T10:00:00Z",
+      host,
+      state: "ok",
+    })),
+  };
+  const option = stateTimelineChart(p, data, {
+    ...CTX,
+    size: { width: 140, height: 60 },
+  }) as {
+    yAxis: { data: string[] };
+    title: { text: string };
+    series: { data: unknown[] }[];
+  };
+  assert.ok(option.yAxis.data.length >= 1);
+  assert.equal(option.series[0]?.data.length, option.yAxis.data.length);
+  assert.equal(option.title.text, `+${4 - option.yAxis.data.length} more not shown`);
 });

@@ -21,6 +21,7 @@ import {
   tooltip,
 } from "@/components/charts/style";
 import { StateTimelineOptions } from "@/lib/panels/kinds/state-timeline";
+import { type ChartSize, labelBudget } from "@/components/charts/size";
 import { formatDateTime, type TimeDisplay } from "@/lib/time-display";
 
 /**
@@ -261,7 +262,10 @@ function renderSpan(timeline: StateTimeline, theme: ChartTheme): CustomSeriesRen
       style: { fill: api.visual("color") },
     };
     const state = timeline.spans[params.dataIndex]?.state ?? "";
-    if (shape.width < 48 || state === "") return rect;
+    // The state is written in a span with room for the word, across and up.
+    const label = blockLabel(theme);
+    if (shape.width < 48 || shape.height < label.fontSize + 2 || state === "")
+      return rect;
     return {
       type: "group",
       children: [
@@ -275,7 +279,7 @@ function renderSpan(timeline: StateTimeline, theme: ChartTheme): CustomSeriesRen
             y: shape.y + shape.height / 2,
             verticalAlign: "middle",
             fill: inkOn(String(api.visual("color"))),
-            ...blockLabel(theme),
+            ...label,
             width: shape.width - 12,
             overflow: "truncate",
           },
@@ -299,8 +303,60 @@ function spanTooltip(timeline: StateTimeline, display: TimeDisplay) {
   };
 }
 
+/** The least a lane is drawn at: its span's bar is 60% of it. */
+const LANE_MIN_PX = 12;
+/** A lane that also writes its name beside it: a line of label text. */
+const LANE_LABEL_PX = 16;
+/** What the timeline spends down the chart besides its lanes: the time axis and margins. */
+const TIMELINE_CHROME_PX = 36;
+/** Below this width a timeline's axis writes times without their day. */
+const TIMELINE_DATES_PX = 240;
+/** The note under the lanes that counts the ones not drawn. */
+const TIMELINE_NOTE_PX = 16;
+
+/**
+ * How many lanes a timeline draws at a size, and whether their names fit
+ * (#643). Every lane while each has room for its bar; past that the first
+ * lanes that do, at least one, and the rest are counted in the note, so the
+ * bars never vanish. Names are written while each lane has a line of text,
+ * and left to the tooltip and the table below that.
+ */
+export function timelineLanesFit(
+  size: ChartSize | undefined,
+  count: number,
+): { shown: number; labels: boolean } {
+  const all = labelBudget(size, count, { need: LANE_MIN_PX, chrome: TIMELINE_CHROME_PX });
+  const shown = all.show
+    ? count
+    : Math.max(
+        1,
+        Math.floor(
+          ((size?.height ?? 0) - TIMELINE_CHROME_PX - TIMELINE_NOTE_PX) / LANE_MIN_PX,
+        ),
+      );
+  const labels = labelBudget(size, Math.min(count, shown), {
+    need: LANE_LABEL_PX,
+    chrome: TIMELINE_CHROME_PX + (shown < count ? TIMELINE_NOTE_PX : 0),
+  }).show;
+  return { shown: Math.min(count, shown), labels };
+}
+
 export const stateTimelineChart: ChartOptionBuilder = normalized((panel, data, ctx) => {
-  const timeline = buildStateTimeline(panel, data, ctx.window);
+  const built = buildStateTimeline(panel, data, ctx.window);
+  const fit = timelineLanesFit(ctx.size, built.lanes.length);
+  // The lanes past the ones that fit are counted, not drawn. Spans run lane
+  // by lane, so the ones kept are the first and keep their indices, which is
+  // what a click maps back through (#373).
+  const timeline: StateTimeline = {
+    ...built,
+    lanes: built.lanes.slice(0, fit.shown),
+    spans: built.spans.filter((s) => s.lane < fit.shown),
+    hiddenLanes: built.hiddenLanes + built.lanes.length - fit.shown,
+  };
+  // A narrow timeline's axis writes the time alone, and half a time is the
+  // room an edge label needs.
+  const dates = !ctx.size || ctx.size.width >= TIMELINE_DATES_PX;
+  const edge = dates ? 48 : 32;
   return {
     ...shared(ctx.theme),
     tooltip: {
@@ -317,7 +373,17 @@ export const stateTimelineChart: ChartOptionBuilder = normalized((panel, data, c
     },
     // Room on the right for the last time label, which is centred on the
     // window's end.
-    grid: { left: 8, right: 48, top: 8, bottom: 40, containLabel: true },
+    // The lane names make that room on the left; without them the first
+    // label has the same room as the last (#643).
+    grid: {
+      left: fit.labels ? 8 : edge,
+      right: edge,
+      top: 8,
+      bottom: timeline.hiddenLanes > 0 ? 8 + TIMELINE_NOTE_PX : 8,
+      // The axis labels are held inside the chart, the first and last too.
+      outerBoundsMode: "same",
+      outerBoundsContain: "all",
+    },
     xAxis: {
       type: "time",
       min: timeline.from,
@@ -326,8 +392,16 @@ export const stateTimelineChart: ChartOptionBuilder = normalized((panel, data, c
       axisLabel: {
         ...text(ctx.theme),
         hideOverlap: true,
+        // The first and last labels stay inside a narrow panel, not centred
+        // off its edges (#643).
+        alignMinLabel: "left",
+        alignMaxLabel: "right",
+        // A narrow timeline writes the time alone: the day is in the tooltip.
         formatter: (v: number) =>
-          formatDateTime(new Date(v), ctx.display, { seconds: false }),
+          formatDateTime(new Date(v), ctx.display, {
+            seconds: false,
+            date: dates,
+          }),
       },
     },
     yAxis: {
@@ -335,6 +409,8 @@ export const stateTimelineChart: ChartOptionBuilder = normalized((panel, data, c
       type: "category",
       inverse: true,
       data: timeline.lanes,
+      // Each lane drawn has its line when names are written, so none is skipped.
+      axisLabel: { ...text(ctx.theme), show: fit.labels, interval: 0 },
     },
     series: [
       {

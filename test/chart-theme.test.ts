@@ -440,8 +440,27 @@ test("every chart kind writes in the page's font, at the chart scale, with the s
       [],
       `${name} writes in another face`,
     );
+    // The one exception is the dial's value, which `gaugeScale` sizes to its
+    // ring (#643), between the label size and twice the value size.
+    const detail = collect(option, "detail");
+    const values = collect(detail, "fontSize") as number[];
+    for (const v of values) {
+      assert.ok(
+        Number.isInteger(v) && v >= DISTINCT.type.label && v <= DISTINCT.type.value * 2,
+        `${name}: the value at ${v}`,
+      );
+    }
+    const others = collect(
+      {
+        ...option,
+        series: collect(option, "series")
+          .flat()
+          .map((s) => ({ ...(s as object), detail: undefined })),
+      },
+      "fontSize",
+    );
     assert.deepEqual(
-      collect(option, "fontSize").filter((s) => !scale.has(s as number)),
+      others.filter((s) => !scale.has(s as number)),
       [],
       `${name} writes off the scale`,
     );

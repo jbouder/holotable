@@ -88,6 +88,33 @@ is merged into the same chart, which is never recreated. On `line`, `area`,
 - a scatter drops its x axis name below 180px high and its y axis name below
   240px wide.
 
+The other chart kinds follow the same rule: a label is drawn whole or not at
+all, and one that is not drawn shows on hover and focus, in the tooltip and in
+the table.
+
+- `gauge` (radial): the ring's width, the value's size and the limits' inset
+  follow the ring's radius, between floors and ceilings, so the value never
+  covers the ring on a small dial and is not lost in a large one; the min and
+  max are written only where they touch neither each other nor the value.
+- `gauge` (bar): as many readings as have a row, largest first, with a
+  `+N more` note for the rest; each bar's thickness follows its row.
+- `pie`, `donut`: a right legend that does not fit moves under the chart, one
+  that would take more than a quarter of the height is dropped for the
+  slices' own labels, and the legend is never paged; slice labels are drawn
+  only while the longest name fits beside the pie.
+- `graph` (tree, dag, force) and `sankey`: node labels are drawn in full,
+  a size smaller, as names without their values, or not at all, whichever is
+  the first to fit the layout's columns and rows; the dag's margins follow the
+  widest label it draws.
+- `state-timeline`: every lane keeps a bar at least 12px tall; lanes past
+  what fits are counted in the note under the chart, lane names are written
+  only while each lane has a line of text, and a state is written only in a span
+  tall and wide enough for it. Below 240px wide the time axis leaves out the day.
+- `heatmap`: the color scale shortens on a short panel; below 240px wide it
+  goes slim, with no drag handles and its range written at its ends, and the
+  time axis leaves out the day. Cells too thin to part are drawn without the
+  hair of surface between them.
+
 The screen-reader table beside a chart is the same at every size.
 
 ```json

@@ -17,6 +17,7 @@ import {
   toText,
 } from "@/components/charts/options";
 import { formatValue } from "@/lib/format";
+import { type ChartSize, labelBudget, textWidth } from "@/components/charts/size";
 import type { Panel } from "@/lib/ir";
 import { type ColorToken, fillHex } from "@/lib/panels/colors";
 import { GaugeOptions } from "@/lib/panels/kinds/gauge";
@@ -153,16 +154,94 @@ function bands(
   return stops;
 }
 
+/** How a dial is drawn at a size: its ring, its value and its limits. */
+export interface GaugeScale {
+  /** The ring's width. */
+  ring: number;
+  /** The value's text size. */
+  value: number;
+  /** How far inside the ring the limits are written. */
+  distance: number;
+  /** Write the min and max at the ends of the ring. */
+  limits: boolean;
+}
+
+/** The dial's radius as a share of the chart's shorter side (`radius: "92%"`). */
+const DIAL_RADIUS = 0.46;
+/** Below this radius the limits are left to the tooltip-less dial's table. */
+const LIMITS_MIN_RADIUS = 56;
+
+/** A dial's limits sit this far inside its ring. */
+const LIMITS_INSET = 8;
+/** The least gap kept between two limits, and between a limit and the value. */
+const LIMITS_GAP = 6;
+/** The angle below the horizontal the ring ends at (`startAngle: 215`, `endAngle: -35`). */
+const RING_END = (35 * Math.PI) / 180;
+
+/**
+ * A dial's proportions at a size (#643): the ring, the value's text and the
+ * limits' distance as shares of the ring's radius, between floors and
+ * ceilings, so a small dial's value never covers its ring and a large one's
+ * is not lost in it. The value is as large as a third of the radius, no
+ * wider than the inside of the ring, and between the label size and twice
+ * the scale's value size. The limits sit just inside the ring's ends, and are
+ * written only on a ring big enough and only where they touch neither each
+ * other nor the value; the table still says them. No size is the dial as it
+ * was drawn before.
+ *
+ * ECharts writes a limit `distance` inside the ring's outer edge (the hidden
+ * split line has no length or gap of its own here), aligned inward: the min's
+ * left edge and the max's right edge are at the ring's ends.
+ */
+export function gaugeScale(
+  size: ChartSize | undefined,
+  theme: ChartTheme,
+  valueText: string,
+  limitText: string,
+): GaugeScale {
+  if (!size) return { ring: 12, value: theme.type.value, distance: 38, limits: true };
+  const radius = DIAL_RADIUS * Math.min(size.width, size.height);
+  const ring = Math.round(Math.min(16, Math.max(6, radius * 0.1)));
+  const inside = Math.max(0, radius - ring);
+  const chars = Math.max(1, valueText.length);
+  const value = Math.round(
+    Math.min(
+      theme.type.value * 2,
+      Math.max(theme.type.label, Math.min(radius / 3, (1.4 * inside) / (chars * 0.62))),
+    ),
+  );
+  const distance = ring + LIMITS_INSET;
+  const reach = Math.max(0, radius - distance);
+  // The limits' inner edges, from the centre, and how far below it they sit;
+  // the value sits 8% of the radius below the centre.
+  const inner = Math.cos(RING_END) * reach - textWidth(limitText, theme.type.axis);
+  const below = Math.sin(RING_END) * reach - 0.08 * radius;
+  const eachOther = 2 * inner >= LIMITS_GAP;
+  const ofValue =
+    inner - textWidth(valueText, value) / 2 >= LIMITS_GAP ||
+    Math.abs(below) - (value + theme.type.axis) / 2 >= LIMITS_GAP / 2;
+  return {
+    ring,
+    value,
+    distance,
+    limits: radius >= LIMITS_MIN_RADIUS && eachOther && ofValue,
+  };
+}
+
 function radial(
   panel: Panel,
   reading: GaugeReading | undefined,
   theme: ChartTheme,
+  size: ChartSize | undefined,
 ): EChartsOption {
   const min = reading?.min ?? DEFAULT_MIN;
   const max = reading?.max ?? DEFAULT_MAX;
   // Clamped for the drawing; the text below says what it really is.
   const drawn = reading ? Math.min(max, Math.max(min, reading.value)) : min;
   const text = reading?.text ?? "—";
+  const limit = (v: number) => formatValue(v, panel.format, gaugeOptions(panel));
+  const longer = [limit(min), limit(max)].sort((a, b) => b.length - a.length)[0] ?? "";
+  const scale = gaugeScale(size, theme, text, longer);
   return {
     ...shared(theme),
     tooltip: { show: false },
@@ -177,29 +256,31 @@ function radial(
         center: ["50%", "58%"],
         progress: {
           show: true,
-          width: 12,
+          width: scale.ring,
           roundCap: theme.radius > 0,
           itemStyle: { color: fillHex(reading?.color ?? DEFAULT_COLOR, theme) },
         },
         axisLine: {
           roundCap: theme.radius > 0,
-          lineStyle: { width: 12, color: bands(panel, min, max, theme) },
+          lineStyle: { width: scale.ring, color: bands(panel, min, max, theme) },
         },
         pointer: { show: false },
         anchor: { show: false },
         axisTick: { show: false },
-        splitLine: { show: false },
+        // No length or gap of its own: the limits' distance is all of their inset.
+        splitLine: { show: false, length: 0, distance: 0 },
         splitNumber: 1,
         axisLabel: {
           ...textStyle(theme),
-          distance: 18,
-          formatter: (v: number) => formatValue(v, panel.format, gaugeOptions(panel)),
+          show: scale.limits,
+          distance: scale.distance,
+          formatter: limit,
         },
         title: { show: false },
         detail: {
           valueAnimation: false,
           offsetCenter: [0, "8%"],
-          ...valueText(theme),
+          ...valueText(theme, scale.value),
           formatter: () => text,
         },
         data: [{ value: drawn, name: reading?.label ?? "" }],
@@ -208,10 +289,57 @@ function radial(
   };
 }
 
-function bars(readings: GaugeReading[], theme: ChartTheme): EChartsOption {
+/** A bar's row: its label's line and a gap. */
+const BAR_ROW_PX = 18;
+/** The room a `+N more` note takes under the bars. */
+const BAR_NOTE_PX = 18;
+
+/**
+ * How many of a bar gauge's readings fit at a size, largest first, and how
+ * thick each bar is (#643): every reading while each has its row, else as
+ * many as fit with room kept for a `+N more` note, at least one. A bar is
+ * 60% of its row, between 4 and 14 pixels.
+ */
+export function gaugeBarFit(
+  size: ChartSize | undefined,
+  count: number,
+): { shown: number; thickness: number } {
+  const budget = labelBudget(size, count, { need: BAR_ROW_PX, chrome: 16 });
+  const shown = budget.show
+    ? count
+    : Math.max(1, Math.floor(((size?.height ?? 0) - 16 - BAR_NOTE_PX) / BAR_ROW_PX));
+  const room = budget.show ? budget.room : BAR_ROW_PX;
+  return {
+    shown: Math.min(count, shown),
+    thickness: Math.round(Math.min(14, Math.max(4, room * 0.6))),
+  };
+}
+
+function bars(
+  all: GaugeReading[],
+  theme: ChartTheme,
+  size: ChartSize | undefined,
+): EChartsOption {
+  // Largest first already: the ones that do not fit are the smallest.
+  const fit = gaugeBarFit(size, all.length);
+  const readings = all.slice(0, fit.shown);
+  const more = all.length - readings.length;
   return {
     ...shared(theme),
-    grid: { left: 8, right: 64, top: 8, bottom: 8, containLabel: true },
+    // Always set, so a note that is no longer needed clears.
+    title: {
+      text: more > 0 ? `+${more} more` : "",
+      right: 0,
+      bottom: 0,
+      textStyle: { ...textStyle(theme), fontWeight: "normal" },
+    },
+    grid: {
+      left: 8,
+      right: 64,
+      top: 8,
+      bottom: more > 0 ? 8 + BAR_NOTE_PX : 8,
+      containLabel: true,
+    },
     tooltip: {
       ...tooltip(theme),
       trigger: "item",
@@ -227,14 +355,15 @@ function bars(readings: GaugeReading[], theme: ChartTheme): EChartsOption {
       type: "category",
       inverse: true,
       data: readings.map((r) => r.label),
-      axisLabel: textStyle(theme),
+      // Every row drawn has room for its label (gaugeBarFit), so none is skipped.
+      axisLabel: { ...textStyle(theme), interval: 0 },
       axisLine: { show: false },
       axisTick: { show: false },
     },
     series: [
       {
         type: "bar",
-        barMaxWidth: 14,
+        barMaxWidth: fit.thickness,
         showBackground: true,
         backgroundStyle: { color: theme.track, ...barCorners(theme, true) },
         data: readings.map((r) => ({
@@ -253,12 +382,14 @@ function bars(readings: GaugeReading[], theme: ChartTheme): EChartsOption {
   };
 }
 
-export const gaugeChart: ChartOptionBuilder = normalized((panel, data, { theme }) => {
-  const readings = gaugeReadings(panel, data);
-  return gaugeOptions(panel).variant === "bar"
-    ? bars(readings, theme)
-    : radial(panel, readings[0], theme);
-});
+export const gaugeChart: ChartOptionBuilder = normalized(
+  (panel, data, { theme, size }) => {
+    const readings = gaugeReadings(panel, data);
+    return gaugeOptions(panel).variant === "bar"
+      ? bars(readings, theme, size)
+      : radial(panel, readings[0], theme, size);
+  },
+);
 
 /** A dial and a bar list are different charts: switching remounts, data never does. */
 export function gaugeShape(panel: Panel): string {

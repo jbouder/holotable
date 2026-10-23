@@ -97,7 +97,12 @@ says how a section gets here.
   overlap another, and writes large numbers compactly (`60M`) when narrow; a
   legend that does not fit is left out instead of covering the plot, and a
   small scatter drops its axis names. Resizing a panel, the fullscreen
-  expand and a window resize update the chart in place.
+  expand and a window resize update the chart in place. The other chart
+  kinds fit too: a dial scales its ring, value and limits to its radius; a
+  bar gauge and a state timeline draw the rows that fit and count the rest;
+  a pie's legend moves under it or gives way to slice labels, never paged;
+  graph and sankey labels are drawn whole, smaller, without values, or on
+  hover only; and a narrow heatmap's color scale goes slim.
 
 ## 0.2.0 — 2026-10-11
 
