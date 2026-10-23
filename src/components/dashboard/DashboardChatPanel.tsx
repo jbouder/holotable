@@ -74,7 +74,7 @@ export default function DashboardChatPanel({
   aiUnavailable: renderedUnavailable,
   open,
   setOpen,
-  launcherRef,
+  focusAfterClose,
 }: {
   dashboardId: string;
   /** The dashboard's workspace: whose models the chip lists (#442). */
@@ -96,7 +96,8 @@ export default function DashboardChatPanel({
   /** Owned by the launcher shell (`DashboardChat.tsx`), which loads this on first open. */
   open: boolean;
   setOpen: (open: boolean) => void;
-  launcherRef: React.RefObject<HTMLButtonElement | null>;
+  /** Where focus goes when the chat closes from inside it: the launcher, or the page. */
+  focusAfterClose: () => void;
 }) {
   const [input, setInput] = React.useState("");
   const [loadedHistory, setLoadedHistory] = React.useState(false);
@@ -173,16 +174,16 @@ export default function DashboardChatPanel({
     inputRef.current?.focus();
   }, [request, setOpen]);
 
-  // Focus the message box on open, and give focus back to the launcher when
-  // the chat closes from inside it.
+  // Focus the message box on open, and give focus back (to the launcher, or
+  // the page when it is hidden, #642) when the chat closes from inside it.
   React.useEffect(() => {
     if (open) {
       inputRef.current?.focus();
     } else if (returnFocus.current) {
       returnFocus.current = false;
-      launcherRef.current?.focus();
+      focusAfterClose();
     }
-  }, [open, launcherRef]);
+  }, [open, focusAfterClose]);
 
   // Load the stored conversation once, on first open. A failure leaves the
   // widget usable and unseeded, which is exactly what it was before #82.

@@ -37,6 +37,10 @@ import {
  * expects a new dashboard there to start on it, on any device. It is written
  * by the server when a generation names a model, not by the settings form.
  *
+ * Whether the dashboard chat's button is drawn (`dashboardChatButton`, #642)
+ * syncs too: it is a choice about the person, read by the dashboard page on
+ * the server.
+ *
  * Chart patterns (`chartPatterns`) sync too, though they look like an
  * appearance setting: they are an accessibility need of the person (telling
  * series apart without color), and they apply when a chart draws, after
@@ -132,6 +136,7 @@ export const PREFERENCE_FIELDS = {
   }),
   chatShowQueries: z.boolean({ error: "must be true or false" }),
   rememberChats: z.boolean({ error: "must be true or false" }),
+  dashboardChatButton: z.boolean({ error: "must be true or false" }),
   modelByWorkspace: ModelByWorkspaceSchema,
 } as const;
 
@@ -164,6 +169,11 @@ export interface Preferences {
    * stored one.
    */
   rememberChats: boolean;
+  /**
+   * Draw the dashboard chat's launcher button (#642). Off, the chat still
+   * opens from its shortcut and a panel's "Ask about this panel".
+   */
+  dashboardChatButton: boolean;
   /** The model last picked in each workspace (#442), by workspace id. */
   modelByWorkspace: Record<string, string>;
 }
@@ -184,6 +194,7 @@ export const DEFAULT_PREFERENCES: Preferences = {
   chatRefreshMs: 0,
   chatShowQueries: false,
   rememberChats: true,
+  dashboardChatButton: true,
   modelByWorkspace: {},
 };
 

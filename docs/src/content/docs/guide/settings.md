@@ -27,7 +27,7 @@ bookmark one or send it to someone.
 | --- | --- | --- |
 | Account | `/settings/account` | Your name, email and user id, the workspaces you can reach with your role in each, and what every role allows |
 | Appearance | `/settings/appearance` | Theme, whether the interface and charts animate, and patterns in charts |
-| Preferences | `/settings/preferences` | Time zone, 12 or 24 hour clock, the page you land on after signing in, how the dashboard list opens, and Explore's live refresh, open queries and whether your conversations are kept |
+| Preferences | `/settings/preferences` | Time zone, 12 or 24 hour clock, the page you land on after signing in, how the dashboard list opens, whether dashboards draw the chat button, and Explore's live refresh, open queries and whether your conversations are kept |
 | Local data | `/settings/local-data` | What this browser remembers, with a way to clear each part |
 | Keyboard shortcuts | `/settings/shortcuts` | Every key binding, grouped by where it works |
 | Workspaces | `/settings/workspaces` | AI usage and limits. Listed only if you are a source-admin somewhere or a platform admin |
@@ -89,6 +89,12 @@ access to it, you land on the list with a one-time notice instead.
 **Dashboard list** defaults set the sort order and whether only your
 favorites are shown. A link that names a sort or filter still wins.
 
+**Dashboard chat**: **Show the chat button on dashboards** is on by default.
+Off, a dashboard draws no chat button over its panels
+([#642](https://github.com/jbouder/holotable/issues/642)), and the chat still
+opens with <kbd>C</kbd> or a panel's **Ask about this panel**. Closing it then
+puts focus back on the page.
+
 **History** turns each kind of recent on or off: recent prompts (with the
 source you last generated a dashboard from), recently viewed dashboards, and
 command palette history. All are on by default. Off means nothing is recorded,
@@ -147,7 +153,7 @@ once. See [Service-account API tokens](/integrations/api-tokens/).
 
 | Setting | Stored | Why |
 | --- | --- | --- |
-| Time zone, clock, start page, dashboard list defaults, Explore defaults, which recents to keep | Server, per user | They are choices about you, and should survive a new laptop or a cleared browser |
+| Time zone, clock, start page, dashboard list defaults, the dashboard chat button, Explore defaults, which recents to keep | Server, per user | They are choices about you, and should survive a new laptop or a cleared browser |
 | Theme, motion | This browser | They must apply before the page first draws, which cannot wait for the server. A device-specific choice is often what people want anyway |
 | Drafts, recents, dismissed hints | This browser | They describe what you did on this device |
 | Explore conversations | Server, per user, readable only by you | So a question can be continued on another device. Never a result row: panels run again when opened. Bounded by `CHAT_CONVERSATIONS_MAX` and the chat history limits; **Keep my conversations** off stores none and deletes what was kept |

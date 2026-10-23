@@ -19,6 +19,7 @@ import {
   type ChatTimeRange,
 } from "@/lib/chat/defaults";
 import { LOCAL_STORES } from "@/lib/local-data";
+import { CHAT_OPEN_SHORTCUT } from "@/lib/shortcuts";
 import { browserStorage } from "@/lib/browser-storage";
 import { formatDateTime, runtimeTimeZone } from "@/lib/time-display";
 
@@ -241,6 +242,21 @@ export function PreferencesForm({
             onCheckedChange={(checked) => void save({ favoritesOnly: checked })}
             label="Only my favorites"
           />
+          <span className="text-sm">Dashboard chat</span>
+          <div className="space-y-1">
+            <Checkbox
+              checked={prefs.dashboardChatButton}
+              onCheckedChange={(checked) => void save({ dashboardChatButton: checked })}
+              label="Show the chat button on dashboards"
+            />
+            <p className="pl-6 text-xs text-muted">
+              Off, the chat still opens with{" "}
+              <kbd className="border border-border bg-surface-2 px-1 font-mono">
+                {CHAT_OPEN_SHORTCUT.key.toUpperCase()}
+              </kbd>{" "}
+              or a panel&apos;s &ldquo;Ask about this panel&rdquo;.
+            </p>
+          </div>
         </CardContent>
       </Card>
 

@@ -287,6 +287,51 @@ test("dashboard chat answers in the panel", async ({ page, request }) => {
   await chat.getByRole("button", { name: "Clear chat" }).click();
 });
 
+test(
+  "with the chat button turned off, the dashboard chat still opens",
+  SERIAL,
+  async ({ page, request }) => {
+    // Serial: the preference is the person's, on every dashboard, and other
+    // tests click the launcher.
+    await page.goto("/settings/preferences");
+    const setting = page.getByRole("checkbox", {
+      name: "Show the chat button on dashboards",
+    });
+    await expect(setting).toBeChecked();
+    try {
+      await setting.click();
+      await expect(page.getByText("Saved to your account.")).toBeVisible();
+      // It is stored for the person, so it follows them to another browser.
+      const saved = await (await request.get("/api/me/preferences")).json();
+      expect(saved.dashboardChatButton).toBe(false);
+
+      await page.goto(`/dashboards/${await copyDashboard(request, DEMO_DASHBOARD)}`);
+      await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
+      await expect(
+        page.getByRole("button", { name: "Ask about this dashboard" }),
+      ).toHaveCount(0);
+
+      // The shortcut opens it, and closing leaves focus on the page.
+      const chat = page.getByRole("dialog", { name: "Dashboard chat" });
+      // Retried: the shortcut is bound once the page has hydrated.
+      await expect(async () => {
+        await page.keyboard.press("c");
+        await expect(chat).toBeVisible({ timeout: 1_000 });
+      }).toPass();
+      await chat.getByRole("textbox", { name: "Message" }).press("Escape");
+      await expect(chat).toHaveCount(0);
+      await expect(page.locator("#main")).toBeFocused();
+
+      // So does a panel's "Ask about this panel".
+      await page.getByRole("button", { name: "Actions for 5xx error rate" }).click();
+      await page.getByRole("menuitem", { name: "Ask about this panel" }).click();
+      await expect(chat).toBeVisible();
+    } finally {
+      await request.patch("/api/me/preferences", { data: { dashboardChatButton: true } });
+    }
+  },
+);
+
 test("a deleted source tombstones the panels that used it", async ({ page, request }) => {
   const id = `e2e-gone-${unique()}`;
   const name = `Doomed ${id}`;

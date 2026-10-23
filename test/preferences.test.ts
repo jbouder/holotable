@@ -228,6 +228,13 @@ test("Chat's preferences default to keeping conversations, with nothing refreshi
   assert.equal(prefs.rememberChats, true);
   assert.equal(prefs.chatRefreshMs, 0);
   assert.equal(prefs.chatShowQueries, false);
+  // The dashboard chat's button is drawn unless the person turns it off (#642).
+  assert.equal(prefs.dashboardChatButton, true);
+  assert.equal(
+    parsePreferences({ dashboardChatButton: false }).dashboardChatButton,
+    false,
+  );
+  assert.equal(parsePreferencesPatch({ dashboardChatButton: "off" }).ok, false);
   const patch = parsePreferencesPatch({ chatRefreshMs: 45_000 });
   assert.equal(patch.ok, false);
   assert.deepEqual(
