@@ -1630,6 +1630,18 @@ test("THEME_FILE: unreadable, malformed and below the bar each stop a production
     ["THEME_DEFAULT_PALETTE"],
   );
 
+  // #648: `shadow` is optional (graphite's export names none) and a name,
+  // not CSS; the default's export, which names one, loads too.
+  assert.equal("shadow" in good, false);
+  assert.deepEqual(check(write("lifted.json", { ...good, shadow: "lifted" })), []);
+  assert.deepEqual(
+    check(write("holotable.json", exportTheme(css, "holotable", "acme"))),
+    [],
+  );
+  const badShadow = check(write("shadow.json", { ...good, shadow: "0 0 4px red" }));
+  assert.equal(badShadow[0]?.severity, "error");
+  assert.match(badShadow[0]?.message ?? "", /shadow/);
+
   const missing = check(join(dir, "nope.json"));
   assert.equal(missing[0]?.severity, "error");
   assert.match(missing[0]?.message ?? "", /could not be read/);

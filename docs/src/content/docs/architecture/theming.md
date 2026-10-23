@@ -87,7 +87,7 @@ colors, so a built-in theme can set it in its blocks:
 | Token | Default | Used for |
 | --- | --- | --- |
 | `--font-sans` | Chakra Petch | All chart text, ECharts and Vega |
-| `--radius` | `0` | Tooltip corners; bars at half; slices, cells, nodes and labels up to 4px |
+| `--radius` | `6px` | Tooltip corners; bars at half; slices, cells, nodes and labels up to 4px |
 | `--surface-3` | | What a tooltip sits on |
 | `--chart-font-size-axis` | `11px` | Axis labels, legend entries, pie labels, corner notes |
 | `--chart-font-size-label` | `11px` | Labels on a node, block or span (an edge's is 1px smaller) |
@@ -115,8 +115,8 @@ band stays visible. Its 2px line is on top of it, and a 1px line of
 drawn after the one above it so neither is covered. Only an unstacked area
 fades.
 
-A theme file (`THEME_FILE`) sets colors and `radius`; it inherits these
-defaults, as it does the chart chrome aliases.
+A theme file (`THEME_FILE`) sets colors, `radius` and `shadow`; it inherits
+these defaults, as it does the chart chrome aliases.
 
 ## Selector convention
 
@@ -137,7 +137,22 @@ schemes. The
 [Themes](/guide/themes/) guide shows them and says what each is for. A
 theme sets every color token itself, so its intent does not depend on
 Holotable's values, and inherits only the aliases (`--chart-text`, the
-`--code-*` colors). Paper also sets `--radius`, the only theme that rounds.
+`--code-*` colors).
+
+Holotable's look is its own too (#648): 6px corners (`--radius`), a card
+lifted on a two-layer shadow (`--shadow-card`, which `Card` draws), and
+gridlines a step below `--surface-2` (`--chart-grid`). Every other theme sets
+those three itself (square, the subtle shadow Tailwind calls `shadow-sm`, and
+`--surface-2`; Paper rounds to 4px), so a change to the default's look never
+reaches them. A theme file gets the same: `themeCss` writes its `radius`,
+`shadow` and `chart-grid`, or the square, subtle, `--surface-2` fallbacks.
+
+In light, Holotable is the first theme whose `--orange` is not an alias. Its
+`--chart-3` is a bright amber held to 3:1 as a graphic, and the spec's
+`orange` is also text (a stat's number), held to AA, so `--orange` takes its
+own value a shade darker. `--warning` is the lightest amber that stays AA on
+its own 20% tint and apart from `--success` and `--danger` under every
+color-vision deficiency `quality.ts` checks.
 
 An operator can add one more without a pull request: `THEME_FILE`, a JSON
 file of token values held to the operator tier at boot. The root layout

@@ -3,7 +3,10 @@ import { pathToFileURL } from "node:url";
 import { parseThemeDecls } from "@/lib/color/contrast";
 import {
   checkThemeFile,
+  OPTIONAL_THEME_FILE_TOKENS,
   parseThemeFile,
+  SHADOWS,
+  type Shadow,
   THEME_FILE_TOKENS,
 } from "@/lib/color/theme-file";
 import { PALETTE_INFO } from "@/lib/theme";
@@ -29,9 +32,21 @@ export function exportTheme(css: string, palette: string, as?: string) {
       const alias = v && /^var\(--([a-z0-9-]+)\)$/.exec(v);
       return alias ? value(alias[1]) : v;
     };
-    return Object.fromEntries(THEME_FILE_TOKENS.map((t) => [t, value(t)]));
+    const tokens = Object.fromEntries(THEME_FILE_TOKENS.map((t) => [t, value(t)]));
+    // Written only when it is not what a file that leaves it out gets.
+    for (const [t, fallback] of Object.entries(OPTIONAL_THEME_FILE_TOKENS)) {
+      if (decls[t] && decls[t] !== fallback) tokens[t] = value(t);
+    }
+    return tokens;
   };
   const radius = blocks.find((b) => b.scheme === "dark")?.decls.radius;
+  // The card's lift by the name whose two values the theme's blocks carry.
+  const lift = (scheme: "light" | "dark") =>
+    blocks.find((b) => b.scheme === scheme)?.decls["shadow-card"];
+  const shadow = (Object.keys(SHADOWS) as Shadow[]).find(
+    (s) => SHADOWS[s].dark === lift("dark") && SHADOWS[s].light === lift("light"),
+  );
+  if (!shadow) throw new Error(`"${palette}" has a card shadow no theme file can name`);
   return {
     name: as ?? `${palette}-copy`,
     // A new name gets a label from it, so the controls never show two Graphites.
@@ -40,6 +55,8 @@ export function exportTheme(css: string, palette: string, as?: string) {
       : `${info.label} (copy)`,
     description: info.description,
     ...(radius && radius !== "0" ? { radius } : {}),
+    // `subtle` is what a file that names none gets.
+    ...(shadow !== "subtle" ? { shadow } : {}),
     light: scheme("light"),
     dark: scheme("dark"),
   };

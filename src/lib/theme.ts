@@ -134,7 +134,7 @@ export const PALETTE_INFO: readonly PaletteInfo[] = [
   {
     name: "holotable",
     label: "Holotable",
-    description: "Cool slate surfaces with a blue accent.",
+    description: "Lifted slate surfaces, soft corners and a quieter series palette.",
   },
   {
     name: "graphite",

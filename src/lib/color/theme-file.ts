@@ -81,15 +81,43 @@ const ColorValue = z.string().transform((value, ctx): Color => {
   return z.NEVER;
 });
 
+/**
+ * Tokens a file may leave out, and what it gets then: Holotable's gridlines
+ * are their own color (#648), every other theme's are its inset surface.
+ */
+export const OPTIONAL_THEME_FILE_TOKENS = { "chart-grid": "var(--surface-2)" } as const;
+
 const SchemeTokens = z
   .object(
     Object.fromEntries(THEME_FILE_TOKENS.map((t) => [t, ColorValue])) as {
       [K in (typeof THEME_FILE_TOKENS)[number]]: typeof ColorValue;
     },
   )
+  .extend({ "chart-grid": ColorValue.optional() })
   .strict();
 
 export const RADII = ["0px", "2px", "4px", "6px"] as const;
+
+/**
+ * A card's lift (#648), by name rather than as CSS, written per scheme: a
+ * shadow that reads on a light page vanishes on a dark one. `subtle` is what
+ * every built-in theme but Holotable draws, and what a file that names none
+ * gets, so a file written before the field looks as it did.
+ */
+export const SHADOWS = {
+  none: { dark: "none", light: "none" },
+  subtle: {
+    dark: "0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1)",
+    light: "0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1)",
+  },
+  lifted: {
+    dark: "0 1px 2px rgb(0 0 0 / 0.2), 0 4px 12px -4px rgb(0 0 0 / 0.35)",
+    light: "0 1px 2px rgb(0 0 0 / 0.04), 0 4px 12px -4px rgb(0 0 0 / 0.1)",
+  },
+} as const satisfies Record<string, Record<ThemeName, string>>;
+
+export type Shadow = keyof typeof SHADOWS;
+const SHADOW_NAMES = Object.keys(SHADOWS) as [Shadow, ...Shadow[]];
 
 export const ThemeFileSchema = z
   .object({
@@ -102,6 +130,7 @@ export const ThemeFileSchema = z
     label: z.string().trim().min(1).max(40),
     description: z.string().trim().max(120).optional(),
     radius: z.enum(RADII).optional(),
+    shadow: z.enum(SHADOW_NAMES).optional(),
     light: SchemeTokens,
     dark: SchemeTokens,
   })
@@ -145,9 +174,12 @@ function colorText(color: Color): string {
 
 /**
  * The theme's two blocks, written from the parsed numbers. The aliases a
- * built-in theme inherits from Holotable's blocks (chart text and grid, the
- * spec's orange, purple and teal, the tints) resolve against these values in
- * the cascade, as they do for a built-in theme.
+ * built-in theme inherits from Holotable's blocks (chart text, the tints)
+ * resolve against these values in the cascade, as they do for a built-in
+ * theme. What is Holotable's own look rather than an alias (its corners,
+ * card lift and gridline color, #648) is written here instead, so a file
+ * that names no radius or shadow is square and subtly lifted, as it was
+ * before Holotable's look changed.
  */
 export function themeCss(theme: ThemeFile): string {
   return (["dark", "light"] as const)
@@ -155,7 +187,12 @@ export function themeCss(theme: ThemeFile): string {
       const decls = THEME_FILE_TOKENS.map(
         (t) => `--${t}:${colorText(theme[scheme][t])};`,
       );
-      if (theme.radius) decls.push(`--radius:${theme.radius};`);
+      const grid = theme[scheme]["chart-grid"];
+      decls.push(
+        `--chart-grid:${grid ? colorText(grid) : OPTIONAL_THEME_FILE_TOKENS["chart-grid"]};`,
+      );
+      decls.push(`--radius:${theme.radius ?? "0px"};`);
+      decls.push(`--shadow-card:${SHADOWS[theme.shadow ?? "subtle"][scheme]};`);
       return `[data-palette="${theme.name}"][data-theme="${scheme}"]{${decls.join("")}}`;
     })
     .join("\n");
@@ -168,7 +205,7 @@ export function themeCss(theme: ThemeFile): string {
 const INHERITED: Record<string, string> = {
   "chart-text": "var(--muted)",
   "chart-axis": "var(--border)",
-  "chart-grid": "var(--surface-2)",
+  ...OPTIONAL_THEME_FILE_TOKENS,
   "chart-track": "var(--surface-2)",
   "tint-5": "5%",
   "tint-10": "10%",
@@ -188,6 +225,8 @@ const INHERITED: Record<string, string> = {
 function block(theme: ThemeFile, scheme: ThemeName) {
   const decls: Record<string, string> = { ...INHERITED };
   for (const t of THEME_FILE_TOKENS) decls[t] = colorText(theme[scheme][t]);
+  const grid = theme[scheme]["chart-grid"];
+  if (grid) decls["chart-grid"] = colorText(grid);
   return { palette: theme.name, scheme, ...resolveBlock(decls) };
 }
 

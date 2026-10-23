@@ -1,10 +1,12 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { test } from "node:test";
-import { resolveBlock } from "@/lib/color/contrast";
+import { parseThemeDecls, resolveBlock } from "@/lib/color/contrast";
 import {
   checkThemeFile,
   parseThemeFile,
+  SHADOWS,
+  THEME_FILE_TOKENS,
   type ThemeFile,
   themeCss,
 } from "@/lib/color/theme-file";
@@ -60,6 +62,7 @@ test("a file is tokens in a closed shape: no built-in name, no stray key, no CSS
     );
   }
   assert.match(problems({ ...good, radius: "1rem" }), /radius/);
+  assert.match(problems({ ...good, shadow: "0 0 4px red" }), /shadow/);
   // A value too long to write back as plain decimal is refused, not crashed on.
   assert.match(
     problems({ ...good, dark: { ...good.dark, ring: "oklch(0.0000001 0 0)" } }),
@@ -71,7 +74,9 @@ test("a file is tokens in a closed shape: no built-in name, no stray key, no CSS
 test("the stylesheet is only declarations under the theme's two selectors", () => {
   const theme = parsed({ ...exportTheme(CSS, "paper", "acme"), radius: "4px" });
   const css = themeCss(theme);
-  const block = String.raw`\[data-palette="acme"\]\[data-theme="(?:dark|light)"\]\{(?:--[a-z0-9-]+:[#a-z0-9. ()]+;)+\}`;
+  // Values are numbers the file gave, or the fixed card shadows and grid
+  // fallback (#648): never a brace, a semicolon or a quote.
+  const block = String.raw`\[data-palette="acme"\]\[data-theme="(?:dark|light)"\]\{(?:--[a-z0-9-]+:[#a-z0-9. ()/,-]+;)+\}`;
   assert.match(css, new RegExp(`^${block}\\n${block}$`));
   // Parsed back, it is the file's colors.
   const dark = /\[data-theme="dark"\]\{([^}]*)\}/.exec(css)?.[1] ?? "";
@@ -88,6 +93,53 @@ test("the stylesheet is only declarations under the theme's two selectors", () =
     resolveBlock({ primary: themeCss(parsedBack).match(/--primary:([^;]+);/)?.[1] ?? "" })
       .tokens.primary,
   );
+});
+
+test("Holotable exports and loads as it paints; a file that names no look keeps the old one", () => {
+  // #648: the default's corners, card lift and gridlines are its own, not
+  // aliases, so its export carries them and the stylesheet writes them back.
+  const decls = (css: string, scheme: "dark" | "light") =>
+    Object.fromEntries(
+      (new RegExp(`\\[data-theme="${scheme}"\\]\\{([^}]*)\\}`).exec(css)?.[1] ?? "")
+        .split(";")
+        .filter(Boolean)
+        .map((d) => {
+          const at = d.indexOf(":");
+          return [d.slice(2, at), d.slice(at + 1)];
+        }),
+    );
+  const builtIn = (scheme: "dark" | "light") =>
+    parseThemeDecls(CSS).find((b) => b.palette === "holotable" && b.scheme === scheme)
+      ?.decls ?? {};
+  const copy = themeCss(parsed(exportTheme(CSS, "holotable", "acme")));
+  for (const scheme of ["dark", "light"] as const) {
+    const ours = decls(copy, scheme);
+    const theirs = resolveBlock(builtIn(scheme)).tokens;
+    const back = resolveBlock(ours).tokens;
+    for (const t of [...THEME_FILE_TOKENS, "chart-grid"]) {
+      assert.deepEqual(back[t], theirs[t], `${scheme} --${t}`);
+    }
+    assert.equal(ours.radius, builtIn(scheme).radius);
+    assert.equal(ours["shadow-card"], builtIn(scheme)["shadow-card"]);
+  }
+  // A file from before #648 (graphite's export names neither) is square,
+  // subtly lifted and gridded in its inset surface, as every such file was.
+  const old = themeCss(parsed(exportTheme(CSS, "graphite", "acme")));
+  for (const scheme of ["dark", "light"] as const) {
+    const d = decls(old, scheme);
+    assert.equal(d.radius, "0px");
+    assert.equal(d["shadow-card"], SHADOWS.subtle[scheme]);
+    assert.equal(d["chart-grid"], "var(--surface-2)");
+  }
+});
+
+test("every built-in theme's card shadow is one a theme file can name", () => {
+  for (const { palette, scheme, decls } of parseThemeDecls(CSS)) {
+    assert.ok(
+      Object.values(SHADOWS).some((s) => s[scheme] === decls["shadow-card"]),
+      `${palette} ${scheme}: --shadow-card`,
+    );
+  }
 });
 
 test("a theme below the bar fails, naming the pairing, the scheme and the number", () => {
