@@ -15,6 +15,7 @@ import { useAskAboutPanel, useAskInChat } from "@/components/dashboard/chat-brid
 import { LoadingLabel, PanelSkeleton } from "@/components/dashboard/PanelSkeleton";
 import { Popover } from "@/components/ui/popover";
 import type { ChartContext, PanelData } from "@/components/charts/options";
+import type { ChartSize } from "@/components/charts/size";
 import { panelRenderer } from "@/components/panels/registry";
 import { formatClockTime } from "@/lib/connection";
 import { useChartTheme } from "@/components/chart-theme";
@@ -469,6 +470,9 @@ function PanelContent({
 }) {
   const display = useTimeDisplay();
   const theme = useChartTheme();
+  // The chart's stepped size, which the chart reports (#643): a new step
+  // rebuilds the option for it and merges it, never a new chart.
+  const [size, setSize] = React.useState<ChartSize>();
   // The registry decides how the kind is drawn (#61); nothing here names one.
   const renderer = panelRenderer(panel.viz);
   if (renderer.type === "html") {
@@ -499,7 +503,9 @@ function PanelContent({
           theme,
           window: window ?? data.window,
           annotations,
+          size,
         })}
+        onSize={setSize}
         crosshairGroup={crosshairGroup}
         onBrush={
           onSelectTimeRange && supportsTimeBrush(panel)

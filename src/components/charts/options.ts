@@ -13,6 +13,7 @@ import {
   shared,
   stackOrder,
   text,
+  tickLabel,
   tooltip,
 } from "@/components/charts/style";
 import { ANNOTATION_COLORS, type Annotation } from "@/lib/annotations";
@@ -30,6 +31,15 @@ import {
 import type { ThresholdStep } from "@/lib/panels/thresholds";
 import { formatDateTime, type TimeDisplay } from "@/lib/time-display";
 import type { Truncation } from "@/lib/truncation";
+import {
+  axisDensity,
+  axisNumber,
+  type ChartSize,
+  legendRows,
+  logLabelStep,
+  logTicks,
+  textWidth,
+} from "@/components/charts/size";
 
 export interface PanelData {
   columns: string[];
@@ -138,6 +148,25 @@ export function timeAxisLabels(values: unknown[], display: TimeDisplay): string[
   });
 }
 
+/** The smallest and largest positive values in these columns: a log axis's span. */
+export function positiveRange(
+  rows: Record<string, unknown>[],
+  keys: readonly string[],
+): { low: number; high: number } {
+  let low = Number.POSITIVE_INFINITY;
+  let high = 0;
+  for (const row of rows) {
+    for (const key of keys) {
+      const n = toNumber(row[key]);
+      if (n > 0) {
+        low = Math.min(low, n);
+        high = Math.max(high, n);
+      }
+    }
+  }
+  return high > 0 ? { low, high } : { low: 0, high: 0 };
+}
+
 /** The shared tooltip, following the axis. */
 function axisTooltip(theme: ChartTheme) {
   return { ...tooltip(theme), trigger: "axis" as const };
@@ -174,30 +203,85 @@ function base(theme: ChartTheme): EChartsOption {
   };
 }
 
-/** Where the legend goes (#115). `top` is where it always was. */
+/**
+ * Where the legend goes (#115). `top` is where it always was. `shown` false
+ * hides it where it is (#643), so a later size can show it again by merging
+ * `show` alone.
+ */
 function legendAt(
   position: LegendPosition | undefined,
   theme: ChartTheme,
+  shown = true,
 ): EChartsOption["legend"] {
   const style = legend(theme);
   switch (position) {
     case "none":
       return { show: false };
     case "bottom":
-      return { bottom: 0, type: "scroll", ...style };
+      return { show: shown, bottom: 0, type: "scroll", ...style };
     case "right":
-      return { right: 0, top: "middle", orient: "vertical", type: "scroll", ...style };
+      return {
+        show: shown,
+        right: 0,
+        top: "middle",
+        orient: "vertical",
+        type: "scroll",
+        ...style,
+      };
     default:
-      return { top: 0, ...style };
+      return { show: shown, top: 0, ...style };
   }
 }
 
+/** A line of legend entries, and the gap below it. */
+const LEGEND_ROW_PX = 24;
+/** The most of a chart's height a legend at the top may take. */
+const LEGEND_SHARE = 0.3;
+/** The gutter a legend on the right takes, and the narrowest chart it is kept on. */
+const LEGEND_RIGHT_PX = 128;
+const LEGEND_RIGHT_MIN_WIDTH = 360;
+
+/**
+ * Where the legend goes at this size, and how many lines it takes (#643).
+ * With room it is where the panel put it. On a small panel a top legend that
+ * wraps makes the plot room for each line it wraps to, a bottom or right one
+ * is kept only while it fits on one line or in its gutter, and one that does
+ * not fit is not drawn at all, never drawn over the plot or paged: the
+ * tooltip names every series under the pointer, and the table beside the
+ * chart lists them.
+ */
+export function legendLayout(
+  position: LegendPosition | undefined,
+  size: ChartSize | undefined,
+  names: readonly string[],
+  textPx: number,
+): { position: LegendPosition; rows: number } {
+  const at = position ?? "top";
+  if (!size || at === "none") return { position: at, rows: at === "none" ? 0 : 1 };
+  const hidden = { position: "none" as const, rows: 0 };
+  if (at === "right") {
+    const fits =
+      size.width >= LEGEND_RIGHT_MIN_WIDTH &&
+      names.length * LEGEND_ROW_PX <= size.height &&
+      names.every((n) => textWidth(n, textPx) + 17 <= LEGEND_RIGHT_PX);
+    return fits ? { position: at, rows: 1 } : hidden;
+  }
+  const rows = legendRows(size.width, names, textPx);
+  if (at === "bottom") return rows <= 1 ? { position: at, rows } : hidden;
+  return rows * LEGEND_ROW_PX <= size.height * LEGEND_SHARE
+    ? { position: at, rows }
+    : hidden;
+}
+
 /** The plot area, making room for the legend where it went and an axis title. */
-function gridFor(position: LegendPosition | undefined, axisTitle: boolean) {
+function gridFor(position: LegendPosition | undefined, axisTitle: boolean, rows = 1) {
   return {
     left: axisTitle ? 64 : 44,
-    right: position === "right" ? 128 : 16,
-    top: position === "none" || position === "bottom" ? 12 : 24,
+    right: position === "right" ? LEGEND_RIGHT_PX : 16,
+    top:
+      position === "none" || position === "bottom"
+        ? 12
+        : 24 + Math.max(0, rows - 1) * LEGEND_ROW_PX,
     bottom: position === "bottom" ? 52 : 28,
   };
 }
@@ -254,6 +338,14 @@ export interface ChartContext {
    * grid, read off `<html>` so a chart follows the theme as the page does.
    */
   theme: ChartTheme;
+  /**
+   * How big the chart is drawn, stepped (#643), once it has been laid out.
+   * A kind fits its ticks, labels and text to it through the rules in
+   * `size.ts`; undefined draws the chart as it would with room. A new step
+   * is merged into the same chart, so a builder that reads it sets every
+   * field it varies in each of its branches.
+   */
+  size?: ChartSize;
 }
 
 /** One kind's chart: a panel spec and its current (bounded) rows as an ECharts option. */
@@ -277,7 +369,7 @@ export function normalized(build: ChartOptionBuilder): ChartOptionBuilder {
  * the panel's time field.
  */
 function buildSeries(type: "line" | "bar", area: boolean): ChartOptionBuilder {
-  return (panel, data, { display, annotations, theme }) => {
+  return (panel, data, { display, annotations, theme, size }) => {
     const x = xKey(panel, data);
     const keys = seriesKeys(panel, data);
     const xValues = data.rows.map((r) => r[x]);
@@ -288,10 +380,14 @@ function buildSeries(type: "line" | "bar", area: boolean): ChartOptionBuilder {
     const o = readOptions(SeriesOptions, panel.options);
     const number = valueFormatter(panel, numberDisplay(o));
     const axis = o.yAxis;
+    // Fewer ticks, written compactly, as the panel gets small (#643).
+    const density = axisDensity(size);
+    const placed = legendLayout(o.legend, size, keys, theme.type.axis);
+    const positive = axis?.log ? positiveRange(data.rows, keys) : { low: 0, high: 0 };
     return {
       ...base(theme),
-      grid: gridFor(o.legend, axis?.label !== undefined),
-      legend: legendAt(o.legend, theme),
+      grid: gridFor(placed.position, axis?.label !== undefined, placed.rows),
+      legend: legendAt(o.legend, theme, placed.position !== "none"),
       tooltip: { ...axisTooltip(theme), ...(number ? { valueFormatter: number } : {}) },
       ...(o.thresholds?.length ? { visualMap: thresholdMap(o.thresholds, theme) } : {}),
       // A category axis, deliberately (#491): the brush maps its span to row
@@ -302,11 +398,12 @@ function buildSeries(type: "line" | "bar", area: boolean): ChartOptionBuilder {
         ...categoryAxis(theme),
         type: "category",
         data: categories,
-        axisLabel: { ...text(theme), hideOverlap: true },
       },
       yAxis: {
         ...axisStyle(theme),
         type: axis?.log ? "log" : "value",
+        // A log axis keeps ECharts' own steps: fewer would be decades apart.
+        splitNumber: axis?.log ? undefined : density.y,
         ...(axis?.min !== undefined ? { min: axis.min } : {}),
         ...(axis?.max !== undefined ? { max: axis.max } : {}),
         ...(axis?.label !== undefined
@@ -317,7 +414,15 @@ function buildSeries(type: "line" | "bar", area: boolean): ChartOptionBuilder {
               nameTextStyle: text(theme),
             }
           : {}),
-        axisLabel: { ...text(theme), ...(number ? { formatter: number } : {}) },
+        axisLabel: tickLabel(
+          theme,
+          axis?.log
+            ? logTicks(
+                logLabelStep(size, positive.low, positive.high),
+                axisNumber(panel.format, numberDisplay(o), density),
+              )
+            : axisNumber(panel.format, numberDisplay(o), density),
+        ),
       },
       series: keys.map((k, i) => ({
         name: k,
@@ -357,8 +462,8 @@ function buildSeries(type: "line" | "bar", area: boolean): ChartOptionBuilder {
 export const lineChart = normalized(buildSeries("line", false));
 export const areaChart = normalized(buildSeries("line", true));
 export const barChart = normalized(buildSeries("bar", false));
-export const scatterChart = normalized((panel, data, { theme }) =>
-  buildScatter(panel, data, theme),
+export const scatterChart = normalized((panel, data, { theme, size }) =>
+  buildScatter(panel, data, theme, size),
 );
 export const heatmapChart = normalized((panel, data, { display, theme }) =>
   buildHeatmap(panel, data, display, theme),
@@ -377,6 +482,9 @@ const FORMAT_UNIT: Partial<Record<ValueFormat, string>> = {
   ms: "ms",
 };
 
+/** Below this size a scatter's axis names give their room to the plot (#643). */
+const SCATTER_NAMES_PX = { width: 240, height: 180 };
+
 /**
  * Scatter: the first numeric column across, every other numeric column up,
  * one series each (#640). Both axes are named in their middle: x by its
@@ -384,19 +492,37 @@ const FORMAT_UNIT: Partial<Record<ValueFormat, string>> = {
  * share it. One series needs no legend, since the y axis already says what it
  * is; several keep theirs. The panel's format writes both axes' ticks.
  */
-function buildScatter(panel: Panel, data: PanelData, theme: ChartTheme): EChartsOption {
+function buildScatter(
+  panel: Panel,
+  data: PanelData,
+  theme: ChartTheme,
+  size: ChartSize | undefined,
+): EChartsOption {
   const numericColumns = data.columns.filter((column) => isNumeric(data.rows, column));
   const [x, ...seriesKeys] = numericColumns;
   const one = seriesKeys.length === 1;
   const yName = one ? seriesKeys[0] : panel.format && FORMAT_UNIT[panel.format];
-  const ticks = panel.format
-    ? { formatter: (v: number) => formatValue(v, panel.format) }
-    : {};
-  const name = (label: string | undefined) =>
+  // Both axes are value axes: fewer ticks, written compactly, on a small
+  // panel, and the names go before the plot is squeezed for them (#643).
+  const density = axisDensity(size);
+  const ticks =
+    density.compact || !panel.format
+      ? axisNumber(panel.format, undefined, density)
+      : (v: number) => formatValue(v, panel.format);
+  // Several series keep a legend while it fits (#643); one needs none.
+  const placed = one
+    ? { position: "none" as const, rows: 0 }
+    : legendLayout(undefined, size, seriesKeys, theme.type.axis);
+  const named = {
+    x: !size || size.height >= SCATTER_NAMES_PX.height,
+    y: !size || size.width >= SCATTER_NAMES_PX.width,
+  };
+  // An empty name, not none: a merge would keep a name the last size drew.
+  const name = (label: string | undefined, show: boolean) =>
     label === undefined
       ? {}
       : {
-          name: label,
+          name: show ? label : "",
           nameLocation: "middle" as const,
           // From the tick labels, which ECharts moves the name clear of.
           nameGap: 12,
@@ -408,24 +534,28 @@ function buildScatter(panel: Panel, data: PanelData, theme: ChartTheme): ECharts
     grid: {
       left: 8,
       right: 16,
-      top: one ? 12 : 32,
+      top: placed.position === "none" ? 12 : 32 + (placed.rows - 1) * LEGEND_ROW_PX,
       bottom: 8,
       outerBoundsMode: "same",
       outerBoundsContain: "all",
     },
-    ...(one ? { legend: { show: false } } : {}),
+    legend: one
+      ? { show: false }
+      : legendAt(undefined, theme, placed.position !== "none"),
     tooltip: { ...tooltip(theme), trigger: "item" },
     xAxis: {
       ...axisStyle(theme),
       type: "value",
-      ...name(x),
-      axisLabel: { ...text(theme), ...ticks },
+      splitNumber: density.x,
+      ...name(x, named.x),
+      axisLabel: tickLabel(theme, ticks),
     },
     yAxis: {
       ...axisStyle(theme),
       type: "value",
-      ...name(yName),
-      axisLabel: { ...text(theme), ...ticks },
+      splitNumber: density.y,
+      ...name(yName, named.y),
+      axisLabel: tickLabel(theme, ticks),
     },
     series: seriesKeys.map((key) => ({
       name: key,

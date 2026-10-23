@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import type { PanelData } from "@/components/charts/options";
+import type { ChartSize } from "@/components/charts/size";
 import { PANEL_RENDERERS } from "@/components/panels/registry";
 import {
   type ChartTheme,
@@ -371,6 +372,7 @@ function drawnBy(
   viz: Panel["viz"],
   theme: ChartTheme,
   options?: object,
+  size?: ChartSize,
 ): Record<string, unknown> {
   const renderer = PANEL_RENDERERS[viz];
   assert.equal(renderer.type, "chart", viz);
@@ -394,8 +396,18 @@ function drawnBy(
       from: Date.parse("2026-10-11T10:00:00Z"),
       to: Date.parse("2026-10-11T10:10:00Z"),
     },
+    size,
   }) as Record<string, unknown>;
 }
+
+/** The panel sizes #643 measured, as a chart inside its card is drawn. */
+const SIZES: (ChartSize | undefined)[] = [
+  undefined,
+  { width: 140, height: 80 },
+  { width: 200, height: 120 },
+  { width: 280, height: 180 },
+  { width: 400, height: 260 },
+];
 
 const CHART_KINDS = Object.entries(PANEL_RENDERERS).flatMap(([viz, renderer]) =>
   renderer.type === "chart" ? [viz as Panel["viz"]] : [],
@@ -412,9 +424,11 @@ test("every chart kind writes in the page's font, at the chart scale, with the s
     ["graph", { layout: "dag" }],
     ["graph", { layout: "force" }],
   ];
-  for (const [viz, options] of variants) {
-    const name = `${viz} ${JSON.stringify(options ?? {})}`;
-    const option = drawnBy(viz, DISTINCT, options);
+  for (const [[viz, options], size] of variants.flatMap((v) =>
+    SIZES.map((size) => [v, size] as const),
+  )) {
+    const name = `${viz} ${JSON.stringify(options ?? {})} at ${JSON.stringify(size)}`;
+    const option = drawnBy(viz, DISTINCT, options, size);
     assert.deepEqual(
       option.textStyle,
       { fontFamily: DISTINCT.font, fontSize: DISTINCT.type.axis },
@@ -444,6 +458,46 @@ test("every chart kind writes in the page's font, at the chart scale, with the s
       },
       name,
     );
+  }
+});
+
+/**
+ * Every leaf path in an option, with array items folded together: what a
+ * merge would leave behind if one option set a field and the next did not.
+ */
+function fieldPaths(node: unknown, at = "", out = new Set<string>()): Set<string> {
+  if (Array.isArray(node)) {
+    for (const item of node) fieldPaths(item, `${at}[]`, out);
+  } else if (node && typeof node === "object") {
+    for (const [k, v] of Object.entries(node)) fieldPaths(v, `${at}.${k}`, out);
+  } else {
+    out.add(at);
+  }
+  return out;
+}
+
+test("a size step sets every field the last one did, so the merge never keeps a stale one", () => {
+  // #643: a new size is merged into the same chart (invariant 11), and a
+  // merge keeps a field the new option leaves out. So a kind that varies a
+  // field by size sets it at every size (`show: false`, an empty name).
+  const variants: [Panel["viz"], object?][] = [
+    ...CHART_KINDS.map((viz): [Panel["viz"]] => [viz]),
+    ["gauge", { variant: "bar" }],
+    ["graph", { layout: "dag" }],
+    ["graph", { layout: "force" }],
+    ["line", { legend: "bottom" }],
+    ["line", { legend: "right", yAxis: { label: "req/s" } }],
+    ["line", { decimals: 0, unit: "req" }],
+    ["histogram", { log: true }],
+  ];
+  for (const [viz, options] of variants) {
+    const name = `${viz} ${JSON.stringify(options ?? {})}`;
+    const [first, ...rest] = SIZES.map((size) =>
+      [...fieldPaths(drawnBy(viz, DISTINCT, options, size))].sort(),
+    );
+    for (const [i, paths] of rest.entries()) {
+      assert.deepEqual(paths, first, `${name} at ${JSON.stringify(SIZES[i + 1])}`);
+    }
   }
 });
 

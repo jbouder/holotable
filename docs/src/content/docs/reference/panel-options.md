@@ -66,6 +66,30 @@ change, because a merged `setOption` cannot take back a visual map, a stack or
 an axis bound; only authoring changes them, so a data update still merges
 (invariant 11).
 
+### Charts adapt to the panel's size
+
+A chart fits its text to the size it is drawn at
+([#643](https://github.com/jbouder/holotable/issues/643)), so a small panel
+thins its ticks and labels rather than stacking them. The chart measures
+itself and is rebuilt when its size crosses a 20px step and holds there for a
+moment, so a drag rebuilds it a few times, never every frame; the new option
+is merged into the same chart, which is never recreated. On `line`, `area`,
+`bar`, `histogram` and `scatter`:
+
+- a value axis draws as many ticks as lines of text fit, two to five, and
+  any tick label that would still overlap another is not drawn, on every axis;
+- below 480px wide, a value axis writes numbers of four digits or more
+  compactly (`60M`, not `60,000,000`), through the panel's number options and
+  unit; bytes keep their unit, and `compact: false` keeps full numbers;
+- a top legend that wraps makes the plot room for each line, and a legend that
+  does not fit (more lines than a short chart has room for, a bottom legend
+  that wraps, a right legend on a chart under 360px wide) is not drawn rather
+  than drawn over the plot or paged; the tooltip still names every series;
+- a scatter drops its x axis name below 180px high and its y axis name below
+  240px wide.
+
+The screen-reader table beside a chart is the same at every size.
+
 ```json
 {
   "viz": "line",
@@ -100,7 +124,9 @@ one series there is no legend, since the y axis says what the points are;
 with several the legend names them, and the y axis is named only by the
 panel's unit (`%`, `ms` or `bytes`) when its `format` has one. The panel's
 `format` writes both axes' ticks
-([#640](https://github.com/jbouder/holotable/issues/640)).
+([#640](https://github.com/jbouder/holotable/issues/640)). On a small panel
+the axis names give their room to the plot
+([size](#charts-adapt-to-the-panels-size)).
 
 ## `stat`
 

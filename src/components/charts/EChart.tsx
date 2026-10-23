@@ -5,6 +5,12 @@ import * as echarts from "@/components/charts/echarts";
 import type { EChartsOption } from "echarts";
 import { useChartPatterns } from "@/components/chart-patterns";
 import { useReducedMotion } from "@/components/motion-preference";
+import {
+  type ChartSize,
+  SIZE_SETTLE_MS,
+  sameSize,
+  sizeStep,
+} from "@/components/charts/size";
 
 /**
  * What a caller outside the chart can ask it for.
@@ -97,6 +103,7 @@ export function EChart({
   crosshairGroup,
   onBrush,
   onDatum,
+  onSize,
 }: {
   option: EChartsOption;
   /**
@@ -120,6 +127,12 @@ export function EChart({
    * what turns clicks on; a click that ends a brush is never one.
    */
   onDatum?: (click: DatumClickEvent) => void;
+  /**
+   * Called with the chart's size whenever it crosses a step (#643): at once
+   * when it is first laid out, then once a drag has settled. The caller
+   * rebuilds `option` for it, which merges into this same chart.
+   */
+  onSize?: (size: ChartSize | undefined) => void;
 }) {
   const containerRef = React.useRef<HTMLDivElement>(null);
   const chartRef = React.useRef<echarts.ECharts | null>(null);
@@ -130,6 +143,8 @@ export function EChart({
   const brushing = onBrush !== undefined;
   const onDatumRef = React.useRef(onDatum);
   onDatumRef.current = onDatum;
+  const onSizeRef = React.useRef(onSize);
+  onSizeRef.current = onSize;
   const clicking = onDatum !== undefined;
   // Reduced motion (#212) turns off ECharts' own transitions. Read through a
   // ref by the init effect so a chart rebuilt for a new crosshair group keeps
@@ -163,8 +178,28 @@ export function EChart({
       },
     });
 
-    const observer = new ResizeObserver(() => chart.resize());
-    observer.observe(containerRef.current);
+    // The canvas follows every frame of a resize; the option is rebuilt only
+    // when the size crosses a step and holds there (#643), so a drag does not
+    // rebuild it every frame. The first size is reported at once: the chart's
+    // first option should already fit.
+    const container = containerRef.current;
+    let reported: ChartSize | undefined;
+    let first = true;
+    let settle: ReturnType<typeof setTimeout> | undefined;
+    const report = () => {
+      const size = sizeStep(container.clientWidth, container.clientHeight);
+      if (!first && sameSize(size, reported)) return;
+      first = false;
+      reported = size;
+      onSizeRef.current?.(size);
+    };
+    const observer = new ResizeObserver(() => {
+      chart.resize();
+      if (first) return report();
+      clearTimeout(settle);
+      settle = setTimeout(report, SIZE_SETTLE_MS);
+    });
+    observer.observe(container);
 
     const detachCrosshair = attachCrosshair(chart, crosshairGroup);
     const brush: BrushState = { active: false, endedAt: 0 };
@@ -179,6 +214,7 @@ export function EChart({
       detachDatum?.();
       detachBrush?.();
       detachCrosshair();
+      clearTimeout(settle);
       observer.disconnect();
       chart.dispose();
       chartRef.current = null;

@@ -266,7 +266,11 @@ drag produce a selection on every panel.
 Fullscreen is not a portal: the same card becomes `fixed`, so the panel's
 position in the React tree never changes and the ECharts instance is *resized*
 by the `ResizeObserver` already in `EChart` rather than disposed and rebuilt
-(#76).
+(#76). The same observer reports the chart's size, stepped by 20px and once a
+resize has settled, and the kind's builder reads it as `ChartContext.size` to
+fit its ticks, labels and legend (#643, `src/components/charts/size.ts`); the
+rebuilt option is merged like a data update, so a builder that varies a field
+by size sets it at every size (`test/chart-theme.test.ts`).
 
 **Export CSV** serializes the window the panel is holding — RFC 4180 quoting,
 CRLF, a UTF-8 BOM so Excel reads it as UTF-8. A *text* cell that starts with
