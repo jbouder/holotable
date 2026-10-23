@@ -116,7 +116,9 @@ test("a panel without options draws exactly as before", () => {
   // swatches, the tooltip on the raised surface, a grid with no axis line.
   const d = DEFAULT_CHART_THEME;
   const text = { fontFamily: d.font, fontSize: d.type.axis, color: d.text };
+  // `show` is always said (#643): a size step merges, and may hide it.
   assert.deepEqual(option.legend, {
+    show: true,
     top: 0,
     textStyle: text,
     icon: "rect",
@@ -137,9 +139,12 @@ test("a panel without options draws exactly as before", () => {
   assert.equal(option.visualMap, undefined);
   assert.deepEqual(option.yAxis, {
     type: "value",
+    // ECharts' own five ticks and formatter, said (#643) so a size step that
+    // changed them can merge them back.
+    splitNumber: 5,
     axisLine: { show: false },
     axisTick: { show: false },
-    axisLabel: text,
+    axisLabel: { ...text, hideOverlap: true, formatter: undefined },
     splitLine: { show: true, lineStyle: { color: d.grid, width: 1 } },
   });
   for (const s of option.series as Record<string, unknown>[]) {

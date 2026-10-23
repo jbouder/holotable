@@ -91,6 +91,14 @@ says how a section gets here.
   tokens per scheme; a file without them fills in its `warning` and `orange`
   as before.
 
+- **Charts fit small panels.** A chart now knows the size it is drawn at and
+  fits its text to it: on line, area, bar, histogram and scatter panels a
+  value axis draws only as many ticks as fit, hides a tick label that would
+  overlap another, and writes large numbers compactly (`60M`) when narrow; a
+  legend that does not fit is left out instead of covering the plot, and a
+  small scatter drops its axis names. Resizing a panel, the fullscreen
+  expand and a window resize update the chart in place.
+
 ## 0.2.0 — 2026-10-11
 
 Two milestones since 0.1.0: scale and render (M17, #484), which closes the

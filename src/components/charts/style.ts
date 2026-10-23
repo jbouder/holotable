@@ -63,12 +63,23 @@ export function shared(theme: ChartTheme): EChartsOption {
   };
 }
 
+/**
+ * An axis's tick labels: the axis text, and a label that would overlap the
+ * one before it is not drawn (#643), on every axis, so a small panel thins
+ * its ticks rather than stacking them. `formatter` is always set, undefined
+ * for ECharts' own: a size step merges into the chart, and a merge would keep
+ * a formatter an earlier step set if this one left the key out.
+ */
+export function tickLabel<F = undefined>(theme: ChartTheme, formatter?: F) {
+  return { ...text(theme), hideOverlap: true, formatter };
+}
+
 /** A value axis: a faint gridline per step, no axis line, no ticks. */
 export function axis(theme: ChartTheme) {
   return {
     axisLine: { show: false },
     axisTick: { show: false },
-    axisLabel: text(theme),
+    axisLabel: tickLabel(theme),
     splitLine: { show: true, lineStyle: { color: theme.grid, width: 1 } },
   };
 }

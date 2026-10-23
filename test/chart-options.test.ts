@@ -5,13 +5,26 @@ import {
   areaChart,
   barChart,
   LARGE_SERIES_POINTS,
+  legendLayout,
   lineChart,
   type PanelData,
   scatterChart,
 } from "@/components/charts/options";
+import {
+  axisDensity,
+  axisNumber,
+  labelBudget,
+  legendRows,
+  logLabelStep,
+  logTicks,
+  SIZE_STEP,
+  sameSize,
+  sizeStep,
+} from "@/components/charts/size";
 import { PANEL_RENDERERS } from "@/components/panels/registry";
 import { DEFAULT_CHART_THEME } from "@/lib/color/chart-theme";
 import { LOCAL_TIME_DISPLAY } from "@/lib/time-display";
+import { formatValue } from "@/lib/format";
 
 function panel(overrides: Partial<Panel> = {}): Panel {
   return {
@@ -174,4 +187,148 @@ test("a series past the large threshold is sampled or drawn in large mode, and n
   const option = lineChart(panel(), data(big), ctx) as Record<string, unknown>;
   assert.equal(option.animationThreshold, LARGE_SERIES_POINTS);
   assert.equal(option.animation, undefined, "the builder never turns animation on");
+});
+
+/*
+ * Charts fit their text to the panel (#643): the chart reports a stepped
+ * size, and these rules turn it into what a kind draws. With no size every
+ * rule answers with the chart as it was before.
+ */
+
+test("a chart's size is stepped, so a drag rebuilds it a few times, not every frame", () => {
+  assert.deepEqual(sizeStep(219, 181), { width: 200, height: 180 });
+  assert.ok(sameSize(sizeStep(201, 181), sizeStep(219, 199)));
+  assert.ok(!sameSize(sizeStep(219, 181), sizeStep(221, 181)));
+  // A box that is not drawn has no size to fit.
+  assert.equal(sizeStep(0, 200), undefined);
+  assert.equal(sizeStep(300, 0), undefined);
+  // The smallest step is one step, never zero.
+  assert.deepEqual(sizeStep(5, 5), { width: SIZE_STEP, height: SIZE_STEP });
+});
+
+test("a value axis has as many ticks as lines of text fit, and writes them compactly when narrow", () => {
+  assert.deepEqual(axisDensity(undefined), { y: 5, x: 5, compact: false });
+  const small = axisDensity({ width: 140, height: 80 });
+  assert.deepEqual(small, { y: 2, x: 2, compact: true });
+  const mid = axisDensity({ width: 280, height: 180 });
+  assert.equal(mid.y, 4);
+  assert.equal(mid.x, 3);
+  assert.equal(mid.compact, true);
+  // Never more than ECharts' own five, never fewer than two.
+  assert.deepEqual(axisDensity({ width: 1600, height: 900 }), {
+    y: 5,
+    x: 5,
+    compact: false,
+  });
+  assert.equal(axisDensity({ width: 20, height: 20 }).y, 2);
+});
+
+test("a narrow axis writes large numbers compactly, through the panel's format and options", () => {
+  const narrow = axisDensity({ width: 200, height: 120 });
+  const wide = axisDensity({ width: 600, height: 300 });
+  // Wide and plain: ECharts' own ticks, as before.
+  assert.equal(axisNumber(undefined, undefined, wide), undefined);
+  assert.equal(axisNumber(undefined, { decimals: 0 }, wide)?.(60_000_000), "60,000,000");
+  const plain = axisNumber(undefined, undefined, narrow);
+  assert.equal(plain?.(60_000_000), "60M");
+  // Small numbers keep their digits: compact would write 0.25 as 0.3.
+  assert.equal(plain?.(0.25), "0.25");
+  assert.equal(plain?.(750), "750");
+  // Bytes always carry their unit.
+  assert.equal(axisNumber("bytes", undefined, narrow)?.(512), "512 B");
+  // The panel's unit stays; its decimals do not merge two ticks into one.
+  const ms = axisNumber("ms", { decimals: 0 }, narrow);
+  assert.notEqual(ms?.(1500), ms?.(2000));
+  assert.match(ms?.(1500) ?? "", /^1\.5K ms$/);
+  assert.equal(axisNumber(undefined, { unit: "req" }, narrow)?.(1200), "1.2K req");
+  // A panel that said `compact: false` keeps its full numbers.
+  assert.equal(
+    axisNumber(undefined, { compact: false, decimals: 0 }, narrow)?.(60_000_000),
+    "60,000,000",
+  );
+});
+
+test("labels fit while each has its line, and are left to hover below that", () => {
+  assert.deepEqual(labelBudget(undefined, 12, { need: 14 }), {
+    show: true,
+    room: Number.POSITIVE_INFINITY,
+  });
+  assert.equal(labelBudget({ width: 200, height: 120 }, 0, { need: 14 }).show, true);
+  assert.deepEqual(labelBudget({ width: 200, height: 120 }, 4, { need: 14 }), {
+    show: true,
+    room: 30,
+  });
+  assert.equal(labelBudget({ width: 200, height: 120 }, 10, { need: 14 }).show, false);
+  // Along the width, less what the chart spends before its labels.
+  const across = labelBudget({ width: 200, height: 120 }, 4, {
+    along: "width",
+    need: 60,
+    chrome: 40,
+  });
+  assert.deepEqual(across, { show: false, room: 40 });
+});
+
+test("a legend makes room for the lines it wraps to, or is not drawn, never over the plot", () => {
+  const names = ["ok", "client_errors", "server_errors"];
+  assert.deepEqual(legendLayout(undefined, undefined, names, 11), {
+    position: "top",
+    rows: 1,
+  });
+  assert.equal(legendRows(1000, names, 11), 1);
+  assert.ok(legendRows(140, names, 11) > 1);
+  // Wide enough to wrap into the room it is given.
+  assert.deepEqual(legendLayout("top", { width: 200, height: 260 }, names, 11), {
+    position: "top",
+    rows: legendRows(200, names, 11),
+  });
+  // Too many lines for a short chart: hidden; the tooltip names the series.
+  assert.equal(
+    legendLayout("top", { width: 140, height: 80 }, names, 11).position,
+    "none",
+  );
+  assert.equal(
+    legendLayout("bottom", { width: 140, height: 200 }, names, 11).position,
+    "none",
+  );
+  assert.equal(
+    legendLayout("right", { width: 300, height: 200 }, names, 11).position,
+    "none",
+  );
+  assert.equal(
+    legendLayout("right", { width: 400, height: 200 }, names, 11).position,
+    "right",
+  );
+  assert.equal(
+    legendLayout("none", { width: 900, height: 600 }, names, 11).position,
+    "none",
+  );
+
+  // And the series chart draws what the layout says.
+  const ctx = { display: LOCAL_TIME_DISPLAY, theme: DEFAULT_CHART_THEME };
+  const data: PanelData = {
+    columns: ["ts", ...names],
+    rows: [{ ts: "2026-10-11T10:00:00Z", ok: 1, client_errors: 2, server_errors: 3 }],
+  };
+  const small = lineChart(panel(), data, { ...ctx, size: { width: 140, height: 80 } });
+  assert.equal((small.legend as { show: boolean }).show, false);
+  assert.equal((small.grid as { top: number }).top, 12);
+  const y = small.yAxis as { splitNumber: number; axisLabel: { hideOverlap: boolean } };
+  assert.equal(y.splitNumber, 2);
+  assert.equal(y.axisLabel.hideOverlap, true);
+  const roomy = lineChart(panel(), data, ctx);
+  assert.equal((roomy.legend as { show: boolean }).show, true);
+  assert.equal((roomy.yAxis as { splitNumber: number }).splitNumber, 5);
+});
+
+test("a short log axis labels every other decade, so six decades never touch", () => {
+  // ECharts draws a log axis a decade a tick whatever splitNumber says.
+  assert.equal(logLabelStep(undefined, 1, 100_000), 1);
+  assert.equal(logLabelStep({ width: 400, height: 260 }, 1, 100_000), 1);
+  const step = logLabelStep({ width: 200, height: 120 }, 2, 50_000);
+  assert.ok(step >= 2, `step ${step}`);
+  const write = logTicks(step, undefined);
+  assert.equal(write?.(1), "1");
+  assert.equal(write?.(10 ** step), formatValue(10 ** step));
+  assert.equal(write?.(10), "");
+  assert.equal(logTicks(1, undefined), undefined);
 });

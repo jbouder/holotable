@@ -4,6 +4,7 @@ import {
   isNumeric,
   normalized,
   type PanelData,
+  positiveRange,
   toNumber,
   toText,
 } from "@/components/charts/options";
@@ -12,9 +13,15 @@ import {
   barCorners,
   categoryAxis,
   shared,
-  text,
+  tickLabel,
   tooltip,
 } from "@/components/charts/style";
+import {
+  axisDensity,
+  axisNumber,
+  logLabelStep,
+  logTicks,
+} from "@/components/charts/size";
 import { formatValue } from "@/lib/format";
 import { type Panel, panelTimeField } from "@/lib/ir";
 import { type ColorToken, fillHex } from "@/lib/panels/colors";
@@ -154,40 +161,59 @@ export function histogramShape(panel: Panel): string {
   return JSON.stringify(panel.options ?? {});
 }
 
-export const histogramChart: ChartOptionBuilder = normalized((panel, data, { theme }) => {
-  const { bars, countKey } = histogramBars(panel, data);
-  const o = readOptions(HistogramOptions, panel.options);
-  return {
-    ...shared(theme),
-    grid: { left: 52, right: 16, top: 16, bottom: 28 },
-    tooltip: {
-      ...tooltip(theme),
-      trigger: "axis",
-      axisPointer: { type: "shadow" },
-      // The counts are plain numbers; the format is the buckets'.
-      valueFormatter: (v: unknown) => formatValue(v),
-    },
-    xAxis: {
-      ...categoryAxis(theme),
-      type: "category",
-      data: bars.map((b) => b.label),
-      axisLabel: { ...text(theme), hideOverlap: true },
-    },
-    yAxis: {
-      ...axisStyle(theme),
-      type: o.log ? "log" : "value",
-    },
-    series: [
-      {
-        type: "bar",
-        name: countKey ?? "count",
-        barCategoryGap: "12%",
-        data: bars.map((b) => ({
-          // A log axis has no zero: an empty bucket is left out of it.
-          value: o.log && b.count <= 0 ? null : b.count,
-          itemStyle: { color: fillHex(b.color, theme), ...barCorners(theme) },
-        })),
+export const histogramChart: ChartOptionBuilder = normalized(
+  (panel, data, { theme, size }) => {
+    const { bars, countKey } = histogramBars(panel, data);
+    const o = readOptions(HistogramOptions, panel.options);
+    // Fewer count ticks, written compactly, as the panel gets small (#643).
+    const density = axisDensity(size);
+    const { low, high } = positiveRange(
+      bars.map((b) => ({ count: b.count })),
+      ["count"],
+    );
+    return {
+      ...shared(theme),
+      grid: { left: 52, right: 16, top: 16, bottom: 28 },
+      tooltip: {
+        ...tooltip(theme),
+        trigger: "axis",
+        axisPointer: { type: "shadow" },
+        // The counts are plain numbers; the format is the buckets'.
+        valueFormatter: (v: unknown) => formatValue(v),
       },
-    ],
-  } satisfies EChartsOption;
-});
+      xAxis: {
+        ...categoryAxis(theme),
+        type: "category",
+        data: bars.map((b) => b.label),
+      },
+      yAxis: {
+        ...axisStyle(theme),
+        type: o.log ? "log" : "value",
+        // A log axis keeps ECharts' own steps: fewer would be decades apart.
+        splitNumber: o.log ? undefined : density.y,
+        // The counts are plain numbers; the format is the buckets'.
+        axisLabel: tickLabel(
+          theme,
+          o.log
+            ? logTicks(
+                logLabelStep(size, low, high),
+                axisNumber(undefined, undefined, density),
+              )
+            : axisNumber(undefined, undefined, density),
+        ),
+      },
+      series: [
+        {
+          type: "bar",
+          name: countKey ?? "count",
+          barCategoryGap: "12%",
+          data: bars.map((b) => ({
+            // A log axis has no zero: an empty bucket is left out of it.
+            value: o.log && b.count <= 0 ? null : b.count,
+            itemStyle: { color: fillHex(b.color, theme), ...barCorners(theme) },
+          })),
+        },
+      ],
+    } satisfies EChartsOption;
+  },
+);
