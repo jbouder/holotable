@@ -211,7 +211,7 @@ export function DuckDbUploadPicker({
       <div
         data-dragging={dragging || undefined}
         className={cn(
-          "flex flex-wrap items-center gap-2 rounded-md border border-dashed border-border p-3 transition-colors duration-(--duration-fast) ease-standard",
+          "flex flex-wrap items-center gap-2 rounded-lg border border-dashed border-border p-3 transition-colors duration-(--duration-fast) ease-standard",
           dragging && "border-solid border-success/60 tinted bg-tint-success/(--tint-10)",
         )}
       >

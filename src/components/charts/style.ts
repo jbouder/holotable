@@ -78,9 +78,14 @@ export function categoryAxis(theme: ChartTheme) {
   return { ...axis(theme), splitLine: { show: false } };
 }
 
-/** The legend's entries: the page's text with small rounded swatches. */
+/** The legend's entries: the page's text with small swatches, rounded only where the page is. */
 export function legend(theme: ChartTheme) {
-  return { textStyle: text(theme), icon: "roundRect", itemWidth: 12, itemHeight: 8 };
+  return {
+    textStyle: text(theme),
+    icon: theme.radius > 0 ? "roundRect" : "rect",
+    itemWidth: 12,
+    itemHeight: 8,
+  };
 }
 
 /**

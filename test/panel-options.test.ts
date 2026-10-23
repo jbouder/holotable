@@ -119,7 +119,7 @@ test("a panel without options draws exactly as before", () => {
   assert.deepEqual(option.legend, {
     top: 0,
     textStyle: text,
-    icon: "roundRect",
+    icon: "rect",
     itemWidth: 12,
     itemHeight: 8,
   });
