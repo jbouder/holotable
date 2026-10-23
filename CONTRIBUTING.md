@@ -445,7 +445,14 @@ The docs site (`docs/`) is the canonical explanation of every feature;
 `README.md` is a landing page that links into it. `SECURITY.md` is canonical
 for the trust model and disclosure, this file for contributor workflow, and
 `AGENTS.md` condenses these rules for coding agents. Say a
-thing in one place and link to it from the others.
+thing in one place and link to it from the others. Within the docs, one page
+owns each topic and the rest keep a sentence and a link: `guide/themes.mdx`
+how each theme looks (corners, card lift, gridlines), `admin/themes.md` the
+`THEME_FILE` fields and their fallbacks, `architecture/theming.md` the token
+mechanics, selectors, chart style and quality bar; `concepts/executing-a-panel.md`
+the SQL, PromQL and LogQL guards' rules and limits; `guide/settings.md` the
+controls in Settings (choosing a theme, the dashboard chat button, the
+Explore preferences).
 
 A change to something a page describes updates that page in the same pull
 request:
@@ -460,16 +467,16 @@ request:
 | `src/components/charts/style.ts`, `src/lib/color/chart-theme.ts`, `quality.ts`, `shade.ts` (the chart style, the quality bar) | "Chart style", the token tables and "Quality bar" in `architecture/theming.md` |
 | `src/components/charts/size.ts` (a chart at its panel's size) | "Charts adapt to the panel's size" in `reference/panel-options.md` |
 | `src/components/panels/` (a renderer: stat, table, status grid, logs, text) | Its kind in `reference/panel-options.md` |
-| `src/lib/theme.ts` (`PALETTE_INFO`), a theme's blocks in `src/app/globals.css` | `guide/themes.mdx` and its screenshots, "Shipped themes" and "Reaching first paint" in `architecture/theming.md` |
-| `src/lib/color/theme-file.ts`, `scripts/themes-export.ts` (`THEME_FILE`) | `admin/themes.md` |
+| `src/lib/theme.ts` (`PALETTE_INFO`), a theme's blocks in `src/app/globals.css` | `guide/themes.mdx` (how each theme looks, its corners, card lift and gridlines) and its screenshots, "Shipped themes" and "Reaching first paint" in `architecture/theming.md` |
+| `src/lib/color/theme-file.ts`, `scripts/themes-export.ts` (`THEME_FILE`) | `admin/themes.md` (the fields and their fallbacks) |
 | `src/lib/motion.ts`, `src/lib/view-transition.ts`, `src/components/use-flip.ts`, `src/components/notice.tsx`, the motion tokens in `globals.css` | `architecture/motion.md`, the motion rules in `AGENTS.md` |
-| `src/lib/preferences.ts`, `src/components/settings/` | `guide/settings.md`, `user_preferences` in `architecture/data-model.md` |
+| `src/lib/preferences.ts`, `src/components/settings/` | `guide/settings.md` (which owns the controls; `guide/themes.mdx` and `guide/explore.md` link to it), `user_preferences` in `architecture/data-model.md` |
 | `src/components/ui/` (a primitive) | The primitives list in `AGENTS.md` |
 | `src/components/ui/logo.tsx` (`LOGO_PATH`) | Its copies: `src/app/icon.svg`, `favicon.ico`, `apple-icon.png`, `docs/src/assets/logo-dark.svg` and `logo-light.svg`, `docs/public/favicon.svg`, the demo's starting page in `deploy/cloudflare/demo/src/policy.ts` |
 | `src/lib/panels/` (a panel kind or its options) | `reference/panel-options.md`, "Panel kinds" in `concepts/streaming-and-rendering.md`. The visualization list is generated |
 | `src/lib/sql/safety.ts`, `ast.ts`, `denylist.ts` (the guard) | `concepts/executing-a-panel.md`, invariants 7 and 8, the trust model in `SECURITY.md`, the skill's `references/sql-rules.md` |
-| `src/lib/promql/` (the PromQL guard, its rewrites, the plan) | `concepts/executing-a-panel.md` ("The PromQL guard"), `concepts/prometheus-sources.md`, invariants 7 and 8, the trust model in `SECURITY.md`, the skill's `references/promql-rules.md` |
-| `src/lib/logql/` (the LogQL guard, its rewrites, the plan) | `concepts/executing-a-panel.md` ("The LogQL guard"), `concepts/loki-sources.md`, `operations/metrics.md`, the skill's `references/logql-rules.md` |
+| `src/lib/promql/` (the PromQL guard, its rewrites, the plan) | `concepts/executing-a-panel.md` ("The PromQL guard", which owns the rules and limits), `concepts/prometheus-sources.md` (its one-line summary, time and variables), invariants 7 and 8, the trust model in `SECURITY.md`, the skill's `references/promql-rules.md` |
+| `src/lib/logql/` (the LogQL guard, its rewrites, the plan) | `concepts/executing-a-panel.md` ("The LogQL guard", which owns the rules and limits), `concepts/loki-sources.md` (its one-line summary, time and variables), `operations/metrics.md`, the skill's `references/logql-rules.md` |
 | `src/lib/sources/` (a source kind, its config or its server half) | `concepts/prometheus-sources.md`, `concepts/loki-sources.md`, `architecture/data-model.md` (`sources`, "Source kinds") |
 | `src/lib/duckdb/` (the DuckDB path guard, engine, lock, uploads, adding files, the orphaned-upload sweep and the workbook conversion), `src/lib/multipart.ts` (the upload reader), `src/lib/csv-writer.ts` (a workbook's CSVs) | `architecture/data-model.md` ("DuckDB"), `concepts/duckdb-sources.md`, `admin/duckdb.md`, the `/api/sources/duckdb/uploads` and `/api/sources/[id]/uploads` rows in `reference/api-routes.md` |
 | `scripts/seed.ts`, `scripts/lib/demo-dashboards.ts`, `scripts/lib/demo-files.ts`, `scripts/self-metrics.ts`, `scripts/smoke.ts`, `scripts/smoke-quickstart.ts`, `src/lib/self-monitoring/`, `docker-compose.yml` (the demo data, the files demo, self-monitoring, the smoke tests) | `operations/demo-data.md`, the Compose steps in `getting-started/quick-start.md` |

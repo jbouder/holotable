@@ -101,24 +101,9 @@ result does not have, and the model is told not to use them for a Prometheus sou
 ## The guard
 
 `validatePromql` (`src/lib/promql/safety.ts`) is the PromQL counterpart of the
-SQL guard, and [Executing a panel](/concepts/executing-a-panel/#the-promql-guard)
-lists its rules. In prose:
-
-- **One expression, made of what the walker allows.** The parser is the
-  Prometheus project's own grammar. Comments, the experimental functions and
-  `info()` are refused, as is anything the walker does not know.
-- **Only listed metrics.** Every selector names exactly one metric, and that
-  metric is on the allowlist. A selector without a name, or with a `__name__`
-  pattern, could read any metric, so it is refused.
-- **No time of its own.** The `@` modifier is refused in every spelling, and a
-  range, subquery or `offset` is bounded by `PROMQL_MAX_RANGE`. The `[5m]` in
-  `rate(…[5m])` is a lookback, not a window, and is fine.
-- **Bounded.** At most 8,000 characters, 32 selectors and 64 levels of nesting.
-  A subquery evaluates at most 11,000 points.
-
-The guard also gives **hints** that never refuse: a label the catalog does not
-list for a metric, `rate()` over a gauge, and a counter drawn without `rate()`
-or `increase()`. The editor underlines them in place.
+SQL guard: one parsed expression, every selector naming one allowlisted
+metric, no time of its own, and bounded in size. Its rules, limits and hints
+are on [Executing a panel](/concepts/executing-a-panel/#the-promql-guard).
 
 ## How time becomes `start`, `end` and `step`
 

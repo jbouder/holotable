@@ -52,10 +52,12 @@ colors the scheme comes in: Holotable, Graphite, Fjord, Paper or High
 contrast. The themes are a gallery. Each card draws a little of the app in
 that theme, in the scheme chosen above it, and System shows light and dark
 side by side. Arrow keys move between the cards and choose. Both settings are
-also in the command palette. Both are kept in this browser and apply before
-the page draws. An operator sets the theme a new browser starts with
-(`THEME_DEFAULT_PALETTE`). [Themes](/guide/themes/) shows each one and what it
-is for.
+also in the command palette (type "Theme" or "Color scheme"), and the color
+scheme is in the account menu too. Both are kept in this browser and apply
+before the page draws. An operator sets the theme a new browser starts with
+(`THEME_DEFAULT_PALETTE`); a browser that never chose one follows that
+default, including when the operator changes it. [Themes](/guide/themes/)
+shows each one and what it is for.
 
 ![Settings, Appearance: the color scheme cards above a gallery of five theme previews, the chosen one checked.](/images/settings-appearance.png)
 
@@ -102,10 +104,14 @@ not merely hidden: the prompt boxes, the dashboard list's Recent row and the
 palette stop writing, and turning one off also clears what this browser had.
 The switch follows you; the lists never leave the browser either way.
 
-**Explore** sets the range a new conversation starts with, live refresh (off,
-30s, 1m, 5m), whether every answer's queries start open, and **Keep my
-conversations**. Turning that off asks first, then deletes every conversation
-kept for you; see [Explore](/guide/explore/#what-is-kept).
+**Explore** sets the range a new conversation starts with and three choices
+that Explore's side panel also changes: **Live refresh** (off, 30s, 1m, 5m)
+runs the panels on screen again at that interval, skipping a hidden tab;
+**Show queries** opens every "Show query" and "Ran this query" by default;
+and **Keep my conversations** keeps conversations on the server, so they
+survive a reload and follow you to another device. Turning that off asks
+first, then deletes every conversation kept for you; see
+[Explore](/guide/explore/#what-is-kept).
 
 ### Local data
 

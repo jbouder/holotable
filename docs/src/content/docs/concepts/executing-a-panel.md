@@ -116,16 +116,19 @@ wrapped in `src/lib/promql/parse.ts`) and walks the tree:
   allowlist does not list.
 - **The server owns time.** `@` is rejected in every spelling. A range, a
   subquery range and an `offset` are bounded by `PROMQL_MAX_RANGE` (default
-  `7d`). A subquery step is at least a second and evaluates at most 11,000
+  `7d`). The `[5m]` in `rate(…[5m])` is a lookback, not a window, and is
+  fine. A subquery step is at least a second and evaluates at most 11,000
   points.
 - **Bounds.** At most 8,000 characters, 32 selectors and 64 levels of nesting.
 - **Variables only as a matcher's whole value.** `{host=":host"}` is the one
   place a `:name` may appear, and it must be declared. A multi-value variable
   needs `=~` or `!~`.
 
-A label the catalog does not list for a metric is a **hint**, not a rejection.
-Prometheus answers an unknown label with an empty result rather than an error,
-so the author is told without being blocked.
+The guard also gives **hints**, which never reject, and the editor underlines
+them in place: a label the catalog does not list for a metric (Prometheus
+answers an unknown label with an empty result rather than an error, so the
+author is told without being blocked), `rate()` over a gauge, and a counter
+drawn without `rate()` or `increase()`.
 
 `buildPromqlPlan` (`src/lib/promql/plan.ts`) then writes the variable values in
 as escaped literals and splices the viewer's tenant matcher into every selector.

@@ -61,14 +61,12 @@ the conversation, which names the sources and the range.
 named after its first question. Rename one, delete one, or **Delete all
 conversations**. The filter searches the titles that are loaded.
 
-**Settings**:
-
-| Setting | What it does | Where it is kept |
-| --- | --- | --- |
-| Time range | The window every query in this conversation runs over. Changing it runs the panels on screen again | The conversation |
-| Live refresh | Runs the panels on screen again every 30 seconds, minute or 5 minutes, skipping a hidden tab | Your preferences |
-| Show queries | Opens every "Show query" and "Ran this query" by default | Your preferences |
-| Keep my conversations | Keeps conversations on the server so they survive a reload and follow you to another device | Your preferences |
+**Settings** holds the **Time range**, the window every query in this
+conversation runs over, kept with the conversation; changing it runs the
+panels on screen again. Beside it are **Live refresh**, **Show queries** and
+**Keep my conversations**, which are your
+[Explore preferences](/guide/settings/#preferences): a change here is a
+change there.
 
 ## What is kept
 
