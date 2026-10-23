@@ -200,6 +200,11 @@ One tile per entity, colored by threshold or by state
   every tile meets WCAG AA in both themes; the value and state are written on
   it, so color is never the only signal.
 - At most 200 tiles are drawn; the panel says how many more there are.
+- Tiles that do not fit the panel scroll, and the panel says so
+  ([#645](https://github.com/jbouder/holotable/issues/645)): a fade over the
+  bottom edge and "N more below", which scrolls to them when clicked. A row
+  only partly in view sits under the fade, so no tile is drawn cut through its
+  value. The list itself is the keyboard's way to scroll.
 - With a [datum link](/guide/drilldown/), each tile is a link carrying its
   row, and its label is the series.
 

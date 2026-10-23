@@ -6,6 +6,7 @@ import { StatusGridView } from "@/components/panels/status-grid";
 import { Panel } from "@/lib/ir";
 import { fallbackToken } from "@/lib/panels/colors";
 import { STATUS_GRID_MAX, statusGrid } from "@/lib/panel-reading";
+import { scrollCue } from "@/lib/scroll-cue";
 
 /*
  * The status grid (#404): one tile per entity, as the function that turns
@@ -215,4 +216,23 @@ test("overflow says how many tiles were left out", () => {
     <StatusGridView panel={grid()} data={{ columns: ["host", "cpu"], rows }} />,
   );
   assert.match(html, /3 more not shown/);
+});
+
+test("tiles out of view are counted, and the cue never leaves a tile cut in view", () => {
+  // #645: rows of 60px tiles with a 6px gap, in a view 110px tall.
+  const rows = (n: number, offset = 0) =>
+    Array.from({ length: n }, (_, i) => ({
+      top: i * 66 - offset,
+      bottom: i * 66 + 60 - offset,
+    }));
+  // The second row is half in view: the cue covers it whole and counts it.
+  assert.deepEqual(scrollCue(rows(4), 110, 24), { cover: 44, hidden: 3, next: 66 });
+  // Scrolled a little, the top row half gone, it is the same.
+  assert.deepEqual(scrollCue(rows(4, 10), 110, 24), { cover: 54, hidden: 3, next: 56 });
+  // Everything in view, or scrolled to the end: no cue.
+  assert.equal(scrollCue(rows(1), 110, 24), null);
+  assert.equal(scrollCue(rows(4, 154), 110, 24), null);
+  // A view too short for one whole tile keeps the cue its own height and
+  // counts the cut tile as the one in view.
+  assert.deepEqual(scrollCue(rows(4), 70, 24), { cover: 24, hidden: 3, next: 66 });
 });
