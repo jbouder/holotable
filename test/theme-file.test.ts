@@ -123,13 +123,14 @@ test("Holotable exports and loads as it paints; a file that names no look keeps 
     assert.equal(ours.radius, builtIn(scheme).radius);
     assert.equal(ours["shadow-card"], builtIn(scheme)["shadow-card"]);
   }
-  // A file from before #648 (graphite's export names neither) is square,
-  // subtly lifted and gridded in its inset surface, as every such file was.
+  // A file that names no radius or shadow (graphite's export names neither)
+  // is square and flat like every built-in theme (#674), and gridded in its
+  // inset surface.
   const old = themeCss(parsed(exportTheme(CSS, "graphite", "acme")));
   for (const scheme of ["dark", "light"] as const) {
     const d = decls(old, scheme);
     assert.equal(d.radius, "0px");
-    assert.equal(d["shadow-card"], SHADOWS.subtle[scheme]);
+    assert.equal(d["shadow-card"], SHADOWS.none[scheme]);
     assert.equal(d["chart-grid"], "var(--surface-2)");
   }
   // #641: a file that does not split its amber fills them in its text colors,
