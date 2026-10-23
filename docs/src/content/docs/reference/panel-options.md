@@ -318,7 +318,7 @@ One tile per entity, colored by threshold or by state
 - A state with no color in `states` takes the state timeline's: `ok` is
   `success`, `down` is `danger`, and so on.
 - The tile's text is always the foreground color over a tint of its color, so
-  every tile meets WCAG AA in both themes; the value and state are written on
+  every tile meets WCAG AA in every theme and color scheme; the value and state are written on
   it, so color is never the only signal.
 - At most 200 tiles are drawn; the panel says how many more there are.
 - Tiles that do not fit the panel scroll, and the panel says so

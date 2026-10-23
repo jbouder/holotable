@@ -90,8 +90,7 @@ in a column called `time`, which is what a time series draws; an instant query
 has none, so a kind that needs time (`state-timeline`, `logs`) needs a range
 query.
 
-LogQL, for a Loki source. The spec accepts it now; no Holotable server runs it
-until Loki sources ship, so a panel with one is refused when it runs:
+LogQL, for a Loki source:
 
 | Field | Type | Rules |
 |---|---|---|
@@ -123,7 +122,7 @@ The server binds the value as a parameter; it never enters the SQL text.
 | `label` | string | Optional, 1–64; what the picker is labeled. |
 | `type` | `"enum"` or `"query"` | |
 | `values` | string[] | `enum` only, required there: 1–200 unique strings, each 1–256 chars. |
-| `query` | `{ sourceId, sql }` or `{ sourceId, label, match? }` | `query` only, required there. SQL: a guarded SELECT whose first column is the values. Prometheus: the values of the label `label` (a label name), optionally narrowed by `match`, a series selector such as `up{job="api"}`. No time filter, and no `:variables` of its own. |
+| `query` | `{ sourceId, sql }` or `{ sourceId, label, match? }` | `query` only, required there. SQL: a guarded SELECT whose first column is the values. Prometheus or Loki: the values of the label `label` (a label name), optionally narrowed by `match`, a series selector such as `up{job="api"}`. No time filter, and no `:variables` of its own. |
 | `multi` | boolean | Several values at once, bound as an array: write `col = ANY(:name)`. |
 | `default` | string or string[] | Optional. An array only when `multi`. For `enum`, each default must be one of `values`. By default the first value. |
 

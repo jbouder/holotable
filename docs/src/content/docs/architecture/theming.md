@@ -19,6 +19,13 @@ designed set of colors that comes in both schemes, on `<html data-palette>`
 | Focus and selection | `--ring`, `--selection` | The focus outline, selected text |
 | Code | `--code-keyword`, `--code-string`, `--code-number`, `--code-comment` | SQL and PromQL highlighting |
 | Tints | `--tint-5` … `--tint-20`, `--tint-<status>`, `--tint-foreground`, `--tinted-*` | Status notices, badges and tiles (below) |
+| Status | `--success`, `--warning`, `--danger` | Badges, alerts, thresholds |
+| Spec colors | `--orange`, `--purple`, `--teal` | A spec's color tokens that are not statuses (below) |
+| Fills | `--warning-fill`, `--orange-fill` | The amber pair drawn as an area: a gauge's arc, a bar, a tile |
+| Chart series | `--chart-1` … `--chart-8` | Categorical series, each at least 3:1 on `--surface` |
+| Chart ramps | `--chart-seq-1` … `--chart-seq-5`, `--chart-div-low/mid/high` | Sequential and diverging scales |
+| Chart chrome | `--chart-text`, `--chart-axis`, `--chart-grid`, `--chart-track`, `--chart-faint` | Axis labels, axis lines, grid lines, a gauge's track, how faint a band or sparkline is |
+| Shape | `--radius`, `--shadow-card` | Corners and the card shadow (below) |
 
 ## Status tints
 
@@ -53,16 +60,12 @@ every fill is exactly a system color.
 `e2e/a11y.spec.ts` emulates forced colors and asserts these rules directly.
 axe-core does not model forced colors: it would measure the page's own
 colors against the system's background.
-| Status | `--success`, `--warning`, `--danger` | Badges, alerts, thresholds |
-| Fills | `--warning-fill`, `--orange-fill` | The amber pair drawn as an area: a gauge's arc, a bar, a tile |
-| Chart series | `--chart-1` … `--chart-8` | Categorical series, each at least 3:1 on `--surface` |
-| Chart ramps | `--chart-seq-1` … `--chart-seq-5`, `--chart-div-low/mid/high` | Sequential and diverging scales |
-| Chart chrome | `--chart-text`, `--chart-axis`, `--chart-grid` | Axis labels, axis lines, grid lines |
 
 A spec never names a color, only a color token. `src/lib/panels/colors.ts`
 maps each one to a variable, for example `success` to `--success` and `teal`
-to `--teal`. Holotable aliases `--orange`, `--purple` and `--teal` to
-`--chart-3`, `--chart-5` and `--chart-6`. A theme that orders its series
+to `--teal`. In dark, Holotable aliases `--orange`, `--purple` and `--teal`
+to `--chart-3`, `--chart-5` and `--chart-6`; in light `--orange` is its own AA
+shade (below). A theme that orders its series
 differently points each one at the series of the same color family, so a
 spec's `teal` is teal in every theme. Markup uses the variable, and a canvas reads its value
 through `ChartTheme` (`src/lib/color/chart-theme.ts`), which converts the
@@ -104,7 +107,7 @@ colors, so a built-in theme can set it in its blocks:
 | `--chart-font-size-axis` | `11px` | Axis labels, legend entries, pie labels, corner notes |
 | `--chart-font-size-label` | `11px` | Labels on a node, block or span (an edge's is 1px smaller) |
 | `--chart-font-size-tooltip` | `12px` | A tooltip's body |
-| `--chart-font-size-value` | `24px` | A radial gauge's value |
+| `--chart-font-size-value` | `24px` | A radial gauge's value when its size is not known; a sized dial scales it between the label size and twice this |
 | `--chart-line-width` | `2px` | Every series line |
 | `--chart-area-fade` | `0.32` | An unstacked area at its line, fading to nothing at the axis |
 | `--chart-area-flat` | `0.18` | An unstacked area whose color a threshold owns (a visual map cannot fade) |
@@ -113,7 +116,8 @@ colors, so a built-in theme can set it in its blocks:
 
 **Large areas are softened.** A saturated color over a whole block is loud in
 a muted interface, so treemap and sunburst nodes, pie and donut slices,
-Sankey nodes, timeline spans and stacked bands take their color pulled
+Sankey nodes, graph nodes drawn as blocks, timeline spans and stacked bands
+take their color pulled
 `--chart-soften` of the way toward the surface (`soften()`). Lines, bars,
 histogram bars and a gauge's progress keep the literal color. A label on a
 softened fill takes `inkOn` of that fill. A status tile is already a tint of
@@ -155,7 +159,8 @@ Holotable's look is its own too (#648): square corners (`--radius: 0`), flat
 cards with no shadow (`--shadow-card: none`; `Card` draws the token), and
 gridlines a step below `--surface-2` (`--chart-grid`). Every other theme sets
 those three itself (square, the subtle shadow Tailwind calls `shadow-sm`, and
-`--surface-2`; Paper rounds to 4px, the one theme that does), so a change to the default's look never
+`--surface-2`, except High contrast, whose grid is a visible gray held to 3:1;
+Paper rounds to 4px, the one theme that does), so a change to the default's look never
 reaches them. A theme file gets the same: `themeCss` writes its `radius`,
 `shadow` and `chart-grid`, or the square, subtle, `--surface-2` fallbacks.
 
@@ -184,12 +189,12 @@ match, and that the new blocks clear the quality bar.
 ## Reaching first paint
 
 `src/lib/theme.ts` owns both choices: the stored keys `theme` and `palette`,
-the `PALETTES` names (reserved and shipped), `PALETTE_INFO` (what is
+the `PALETTES` names (the built-in themes), `PALETTE_INFO` (what is
 shipped and offered), and the change events. The inline bootstrap script
 (`src/lib/bootstrap.ts`) writes `data-theme` and `data-palette` before the
 page draws. A stored palette the app does not ship falls back to the
 server's default, `THEME_DEFAULT_PALETTE`. `validateConfig` refuses a name
-outside the shipped list at boot. Every control changes the theme through
+that is neither built in nor the `THEME_FILE` theme's at boot. Every control changes the theme through
 `src/lib/theme-transition.ts`, under the `theme` view transition, and charts
 re-read their colors when either attribute changes.
 

@@ -62,7 +62,8 @@ is a **datum link**. It needs to know what was clicked,
 so it is not in the panel's menu. Instead the panel's data is clickable:
 
 - **A chart.** Click a point, bar, slice, cell, span, gauge or a graph
-  node's label (its symbol opens and closes its branch instead). With one link,
+  node: a marker's label (its symbol opens and closes its branch instead), or
+  anywhere on a block (its knob opens and closes the branch). With one link,
   the click follows it. With several, a small list opens at the point, and
   Escape or a click outside closes it. A click that ends a time brush never
   follows a link.

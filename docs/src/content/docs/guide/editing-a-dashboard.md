@@ -28,8 +28,8 @@ beside the canvas then edits that panel, top to bottom:
   Loki source it is the LogQL, with the same two fields for a metric query
   (see [A LogQL panel](/concepts/executing-a-panel/#a-logql-panel)). Choosing a
   source of the other kind restarts the query from that source's starter
-  rather than keeping one its source cannot run. A text panel shows its
-  Markdown here.
+  rather than keeping one its source cannot run. On a text panel this
+  section is **Text**, and holds its Markdown.
 - **Visualization**: title, kind, value format and description.
 - **Display**: the presentation options, collapsed until wanted. On a line,
   an area or a stat, **Line** sets the **Curve**: straight (the default),
@@ -41,8 +41,8 @@ beside the canvas then edits that panel, top to bottom:
 - **Links**: where the panel leads (see [Links](#links) below). Not on a text
   panel.
 
-The panel's actions menu holds **Duplicate**, **Save as template** and
-**Delete**. Closing the panel (or selecting nothing) shows the dashboard's own
+The panel's actions menu holds **Duplicate**, **Save as template…**
+and **Delete panel**. Closing the panel (or selecting nothing) shows the dashboard's own
 settings instead: the time range (the same picker readers use), the refresh
 interval as presets with a custom value in seconds, the `Arrange: N-up`
 presets, **Variables**, **Annotations**, and the description and tags. The

@@ -16,9 +16,11 @@ scratch.
 - Every referenced `sourceId` must resolve to a real, non-tombstoned source.
 - **All panels must belong to one workspace**, derived from the trusted source
   records — mixing workspaces is rejected.
-- **Every panel's SQL is re-run through `validateSql`** against *its own
-  source's catalog*. Generation-time validity is not assumed; the source is
-  re-authorized and the SQL re-checked at save.
+- **Every panel's query is re-checked by its source kind** (`validateSql`,
+  `validatePromql` or `validateLogql`) against *its own source's catalog*, and
+  a query in another language than the source's is refused. Generation-time
+  validity is not assumed; the source is re-authorized and the query
+  re-checked at save.
 
 The derived workspace then authorizes `dashboard:create`, and the spec is
 written as a new immutable row. Specs are **never mutated in place** — an edit
@@ -311,9 +313,10 @@ browser drops the stylesheet and the editor renders as unstyled text.
 
 ## The server owns time
 
-Real data enters the system only here — server-side, from a stored spec. Three
-places share the same guard code: the live poller, the one-shot query route, and
-the read-only dashboard chat's `runQuery` tool. The core is
+Real data enters the system only here — server-side, from a stored spec. Every
+path that runs a query shares the same guard code: the live poller, the
+one-shot query route, Explore's and the dashboard chat's tools, a chat panel's
+re-run, and the MCP `run_query` tool. The core is
 `buildExecutablePlan`, which runs **after** `validateSql` has passed.
 
 The validated query is wrapped as a subquery, and the dashboard's resolved

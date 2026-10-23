@@ -28,7 +28,7 @@ keep them from regressing (#77, #91).
   points at the selection — because a menu would move focus out of the box
   being typed into.
 - **Focus is always visible.** Every interactive primitive draws
-  `focus-visible:outline-2 outline-primary`. A scroll container that can
+  `focus-visible:outline-2 focus-visible:outline-ring`. A scroll container that can
   overflow (a table panel, an Explore answer's table) is itself focusable, so it can be
   scrolled from the keyboard.
 - **Links are links.** Something that navigates is one `<a>` styled as a
@@ -70,14 +70,14 @@ Contrast is the floor. The wider [theme quality bar](/architecture/theming/#qual
 also covers borders, the focus ring, selection, code colors, and whether
 statuses and chart series stay distinct under a color-vision deficiency.
 
-Every text-on-background pairing the interface uses meets AA (4.5:1) in both
-themes. The pairings are listed in `src/lib/color/contrast.ts`, measured from
+Every text-on-background pairing the interface uses meets AA (4.5:1) in every
+theme, in both color schemes. The pairings are listed in `src/lib/color/contrast.ts`, measured from
 the OKLCH tokens in `src/app/globals.css` (resolved to sRGB, translucent tints
 composited over the surface the way the browser paints them), and
-`test/contrast.test.ts` fails if any drops below 4.5:1 — or if this table is
-not what the tokens produce.
+`test/contrast.test.ts` fails if any text pairing drops below 4.5:1, or a
+series or fill below 3:1 — or if this table is not what the tokens produce.
 
-In the dark theme the primary button carries dark text: a blue light enough to
+In the dark scheme the primary button carries dark text: a blue light enough to
 read as text on `surface-2` is too light to carry white at AA.
 
 ### holotable
@@ -517,15 +517,15 @@ color directly. axe-core cannot measure contrast in that mode.
 
 - `npm test`: the contrast table above, the chart table and description
   (`test/chart-accessibility.test.ts`), the editor's arrow and Delete keys
-  (`test/panel-layout-grid.test.tsx`), and every palette's pairings and
+  (`test/panel-layout-grid.test.tsx`), and every theme's pairings and
   quality bar (`test/theme-quality.test.ts`).
 - `npm run e2e`: axe-core over every main surface, an open dialog, an open
-  menu and the chat panel, in the default palette's dark and light, and the
-  live dashboard in each other palette's two schemes (`e2e/a11y.spec.ts`).
-  That every pairing meets AA in every palette is the unit tests' job
+  menu and the chat panel, in the default theme's dark and light, and the
+  live dashboard in each other theme's two schemes (`e2e/a11y.spec.ts`).
+  That every pairing meets AA in every theme is the unit tests' job
   (`test/contrast.test.ts`, `test/theme-quality.test.ts`); the browser
   proves each surface is built right, which does not change with the
-  palette. Serious and critical violations fail; moderate and minor are
+  theme. Serious and critical violations fail; moderate and minor are
   reported on the test.
   Exclusions are named in `e2e/support/a11y.ts` with the reason. What axe
   cannot see is asserted as behavior in `e2e/keyboard.spec.ts`: the focus

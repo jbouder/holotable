@@ -45,23 +45,26 @@ The three default demo dashboards each answer one question, and with
 **Holotable self-monitoring** they use every panel kind, so a first look sees
 all of them:
 
-- **Demo service health**: is the API serving well? The 5xx error rate, p95
+- **Demo service health**: is the API serving well? After an *About this
+  dashboard* text panel, the 5xx error rate, p95
   latency and the share of requests over the 300 ms SLO as stats with
   sparklines and availability as a gauge; then where requests go: a service
   map of which service calls which (a [graph](/reference/panel-options/#graph),
-  drawn as a directed graph) beside the request flow from service to route to
+  drawn left to right as a directed graph of boxes, each with its icon, name
+  and requests inside) beside the request flow from service to route to
   status (a [Sankey](/reference/panel-options/#sankey)); then requests per
   minute by outcome beside the latency band against the SLO (a [custom
   visual](/architecture/custom-visuals/)); then the latency histogram, the
   slowest routes and requests by service; and the gateway's recent errors and
   warnings at the bottom.
-- **Demo fleet**: which hosts need attention, and why? Status grids of CPU and
+- **Demo fleet**: which hosts need attention, and why? After an *About this
+  dashboard* text panel, status grids of CPU and
   disk now, a CPU heatmap by host and minute beside memory as gauge bars, the
   load-state timeline, network in as a region-then-host treemap beside CPU
   against memory as a scatter, and a table of hosts.
-- **Demo host detail**: one host, picked with a `host` variable: its CPU,
-  memory, disk and network, its own log lines and their levels, the errors
-  it logged per minute (a line drawn in steps), and the other hosts.
+- **Demo host detail**: one host, picked with a `host` variable: its CPU and
+  memory, disk and network beside the other hosts, its own log lines and their
+  levels, and the errors it logged per minute (a line drawn in steps).
 
 They show [drilldown](/guide/drilldown/) too. **Demo service health** has a
 `service` variable, the API's three services, all of them picked by default
@@ -166,7 +169,7 @@ database.
 
 | Variable | Default | Effect |
 | --- | --- | --- |
-| `SEED_INTERVAL_MS` | `2000` | Delay between insert batches (Docker dev override: `1000`). |
+| `SEED_INTERVAL_MS` | `2000` | Delay between insert batches. |
 | `SEED_DEMO` | — | Set to `false` to skip the one-time bootstrap and only stream metrics. |
 | `SEED_BACKFILL` | — | History to write before streaming: `30m`, `6h`, `1d`, at most `7d`. Unset writes none. An invalid value exits 1. |
 | `SEED_DEMO_FILES` | — | Set to `true` to write the files demo under `DUCKDB_SOURCES_DIR` and seed the **Demo files** source and dashboard. Unset, neither is seeded, and one an earlier seed wrote is retired. Smoke test too: with it, the smoke checks **Demo files**. |
@@ -203,7 +206,7 @@ own store, `api-db` (tier `database`), `web-cache` (`cache`) and
 `worker-queue` (`queue`), and `api` and `web` share a `redis` (tier `store`,
 [#624](https://github.com/jbouder/holotable/issues/624)). With a node of two
 parents the map is not a tree, so the panel draws it with `layout: "dag"`,
-the layered directed graph; its SQL gives the shared store no `service`, so
+the layered directed graph, each node a box (`node: "block"`); its SQL gives the shared store no `service`, so
 its click is no dead link. The seeder deletes rows an earlier topology wrote
 for edges the map no longer has. The gateway's requests follow `http_requests`' rhythm at the default cadence, and
 about 3% of calls fail, as its 5xx do. A **read-only** role is created by
@@ -392,14 +395,15 @@ seeder writes five files under `<DUCKDB_SOURCES_DIR>/demo/` with the binding its
 
 It registers them as the **Demo files** source (`duckdb-demo`, path `demo`,
 no `secret_ref`) with that catalog, and seeds the **Demo files** dashboard.
-Requests per minute and the 5xx rate come from `time_bucket` panels over the
-Parquet file. Daily revenue by region comes from a `date_trunc` panel with
-its own 30-day window. Requests by region joins the Parquet file to the CSV,
+Requests per minute, the 5xx rate and requests per minute by service come
+from `time_bucket` panels over the Parquet file. The latest day's revenue and
+daily revenue by region come from `date_trunc` panels with their own 30-day
+window. Requests by region joins the Parquet file to the CSV,
 a table of revenue by region covers the whole file, a table of deploys
 reads the JSON-lines file, its nested object as `actor.name` and
 `actor.team`, and a network topology draws `links.csv` joined to the host
 inventory as a top-to-bottom directed graph, routers, switches and servers as
-icons, each link as wide as its bandwidth, the core routers' loop dashed.
+boxes, each with its icon and name inside, each link as wide as its bandwidth, the core routers' loop dashed.
 
 Every value in the files is a function of its minute or day, so the seeder
 can rewrite them every minute, and does. Each file is written beside its

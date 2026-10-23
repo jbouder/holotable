@@ -71,8 +71,9 @@ request header also discards any policy a client sent, so a request cannot
 choose its own nonce.
 
 One inline script is hand-written: the bootstrap in `src/app/layout.tsx`
-(built by `src/lib/bootstrap.ts`) that sets `data-theme` and `data-motion`
-before first paint. The layout reads the nonce from the
+(built by `src/lib/bootstrap.ts`) that sets `data-theme`, `data-palette` and
+`data-motion` before first paint. With a `THEME_FILE`, the layout also writes
+that theme's token blocks in an inline `<style>` stamped with the same nonce. The layout reads the nonce from the
 `x-nonce` request header and stamps it itself.
 
 Reading a request header makes every page dynamic, which they already were:
@@ -99,7 +100,7 @@ same-origin script, which is what that helper reads.
 Set `CSP_REPORT_ONLY=true` and the same policy is sent as
 `Content-Security-Policy-Report-Only`: the browser logs every violation in the
 console and blocks nothing. Watch the console across dashboards, the editor
-and the theme toggle, then set it back to `false`. In production the flag adds
+and the color scheme toggle, then set it back to `false`. In production the flag adds
 a startup warning on every boot, because it means the policy is being logged
 rather than enforced; see [Startup validation](/operations/startup-validation/).
 
@@ -108,8 +109,8 @@ the browser, not collected.
 
 ## What is exempt
 
-The proxy runs on every path except `/api`, `/_next/static`, `/_next/image`
-and the icons (`/icon.svg`, `/apple-icon.png`, `/favicon.ico`), which a
+The proxy runs on every path except `/api`, `/.well-known`, `/_next/static`,
+`/_next/image` and the icons (`/icon.svg`, `/apple-icon.png`, `/favicon.ico`), which a
 browser fetches with no session and must not be sent to sign in. API
 responses are JSON, or the SSE stream at `/api/dashboards/[id]/stream`,
 which a document policy does not apply to. Leaving `/api` out keeps the proxy

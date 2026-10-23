@@ -204,7 +204,7 @@ npm run migrate        # apply Postgres migrations (--check, --dry-run, --down)
 npm run migrate:verify # round-trip every migration against a scratch database
 npm run seed           # looping metrics seeder (+ demo sources and dashboards)
 npm run self-metrics   # scrape the app's own /api/metrics into metrics.holotable_self
-npm run smoke          # check the self-monitoring dashboard answers with scraped rows
+npm run smoke          # check the seeded dashboards end to end, and each opt-in one that is on
 ```
 
 ## Pages
@@ -217,8 +217,9 @@ npm run smoke          # check the self-monitoring dashboard answers with scrape
 | `/dashboards/[id]/edit` | Panel CRUD/layout, single-panel NL edits, version save | editor |
 | `/dashboards/[id]/versions` | Version history, diff, preview and restore | viewer (restore: editor) |
 | `/embed/dashboards/[id]` | A [share link](/integrations/share-links/)'s read-only view, framable by the origins the link names | the link's token |
+| `/models` | Server, workspace and personal models: add, test, choose the default | editor (demo: anyone) |
 | `/explore` | Ask questions of your data in a conversation, with inline panels; `/chat` redirects here | viewer |
-| `/settings` | Account, appearance, preferences, local data, shortcuts; workspace AI limits and API tokens for admins. Reached from the account menu | signed in |
+| `/settings` | Account, appearance, preferences, local data, shortcuts; AI context for editors; workspace AI limits and API tokens for admins. Reached from the account menu | signed in |
 | `/data-sources` | Source CRUD / test / reviewed refresh, a catalog browser with per-column exposure, a structured form with table discovery, plus a natural-language drafter. Viewers get the list and the catalog browser read-only, without connection details or hidden columns | source-admin (read-only: viewer) |
 
 Roles come from Keycloak group membership — see

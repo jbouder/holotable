@@ -97,7 +97,7 @@ and restarts as long as the database does (the quick start's data volume).
 
 With the default groups the owner is a source-admin of one workspace, `local`:
 they can add sources, [upload files](/admin/duckdb/#uploads), and
-manage the workspace's limits and models. Unlike demo mode, the [models
+manage the workspace's models; its limits they can read but not change. Unlike demo mode, the [models
 configured in the app](/admin/models/#models-configured-in-the-app) stay on,
 so the owner can add a model and its key on the [Models page](/guide/models/)
 instead of restarting with `-e`. A banner at the top of every page says that

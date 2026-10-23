@@ -15,9 +15,9 @@ dashboard readable during an incident.
 | How close to a limit? (CPU %, disk, quota) | `gauge` | One value, `min`/`max` set; `variant: "bar"` for one bar per host. |
 | What state was it in, and when? (up/down, deploys) | `state-timeline` | Raw time, entity, state, ordered by time. |
 | What does it look like, not just its p95? (latency, sizes) | `histogram` | A bucket (lower bound) + a count, with a coarse time bucket; `cumulative` for a Prometheus `le`. |
-| What did it say? (errors, audit entries, recent events) | `logs` | Raw time + message (+ level), newest first, `LIMIT 200`. |
+| What did it say? (errors, audit entries, recent events) | `logs` | Raw time + message (+ level), newest first, `options.limit: 200` (not a SQL `LIMIT`). |
 | What is the whole made of, level by level? (disk, cost, traffic) | `treemap` | Path columns + a summable value; `variant: "sunburst"` for rings. |
-| What points at what? (service calls, schema, hierarchy, lineage) | `graph` | One row per edge (parent, child) or path columns; `layout: "tree"` when every node has one parent, `"dag"` when a node can have several or edges can cycle, `"force"` when direction says nothing (who talks to whom); icons by `group` for a service map. |
+| What points at what? (service calls, schema, hierarchy, lineage) | `graph` | One row per edge (parent, child) or path columns; `layout: "tree"` when every node has one parent, `"dag"` when a node can have several or edges can cycle, `"force"` when direction says nothing (who talks to whom); icons by `group` for a service map; `node: "block"` for anything read as a diagram (an architecture map, a lineage). |
 | How much flows where? (requests service → route → status, bytes source → sink, a funnel) | `sankey` | Path columns (one per stage) or edge rows, plus a required volume; no cycles. |
 | Which of these is unhealthy? (hosts, services, targets) | `status-grid` | One row per entity, a label + a value (or a state); thresholds color it. |
 | Where is the load concentrated over time? | `heatmap` | Time bucket, a dimension, a count. |

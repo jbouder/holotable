@@ -80,7 +80,10 @@ names, addresses and CIDR ranges; one entry that is none of those is an error.
 name or password (at most 16); a bad entry is an error that names its position
 in the list, never the entry, which may hold a password. `LOCAL_MODEL_ENDPOINTS`
 set while detection is off is a **warning**; see [A model on this
-machine](/admin/models/#a-model-on-this-machine).
+machine](/admin/models/#a-model-on-this-machine). A `THEME_FILE` that cannot be
+read is an error anywhere; one that fails the operator tier of the quality bar
+is an error in production and a warning in development, where it is not
+loaded; see [Your own theme](/admin/themes/).
 The full list of variables is in
 [Configuration](/reference/configuration/).
 

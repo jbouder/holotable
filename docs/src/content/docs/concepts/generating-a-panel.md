@@ -31,9 +31,9 @@ Only then does it hand off to `src/lib/ai/generate.ts`, which uses the AI SDK's
 
 ```ts
 streamObject({
-  model: getModel(),               // env-selected provider/model
+  ...modelSettings(model),         // the model requireModel resolved for this caller and workspace
   schema: DashboardGenerationSchema, // or ExplorePanel — the model's output IS the IR
-  system: baseSystem(source, workspacePrompt), // catalog, workspace context, strict SQL rules
+  system: baseSystem(source, workspacePrompt, additionalSources, dashboards), // catalogs, workspace context, strict rules
   prompt: ...,
 })
 ```
@@ -45,7 +45,8 @@ to emit a spec shaped like `Dashboard`/`Panel` — not free-form text, and not
 data rows.
 
 **The system prompt contains only catalog *metadata*** for the selected
-sources (one, or for a dashboard [up to three](#more-than-one-source)): table and column names and types from `buildCatalogPrompt(source)`,
+sources (one, or for a dashboard [up to three](#more-than-one-source)): table and column names and types from the source kind's `catalogPrompt` (`buildCatalogPrompt` for a
+TimescaleDB source),
 plus the workspace's own context when it has one (below). No sample rows are
 ever sent to the model. It designs against a schema, not against
 data.
@@ -95,7 +96,8 @@ drafting do not.
 
 `baseSystem` composes the prompt as the base rules, the fenced catalog, the
 workspace's block, and then the SQL, description, layout and presentation
-rules (`src/lib/ai/prompt.ts`). The text is written by an admin, but it is
+rules (`src/lib/ai/generate.ts`; the fenced blocks are built in
+`src/lib/ai/prompt.ts`). The text is written by an admin, but it is
 still not an instruction channel:
 
 - **It is fenced like the catalog.** Every line is flattened and clamped, and
@@ -210,10 +212,11 @@ source is among the sources, the prompt changes in four ways:
   - `sum by (…)` to keep series few;
   - `histogram_quantile(0.95, sum by (le) (rate(x_bucket[5m])))` for
     percentiles;
-  - `"instant": true` for a stat, gauge, pie, donut or table;
+  - `"instant": true` for a stat, gauge, pie, donut, status-grid, histogram,
+    treemap, graph, sankey or table;
   - a variable only as a whole matcher value, `{host=":host"}`.
 - Each panel kind's hint has a PromQL form where the SQL one talks about
-  `timeField`. Heatmap, scatter and state timeline tell the model not to use them
+  `timeField`. Heatmap, scatter, state timeline and logs tell the model not to use them
   with a Prometheus source, because PromQL's rows are a time and one column per
   series.
 - A `query` variable can list a label's values:

@@ -5,13 +5,18 @@ sidebar:
   order: 6
 ---
 
-Three routes call the configured model: `/api/generate`,
-`/api/sources/generate`, and `/api/dashboards/[id]/chat`. Before
+Every model-backed route calls the configured model through the same gate:
+generation (`/api/generate`), the source drafter (`/api/sources/generate`),
+the dashboard chat (`/api/dashboards/[id]/chat`), Explore (`/api/chat/turn`,
+`/api/chat/[id]/messages`), and a model's Test connection, listing and
+re-scan (`/api/me/models/test`, `/api/workspaces/[id]/models/test`,
+`/api/workspaces/[id]/models/[modelId]/test`, `/api/models/discover`,
+`/api/models/detect`). Before
 [#18](https://github.com/jbouder/holotable/issues/18) nothing bounded them: an
 editor holding a button, or a loop in a browser tab, could spend as fast as
 the provider would answer, and a chat turn can take up to six model round
 trips. Every one of those routes now passes through `enforceLlmLimits`
-(`src/lib/limits/llm.ts`) immediately after `assertAuthorized`, and a request
+(`src/lib/limits/llm.ts`) after `assertAuthorized` and `requireModel`, and a request
 over either ceiling is refused with **429** before the model is called.
 
 ## Three ceilings
@@ -97,7 +102,8 @@ The row is read on every model request, so a change applies to the next one.
 
 `llm_usage` holds one row per `(workspace_id, day, route, model)` with
 `input_tokens`, `output_tokens`, and `requests`, each finished call adding to
-it. `route` is one of `generate`, `source-draft`, `chat`. The table holds
+it. `route` is one of `generate`, `source-draft`, `chat`,
+`model-test`, `model-discover`, `model-detect`. The table holds
 counters only, never prompts, specs, or output. The Prometheus counter
 `holotable_llm_tokens_total` ([#51](https://github.com/jbouder/holotable/issues/51))
 counts the same calls in process; see [Prometheus metrics](/operations/metrics/).

@@ -30,7 +30,8 @@ Server side (`.../stream/route.ts` and `src/lib/poller/registry.ts`):
      tombstoned, or belongs to a *different* workspace than the dashboard, it
      emits a `tombstone` event. All three cases look identical, so a crafted
      spec cannot probe for cross-workspace sources.
-  2. Re-runs `validateSql`, builds the guarded plan, and executes it.
+  2. Re-runs its source kind's guard (`validateSql`, `validatePromql` or
+     `validateLogql`), builds the guarded plan, and executes it.
   3. **Remembers the result and computes each subscriber's delta.** The
      poller keeps every panel's last result. For a time-series panel each
      **subscriber** has its own cursor (the newest timestamp it has been
@@ -41,9 +42,9 @@ Server side (`.../stream/route.ts` and `src/lib/poller/registry.ts`):
      Non-time panels are sent as a full `replace` snapshot.
 
 Events go to every subscriber's stream. The event types are `panel`
-(`append`/`replace`), `panel-error`, `panel-degraded`, `dashboard-error`,
-`tombstone`, and `tick`, plus the per-stream `session-expired`,
-`session-ended` and `access-ended` described below.
+(`append`/`replace`), `panel-error`, `panel-degraded`, `panel-waiting`,
+`dashboard-error`, `tombstone`, and `tick`, plus the per-stream
+`session-expired`, `session-ended`, `access-ended` and `drop` described below.
 
 ### When a panel keeps failing
 
@@ -296,6 +297,7 @@ module under `src/lib/panels/kinds/` that says, in plain data:
 | `kind` | `panel.viz`. `VizType` in `src/lib/ir.ts` is built from the registered names, so an unregistered one fails validation with the list of valid kinds. |
 | `summary` | The [Visualization types](/reference/visualization-types/) reference, generated from it. |
 | `promptHint` | The generation prompt, whose list of kinds is built from the hints. |
+| `promqlHint`, `logqlHint` | The hint in its place when the source is Prometheus or Loki. |
 | `canvas` | Drawn by ECharts: PNG export. |
 | `image` | Draws its own image rather than an ECharts chart (a custom visual): PNG export. |
 | `timeBrush` | Whether a drag across the chart selects a time range. |
@@ -303,6 +305,9 @@ module under `src/lib/panels/kinds/` that says, in plain data:
 | `query` | `"required"`, or `"none"` for a kind that runs nothing (text). The IR holds the panel to it, and code that executes or lists queries filters through `hasQuery`. |
 | `requiresTimeField` | The IR refuses the panel without `query.timeField` (state timeline). |
 | `options` | The kind's own options schema, which `panel.options` is validated against. See [Panel options](/reference/panel-options/). |
+| `optionGroups` | The shared option groups the editor's Display section draws fields for. |
+| `rowLimit` | The rows the query is asked for, from the kind's own options (a table's or a log's `limit`). |
+| `datumColumns` | Columns a click carries beyond the result's own (a graph node's `node` and `parent`), which the link editor offers. |
 | `starterOptions` | What a panel switched to this kind in the editor starts with, when `{}` would not do. |
 | `check` | A server-side check of the options beyond their schema, run wherever a dashboard is saved. A custom visual's spec must compile. |
 
@@ -321,8 +326,9 @@ says why a result cannot be drawn, naming what is wrong, and the panel shows
 it in the shared error state instead of the chart; `notice` says the rows were
 drawn other than the spec asked, and the panel shows it as a badge beside its
 title, as it shows a truncation (a graph's tree drawn as a directed graph
-because its rows are not a tree, #624, or a Sankey's rows left out for
-having no volume, #625; a Sankey whose flows cycle is a `problem`); `table` is the kind's own
+because its rows are not a tree, #624, a Sankey's rows left out for
+having no volume, #625, or a graph's blocks drawn as markers where the panel
+has no room for them, #649; a Sankey whose flows cycle is a `problem`); `table` is the kind's own
 screen-reader table where its marks are not one per row (a graph's edges). It is kept
 apart because `src/lib/ir.ts` imports the registry, and the server and the
 prompt must not pull React in with it. The renderer map is typed as
@@ -367,16 +373,17 @@ down and recreated on a data tick, so streaming feels continuous.
 ## A rendering detail worth knowing
 
 Design tokens are authored in **OKLCH**, but ECharts cannot parse `oklch()`,
-and a canvas cannot read a CSS variable at all. The series palette is
-`chartPalette()` (`src/lib/color/oklch.ts`), resolved to hex once. The chrome
-around the series — axis and legend text, axis lines, grid lines, a gauge's
-track — is the page's own `--muted`, `--border`, `--surface-2` and
-`--foreground`, read off `<html>`'s computed style by `useChartTheme()`
-(`src/lib/color/chart-theme.ts`) and handed to every option builder as
-`ctx.theme`. A theme change re-reads them and the chart merges the new colors
-in, so a chart's text is the same gray as the text beside it in either theme
-and no chart is recreated. `test/chart-theme.test.ts` holds every chart kind
-to this: none may draw a color that suits only one theme. The font, type
+and a canvas cannot read a CSS variable at all. Every color a
+chart draws is a token read off `<html>`'s computed style by `readChartTheme`
+(`src/lib/color/chart-theme.ts`) through the `useChartTheme()` hook
+(`src/components/chart-theme.tsx`), converted from OKLCH (`src/lib/color/oklch.ts`)
+and handed to every option builder as `ctx.theme`: the series `--chart-1` to
+`--chart-8`, the ramps, and the chrome around them, `--chart-text`,
+`--chart-axis`, `--chart-grid`, `--chart-track` and `--chart-faint`. A change
+of theme or color scheme re-reads them and the chart merges the new colors in,
+so a chart's text is the same gray as the text beside it in either color
+scheme and no chart is recreated. `test/chart-theme.test.ts` holds every chart
+kind to this: none may draw a color that suits only one color scheme. The font, type
 scale, corners and line width arrive the same way, through the one chart
 style every kind spreads (`src/components/charts/style.ts`; see
 [Theming](/architecture/theming/#chart-style)).

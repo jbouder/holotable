@@ -100,15 +100,16 @@ including inside an error message or a stack trace:
 | `sk-livekey000111222333444` | `[redacted]` |
 
 **Secret-shaped keys** are dropped whatever their value looks like:
-`password`, `secret`, `*_API_KEY`, `authorization`, `cookie`, `private_key`,
+`password` (`passwd`, `pwd`), `secret`, `*_API_KEY` / `apikey`,
+`authorization`, `credentials`, `cookie`, `private_key`, `bearer`, `jwt`,
 `access_token` / `id_token` / `refresh_token` / `session_token`. `secretRef` is
 deliberately exempt — it names the environment-variable family a source draws
 its credentials from (`TS_METRICS`), which is exactly what an operator needs.
 Bare `token` is not in the list, so the `inputTokens` and `outputTokens` counts
 the LLM limits record survive.
 
-**SQL and prompt text is never logged verbatim.** A `sql`, `statement`,
-`prompt`, `messages`, or `catalog` field is reduced to a truncated SHA-256 and
+**SQL and prompt text is never logged verbatim.** A `sql`, `promql`, `logql`,
+`statement`, `prompt`, `messages`, or `catalog` field is reduced to a truncated SHA-256 and
 a length:
 
 ```json

@@ -48,6 +48,10 @@ Checks three dependencies and reports each one:
 }
 ```
 
+A check that does not apply reports `"status": "skipped"` with its reason:
+`identityProvider` is skipped when `OIDC_JWKS_URL` is unset, as in demo and
+local mode.
+
 | `status` | HTTP | Meaning |
 | --- | --- | --- |
 | `ready` | 200 | Everything answers. |
@@ -67,7 +71,8 @@ instance would turn a login outage into a total one. The realm check is also
 probe loop does not hammer Keycloak.
 
 **AI configuration is advisory**, and is configuration *only*: readiness checks
-that `AI_MODEL` and the provider key are set and never makes a billed call. A
+that a server model is configured (`AI_MODEL` and its provider key, an
+`AI_MODELS_FILE` default, or a model detected on this machine) and never makes a billed call. A
 deployment that shipped without a key is degraded, not down — only generation
 fails.
 

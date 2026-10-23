@@ -29,7 +29,7 @@ model authors a **validated visualization spec** (SQL + chart config) — never 
 data itself — and Holotable executes the guarded SQL against TimescaleDB and
 streams the results live. Prometheus-compatible endpoints are sources too, with
 panels written in guarded PromQL, and so are Loki-compatible ones, in guarded
-LogQL.
+LogQL, and Parquet, CSV, JSON or Excel files, through DuckDB.
 
 **Stack:** Next.js 16 (App Router) · TypeScript · Tailwind v4 · Base UI · ECharts ·
 TimescaleDB/PostgreSQL · Vercel AI SDK · Keycloak OIDC · Server-Sent Events. One
@@ -48,7 +48,7 @@ docker run -p 3000:3000 ghcr.io/jbouder/holotable:quickstart
 ```
 
 Then open <http://localhost:3000>: you are its owner, so **Data sources → Add
-source → Upload files** takes a CSV or JSON file straight away. Keep it on your own
+source → or enter configuration manually → Upload files** takes a CSV or JSON file straight away. Keep it on your own
 machine; everyone who can reach the port is signed in the same way. With
 Docker Compose instead (Keycloak, real
 sign-in as `demo` / `demo`, your own `.env`):

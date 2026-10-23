@@ -62,7 +62,7 @@ them; the embed path has no `X-Frame-Options`. Every other page keeps
 `frame-ancestors 'none'` and `X-Frame-Options: DENY`. The stream authenticates
 with the token in its URL, so it does not depend on third-party cookies.
 
-### The theme a link carries
+### The theme and color scheme a link carries
 
 An embed sits in someone else's page, where Holotable's stored settings are
 not available. So the link names its look with two query parameters:

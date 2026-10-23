@@ -35,8 +35,8 @@ of the last visitor walking away. A script can still hold a stream open;
 A cold start serves a page that refreshes every three seconds until the app
 answers. It shows the boot's progress and steps, estimated from how long the
 start has been running (the Worker can't see inside the container), and the
-bar stops short of the end until the app itself answers. It uses the theme
-and motion setting the visitor chose in the app (dark when they chose none),
+bar stops short of the end until the app itself answers. It uses the color
+scheme and motion setting the visitor chose in the app (dark when they chose none),
 read from the browser by one inline script the page's CSP lets in by nonce. Locally it takes about 10 seconds; Cloudflare adds the image pull on a
 new host.
 

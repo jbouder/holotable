@@ -232,8 +232,8 @@ and the client's renderers.
 | --- | --- |
 ${vizRows}
 
-\`stat\`, \`table\` and \`text\` are drawn as HTML; every other kind is an
-ECharts chart. The options a kind takes are in
+\`stat\`, \`table\`, \`status-grid\`, \`logs\` and \`text\` are drawn as HTML
+and \`vega\` as a Vega view; every other kind is an ECharts chart. The options a kind takes are in
 [Panel options](/reference/panel-options/), and
 [Adding a panel kind](/concepts/streaming-and-rendering/#panel-kinds) says
 where each one is declared.
