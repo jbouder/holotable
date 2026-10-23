@@ -44,6 +44,7 @@ values. The chart renders it into a ConfigMap, mounts it and sets
 | `label` | Yes | What the theme controls show, up to 40 characters. |
 | `description` | No | One sentence for the gallery, up to 120 characters. |
 | `radius` | No | Corner rounding: `0px`, `2px`, `4px` or `6px`. Square when absent. |
+| `shadow` | No | How far a card lifts off the page: `none`, `subtle` or `lifted` (Holotable's). Written per scheme for you, since a shadow that reads on a light page vanishes on a dark one. `subtle` when absent. |
 | `light`, `dark` | Yes | Every token below, in each scheme. |
 
 Each token is `oklch(L C H)`, with L from 0 to 1 (or 0–100%), C from 0 to
@@ -62,9 +63,11 @@ scheme, is refused.
 | `chart-seq-1` … `chart-seq-5`, `chart-div-low`, `chart-div-mid`, `chart-div-high` | Sequential and diverging scales |
 | `orange`, `purple`, `teal` | Which series a spec's `orange`, `purple` and `teal` mean |
 | `code-keyword`, `code-string`, `code-number`, `code-comment` | SQL and PromQL highlighting |
+| `chart-grid` (optional) | Chart gridlines; the scheme's `surface-2` when absent |
 
-Chart text, axis and grid lines, and status tints follow from these the same
-way they do for a built-in theme.
+Chart text, axis lines, and status tints follow from these the same way they
+do for a built-in theme. A file written before `shadow` and `chart-grid`
+existed still loads, and looks as it did.
 
 ## What it is held to
 

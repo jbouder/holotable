@@ -361,7 +361,7 @@ export function PanelCardSkeleton({
   return (
     <div
       className={cn(
-        "flex h-48 flex-col border border-border bg-surface shadow-sm",
+        "flex h-48 flex-col rounded-lg border border-border bg-surface shadow-(--shadow-card)",
         className,
       )}
     >

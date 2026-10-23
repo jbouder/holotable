@@ -7,7 +7,10 @@ import { cn } from "@/lib/utils";
 export function Card({ className, ...props }: React.ComponentPropsWithRef<"div">) {
   return (
     <div
-      className={cn("rounded-lg border border-border bg-surface shadow-sm", className)}
+      className={cn(
+        "rounded-lg border border-border bg-surface shadow-(--shadow-card)",
+        className,
+      )}
       {...props}
     />
   );
