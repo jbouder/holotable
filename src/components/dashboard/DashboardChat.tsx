@@ -48,11 +48,23 @@ export function DashboardChat(props: {
    * sending a question that can only fail.
    */
   aiUnavailable: string | null;
+  /**
+   * Draw the launcher (#642): the viewer's `dashboardChatButton` preference.
+   * Without it the chat still opens from its shortcut and from a panel's
+   * "Ask about this panel".
+   */
+  showLauncher: boolean;
 }) {
+  const { showLauncher, ...chat } = props;
   const [open, setOpen] = React.useState(false);
   const [loaded, setLoaded] = React.useState(false);
   if (open && !loaded) setLoaded(true);
   const launcherRef = React.useRef<HTMLButtonElement>(null);
+  // Closing the chat gives focus back to the launcher, or with no launcher
+  // to the page's main region, never to `body`.
+  const focusAfterClose = React.useCallback(() => {
+    (launcherRef.current ?? document.getElementById("main"))?.focus();
+  }, []);
 
   useShortcuts([{ ...CHAT_OPEN_SHORTCUT, run: () => setOpen(true), disabled: open }]);
 
@@ -69,7 +81,7 @@ export function DashboardChat(props: {
 
   return (
     <>
-      {!open && (
+      {!open && showLauncher && (
         <Button
           ref={launcherRef}
           variant="primary"
@@ -87,10 +99,10 @@ export function DashboardChat(props: {
       )}
       {loaded && (
         <DashboardChatPanel
-          {...props}
+          {...chat}
           open={open}
           setOpen={setOpen}
-          launcherRef={launcherRef}
+          focusAfterClose={focusAfterClose}
         />
       )}
     </>

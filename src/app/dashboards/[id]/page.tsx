@@ -22,6 +22,7 @@ import { effectiveModel } from "@/lib/ai/models";
 import { rangeFromParams } from "@/lib/time-range";
 import { DEMO_IDLE_PAUSE_MS } from "@/lib/stream-idle";
 import { resolveLinkTargets } from "@/lib/drilldown-targets";
+import { requestPreferences } from "@/lib/preferences-server";
 
 export const dynamic = "force-dynamic";
 
@@ -81,6 +82,8 @@ export default async function DashboardViewPage({
 
   // Chat answers with the reader's model in this workspace (#331).
   const model = await effectiveModel({ identity, workspaceId: dashboard.workspaceId });
+  // Whether the chat's button is drawn (#642); the chat opens either way.
+  const prefs = await requestPreferences(identity);
   const canDelete = can(identity, "dashboard:delete", {
     workspaceId: dashboard.workspaceId,
     ownerSub: dashboard.createdBy,
@@ -217,6 +220,7 @@ export default async function DashboardViewPage({
           }))}
           suggestions={chatSuggestions(dashboard.spec)}
           aiUnavailable={model.unavailable}
+          showLauncher={prefs.dashboardChatButton}
         />
       </div>
     </DashboardChatProvider>
