@@ -528,6 +528,10 @@ Match the surrounding code rather than importing conventions from elsewhere.
   (`src/lib/color/chart-theme.ts`), from the `--chart-*` tokens and the spec's
   color tokens; `test/color-literals.test.ts` fails on a literal outside
   `src/lib/color/` and `globals.css`.
+- One chart style. A chart kind spreads `shared(theme)` and the helpers in
+  `src/components/charts/style.ts` for its font, type sizes, axes, tooltip,
+  fills and corners, and sets no `borderRadius`, `fontFamily` or `fontSize`
+  of its own (`test/chart-theme.test.ts`).
 - Domain logic belongs in `src/lib/`, not inside page components.
 - Motion is platform-only (View Transitions, WAAPI, `@starting-style`, FLIP)
   and keys off `<html data-motion>`, never the OS media query directly.

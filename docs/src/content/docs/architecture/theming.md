@@ -47,7 +47,9 @@ filled elements an outline, since their fill no longer tells them apart, and
 draws focus in `Highlight`. A chart's container opts out of the adjustment
 (`forced-color-adjust: none`), because the system cannot recolor a canvas.
 `useChartTheme` then reads `forcedColorsTheme`: text and lines in
-`CanvasText` on `Canvas`, with series from the few other system colors.
+`CanvasText` on `Canvas`, with series from the few other system colors. It
+keeps the page's font and type scale, but nothing is softened or rounded, so
+every fill is exactly a system color.
 `e2e/a11y.spec.ts` emulates forced colors and asserts these rules directly.
 axe-core does not model forced colors: it would measure the page's own
 colors against the system's background.
@@ -66,6 +68,55 @@ through `ChartTheme` (`src/lib/color/chart-theme.ts`), which converts the
 computed style off `<html>`.
 `test/color-literals.test.ts` keeps color literals out of `src/`, except in
 `src/lib/color/` and `globals.css`.
+
+## Chart style
+
+Every chart kind draws in one style (#647), from
+`src/components/charts/style.ts`: the page's font on all its text, a small
+type scale, gridlines in `--chart-grid` with no axis lines or ticks, 2px
+series lines, the tooltip on `--surface-3` with the page's `--radius`, and
+bar, slice and node corners from that radius. A kind spreads `shared(theme)`
+and the axis, legend, label and fill helpers, and says only what is its own.
+`test/chart-theme.test.ts` holds every registered kind to the page's font, the
+scale and the shared tooltip, and fails on a `borderRadius`, `fontFamily` or
+`fontSize` set anywhere in the chart code but `style.ts`.
+
+What is not a color is a token too, read through `ChartTheme` like the
+colors, so a built-in theme can set it in its blocks:
+
+| Token | Default | Used for |
+| --- | --- | --- |
+| `--font-sans` | Chakra Petch | All chart text, ECharts and Vega |
+| `--radius` | `0` | Tooltip corners; bars at half; slices, cells, nodes and labels up to 4px |
+| `--surface-3` | | What a tooltip sits on |
+| `--chart-font-size-axis` | `11px` | Axis labels, legend entries, pie labels, corner notes |
+| `--chart-font-size-label` | `11px` | Labels on a node, block or span (an edge's is 1px smaller) |
+| `--chart-font-size-tooltip` | `12px` | A tooltip's body |
+| `--chart-font-size-value` | `24px` | A radial gauge's value |
+| `--chart-line-width` | `2px` | Every series line |
+| `--chart-area-fade` | `0.32` | An unstacked area at its line, fading to nothing at the axis |
+| `--chart-area-flat` | `0.18` | An unstacked area whose color a threshold owns (a visual map cannot fade) |
+| `--chart-area-stacked` | `0.85` | A stacked band |
+| `--chart-soften` | `0.2` | How far a large area's color moves toward `--surface`; `0` in High contrast |
+
+**Large areas are softened.** A saturated color over a whole block is loud in
+a muted interface, so treemap and sunburst nodes, pie and donut slices,
+Sankey nodes, timeline spans and stacked bands take their color pulled
+`--chart-soften` of the way toward the surface (`soften()`). Lines, bars,
+histogram bars and a gauge's progress keep the literal color. A label on a
+softened fill takes `inkOn` of that fill. A status tile is already a tint of
+its status, so it is not softened again. The list is one test in
+`test/chart-theme.test.ts`.
+
+**A stack is read by its bands.** A stacked band's thickness is its share,
+so it is near solid (`--chart-area-stacked`) rather than faded, and a thin
+band stays visible. Its 2px line is on top of it, and a 1px line of
+`--surface` above that line parts it from the band above; each lower band is
+drawn after the one above it so neither is covered. Only an unstacked area
+fades.
+
+A theme file (`THEME_FILE`) sets colors and `radius`; it inherits these
+defaults, as it does the chart chrome aliases.
 
 ## Selector convention
 

@@ -262,6 +262,10 @@ authored in OKLCH and are converted before they reach ECharts, so chart
 colors come from the token system too: series from `chartPalette()`, and
 axis text, lines and grid from `ctx.theme` (`useChartTheme`, read off the
 page), never a literal that suits one theme (`test/chart-theme.test.ts`).
+Every kind starts from the one chart style, `src/components/charts/style.ts`
+(`shared(theme)`, the axis, legend, label, fill and corner helpers); no other
+chart module sets a `borderRadius`, `fontFamily` or `fontSize`, and a large
+area's color goes through `soften()` (the same test).
 
 ### Motion rules
 

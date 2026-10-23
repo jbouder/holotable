@@ -7,9 +7,10 @@ import {
   DEFAULT_CHART_THEME,
   forcedColorsTheme,
   readChartTheme,
+  soften,
 } from "@/lib/color/chart-theme";
-import type { Panel } from "@/lib/ir";
-import { readFileSync } from "node:fs";
+import { Panel } from "@/lib/ir";
+import { readdirSync, readFileSync } from "node:fs";
 import { parseThemeTokens } from "@/lib/color/contrast";
 import { resolveColor } from "@/lib/color/oklch";
 import { COLOR_TOKENS } from "@/lib/panels/colors";
@@ -96,6 +97,64 @@ test("the defaults are the dark scheme's tokens in globals.css", () => {
   for (const [token, variable] of Object.entries(COLOR_TOKENS)) {
     assert.equal(d.tokens[token as keyof typeof d.tokens], hex(variable.slice(2)), token);
   }
+  assert.equal(d.raised, hex("surface-3"));
+});
+
+test("the chart style's defaults are the tokens in globals.css", () => {
+  // #647: the type scale, line width and fills are tokens a palette can set;
+  // the defaults a server render draws with are the stylesheet's.
+  const css = readFileSync("src/app/globals.css", "utf8");
+  const value = (token: string) => {
+    const m = new RegExp(`--${token}:\\s*([\\d.]+)(px)?;`).exec(css);
+    assert.ok(m, `--${token}`);
+    return Number(m[1]);
+  };
+  const d = DEFAULT_CHART_THEME;
+  assert.deepEqual(d.type, {
+    axis: value("chart-font-size-axis"),
+    label: value("chart-font-size-label"),
+    tooltip: value("chart-font-size-tooltip"),
+    value: value("chart-font-size-value"),
+  });
+  assert.equal(d.lineWidth, value("chart-line-width"));
+  assert.deepEqual(d.area, {
+    fade: value("chart-area-fade"),
+    flat: value("chart-area-flat"),
+    stacked: value("chart-area-stacked"),
+  });
+  assert.equal(d.soften, value("chart-soften"));
+  assert.equal(d.radius, value("radius"));
+});
+
+test("the chart style is read off the page like its colors", () => {
+  const theme = readChartTheme(
+    style({
+      "--font-sans": ' "Chakra Petch", ui-sans-serif ',
+      "--radius": "6px",
+      "--chart-font-size-axis": "12px",
+      "--chart-line-width": "1.5px",
+      "--chart-area-stacked": "0.9",
+      "--chart-soften": "0",
+      "--chart-area-fade": "not a number",
+    }),
+  );
+  assert.equal(theme.font, '"Chakra Petch", ui-sans-serif');
+  assert.equal(theme.radius, 6);
+  assert.equal(theme.type.axis, 12);
+  assert.equal(theme.type.tooltip, DEFAULT_CHART_THEME.type.tooltip);
+  assert.equal(theme.lineWidth, 1.5);
+  assert.equal(theme.area.stacked, 0.9);
+  assert.equal(
+    theme.area.fade,
+    DEFAULT_CHART_THEME.area.fade,
+    "an unreadable value keeps its default",
+  );
+  assert.equal(theme.soften, 0);
+  assert.equal(
+    soften(theme, "#123456"),
+    "#123456",
+    "no softening leaves the color as it is",
+  );
 });
 
 /** Nothing like any scheme's real colors, so a leak of a default is visible. */
@@ -119,6 +178,13 @@ const DISTINCT: ChartTheme = {
   ],
   sequential: ["#202020", "#212121", "#222222", "#232323", "#242424"],
   diverging: ["#303030", "#313131", "#323232"],
+  font: "Distinct Sans",
+  radius: 6,
+  raised: "#070707",
+  type: { axis: 13, label: 14, tooltip: 15, value: 29 },
+  lineWidth: 3,
+  area: { fade: 0.4, flat: 0.2, stacked: 0.8 },
+  soften: 0.2,
   tokens: {
     success: "#404040",
     warning: "#414141",
@@ -219,5 +285,258 @@ test("under forced colors a chart draws only in system colors", () => {
   // Adjacent series differ, so neighbors stay apart.
   for (let i = 1; i < theme.series.length; i++) {
     assert.notEqual(theme.series[i], theme.series[i - 1]);
+  }
+  // The page's face and sizes carry over; nothing blends a system color into
+  // another (#647), so a large area and a stacked band are the color itself.
+  const page = forcedColorsTheme((k) => system[k], DISTINCT);
+  assert.equal(page.font, DISTINCT.font);
+  assert.deepEqual(page.type, DISTINCT.type);
+  assert.equal(page.soften, 0);
+  assert.equal(page.area.stacked, 1);
+  assert.equal(page.radius, 0);
+});
+
+/** Every value under `key`, anywhere in an option. */
+function collect(node: unknown, key: string, out: unknown[] = []): unknown[] {
+  if (Array.isArray(node)) {
+    for (const item of node) collect(item, key, out);
+  } else if (node && typeof node === "object") {
+    for (const [k, v] of Object.entries(node)) {
+      if (k === key) out.push(v);
+      collect(v, key, out);
+    }
+  }
+  return out;
+}
+
+/** Each registered chart kind with rows it draws from, and the options it needs. */
+const KIND_FIXTURES: Partial<
+  Record<Panel["viz"], { data: PanelData; options?: object }>
+> = {
+  treemap: {
+    data: {
+      columns: ["region", "host", "used"],
+      rows: [
+        { region: "eu", host: "a", used: 4 },
+        { region: "us", host: "b", used: 6 },
+      ],
+    },
+    options: { path: ["region", "host"], value: "used" },
+  },
+  graph: {
+    data: {
+      columns: ["source", "target", "calls"],
+      rows: [
+        { source: "lb", target: "api", calls: 3 },
+        { source: "api", target: "db", calls: 2 },
+      ],
+    },
+    options: { source: "source", target: "target", value: "calls" },
+  },
+  sankey: {
+    data: {
+      columns: ["source", "target", "bytes"],
+      rows: [
+        { source: "lb", target: "api", bytes: 3 },
+        { source: "api", target: "db", bytes: 2 },
+      ],
+    },
+    options: { source: "source", target: "target", value: "bytes" },
+  },
+  "state-timeline": {
+    data: {
+      columns: ["ts", "service", "state"],
+      rows: [
+        { ts: "2026-10-11T10:00:00Z", service: "api", state: "up" },
+        { ts: "2026-10-11T10:05:00Z", service: "api", state: "down" },
+      ],
+    },
+  },
+};
+
+function drawnBy(
+  viz: Panel["viz"],
+  theme: ChartTheme,
+  options?: object,
+): Record<string, unknown> {
+  const renderer = PANEL_RENDERERS[viz];
+  assert.equal(renderer.type, "chart", viz);
+  if (renderer.type !== "chart") throw new Error(viz);
+  const fixture = KIND_FIXTURES[viz];
+  const parsed = Panel.safeParse({
+    id: "p",
+    title: "Requests",
+    viz,
+    query: { sourceId: "s", sql: "SELECT 1", timeField: "ts" },
+    layout: { x: 0, y: 0, w: 6, h: 4 },
+    ...(fixture?.options || options
+      ? { options: { ...fixture?.options, ...options } }
+      : {}),
+  });
+  assert.ok(parsed.success, `${viz}: ${JSON.stringify(parsed.error?.issues)}`);
+  return renderer.option(parsed.data, fixture?.data ?? DATA, {
+    display: LOCAL_TIME_DISPLAY,
+    theme,
+    window: {
+      from: Date.parse("2026-10-11T10:00:00Z"),
+      to: Date.parse("2026-10-11T10:10:00Z"),
+    },
+  }) as Record<string, unknown>;
+}
+
+const CHART_KINDS = Object.entries(PANEL_RENDERERS).flatMap(([viz, renderer]) =>
+  renderer.type === "chart" ? [viz as Panel["viz"]] : [],
+);
+
+test("every chart kind writes in the page's font, at the chart scale, with the shared tooltip", () => {
+  // #647: one style for every kind. A kind's own text, wherever it sits,
+  // is the page's face at a size from the type scale.
+  const scale = new Set([...Object.values(DISTINCT.type), DISTINCT.type.label - 1]);
+  const variants: [Panel["viz"], object?][] = [
+    ...CHART_KINDS.map((viz): [Panel["viz"]] => [viz]),
+    ["gauge", { variant: "bar" }],
+    ["treemap", { variant: "sunburst" }],
+    ["graph", { layout: "dag" }],
+    ["graph", { layout: "force" }],
+  ];
+  for (const [viz, options] of variants) {
+    const name = `${viz} ${JSON.stringify(options ?? {})}`;
+    const option = drawnBy(viz, DISTINCT, options);
+    assert.deepEqual(
+      option.textStyle,
+      { fontFamily: DISTINCT.font, fontSize: DISTINCT.type.axis },
+      name,
+    );
+    const families = collect(option, "fontFamily");
+    assert.deepEqual(
+      families.filter((f) => f !== DISTINCT.font),
+      [],
+      `${name} writes in another face`,
+    );
+    assert.deepEqual(
+      collect(option, "fontSize").filter((s) => !scale.has(s as number)),
+      [],
+      `${name} writes off the scale`,
+    );
+    const tooltip = option.tooltip as Record<string, unknown>;
+    if (tooltip.show === false) continue;
+    assert.equal(tooltip.backgroundColor, DISTINCT.raised, name);
+    assert.equal(tooltip.borderRadius, DISTINCT.radius, name);
+    assert.deepEqual(
+      tooltip.textStyle,
+      {
+        fontFamily: DISTINCT.font,
+        fontSize: DISTINCT.type.tooltip,
+        color: DISTINCT.foreground,
+      },
+      name,
+    );
+  }
+});
+
+test("only the shared chart style sets corners, faces and sizes", () => {
+  // #647: a kind that sets its own `borderRadius`, `fontFamily` or `fontSize`
+  // drifts from the rest; it takes them from `style.ts` instead.
+  const files = [
+    ...readdirSync("src/components/charts")
+      .filter((f) => /\.tsx?$/.test(f) && f !== "style.ts")
+      .map((f) => `src/components/charts/${f}`),
+    "src/components/panels/vega.tsx",
+  ];
+  const own = /\b(borderRadius|fontFamily|fontSize)\s*:/;
+  for (const file of files) {
+    const lines = readFileSync(file, "utf8").split("\n");
+    const found = lines.flatMap((line, i) =>
+      own.test(line) ? [`${file}:${i + 1}`] : [],
+    );
+    assert.deepEqual(found, [], "set through src/components/charts/style.ts");
+  }
+});
+
+test("large areas are softened toward the surface; lines, bars and progress are not", () => {
+  // #647: a block of saturated color shouts in a muted interface, so the
+  // kinds that fill large areas pull their colors toward the surface; a thin
+  // mark keeps the literal color. This is the list.
+  const softened = (hex: string) => soften(DISTINCT, hex);
+  const literal = new Set([...DISTINCT.series, ...Object.values(DISTINCT.tokens)]);
+  const soft = new Set([...literal].map(softened));
+  const fills = (option: Record<string, unknown>) =>
+    (option.series as { data: { itemStyle?: { color?: string } }[] }[]).flatMap((s) =>
+      s.data.flatMap((d) => (d.itemStyle?.color ? [d.itemStyle.color] : [])),
+    );
+  const allSoft = (colors: unknown[], name: string) => {
+    assert.ok(colors.length > 0, name);
+    for (const c of colors)
+      assert.ok(soft.has(c as string), `${name}: ${c} is not softened`);
+  };
+  const allLiteral = (colors: unknown[], name: string) => {
+    assert.ok(colors.length > 0, name);
+    for (const c of colors)
+      assert.ok(literal.has(c as string), `${name}: ${c} is not literal`);
+  };
+
+  // Softened: the large areas.
+  for (const viz of ["pie", "donut"] as const) {
+    assert.deepEqual(drawnBy(viz, DISTINCT).color, DISTINCT.series.map(softened), viz);
+  }
+  allSoft(fills(drawnBy("treemap", DISTINCT)), "treemap");
+  allSoft(fills(drawnBy("treemap", DISTINCT, { variant: "sunburst" })), "sunburst");
+  allSoft(fills(drawnBy("sankey", DISTINCT)), "sankey");
+  allSoft(fills(drawnBy("state-timeline", DISTINCT)), "state-timeline");
+  const stacked = drawnBy("area", DISTINCT, { stacked: true }).series as {
+    areaStyle: { color: string; opacity: number };
+    lineStyle: Record<string, unknown>;
+    z: number;
+  }[];
+  allSoft(
+    stacked.map((s) => s.areaStyle.color),
+    "a stacked area",
+  );
+
+  // Literal: lines, bars, a histogram's bars and a gauge's progress.
+  for (const viz of ["line", "bar", "area"] as const) {
+    assert.deepEqual(drawnBy(viz, DISTINCT).color, [...DISTINCT.series], viz);
+  }
+  allLiteral(fills(drawnBy("histogram", DISTINCT)), "histogram");
+  allLiteral(fills(drawnBy("gauge", DISTINCT, { variant: "bar" })), "bar gauge");
+  const radial = drawnBy("gauge", DISTINCT).series as {
+    progress: { itemStyle: { color: string } };
+  }[];
+  allLiteral([radial[0].progress.itemStyle.color], "radial gauge");
+});
+
+test("a stacked area draws near-solid bands parted by a line of surface; a lone one fades", () => {
+  // #647: a band's thickness is its share, so it is near solid, and the thin
+  // ones stay visible. Its 2px line is on top of it, with a 1px line of
+  // surface above that parting it from the next band up; each lower band is
+  // drawn after the one above, so the band above does not cover them.
+  const stacked = drawnBy("area", DISTINCT, { stacked: true }).series as {
+    areaStyle: { opacity: number };
+    lineStyle: Record<string, unknown>;
+    z: number;
+  }[];
+  assert.ok(stacked.length > 0);
+  for (const [i, s] of stacked.entries()) {
+    assert.equal(s.areaStyle.opacity, DISTINCT.area.stacked);
+    assert.deepEqual(s.lineStyle, {
+      width: DISTINCT.lineWidth,
+      shadowColor: DISTINCT.background,
+      shadowBlur: 0,
+      shadowOffsetY: -1,
+    });
+    if (i > 0)
+      assert.ok(s.z < stacked[i - 1].z, "a lower band is drawn over the one above");
+  }
+  const lone = drawnBy("area", DISTINCT).series as {
+    areaStyle: { color: { colorStops: { color: string }[] } };
+    lineStyle: Record<string, unknown>;
+    z?: number;
+  }[];
+  for (const s of lone) {
+    const [top, bottom] = s.areaStyle.color.colorStops.map((c) => c.color);
+    assert.match(top, new RegExp(`, ${DISTINCT.area.fade}\\)$`));
+    assert.match(bottom, /, 0\)$/);
+    assert.deepEqual(s.lineStyle, { width: DISTINCT.lineWidth });
+    assert.equal(s.z, undefined);
   }
 });

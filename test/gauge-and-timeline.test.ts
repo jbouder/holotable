@@ -17,7 +17,7 @@ import {
 } from "@/components/charts/state-timeline";
 import { Panel } from "@/lib/ir";
 import { fallbackToken, tokenHex } from "@/lib/panels/colors";
-import { DEFAULT_CHART_THEME } from "@/lib/color/chart-theme";
+import { DEFAULT_CHART_THEME, soften } from "@/lib/color/chart-theme";
 import { LOCAL_TIME_DISPLAY } from "@/lib/time-display";
 
 /*
@@ -234,8 +234,11 @@ test("the same state always gets the same color, from the token layer", () => {
 
   const option = stateTimelineChart(plain, ROWS, CTX);
   const data = (option.series as { data: { itemStyle: { color: string } }[] }[])[0].data;
-  assert.equal(data[0].itemStyle.color, tokenHex("success", DEFAULT_CHART_THEME));
-  assert.equal(data[1].itemStyle.color, tokenHex("danger", DEFAULT_CHART_THEME));
+  // A span is a large area, so it wears its token softened (#647).
+  const fill = (token: "success" | "danger") =>
+    soften(DEFAULT_CHART_THEME, tokenHex(token, DEFAULT_CHART_THEME));
+  assert.equal(data[0].itemStyle.color, fill("success"));
+  assert.equal(data[1].itemStyle.color, fill("danger"));
 });
 
 test("lanes past the cap are counted and reported, not silently dropped", () => {

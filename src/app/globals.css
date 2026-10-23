@@ -64,6 +64,21 @@
   --chart-track: var(--surface-2);
   /* How strongly a mark behind a value is drawn: a stat's sparkline, a gauge's bands. */
   --chart-faint: 0.35;
+  /* The one chart style (#647), read through ChartTheme like the colors: the
+     type scale a chart writes in, every series line's width, an area's
+     opacities (an unstacked area fades from --chart-area-fade at its line; a
+     threshold-colored one is flat; a stacked band is near solid), and how far
+     a large area (a treemap node, a slice, a span) is pulled toward the
+     surface. Not per scheme: the light block inherits them. */
+  --chart-font-size-axis: 11px;
+  --chart-font-size-label: 11px;
+  --chart-font-size-tooltip: 12px;
+  --chart-font-size-value: 24px;
+  --chart-line-width: 2px;
+  --chart-area-fade: 0.32;
+  --chart-area-flat: 0.18;
+  --chart-area-stacked: 0.85;
+  --chart-soften: 0.2;
   /* The spec's palette-only color tokens: a series each, by family. A theme
      that orders its series differently points them elsewhere (#505). */
   --orange: var(--chart-3);
@@ -454,6 +469,8 @@
   --chart-div-high: oklch(0.7 0.2 25);
   --chart-grid: oklch(0.5 0 0);
   --chart-faint: 0.6;
+  /* Large areas keep their full color: contrast comes before calm here. */
+  --chart-soften: 0;
   --tint-5: 100%;
   --tint-10: 100%;
   --tint-15: 100%;
@@ -501,6 +518,8 @@
   --chart-div-high: oklch(0.48 0.2 25);
   --chart-grid: oklch(0.62 0 0);
   --chart-faint: 0.6;
+  /* Large areas keep their full color: contrast comes before calm here. */
+  --chart-soften: 0;
   --tint-5: 100%;
   --tint-10: 100%;
   --tint-15: 100%;

@@ -7,6 +7,14 @@ import {
   toNumber,
   toText,
 } from "@/components/charts/options";
+import {
+  axis as axisStyle,
+  barCorners,
+  categoryAxis,
+  shared,
+  text,
+  tooltip,
+} from "@/components/charts/style";
 import { formatValue } from "@/lib/format";
 import { type Panel, panelTimeField } from "@/lib/ir";
 import { type ColorToken, tokenHex } from "@/lib/panels/colors";
@@ -150,35 +158,34 @@ export const histogramChart: ChartOptionBuilder = normalized((panel, data, { the
   const { bars, countKey } = histogramBars(panel, data);
   const o = readOptions(HistogramOptions, panel.options);
   return {
-    backgroundColor: "transparent",
+    ...shared(theme),
     grid: { left: 52, right: 16, top: 16, bottom: 28 },
     tooltip: {
+      ...tooltip(theme),
       trigger: "axis",
       axisPointer: { type: "shadow" },
-      borderRadius: 0,
       // The counts are plain numbers; the format is the buckets'.
       valueFormatter: (v: unknown) => formatValue(v),
     },
     xAxis: {
+      ...categoryAxis(theme),
       type: "category",
       data: bars.map((b) => b.label),
-      axisLabel: { color: theme.text, hideOverlap: true },
-      axisLine: { lineStyle: { color: theme.line } },
+      axisLabel: { ...text(theme), hideOverlap: true },
     },
     yAxis: {
+      ...axisStyle(theme),
       type: o.log ? "log" : "value",
-      axisLabel: { color: theme.text },
-      splitLine: { lineStyle: { color: theme.grid } },
     },
     series: [
       {
         type: "bar",
         name: countKey ?? "count",
-        barCategoryGap: "8%",
+        barCategoryGap: "12%",
         data: bars.map((b) => ({
           // A log axis has no zero: an empty bucket is left out of it.
           value: o.log && b.count <= 0 ? null : b.count,
-          itemStyle: { color: tokenHex(b.color, theme) },
+          itemStyle: { color: tokenHex(b.color, theme), ...barCorners(theme) },
         })),
       },
     ],

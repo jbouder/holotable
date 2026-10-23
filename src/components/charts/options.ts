@@ -1,7 +1,20 @@
 import { panelTimeField } from "@/lib/ir";
 import type { EChartsOption } from "echarts";
 import type { Panel } from "@/lib/ir";
-import { type ChartTheme, seriesColor, withAlpha } from "@/lib/color/chart-theme";
+import { type ChartTheme, seriesColor, soften, withAlpha } from "@/lib/color/chart-theme";
+import {
+  areaFill,
+  axis as axisStyle,
+  barCorners,
+  categoryAxis,
+  block,
+  legend,
+  seriesLine,
+  shared,
+  stackOrder,
+  text,
+  tooltip,
+} from "@/components/charts/style";
 import { ANNOTATION_COLORS, type Annotation } from "@/lib/annotations";
 import { formatValue } from "@/lib/format";
 import { tokenHex } from "@/lib/panels/colors";
@@ -124,7 +137,10 @@ export function timeAxisLabels(values: unknown[], display: TimeDisplay): string[
   });
 }
 
-const TOOLTIP_AXIS = { trigger: "axis", borderRadius: 0 } as const;
+/** The shared tooltip, following the axis. */
+function axisTooltip(theme: ChartTheme) {
+  return { ...tooltip(theme), trigger: "axis" as const };
+}
 
 const GRID = { left: 44, right: 16, top: 24, bottom: 28 };
 
@@ -147,14 +163,13 @@ export function largeSeries(type: "line" | "bar" | "scatter", points: number) {
 
 function base(theme: ChartTheme): EChartsOption {
   return {
+    ...shared(theme),
     // A series this long does not animate, whatever the motion preference
     // allows; the preference still turns animation off below it (#491).
     animationThreshold: LARGE_SERIES_POINTS,
-    color: [...theme.series],
     grid: GRID,
-    tooltip: TOOLTIP_AXIS,
+    tooltip: axisTooltip(theme),
     legend: legendAt(undefined, theme),
-    backgroundColor: "transparent",
   };
 }
 
@@ -163,16 +178,16 @@ function legendAt(
   position: LegendPosition | undefined,
   theme: ChartTheme,
 ): EChartsOption["legend"] {
-  const textStyle = { color: theme.text };
+  const style = legend(theme);
   switch (position) {
     case "none":
       return { show: false };
     case "bottom":
-      return { bottom: 0, type: "scroll", textStyle };
+      return { bottom: 0, type: "scroll", ...style };
     case "right":
-      return { right: 0, top: "middle", orient: "vertical", type: "scroll", textStyle };
+      return { right: 0, top: "middle", orient: "vertical", type: "scroll", ...style };
     default:
-      return { top: 0, textStyle };
+      return { top: 0, ...style };
   }
 }
 
@@ -276,19 +291,20 @@ function buildSeries(type: "line" | "bar", area: boolean): ChartOptionBuilder {
       ...base(theme),
       grid: gridFor(o.legend, axis?.label !== undefined),
       legend: legendAt(o.legend, theme),
-      tooltip: { ...TOOLTIP_AXIS, ...(number ? { valueFormatter: number } : {}) },
+      tooltip: { ...axisTooltip(theme), ...(number ? { valueFormatter: number } : {}) },
       ...(o.thresholds?.length ? { visualMap: thresholdMap(o.thresholds, theme) } : {}),
       // A category axis, deliberately (#491): the brush maps its span to row
       // indices (`brushedRange`), the crosshair group moves its peers by
       // index, and a datum click reads the row at its index. A time axis
       // would need all three to work by timestamp. See architecture/scaling.
       xAxis: {
+        ...categoryAxis(theme),
         type: "category",
         data: categories,
-        axisLabel: { color: theme.text, hideOverlap: true },
-        axisLine: { lineStyle: { color: theme.line } },
+        axisLabel: { ...text(theme), hideOverlap: true },
       },
       yAxis: {
+        ...axisStyle(theme),
         type: axis?.log ? "log" : "value",
         ...(axis?.min !== undefined ? { min: axis.min } : {}),
         ...(axis?.max !== undefined ? { max: axis.max } : {}),
@@ -297,18 +313,32 @@ function buildSeries(type: "line" | "bar", area: boolean): ChartOptionBuilder {
               name: axis.label,
               nameLocation: "middle",
               nameGap: 48,
-              nameTextStyle: { color: theme.text },
+              nameTextStyle: text(theme),
             }
           : {}),
-        axisLabel: { color: theme.text, ...(number ? { formatter: number } : {}) },
-        splitLine: { lineStyle: { color: theme.grid } },
+        axisLabel: { ...text(theme), ...(number ? { formatter: number } : {}) },
       },
       series: keys.map((k, i) => ({
         name: k,
         type,
         showSymbol: false,
         smooth: type === "line",
-        areaStyle: area ? {} : undefined,
+        ...(type === "line"
+          ? { lineStyle: seriesLine(theme, area && o.stacked === true) }
+          : {}),
+        // Alone, an area fades toward the axis; in a stack, each band is
+        // near solid, parted from the one above by its line (#647).
+        ...(area
+          ? {
+              areaStyle: areaFill(
+                theme,
+                o.thresholds?.length ? undefined : seriesColor(theme, i),
+                o.stacked === true,
+              ),
+              ...(o.stacked ? stackOrder(i, keys.length) : {}),
+            }
+          : {}),
+        ...(type === "bar" && !o.stacked ? { itemStyle: barCorners(theme) } : {}),
         ...largeSeries(type, data.rows.length),
         ...(o.stacked ? { stack: "total" } : {}),
         // The marks ride on the first series; one per chart is enough.
@@ -316,7 +346,9 @@ function buildSeries(type: "line" | "bar", area: boolean): ChartOptionBuilder {
           ? annotationMarks(annotations, xValues, display, theme)
           : {}),
         data: data.rows.map((r) => toNumber(r[k])),
-      })),
+        // The corners and the fill widen the inferred union past what the
+        // option type narrows by `type`; each member is a line or a bar.
+      })) as EChartsOption["series"],
     };
   };
 }
@@ -342,23 +374,22 @@ function buildScatter(data: PanelData, theme: ChartTheme): EChartsOption {
   const [x, ...seriesKeys] = numericColumns;
   return {
     ...base(theme),
-    tooltip: { trigger: "item", borderRadius: 0 },
+    tooltip: { ...tooltip(theme), trigger: "item" },
     xAxis: {
+      ...axisStyle(theme),
       type: "value",
       name: x,
-      axisLabel: { color: theme.text },
-      axisLine: { lineStyle: { color: theme.line } },
-      splitLine: { lineStyle: { color: theme.grid } },
+      nameTextStyle: text(theme),
     },
     yAxis: {
+      ...axisStyle(theme),
       type: "value",
-      axisLabel: { color: theme.text },
-      splitLine: { lineStyle: { color: theme.grid } },
     },
     series: seriesKeys.map((key) => ({
       name: key,
       type: "scatter",
       symbolSize: 8,
+      itemStyle: { opacity: 0.85 },
       ...largeSeries("scatter", data.rows.length),
       data: data.rows.map((row) => [toNumber(row[x]), toNumber(row[key])]),
     })),
@@ -390,11 +421,12 @@ function buildPie(
         ? ["50%", "46%"]
         : ["50%", "56%"];
   return {
-    color: [...theme.series],
-    backgroundColor: "transparent",
+    ...shared(theme),
+    // A slice is a large area: its color is softened, as a treemap node's is.
+    color: theme.series.map((c) => soften(theme, c)),
     tooltip: {
+      ...tooltip(theme),
       trigger: "item",
-      borderRadius: 0,
       ...(number ? { valueFormatter: number } : {}),
     },
     legend: legendAt(o.legend, theme),
@@ -407,7 +439,9 @@ function buildPie(
           name: toText(r[x]),
           value: toNumber(r[valueKey]) || 0,
         })),
-        label: { color: theme.text },
+        // Slices part by a hair of surface, with the page's corners.
+        itemStyle: block(theme, { edge: 2 }),
+        label: text(theme),
         labelLine: { lineStyle: { color: theme.line } },
       },
     ],
@@ -516,11 +550,11 @@ function buildHeatmap(
   ]);
   const max = Math.max(1, ...values.map((v) => v[2]));
   return {
-    backgroundColor: "transparent",
-    tooltip: { position: "top" },
+    ...shared(theme),
+    tooltip: { ...tooltip(theme), position: "top" },
     grid: { left: 60, right: 16, top: 24, bottom: 40 },
-    xAxis: { type: "category", data: xLabels, axisLabel: { color: theme.text } },
-    yAxis: { type: "category", data: ys, axisLabel: { color: theme.text } },
+    xAxis: { ...categoryAxis(theme), type: "category", data: xLabels },
+    yAxis: { ...categoryAxis(theme), type: "category", data: ys },
     visualMap: {
       min: 0,
       max,
@@ -529,8 +563,16 @@ function buildHeatmap(
       left: "center",
       bottom: 0,
       inRange: { color: [...theme.sequential] },
-      textStyle: { color: theme.text },
+      textStyle: text(theme),
     },
-    series: [{ type: "heatmap", data: values, progressive: 1000 }],
+    series: [
+      {
+        type: "heatmap",
+        data: values,
+        progressive: 1000,
+        // Cells part by a hair of surface, with the page's corners.
+        itemStyle: block(theme, { cap: 3 }),
+      },
+    ],
   };
 }

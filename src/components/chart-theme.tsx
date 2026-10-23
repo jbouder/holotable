@@ -21,10 +21,12 @@ function systemColor(keyword: string): string {
   return resolveColor(value);
 }
 
-const read = () =>
-  window.matchMedia(FORCED_COLORS_QUERY).matches
-    ? forcedColorsTheme(systemColor)
-    : readChartTheme(getComputedStyle(document.documentElement));
+const read = () => {
+  const page = readChartTheme(getComputedStyle(document.documentElement));
+  return window.matchMedia(FORCED_COLORS_QUERY).matches
+    ? forcedColorsTheme(systemColor, page)
+    : page;
+};
 
 /**
  * The page's colors for a chart's chrome, following the theme (#502).

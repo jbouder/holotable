@@ -21,7 +21,8 @@ import {
 } from "@/components/charts/options";
 import { escapeHtml } from "@/components/charts/state-timeline";
 import type { PanelNotice } from "@/components/panels/types";
-import { type ChartTheme, inkOn, seriesColor } from "@/lib/color/chart-theme";
+import { type ChartTheme, inkOn, seriesColor, soften } from "@/lib/color/chart-theme";
+import { block, pinnedLabel, shared, text, tooltip } from "@/components/charts/style";
 import type { Datum } from "@/lib/drilldown";
 import { formatValue } from "@/lib/format";
 import { type Panel, panelTimeField } from "@/lib/ir";
@@ -393,7 +394,7 @@ function overflowTitle(theme: ChartTheme, net: GraphNet) {
     text: parts.length > 0 ? `${parts.join(", ")} not shown` : "",
     right: 0,
     bottom: 0,
-    textStyle: { color: theme.text, fontSize: 11, fontWeight: "normal" as const },
+    textStyle: { ...text(theme), fontWeight: "normal" as const },
   };
 }
 
@@ -427,7 +428,8 @@ export const sankeyChart: ChartOptionBuilder = normalized((panel, data, { theme 
   );
   const labelWidth = Math.min(200, 20 + longest * 7);
   const nodes = (ok ? net.nodes : []).map((node) => {
-    const color = colorOf(node);
+    // A node is a block: its color softened, as a treemap node's is.
+    const color = soften(theme, colorOf(node));
     return {
       id: node.id,
       name: node.name,
@@ -444,10 +446,10 @@ export const sankeyChart: ChartOptionBuilder = normalized((panel, data, { theme 
     value: e.value ?? 0,
   }));
   return {
-    backgroundColor: "transparent",
+    ...shared(theme),
     tooltip: {
+      ...tooltip(theme),
       trigger: "item",
-      borderRadius: 0,
       formatter: (p: unknown) => {
         const {
           dataType,
@@ -485,13 +487,13 @@ export const sankeyChart: ChartOptionBuilder = normalized((panel, data, { theme 
         labelLayout: { hideOverlap: true },
         data: nodes,
         links,
-        lineStyle: { color: "gradient", opacity: 0.35, curveness: 0.5 },
+        lineStyle: { color: "gradient", opacity: 0.3, curveness: 0.5 },
+        // Nodes part from their links by a hair of surface, with the page's corners.
+        itemStyle: block(theme, { cap: 3 }),
         label: {
           show: true,
           position: vertical ? "bottom" : "right",
-          fontSize: 11,
-          padding: [2, 4],
-          borderRadius: 2,
+          ...pinnedLabel(theme),
           distance: 4,
           formatter: (p: unknown) => (p as { data?: { text?: string } }).data?.text ?? "",
         },

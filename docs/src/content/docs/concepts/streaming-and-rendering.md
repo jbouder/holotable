@@ -372,7 +372,10 @@ track — is the page's own `--muted`, `--border`, `--surface-2` and
 `ctx.theme`. A theme change re-reads them and the chart merges the new colors
 in, so a chart's text is the same gray as the text beside it in either theme
 and no chart is recreated. `test/chart-theme.test.ts` holds every chart kind
-to this: none may draw a color that suits only one theme.
+to this: none may draw a color that suits only one theme. The font, type
+scale, corners and line width arrive the same way, through the one chart
+style every kind spreads (`src/components/charts/style.ts`; see
+[Theming](/architecture/theming/#chart-style)).
 
 One layout is Holotable's own rather than ECharts': the graph kind's directed
 graph (`layout: "dag"`, #624). ECharts' `graph` series lays nodes out only by

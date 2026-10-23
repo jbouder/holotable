@@ -42,10 +42,57 @@ export interface ChartTheme {
   diverging: readonly [string, string, string];
   /** Each spec color token (`success`, `teal`, …), as the page paints it. */
   tokens: Readonly<Record<ColorToken, string>>;
+  /**
+   * The page's type: `--font-sans`, so a canvas writes in the same face the
+   * page beside it is set in. A canvas cannot inherit a font any more than a
+   * color (#647).
+   */
+  font: string;
+  /** The page's corner radius in CSS pixels: `--radius`. Bars, tooltips and labels take it. */
+  radius: number;
+  /** A tooltip sits on this, a step above the surface: `--surface-3`. */
+  raised: string;
+  /** The chart type scale in CSS pixels: `--chart-font-size-*`. */
+  type: Readonly<ChartTypeScale>;
+  /** Every series line's width in CSS pixels: `--chart-line-width`. */
+  lineWidth: number;
+  /** How opaque an area is drawn, 0 to 1: `--chart-area-*`. */
+  area: Readonly<ChartAreaFill>;
+  /**
+   * How far a large area's color is pulled toward the surface, 0 to 1:
+   * `--chart-soften`. See {@link soften}.
+   */
+  soften: number;
+}
+
+/** The sizes a chart writes in. */
+export interface ChartTypeScale {
+  /** Axis labels, legend entries, pie labels, a corner note. */
+  axis: number;
+  /** A label on a node, a block or a span. */
+  label: number;
+  /** A tooltip's body. */
+  tooltip: number;
+  /** The one number a gauge writes large. */
+  value: number;
+}
+
+/** An area's opacities. */
+export interface ChartAreaFill {
+  /** An unstacked area at its line, fading to nothing at the axis. */
+  fade: number;
+  /** An unstacked area whose color a threshold map owns, which cannot fade. */
+  flat: number;
+  /** A stacked band: near solid, since its thickness is the data. */
+  stacked: number;
 }
 
 export const SERIES_COUNT = 8;
 const SEQUENTIAL_COUNT = 5;
+
+/** What a chart writes in when the page has not said: the page's own stack, less the loaded face. */
+export const DEFAULT_CHART_FONT =
+  'ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif';
 
 /**
  * The dark scheme's values, for a server render and a test, which have no
@@ -83,6 +130,13 @@ export const DEFAULT_CHART_THEME: ChartTheme = {
     oklchToHex({ l: 0.36, c: 0.02, h: 265 }),
     oklchToHex({ l: 0.68, c: 0.21, h: 20 }),
   ],
+  font: DEFAULT_CHART_FONT,
+  radius: 0,
+  raised: oklchToHex({ l: 0.31, c: 0.02, h: 265 }),
+  type: { axis: 11, label: 11, tooltip: 12, value: 24 },
+  lineWidth: 2,
+  area: { fade: 0.32, flat: 0.18, stacked: 0.85 },
+  soften: 0.2,
   tokens: {
     success: oklchToHex({ l: 0.78, c: 0.16, h: 160 }),
     warning: oklchToHex({ l: 0.78, c: 0.16, h: 75 }),
@@ -103,6 +157,10 @@ export function readChartTheme(
     const value = style.getPropertyValue(name).trim();
     return value ? resolveColor(value) : fallback;
   };
+  const px = (name: string, fallback: number) =>
+    readPx(style.getPropertyValue(name), fallback);
+  const fraction = (name: string, fallback: number) =>
+    readFraction(style.getPropertyValue(name), fallback);
   const d = DEFAULT_CHART_THEME;
   const tokens = Object.fromEntries(
     (Object.keys(COLOR_TOKENS) as ColorToken[]).map((t) => [
@@ -115,7 +173,7 @@ export function readChartTheme(
     line: read("--chart-axis", d.line),
     grid: read("--chart-grid", d.grid),
     track: read("--chart-track", d.track),
-    faint: readFraction(style.getPropertyValue("--chart-faint"), d.faint),
+    faint: fraction("--chart-faint", d.faint),
     foreground: read("--foreground", d.foreground),
     background: read("--surface", d.background),
     series: Array.from({ length: SERIES_COUNT }, (_, i) =>
@@ -130,6 +188,22 @@ export function readChartTheme(
       read("--chart-div-high", d.diverging[2]),
     ],
     tokens,
+    font: readFont(style.getPropertyValue("--font-sans"), d.font),
+    radius: px("--radius", d.radius),
+    raised: read("--surface-3", d.raised),
+    type: {
+      axis: px("--chart-font-size-axis", d.type.axis),
+      label: px("--chart-font-size-label", d.type.label),
+      tooltip: px("--chart-font-size-tooltip", d.type.tooltip),
+      value: px("--chart-font-size-value", d.type.value),
+    },
+    lineWidth: px("--chart-line-width", d.lineWidth),
+    area: {
+      fade: fraction("--chart-area-fade", d.area.fade),
+      flat: fraction("--chart-area-flat", d.area.flat),
+      stacked: fraction("--chart-area-stacked", d.area.stacked),
+    },
+    soften: fraction("--chart-soften", d.soften),
   };
 }
 
@@ -148,9 +222,14 @@ export const FORCED_COLORS_QUERY = "(forced-colors: active)";
  * order and the "Patterns in charts" setting more than on hue.
  *
  * `system` resolves a system color keyword to a hex string; the hook does
- * that with a probe element.
+ * that with a probe element. `page` is the theme the page would draw, for
+ * what is not a color: its font, type scale and line width carry over; its
+ * corners and softening do not, so every fill is exactly a system color.
  */
-export function forcedColorsTheme(system: (keyword: string) => string): ChartTheme {
+export function forcedColorsTheme(
+  system: (keyword: string) => string,
+  page: ChartTheme = DEFAULT_CHART_THEME,
+): ChartTheme {
   const text = system("CanvasText");
   const gray = system("GrayText");
   const highlight = system("Highlight");
@@ -175,6 +254,14 @@ export function forcedColorsTheme(system: (keyword: string) => string): ChartThe
     sequential: [gray, gray, link, highlight, text],
     diverging: [link, gray, highlight],
     tokens,
+    font: page.font,
+    radius: 0,
+    raised: system("Canvas"),
+    type: page.type,
+    lineWidth: page.lineWidth,
+    // A stacked band is solid: a system color at an alpha is not one.
+    area: { ...page.area, stacked: 1 },
+    soften: 0,
   };
 }
 
@@ -201,8 +288,39 @@ export function inkOn(fill: string): string {
     : INK.light;
 }
 
-/** A block's edge, drawn over any fill: black at a third. */
-export const BLOCK_EDGE = withAlpha(INK.dark, 0.35);
+/**
+ * A color as a large area wears it (#647): a treemap node, a pie slice, a
+ * sankey node, a timeline span, a stacked band. A line can be saturated
+ * because it is thin; the same color over a whole block shouts, so a block
+ * takes the color pulled `theme.soften` of the way (a fifth, by default)
+ * toward the surface it sits on. A label on it goes through `inkOn` of the
+ * softened fill. Lines, bars and a gauge's progress keep the literal color.
+ */
+export function soften(theme: ChartTheme, hex: string): string {
+  return theme.soften > 0 ? blend(hex, theme.background, theme.soften) : hex;
+}
+
+/** `hex` mixed with `toward` by `amount` (0 keeps `hex`), in sRGB, as a hex. */
+export function blend(hex: string, toward: string, amount: number): string {
+  const a = hexToRgb(hex);
+  const b = hexToRgb(toward);
+  const mix = (i: number) => Math.round(a[i] * (1 - amount) + b[i] * amount);
+  return `#${[0, 1, 2].map((i) => mix(i).toString(16).padStart(2, "0")).join("")}`;
+}
+
+/** A font-family list from a custom property, or `fallback` when it is empty. */
+function readFont(value: string, fallback: string): string {
+  const font = value.trim();
+  return font ? font : fallback;
+}
+
+/** A pixel length from a custom property (`6px`, `0`), or `fallback` when it is not one. */
+function readPx(value: string, fallback: number): number {
+  const m = /^\s*(\d+(?:\.\d+)?)(px)?\s*$/.exec(value);
+  if (!m) return fallback;
+  const n = Number.parseFloat(m[1]);
+  return Number.isFinite(n) && n >= 0 ? n : fallback;
+}
 
 /** A 0–1 number from a custom property, or `fallback` when it is not one. */
 function readFraction(value: string, fallback: number): number {
