@@ -91,6 +91,17 @@ handles never cover the time labels under the cells; drag a handle to show
 only the cells in a range
 ([#639](https://github.com/jbouder/holotable/issues/639)).
 
+## `scatter`
+
+No options. A scatter reads its first numeric column across and every other
+numeric column up, one series each. Both axes are named in their middle: the
+x axis by its column, and the y axis by its column when there is one. With
+one series there is no legend, since the y axis says what the points are;
+with several the legend names them, and the y axis is named only by the
+panel's unit (`%`, `ms` or `bytes`) when its `format` has one. The panel's
+`format` writes both axes' ticks
+([#640](https://github.com/jbouder/holotable/issues/640)).
+
 ## `stat`
 
 | Option | Type | Default | Meaning |

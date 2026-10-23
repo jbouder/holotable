@@ -50,6 +50,8 @@ With PromQL: a range query drawn as bars per step, or an instant query (`"instan
 
 The relationship between two numeric dimensions. The first numeric column is
 the x-axis, the second the y-axis; a label column may follow. No options.
+Each axis is named by its column, so alias them to read well (`AS cpu`,
+`AS memory`); with more numeric columns each is its own series in a legend.
 
 With PromQL: not for a Prometheus source; a PromQL result is a time and one column per series.
 
