@@ -67,9 +67,8 @@ function pageHeaders(nonce: string): Record<string, string> {
 
 /**
  * The app's default palette (src/app/globals.css): dark, and light under
- * `data-theme="light"`, with its square corners and lifted card. These pages
- * are served before the app is up, so they carry their own copy; the CSP
- * allows no fonts, so the type is the system's.
+ * `data-theme="light"`. These pages are served before the app is up, so they
+ * carry their own copy; the CSP allows no fonts, so the type is the system's.
  */
 const TOKENS = `
   :root { color-scheme: dark;
@@ -78,16 +77,14 @@ const TOKENS = `
     --foreground: oklch(0.95 0.008 260); --muted: oklch(0.72 0.015 260);
     --primary: oklch(0.72 0.13 250); --success: oklch(0.8 0.12 160);
     --chart-1: oklch(0.68 0.13 250); --chart-2: oklch(0.72 0.12 160);
-    --chart-3: oklch(0.8 0.13 80); --chart-4: oklch(0.72 0.15 25);
-    --shadow-card: 0 1px 2px rgb(0 0 0 / 0.2), 0 4px 12px -4px rgb(0 0 0 / 0.35); }
+    --chart-3: oklch(0.8 0.13 80); --chart-4: oklch(0.72 0.15 25); }
   :root[data-theme="light"] { color-scheme: light;
     --background: oklch(0.975 0.004 260); --surface: oklch(1 0 0);
     --surface-2: oklch(0.955 0.006 260); --border: oklch(0.86 0.01 260);
     --foreground: oklch(0.22 0.02 260); --muted: oklch(0.5 0.02 260);
     --primary: oklch(0.5 0.17 255); --success: oklch(0.44 0.1 160);
     --chart-1: oklch(0.52 0.15 250); --chart-2: oklch(0.56 0.12 160);
-    --chart-3: oklch(0.62 0.15 70); --chart-4: oklch(0.55 0.17 25);
-    --shadow-card: 0 1px 2px rgb(0 0 0 / 0.04), 0 4px 12px -4px rgb(0 0 0 / 0.1); }
+    --chart-3: oklch(0.62 0.15 70); --chart-4: oklch(0.55 0.17 25); }
   body { margin: 0; min-height: 100vh; display: grid; place-items: center;
          font: 16px/1.5 ui-sans-serif, system-ui, sans-serif;
          background: var(--background); color: var(--foreground); }
@@ -155,7 +152,6 @@ const STARTING_STYLE = `
   .board { display: grid; grid-template-columns: 1fr 1fr; grid-template-rows: 3.5rem 2rem 3.5rem;
            gap: .5rem; margin-bottom: 1.75rem; }
   .tile { background: var(--surface); border: 1px solid var(--border); overflow: hidden;
-          box-shadow: var(--shadow-card);
           position: relative; animation: rise .5s cubic-bezier(.2,0,0,1) backwards;
           animation-delay: calc(var(--i) * 90ms - var(--t)); }
   .a { grid-row: 1 / 3; } .b { grid-row: 1; } .c { grid-row: 2 / 4; } .d { grid-row: 3; }
