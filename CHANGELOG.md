@@ -83,6 +83,16 @@ says how a section gets here.
   `shadow` (`none`, `subtle` or `lifted`) and an optional `chart-grid` per
   scheme; a file without them loads as before, square and subtly lifted
   unless it says otherwise.
+- **Amber fills, not brown, in light.** A warning or a spec's `orange` drawn
+  as an area (a gauge's arc and bands, a gauge bar, a histogram bar, a
+  threshold-colored line, a stat's sparkline, a status tile, a timeline span,
+  a log line's stripe) is now a bright amber held to 3:1, while the same
+  color as text (a stat's number, a badge) keeps its AA shade. In Graphite,
+  Fjord and Paper the amber chart series is raised too, so pie, treemap and
+  line series 4, 2 and 3 read amber rather than brown. High contrast is
+  unchanged. A theme file gains optional `warning-fill` and `orange-fill`
+  tokens per scheme; a file without them fills in its `warning` and `orange`
+  as before.
 
 ## 0.2.0 — 2026-10-11
 

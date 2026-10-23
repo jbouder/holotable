@@ -18,7 +18,7 @@ import {
 } from "@/components/charts/options";
 import { formatValue } from "@/lib/format";
 import type { Panel } from "@/lib/ir";
-import { type ColorToken, tokenHex } from "@/lib/panels/colors";
+import { type ColorToken, fillHex } from "@/lib/panels/colors";
 import { GaugeOptions } from "@/lib/panels/kinds/gauge";
 import { thresholdColor } from "@/lib/panels/thresholds";
 
@@ -147,7 +147,7 @@ function bands(
   for (const step of steps) {
     const at = (step.value - min) / (max - min);
     if (at > 0 && at < 1) stops.push([at, color]);
-    if (at < 1) color = withAlpha(tokenHex(step.color, theme), theme.faint);
+    if (at < 1) color = withAlpha(fillHex(step.color, theme), theme.faint);
   }
   stops.push([1, color]);
   return stops;
@@ -179,7 +179,7 @@ function radial(
           show: true,
           width: 12,
           roundCap: theme.radius > 0,
-          itemStyle: { color: tokenHex(reading?.color ?? DEFAULT_COLOR, theme) },
+          itemStyle: { color: fillHex(reading?.color ?? DEFAULT_COLOR, theme) },
         },
         axisLine: {
           roundCap: theme.radius > 0,
@@ -239,7 +239,7 @@ function bars(readings: GaugeReading[], theme: ChartTheme): EChartsOption {
         backgroundStyle: { color: theme.track, ...barCorners(theme, true) },
         data: readings.map((r) => ({
           value: r.fraction,
-          itemStyle: { color: tokenHex(r.color, theme), ...barCorners(theme, true) },
+          itemStyle: { color: fillHex(r.color, theme), ...barCorners(theme, true) },
         })),
         label: {
           show: true,

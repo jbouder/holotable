@@ -54,6 +54,7 @@ every fill is exactly a system color.
 axe-core does not model forced colors: it would measure the page's own
 colors against the system's background.
 | Status | `--success`, `--warning`, `--danger` | Badges, alerts, thresholds |
+| Fills | `--warning-fill`, `--orange-fill` | The amber pair drawn as an area: a gauge's arc, a bar, a tile |
 | Chart series | `--chart-1` … `--chart-8` | Categorical series, each at least 3:1 on `--surface` |
 | Chart ramps | `--chart-seq-1` … `--chart-seq-5`, `--chart-div-low/mid/high` | Sequential and diverging scales |
 | Chart chrome | `--chart-text`, `--chart-axis`, `--chart-grid` | Axis labels, axis lines, grid lines |
@@ -68,6 +69,17 @@ through `ChartTheme` (`src/lib/color/chart-theme.ts`), which converts the
 computed style off `<html>`.
 `test/color-literals.test.ts` keeps color literals out of `src/`, except in
 `src/lib/color/` and `globals.css`.
+
+A token is drawn two ways (#641). As text (a stat's number, a badge), it is
+the token, held to AA. As a fill (a gauge's arc and bands, a gauge bar, a
+histogram bar, a threshold-colored line, a stat's sparkline, a status tile, a
+timeline span, a log line's stripe), it is `FILL_TOKENS`, through `fillHex`
+or `fillCss` and `ChartTheme.fills`. A fill is a graphic, held to 3:1 (WCAG
+1.4.11), and an amber dark enough to be text on a light surface reads brown
+over an area, so `warning` and `orange` have fills of their own:
+`--warning-fill` and `--orange-fill`. Every other token, and both in dark,
+fills in its text color. High contrast does not split them: its tiles are
+solid fills under white ink at 7:1, which no lighter amber carries.
 
 ## Chart style
 
@@ -152,7 +164,11 @@ In light, Holotable is the first theme whose `--orange` is not an alias. Its
 `orange` is also text (a stat's number), held to AA, so `--orange` takes its
 own value a shade darker. `--warning` is the lightest amber that stays AA on
 its own 20% tint and apart from `--success` and `--danger` under every
-color-vision deficiency `quality.ts` checks.
+color-vision deficiency `quality.ts` checks. Graphite, Fjord and Paper do the
+same in light (#641): their amber series is raised to a bright 3:1 amber,
+`--orange` keeps the AA shade the series had, and `--orange-fill` points at
+the series. Their `--warning` is pinned dark by its distance from `--danger`
+under a deficiency, so each sets a bright `--warning-fill` beside it.
 
 An operator can add one more without a pull request: `THEME_FILE`, a JSON
 file of token values held to the operator tier at boot. The root layout
@@ -206,6 +222,7 @@ the operator tier).
 | `primary` | The accent as text, as a fill, and its hue from each status | 4.5:1, 3:1, 60° |
 | `on-fill` | `--primary-foreground` on the primary and danger fills | 4.5:1 |
 | `status-distinct` | Success, warning and danger from each other, plainly and under protanopia, deuteranopia and tritanopia | ΔE 0.12, 0.05 |
+| `status-fill` | `--warning-fill` and `--orange-fill` on the surface; the warning fill from success and danger, plainly and under each deficiency | 3:1, ΔE 0.12, 0.05 |
 | `chart-series` | Each series on the surface, and the closest two, plainly and under each deficiency | 3:1, ΔE 0.08, 0.02 |
 | `chart-text` | Axis text on the surface | 4.5:1 |
 | `ring` | The focus ring on every surface | 3:1 |

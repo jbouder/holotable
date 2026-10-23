@@ -1,7 +1,7 @@
 import { DatumLinksBody } from "@/components/dashboard/DatumLinks";
 import type { PanelBodyProps } from "@/components/panels/types";
 import { datumOf } from "@/lib/drilldown-datum";
-import { tokenCss } from "@/lib/panels/colors";
+import { fillCss, tokenCss } from "@/lib/panels/colors";
 import { statReading } from "@/lib/panel-reading";
 
 /**
@@ -12,10 +12,11 @@ import { statReading } from "@/lib/panel-reading";
  */
 export function StatView({ panel, data }: PanelBodyProps) {
   const reading = statReading(panel, data);
-  // A token is a CSS variable (#502): it is the scheme's own color, held to
-  // AA as text, so the number and the sparkline take the same one.
-  const color = reading.color ? tokenCss(reading.color) : undefined;
-  const text = color;
+  // A token is a CSS variable (#502), the scheme's own color: the number
+  // takes it as text, held to AA, and the sparkline as a fill, which in a
+  // light scheme is a brighter amber than text can be (#641).
+  const color = reading.color ? fillCss(reading.color) : undefined;
+  const text = reading.color ? tokenCss(reading.color) : undefined;
   // The whole number is the datum (#373): with a datum link, the body is one control.
   return (
     <DatumLinksBody datum={datumOf(panel, data, {})} label={panel.title}>
@@ -30,9 +31,9 @@ function StatBody({
   text,
 }: {
   reading: ReturnType<typeof statReading>;
-  /** The sparkline's color: the token, as a CSS color. */
+  /** The sparkline's color: the token as a fill, as a CSS color. */
   color?: string;
-  /** The number's color: the same token, or none. */
+  /** The number's color: the token as text, or none. */
   text?: string;
 }) {
   return (

@@ -211,6 +211,32 @@ export const THEME_RULES: readonly ThemeRule[] = [
       ]),
   },
   {
+    id: "status-fill",
+    why: "A warning drawn as a fill (an arc, a bar, a tile) is a 3:1 graphic on the surface (WCAG 1.4.11), apart from success and danger with or without a color-vision deficiency; so is the spec's orange as a fill (#641).",
+    measure: (t) => [
+      ...["warning-fill", "orange-fill"].map((fill) => ({
+        where: `${fill} on surface`,
+        measured: ratio(t, fill, "surface"),
+        floor: 3,
+      })),
+      ...(["success", "danger"] as const).flatMap((other) => [
+        {
+          where: `warning-fill vs ${other} (OKLab ΔE)`,
+          measured: deltaE(get(t, "warning-fill"), get(t, other)),
+          floor: 0.12,
+        },
+        ...DEFICIENCIES.map((d) => ({
+          where: `warning-fill vs ${other} under ${d} (OKLab ΔE)`,
+          measured: deltaE(
+            simulate(get(t, "warning-fill"), d),
+            simulate(get(t, other), d),
+          ),
+          floor: 0.05,
+        })),
+      ]),
+    ],
+  },
+  {
     id: "chart-series",
     why: "Every series is a 3:1 graphic on the surface, and no two are near-twins, with or without a color-vision deficiency.",
     measure: (t) => [

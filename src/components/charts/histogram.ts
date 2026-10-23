@@ -17,7 +17,7 @@ import {
 } from "@/components/charts/style";
 import { formatValue } from "@/lib/format";
 import { type Panel, panelTimeField } from "@/lib/ir";
-import { type ColorToken, tokenHex } from "@/lib/panels/colors";
+import { type ColorToken, fillHex } from "@/lib/panels/colors";
 import { HistogramOptions } from "@/lib/panels/kinds/histogram";
 import { numberDisplay, readOptions } from "@/lib/panels/presentation";
 import { thresholdColor } from "@/lib/panels/thresholds";
@@ -185,7 +185,7 @@ export const histogramChart: ChartOptionBuilder = normalized((panel, data, { the
         data: bars.map((b) => ({
           // A log axis has no zero: an empty bucket is left out of it.
           value: o.log && b.count <= 0 ? null : b.count,
-          itemStyle: { color: tokenHex(b.color, theme), ...barCorners(theme) },
+          itemStyle: { color: fillHex(b.color, theme), ...barCorners(theme) },
         })),
       },
     ],

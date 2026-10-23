@@ -83,9 +83,17 @@ const ColorValue = z.string().transform((value, ctx): Color => {
 
 /**
  * Tokens a file may leave out, and what it gets then: Holotable's gridlines
- * are their own color (#648), every other theme's are its inset surface.
+ * are their own color (#648), every other theme's are its inset surface; a
+ * warning or orange fill (#641) is the text token unless the file splits it.
  */
-export const OPTIONAL_THEME_FILE_TOKENS = { "chart-grid": "var(--surface-2)" } as const;
+export const OPTIONAL_THEME_FILE_TOKENS = {
+  "chart-grid": "var(--surface-2)",
+  "warning-fill": "var(--warning)",
+  "orange-fill": "var(--orange)",
+} as const;
+
+type OptionalToken = keyof typeof OPTIONAL_THEME_FILE_TOKENS;
+const OPTIONAL_TOKENS = Object.keys(OPTIONAL_THEME_FILE_TOKENS) as OptionalToken[];
 
 const SchemeTokens = z
   .object(
@@ -93,7 +101,11 @@ const SchemeTokens = z
       [K in (typeof THEME_FILE_TOKENS)[number]]: typeof ColorValue;
     },
   )
-  .extend({ "chart-grid": ColorValue.optional() })
+  .extend(
+    Object.fromEntries(OPTIONAL_TOKENS.map((t) => [t, ColorValue.optional()])) as {
+      [K in OptionalToken]: ReturnType<typeof ColorValue.optional>;
+    },
+  )
   .strict();
 
 export const RADII = ["0px", "2px", "4px", "6px"] as const;
@@ -187,10 +199,10 @@ export function themeCss(theme: ThemeFile): string {
       const decls = THEME_FILE_TOKENS.map(
         (t) => `--${t}:${colorText(theme[scheme][t])};`,
       );
-      const grid = theme[scheme]["chart-grid"];
-      decls.push(
-        `--chart-grid:${grid ? colorText(grid) : OPTIONAL_THEME_FILE_TOKENS["chart-grid"]};`,
-      );
+      for (const t of OPTIONAL_TOKENS) {
+        const value = theme[scheme][t];
+        decls.push(`--${t}:${value ? colorText(value) : OPTIONAL_THEME_FILE_TOKENS[t]};`);
+      }
       decls.push(`--radius:${theme.radius ?? "0px"};`);
       decls.push(`--shadow-card:${SHADOWS[theme.shadow ?? "subtle"][scheme]};`);
       return `[data-palette="${theme.name}"][data-theme="${scheme}"]{${decls.join("")}}`;
@@ -225,8 +237,10 @@ const INHERITED: Record<string, string> = {
 function block(theme: ThemeFile, scheme: ThemeName) {
   const decls: Record<string, string> = { ...INHERITED };
   for (const t of THEME_FILE_TOKENS) decls[t] = colorText(theme[scheme][t]);
-  const grid = theme[scheme]["chart-grid"];
-  if (grid) decls["chart-grid"] = colorText(grid);
+  for (const t of OPTIONAL_TOKENS) {
+    const value = theme[scheme][t];
+    if (value) decls[t] = colorText(value);
+  }
   return { palette: theme.name, scheme, ...resolveBlock(decls) };
 }
 

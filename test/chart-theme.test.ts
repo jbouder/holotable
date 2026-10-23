@@ -13,7 +13,7 @@ import { Panel } from "@/lib/ir";
 import { readdirSync, readFileSync } from "node:fs";
 import { parseThemeTokens } from "@/lib/color/contrast";
 import { resolveColor } from "@/lib/color/oklch";
-import { COLOR_TOKENS } from "@/lib/panels/colors";
+import { COLOR_TOKENS, FILL_TOKENS } from "@/lib/panels/colors";
 import { LOCAL_TIME_DISPLAY } from "@/lib/time-display";
 
 /*
@@ -96,6 +96,9 @@ test("the defaults are the dark scheme's tokens in globals.css", () => {
   ]);
   for (const [token, variable] of Object.entries(COLOR_TOKENS)) {
     assert.equal(d.tokens[token as keyof typeof d.tokens], hex(variable.slice(2)), token);
+  }
+  for (const [token, variable] of Object.entries(FILL_TOKENS)) {
+    assert.equal(d.fills[token as keyof typeof d.fills], hex(variable.slice(2)), token);
   }
   assert.equal(d.raised, hex("surface-3"));
 });
@@ -192,6 +195,16 @@ const DISTINCT: ChartTheme = {
     info: "#434343",
     neutral: "#444444",
     orange: "#454545",
+    purple: "#464646",
+    teal: "#474747",
+  },
+  fills: {
+    success: "#404040",
+    warning: "#515151",
+    danger: "#424242",
+    info: "#434343",
+    neutral: "#444444",
+    orange: "#555555",
     purple: "#464646",
     teal: "#474747",
   },
@@ -539,4 +552,24 @@ test("a stacked area draws near-solid bands parted by a line of surface; a lone 
     assert.deepEqual(s.lineStyle, { width: DISTINCT.lineWidth });
     assert.equal(s.z, undefined);
   }
+});
+
+test("a status drawn as a fill takes its fill token, and as text its text token", () => {
+  // #641: an amber dark enough to be text on a light surface reads brown over
+  // an arc or a bar, so a fill (held to 3:1) draws the brighter shade.
+  const warn = { value: 0, color: "warning" };
+  const gauge = JSON.stringify(drawnBy("gauge", DISTINCT, { thresholds: [warn] }));
+  assert.ok(gauge.includes(DISTINCT.fills.warning), "the gauge's arc is the fill");
+  assert.ok(!gauge.includes(DISTINCT.tokens.warning), "the gauge draws no warning text");
+  const bars = JSON.stringify(
+    drawnBy("gauge", DISTINCT, { thresholds: [warn], variant: "bar" }),
+  );
+  assert.ok(bars.includes(DISTINCT.fills.warning), "a gauge's bar is the fill");
+  // A page that sets no fill fills in the token's own color.
+  const theme = readChartTheme(style({ "--warning": "oklch(0.5 0.17 70)" }));
+  assert.equal(theme.fills.warning, theme.tokens.warning);
+  const split = readChartTheme(
+    style({ "--warning": "oklch(0.5 0.17 70)", "--warning-fill": "oklch(0.66 0.15 75)" }),
+  );
+  assert.notEqual(split.fills.warning, split.tokens.warning);
 });

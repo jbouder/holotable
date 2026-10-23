@@ -4,6 +4,7 @@ import { test } from "node:test";
 import { parseThemeDecls, resolveBlock } from "@/lib/color/contrast";
 import {
   checkThemeFile,
+  OPTIONAL_THEME_FILE_TOKENS,
   parseThemeFile,
   SHADOWS,
   THEME_FILE_TOKENS,
@@ -116,7 +117,7 @@ test("Holotable exports and loads as it paints; a file that names no look keeps 
     const ours = decls(copy, scheme);
     const theirs = resolveBlock(builtIn(scheme)).tokens;
     const back = resolveBlock(ours).tokens;
-    for (const t of [...THEME_FILE_TOKENS, "chart-grid"]) {
+    for (const t of [...THEME_FILE_TOKENS, ...Object.keys(OPTIONAL_THEME_FILE_TOKENS)]) {
       assert.deepEqual(back[t], theirs[t], `${scheme} --${t}`);
     }
     assert.equal(ours.radius, builtIn(scheme).radius);
@@ -131,6 +132,18 @@ test("Holotable exports and loads as it paints; a file that names no look keeps 
     assert.equal(d["shadow-card"], SHADOWS.subtle[scheme]);
     assert.equal(d["chart-grid"], "var(--surface-2)");
   }
+  // #641: a file that does not split its amber fills them in its text colors,
+  // and one that does is written and measured with its own fill.
+  const unsplit = parsed(exportTheme(CSS, "graphite", "acme"));
+  delete unsplit.light["warning-fill"];
+  delete unsplit.light["orange-fill"];
+  const plain = decls(themeCss(unsplit), "light");
+  assert.equal(plain["warning-fill"], "var(--warning)");
+  assert.equal(plain["orange-fill"], "var(--orange)");
+  assert.deepEqual(checkThemeFile(unsplit), []);
+  const split = decls(old, "light");
+  assert.match(split["warning-fill"], /^oklch\(/);
+  assert.notEqual(split["orange-fill"], split.orange);
 });
 
 test("every built-in theme's card shadow is one a theme file can name", () => {

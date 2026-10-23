@@ -237,7 +237,10 @@ Checked, not hoped for:
   colors, and statuses and series distinct under a color-vision deficiency.
   A new color token goes in `THEME_FILE_TOKENS` (`src/lib/color/theme-file.ts`)
   too, since an operator's `THEME_FILE` (#508) sets every token and is the
-  only way to add a theme without a pull request.
+  only way to add a theme without a pull request; one an older file must load
+  without goes in `OPTIONAL_THEME_FILE_TOKENS` with its fallback. A color
+  drawn as an area (an arc, a bar, a tile) is `fillHex` / `fillCss`, held to
+  3:1; as text it is `tokenHex` / `tokenCss`, held to AA (#641).
   A status tint is `tinted bg-tint-<status>/(--tint-<n>)`, never a bare
   `bg-<status>/<n>`, and no component asks which theme is on
   (`test/color-literals.test.ts`).

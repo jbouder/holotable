@@ -17,7 +17,7 @@ import {
 } from "@/components/charts/style";
 import { ANNOTATION_COLORS, type Annotation } from "@/lib/annotations";
 import { formatValue } from "@/lib/format";
-import { tokenHex } from "@/lib/panels/colors";
+import { fillHex, tokenHex } from "@/lib/panels/colors";
 import {
   type LegendPosition,
   type NumberDisplay,
@@ -213,7 +213,7 @@ function thresholdMap(
   const pieces = steps.map((step, i) => ({
     gte: step.value,
     ...(steps[i + 1] ? { lt: steps[i + 1].value } : {}),
-    color: tokenHex(step.color, theme),
+    color: fillHex(step.color, theme),
   }));
   return {
     show: false,
