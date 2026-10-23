@@ -55,8 +55,8 @@ export function exportTheme(css: string, palette: string, as?: string) {
       : `${info.label} (copy)`,
     description: info.description,
     ...(radius && radius !== "0" ? { radius } : {}),
-    // `subtle` is what a file that names none gets.
-    ...(shadow !== "subtle" ? { shadow } : {}),
+    // `none` is what a file that names none gets.
+    ...(shadow !== "none" ? { shadow } : {}),
     light: scheme("light"),
     dark: scheme("dark"),
   };

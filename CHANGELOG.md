@@ -104,14 +104,14 @@ says how a section gets here.
 - **A new default look.** The default theme, Holotable, keeps its name, its
   font and its square corners, with slightly quieter surfaces and borders and
   a calmer series palette whose colors stay apart under every color-vision
-  deficiency the theme checks cover. Its cards are flat now, with no shadow;
-  the other built-in themes keep the slight shadow they had. In light, the
+  deficiency the theme checks cover. Its cards are flat now, with no shadow,
+  and so are every other built-in theme's. In light, the
   warning is a burnt amber instead of brown, and a spec's `orange` used as
   text is a shade darker than the amber series it stands for. A stored theme
   preference, `THEME_DEFAULT_PALETTE=holotable` and embed links keep working
   and simply look new. A theme file gains an optional `shadow` (`none`,
   `subtle` or `lifted`) and an optional `chart-grid` per scheme; a file
-  without them loads as before, square and with the subtle shadow.
+  without them still loads, square and flat like the built-in themes.
 - **Status tiles follow the theme's corners.** A status grid's tiles take the
   theme's corner radius, like the panel around them: square everywhere but
   Paper, the one built-in theme that rounds (4px). They were rounded the same

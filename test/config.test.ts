@@ -1630,8 +1630,8 @@ test("THEME_FILE: unreadable, malformed and below the bar each stop a production
     ["THEME_DEFAULT_PALETTE"],
   );
 
-  // #648: `shadow` is optional (graphite's export names none) and a name,
-  // not CSS; the default's export, which names one, loads too.
+  // #648: `shadow` is optional (no built-in theme's export names one, since
+  // all are flat, #674) and a name, not CSS; the default's export loads too.
   assert.equal("shadow" in good, false);
   assert.deepEqual(check(write("lifted.json", { ...good, shadow: "lifted" })), []);
   assert.deepEqual(

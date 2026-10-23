@@ -112,9 +112,9 @@ export const RADII = ["0px", "2px", "4px", "6px"] as const;
 
 /**
  * A card's lift (#648), by name rather than as CSS, written per scheme: a
- * shadow that reads on a light page vanishes on a dark one. `subtle` is what
- * every built-in theme but Holotable (flat, `none`) draws, and what a file
- * that names none gets, so a file written before the field looks as it did.
+ * shadow that reads on a light page vanishes on a dark one. Every built-in
+ * theme is flat (`none`, #674), and so is a file that names none; `subtle`
+ * and `lifted` are there for a file that wants its cards lifted.
  */
 export const SHADOWS = {
   none: { dark: "none", light: "none" },
@@ -190,8 +190,8 @@ function colorText(color: Color): string {
  * resolve against these values in the cascade, as they do for a built-in
  * theme. What is Holotable's own look rather than an alias (its corners,
  * card lift and gridline color, #648) is written here instead, so a file
- * that names no radius or shadow is square and subtly lifted, as it was
- * before Holotable's look changed.
+ * that names no radius or shadow is square and flat, like every built-in
+ * theme (#674).
  */
 export function themeCss(theme: ThemeFile): string {
   return (["dark", "light"] as const)
@@ -204,7 +204,7 @@ export function themeCss(theme: ThemeFile): string {
         decls.push(`--${t}:${value ? colorText(value) : OPTIONAL_THEME_FILE_TOKENS[t]};`);
       }
       decls.push(`--radius:${theme.radius ?? "0px"};`);
-      decls.push(`--shadow-card:${SHADOWS[theme.shadow ?? "subtle"][scheme]};`);
+      decls.push(`--shadow-card:${SHADOWS[theme.shadow ?? "none"][scheme]};`);
       return `[data-palette="${theme.name}"][data-theme="${scheme}"]{${decls.join("")}}`;
     })
     .join("\n");

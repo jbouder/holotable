@@ -262,7 +262,7 @@
   /* What Holotable's blocks set before #648, so this theme looks as it did. */
   --radius: 0;
   --chart-grid: var(--surface-2);
-  --shadow-card: 0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1);
+  --shadow-card: none;
 }
 
 [data-palette="graphite"][data-theme="light"] {
@@ -310,7 +310,7 @@
   /* What Holotable's blocks set before #648, so this theme looks as it did. */
   --radius: 0;
   --chart-grid: var(--surface-2);
-  --shadow-card: 0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1);
+  --shadow-card: none;
 }
 
 /*
@@ -359,7 +359,7 @@
   /* What Holotable's blocks set before #648, so this theme looks as it did. */
   --radius: 0;
   --chart-grid: var(--surface-2);
-  --shadow-card: 0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1);
+  --shadow-card: none;
 }
 
 [data-palette="fjord"][data-theme="light"] {
@@ -404,7 +404,7 @@
   /* What Holotable's blocks set before #648, so this theme looks as it did. */
   --radius: 0;
   --chart-grid: var(--surface-2);
-  --shadow-card: 0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1);
+  --shadow-card: none;
 }
 
 /*
@@ -448,7 +448,7 @@
   --radius: 4px;
   /* What Holotable's blocks set before #648, so this theme looks as it did. */
   --chart-grid: var(--surface-2);
-  --shadow-card: 0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1);
+  --shadow-card: none;
 }
 
 [data-palette="paper"][data-theme="light"] {
@@ -491,7 +491,7 @@
   --orange: oklch(0.52 0.12 65);
   --orange-fill: var(--chart-3);
   --warning-fill: oklch(0.65 0.14 75);
-  --shadow-card: 0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1);
+  --shadow-card: none;
 }
 
 /*
@@ -550,7 +550,7 @@
   --tinted-primary: var(--tint-foreground);
   /* What Holotable's blocks set before #648, so this theme looks as it did. */
   --radius: 0;
-  --shadow-card: 0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1);
+  --shadow-card: none;
 }
 
 [data-palette="high-contrast"][data-theme="light"] {
@@ -607,7 +607,7 @@
      a fill can be no lighter than the text token. */
   --warning-fill: var(--warning);
   --orange-fill: var(--orange);
-  --shadow-card: 0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1);
+  --shadow-card: none;
 }
 
 @theme inline {

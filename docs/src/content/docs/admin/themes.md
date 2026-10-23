@@ -44,7 +44,7 @@ values. The chart renders it into a ConfigMap, mounts it and sets
 | `label` | Yes | What the theme controls show, up to 40 characters. |
 | `description` | No | One sentence for the gallery, up to 120 characters. |
 | `radius` | No | Corner rounding: `0px`, `2px`, `4px` or `6px`. Square when absent. |
-| `shadow` | No | How far a card lifts off the page: `none` (Holotable's), `subtle` or `lifted`. Written per scheme for you, since a shadow that reads on a light page vanishes on a dark one. `subtle` when absent. |
+| `shadow` | No | How far a card lifts off the page: `none` (every built-in theme's), `subtle` or `lifted`. Written per scheme for you, since a shadow that reads on a light page vanishes on a dark one. `none` when absent. |
 | `light`, `dark` | Yes | Every token below, in each scheme. |
 
 Each token is `oklch(L C H)`, with L from 0 to 1 (or 0–100%), C from 0 to
@@ -68,7 +68,8 @@ scheme, is refused.
 
 Chart text, axis lines, and status tints follow from these the same way they
 do for a built-in theme. A file written before `shadow`, `chart-grid` and the
-fills existed still loads, and looks as it did.
+fills existed still loads; its cards are flat now, like every built-in
+theme's, unless it adds `shadow`.
 
 ## What it is held to
 

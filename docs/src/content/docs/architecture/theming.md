@@ -158,11 +158,11 @@ Holotable's values, and inherits only the aliases (`--chart-text`, the
 Holotable's look is its own too (#648): square corners (`--radius: 0`), flat
 cards with no shadow (`--shadow-card: none`; `Card` draws the token), and
 gridlines a step below `--surface-2` (`--chart-grid`). Every other theme sets
-those three itself (square, the subtle shadow Tailwind calls `shadow-sm`, and
+those three itself (square, flat like Holotable since #674, and
 `--surface-2`, except High contrast, whose grid is a visible gray held to 3:1;
 Paper rounds to 4px, the one theme that does), so a change to the default's look never
 reaches them. A theme file gets the same: `themeCss` writes its `radius`,
-`shadow` and `chart-grid`, or the square, subtle, `--surface-2` fallbacks.
+`shadow` and `chart-grid`, or the square, flat, `--surface-2` fallbacks.
 
 In light, Holotable is the first theme whose `--orange` is not an alias. Its
 `--chart-3` is a bright amber held to 3:1 as a graphic, and the spec's
