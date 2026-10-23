@@ -11,6 +11,7 @@ import { escapeHtml } from "@/components/charts/state-timeline";
 import type { PanelNotice } from "@/components/panels/types";
 import { type ChartTheme, inkOn, seriesColor } from "@/lib/color/chart-theme";
 import { edgeLabel, pinnedLabel, shared, text, tooltip } from "@/components/charts/style";
+import { type ChartSize, nodeLabels, textWidth } from "@/components/charts/size";
 import type { Datum } from "@/lib/drilldown";
 import { formatValue } from "@/lib/format";
 import { type GraphDirection, graphLayout } from "@/lib/graph/layout";
@@ -928,12 +929,42 @@ const NOTHING = {
   label: { show: false },
 };
 
-export const graphChart: ChartOptionBuilder = normalized((panel, data, { theme }) => {
-  const view = graphView(panel, data);
-  if (view.layout === "tree") return treeOption(panel, view.tree, theme);
-  if (view.layout === "force") return forceOption(panel, view.net, theme);
-  return dagOption(panel, view.net, view.direction, theme);
-});
+export const graphChart: ChartOptionBuilder = normalized(
+  (panel, data, { theme, size }) => {
+    const view = graphView(panel, data);
+    if (view.layout === "tree") return treeOption(panel, view.tree, theme, size);
+    if (view.layout === "force") return forceOption(panel, view.net, theme, size);
+    return dagOption(panel, view.net, view.direction, theme, size);
+  },
+);
+
+/** The longest of a graph's labels, with its value and without (#643). */
+function widestLabels(items: readonly { text: string; short: string }[]) {
+  const longest = (key: "text" | "short") =>
+    items.reduce((a, b) => (b[key].length > a.length ? b[key] : a), "");
+  return { widest: longest("text"), widestName: longest("short") };
+}
+
+/** A label's text: the name and value, or the name alone where only it fits. */
+function labelText(values: boolean) {
+  return (p: unknown) => {
+    const d = (p as { data?: { text?: string; short?: string } }).data;
+    return (values ? d?.text : d?.short) ?? "";
+  };
+}
+
+/** A tree's layout as rows and columns: its depth, and its leaves. */
+function treeExtent(roots: readonly GraphNode[]): { levels: number; leaves: number } {
+  let levels = 0;
+  let leaves = 0;
+  const visit = (node: GraphNode, depth: number) => {
+    levels = Math.max(levels, depth + 1);
+    if (node.children.length === 0) leaves++;
+    for (const child of node.children) visit(child, depth + 1);
+  };
+  for (const root of roots) visit(root, roots.length > 1 ? 1 : 0);
+  return { levels, leaves };
+}
 
 /** The symbol a node is drawn with: its group's, the default, or a circle. */
 function symbolFor(o: GraphOptions, group: string | undefined): GraphSymbol {
@@ -954,7 +985,12 @@ function overflowTitle(theme: ChartTheme, nodes: number, edges = 0) {
   };
 }
 
-function treeOption(panel: Panel, tree: GraphTree, theme: ChartTheme): EChartsOption {
+function treeOption(
+  panel: Panel,
+  tree: GraphTree,
+  theme: ChartTheme,
+  size: ChartSize | undefined,
+): EChartsOption {
   const o = readOptions(GraphOptions, panel.options);
   const orient = o.orient ?? "LR";
   const display = numberDisplay(o);
@@ -980,6 +1016,7 @@ function treeOption(panel: Panel, tree: GraphTree, theme: ChartTheme): EChartsOp
       ...(node.value !== undefined ? { value: node.value } : {}),
       // The label's text, read by the formatter: the name, then the value.
       text: node.value === undefined ? node.name : `${node.name}  ${text(node.value)}`,
+      short: node.name,
       group: node.group,
       symbol: echartsSymbol(symbol),
       symbolSize: symbolSizeFor(symbol, o.symbolSize),
@@ -1009,12 +1046,39 @@ function treeOption(panel: Panel, tree: GraphTree, theme: ChartTheme): EChartsOp
           id: GRAPH_ROOT_ID,
           name: panel.title,
           text: panel.title,
+          short: panel.title,
           symbol: "circle",
           symbolSize: 6,
           itemStyle: { color: theme.line },
           label: { backgroundColor: "transparent", color: theme.text },
           children: tree.roots.map((r, i) => toItem(r, 0, i)),
         };
+
+  // Whether the labels fit the tree's levels and leaves at this size (#643):
+  // across the levels and down the leaves, or the other way when it runs
+  // down, or round the circle when it is radial.
+  const extent = treeExtent(tree.roots);
+  const all: { text: string; short: string }[] = [];
+  const gather = (node: GraphNode) => {
+    all.push({
+      text: node.value === undefined ? node.name : `${node.name}  ${text(node.value)}`,
+      short: node.name,
+    });
+    node.children.forEach(gather);
+  };
+  tree.roots.forEach(gather);
+  const sideways = orient === "LR" || orient === "RL";
+  const round = size && {
+    width: Math.min(size.width, size.height),
+    height: Math.PI * Math.min(size.width, size.height) * 0.68,
+  };
+  const fit = nodeLabels(orient === "radial" ? round : size, {
+    across:
+      orient === "radial" ? extent.levels * 2 : sideways ? extent.levels : extent.leaves,
+    down: orient === "radial" || sideways ? extent.leaves : extent.levels,
+    ...widestLabels(all),
+    textPx: theme.type.label,
+  });
 
   return {
     ...shared(theme),
@@ -1056,13 +1120,15 @@ function treeOption(panel: Panel, tree: GraphTree, theme: ChartTheme): EChartsOp
         data: tree.roots.length > 0 ? [root] : [NOTHING],
         itemStyle: { borderColor: theme.background, borderWidth: 1 },
         lineStyle: { color: theme.line, width: 1.5, curveness: 0.5 },
+        // Labels that do not fit show on the node under the pointer (#643).
         label: {
-          show: true,
-          ...pinnedLabel(theme),
+          show: fit.show,
+          ...pinnedLabel(theme, fit.small),
           distance: 6,
-          formatter: (p: unknown) => (p as { data?: { text?: string } }).data?.text ?? "",
+          formatter: labelText(fit.values),
         },
-        emphasis: { focus: "descendant" },
+        labelLayout: { hideOverlap: true },
+        emphasis: { focus: "descendant", label: { show: true } },
       },
     ],
   } as EChartsOption;
@@ -1091,6 +1157,7 @@ function dagOption(
   net: GraphNet,
   direction: GraphDirection,
   theme: ChartTheme,
+  size: ChartSize | undefined,
 ): EChartsOption {
   const o = readOptions(GraphOptions, panel.options);
   const display = numberDisplay(o);
@@ -1133,6 +1200,7 @@ function dagOption(
       value: [at?.x ?? 0, at?.y ?? 0],
       ...(node.value !== undefined ? { amount: node.value } : {}),
       text: node.value === undefined ? name : `${name}  ${text(node.value)}`,
+      short: name,
       group: node.group,
       parents: node.parents.map(nameOf),
       loop: loops.has(node.id),
@@ -1161,16 +1229,55 @@ function dagOption(
       };
     });
 
+  // Whether the labels fit the layers at this size (#643): a layer is a
+  // column when they run across, a row when they run down, and the most
+  // nodes in one layer the other way. A label under a node (across) needs
+  // the node's height as well as its line.
+  const across = direction === "LR";
+  const layers = new Map<number, number>();
+  for (const n of layout.nodes) {
+    const layer = across ? n.x : n.y;
+    layers.set(layer, (layers.get(layer) ?? 0) + 1);
+  }
+  const most = Math.max(1, ...layers.values());
+  const symbolPx = Math.max(0, ...nodes.map((n) => n.symbolSize));
+  const fit = nodeLabels(size, {
+    across: across ? layers.size : most,
+    down: across ? most : layers.size,
+    ...widestLabels(nodes),
+    textPx: theme.type.label,
+    line: across
+      ? symbolPx + theme.type.label + 12
+      : Math.max(symbolPx, theme.type.label + 8),
+  });
+  // The margins hold the labels at the layout's edges, by the width of the
+  // widest one drawn: half of it either side under nodes, all of it beside.
+  const drawn = fit.show
+    ? textWidth(
+        fit.values ? widestLabels(nodes).widest : widestLabels(nodes).widestName,
+        theme.type.label - (fit.small ? 1 : 0),
+      ) + 10
+    : 0;
+  const cap = (px: number) => Math.round(Math.min((size?.width ?? 800) * 0.3, px));
+
   return {
     ...shared(theme),
     tooltip: netTooltip(theme, nameOf, text),
     title: overflowTitle(theme, net.overflow, net.edgeOverflow),
     // Room for the labels beside the nodes at the edges of the layout: below
     // them when the layers run across, to their right when they run down.
-    grid:
-      direction === "LR"
+    grid: !size
+      ? direction === "LR"
         ? { left: 56, right: 56, top: 20, bottom: 36 }
-        : { left: 24, right: "18%", top: 20, bottom: 20 },
+        : { left: 24, right: "18%", top: 20, bottom: 20 }
+      : direction === "LR"
+        ? {
+            left: cap(Math.max(24, drawn / 2 + 4)),
+            right: cap(Math.max(24, drawn / 2 + 4)),
+            top: 20,
+            bottom: fit.show ? 36 : 20,
+          }
+        : { left: 24, right: cap(Math.max(24, drawn + 8)), top: 20, bottom: 20 },
     // Hidden: they only place the nodes. The first layer, and the first node
     // of a layer, at the top.
     xAxis: { type: "value", show: false, min: "dataMin", max: "dataMax" },
@@ -1196,13 +1303,15 @@ function dagOption(
         edgeSymbolSize: 8,
         itemStyle: { borderColor: theme.background, borderWidth: 1 },
         lineStyle: { color: theme.line, opacity: 0.9 },
+        // Labels that do not fit show on the node under the pointer (#643).
         label: {
-          show: true,
+          show: fit.show,
           position: direction === "LR" ? "bottom" : "right",
-          ...pinnedLabel(theme),
+          ...pinnedLabel(theme, fit.small),
           distance: 4,
-          formatter: (p: unknown) => (p as { data?: { text?: string } }).data?.text ?? "",
+          formatter: labelText(fit.values),
         },
+        labelLayout: { hideOverlap: true },
         edgeLabel: {
           show: o.edgeLabels === true,
           ...edgeLabel(theme),
@@ -1211,7 +1320,11 @@ function dagOption(
             return v === undefined ? "" : text(v);
           },
         },
-        emphasis: { focus: "adjacency", lineStyle: { opacity: 1 } },
+        emphasis: {
+          focus: "adjacency",
+          label: { show: true },
+          lineStyle: { opacity: 1 },
+        },
       },
     ],
   } as EChartsOption;
@@ -1320,7 +1433,12 @@ export function forceNodeSize(
  * drag pans, and Ctrl and the wheel or a pinch zooms (`EChart`'s
  * `attachCtrlZoom`), so the page still scrolls past the panel.
  */
-function forceOption(panel: Panel, net: GraphNet, theme: ChartTheme): EChartsOption {
+function forceOption(
+  panel: Panel,
+  net: GraphNet,
+  theme: ChartTheme,
+  size: ChartSize | undefined,
+): EChartsOption {
   const o = readOptions(GraphOptions, panel.options);
   const display = numberDisplay(o);
   const text = (v: number) => formatValue(v, panel.format, display);
@@ -1340,12 +1458,35 @@ function forceOption(panel: Panel, net: GraphNet, theme: ChartTheme): EChartsOpt
       ? EDGE_WIDTH[0] + ((EDGE_WIDTH[1] - EDGE_WIDTH[0]) * Math.abs(e.value)) / widest
       : 1.5;
   const largest = Math.max(0, ...net.nodes.map((n) => n.value ?? 0));
-  const labels = net.nodes.length <= FORCE_LABELS_MAX;
+  const texts = net.nodes.map((node) => {
+    const name = loops.has(node.id) ? `${node.name} ↻` : node.name;
+    return {
+      text: node.value === undefined ? name : `${name}  ${text(node.value)}`,
+      short: name,
+    };
+  });
+  // A force layout has no rows or columns: its labels fit while the panel
+  // has room for each one about three times over, the cloud being uneven
+  // (#643), and never past the cap.
+  const room = (label: string, px: number) =>
+    !size ||
+    (size.width * size.height) / Math.max(1, net.nodes.length) >=
+      3 * (textWidth(label, px) + 14) * (px + 8);
+  const longest = widestLabels(texts);
+  const px = theme.type.label;
+  const fit =
+    net.nodes.length > FORCE_LABELS_MAX
+      ? { show: false, values: false, small: false }
+      : room(longest.widest, px)
+        ? { show: true, values: true, small: false }
+        : room(longest.widestName, px - 1)
+          ? { show: true, values: false, small: true }
+          : { show: false, values: false, small: true };
   const label = {
-    ...pinnedLabel(theme),
+    ...pinnedLabel(theme, fit.small),
     distance: 4,
     position: "right",
-    formatter: (p: unknown) => (p as { data?: { text?: string } }).data?.text ?? "",
+    formatter: labelText(fit.values),
   };
 
   const nodes = net.nodes.map((node) => {
@@ -1358,6 +1499,7 @@ function forceOption(panel: Panel, net: GraphNet, theme: ChartTheme): EChartsOpt
       // The node's own value is `amount`: a `value` would weigh its repulsion.
       ...(node.value !== undefined ? { amount: node.value } : {}),
       text: node.value === undefined ? name : `${name}  ${text(node.value)}`,
+      short: name,
       group: node.group,
       parents: node.parents.map(nameOf),
       loop: loops.has(node.id),
@@ -1408,7 +1550,7 @@ function forceOption(panel: Panel, net: GraphNet, theme: ChartTheme): EChartsOpt
         itemStyle: { borderColor: theme.background, borderWidth: 1 },
         lineStyle: { color: theme.line, opacity: 0.7, curveness: 0 },
         // Past the cap, a label shows only on the node under the pointer.
-        label: { show: labels, ...label },
+        label: { show: fit.show, ...label },
         edgeLabel: {
           show: o.edgeLabels === true,
           ...edgeLabel(theme),

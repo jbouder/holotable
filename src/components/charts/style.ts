@@ -187,15 +187,19 @@ export function spanCorner(theme: ChartTheme, shape: { width: number; height: nu
   return shape.width >= 48 ? Math.min(theme.radius, 4, shape.height / 2) : 0;
 }
 
-/** A label written on a block: a treemap node's, a timeline span's. */
-export function blockLabel(theme: ChartTheme) {
-  return { fontFamily: theme.font, fontSize: theme.type.label };
+/**
+ * A label written on a block: a treemap node's, a timeline span's. `small`
+ * writes it a size under, the smallest the chart scale goes, where a small
+ * panel has room for a label only at that size (#643).
+ */
+export function blockLabel(theme: ChartTheme, small = false) {
+  return { fontFamily: theme.font, fontSize: theme.type.label - (small ? 1 : 0) };
 }
 
 /** A label pinned to a node: its own small box with the page's corners. */
-export function pinnedLabel(theme: ChartTheme) {
+export function pinnedLabel(theme: ChartTheme, small = false) {
   return {
-    ...blockLabel(theme),
+    ...blockLabel(theme, small),
     padding: [2, 5],
     borderRadius: Math.min(theme.radius, 4),
   };
@@ -212,11 +216,15 @@ export function edgeLabel(theme: ChartTheme) {
   };
 }
 
-/** The one value a gauge writes large. */
-export function valueText(theme: ChartTheme) {
+/**
+ * The one value a gauge writes large: at the type scale's value size, or at
+ * `px` where the gauge scales it to its ring (#643), which `gaugeScale` holds
+ * between the label size and twice the value size.
+ */
+export function valueText(theme: ChartTheme, px: number = theme.type.value) {
   return {
     fontFamily: theme.font,
-    fontSize: theme.type.value,
+    fontSize: px,
     fontWeight: 600,
     color: theme.foreground,
   };

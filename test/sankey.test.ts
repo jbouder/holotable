@@ -10,6 +10,7 @@ import {
   sankeyProblem,
   sankeyShape,
   sankeyTable,
+  sankeyStages,
 } from "@/components/charts/sankey";
 import { DEFAULT_CHART_THEME, inkOn } from "@/lib/color/chart-theme";
 import { Panel } from "@/lib/ir";
@@ -232,4 +233,21 @@ test("the table is one row per flow, with each end's total out and in", () => {
     "from total out",
     "to total in",
   ]);
+});
+
+test("a flow's stages are its columns, with every end in the last (#643)", () => {
+  const nodes = ["a", "b", "x", "y", "z"].map((id) => ({ id, name: id }));
+  const edge = (source: string, target: string) => ({
+    id: `${source}>${target}`,
+    source,
+    target,
+    row: {},
+  });
+  // a → x → y, b → z: z ends early but is drawn in the last stage.
+  const shape = sankeyStages({
+    nodes: nodes as never,
+    edges: [edge("a", "x"), edge("x", "y"), edge("b", "z")] as never,
+  });
+  assert.deepEqual(shape, { stages: 3, most: 2 });
+  assert.deepEqual(sankeyStages({ nodes: [], edges: [] }), { stages: 0, most: 0 });
 });

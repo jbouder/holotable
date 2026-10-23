@@ -1,4 +1,5 @@
 import type { EChartsOption } from "echarts";
+import { nodeLabels } from "@/components/charts/size";
 import {
   capNet,
   GRAPH_SEP,
@@ -403,102 +404,163 @@ function overflowTitle(theme: ChartTheme, net: GraphNet) {
  * bottom, justified so the last stage sits at the far edge, each flow as wide
  * as its volume and shaded from its source's color to its target's.
  */
-export const sankeyChart: ChartOptionBuilder = normalized((panel, data, { theme }) => {
-  const net = sankeyNet(panel, data);
-  const o = readOptions(SankeyOptions, panel.options);
-  const display = numberDisplay(o);
-  const text = (v: number) => formatValue(v, panel.format, display);
-  const vertical = o.orient === "TB";
-  const colorOf = colorer(net, theme);
-  const byId = new Map(net.nodes.map((n) => [n.id, n]));
-  const nameOf = (id: string) => byId.get(id)?.name ?? id;
-  // A cycle is refused before this is drawn, and ECharts throws on one, so
-  // a refused net draws nothing at all.
-  const ok = net.problem === undefined;
-  // The last stage's labels sit beside it, outside the flows: room for the
-  // longest of them, by its length, up to 200 pixels.
+/**
+ * A flow's stages as columns (#643): each node's stage is the longest run of
+ * flows into it, and a node nothing flows out of sits in the last stage, as
+ * `nodeAlign: "justify"` draws it. The count of stages, and the most nodes
+ * in one, are what its labels have to fit across and down.
+ */
+export function sankeyStages(net: Pick<GraphNet, "nodes" | "edges">): {
+  stages: number;
+  most: number;
+} {
+  if (net.nodes.length === 0) return { stages: 0, most: 0 };
+  const depth = new Map(net.nodes.map((n) => [n.id, 0]));
+  // Longest paths by relaxing every edge once per node: the net is acyclic
+  // here (a cycle is refused before it is drawn), and small.
+  for (let i = 0; i < net.nodes.length; i++) {
+    let moved = false;
+    for (const e of net.edges) {
+      const next = (depth.get(e.source) ?? 0) + 1;
+      if (next > (depth.get(e.target) ?? 0) && next < net.nodes.length) {
+        depth.set(e.target, next);
+        moved = true;
+      }
+    }
+    if (!moved) break;
+  }
+  const stages = Math.max(...depth.values()) + 1;
   const sources = new Set(net.edges.map((e) => e.source));
-  const longest = Math.max(
-    0,
-    ...net.nodes
-      .filter((n) => !sources.has(n.id))
-      .map(
-        (n) => (n.value === undefined ? n.name : `${n.name}  ${text(n.value)}`).length,
-      ),
-  );
-  const labelWidth = Math.min(200, 20 + longest * 7);
-  const nodes = (ok ? net.nodes : []).map((node) => {
-    // A node is a block: its color softened, as a treemap node's is.
-    const color = soften(theme, colorOf(node));
+  const per = new Map<number, number>();
+  for (const n of net.nodes) {
+    const stage = sources.has(n.id) ? (depth.get(n.id) ?? 0) : stages - 1;
+    per.set(stage, (per.get(stage) ?? 0) + 1);
+  }
+  return { stages, most: Math.max(...per.values()) };
+}
+
+export const sankeyChart: ChartOptionBuilder = normalized(
+  (panel, data, { theme, size }) => {
+    const net = sankeyNet(panel, data);
+    const o = readOptions(SankeyOptions, panel.options);
+    const display = numberDisplay(o);
+    const text = (v: number) => formatValue(v, panel.format, display);
+    const vertical = o.orient === "TB";
+    const colorOf = colorer(net, theme);
+    const byId = new Map(net.nodes.map((n) => [n.id, n]));
+    const nameOf = (id: string) => byId.get(id)?.name ?? id;
+    // A cycle is refused before this is drawn, and ECharts throws on one, so
+    // a refused net draws nothing at all.
+    const ok = net.problem === undefined;
+    // The last stage's labels sit beside it, outside the flows: room for the
+    // longest of them, by its length, up to 200 pixels.
+    // Whether the labels fit the stages at this size (#643): side by side
+    // across the stages and down the most nodes in one, or the other way when
+    // the flow runs down. Below that they show on the node under the pointer.
+    const full = (n: { name: string; value?: number }) =>
+      n.value === undefined ? n.name : `${n.name}  ${text(n.value)}`;
+    const shape = sankeyStages(net);
+    const longestOf = (pick: (n: { name: string; value?: number }) => string) =>
+      net.nodes.map(pick).reduce((a, b) => (b.length > a.length ? b : a), "");
+    const fit = nodeLabels(size, {
+      across: vertical ? shape.most : shape.stages,
+      down: vertical ? shape.stages : shape.most,
+      widest: longestOf(full),
+      widestName: longestOf((n) => n.name),
+      textPx: theme.type.label,
+      chrome: { width: 16, height: 24 },
+    });
+    const sources = new Set(net.edges.map((e) => e.source));
+    const longest = Math.max(
+      0,
+      ...net.nodes
+        .filter((n) => !sources.has(n.id))
+        .map((n) => (fit.values ? full(n) : n.name).length),
+    );
+    const labelWidth = fit.show
+      ? Math.round(Math.min(200, (size?.width ?? 800) * 0.35, 20 + longest * 7))
+      : 8;
+    const nodes = (ok ? net.nodes : []).map((node) => {
+      // A node is a block: its color softened, as a treemap node's is.
+      const color = soften(theme, colorOf(node));
+      return {
+        id: node.id,
+        name: node.name,
+        text: node.value === undefined ? node.name : `${node.name}  ${text(node.value)}`,
+        short: node.name,
+        group: node.group,
+        itemStyle: { color, borderColor: theme.background, borderWidth: 1 },
+        label: { backgroundColor: color, color: inkOn(color) },
+      };
+    });
+    const links = (ok ? net.edges : []).map((e) => ({
+      id: e.id,
+      source: e.source,
+      target: e.target,
+      value: e.value ?? 0,
+    }));
     return {
-      id: node.id,
-      name: node.name,
-      text: node.value === undefined ? node.name : `${node.name}  ${text(node.value)}`,
-      group: node.group,
-      itemStyle: { color, borderColor: theme.background, borderWidth: 1 },
-      label: { backgroundColor: color, color: inkOn(color) },
-    };
-  });
-  const links = (ok ? net.edges : []).map((e) => ({
-    id: e.id,
-    source: e.source,
-    target: e.target,
-    value: e.value ?? 0,
-  }));
-  return {
-    ...shared(theme),
-    tooltip: {
-      ...tooltip(theme),
-      trigger: "item",
-      formatter: (p: unknown) => {
-        const {
-          dataType,
-          data: item,
-          value,
-        } = p as {
-          dataType?: string;
-          value?: number;
-          data?: { name?: string; source?: string; target?: string; group?: string };
-        };
-        if (!item) return "";
-        const lines =
-          dataType === "edge"
-            ? [`${nameOf(item.source ?? "")} → ${nameOf(item.target ?? "")}`]
-            : [item.name ?? ""];
-        if (typeof value === "number") lines.push(text(value));
-        if (dataType !== "edge" && item.group) lines.push(item.group);
-        return lines.map(escapeHtml).join("<br/>");
-      },
-    },
-    title: overflowTitle(theme, net),
-    series: [
-      {
-        type: "sankey",
-        orient: vertical ? "vertical" : "horizontal",
-        nodeAlign: "justify",
-        // Room for the labels beside the last stage: right of it, or below.
-        ...(vertical
-          ? { left: 16, right: 16, top: 12, bottom: 36 }
-          : { left: 8, right: labelWidth, top: 12, bottom: 12 }),
-        draggable: false,
-        layoutIterations: 32,
-        // Small nodes side by side (top to bottom, a thin last stage) would
-        // write over each other: the overlapped label waits for the pointer.
-        labelLayout: { hideOverlap: true },
-        data: nodes,
-        links,
-        lineStyle: { color: "gradient", opacity: 0.3, curveness: 0.5 },
-        // Nodes part from their links by a hair of surface, with the page's corners.
-        itemStyle: block(theme, { cap: 3 }),
-        label: {
-          show: true,
-          position: vertical ? "bottom" : "right",
-          ...pinnedLabel(theme),
-          distance: 4,
-          formatter: (p: unknown) => (p as { data?: { text?: string } }).data?.text ?? "",
+      ...shared(theme),
+      tooltip: {
+        ...tooltip(theme),
+        trigger: "item",
+        formatter: (p: unknown) => {
+          const {
+            dataType,
+            data: item,
+            value,
+          } = p as {
+            dataType?: string;
+            value?: number;
+            data?: { name?: string; source?: string; target?: string; group?: string };
+          };
+          if (!item) return "";
+          const lines =
+            dataType === "edge"
+              ? [`${nameOf(item.source ?? "")} → ${nameOf(item.target ?? "")}`]
+              : [item.name ?? ""];
+          if (typeof value === "number") lines.push(text(value));
+          if (dataType !== "edge" && item.group) lines.push(item.group);
+          return lines.map(escapeHtml).join("<br/>");
         },
-        emphasis: { focus: "adjacency", lineStyle: { opacity: 0.6 } },
       },
-    ],
-  } as EChartsOption;
-});
+      title: overflowTitle(theme, net),
+      series: [
+        {
+          type: "sankey",
+          orient: vertical ? "vertical" : "horizontal",
+          nodeAlign: "justify",
+          // Room for the labels beside the last stage: right of it, or below.
+          ...(vertical
+            ? { left: 16, right: 16, top: 12, bottom: fit.show ? 36 : 12 }
+            : { left: 8, right: labelWidth, top: 12, bottom: 12 }),
+          draggable: false,
+          layoutIterations: 32,
+          // Small nodes side by side (top to bottom, a thin last stage) would
+          // write over each other: the overlapped label waits for the pointer.
+          labelLayout: { hideOverlap: true },
+          data: nodes,
+          links,
+          lineStyle: { color: "gradient", opacity: 0.3, curveness: 0.5 },
+          // Nodes part from their links by a hair of surface, with the page's corners.
+          itemStyle: block(theme, { cap: 3 }),
+          label: {
+            show: fit.show,
+            position: vertical ? "bottom" : "right",
+            ...pinnedLabel(theme, fit.small),
+            distance: 4,
+            formatter: (p: unknown) => {
+              const d = (p as { data?: { text?: string; short?: string } }).data;
+              return (fit.values ? d?.text : d?.short) ?? "";
+            },
+          },
+          emphasis: {
+            focus: "adjacency",
+            label: { show: true },
+            lineStyle: { opacity: 0.6 },
+          },
+        },
+      ],
+    } as EChartsOption;
+  },
+);

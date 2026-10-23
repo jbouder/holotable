@@ -78,17 +78,17 @@ function clockOptions(clock: Clock): Intl.DateTimeFormatOptions {
 
 /**
  * Month, day, hour and minute, e.g. "Sep 22, 14:05". `seconds` adds the
- * seconds and `year` the year, for labels that need them.
+ * seconds and `year` the year, for labels that need them; `date: false`
+ * leaves the day out, for an axis too narrow to write it (#643).
  */
 export function formatDateTime(
   date: Date,
   display: TimeDisplay = LOCAL_TIME_DISPLAY,
-  opts: { seconds?: boolean; year?: boolean } = {},
+  opts: { seconds?: boolean; year?: boolean; date?: boolean } = {},
 ): string {
   return cachedDateTimeFormat(undefined, {
     ...(opts.year ? { year: "numeric" } : {}),
-    month: "short",
-    day: "numeric",
+    ...(opts.date === false ? {} : { month: "short", day: "numeric" }),
     hour: "2-digit",
     minute: "2-digit",
     ...(opts.seconds ? { second: "2-digit" } : {}),

@@ -7,7 +7,10 @@ import {
   LARGE_SERIES_POINTS,
   legendLayout,
   lineChart,
+  heatmapScale,
+  pieLayout,
   type PanelData,
+  pieChart,
   scatterChart,
 } from "@/components/charts/options";
 import {
@@ -17,6 +20,7 @@ import {
   legendRows,
   logLabelStep,
   logTicks,
+  nodeLabels,
   SIZE_STEP,
   sameSize,
   sizeStep,
@@ -331,4 +335,91 @@ test("a short log axis labels every other decade, so six decades never touch", (
   assert.equal(write?.(10 ** step), formatValue(10 ** step));
   assert.equal(write?.(10), "");
   assert.equal(logTicks(1, undefined), undefined);
+});
+
+test("node labels are full, smaller, names alone, or left to hover, never half-drawn", () => {
+  const fit = (width: number, height: number, across = 3, down = 4) =>
+    nodeLabels(
+      { width, height },
+      {
+        across,
+        down,
+        widest: "worker-queue  23.9K",
+        widestName: "worker-queue",
+        textPx: 11,
+      },
+    );
+  assert.deepEqual(
+    nodeLabels(undefined, {
+      across: 9,
+      down: 9,
+      widest: "x",
+      widestName: "x",
+      textPx: 11,
+    }),
+    { show: true, values: true, small: false },
+  );
+  assert.deepEqual(fit(900, 600), { show: true, values: true, small: false });
+  const narrower = fit(380, 600);
+  assert.equal(narrower.show, true);
+  assert.equal(narrower.values, false, "the name alone where the value does not fit");
+  assert.deepEqual(fit(140, 80), { show: false, values: false, small: true });
+  // Too many rows for the height hides them whatever the width.
+  assert.equal(fit(2000, 100, 3, 12).show, false);
+});
+
+test("a pie's legend moves under it or gives way to labels, and is never paged", () => {
+  const names = ["worker", "api", "web"];
+  assert.deepEqual(pieLayout("right", undefined, names, 11), {
+    position: "right",
+    rows: 1,
+    labels: true,
+  });
+  // A right legend on a narrow pie goes underneath.
+  assert.equal(
+    pieLayout("right", { width: 300, height: 240 }, names, 11).position,
+    "bottom",
+  );
+  assert.equal(
+    pieLayout("right", { width: 460, height: 300 }, names, 11).position,
+    "right",
+  );
+  // No room for any legend: the slices' own labels, if they fit beside it.
+  const many = Array.from({ length: 12 }, (_, i) => `service-${i}`);
+  const dropped = pieLayout("bottom", { width: 200, height: 120 }, many, 11);
+  assert.equal(dropped.position, "none");
+  // Labels never cut: a long name on a small pie is left to the tooltip.
+  assert.equal(
+    pieLayout("none", { width: 140, height: 80 }, ["a-very-long-service-name"], 11)
+      .labels,
+    false,
+  );
+  assert.equal(pieLayout("none", { width: 600, height: 300 }, names, 11).labels, true);
+  // The legend itself is plain at every size: wrapped, never paged.
+  const option = pieChart(
+    panel({ viz: "pie", options: { legend: "bottom" } }),
+    { columns: ["name", "v"], rows: names.map((name, i) => ({ name, v: i + 1 })) },
+    {
+      display: LOCAL_TIME_DISPLAY,
+      theme: DEFAULT_CHART_THEME,
+      size: { width: 200, height: 120 },
+    },
+  ) as { legend: { type: string } };
+  assert.equal(option.legend.type, "plain");
+});
+
+test("a heatmap's color scale shortens on a short panel and goes slim on a narrow one", () => {
+  const at = (width: number, height: number) => heatmapScale({ width, height }, "88", 11);
+  assert.deepEqual(heatmapScale(undefined, "88", 11), {
+    slim: false,
+    length: 120,
+    strip: 72,
+  });
+  assert.deepEqual(at(400, 260), { slim: false, length: 120, strip: 72 });
+  assert.deepEqual(at(280, 120), { slim: false, length: 64, strip: 72 });
+  assert.deepEqual(at(280, 60), { slim: false, length: 32, strip: 72 });
+  // Narrow: no handles, a strip as wide as the largest value, so the cells keep the room.
+  const narrow = at(200, 120);
+  assert.equal(narrow.slim, true);
+  assert.ok(narrow.strip < 72 && narrow.length >= 32, JSON.stringify(narrow));
 });
