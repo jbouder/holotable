@@ -5,7 +5,7 @@ description: Add a theme of your own with THEME_FILE, a JSON file of token value
 
 Holotable ships five themes. You can add one more without changing the code:
 a JSON file of color values that the server reads at boot, checks, and offers
-beside the built-in themes. It appears in the account menu, the command
+beside the built-in themes. It appears in the command
 palette, the theme gallery in **Settings → Appearance** and the share dialog,
 and charts, the editor and custom visuals use its colors.
 

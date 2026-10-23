@@ -103,7 +103,7 @@ export function ThemeToggle() {
   return (
     <div
       role="radiogroup"
-      aria-label="Theme"
+      aria-label="Color scheme"
       className="inline-flex items-center gap-0.5 border border-border bg-surface-2 p-0.5"
     >
       {THEME_OPTIONS.map(({ value, label, Icon }) => {
