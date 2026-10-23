@@ -83,6 +83,14 @@ an axis bound; only authoring changes them, so a data update still merges
 }
 ```
 
+## `heatmap`
+
+No options. A heatmap reads its first three columns as x, y and value. Its
+color scale stands upright on the right edge, in a strip of its own, so its
+handles never cover the time labels under the cells; drag a handle to show
+only the cells in a range
+([#639](https://github.com/jbouder/holotable/issues/639)).
+
 ## `stat`
 
 | Option | Type | Default | Meaning |
