@@ -220,21 +220,23 @@ function OptionGroupFields({
       );
     case "number":
       return (
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-          <SelectOption
-            {...field("decimals")}
-            label="Decimals"
-            options={[
-              { value: "", label: "automatic" },
-              ...[0, 1, 2, 3, 4, 5, 6].map((n) => ({
-                value: String(n),
-                label: String(n),
-              })),
-            ]}
-            parse={(v) => (v === "" ? undefined : Number(v))}
-          />
-          <TextOption {...field("unit")} label="Unit" placeholder="e.g. req/s" />
-          <BooleanOption {...field("compact")} label="Compact (1.2K)" />
+        <div className="space-y-2">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <SelectOption
+              {...field("decimals")}
+              label="Decimals"
+              options={[
+                { value: "", label: "automatic" },
+                ...[0, 1, 2, 3, 4, 5, 6].map((n) => ({
+                  value: String(n),
+                  label: String(n),
+                })),
+              ]}
+              parse={(v) => (v === "" ? undefined : Number(v))}
+            />
+            <TextOption {...field("unit")} label="Unit" placeholder="e.g. req/s" />
+          </div>
+          <BooleanOption {...field("compact")} label="Compact (1.2K)" ownRow />
         </div>
       );
     case "legend":
@@ -501,12 +503,17 @@ function BooleanOption({
   onChange,
   optionKey,
   label,
-}: OptionFieldProps & { label: string }) {
+  ownRow = false,
+}: OptionFieldProps & {
+  label: string;
+  /** On a row of its own under the inputs, rather than beside them. */
+  ownRow?: boolean;
+}) {
   const [problem, setProblem] = React.useState<string | null>(null);
   return (
     <div className="flex flex-col justify-end">
       <Checkbox
-        className="h-10"
+        className={ownRow ? undefined : "h-10"}
         checked={panel.options?.[optionKey] === true}
         label={label}
         onCheckedChange={(on) =>
@@ -546,7 +553,9 @@ function SelectOption({
       <Label htmlFor={id}>{label}</Label>
       <Select
         id={id}
-        className="w-full"
+        // The primitive's own minimum is wider than a column of the editor's
+        // narrow side panel; there it fills its column and no more.
+        className="w-full min-w-0"
         value={value === undefined ? "" : String(value)}
         onValueChange={(v) =>
           setProblem(

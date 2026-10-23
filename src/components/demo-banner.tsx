@@ -62,7 +62,7 @@ export function DemoBanner({ mode }: { mode: BannerMode }) {
             dismissDemoBanner(browserStorage(), mode);
             setOpen(false);
           }}
-          className="tap-target -my-1 inline-flex shrink-0 items-center justify-center text-muted transition-colors duration-(--duration-fast) ease-standard hover:text-foreground"
+          className="tap-target pointer-coarse:-my-3 inline-flex h-5 w-5 shrink-0 items-center justify-center text-muted transition-colors duration-(--duration-fast) ease-standard hover:text-foreground"
           aria-label={copy.dismiss}
         >
           <X className="h-4 w-4" aria-hidden />
