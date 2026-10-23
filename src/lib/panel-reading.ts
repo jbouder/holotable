@@ -20,7 +20,12 @@ import {
   TableOptions,
 } from "@/lib/panels/presentation";
 import { thresholdColor } from "@/lib/panels/thresholds";
-import { formatDateTime, LOCAL_TIME_DISPLAY, type TimeDisplay } from "@/lib/time-display";
+import {
+  formatClock,
+  formatDateTime,
+  LOCAL_TIME_DISPLAY,
+  type TimeDisplay,
+} from "@/lib/time-display";
 
 /**
  * What the HTML-drawn kinds show for a set of rows, worked out apart from
@@ -189,6 +194,8 @@ export interface LogLine {
   /** Stable across polls while the line is in the window, for React and expansion. */
   key: string;
   time: string;
+  /** The time as a wall clock alone, `07:07:11`, for a panel too narrow for the date (#644). */
+  clock: string;
   level?: string;
   color?: ColorToken;
   message: string;
@@ -265,6 +272,7 @@ export function logLines(
       time: Number.isFinite(t)
         ? formatDateTime(new Date(t), display, { seconds: true })
         : "",
+      clock: Number.isFinite(t) ? formatClock(new Date(t), display) : "",
       level: level || undefined,
       color: level
         ? (colors.get(level) ??
