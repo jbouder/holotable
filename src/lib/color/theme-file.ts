@@ -113,8 +113,8 @@ export const RADII = ["0px", "2px", "4px", "6px"] as const;
 /**
  * A card's lift (#648), by name rather than as CSS, written per scheme: a
  * shadow that reads on a light page vanishes on a dark one. `subtle` is what
- * every built-in theme but Holotable draws, and what a file that names none
- * gets, so a file written before the field looks as it did.
+ * every built-in theme but Holotable (flat, `none`) draws, and what a file
+ * that names none gets, so a file written before the field looks as it did.
  */
 export const SHADOWS = {
   none: { dark: "none", light: "none" },

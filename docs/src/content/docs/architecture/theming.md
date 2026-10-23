@@ -151,8 +151,8 @@ theme sets every color token itself, so its intent does not depend on
 Holotable's values, and inherits only the aliases (`--chart-text`, the
 `--code-*` colors).
 
-Holotable's look is its own too (#648): square corners (`--radius: 0`), a card
-lifted on a two-layer shadow (`--shadow-card`, which `Card` draws), and
+Holotable's look is its own too (#648): square corners (`--radius: 0`), flat
+cards with no shadow (`--shadow-card: none`; `Card` draws the token), and
 gridlines a step below `--surface-2` (`--chart-grid`). Every other theme sets
 those three itself (square, the subtle shadow Tailwind calls `shadow-sm`, and
 `--surface-2`; Paper rounds to 4px, the one theme that does), so a change to the default's look never
