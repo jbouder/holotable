@@ -99,9 +99,15 @@ the table.
 - `gauge` (bar): as many readings as have a row, largest first, with a
   `+N more` note for the rest; each bar's thickness follows its row.
 - `pie`, `donut`: a right legend that does not fit moves under the chart, one
-  that would take more than a quarter of the height is dropped for the
-  slices' own labels, and the legend is never paged; slice labels are drawn
-  only while the longest name fits beside the pie.
+  that would take more than a quarter of the height is dropped, and the
+  legend is never paged. With a legend, the legend names the slices and
+  there are no outside labels or leader lines; a slice wide and deep enough
+  for it carries its share (`42%`) inside, in black or white, whichever
+  clears AA on its fill. With no legend (`legend: "none"`, or one that was
+  dropped), each slice is named outside, with a leader line, only while the
+  longest name fits whole beside the pie; otherwise the large slices carry
+  their shares and the tooltip and table name them. A label that would
+  overlap another is hidden with its line.
 - `graph` (tree, dag, force) and `sankey`: node labels are drawn in full,
   a size smaller, as names without their values, or not at all, whichever is
   the first to fit the layout's columns and rows; the dag's margins follow the
