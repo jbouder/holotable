@@ -50,6 +50,12 @@ says how a section gets here.
   which `npm run smoke` and the accessibility scan now check. A line, area or
   bar chart with `decimals` set no longer writes the same tick twice: its
   value axis steps no finer than the decimals show.
+- **Graphs drawn as diagrams.** `node: "block"` on a graph panel draws each
+  node as a box sized to its name, the name and value inside and an icon
+  symbol beside the name, on a tree, a directed graph or a force graph. The
+  boxes never overlap; a directed graph's arrows meet their borders. A panel
+  too small for them draws markers with a "Drawn as markers" badge. The
+  demo's service map and network topology are drawn as blocks.
 
 ### Changed
 

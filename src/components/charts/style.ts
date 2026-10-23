@@ -1,5 +1,5 @@
 import type { EChartsOption } from "echarts";
-import { type ChartTheme, INK, soften, withAlpha } from "@/lib/color/chart-theme";
+import { type ChartTheme, INK, inkOn, soften, withAlpha } from "@/lib/color/chart-theme";
 
 /**
  * The one style every chart kind starts from (#647).
@@ -218,6 +218,39 @@ export function blockValueLabel(theme: ChartTheme) {
       },
     },
   };
+}
+
+/**
+ * A graph node drawn as a block (#649): the label is the box, on `fill` with
+ * the ink that reads on it, parted from its neighbors by a hair of surface,
+ * with the page's corners, its name and value as {@link blockValueLabel}
+ * writes them, cut with an ellipsis past `width`. Under the pointer, an
+ * outline in the ring color, as a treemap block's (#657).
+ */
+export function nodeBlock(
+  theme: ChartTheme,
+  fill: string,
+  width: number,
+  padding: [number, number],
+) {
+  const ink = inkOn(fill);
+  const value = blockValueLabel(theme);
+  return {
+    ...value,
+    ...block(theme),
+    color: ink,
+    rich: { v: { ...value.rich.v, color: ink } },
+    backgroundColor: fill,
+    padding,
+    width,
+    overflow: "truncate" as const,
+    ellipsis: "…",
+  };
+}
+
+/** The outline a {@link nodeBlock} wears under the pointer, around its fill as it is. */
+export function nodeBlockHover(theme: ChartTheme, fill: string) {
+  return { backgroundColor: fill, borderColor: theme.ring, borderWidth: 2 };
 }
 
 /** One line of a {@link blockValueLabel}, in pixels. */

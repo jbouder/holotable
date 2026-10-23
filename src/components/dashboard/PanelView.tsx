@@ -122,6 +122,10 @@ export const PanelView = React.memo(function PanelView({
   const askAbout = useAskAboutPanel();
   const askInChat = useAskInChat();
   const [sqlOpen, setSqlOpen] = React.useState(false);
+  // The chart's stepped size, which the chart reports (#643): a new step
+  // rebuilds the option for it and merges it, never a new chart. Held here
+  // so the header's notice can say what this size drew (#649).
+  const [size, setSize] = React.useState<ChartSize>();
 
   // While paused, suppress the transient "live"/"loading" badges — they no
   // longer reflect reality. Error/tombstoned states remain meaningful. A text
@@ -172,7 +176,7 @@ export const PanelView = React.memo(function PanelView({
           <div className="flex shrink-0 items-center gap-1">
             <OverrideBadge panel={panel} />
             {queried && data.truncated && <TruncationBadge truncated={data.truncated} />}
-            <DrawnAsBadge panel={panel} data={data} />
+            <DrawnAsBadge panel={panel} data={data} size={size} />
             {showBadge && <StatusBadge status={status} updatedAt={state?.updatedAt} />}
             {!embedded && links && hasUsableLinks(links) && (
               <span className="inline-flex h-7 w-5 items-center justify-center text-muted">
@@ -221,6 +225,8 @@ export const PanelView = React.memo(function PanelView({
               onSelectTimeRange={onSelectTimeRange}
               window={window}
               annotations={annotations}
+              size={size}
+              onSize={setSize}
             />
           </WithDatumLinks>
         </CardContent>
@@ -376,6 +382,8 @@ function PanelBody({
   onSelectTimeRange,
   window,
   annotations,
+  size,
+  onSize,
 }: {
   panel: Panel;
   data: PanelData;
@@ -388,6 +396,9 @@ function PanelBody({
   window?: ChartContext["window"];
   /** Markers to draw on a time axis (#68); none when undefined. */
   annotations?: ChartContext["annotations"];
+  /** The chart's stepped size (#643), and where the chart reports it. */
+  size: ChartSize | undefined;
+  onSize: (size: ChartSize | undefined) => void;
 }) {
   if (state?.status === "tombstoned") {
     // A tombstone is the `conflict` kind: the source is gone, and the fix is to
@@ -445,6 +456,8 @@ function PanelBody({
         onSelectTimeRange={onSelectTimeRange}
         window={window}
         annotations={annotations}
+        size={size}
+        onSize={onSize}
       />
     </div>
   );
@@ -458,6 +471,8 @@ function PanelContent({
   onSelectTimeRange,
   window,
   annotations,
+  size,
+  onSize,
 }: {
   panel: Panel;
   data: PanelData;
@@ -467,12 +482,11 @@ function PanelContent({
   window?: ChartContext["window"];
   /** Markers to draw on a time axis (#68); none when undefined. */
   annotations?: ChartContext["annotations"];
+  size: ChartSize | undefined;
+  onSize: (size: ChartSize | undefined) => void;
 }) {
   const display = useTimeDisplay();
   const theme = useChartTheme();
-  // The chart's stepped size, which the chart reports (#643): a new step
-  // rebuilds the option for it and merges it, never a new chart.
-  const [size, setSize] = React.useState<ChartSize>();
   // The registry decides how the kind is drawn (#61); nothing here names one.
   const renderer = panelRenderer(panel.viz);
   if (renderer.type === "html") {
@@ -505,7 +519,7 @@ function PanelContent({
           annotations,
           size,
         })}
-        onSize={setSize}
+        onSize={onSize}
         crosshairGroup={crosshairGroup}
         onBrush={
           onSelectTimeRange && supportsTimeBrush(panel)
@@ -608,11 +622,22 @@ function TruncationBadge({ truncated }: { truncated: Truncation }) {
  * truncation is, so the chart does not pass for what was asked; the popover
  * says why and what to change.
  */
-function DrawnAsBadge({ panel, data }: { panel: Panel; data: PanelData }) {
+function DrawnAsBadge({
+  panel,
+  data,
+  size,
+}: {
+  panel: Panel;
+  data: PanelData;
+  size: ChartSize | undefined;
+}) {
+  const theme = useChartTheme();
   const notice = React.useMemo(() => {
     const renderer = panelRenderer(panel.viz);
-    return renderer.type === "chart" ? renderer.notice?.(panel, data) : undefined;
-  }, [panel, data]);
+    return renderer.type === "chart"
+      ? renderer.notice?.(panel, data, size, theme)
+      : undefined;
+  }, [panel, data, size, theme]);
   if (!notice) return null;
   return (
     <Popover

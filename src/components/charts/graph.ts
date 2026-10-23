@@ -9,15 +9,44 @@ import {
 } from "@/components/charts/options";
 import { escapeHtml } from "@/components/charts/state-timeline";
 import type { PanelNotice } from "@/components/panels/types";
-import { type ChartTheme, inkOn, seriesColor } from "@/lib/color/chart-theme";
-import { edgeLabel, pinnedLabel, shared, text, tooltip } from "@/components/charts/style";
+import {
+  type ChartTheme,
+  DEFAULT_CHART_THEME,
+  inkOn,
+  seriesColor,
+  soften,
+} from "@/lib/color/chart-theme";
+import {
+  edgeLabel,
+  nodeBlockHover,
+  pinnedLabel,
+  shared,
+  text,
+  tooltip,
+} from "@/components/charts/style";
 import { type ChartSize, nodeLabels, textWidth } from "@/components/charts/size";
+import {
+  BLOCK_KNOB,
+  type BlockStep,
+  type BlockText,
+  type BlockTreeNode,
+  blockNodeLabel,
+  blockSteps,
+  type DagBlocks,
+  dagBlocks,
+  forceBlockSpacing,
+  forceBlocksFit,
+  halfDiagonal,
+  type TreeBlocks,
+  treeBlocks,
+} from "@/components/charts/graph-blocks";
 import type { Datum } from "@/lib/drilldown";
 import { formatValue } from "@/lib/format";
-import { type GraphDirection, graphLayout } from "@/lib/graph/layout";
+import { type BoxSize, type GraphDirection, graphLayout } from "@/lib/graph/layout";
 import {
   echartsSymbol,
   type GraphSymbol,
+  isIcon,
   SYMBOL_SIZE_MIN,
   symbolSizeFor,
 } from "@/lib/graph/symbols";
@@ -681,13 +710,158 @@ function graphDirection(o: GraphOptions): GraphDirection {
  * What the panel says beside its title when its tree fell back to a directed
  * graph (#624): why, naming the node. Nothing when it drew what it was asked.
  */
-export function graphNotice(panel: Panel, data: PanelData): PanelNotice | undefined {
+export function graphNotice(
+  panel: Panel,
+  data: PanelData,
+  size?: ChartSize,
+  theme: ChartTheme = DEFAULT_CHART_THEME,
+): PanelNotice | undefined {
   const view = graphView(panel, data);
-  if (view.layout !== "dag" || view.fallback === undefined) return undefined;
+  // Blocks the panel has no room for are drawn as markers (#649), and said.
+  const markers =
+    readOptions(GraphOptions, panel.options).node === "block" &&
+    graphHasNodes(view) &&
+    graphBlocks(panel, view, theme, size) === undefined;
+  const small =
+    "The blocks do not fit this panel, so the nodes are drawn as markers. Make the panel larger, or open it full screen, to draw them as blocks.";
+  if (view.layout === "dag" && view.fallback !== undefined) {
+    return {
+      label: "Not a tree",
+      detail: `${view.fallback}, so it is drawn as a directed graph. Set the layout to "dag" to draw it that way on purpose.${markers ? ` ${small}` : ""}`,
+    };
+  }
+  return markers ? { label: "Drawn as markers", detail: small } : undefined;
+}
+
+/** Whether the view has a node to draw. */
+function graphHasNodes(view: GraphView): boolean {
+  return view.layout === "tree" ? view.tree.roots.length > 0 : view.net.nodes.length > 0;
+}
+
+/** A graph's blocks at this size (#649), or undefined when they are drawn as markers. */
+function graphBlocks(
+  panel: Panel,
+  view: GraphView,
+  theme: ChartTheme,
+  size: ChartSize | undefined,
+): unknown {
+  if (view.layout === "tree") return treeBlockPlan(panel, view.tree, theme, size);
+  if (view.layout === "force") return forceBlockPlan(panel, view.net, theme, size);
+  return dagBlockPlan(panel, view.net, view.direction, theme, size);
+}
+
+/** How a node's value is written on it and in its tooltip. */
+function valueWriter(panel: Panel): (v: number) => string {
+  const display = numberDisplay(readOptions(GraphOptions, panel.options));
+  return (v) => formatValue(v, panel.format, display);
+}
+
+/** What a node's box writes: its name, its value, and its symbol when that is an icon. */
+function blockText(
+  o: GraphOptions,
+  name: string,
+  value: string | undefined,
+  group: string | undefined,
+): BlockText {
+  const symbol = symbolFor(o, group);
   return {
-    label: "Not a tree",
-    detail: `${view.fallback}, so it is drawn as a directed graph. Set the layout to "dag" to draw it that way on purpose.`,
+    name,
+    ...(value !== undefined ? { value } : {}),
+    ...(isIcon(symbol) ? { icon: symbol } : {}),
   };
+}
+
+/** The tree as its blocks read it: the one root drawn, or the panel's above several. */
+function blockTree(tree: GraphTree): BlockTreeNode {
+  const walk = (n: GraphNode): BlockTreeNode => ({
+    id: n.id,
+    children: n.children.map(walk),
+  });
+  const [only] = tree.roots;
+  return tree.roots.length === 1 && only
+    ? walk(only)
+    : { id: GRAPH_ROOT_ID, children: tree.roots.map(walk) };
+}
+
+type TreePlan = BlockStep & { geometry: TreeBlocks; texts: Map<string, BlockText> };
+type DagPlan = BlockStep & { geometry: DagBlocks; texts: Map<string, BlockText> };
+type ForcePlan = BlockStep & { geometry: true; texts: Map<string, BlockText> };
+
+function treeBlockPlan(
+  panel: Panel,
+  tree: GraphTree,
+  theme: ChartTheme,
+  size: ChartSize | undefined,
+): TreePlan | undefined {
+  const o = readOptions(GraphOptions, panel.options);
+  if (o.node !== "block" || tree.roots.length === 0) return undefined;
+  const write = valueWriter(panel);
+  const texts = new Map<string, BlockText>();
+  if (tree.roots.length > 1) texts.set(GRAPH_ROOT_ID, { name: panel.title });
+  for (const n of graphNodes(tree)) {
+    texts.set(
+      n.id,
+      blockText(o, n.name, n.value === undefined ? undefined : write(n.value), n.group),
+    );
+  }
+  const root = blockTree(tree);
+  const orient = o.orient ?? "LR";
+  const plan = blockSteps(theme, texts, size, (step) =>
+    treeBlocks(root, orient, step, size),
+  );
+  return plan && { ...plan, texts };
+}
+
+/** A node's name as a directed or force graph writes it: a ↻ when it points at itself. */
+function loopName(net: GraphNet) {
+  const loops = new Set(
+    net.edges.filter((e) => e.source === e.target).map((e) => e.source),
+  );
+  return (node: GraphVertex) => (loops.has(node.id) ? `${node.name} ↻` : node.name);
+}
+
+function netTexts(panel: Panel, net: GraphNet): Map<string, BlockText> {
+  const o = readOptions(GraphOptions, panel.options);
+  const write = valueWriter(panel);
+  const name = loopName(net);
+  return new Map(
+    net.nodes.map((n) => [
+      n.id,
+      blockText(o, name(n), n.value === undefined ? undefined : write(n.value), n.group),
+    ]),
+  );
+}
+
+function dagBlockPlan(
+  panel: Panel,
+  net: GraphNet,
+  direction: GraphDirection,
+  theme: ChartTheme,
+  size: ChartSize | undefined,
+): DagPlan | undefined {
+  if (readOptions(GraphOptions, panel.options).node !== "block") return undefined;
+  if (net.nodes.length === 0) return undefined;
+  const texts = netTexts(panel, net);
+  const ids = net.nodes.map((n) => n.id);
+  const plan = blockSteps(theme, texts, size, (step) =>
+    dagBlocks(ids, net.edges, direction, step, size),
+  );
+  return plan && { ...plan, texts };
+}
+
+function forceBlockPlan(
+  panel: Panel,
+  net: GraphNet,
+  theme: ChartTheme,
+  size: ChartSize | undefined,
+): ForcePlan | undefined {
+  if (readOptions(GraphOptions, panel.options).node !== "block") return undefined;
+  if (net.nodes.length === 0 || net.nodes.length > FORCE_LABELS_MAX) return undefined;
+  const texts = netTexts(panel, net);
+  const plan = blockSteps(theme, texts, size, (step) =>
+    forceBlocksFit(step, size) ? (true as const) : undefined,
+  );
+  return plan && { ...plan, texts };
 }
 
 /** A node as a datum (#373): the columns it stands for, its name the series. */
@@ -738,7 +912,12 @@ export function graphClickDatum(panel: Panel, data: PanelData, id: string): Datu
  */
 export function graphShape(panel: Panel): string {
   const o = readOptions(GraphOptions, panel.options);
-  return JSON.stringify([o.layout ?? "tree", o.orient ?? "LR", o.direction ?? ""]);
+  return JSON.stringify([
+    o.layout ?? "tree",
+    o.orient ?? "LR",
+    o.direction ?? "",
+    o.node ?? "marker",
+  ]);
 }
 
 /**
@@ -998,6 +1177,44 @@ function treeOption(
   const colorOf = colorer(tree, theme);
   const symbolOf = (node: GraphNode): GraphSymbol => symbolFor(o, node.group);
   const open = o.collapseDepth ?? Number.POSITIVE_INFINITY;
+  // Each node a box with its name inside (#649), when the panel has room.
+  const blocks = treeBlockPlan(panel, tree, theme, size);
+  // A box is the label, on its fill; the symbol is a branch's knob, just past
+  // the box's trailing edge, which opens and closes it (a leaf's is nothing),
+  // and the label is moved back over the node by as much.
+  const treeBlock = (id: string, fill: string, leaf: boolean) => {
+    const plan = blocks as TreePlan;
+    const box = plan.sizes.get(id) ?? { width: 0, height: 0 };
+    const reach = BLOCK_KNOB.gap + BLOCK_KNOB.size / 2;
+    const angle = plan.geometry.angles?.get(id);
+    const [ox, oy] = leaf
+      ? [0, 0]
+      : angle !== undefined
+        ? outward(box, angle, reach)
+        : orient === "TB"
+          ? [0, box.height / 2 + reach]
+          : orient === "BT"
+            ? [0, -(box.height / 2 + reach)]
+            : orient === "RL"
+              ? [-(box.width / 2 + reach), 0]
+              : [box.width / 2 + reach, 0];
+    const label = blockNodeLabel(
+      theme,
+      fill,
+      box,
+      plan.texts.get(id) ?? { name: "" },
+      plan.values,
+    );
+    return {
+      symbol: "circle",
+      symbolSize: leaf ? 0 : BLOCK_KNOB.size,
+      symbolOffset: [ox, oy],
+      itemStyle: { color: fill },
+      // Upright on a radial tree too, which would turn a label along its ray.
+      label: { ...label, show: true, position: "inside", offset: [-ox, -oy], rotate: 0 },
+      emphasis: { label: nodeBlockHover(theme, fill) },
+    };
+  };
 
   // Without groups, a branch keeps one color down from where it starts: below
   // a lone root, each of its children starts one; among several, each root.
@@ -1018,14 +1235,20 @@ function treeOption(
       text: node.value === undefined ? node.name : `${node.name}  ${text(node.value)}`,
       short: node.name,
       group: node.group,
-      symbol: echartsSymbol(symbol),
-      symbolSize: symbolSizeFor(symbol, o.symbolSize),
-      itemStyle: { color },
-      label: {
-        backgroundColor: color,
-        color: inkOn(color),
-        ...(labelPosition(orient, leaf) ? { position: labelPosition(orient, leaf) } : {}),
-      },
+      ...(blocks
+        ? treeBlock(node.id, soften(theme, color), leaf)
+        : {
+            symbol: echartsSymbol(symbol),
+            symbolSize: symbolSizeFor(symbol, o.symbolSize),
+            itemStyle: { color },
+            label: {
+              backgroundColor: color,
+              color: inkOn(color),
+              ...(labelPosition(orient, leaf)
+                ? { position: labelPosition(orient, leaf) }
+                : {}),
+            },
+          }),
       ...(!leaf && depth >= open ? { collapsed: true } : {}),
       ...(leaf
         ? {}
@@ -1047,10 +1270,15 @@ function treeOption(
           name: panel.title,
           text: panel.title,
           short: panel.title,
-          symbol: "circle",
-          symbolSize: 6,
-          itemStyle: { color: theme.line },
-          label: { backgroundColor: "transparent", color: theme.text },
+          // As blocks, the panel's own box, on the raised surface.
+          ...(blocks
+            ? treeBlock(GRAPH_ROOT_ID, theme.container, false)
+            : {
+                symbol: "circle",
+                symbolSize: 6,
+                itemStyle: { color: theme.line },
+                label: { backgroundColor: "transparent", color: theme.text },
+              }),
           children: tree.roots.map((r, i) => toItem(r, 0, i)),
         };
 
@@ -1106,7 +1334,7 @@ function treeOption(
     series: [
       {
         type: "tree",
-        ...margins(orient),
+        ...(blocks ? blocks.geometry.margins : margins(orient)),
         layout: orient === "radial" ? "radial" : "orthogonal",
         ...(orient === "radial" ? {} : { orient }),
         roam: false,
@@ -1120,14 +1348,15 @@ function treeOption(
         data: tree.roots.length > 0 ? [root] : [NOTHING],
         itemStyle: { borderColor: theme.background, borderWidth: 1 },
         lineStyle: { color: theme.line, width: 1.5, curveness: 0.5 },
-        // Labels that do not fit show on the node under the pointer (#643).
+        // Labels that do not fit show on the node under the pointer (#643);
+        // a block is always drawn, and never on another, so none is hidden.
         label: {
-          show: fit.show,
+          show: blocks !== undefined || fit.show,
           ...pinnedLabel(theme, fit.small),
           distance: 6,
           formatter: labelText(fit.values),
         },
-        labelLayout: { hideOverlap: true },
+        labelLayout: { hideOverlap: blocks === undefined },
         emphasis: { focus: "descendant", label: { show: true } },
       },
     ],
@@ -1187,12 +1416,19 @@ function dagOption(
       ? EDGE_WIDTH[0] + ((EDGE_WIDTH[1] - EDGE_WIDTH[0]) * Math.abs(e.value)) / widest
       : 1.5;
   const curve = o.curve ?? true;
+  // Each node a box with its name inside (#649), placed in pixels, when the
+  // panel has room; the plot is then exactly the boxes' layout, a pixel a
+  // unit, so an edge can run from one box's border to the next's.
+  const blocks = dagBlockPlan(panel, net, direction, theme, size);
+  const across = direction === "LR";
 
   const nodes = net.nodes.map((node) => {
-    const at = placed.get(node.id);
+    const at = blocks ? blocks.geometry.at.get(node.id) : placed.get(node.id);
     const color = colorOf(node);
     const symbol = symbolFor(o, node.group);
     const name = loops.has(node.id) ? `${node.name} ↻` : node.name;
+    const box = blocks?.sizes.get(node.id);
+    const fill = soften(theme, color);
     return {
       id: node.id,
       name: node.name,
@@ -1204,20 +1440,73 @@ function dagOption(
       group: node.group,
       parents: node.parents.map(nameOf),
       loop: loops.has(node.id),
-      symbol: echartsSymbol(symbol),
-      symbolSize: symbolSizeFor(symbol, o.symbolSize),
-      itemStyle: { color },
-      label: { backgroundColor: color, color: inkOn(color) },
+      ...(blocks && box
+        ? {
+            // The label is the box; the symbol under it only takes the pointer.
+            symbol: "rect",
+            symbolSize: [box.width, box.height],
+            itemStyle: { color: "transparent", borderWidth: 0 },
+            label: {
+              ...blockNodeLabel(
+                theme,
+                fill,
+                box,
+                blocks.texts.get(node.id) ?? { name },
+                blocks.values,
+              ),
+              position: "inside",
+            },
+            emphasis: { label: nodeBlockHover(theme, fill) },
+          }
+        : {
+            symbol: echartsSymbol(symbol),
+            symbolSize: symbolSizeFor(symbol, o.symbolSize),
+            itemStyle: { color },
+            label: { backgroundColor: color, color: inkOn(color) },
+          }),
     };
   });
+  // Where an edge meets a box (#649): the middle of its side that faces the
+  // next layer (out) or the last (in). Each is a node with nothing drawn.
+  const ports = blocks
+    ? net.nodes.flatMap((node) => {
+        const at = blocks.geometry.at.get(node.id) ?? { x: 0, y: 0 };
+        const box = blocks.sizes.get(node.id) ?? { width: 0, height: 0 };
+        const half = across ? box.width / 2 : box.height / 2;
+        return (["in", "out"] as const).map((side) => {
+          const d = side === "in" ? -half : half;
+          return {
+            id: portId(node.id, side),
+            name: node.name,
+            value: across ? [at.x + d, at.y] : [at.x, at.y + d],
+            symbol: "none",
+            // ECharts stops an arrow short of its node by half the node's
+            // size, and on a curve finds that point only for a size above
+            // nothing: a pixel, so the arrow meets the box's border.
+            symbolSize: 2,
+            label: { show: false },
+            tooltip: { show: false },
+            emphasis: { disabled: true },
+          };
+        });
+      })
+    : [];
   const links = net.edges
     .filter((e) => e.source !== e.target)
     .map((e) => {
       const reversed = back.has(e.id);
+      // A box's edges leave from its trailing side and reach the next box's
+      // leading one; a back edge, drawn against the flow, the other way.
+      const ends = blocks
+        ? reversed
+          ? { source: portId(e.source, "in"), target: portId(e.target, "out") }
+          : { source: portId(e.source, "out"), target: portId(e.target, "in") }
+        : { source: e.source, target: e.target };
       return {
         id: e.id,
-        source: e.source,
-        target: e.target,
+        ...ends,
+        from: e.source,
+        to: e.target,
         ...(e.value !== undefined ? { value: e.value } : {}),
         reversed,
         lineStyle: {
@@ -1233,14 +1522,13 @@ function dagOption(
   // column when they run across, a row when they run down, and the most
   // nodes in one layer the other way. A label under a node (across) needs
   // the node's height as well as its line.
-  const across = direction === "LR";
   const layers = new Map<number, number>();
-  for (const n of layout.nodes) {
-    const layer = across ? n.x : n.y;
-    layers.set(layer, (layers.get(layer) ?? 0) + 1);
-  }
+  for (const n of layout.nodes) layers.set(n.layer, (layers.get(n.layer) ?? 0) + 1);
   const most = Math.max(1, ...layers.values());
-  const symbolPx = Math.max(0, ...nodes.map((n) => n.symbolSize));
+  const symbolPx = Math.max(
+    0,
+    ...nodes.map((n) => (typeof n.symbolSize === "number" ? n.symbolSize : 0)),
+  );
   const fit = nodeLabels(size, {
     across: across ? layers.size : most,
     down: across ? most : layers.size,
@@ -1266,25 +1554,54 @@ function dagOption(
     title: overflowTitle(theme, net.overflow, net.edgeOverflow),
     // Room for the labels beside the nodes at the edges of the layout: below
     // them when the layers run across, to their right when they run down.
-    grid: !size
-      ? direction === "LR"
-        ? { left: 56, right: 56, top: 20, bottom: 36 }
-        : { left: 24, right: "18%", top: 20, bottom: 20 }
-      : direction === "LR"
-        ? {
-            left: cap(Math.max(24, drawn / 2 + 4)),
-            right: cap(Math.max(24, drawn / 2 + 4)),
-            top: 20,
-            bottom: fit.show ? 36 : 20,
-          }
-        : { left: 24, right: cap(Math.max(24, drawn + 8)), top: 20, bottom: 20 },
+    // Blocks: the plot is the boxes' layout, a pixel a unit, in the middle.
+    // Every key is set in both, since a size step merges.
+    grid: blocks
+      ? {
+          left: "center",
+          top: "middle",
+          right: 0,
+          bottom: 0,
+          width: blocks.geometry.width,
+          height: blocks.geometry.height,
+        }
+      : {
+          ...(!size
+            ? direction === "LR"
+              ? { left: 56, right: 56, top: 20, bottom: 36 }
+              : { left: 24, right: "18%", top: 20, bottom: 20 }
+            : direction === "LR"
+              ? {
+                  left: cap(Math.max(24, drawn / 2 + 4)),
+                  right: cap(Math.max(24, drawn / 2 + 4)),
+                  top: 20,
+                  bottom: fit.show ? 36 : 20,
+                }
+              : { left: 24, right: cap(Math.max(24, drawn + 8)), top: 20, bottom: 20 }),
+          width: undefined,
+          height: undefined,
+        },
     // Hidden: they only place the nodes. The first layer, and the first node
     // of a layer, at the top.
-    xAxis: { type: "value", show: false, min: "dataMin", max: "dataMax" },
-    yAxis: { type: "value", show: false, min: "dataMin", max: "dataMax", inverse: true },
+    xAxis: {
+      type: "value",
+      show: false,
+      min: blocks ? 0 : "dataMin",
+      max: blocks ? blocks.geometry.width : "dataMax",
+    },
+    yAxis: {
+      type: "value",
+      show: false,
+      min: blocks ? 0 : "dataMin",
+      max: blocks ? blocks.geometry.height : "dataMax",
+      inverse: true,
+    },
+    // Blocks fit the panel whole, and a box keeps its size as the plot
+    // zooms, so there is nothing to pan and the edges would miss its border.
     dataZoom: [0, 1].map((axis) => ({
       type: "inside",
       ...(axis === 0 ? { xAxisIndex: 0 } : { yAxisIndex: 0 }),
+      disabled: blocks !== undefined,
       // A node panned out of view keeps its edges.
       filterMode: "none",
       zoomOnMouseWheel: "ctrl",
@@ -1297,21 +1614,22 @@ function dagOption(
         coordinateSystem: "cartesian2d",
         layout: "none",
         symbolKeepAspect: true,
-        data: nodes,
+        data: [...nodes, ...ports],
         links,
         edgeSymbol: ["none", "arrow"],
         edgeSymbolSize: 8,
         itemStyle: { borderColor: theme.background, borderWidth: 1 },
         lineStyle: { color: theme.line, opacity: 0.9 },
-        // Labels that do not fit show on the node under the pointer (#643).
+        // Labels that do not fit show on the node under the pointer (#643);
+        // a block is always drawn, and never on another.
         label: {
-          show: fit.show,
+          show: blocks !== undefined || fit.show,
           position: direction === "LR" ? "bottom" : "right",
           ...pinnedLabel(theme, fit.small),
           distance: 4,
           formatter: labelText(fit.values),
         },
-        labelLayout: { hideOverlap: true },
+        labelLayout: { hideOverlap: blocks === undefined },
         edgeLabel: {
           show: o.edgeLabels === true,
           ...edgeLabel(theme),
@@ -1320,14 +1638,35 @@ function dagOption(
             return v === undefined ? "" : text(v);
           },
         },
+        // A box's edges are its sides' (the ports'), not its own, so its
+        // neighbors cannot be told apart from the rest: nothing fades.
         emphasis: {
-          focus: "adjacency",
+          focus: blocks ? "none" : "adjacency",
           label: { show: true },
           lineStyle: { opacity: 1 },
         },
       },
     ],
   } as EChartsOption;
+}
+
+/**
+ * Where a radial tree's knob goes (#649): just past its box's edge, on the
+ * way out from the middle at `angle`.
+ */
+function outward(box: BoxSize, angle: number, reach: number): [number, number] {
+  const c = Math.cos(angle);
+  const s = Math.sin(angle);
+  const toEdge = Math.min(
+    Math.abs(c) > 1e-9 ? box.width / 2 / Math.abs(c) : Number.POSITIVE_INFINITY,
+    Math.abs(s) > 1e-9 ? box.height / 2 / Math.abs(s) : Number.POSITIVE_INFINITY,
+  );
+  return [c * (toEdge + reach), s * (toEdge + reach)];
+}
+
+/** The node an edge meets a box's side at (#649): no node's id starts with it. */
+function portId(id: string, side: "in" | "out"): string {
+  return `${SEP}port${SEP}${side}${SEP}${id}`;
 }
 
 /**
@@ -1349,6 +1688,8 @@ function netTooltip(
           name?: string;
           source?: string;
           target?: string;
+          from?: string;
+          to?: string;
           value?: number;
           amount?: number;
           group?: string;
@@ -1360,7 +1701,10 @@ function netTooltip(
       if (!item) return "";
       const lines: string[] = [];
       if (dataType === "edge") {
-        lines.push(`${nameOf(item.source ?? "")} → ${nameOf(item.target ?? "")}`);
+        // A block's edge runs between its ports; `from` and `to` are its ends.
+        const from = item.from ?? item.source ?? "";
+        const to = item.to ?? item.target ?? "";
+        lines.push(`${nameOf(from)} → ${nameOf(to)}`);
         if (item.value !== undefined) lines.push(text(item.value));
         if (item.reversed) lines.push("Back edge: closes a cycle");
       } else {
@@ -1393,6 +1737,12 @@ export function forceSpacing(nodes: number): { repulsion: number; edgeLength: nu
     repulsion: clamp(900 / Math.sqrt(n), 25, 350),
     edgeLength: clamp(210 / Math.sqrt(n), 15, 90),
   };
+}
+
+/** {@link forceSpacing} with its repulsion as ECharts' range, the same at both ends. */
+function markerSpacing(nodes: number) {
+  const { repulsion, edgeLength } = forceSpacing(nodes);
+  return { repulsion: [repulsion, repulsion], edgeLength };
 }
 
 /** The most a force graph's node is drawn at, whatever its value and size. */
@@ -1489,10 +1839,15 @@ function forceOption(
     formatter: labelText(fit.values),
   };
 
+  // Each node a box with its name inside (#649), when the panel has room.
+  const blocks = forceBlockPlan(panel, net, theme, size);
+
   const nodes = net.nodes.map((node) => {
     const color = colorOf(node);
     const symbol = symbolFor(o, node.group);
     const name = loops.has(node.id) ? `${node.name} ↻` : node.name;
+    const box = blocks?.sizes.get(node.id);
+    const fill = soften(theme, color);
     return {
       id: node.id,
       name: node.name,
@@ -1503,14 +1858,36 @@ function forceOption(
       group: node.group,
       parents: node.parents.map(nameOf),
       loop: loops.has(node.id),
-      symbol: echartsSymbol(symbol),
-      symbolSize: forceNodeSize(
-        symbolSizeFor(symbol, o.symbolSize),
-        o.value === undefined ? undefined : node.value,
-        largest,
-      ),
-      itemStyle: { color },
-      label: { backgroundColor: color, color: inkOn(color) },
+      ...(blocks && box
+        ? {
+            // A box's `value` is its half-diagonal, which ECharts maps onto
+            // the repulsion's range, so a larger box pushes harder.
+            value: halfDiagonal(box),
+            symbol: "rect",
+            symbolSize: [box.width, box.height],
+            itemStyle: { color: "transparent", borderWidth: 0 },
+            label: {
+              ...blockNodeLabel(
+                theme,
+                fill,
+                box,
+                blocks.texts.get(node.id) ?? { name },
+                blocks.values,
+              ),
+              position: "inside",
+            },
+            emphasis: { label: nodeBlockHover(theme, fill) },
+          }
+        : {
+            symbol: echartsSymbol(symbol),
+            symbolSize: forceNodeSize(
+              symbolSizeFor(symbol, o.symbolSize),
+              o.value === undefined ? undefined : node.value,
+              largest,
+            ),
+            itemStyle: { color },
+            label: { backgroundColor: color, color: inkOn(color) },
+          }),
     };
   });
   const links = net.edges
@@ -1532,9 +1909,12 @@ function forceOption(
         type: "graph",
         layout: "force",
         force: {
-          ...forceSpacing(net.nodes.length),
           initLayout: "circular",
           gravity: 0.15,
+          // A range in both, since a size step merges: one value, as a pair.
+          ...(blocks
+            ? forceBlockSpacing(blocks.sizes.values())
+            : markerSpacing(net.nodes.length)),
           layoutAnimation: false,
         },
         left: 24,
@@ -1550,7 +1930,7 @@ function forceOption(
         itemStyle: { borderColor: theme.background, borderWidth: 1 },
         lineStyle: { color: theme.line, opacity: 0.7, curveness: 0 },
         // Past the cap, a label shows only on the node under the pointer.
-        label: { show: fit.show, ...label },
+        label: { show: blocks !== undefined || fit.show, ...label },
         edgeLabel: {
           show: o.edgeLabels === true,
           ...edgeLabel(theme),

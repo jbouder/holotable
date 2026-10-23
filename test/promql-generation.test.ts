@@ -121,14 +121,15 @@ test("a single-source SQL or PromQL prompt is what it was before LogQL existed (
   });
   // Byte for byte as they were on the commit before #564, but for what a new
   // panel kind or option adds to every prompt (the graph, #623, its dag, #624,
-  // its force layout and the Sankey, #625, and the line curve, #665).
+  // its force layout and the Sankey, #625, the line curve, #665, and graph
+  // blocks, #649).
   assert.deepEqual(digests(sql), {
-    generation: "0245f2152ab1bf09f08b79d106203fe2d1c983e07ff0f89e7bc84a27db8ffad3",
-    chat: "c3359429a1dba3060bfbb2520c1eb75c6e5694cb45bd5acad16d9610e9a7c261",
+    generation: "ef2b1cfbb0cb28d4f7e0f048f1fb27086770923cf8dde74b347a2f38b96495fa",
+    chat: "c6da714c49c17b34506d440b03fb9978f443eebeb44dc97b787497142d12c7f1",
     dashboardChat: "479960869c34a70a899dc471b2e471cc05f3218ab49b17f50eb9f4e99d25b8ae",
   });
   assert.deepEqual(digests(prom), {
-    generation: "ce9b47e1fa09435285a155acfe9d2b1c34513f3212cd7f2200dee33a2f143f0d",
+    generation: "f48151d7bb5e123ff1a98fa38dca777df6edb1b05a40fb5a281032ee5d5cde5f",
     chat: "ff1283eb66e3bf894f67a1fff68382830ebb05208e8aedc4861088fe6cb90775",
     dashboardChat: "3e82a5b940a4a3b6acd828bc72c550c73c45ebd1eef46de0946bcf26e438afcd",
   });

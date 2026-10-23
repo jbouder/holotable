@@ -1,0 +1,13 @@
+{
+  "name": "service-architecture",
+  "mode": "dashboard",
+  "catalog": "demo-services",
+  "prompt": "Draw our service architecture: which service calls which, with how many requests each receives.",
+  "expect": {
+    "tables": ["service_calls"],
+    "requiredViz": ["graph"],
+    "graphNode": "block",
+    "minPanels": 1,
+    "maxPanels": 6
+  }
+}

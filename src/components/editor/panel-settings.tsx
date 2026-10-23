@@ -289,6 +289,15 @@ function OptionGroupFields({
             parse={(v) => (v === "" ? undefined : v)}
           />
           <SelectOption
+            {...field("node")}
+            label="Nodes"
+            options={[
+              { value: "", label: "markers (default)" },
+              { value: "block", label: "blocks" },
+            ]}
+            parse={(v) => (v === "" ? undefined : v)}
+          />
+          <SelectOption
             {...field("orient")}
             label="Orientation"
             options={[

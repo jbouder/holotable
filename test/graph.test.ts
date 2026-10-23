@@ -20,9 +20,19 @@ import {
   graphView,
 } from "@/components/charts/graph";
 import type { PanelData } from "@/components/charts/options";
-import { DEFAULT_CHART_THEME, inkOn } from "@/lib/color/chart-theme";
-import { AA_TEXT, contrastRatio, hexToRgb, parseThemeTokens } from "@/lib/color/contrast";
+import { GRAPH_BLOCK_MAX_WIDTH } from "@/components/charts/graph-blocks";
+import { DEFAULT_CHART_THEME, inkOn, soften } from "@/lib/color/chart-theme";
+import {
+  AA_TEXT,
+  contrastRatio,
+  hexToRgb,
+  parseThemeDecls,
+  parseThemeTokens,
+  resolveBlock,
+} from "@/lib/color/contrast";
 import { graphLayout } from "@/lib/graph/layout";
+import { tidyTree } from "@/lib/graph/tidy-tree";
+import { DEMO_LINKS } from "../scripts/lib/demo-files";
 import { GRAPH_SYMBOLS, ICON_PATHS, isIcon } from "@/lib/graph/symbols";
 import { Panel } from "@/lib/ir";
 import { LOCAL_TIME_DISPLAY } from "@/lib/time-display";
@@ -673,7 +683,7 @@ interface ForceSeries {
   force: {
     layoutAnimation: boolean;
     initLayout: string;
-    repulsion: number;
+    repulsion: number[];
     edgeLength: number;
   };
   label: { show: boolean };
@@ -740,7 +750,8 @@ test("a force graph spreads by its node count, thins its labels when dense, and 
     (({ repulsion, edgeLength }) => ({ repulsion, edgeLength }))(
       forceSeries(graph(FORCE), DEPS).force,
     ),
-    forceSpacing(5),
+    // As ECharts' range, the same at both ends.
+    { repulsion: [few.repulsion, few.repulsion], edgeLength: few.edgeLength },
   );
   // Past the cap, labels show on hover only.
   const ring = (n: number) => ({
@@ -782,4 +793,506 @@ test("a force graph's nodes and edges are datums, and its table is its edges", (
     ["api", "db", "25"],
   );
   assert.equal(table.datums[0]?.series, "api");
+});
+
+/*
+ * Blocks (#649): each node a box with its name inside, as a diagram is
+ * drawn. Every box reads (AA) on its softened fill in every palette and
+ * scheme; no two boxes overlap in any layout; a directed graph's edges meet
+ * its boxes' borders; a panel too small for them draws markers and says so;
+ * clicks and the table are a marker graph's.
+ */
+
+/** The demo's service map, as `scripts/lib/seed-data.ts` writes its edges. */
+const SERVICE_MAP: PanelData = {
+  columns: ["caller", "callee", "tier", "requests"],
+  rows: [
+    ["gateway", "api", "service", 1600],
+    ["gateway", "web", "service", 1800],
+    ["gateway", "worker", "service", 1700],
+    ["api", "api-db", "database", 2500],
+    ["web", "web-cache", "cache", 3400],
+    ["worker", "worker-queue", "queue", 1300],
+    ["api", "redis", "store", 1000],
+    ["web", "redis", "store", 800],
+  ].map(([caller, callee, tier, requests]) => ({ caller, callee, tier, requests })),
+};
+const BLOCKS = {
+  ...EDGES,
+  node: "block",
+  compact: true,
+  symbol: "loadBalancer",
+  symbols: { service: "server", database: "database", store: "storage" },
+};
+/** About the drawn size of the demo's service map (w 7, h 4) and of a full-width panel. */
+const DEFAULT_SIZE = { width: 780, height: 320 };
+const WIDE = { width: 1380, height: 500 };
+
+interface BlockItem {
+  id: string;
+  value?: number | number[];
+  symbolSize: number | number[];
+  label: { backgroundColor?: string; color?: string; width?: number; show?: boolean };
+  children?: BlockItem[];
+}
+const seriesOf = (option: unknown) =>
+  (option as { series: { type: string; data: BlockItem[]; links?: Link[] }[] })
+    .series[0] as {
+    type: string;
+    data: BlockItem[];
+    links?: Link[];
+    label: { show: boolean };
+    left?: number;
+    top?: number;
+  };
+interface Link {
+  id: string;
+  source: string;
+  target: string;
+  from: string;
+  to: string;
+  reversed: boolean;
+}
+const isBox = (d: BlockItem) => Array.isArray(d.symbolSize);
+const overlap = (
+  a: { x: number; y: number; w: number; h: number },
+  b: { x: number; y: number; w: number; h: number },
+) => Math.abs(a.x - b.x) < (a.w + b.w) / 2 && Math.abs(a.y - b.y) < (a.h + b.h) / 2;
+
+test("block is an option of its own; marker, or none, draws exactly as before", () => {
+  assert.ok(accepts({ node: "block" }));
+  assert.ok(accepts({ node: "marker" }));
+  assert.ok(!accepts({ node: "box" }));
+  for (const layout of ["tree", "dag", "force"]) {
+    for (const size of [undefined, DEFAULT_SIZE]) {
+      const ctx = { ...CTX, size };
+      const before = graphChart(graph({ ...EDGES, layout }), SERVICE_MAP, ctx);
+      const marker = graphChart(
+        graph({ ...EDGES, layout, node: "marker" }),
+        SERVICE_MAP,
+        ctx,
+      );
+      assert.deepEqual(
+        JSON.parse(JSON.stringify(marker)),
+        JSON.parse(JSON.stringify(before)),
+        layout,
+      );
+    }
+  }
+  // A change of how nodes are drawn is a new chart.
+  assert.notEqual(graphShape(graph(BLOCKS)), graphShape(graph(EDGES)));
+});
+
+test("every box's text clears AA on its softened fill, in every palette and scheme", () => {
+  // The fill is the node's series color softened as a large area is (#647),
+  // and the ink is whichever reads on it.
+  const option = graphChart(graph({ ...BLOCKS, layout: "dag" }), SERVICE_MAP, CTX);
+  const boxes = seriesOf(option).data.filter(isBox);
+  assert.equal(boxes.length, 8);
+  for (const b of boxes) {
+    assert.ok(b.label.backgroundColor);
+    assert.equal(b.label.color, inkOn(b.label.backgroundColor as string));
+    assert.ok(
+      DEFAULT_CHART_THEME.series.some(
+        (c) => soften(DEFAULT_CHART_THEME, c) === b.label.backgroundColor,
+      ),
+    );
+  }
+  const hex = (rgb: readonly number[]) =>
+    `#${rgb.map((c) => c.toString(16).padStart(2, "0")).join("")}`;
+  const blocks = parseThemeDecls(readFileSync("src/app/globals.css", "utf8"));
+  assert.ok(blocks.length >= 10);
+  for (const { palette, scheme, decls } of blocks) {
+    const { tokens } = resolveBlock(decls);
+    const theme = {
+      ...DEFAULT_CHART_THEME,
+      background: hex(tokens.surface),
+      soften: Number(decls["chart-soften"] ?? DEFAULT_CHART_THEME.soften),
+    };
+    for (let i = 1; i <= 8; i++) {
+      const fill = soften(theme, hex(tokens[`chart-${i}`]));
+      const ratio = contrastRatio(hexToRgb(inkOn(fill)), hexToRgb(fill));
+      assert.ok(
+        ratio >= AA_TEXT,
+        `${palette} ${scheme} chart-${i}: ${ratio.toFixed(2)}:1`,
+      );
+    }
+  }
+});
+
+test("a directed graph's boxes never overlap, and each edge runs from one box's border to the next's", () => {
+  const network: PanelData = {
+    columns: ["parent", "child", "tier", "bandwidth_gbps"],
+    rows: DEMO_LINKS.map(([parent, child, tier, bandwidth_gbps]) => ({
+      parent,
+      child,
+      tier,
+      bandwidth_gbps,
+    })),
+  };
+  const cases = [
+    {
+      panel: graph({ ...BLOCKS, layout: "dag", direction: "LR" }),
+      data: SERVICE_MAP,
+      size: DEFAULT_SIZE,
+    },
+    {
+      panel: graph({
+        layout: "dag",
+        direction: "TB",
+        node: "block",
+        source: "parent",
+        target: "child",
+        value: "bandwidth_gbps",
+        group: "tier",
+        symbols: { router: "router", switch: "switch", server: "server" },
+        unit: "Gbps",
+      }),
+      data: network,
+      size: WIDE,
+    },
+  ];
+  for (const { panel, data, size } of cases) {
+    const option = graphChart(panel, data, { ...CTX, size }) as {
+      grid: { width: number; height: number };
+      xAxis: { min: number; max: number };
+    };
+    const series = seriesOf(option);
+    const boxes = series.data.filter(isBox);
+    // The demos draw blocks at their default sizes, not the fallback.
+    assert.equal(boxes.length, data === SERVICE_MAP ? 8 : 11);
+    assert.equal(graphNotice(panel, data, size), undefined);
+    // A pixel a unit: the plot is the layout, and it fits the panel.
+    assert.equal(option.xAxis.max - option.xAxis.min, option.grid.width);
+    assert.ok(option.grid.width <= size.width && option.grid.height <= size.height);
+    const at = new Map(
+      boxes.map((b) => {
+        const [x, y] = b.value as number[];
+        const [w, h] = b.symbolSize as number[];
+        return [b.id, { x: x as number, y: y as number, w: w as number, h: h as number }];
+      }),
+    );
+    const list = [...at.values()];
+    for (let i = 0; i < list.length; i++) {
+      for (let j = i + 1; j < list.length; j++) {
+        assert.ok(!overlap(list[i] as never, list[j] as never), `${i} and ${j} overlap`);
+      }
+    }
+    const ports = new Map(
+      series.data.filter((d) => !isBox(d)).map((d) => [d.id, d.value as number[]]),
+    );
+    const across = (panel.options as { direction?: string }).direction !== "TB";
+    for (const link of series.links ?? []) {
+      const from = at.get(link.from);
+      const to = at.get(link.to);
+      const start = ports.get(link.source);
+      const end = ports.get(link.target);
+      assert.ok(from && to && start && end, link.id);
+      // On the border of its box, the middle of the side that faces the flow.
+      const onSide = (box: typeof from, p: number[], sign: number) =>
+        across
+          ? p[0] === box.x + (sign * box.w) / 2 && p[1] === box.y
+          : p[1] === box.y + (sign * box.h) / 2 && p[0] === box.x;
+      const sign = link.reversed ? -1 : 1;
+      assert.ok(onSide(from, start, sign), `${link.id} leaves its box's border`);
+      assert.ok(onSide(to, end, -sign), `${link.id} meets its box's border`);
+    }
+  }
+});
+
+test("a tree's boxes never overlap where ECharts places them, at any size", () => {
+  // Positions as ECharts' tree sets them: the tidy tree's units stretched
+  // over the series' box, the levels evenly; whatever the size, the boxes
+  // either sit apart or are drawn as markers.
+  const rows = Array.from({ length: 14 }, (_, i) => ({
+    caller: i < 3 ? "gateway" : `svc-${i % 3}`,
+    callee: `svc-${i}`,
+    tier: "service",
+    requests: 100 + i,
+  })).filter((r) => r.caller !== r.callee);
+  const data = { columns: SERVICE_MAP.columns, rows };
+  let drawn = 0;
+  for (const orient of ["LR", "TB", "RL", "BT"]) {
+    for (const width of [300, 500, 800, 1200]) {
+      for (const height of [200, 320, 600]) {
+        const size = { width, height };
+        const panel = graph({ ...BLOCKS, layout: "tree", orient });
+        const option = graphChart(panel, data, { ...CTX, size });
+        const series = seriesOf(option) as unknown as {
+          data: BlockItem[];
+          left: number;
+          right: number;
+          top: number;
+          bottom: number;
+        };
+        const [root] = series.data;
+        if (!root?.label.width) {
+          assert.equal(graphNotice(panel, data, size)?.label, "Drawn as markers");
+          continue;
+        }
+        drawn++;
+        const boxes = new Map<string, { w: number; h: number }>();
+        const walk = (item: BlockItem) => {
+          boxes.set(item.id, {
+            w: (item.label.width as number) + 16,
+            h: 0,
+          });
+          item.children?.forEach(walk);
+        };
+        walk(root);
+        type Shape = { id: string; children: Shape[] };
+        const shape = (item: BlockItem): Shape => ({
+          id: item.id,
+          children: (item.children ?? []).map(shape),
+        });
+        // As drawn, and with any one branch closed, which ECharts lays out again.
+        const full = shape(root);
+        const closed = (tree: Shape, id: string): Shape => ({
+          id: tree.id,
+          children: tree.id === id ? [] : tree.children.map((c) => closed(c, id)),
+        });
+        for (const variant of [
+          full,
+          ...[...boxes.keys()].map((id) => closed(full, id)),
+        ]) {
+          const { places, span } = tidyTree(variant, false);
+          const w = width - series.left - series.right;
+          const h = height - series.top - series.bottom;
+          const depths = Math.max(...places.map((p) => p.depth));
+          const sideways = orient === "LR" || orient === "RL";
+          const at = places.map((p) => {
+            const breadth = (p.x / span) * (sideways ? h : w);
+            const level = ((p.depth - 1) / (depths - 1 || 1)) * (sideways ? w : h);
+            const box = boxes.get(p.node.id) as { w: number };
+            return sideways
+              ? { x: level, y: breadth, w: box.w, h: 40 }
+              : { x: breadth, y: level, w: box.w, h: 40 };
+          });
+          for (let i = 0; i < at.length; i++) {
+            for (let j = i + 1; j < at.length; j++) {
+              assert.ok(
+                !overlap(at[i] as never, at[j] as never),
+                `${orient} at ${width}×${height}: ${i} and ${j}`,
+              );
+            }
+          }
+        }
+      }
+    }
+  }
+  assert.ok(drawn > 4, "and at a fair size they are drawn");
+});
+
+test("the tidy tree is ECharts' own: the same places, siblings a unit apart", async () => {
+  interface Helper {
+    init(root: E): void;
+    separation(): unknown;
+    firstWalk(node: E, separation: unknown): void;
+    secondWalk(node: E): void;
+  }
+  // ECharts' own tidy tree, which has no types of its own.
+  const at = "echarts/lib/chart/tree/layoutHelper.js";
+  const helper = (await import(at)) as Helper;
+  interface E {
+    children: E[];
+    parentNode: E | null;
+    isExpand: boolean;
+    depth: number;
+    hierNode?: unknown;
+    layout?: { x: number };
+    getLayout(): { x: number };
+    setLayout(l: { x: number }): void;
+  }
+  const echartsNode = (children: E[], depth: number): E => {
+    const n: E = {
+      children,
+      parentNode: null,
+      isExpand: true,
+      depth,
+      getLayout() {
+        return this.layout as { x: number };
+      },
+      setLayout(l) {
+        this.layout = { ...this.layout, ...l };
+      },
+    };
+    for (const c of children) c.parentNode = n;
+    return n;
+  };
+  // Seeded random trees, ECharts' walk and ours side by side.
+  let seed = 3;
+  const random = () => {
+    seed = (seed * 16807) % 2147483647;
+    return seed / 2147483647;
+  };
+  for (let t = 0; t < 30; t++) {
+    interface Shape {
+      children: Shape[];
+    }
+    const build = (depth: number): Shape => ({
+      children:
+        depth > 4 || (depth > 1 && random() < 0.35)
+          ? []
+          : Array.from({ length: 1 + Math.floor(random() * 3) }, () => build(depth + 1)),
+    });
+    const mine = build(1);
+    const toE = (n: Shape, depth: number): E =>
+      echartsNode(
+        n.children.map((c) => toE(c, depth + 1)),
+        depth,
+      );
+    const real = toE(mine, 1);
+    const virtual = echartsNode([real], 0);
+    const all: E[] = [];
+    const collect = (n: E) => {
+      all.push(n);
+      n.children.forEach(collect);
+    };
+    collect(real);
+    helper.init(virtual);
+    const sep = helper.separation();
+    // Children before their parent, left to right: ECharts' `eachAfter`.
+    const after = (n: E) => {
+      n.children.forEach(after);
+      helper.firstWalk(n, sep);
+    };
+    after(real);
+    (virtual.hierNode as { modifier: number }).modifier = -(
+      real.hierNode as { prelim: number }
+    ).prelim;
+    for (const n of all) helper.secondWalk(n);
+    const theirs = all.map((n) => n.getLayout().x);
+    const { places } = tidyTree(mine);
+    const shift = (places[0]?.x ?? 0) - (theirs[0] ?? 0);
+    assert.deepEqual(
+      places.map((p) => Math.round((p.x - shift) * 1e6) / 1e6),
+      theirs.map((x) => Math.round(x * 1e6) / 1e6),
+      `tree ${t}`,
+    );
+  }
+});
+
+test("a force graph's boxes push apart by their size and fit or fall back", () => {
+  const panel = graph({ ...BLOCKS, layout: "force" });
+  const option = graphChart(panel, SERVICE_MAP, {
+    ...CTX,
+    size: { width: 680, height: 420 },
+  });
+  const series = seriesOf(option) as unknown as {
+    data: BlockItem[];
+    force: { repulsion: number[]; edgeLength: number; gravity: number };
+  };
+  const boxes = series.data.filter(isBox);
+  assert.equal(boxes.length, 8);
+  const radii = boxes.map((b) => {
+    const [w, h] = b.symbolSize as number[];
+    return Math.hypot(w as number, h as number) / 2;
+  });
+  // Each box's value is its half-diagonal, mapped onto the repulsion's range.
+  assert.deepEqual(
+    boxes.map((b) => b.value),
+    radii,
+  );
+  assert.deepEqual(series.force.repulsion, [
+    Math.round(Math.min(...radii) * 80),
+    Math.round(Math.max(...radii) * 80),
+  ]);
+  assert.ok(series.force.edgeLength >= 2 * Math.max(...radii));
+  // A small panel draws markers, and says so.
+  const small = { width: 240, height: 160 };
+  assert.ok(
+    !seriesOf(graphChart(panel, SERVICE_MAP, { ...CTX, size: small })).data.some(isBox),
+  );
+  assert.equal(graphNotice(panel, SERVICE_MAP, small)?.label, "Drawn as markers");
+});
+
+test("too small for its boxes, a graph draws markers with a notice; never half-overlapping boxes", () => {
+  for (const layout of ["tree", "dag"]) {
+    const panel = graph({ ...BLOCKS, layout });
+    const small = { width: 160, height: 100 };
+    const option = graphChart(panel, CALLS, { ...CTX, size: small });
+    const items = seriesOf(option).data;
+    assert.ok(
+      !items.some((d) => d.label?.width !== undefined),
+      `${layout} draws markers`,
+    );
+    const notice = graphNotice(panel, CALLS, small);
+    assert.equal(notice?.label, "Drawn as markers", layout);
+    assert.match(notice?.detail ?? "", /do not fit/);
+    // A marker graph asked for has nothing to say at any size.
+    assert.equal(graphNotice(graph({ ...EDGES, layout }), CALLS, small), undefined);
+  }
+  // A tree that is not one says both.
+  assert.match(
+    graphNotice(graph({ ...BLOCKS, layout: "tree" }), SERVICE_MAP, {
+      width: 160,
+      height: 100,
+    })?.detail ?? "",
+    /two parents.*do not fit/,
+  );
+  // A long name is cut with an ellipsis, never wider than the cap; whole in the table.
+  const long = {
+    columns: SERVICE_MAP.columns,
+    rows: [
+      {
+        caller: "gateway",
+        callee: "a-service-with-a-very-long-name-indeed",
+        tier: "service",
+        requests: 1,
+      },
+    ],
+  };
+  const option = graphChart(graph({ ...BLOCKS, layout: "dag" }), long, CTX);
+  for (const b of seriesOf(option).data.filter(isBox)) {
+    assert.ok(((b.symbolSize as number[])[0] as number) <= GRAPH_BLOCK_MAX_WIDTH);
+    assert.equal((b.label as { overflow?: string }).overflow, "truncate");
+  }
+  assert.ok(
+    graphTable(graph({ ...BLOCKS, layout: "dag" }), long).rows.some((r) =>
+      r.includes("a-service-with-a-very-long-name-indeed"),
+    ),
+  );
+});
+
+test("a box is its node's datum; a tree branch's knob opens and closes it; the table is unchanged", () => {
+  for (const layout of ["tree", "dag", "force"]) {
+    const blocks = graph({ ...BLOCKS, layout });
+    const markers = graph({ ...BLOCKS, layout, node: "marker" });
+    assert.deepEqual(
+      graphTable(blocks, SERVICE_MAP),
+      graphTable(markers, SERVICE_MAP),
+      layout,
+    );
+    for (const id of ["gateway", "api", "redis"]) {
+      assert.deepEqual(
+        graphClickDatum(blocks, SERVICE_MAP, id),
+        graphClickDatum(markers, SERVICE_MAP, id),
+      );
+    }
+  }
+  const dag = seriesOf(graphChart(graph({ ...BLOCKS, layout: "dag" }), SERVICE_MAP, CTX));
+  // An edge's click is its datum, though it is drawn between ports; a port is none.
+  const edge = dag.links?.[0] as Link;
+  assert.equal(
+    graphClickDatum(graph({ ...BLOCKS, layout: "dag" }), SERVICE_MAP, edge.id)?.row
+      .source,
+    edge.from,
+  );
+  assert.equal(
+    graphClickDatum(graph({ ...BLOCKS, layout: "dag" }), SERVICE_MAP, edge.source),
+    null,
+  );
+  // A tree's box is its label, so a click on it is a datum; a branch's knob
+  // is its symbol, which toggles.
+  const tree = seriesOf(
+    graphChart(graph({ ...BLOCKS, layout: "tree", orient: "TB" }), CALLS, CTX),
+  );
+  const root = tree.data[0] as BlockItem & { symbolSize: number; symbolOffset: number[] };
+  assert.equal(root.symbolSize, 8);
+  assert.ok(
+    (root.symbolOffset[1] as number) > 0,
+    "below the box, the way the tree grows",
+  );
+  const target = { type: "text", parent: { type: "path" } };
+  assert.equal(treeClickPart({ seriesType: "tree", event: { target } }), "datum");
 });

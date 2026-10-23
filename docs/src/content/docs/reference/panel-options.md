@@ -148,7 +148,8 @@ the table.
 - `graph` (tree, dag, force) and `sankey`: node labels are drawn in full,
   a size smaller, as names without their values, or not at all, whichever is
   the first to fit the layout's columns and rows; the dag's margins follow the
-  widest label it draws.
+  widest label it draws. A graph's blocks narrow, then drop their values,
+  and where they still do not fit are drawn as markers, with a notice.
 - `state-timeline`: every lane keeps a bar at least 12px tall; lanes past
   what fits are counted in the note under the chart, lane names are written
   only while each lane has a line of text, and a state is written only in a span
@@ -507,6 +508,7 @@ How *much* flows where is a [`sankey`](#sankey), not a graph.
 | Option | Type | Default | Meaning |
 | --- | --- | --- | --- |
 | `layout` | `"tree"` \| `"dag"` \| `"force"` | `"tree"` | How the graph is drawn: a tree, a layered directed graph, or a force-directed cloud. |
+| `node` | `"marker"` \| `"block"` | `"marker"` | How a node is drawn: a symbol with its name beside it, or a box with its name (and value) inside, as a diagram is drawn. Blocks that do not fit the panel are drawn as markers, with a notice. |
 | `orient` | `"LR"` \| `"TB"` \| `"RL"` \| `"BT"` \| `"radial"` | `"LR"` | Which way the tree grows: left to right, top to bottom, right to left, bottom to top, or out from its root. |
 | `direction` | `"LR"` \| `"TB"` | `orient`'s nearer one, else `"LR"` | Which way a directed graph's layers run: left to right or top to bottom. |
 | `edgeLabels` | boolean | `false` | A directed or force graph writes each edge's value on it. |
@@ -561,6 +563,29 @@ fetch an image.
   picture; only a new node finds its place. Past 60 nodes, labels show only
   on the node under the pointer. Drag to pan; hold Ctrl and scroll, or pinch
   on a trackpad, to zoom. Nodes and edges are datums exactly as on a directed graph.
+- **Blocks** (`node: "block"`, [#649](https://github.com/jbouder/holotable/issues/649))
+  draw each node as a box sized to its name, the name inside in the page's
+  font and, under it in the regular weight, its value, the way an
+  architecture diagram, a lineage or a pipeline is drawn. A box is 56 to 160
+  pixels wide; a longer name is cut with an ellipsis, and is whole in the
+  tooltip and the screen-reader table. It is filled with its group's color,
+  softened as a large area is, its text black or white, whichever meets WCAG
+  AA on that fill, with the theme's corners (square but for Paper's). A node
+  whose symbol is an icon draws the icon inside the box, before its name, in
+  the text's color; a shape symbol (`circle`, `rect`, …) is not drawn. On a
+  directed graph an edge leaves the side of its box that faces the next layer
+  and its arrow meets the next box's border, a back edge the other way round;
+  the boxes are placed with a gap between their edges, each layer past the
+  widest box of the one before, and the drawing fits the panel whole, so
+  there is nothing to pan or zoom. On a tree, the spacing is checked against
+  every branch a reader might close, and a branch's open-and-close knob sits
+  just past its box's trailing edge (on a radial tree, outward); a click on
+  the box itself is a datum. On a force graph each box pushes the others by
+  the size of its half-diagonal. Where the boxes do not fit the panel at any
+  width down to 96 pixels (with values first, then names alone), the nodes
+  are drawn as markers instead, with a **Drawn as markers** badge beside the
+  title, never boxes on top of boxes. Choose blocks for a diagram of a few
+  dozen nodes; keep markers for a large or dense graph.
 - At most 500 nodes are drawn, breadth first from the roots, and on a directed
   or force graph at most 1,500 edges; a note in the corner says how many more there
   are.
@@ -597,6 +622,7 @@ fetch an image.
   "options": {
     "layout": "dag",
     "direction": "LR",
+    "node": "block",
     "source": "caller",
     "target": "callee",
     "value": "requests",

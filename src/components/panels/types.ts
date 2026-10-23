@@ -1,6 +1,8 @@
 import type * as React from "react";
 import type { EChartHandle } from "@/components/charts/EChart";
 import type { ChartOptionBuilder, PanelData } from "@/components/charts/options";
+import type { ChartSize } from "@/components/charts/size";
+import type { ChartTheme } from "@/lib/color/chart-theme";
 import type { Panel } from "@/lib/ir";
 import type { ChartRows } from "@/lib/panel-reading";
 import type { TimeDisplay } from "@/lib/time-display";
@@ -42,9 +44,15 @@ export type PanelRenderer =
       /**
        * What the panel says beside its title about how these rows were drawn,
        * when that is not what its spec asked for (#624): a graph's tree drawn
-       * as a directed graph because its rows are not a tree.
+       * as a directed graph because its rows are not a tree, or its blocks
+       * as markers because the chart, at its `size`, has no room (#649).
        */
-      notice?: (panel: Panel, data: PanelData) => PanelNotice | undefined;
+      notice?: (
+        panel: Panel,
+        data: PanelData,
+        size?: ChartSize,
+        theme?: ChartTheme,
+      ) => PanelNotice | undefined;
       /**
        * The kind's own screen-reader table (#77), where its marks are not one
        * per row (a graph's edges); by default the rows as they came.
