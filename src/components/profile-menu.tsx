@@ -85,7 +85,7 @@ export function ProfileMenu({ account }: { account: ProfileMenuAccount }) {
         <Keyboard className="h-4 w-4" aria-hidden /> Keyboard shortcuts
       </MenuLink>
       <MenuSeparator />
-      <MenuRadioGroup<Theme> label="Theme" value={theme} onValueChange={setTheme}>
+      <MenuRadioGroup<Theme> label="Color scheme" value={theme} onValueChange={setTheme}>
         {THEME_OPTIONS.map(({ value, label, Icon }) => (
           <MenuRadioItem key={value} value={value}>
             <Icon className="h-4 w-4" aria-hidden /> {label}
