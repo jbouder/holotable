@@ -69,7 +69,7 @@ function Tile({ tile }: { tile: StatusTile }) {
   const ink = hex ? "tinted" : undefined;
   return (
     <div
-      className="flex h-full flex-col gap-0.5 rounded-md border border-l-4 border-border bg-surface-2 px-2 py-1.5"
+      className="flex h-full flex-col gap-0.5 rounded-lg border border-l-4 border-border bg-surface-2 px-2 py-1.5"
       style={
         hex
           ? {
