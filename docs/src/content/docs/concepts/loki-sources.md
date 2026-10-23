@@ -114,23 +114,10 @@ The parse tree says which a query is, and the result's shape follows:
 ## The guard
 
 `validateLogql` (`src/lib/logql/safety.ts`) is the LogQL counterpart of the
-SQL and PromQL guards, and
-[Executing a panel](/concepts/executing-a-panel/#the-logql-guard) lists its
-rules. In prose:
-
-- **One expression, made of what the walker allows.** The parser is the Loki
-  project's own grammar. Pipeline stages, range functions and aggregations are
-  allowlisted by the grammar node they are; a stage a newer grammar adds is
-  refused until it is listed. Comments are refused.
-- **Every stream selector anchored on the allowlist.** At least one `=`
-  matcher with a value, on a listed label. `{app=~".*"}`, `{app!="api"}`,
-  `{app=""}` and a selector anchored only on an unlisted label are refused, as
-  Loki itself refuses the first three. Any other matcher on an unlisted label
-  is a **hint** that never refuses.
-- **No time of its own.** LogQL has no `@` and no timestamp; a `[range]` and
-  an `offset` are bounded by `LOGQL_MAX_RANGE`, and an offset only looks back.
-- **Bounded.** At most 8,000 characters, 32 stream selectors and 128 levels
-  of nesting.
+SQL and PromQL guards: one parsed expression from allowlisted stages and
+functions, every stream selector anchored by an `=` matcher on a listed
+label, no time of its own, and bounded in size. Its rules, limits and hints
+are on [Executing a panel](/concepts/executing-a-panel/#the-logql-guard).
 
 ## How time becomes `start`, `end`, `step` and `limit`
 

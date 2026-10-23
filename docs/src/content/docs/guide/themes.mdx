@@ -18,18 +18,22 @@ import highContrastDark from '../../../../public/images/themes/high-contrast-dar
 import highContrastLight from '../../../../public/images/themes/high-contrast-light.png';
 
 A theme is a named set of colors. Each comes in a light and a dark color
-scheme, and you choose the two separately in **Settings → Appearance**, where
-the [theme gallery](/guide/settings/#appearance) previews each one, or from
-the command palette (type "Theme" or "Color scheme"); the color scheme is
-also in the account menu. The choice is kept in this browser and
-applies before the page draws. An operator picks the theme a new browser
-starts with (`THEME_DEFAULT_PALETTE`). A browser that never chose one follows
-that default, including when the operator changes it.
+scheme, and you choose the two separately, in
+[Settings → Appearance](/guide/settings/#appearance) or the command palette.
+That page says where the choice is kept and how an operator's default applies.
 
 Every theme is held to the same bar: AA contrast for all text and AAA for body
 text, visible borders and focus, and status colors and chart series that stay
 apart for readers with a color-vision deficiency. The rules and how they are
 measured are on [Theming](/architecture/theming/#quality-bar).
+
+Every theme draws its cards flat on the page, with no shadow, and with
+square corners except Paper's, which round to 4px. Chart gridlines sit a step
+below the inset surface in Holotable and in the inset surface itself in
+Graphite, Fjord and Paper; in High contrast they are a visible gray held to
+3:1. A
+[custom theme](/admin/themes/) can choose its own corners, lift its cards and
+color its gridlines.
 
 ## How to choose
 
@@ -44,15 +48,12 @@ measured are on [Theming](/architecture/theming/#quality-bar).
 
 ## Holotable
 
-Flat slate surfaces, square corners and a quieter series palette. Cards sit
-flat on the page with no shadow, corners stay square, and the eight
+Flat slate surfaces, square corners and a quieter series palette. The eight
 chart series are calm enough to share a dashboard without shouting, while
 staying apart under every color-vision deficiency the checks cover. In light,
 the warning is a burnt amber rather than brown, and a gauge's arc, a bar or a
 status tile in warning is a brighter amber still. Its statuses and series are
-the reference the other themes are measured against. Every built-in theme's
-cards are flat; a [custom theme](/admin/themes/) can lift them with `subtle`
-or `lifted`.
+the reference the other themes are measured against.
 
 <Image src={holotableDark} widths={[720, 1440]} sizes="(min-width: 72rem) 68rem, 100vw" alt="The demo dashboard in Holotable, dark scheme." />
 <Image src={holotableLight} widths={[720, 1440]} sizes="(min-width: 72rem) 68rem, 100vw" alt="The demo dashboard in Holotable, light scheme." />

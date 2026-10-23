@@ -132,7 +132,8 @@ drawn after the one above it so neither is covered. Only an unstacked area
 fades.
 
 A theme file (`THEME_FILE`) sets colors, `radius` and `shadow`; it inherits
-these defaults, as it does the chart chrome aliases.
+these defaults, as it does the chart chrome aliases. Its fields and their
+fallbacks are on [Your own theme](/admin/themes/#the-file).
 
 ## Selector convention
 
@@ -155,14 +156,13 @@ theme sets every color token itself, so its intent does not depend on
 Holotable's values, and inherits only the aliases (`--chart-text`, the
 `--code-*` colors).
 
-Holotable's look is its own too (#648): square corners (`--radius: 0`), flat
-cards with no shadow (`--shadow-card: none`; `Card` draws the token), and
-gridlines a step below `--surface-2` (`--chart-grid`). Every other theme sets
-those three itself (square, flat like Holotable since #674, and
-`--surface-2`, except High contrast, whose grid is a visible gray held to 3:1;
-Paper rounds to 4px, the one theme that does), so a change to the default's look never
-reaches them. A theme file gets the same: `themeCss` writes its `radius`,
-`shadow` and `chart-grid`, or the square, flat, `--surface-2` fallbacks.
+Holotable's look is its own too (#648): its corners (`--radius`), card lift
+(`--shadow-card`; `Card` draws the token) and gridline color (`--chart-grid`)
+are values, not aliases. Every other theme sets those three itself, so a
+change to the default's look never reaches them, and a theme file gets the
+same: `themeCss` writes its `radius`, `shadow` and `chart-grid`, or the
+fallbacks on [Your own theme](/admin/themes/#the-file). What each theme sets
+them to is on [Themes](/guide/themes/).
 
 In light, Holotable is the first theme whose `--orange` is not an alias. Its
 `--chart-3` is a bright amber held to 3:1 as a graphic, and the spec's
