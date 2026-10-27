@@ -11,7 +11,7 @@ fix ships as the next patch of it rather than as a back-port.
 
 | Version | Supported | What a fix looks like |
 | --- | --- | --- |
-| 0.2.x (latest release) | Yes | The next 0.2.x patch, as `ghcr.io/jbouder/holotable:<version>` and the chart |
+| 0.3.x (latest release) | Yes | The next 0.3.x patch, as `ghcr.io/jbouder/holotable:<version>` and the chart |
 | `main` | Yes, as the next release | A commit on `main`, in the next `:main` image and the next release |
 | Anything older than the latest release | No | Upgrade |
 

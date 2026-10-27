@@ -5,10 +5,90 @@ release page carries the matching section below, followed by the list of
 pull requests merged since the previous tag. `CONTRIBUTING.md` ("Releasing")
 says how a section gets here.
 
-## Unreleased
+## 0.3.0 — 2026-10-27
+
+Two new source kinds and three ways to get your own files in: Loki (M19,
+#559), DuckDB (M20, #569) and uploads from the browser (#595–#607), with a
+local mode for one person's machine. Then a round of panel kinds (graphs,
+directed graphs, force graphs, Sankey) and a styling pass that gives every
+chart one style, a new default look and a logo of Holotable's own.
 
 ### Added
 
+- **Loki sources.** A third source kind, `loki`: a Loki-compatible endpoint
+  whose panels carry LogQL, the third query language beside SQL and PromQL
+  (`query.logql` in the IR). Generation, chat, the MCP tools and the
+  `/holotable` skill write it; the panel editor has a LogQL editor with
+  highlighting, completion over the source's labels and the guard's lint;
+  a label-values variable picks one value from streams; and a log line's
+  labels feed drilldown links. Every expression goes through a LogQL guard
+  of its own (parse tree, label allowlist, allowlisted stages and
+  functions, a range cap, a tenant matcher spliced and re-parsed, variables
+  bound only as matcher or line-filter values), fuzzed like the other two.
+  Adding one is the same three verbs as Prometheus: a form with label
+  discovery, a test report and a refresh review. `LOKI_MAX_ENTRIES` (1,000)
+  and `LOKI_MAX_SERIES` (100) bound a result; a log query that came back
+  full says so with a "Newest N lines" badge. Compose gains a `logs`
+  profile (Loki and Alloy) that seeds a Holotable logs dashboard over the
+  app's own lines, and every guard refusal is now also a `guard.refused`
+  log line.
+- **DuckDB sources.** A fourth source kind, `duckdb`: a directory of
+  Parquet, CSV and JSON (`.json`, `.jsonl`, `.ndjson`) files, or a
+  `.duckdb` file, under `DUCKDB_SOURCES_DIR`, queried in process through
+  the same SQL guard and planner as TimescaleDB. The engine is locked (no
+  file, network or extension access past the source's own files) and the
+  guard learned DuckDB's escapes: its file, network and introspection
+  functions are refused, and a table function in `FROM` is refused unless
+  allowlisted. A path picker lists what the root holds, Discover finds the
+  tables, and the test report shows the lock verdict and the engine. The
+  model is told DuckDB's dialect; the stub and the skill know it. With
+  `SEED_DEMO_FILES=true` the seeder writes a files demo and a Demo files
+  dashboard. `DUCKDB_MEMORY_LIMIT` and `DUCKDB_THREADS` bound the engine.
+  The runtime image carries the DuckDB binding, so the kind works under
+  compose and Helm, not only the quick-start image.
+- **Upload your own files.** **Add source → Upload files** makes a DuckDB
+  source from files chosen or dropped in the browser, with no access to the
+  server's file system: CSV, JSON and Excel workbooks (`.xlsx`, `.xlsm`,
+  one table per sheet, converted on the server with cells typed and dates
+  in UTC). Each file shows its own progress; a refused file is named with
+  the reason. An upload source takes more files later (**Add files** beside
+  Refresh, with the refresh review offering them as new tables), and
+  deleting the source removes its directory. Uploads are held to their
+  workspace by the path guard, bounded by `DUCKDB_UPLOAD_MAX_BYTES`
+  (50 MiB per file) and `DUCKDB_UPLOAD_MAX_FILES` (20), rate limited and
+  audited as `source.upload`; an upload abandoned in the form is swept
+  after an hour. Three samples (household expenses, workouts, home energy)
+  are one click away in the form.
+- **Starters for files.** A new source whose table looks like spending, an
+  activity log or daily measurements is recognized by its columns, and New
+  dashboard leads with a ready dashboard for it ("Start from"), applied
+  with no model call. The data sources page offers the same right after
+  Create source.
+- **Local mode.** `AUTH_MODE=local` signs everyone who can reach the server
+  in as its one owner, with `LOCAL_GROUPS` (default a source admin of the
+  `local` workspace), so one person on their own machine can add sources
+  and upload files, which demo mode's editor cap forbids. It is fenced like
+  demo mode: no `OIDC_*`, a banner that says what it means, and nothing in
+  verification changed. The quick-start image now runs in it, with a
+  writable files volume at `/var/lib/holotable/files`.
+- **A model on this machine.** With `LOCAL_MODEL_DETECT` (`auto`: on in
+  local mode) Holotable probes `LOCAL_MODEL_ENDPOINTS` (Ollama and LM
+  Studio by default) at boot, lists what answers as server models under
+  "Detected on this machine" on the Models page, and makes the one found
+  the default when the server has no model of its own. **Re-scan** probes
+  again (`POST /api/models/detect`, rate limited and audited as
+  `model.detect`). The endpoints' hosts join the base-URL allowlist only
+  while detection is on.
+- **An Anthropic-compatible provider.** A provider kind for endpoints that
+  speak Anthropic's Messages API at a URL of their own (OpenCode Zen's
+  Claude models, a gateway), with a typed base URL and an optional key,
+  beside the OpenAI-compatible kind.
+- **Plain PostgreSQL.** A TimescaleDB source records at Test whether the
+  server has the extension (migration 026, `sources.catalog_facts`). The
+  source list and catalog browser say `PostgreSQL` or `TimescaleDB 2.17.2`,
+  and against plain PostgreSQL the model is told to bucket with
+  `date_trunc` or `date_bin`, so the first generation against Neon,
+  Supabase or RDS no longer fails on `time_bucket`.
 - **A graph panel.** `viz: "graph"` draws what points at what as a tree, left
   to right, top to bottom or radial, from one row per edge or from path
   columns, with branches that collapse and expand. Nodes are colored by a
@@ -93,6 +173,19 @@ says how a section gets here.
   service health puts the service map and the request flow under its stats
   and drops the server-errors-by-route bar; Demo fleet drops the CPU line and
   the CPU tick plot, which repeated its heatmap.
+- **The dashboard list is the home page.** It is served at `/`, and
+  `/dashboards` permanently redirects there with its query string; a
+  dashboard stays at `/dashboards/<id>`. A start-page preference is applied
+  after sign-in instead, so opening the app at its root no longer moves you
+  somewhere else.
+- **One build behind both images.** The runtime and quick-start images are
+  two targets of one `Dockerfile` sharing one `next build`; the quick-start
+  image moved to Alpine 3.23 and Node 24. CI fuzzes the guards on a pull
+  request only when it touches one, with a 100,000-run nightly that files a
+  "Fuzz counterexample" issue when it finds one.
+- **The hosted demo's starting page** shows the boot's progress, step by
+  step, in the app's palette, and the docs site wears the app's theme and
+  defaults to dark as the app does.
 - **One chart style.** Every chart kind now draws its text in the app's font
   at one type scale, with gridlines and no axis lines, 2px series lines, and
   a tooltip on the raised surface with the theme's corners (it was a white
@@ -163,6 +256,43 @@ says how a section gets here.
 - The panel editor's Numbers fields (Decimals, Unit, Compact) no longer
   overlap in the narrow side panel, and the demo and local banners' close
   button is centered on its line.
+- A menu taller than the window (the chat's Sources menu in a workspace with
+  many sources) scrolls inside itself instead of running off-screen (#585).
+- The protocol-mismatch message under Test connection names the model's API
+  (Responses or Chat Completions) instead of telling the reader to set
+  environment variables the form does not have (#591).
+- A DuckDB engine opens inside the Docker images on Linux in every time
+  zone, and the smoke test runs a panel over its own window when it has one.
+
+### Upgrading
+
+- Migration `026_source_catalog_facts` adds `sources.catalog_facts`; the
+  migrate job runs it as usual. A TimescaleDB source shows its engine after
+  its next Test or applied Refresh.
+- `/dashboards` now redirects to `/` (308). Bookmarks and links keep working;
+  update anything that matches the list's path exactly.
+- The seeder retires an opt-in demo dashboard (PromQL self-monitoring,
+  Holotable logs, Demo files) while it still owns it and its source is off;
+  it is restored under the same id when turned back on. A dashboard you
+  saved over is never touched. Add the compose `prometheus` or `logs`
+  profile, or set `SEED_DEMO_FILES=true`, to keep one.
+- The quick-start image runs `AUTH_MODE=local` by default, which lets
+  anyone who reaches it manage sources and upload files; it is for one
+  person's own machine. Pass `AUTH_MODE=demo` to get the old behavior.
+- New variables, all optional: `LOKI_MAX_ENTRIES`, `LOKI_MAX_SERIES`,
+  `LOGQL_MAX_RANGE`, `LOKI_SELF_URL`, `DUCKDB_SOURCES_DIR`,
+  `DUCKDB_MEMORY_LIMIT`, `DUCKDB_THREADS`, `DUCKDB_UPLOAD_MAX_BYTES`,
+  `DUCKDB_UPLOAD_MAX_FILES`, `SEED_DEMO_FILES`, `LOCAL_GROUPS`,
+  `LOCAL_MODEL_DETECT`, `LOCAL_MODEL_ENDPOINTS`. `SOURCE_URL_ALLOWLIST` now
+  also fences Loki endpoints.
+- The default look changed (palette, flat cards, straight lines, one chart
+  style). A theme file without the new optional tokens (`shadow`,
+  `chart-grid`, `warning-fill`, `orange-fill`) still loads.
+
+### Known limits
+
+- One Node process by design; multi-instance is deliberately not supported
+  yet.
 
 ## 0.2.0 — 2026-10-11
 
