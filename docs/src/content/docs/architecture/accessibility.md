@@ -1,13 +1,14 @@
 ---
 title: Accessibility
-description: The WCAG 2.1 AA bar, what holds the interface to it, the measured contrast of every token pairing, and the automated checks in CI.
+description: How the interface is built to the WCAG 2.2 AA target, and the measured contrast of every token pairing.
 sidebar:
   order: 6
 ---
 
-Holotable aims at WCAG 2.1 AA. Most of it is ordinary markup done carefully;
-this page records the parts that are deliberate decisions, and the checks that
-keep them from regressing (#77, #91).
+Holotable aims at WCAG 2.2 AA. Most of it is ordinary markup done carefully;
+this page records the parts that are deliberate decisions (#77, #91). How far
+it conforms, what checks it, and the known exceptions are the
+[Accessibility statement](/reference/accessibility/).
 
 ## Keyboard
 
@@ -515,24 +516,13 @@ color directly. axe-core cannot measure contrast in that mode.
 
 ## Automated checks
 
-- `npm test`: the contrast table above, the chart table and description
-  (`test/chart-accessibility.test.ts`), the editor's arrow and Delete keys
-  (`test/panel-layout-grid.test.tsx`), and every theme's pairings and
-  quality bar (`test/theme-quality.test.ts`).
-- `npm run e2e`: axe-core over every main surface, an open dialog, an open
-  menu and the chat panel, in the default theme's dark and light, and the
-  live dashboard in each other theme's two schemes (`e2e/a11y.spec.ts`).
-  That every pairing meets AA in every theme is the unit tests' job
-  (`test/contrast.test.ts`, `test/theme-quality.test.ts`); the browser
-  proves each surface is built right, which does not change with the
-  theme. Serious and critical violations fail; moderate and minor are
-  reported on the test.
-  Exclusions are named in `e2e/support/a11y.ts` with the reason. What axe
-  cannot see is asserted as behavior in `e2e/keyboard.spec.ts`: the focus
-  trap and its return, the skip link, a visible focus indicator on every Tab
-  stop, and the theme gallery's arrow keys.
-
-A manual pass with a screen reader is still the maintainer's, per release.
+Every check, what it tests and which CI job runs it, and the manual checks
+before a release, are under
+[How it is checked](/reference/accessibility/#how-it-is-checked) in the
+accessibility statement. That every pairing meets AA in every theme is the
+unit tests' job (`test/contrast.test.ts`, `test/theme-quality.test.ts`); the
+browser proves each surface is built right (`e2e/a11y.spec.ts`), which does
+not change with the theme.
 
 ---
 

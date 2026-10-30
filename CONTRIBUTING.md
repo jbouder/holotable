@@ -186,8 +186,8 @@ tests tagged `@serial` because they share state the workspace or the person
 holds (uploads, the DuckDB root, a default model, a preference). A new test
 names what it creates with `unique()` from `e2e/support/app.ts` and never
 counts a shared list, so it can run beside the others.
-See [Accessibility](docs/src/content/docs/architecture/accessibility.md) for
-what the scans gate on.
+See the [Accessibility statement](docs/src/content/docs/reference/accessibility.md)
+for what the scans gate on, and every other accessibility check.
 
 A change to the IR is checked against `test/fixtures/specs/`, stored specs
 that are never edited; see the README there before adding one or changing a
@@ -504,6 +504,7 @@ request:
 | `src/lib/metrics.ts` (an instrument) | `operations/metrics.md` |
 | `migrations/` (a table or column) | `architecture/data-model.md` |
 | `keycloak/holotable-realm.json` | `admin/keycloak.md` (the local realm, its users, client settings) |
+| A drag, an axe exclusion, an accessibility check, or a known accessibility gap | `reference/accessibility.md` (the checks, the drag table, the known exceptions) |
 | A color token in `src/app/globals.css` | The contrast table in `architecture/accessibility.md` (`test/contrast.test.ts` fails until it matches), the token tables in `architecture/theming.md`, `THEME_FILE_TOKENS` and the token table in `admin/themes.md`, and for a spec's color token the skill's `references/ir.md` |
 | `src/lib/ai/providers/` (a provider kind, including `stub`), `src/lib/ai/server-models.ts` | `admin/models.md` |
 | `src/lib/ai/local-models.ts`, `LOCAL_MODEL_DETECT` / `LOCAL_MODEL_ENDPOINTS` in `src/lib/config.ts` | "A model on this machine" in `admin/models.md`, "A model on your machine" in `admin/demo-mode.md`, "Detected on this machine" in `guide/models.md` |
