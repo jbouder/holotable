@@ -193,6 +193,7 @@ export default defineConfig({
             { label: "Visualization types", slug: "reference/visualization-types" },
             { label: "Panel options", slug: "reference/panel-options" },
             { label: "API routes", slug: "reference/api-routes" },
+            { label: "Accessibility statement", slug: "reference/accessibility" },
           ],
         },
       ],
