@@ -20,12 +20,12 @@ contrast of every token pairing, is on [Accessibility](/architecture/accessibili
 
 Automated. `npm test` runs in CI's required `Test` job on every pull request.
 `npm run e2e` runs in the `End-to-end and accessibility` job on every pull
-request that changes code and on `main`; it is expected to pass but does not
-gate the merge yet.
+request that changes code and on `main`, and that job is required to merge
+too.
 
 | What | Where |
 | --- | --- |
-| axe-core (the WCAG 2.0, 2.1 and 2.2 A and AA rules, and best practice) on every main surface: the dashboard list, a live dashboard and the demo dashboards, the editor and its PromQL, LogQL and link forms, Explore (empty, with an answer, filtered, and at 390 px with its side panel open), data sources with the DuckDB, upload and Loki forms, Models, Settings, the dashboard chat, and an open dialog, menu and popover; in the default theme's dark and light. Serious and critical violations fail; moderate and minor are reported on the test. A chart's canvas is excluded; its name and table are scanned | `e2e/a11y.spec.ts`, `e2e/support/a11y.ts` |
+| axe-core (the WCAG 2.0, 2.1 and 2.2 A and AA rules, and best practice) on every main surface: the dashboard list, a live dashboard and the demo dashboards, the editor and its PromQL, LogQL and link forms, Explore (empty, with an answer, filtered, and at 390 px with its side panel open), data sources with the DuckDB, upload and Loki forms, Models, Settings, the dashboard chat, and an open dialog, menu and popover; in the default theme's dark and light. Every violation fails, whatever its impact. A chart's canvas is excluded; its name and table are scanned. An open menu or listbox popup counts as a landmark region, as a dialog does, since it is portaled outside the page's landmarks and reached from its trigger | `e2e/a11y.spec.ts`, `e2e/support/a11y.ts` |
 | The same scan of the live dashboard in every other shipped theme, both schemes; of the signed-out card; of a share-link embed and the share dialog | `e2e/a11y.spec.ts` |
 | Contrast of every text/background token pairing ≥ 4.5:1, and of chart series and fills ≥ 3:1, in every theme and both schemes, measured from the tokens as the browser paints them; the table on [Accessibility](/architecture/accessibility/#contrast) is what the tokens produce | `test/contrast.test.ts`, `src/lib/color/contrast.ts` |
 | Every theme clears the quality bar: borders, the focus ring, selection, code colors, and statuses and chart series still distinct under protanopia, deuteranopia and tritanopia. The High contrast theme holds text at 7:1 and borders at 4.5:1 | `test/theme-quality.test.ts`, `src/lib/color/quality.ts` |
@@ -79,7 +79,6 @@ WCAG 2.1.1 (keyboard) and 2.5.7 (dragging movements).
 - **Signing in happens on the identity provider's page.** The bundled realm
   uses Keycloak's stock `keycloak` login theme, which Holotable does not draw
   or scan.
-- **Moderate and minor axe findings are reported, not gated** (#685).
 - **The manual checks above have not been recorded yet.** Until they are,
   this statement rests on the automated checks.
 

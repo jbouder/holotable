@@ -74,7 +74,7 @@ function PanelSqlBody({
 
   return (
     <div className="space-y-4">
-      <h4 className="text-sm font-medium">{panel.title}</h4>
+      <h3 className="text-sm font-medium">{panel.title}</h3>
       {details.description && <p className="text-sm text-muted">{details.description}</p>}
 
       <dl className="grid grid-cols-[auto_minmax(0,1fr)] gap-x-4 gap-y-1 text-xs">

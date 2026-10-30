@@ -1,7 +1,7 @@
 name: CI
 
-# Deliberately unfiltered by `paths`. The static-checks/test/build jobs are
-# required status checks on `main`, and a required check that is skipped by a
+# Deliberately unfiltered by `paths`. The static-checks, test, build and
+# end-to-end jobs are required status checks on `main` (#685), and a required check that is skipped by a
 # path filter never reports a conclusion — GitHub then blocks the pull request
 # forever waiting for a run that will not happen. docs.yml can filter by path
 # precisely because none of its jobs are required.
@@ -360,8 +360,8 @@ jobs:
     name: End-to-end and accessibility
     # Runs the build job's output (#610), so it never runs `next build`
     # itself, and waits for the test job rather than spending a stack
-    # bring-up on a failing unit test. Not a required check yet: a browser
-    # suite earns that after it has been quiet on main for a while.
+    # bring-up on a failing unit test. A required check since #685, after a
+    # month quiet on main.
     needs: [code-paths, test, build]
     if: github.event_name != 'pull_request' || needs.code-paths.outputs.changed == 'true'
     runs-on: ubuntu-latest

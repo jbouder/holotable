@@ -112,13 +112,14 @@ cd docs && npm install && npm run dev
 
 Run these before you push. CI runs the same four on every pull request, as
 three jobs — `Static checks` (lint and typecheck), `Test` (which also validates
-`.env.example` and replays the LLM eval corpus) and `Build` — and those three
-are the checks required to merge. The same workflow also round-trips the
-migrations and runs the integration suites against one TimescaleDB
-(`Database`), lints and renders the Helm chart, builds the Docker images and
-runs the self-monitoring smoke test against them (`Images and smoke`), runs
-the `End-to-end and accessibility` suite, and fuzzes the guards for longer;
-those report on a pull request without gating it, so look at them too. The
+`.env.example` and replays the LLM eval corpus) and `Build` — and those three,
+with `End-to-end and accessibility` (the Playwright suite and its axe scans,
+where any axe violation fails), are the checks required to merge. The same
+workflow also round-trips the migrations and runs the integration suites
+against one TimescaleDB (`Database`), lints and renders the Helm chart, builds
+the Docker images and runs the self-monitoring smoke test against them
+(`Images and smoke`), and fuzzes the guards for longer; those report on a pull
+request without gating it, so look at them too. The
 fuzz runs on a pull request only when it touches a guard path (see below);
 otherwise it shows as skipped. A pull request that changes only documentation
 (`docs/`, the root markdown files, the issue and pull request templates)
