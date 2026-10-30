@@ -107,7 +107,7 @@ RUN npm ci --omit=dev \
     node_modules/@duckdb/node-bindings-linux-x64 \
     node_modules/@duckdb/node-bindings-linux-arm64
 
-FROM timescale/timescaledb:2.30.2-pg16@sha256:6f139d56042989bd35f50ba5986e492cd32e35cc6778c50be2659add298dc09f AS quickstart
+FROM timescale/timescaledb:2.31.0-pg16@sha256:322ae364eca3321cf2a48f1ef31213b87843413b3cf8feeebf54e999a26bb731 AS quickstart
 
 # Node 24 from the same Alpine release `quickstart-deps` uses (3.23). `--upgrade` with
 # sqlite-libs because Alpine's node links SQLite's session extension, which the
