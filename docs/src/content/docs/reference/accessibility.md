@@ -25,7 +25,7 @@ gate the merge yet.
 
 | What | Where |
 | --- | --- |
-| axe-core (the WCAG 2.0 and 2.1 A and AA rules, and best practice) on every main surface: the dashboard list, a live dashboard and the demo dashboards, the editor and its PromQL, LogQL and link forms, Explore (empty, with an answer, filtered, and at 390 px with its side panel open), data sources with the DuckDB, upload and Loki forms, Models, Settings, the dashboard chat, and an open dialog, menu and popover; in the default theme's dark and light. Serious and critical violations fail; moderate and minor are reported on the test. A chart's canvas is excluded; its name and table are scanned | `e2e/a11y.spec.ts`, `e2e/support/a11y.ts` |
+| axe-core (the WCAG 2.0, 2.1 and 2.2 A and AA rules, and best practice) on every main surface: the dashboard list, a live dashboard and the demo dashboards, the editor and its PromQL, LogQL and link forms, Explore (empty, with an answer, filtered, and at 390 px with its side panel open), data sources with the DuckDB, upload and Loki forms, Models, Settings, the dashboard chat, and an open dialog, menu and popover; in the default theme's dark and light. Serious and critical violations fail; moderate and minor are reported on the test. A chart's canvas is excluded; its name and table are scanned | `e2e/a11y.spec.ts`, `e2e/support/a11y.ts` |
 | The same scan of the live dashboard in every other shipped theme, both schemes; of the signed-out card; of a share-link embed and the share dialog | `e2e/a11y.spec.ts` |
 | Contrast of every text/background token pairing ≥ 4.5:1, and of chart series and fills ≥ 3:1, in every theme and both schemes, measured from the tokens as the browser paints them; the table on [Accessibility](/architecture/accessibility/#contrast) is what the tokens produce | `test/contrast.test.ts`, `src/lib/color/contrast.ts` |
 | Every theme clears the quality bar: borders, the focus ring, selection, code colors, and statuses and chart series still distinct under protanopia, deuteranopia and tritanopia. The High contrast theme holds text at 7:1 and borders at 4.5:1 | `test/theme-quality.test.ts`, `src/lib/color/quality.ts` |
@@ -68,8 +68,6 @@ WCAG 2.1.1 (keyboard) and 2.5.7 (dragging movements).
 - **Moving and resizing a panel without a keyboard needs a drag** (2.5.7).
   The arrow keys do both; a pointer has no single-tap way to place or size one
   panel (#681).
-- **The canvas's resize handle is 16 × 16 px**, under 2.5.8's 24 px minimum
-  target. Shift and the arrow keys on the tile do the same (#681).
 - **A graph's pan and zoom are gestures only**: a drag pans, a pinch or Ctrl
   and the wheel zooms, with no buttons and no keys. What the graph shows is in
   its table (#682).
@@ -81,10 +79,7 @@ WCAG 2.1.1 (keyboard) and 2.5.7 (dragging movements).
 - **Signing in happens on the identity provider's page.** The bundled realm
   uses Keycloak's stock `keycloak` login theme, which Holotable does not draw
   or scan.
-- **The automated scan runs the WCAG 2.1 rule sets**, not axe's 2.2 tags, so
-  2.2's new criteria (target size, dragging, focus not obscured) are covered
-  only by the specs and exceptions above. Moderate and minor axe findings are
-  reported, not gated (#680, #685).
+- **Moderate and minor axe findings are reported, not gated** (#685).
 - **The manual checks above have not been recorded yet.** Until they are,
   this statement rests on the automated checks.
 

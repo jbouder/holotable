@@ -228,8 +228,11 @@ export function PanelLayoutGrid({
                   onPointerUp={(e) => end(e, true)}
                   onPointerCancel={(e) => end(e, false)}
                   onKeyDown={(e) => nudge(e, panel, "resize")}
-                  className="absolute bottom-0 right-0 z-10 h-4 w-4 cursor-se-resize touch-none border-b-2 border-r-2 border-muted hover:border-primary"
-                />
+                  // A 24px target (44px to a finger) around a 16px corner (WCAG 2.5.8).
+                  className="group/resize absolute bottom-0 right-0 z-10 size-6 cursor-se-resize touch-none pointer-coarse:size-11"
+                >
+                  <span className="absolute bottom-0 right-0 size-4 border-b-2 border-r-2 border-muted group-hover/resize:border-primary" />
+                </button>
               </div>
             );
           }}

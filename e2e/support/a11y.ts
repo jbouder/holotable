@@ -12,8 +12,16 @@ import { expect, type Page, test } from "@playwright/test";
  * that needs one more passes it in `exclude` with its own comment.
  */
 
-/** WCAG 2.1 A and AA, which is the bar #77 sets. */
-const TAGS = ["wcag2a", "wcag2aa", "wcag21a", "wcag21aa", "best-practice"];
+/** WCAG 2.0, 2.1 and 2.2 A and AA (the 2.2 AA target, #680), and best practice. */
+const TAGS = [
+  "wcag2a",
+  "wcag2aa",
+  "wcag21a",
+  "wcag21aa",
+  "wcag22a",
+  "wcag22aa",
+  "best-practice",
+];
 
 const GATING = new Set(["serious", "critical"]);
 
