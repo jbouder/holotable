@@ -1,15 +1,13 @@
 import AxeBuilder from "@axe-core/playwright";
-import { expect, type Page, test } from "@playwright/test";
+import { source as axeSource } from "axe-core";
+import { expect, type Page } from "@playwright/test";
 
 /**
  * The accessibility gate (#91): axe-core over a rendered page.
  *
- * Serious and critical violations fail the test. Moderate and minor ones are
- * reported as annotations on it — visible in the list and HTML reporters —
- * without gating, so they can be worked down rather than ignored.
- *
- * Every exclusion is named here, with the reason, and nowhere else. A spec
- * that needs one more passes it in `exclude` with its own comment.
+ * Every violation fails the test, whatever its impact (#685). A finding that
+ * is accepted is named here, with the reason, and nowhere else. A spec that
+ * needs one more passes it in `exclude` with its own comment.
  */
 
 /** WCAG 2.0, 2.1 and 2.2 A and AA (the 2.2 AA target, #680), and best practice. */
@@ -23,8 +21,6 @@ const TAGS = [
   "best-practice",
 ];
 
-const GATING = new Set(["serious", "critical"]);
-
 /**
  * Regions axe is not asked to look inside.
  *
@@ -35,6 +31,21 @@ const GATING = new Set(["serious", "critical"]);
  *   outside this selector and still scanned.
  */
 const ALWAYS_EXCLUDE = ["[data-echarts-canvas]"];
+
+/**
+ * Rules axe runs with settings of ours.
+ *
+ * - `region` (every piece of content sits in a landmark) counts an open menu
+ *   or listbox (an autocomplete's options) as a region, as it already counts
+ *   a dialog. Base UI portals those popups to `<body>`, outside every
+ *   landmark, and that is where a popup belongs: it is reached from its
+ *   trigger, which sits in a landmark and owns it, not by moving through the
+ *   page's regions. The selectors before `[role=menu]` are axe's own default.
+ */
+const AXE_SOURCE = `${axeSource}
+axe.configure({ checks: [{ id: "region", options: {
+  regionMatcher: "dialog, [role=dialog], [role=alertdialog], svg, [role=menu], [role=listbox]",
+} }] });`;
 
 export type Theme = "light" | "dark";
 
@@ -67,7 +78,7 @@ export async function expectNoA11yViolations(
   page: Page,
   options: { exclude?: string[]; include?: string } = {},
 ): Promise<void> {
-  let builder = new AxeBuilder({ page }).withTags(TAGS);
+  let builder = new AxeBuilder({ page, axeSource: AXE_SOURCE }).withTags(TAGS);
   if (options.include) builder = builder.include(options.include);
   for (const selector of [...ALWAYS_EXCLUDE, ...(options.exclude ?? [])]) {
     builder = builder.exclude(selector);
@@ -83,11 +94,5 @@ export async function expectNoA11yViolations(
       )
       .join("\n")}`;
 
-  for (const v of violations.filter((v) => !GATING.has(v.impact ?? ""))) {
-    test.info().annotations.push({ type: `a11y ${v.impact}`, description: describe(v) });
-  }
-  const gating = violations.filter((v) => GATING.has(v.impact ?? ""));
-  expect(gating.map(describe), `serious or critical violations on ${page.url()}`).toEqual(
-    [],
-  );
+  expect(violations.map(describe), `axe violations on ${page.url()}`).toEqual([]);
 }

@@ -4,8 +4,8 @@
 # which is right for reproducibility and also means nothing moves unless
 # something proposes it. This file is that something. Each entry is reviewed
 # and merged by a person like any other pull request: nothing here
-# auto-merges, and CI's required checks (static checks, test, build) gate
-# every update the same way they gate a hand-written change.
+# auto-merges, and CI's required checks (static checks, test, build,
+# end-to-end) gate every update the same way they gate a hand-written change.
 #
 # Minor and patch updates arrive grouped, one pull request per directory per
 # month, production and development dependencies together. A major is never in
