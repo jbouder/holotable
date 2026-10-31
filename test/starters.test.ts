@@ -8,11 +8,7 @@ import {
   GENERIC_SOURCE_DESCRIPTIONS,
   type StarterKind,
 } from "@/lib/prompts/starters";
-import {
-  type SqlSourceConfig,
-  type SqlSourceRecord,
-  TimescaleDbConfig,
-} from "@/lib/registry";
+import { type SqlSourceRecord, TimescaleDbConfig } from "@/lib/registry";
 
 /**
  * Starter prompts used to be three hard-coded lists that described the seeded

@@ -4,7 +4,6 @@ import { catalogView, searchCatalog, setColumnExposure } from "@/lib/catalog/bro
 import { catalogHealth } from "@/lib/catalog/health";
 import {
   SourceConfig,
-  type SqlSourceConfig,
   type TimescaleDbSourceRecord,
   TimescaleDbConfig,
 } from "@/lib/registry";

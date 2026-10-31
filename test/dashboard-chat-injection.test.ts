@@ -4,11 +4,7 @@ import assert from "node:assert/strict";
 import { buildChatQueryPlan, buildSystemPrompt, resolveChatSources } from "@/lib/ai/chat";
 import { parseGroups } from "@/lib/auth/claims";
 import { parseDashboard } from "@/lib/ir";
-import {
-  type SqlSourceConfig,
-  type SqlSourceRecord,
-  TimescaleDbConfig,
-} from "@/lib/registry";
+import { type SqlSourceRecord, TimescaleDbConfig } from "@/lib/registry";
 
 /**
  * Prompt-injection suite for dashboard chat.

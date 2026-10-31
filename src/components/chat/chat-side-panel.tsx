@@ -389,7 +389,6 @@ function RenameField({
       </Label>
       <Input
         id={id}
-        // biome-ignore lint/a11y/noAutofocus: the rename was just asked for here
         autoFocus
         value={value}
         maxLength={80}

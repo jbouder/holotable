@@ -4,7 +4,6 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
   Building2,
-  Cpu,
   HardDrive,
   KeyRound,
   Keyboard,

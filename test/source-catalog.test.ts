@@ -1,11 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import {
-  allowedTables,
-  type SqlSourceConfig,
-  sqlCatalog,
-  TimescaleDbConfig,
-} from "@/lib/registry";
+import { allowedTables, sqlCatalog, TimescaleDbConfig } from "@/lib/registry";
 import { catalogCompletions } from "@/lib/sql/completion";
 
 /**

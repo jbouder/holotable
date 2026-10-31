@@ -8,11 +8,7 @@ import {
   stubModel,
 } from "@/lib/ai/stub";
 import { DashboardGenerationSchema, ExplorePanel, Panel, queryText } from "@/lib/ir";
-import {
-  ModelSourceDraft,
-  type SqlSourceConfig,
-  TimescaleDbConfig,
-} from "@/lib/registry";
+import { ModelSourceDraft, TimescaleDbConfig } from "@/lib/registry";
 import { validateSql } from "@/lib/sql/safety";
 
 /*

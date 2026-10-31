@@ -117,7 +117,7 @@ export function buildPromqlPlan(input: {
     instant: false,
     expr,
     start,
-    end: end < start ? start : end,
+    end: end.getTime() < start.getTime() ? start : end,
     stepSeconds,
     timeoutMs,
     ...(finestPoints !== undefined ? { finestPoints } : {}),

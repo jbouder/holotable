@@ -682,7 +682,7 @@ export function pieShares(
   donut: boolean,
   textPx: number,
 ): boolean[] {
-  const total = values.reduce((sum, v) => sum + (v > 0 ? v : 0), 0);
+  const total = values.reduce((sum, v) => (v > 0 ? sum + v : sum), 0);
   if (!(total > 0)) return values.map(() => false);
   if (!size) return values.map((v) => v / total >= PIE_SHARE_MIN);
   const r = outer * (Math.min(size.width, size.height) / 2);

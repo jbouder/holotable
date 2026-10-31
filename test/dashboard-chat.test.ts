@@ -5,11 +5,7 @@ import { buildChatQueryPlan, buildSystemPrompt, resolveChatView } from "@/lib/ai
 import type { VariableValues } from "@/lib/sql/variables";
 import type { Selection } from "@/lib/variable-selection";
 import { parseGroups } from "@/lib/auth/claims";
-import {
-  type SqlSourceConfig,
-  type SqlSourceRecord,
-  TimescaleDbConfig,
-} from "@/lib/registry";
+import { type SqlSourceRecord, TimescaleDbConfig } from "@/lib/registry";
 import type { Dashboard } from "@/lib/ir";
 
 const reader = parseGroups("reader", ["/workspaces/ws/viewer"]);

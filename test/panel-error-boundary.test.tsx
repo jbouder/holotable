@@ -23,19 +23,21 @@ function panel(id: string, overrides: Partial<Panel> = {}): Panel {
 
 const DATA = { columns: ["ts", "v"], rows: [{ ts: "t0", v: 41 }] };
 
-/** A component that throws until `stopThrowing` is flipped. */
-function makeBomb(message: string) {
-  const state = { throwing: true };
-  function Bomb(): React.ReactNode {
-    if (state.throwing) throw new Error(message);
-    return <div>recovered</div>;
-  }
-  return { Bomb, state };
+/** A component that throws `message` until `state.throwing` is flipped. */
+function Bomb({
+  message,
+  state,
+}: {
+  message: string;
+  state: { throwing: boolean };
+}): React.ReactNode {
+  if (state.throwing) throw new Error(message);
+  return <div>recovered</div>;
 }
 
 test("a panel that throws degrades to an error card; siblings keep rendering", async () => {
   const h = await mount();
-  const { Bomb } = makeBomb("bad row shape");
+  const bomb = { message: "bad row shape", state: { throwing: true } };
   const panels = [panel("alpha"), panel("bad"), panel("omega")];
 
   h.render(
@@ -43,7 +45,7 @@ test("a panel that throws degrades to an error card; siblings keep rendering", a
       panels={panels}
       renderPanel={(p) =>
         p.id === "bad" ? (
-          <Bomb />
+          <Bomb {...bomb} />
         ) : (
           <PanelView panel={p} state={{ data: DATA, status: "live" }} />
         )
@@ -69,7 +71,8 @@ test("a panel that throws degrades to an error card; siblings keep rendering", a
 
 test("retry remounts only the failed panel", async () => {
   const h = await mount();
-  const { Bomb, state } = makeBomb("transient");
+  const state = { throwing: true };
+  const bomb = { message: "transient", state };
   const panels = [panel("alpha"), panel("bad")];
 
   const tree = (
@@ -77,7 +80,7 @@ test("retry remounts only the failed panel", async () => {
       panels={panels}
       renderPanel={(p) =>
         p.id === "bad" ? (
-          <Bomb />
+          <Bomb {...bomb} />
         ) : (
           <PanelView panel={p} state={{ data: DATA, status: "live" }} />
         )
@@ -107,13 +110,13 @@ test("retry remounts only the failed panel", async () => {
 
 test("the caught error is reported with the panel id and viz type", async () => {
   const h = await mount();
-  const { Bomb } = makeBomb("kaboom");
+  const bomb = { message: "kaboom", state: { throwing: true } };
   const reports: PanelErrorReport[] = [];
 
   h.render(
     <DashboardGrid
       panels={[panel("p-7", { viz: "heatmap" })]}
-      renderPanel={() => <Bomb />}
+      renderPanel={() => <Bomb {...bomb} />}
       onPanelError={(r) => reports.push(r)}
     />,
   );

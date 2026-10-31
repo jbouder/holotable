@@ -15,7 +15,6 @@ import {
   describeHideImpact,
   fetchHideImpact,
   type AnyCatalogView,
-  type CatalogView,
   fetchCatalogView,
   isLabelCatalogView,
   isMetricCatalogView,

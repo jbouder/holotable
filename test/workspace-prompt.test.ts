@@ -9,11 +9,7 @@ import {
 } from "@/lib/ai/prompt";
 import { findUntrustedBlocks } from "@/lib/ai/untrusted";
 import { type Panel, SPEC_VERSION } from "@/lib/ir";
-import {
-  type SqlSourceConfig,
-  type SqlSourceRecord,
-  TimescaleDbConfig,
-} from "@/lib/registry";
+import { type SqlSourceRecord, TimescaleDbConfig } from "@/lib/registry";
 import { validateSql } from "@/lib/sql/safety";
 import {
   draftFromPrompt,
