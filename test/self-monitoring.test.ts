@@ -21,7 +21,7 @@ import {
   rowValues,
   toRow,
 } from "@/lib/self-monitoring/exposition";
-import { type SqlSourceConfig, TimescaleDbConfig } from "@/lib/registry";
+import { TimescaleDbConfig } from "@/lib/registry";
 import { renderMetrics, resetMetricsForTests } from "@/lib/metrics";
 import { validateLogql } from "@/lib/logql/safety";
 import { validatePromql } from "@/lib/promql/safety";

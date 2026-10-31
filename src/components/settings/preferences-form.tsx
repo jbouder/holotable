@@ -45,11 +45,6 @@ const REFRESH_OPTIONS: SelectOption[] = CHAT_REFRESH_CHOICES.map((c) => ({
   label: c.label,
 }));
 
-const START_VIEW_OPTIONS: SelectOption[] = [
-  { value: "model", label: "As the model drew it" },
-  { value: "table", label: "A table" },
-];
-
 /** The history switches, each with the local store it keeps. */
 const HISTORY_SWITCHES: {
   key: "rememberPrompts" | "rememberRecentDashboards" | "rememberPaletteHistory";

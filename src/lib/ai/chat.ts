@@ -21,19 +21,9 @@ import {
 } from "@/lib/ai/data-chat";
 import { sourceKind } from "@/lib/sources/registry";
 import { serverKind } from "@/lib/sources/server/registry";
-import {
-  type Dashboard,
-  declaredVariables,
-  hasQuery,
-  Panel,
-  type TimeRange,
-  SqlQuery,
-  PromqlQuery,
-  isSqlQuery,
-  queryTimeField,
-} from "@/lib/ir";
+import { type Dashboard, declaredVariables, hasQuery, type TimeRange } from "@/lib/ir";
 import type { VariableValues } from "@/lib/sql/variables";
-import { defaultValue, type Selection } from "@/lib/variable-selection";
+import type { Selection } from "@/lib/variable-selection";
 import type { SourceRecord } from "@/lib/registry";
 import { can } from "@/lib/auth/authorize";
 import { workspaceContextBlock } from "@/lib/ai/prompt";

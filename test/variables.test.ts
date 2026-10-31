@@ -6,11 +6,7 @@ import { HttpError } from "@/lib/auth/authorize";
 import { resolveAndValidateDashboard } from "@/lib/dashboard-service";
 import { Dashboard, type Variable } from "@/lib/ir";
 import { getPoller, type PanelExecutor } from "@/lib/poller/registry";
-import {
-  type SqlSourceConfig,
-  type SqlSourceRecord,
-  TimescaleDbConfig,
-} from "@/lib/registry";
+import { type SqlSourceRecord, TimescaleDbConfig } from "@/lib/registry";
 import type { ExecutablePlan } from "@/lib/sql/safety";
 import {
   resolveSelection,

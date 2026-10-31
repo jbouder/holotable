@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { type SqlSourceConfig, sqlCatalog, TimescaleDbConfig } from "@/lib/registry";
+import { sqlCatalog, TimescaleDbConfig } from "@/lib/registry";
 import {
   selectOutputs,
   sqlHints,

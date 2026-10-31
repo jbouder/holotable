@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { parseSync } from "libpg-query";
 import { config } from "@/lib/config";
 import { validateSql, buildExecutablePlan, verifyWrapper } from "@/lib/sql/safety";
-import { type SqlSourceConfig, TimescaleDbConfig } from "@/lib/registry";
+import { TimescaleDbConfig } from "@/lib/registry";
 import { resolveTimeRange, resolveTimeExpr, TimeRangeError } from "@/lib/time";
 import { renderMetrics, resetMetricsForTests } from "@/lib/metrics";
 

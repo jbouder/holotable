@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { ColumnImpact, describeHideImpact } from "@/lib/catalog/browse";
 import { hiddenColumnImpact, type PanelStatement } from "@/lib/catalog/hide-impact";
 import { renderMetrics, resetMetricsForTests } from "@/lib/metrics";
-import { type SqlSourceConfig, TimescaleDbConfig } from "@/lib/registry";
+import { TimescaleDbConfig } from "@/lib/registry";
 import { checkSql, validateSql } from "@/lib/sql/safety";
 
 /**

@@ -14,7 +14,6 @@ import { type McpDeps, MCP_INSTRUCTIONS, mcpTools } from "@/lib/mcp/tools";
 import { MAX_TOOL_ROWS } from "@/lib/mcp/tools/sql";
 import {
   type SourceRecord,
-  type SqlSourceConfig,
   type SqlSourceRecord,
   TimescaleDbConfig,
 } from "@/lib/registry";

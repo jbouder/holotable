@@ -2,12 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import fc from "fast-check";
 import { parse, scan } from "libpg-query";
-import {
-  allowedTables,
-  type SqlSourceConfig,
-  sqlCatalog,
-  TimescaleDbConfig,
-} from "@/lib/registry";
+import { allowedTables, sqlCatalog, TimescaleDbConfig } from "@/lib/registry";
 import { sqlHints } from "@/lib/sql/hints";
 import { RowFilterError } from "@/lib/sql/row-filter";
 import { buildExecutablePlan, validateSql } from "@/lib/sql/safety";

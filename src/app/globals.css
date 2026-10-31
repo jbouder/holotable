@@ -1020,15 +1020,15 @@ html[data-vt="tab"] [role="tab"][aria-selected="true"] {
  * utility, not `hover:bg-surface-2`, which only fills on hover.
  */
 .tinted
-:is(
-  [class^="bg-surface"],
-  [class*=" bg-surface"],
-  [class^="bg-primary"],
-  [class*=" bg-primary"],
-  [class*="hover:bg-surface"]:hover,
-  input,
-  textarea
-) {
+  :is(
+    [class^="bg-surface"],
+    [class*=" bg-surface"],
+    [class^="bg-primary"],
+    [class*=" bg-primary"],
+    [class*="hover:bg-surface"]:hover,
+    input,
+    textarea
+  ) {
   --foreground: var(--page-foreground);
   --muted: var(--page-muted);
   --primary: var(--page-primary);

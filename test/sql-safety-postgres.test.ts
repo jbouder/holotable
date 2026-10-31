@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { validateSql } from "@/lib/sql/safety";
-import { type SqlSourceConfig, TimescaleDbConfig } from "@/lib/registry";
+import { TimescaleDbConfig } from "@/lib/registry";
 
 /**
  * PostgreSQL-specific guard coverage.

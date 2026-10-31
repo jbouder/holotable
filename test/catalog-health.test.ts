@@ -7,11 +7,7 @@ import {
   describeCatalogHealth,
   liveCatalogTables,
 } from "@/lib/catalog/health";
-import {
-  type SqlSourceConfig,
-  type TimescaleDbSourceRecord,
-  TimescaleDbConfig,
-} from "@/lib/registry";
+import { type TimescaleDbSourceRecord, TimescaleDbConfig } from "@/lib/registry";
 import { renderCatalog } from "@/lib/timescaledb/catalog";
 
 /**

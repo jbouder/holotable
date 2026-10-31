@@ -1,7 +1,7 @@
 import { before, test } from "node:test";
 import assert from "node:assert/strict";
 import { loadModule } from "libpg-query";
-import { type SqlSourceConfig, TimescaleDbConfig } from "@/lib/registry";
+import { TimescaleDbConfig } from "@/lib/registry";
 import { analyzeSelectSync } from "@/lib/sql/ast";
 import { buildExecutablePlan, checkSql } from "@/lib/sql/safety";
 import { scanVariables, VariableError } from "@/lib/sql/variables";

@@ -1,5 +1,5 @@
 import { test } from "node:test";
-import { CHAT_EXPANDED_KEY, CHAT_PANEL_CLOSED_KEY } from "@/lib/chat-layout";
+import { CHAT_EXPANDED_KEY } from "@/lib/chat-layout";
 import assert from "node:assert/strict";
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join, relative } from "node:path";

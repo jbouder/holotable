@@ -16,10 +16,7 @@ import { sourceKind } from "@/lib/sources/registry";
 import { serverKind } from "@/lib/sources/server/registry";
 import {
   type Dashboard,
-  DashboardGenerationSchema,
-  ExplorePanel,
   forGeneration,
-  GeneratedPanel,
   type Panel,
   generationSchemas,
   type QueryLanguage,

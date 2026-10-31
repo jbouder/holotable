@@ -9,7 +9,6 @@ import { buildSourceDescriptionStarters, buildStarters } from "@/lib/prompts/sta
 import {
   exposedTable,
   SourceConfig,
-  type SqlSourceConfig,
   type TimescaleDbSourceRecord,
   sqlCatalog,
   TimescaleDbConfig,

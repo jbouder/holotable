@@ -9,6 +9,7 @@
       "!docs",
       "!deploy/cloudflare/*/worker-configuration.d.ts",
       "!keycloak/*-realm.json",
+      "!deploy/helm/*/templates",
       "!package-lock.json"
     ]
   },
@@ -20,6 +21,9 @@
   },
   "javascript": {
     "formatter": { "quoteStyle": "double", "trailingCommas": "all" }
+  },
+  "markdown": {
+    "formatter": { "enabled": false }
   },
   "css": {
     "parser": { "tailwindDirectives": true }
