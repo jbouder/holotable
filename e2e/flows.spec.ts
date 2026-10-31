@@ -157,7 +157,7 @@ async function expectNoSidewaysScroll(page: Page) {
   const { overflow, past } = await page.evaluate(() => {
     const doc = document.documentElement;
     const overflowing = () => doc.scrollWidth > doc.clientWidth;
-    const describe = (el: Element) => {
+    const summarize = (el: Element) => {
       const r = el.getBoundingClientRect();
       return `${Math.round(r.left)}..${Math.round(r.right)} ${getComputedStyle(el).position} <${el.tagName.toLowerCase()} class="${el.getAttribute("class") ?? ""}"> ${(el.textContent ?? "").trim().slice(0, 60)}`;
     };
@@ -175,7 +175,7 @@ async function expectNoSidewaysScroll(page: Page) {
           const fixed = !overflowing();
           child.style.display = display;
           if (fixed) {
-            past.push(describe(child));
+            past.push(summarize(child));
             node = child;
             continue descend;
           }
