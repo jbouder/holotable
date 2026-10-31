@@ -125,8 +125,12 @@ long way round — it adds a version that differs only in the title — because
 
 Order, position and size live in one place: the canvas. Drag a panel to move
 it and drag its corner to resize it; with a panel focused, the arrow keys move
-it, Shift and the arrow keys resize it, and Delete removes it. Each gesture is
-one change, committed when the pointer comes up.
+it, Shift and the arrow keys resize it, and Delete removes it. Without a drag
+or the keyboard, select a panel and open **Position and size** in the
+inspector: it says where the panel is, and its buttons move it a cell at a
+time or make it a cell wider, narrower, taller or shorter. The other panels
+make room the same way for every one of these. Each gesture is one change,
+committed when the pointer comes up.
 
 The `Arrange: N-up` presets in the dashboard settings re-flow every panel into
 N columns in reading order, as one undoable step. **Duplicate** copies a panel

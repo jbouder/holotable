@@ -26,6 +26,7 @@ import {
 } from "@/lib/ir";
 import { panelKind } from "@/lib/panels/registry";
 import { autoLayoutPanels } from "@/lib/layout";
+import { applyLayout, sameLayouts } from "@/lib/grid-layout";
 import { duplicatePanel } from "@/lib/panel-list";
 import { isStarterQuery, starterPanel } from "@/lib/panel-starter";
 import { AiUnavailable } from "@/components/ai-unavailable";
@@ -1012,8 +1013,9 @@ export function EditDashboardClient({
           />
           {spec.panels.length > 0 && (
             <p className="mt-2 text-xs text-muted">
-              Click a panel to edit it. Drag to move, drag the corner to resize; arrow
-              keys move the focused panel, Shift and arrows resize it, Delete removes it.
+              Click a panel to edit it. Drag to move, drag the corner to resize, or use
+              Position and size in the inspector; arrow keys move the focused panel, Shift
+              and arrows resize it, Delete removes it.
             </p>
           )}
         </section>
@@ -1045,6 +1047,10 @@ export function EditDashboardClient({
                 });
               }}
               onChange={(fn, intent) => updatePanel(selected.id, fn, intent)}
+              onLayout={(next) => {
+                const panels = applyLayout(spec.panels, selected.id, next);
+                if (!sameLayouts(panels, spec.panels)) setPanels(panels);
+              }}
               onClose={() => selectPanel(null)}
               onDuplicate={() => duplicate(selected.id)}
               onSaveAsTemplate={panelTemplate.openDialog}

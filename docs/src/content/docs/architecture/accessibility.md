@@ -19,7 +19,9 @@ it conforms, what checks it, and the known exceptions are the
   returns to the control that opened it.
 - **Editor.** On the canvas, each panel is a button named by its title and
   position: Enter selects it (`aria-pressed`), the arrow keys move it, Shift and
-  the arrow keys resize it, and Delete or Backspace removes it. The live panel
+  the arrow keys resize it, and Delete or Backspace removes it; the inspector's
+  **Position and size** buttons do the same moves and resizes with clicks alone
+  (2.5.7), and its status line announces where the panel is. The live panel
   under it is `inert`, so Tab reaches the handle and not the chart's own
   controls. Duplicate, Save as template and Delete are also in the inspector's
   named panel menu, and every deletion is one step to undo. The keys are listed
