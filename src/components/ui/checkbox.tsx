@@ -43,7 +43,9 @@ export function Checkbox({
       <label
         htmlFor={inputId}
         className={cn(
-          "cursor-pointer text-sm text-foreground",
+          // `min-w-0`: a long label wraps or truncates in its row, never
+          // pushes the row past its container (1.4.10).
+          "min-w-0 cursor-pointer text-sm text-foreground",
           disabled && "cursor-not-allowed opacity-50",
         )}
       >
