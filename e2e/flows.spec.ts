@@ -148,33 +148,44 @@ test(
 );
 
 /**
- * The page must not scroll sideways. A failure names what reaches past the
- * window: the outermost such elements, where they end and how they are
- * placed, since an overflow is often something unseen (an `sr-only` name, an
- * element off to the side) and the screenshot shows nothing wrong.
+ * The page must not scroll sideways. A failure says why: the window, the
+ * page and a scrollbar's widths, and the chain of elements down to the one
+ * whose hiding ends the overflow, since it is often something unseen (an
+ * `sr-only` name, a pseudo-element) and the screenshot shows nothing wrong.
  */
 async function expectNoSidewaysScroll(page: Page) {
   const { overflow, past } = await page.evaluate(() => {
-    const width = document.documentElement.clientWidth;
-    const beyond = (el: Element | null) =>
-      el !== null && el.getBoundingClientRect().right > width + 0.5;
-    const past: string[] = [];
-    for (const el of Array.from(document.querySelectorAll("body *"))) {
-      if (!beyond(el) || beyond(el.parentElement)) continue;
+    const doc = document.documentElement;
+    const overflowing = () => doc.scrollWidth > doc.clientWidth;
+    const describe = (el: Element) => {
       const r = el.getBoundingClientRect();
-      past.push(
-        `${Math.round(r.left)}..${Math.round(r.right)} ${getComputedStyle(el).position} <${el.tagName.toLowerCase()} class="${el.getAttribute("class") ?? ""}"> ${(el.textContent ?? "").trim().slice(0, 60)}`,
-      );
-    }
-    return {
-      overflow: document.documentElement.scrollWidth - width,
-      past: past.slice(0, 10),
+      return `${Math.round(r.left)}..${Math.round(r.right)} ${getComputedStyle(el).position} <${el.tagName.toLowerCase()} class="${el.getAttribute("class") ?? ""}"> ${(el.textContent ?? "").trim().slice(0, 60)}`;
     };
+    const past: string[] = [
+      `window ${innerWidth}, page ${doc.clientWidth} (a scrollbar takes ${innerWidth - doc.clientWidth}), html ${doc.scrollWidth}, body ${document.body.scrollWidth}`,
+    ];
+    if (overflowing()) {
+      // Hide each child in turn and follow the one whose hiding ends the
+      // overflow: it finds a culprit no box shows, a pseudo-element or text.
+      let node: Element = document.body;
+      descend: for (;;) {
+        for (const child of Array.from(node.children) as HTMLElement[]) {
+          const display = child.style.display;
+          child.style.display = "none";
+          const fixed = !overflowing();
+          child.style.display = display;
+          if (fixed) {
+            past.push(describe(child));
+            node = child;
+            continue descend;
+          }
+        }
+        break;
+      }
+    }
+    return { overflow: doc.scrollWidth - doc.clientWidth, past };
   });
-  expect(
-    overflow,
-    `scrolls sideways; past the edge:\n${past.join("\n")}`,
-  ).toBeLessThanOrEqual(0);
+  expect(overflow, `scrolls sideways:\n${past.join("\n")}`).toBeLessThanOrEqual(0);
 }
 
 test("the demo dashboard at 1440 px does not scroll sideways", async ({
