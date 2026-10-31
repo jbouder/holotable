@@ -167,15 +167,17 @@ export const PanelView = React.memo(function PanelView({
           expansion.expanded && "fixed inset-3 z-50 h-auto sm:inset-8",
         )}
       >
-        {/* At phone width the badges drop below the title rather than push the
-            page sideways (1.4.10, #683); wider, a long title truncates. */}
-        <CardHeader className="flex-wrap gap-x-2 gap-y-1">
+        {/* On a phone the badges drop below the title rather than push the
+            page sideways (1.4.10, #683). From `sm` up the header stays one
+            line and a long title truncates: a panel there is often as narrow
+            as a phone, and a taller header would shrink every chart. */}
+        <CardHeader className="max-sm:flex-wrap max-sm:gap-x-2 max-sm:gap-y-1">
           {/* The description reads as part of the title, so it sits beside it. */}
-          <div className="flex min-w-0 grow basis-40 items-center gap-0.5">
+          <div className="flex min-w-0 items-center gap-0.5 max-sm:grow max-sm:basis-40">
             <CardTitle className="min-w-0 truncate">{panel.title}</CardTitle>
             <PanelDescription panel={panel} />
           </div>
-          <div className="ml-auto flex max-w-full shrink-0 flex-wrap items-center justify-end gap-1">
+          <div className="flex shrink-0 items-center gap-1 max-sm:ml-auto max-sm:max-w-full max-sm:flex-wrap max-sm:justify-end">
             <OverrideBadge panel={panel} />
             {queried && data.truncated && <TruncationBadge truncated={data.truncated} />}
             <DrawnAsBadge panel={panel} data={data} size={size} />
