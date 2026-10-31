@@ -508,7 +508,7 @@ request:
 | `src/lib/metrics.ts` (an instrument) | `operations/metrics.md` |
 | `migrations/` (a table or column) | `architecture/data-model.md` |
 | `keycloak/holotable-realm.json` | `admin/keycloak.md` (the local realm, its users, client settings) |
-| A drag, an axe exclusion, an accessibility check, or a known accessibility gap | `reference/accessibility.md` (the checks, the drag table, the known exceptions) |
+| A drag, an axe exclusion, an accessibility check, or a known accessibility gap | `reference/accessibility.md` (the checks, the drag table, the known exceptions); `ACCESSIBILITY.md` too if the target, what CI gates on, or how to report changes |
 | A color token in `src/app/globals.css` | The contrast table in `architecture/accessibility.md` (`test/contrast.test.ts` fails until it matches), the token tables in `architecture/theming.md`, `THEME_FILE_TOKENS` and the token table in `admin/themes.md`, and for a spec's color token the skill's `references/ir.md` |
 | `src/lib/ai/providers/` (a provider kind, including `stub`), `src/lib/ai/server-models.ts` | `admin/models.md` |
 | `src/lib/ai/local-models.ts`, `LOCAL_MODEL_DETECT` / `LOCAL_MODEL_ENDPOINTS` in `src/lib/config.ts` | "A model on this machine" in `admin/models.md`, "A model on your machine" in `admin/demo-mode.md`, "Detected on this machine" in `guide/models.md` |

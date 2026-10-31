@@ -67,11 +67,11 @@ jobs:
         working-directory: docs
         run: npm run build
 
-      # README, CONTRIBUTING, SECURITY, AGENTS, the pull request template and
-      # the chart README: relative links, links into the docs site and
-      # backticked repository paths must all resolve. Offline, so a third
-      # party's outage cannot fail it. Runs after the build because links to
-      # the generated reference pages need them generated.
+      # README, CONTRIBUTING, SECURITY, ACCESSIBILITY, AGENTS, the pull
+      # request template and the chart README: relative links, links into the
+      # docs site and backticked repository paths must all resolve. Offline,
+      # so a third party's outage cannot fail it. Runs after the build because
+      # links to the generated reference pages need them generated.
       - name: Check root markdown links
         working-directory: docs
         run: node scripts/check-root-links.mjs
