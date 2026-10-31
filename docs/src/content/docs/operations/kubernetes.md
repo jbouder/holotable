@@ -57,9 +57,9 @@ To run your own build, push both targets to a registry the cluster can pull from
 and point `image.repository` and `migrations.image.repository` at it:
 
 ```bash
-docker build -t <registry>/holotable:0.3.0 \
+docker build -t <registry>/holotable:0.4.0 \
   --build-arg GIT_COMMIT="$(git rev-parse HEAD)" .
-docker build -t <registry>/holotable:0.3.0-migrate --target migrate .
+docker build -t <registry>/holotable:0.4.0-migrate --target migrate .
 ```
 
 The standalone server carries no image library (#498). The app uses no

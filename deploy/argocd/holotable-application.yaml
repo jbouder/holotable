@@ -41,7 +41,7 @@ spec:
         image:
           repository: ghcr.io/jbouder/holotable
           # Pin by digest so a re-sync cannot quietly pull different bytes.
-          tag: "0.3.0"
+          tag: "0.4.0"
         secrets:
           existingSecret: holotable-env
         config:
