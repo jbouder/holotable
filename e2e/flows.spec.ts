@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+import { type APIRequestContext, expect, type Page, test } from "@playwright/test";
 import { STUB_CHAT_REPLY } from "../src/lib/ai/stub";
 import { SPEC_VERSION } from "../src/lib/ir";
 import { PG_PORT, storageStatePath } from "./env";
@@ -28,8 +28,11 @@ const SERIAL = { tag: "@serial" };
 
 test("Explore is in the main nav, and old /chat and /dashboards links land", async ({
   page,
+  isMobile,
 }) => {
   await page.goto("/");
+  // A phone folds the nav behind its menu button.
+  if (isMobile) await page.getByRole("button", { name: "Open menu" }).click();
   await page
     .getByRole("navigation", { name: "Main" })
     .getByRole("link", { name: "Explore" })
@@ -84,13 +87,18 @@ test("chat answers with an inline panel that survives a reload", async ({ page }
   await expect(page.getByRole("region", { name: "Requests by service" })).toBeVisible();
 });
 
-test("chat history: a conversation is listed, renamed and deleted", async ({ page }) => {
+test("chat history: a conversation is listed, renamed and deleted", async ({
+  page,
+  isMobile,
+}) => {
   // Titles of this test's own, since other tests chat at the same time.
   const id = unique();
   const question = `Which service is busiest right now? ${id}`;
   const renamed = `Busiest service ${id}`;
   await askChat(page, question);
   await expect(page.getByText(STUB_CHAT_REPLY)).toBeVisible();
+  // A phone keeps the history in the side panel's sheet.
+  if (isMobile) await page.getByRole("button", { name: /source.* · / }).click();
   const history = page.getByRole("navigation", { name: "History" });
   const entry = history.getByRole("link", { name: question });
   await expect(entry).toHaveAttribute("aria-current", "page");
@@ -139,20 +147,63 @@ test(
   },
 );
 
-for (const width of [1440, 390]) {
-  test(`the demo dashboard at ${width} px does not scroll sideways`, async ({
-    page,
-    request,
-  }) => {
-    // #536: a chart's screen-reader table is clipped to a pixel, but a table
-    // ignores its width, so it reached past the page and made it scroll.
-    await page.setViewportSize({ width, height: 900 });
-    await page.goto(`/dashboards/${await dashboardId(request, DEMO_DASHBOARD)}`);
-    await waitForPanels(page);
-    const overflow = await page.evaluate(
-      () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
-    );
-    expect(overflow).toBeLessThanOrEqual(0);
+/** How far the page reaches past the window, sideways. */
+function sidewaysOverflow(page: Page) {
+  return page.evaluate(
+    () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
+  );
+}
+
+test("the demo dashboard at 1440 px does not scroll sideways", async ({
+  page,
+  request,
+}) => {
+  // #536: a chart's screen-reader table is clipped to a pixel, but a table
+  // ignores its width, so it reached past the page and made it scroll.
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto(`/dashboards/${await dashboardId(request, DEMO_DASHBOARD)}`);
+  await waitForPanels(page);
+  expect(await sidewaysOverflow(page)).toBeLessThanOrEqual(0);
+});
+
+// WCAG 1.4.10 (#683): 320 CSS px, a 1280 px window at 400% zoom. Something
+// that needs two dimensions, a chart or a wide table, may scroll inside
+// itself; the page never does.
+const REFLOW_PAGES: {
+  name: string;
+  path: (request: APIRequestContext) => Promise<string>;
+  panels?: boolean;
+}[] = [
+  { name: "the dashboard list", path: async () => "/" },
+  { name: "a new dashboard", path: async () => "/dashboards/new" },
+  { name: "data sources", path: async () => "/data-sources" },
+  { name: "explore", path: async () => "/explore" },
+  { name: "models", path: async () => "/models" },
+  { name: "settings", path: async () => "/settings/appearance" },
+  {
+    name: "the demo dashboard",
+    path: async (request) => `/dashboards/${await dashboardId(request, DEMO_DASHBOARD)}`,
+    panels: true,
+  },
+  {
+    name: "the fleet demo",
+    path: async (request) => `/dashboards/${await dashboardId(request, "Demo fleet")}`,
+    panels: true,
+  },
+  {
+    name: "the dashboard editor",
+    path: async (request) =>
+      `/dashboards/${await dashboardId(request, DEMO_DASHBOARD)}/edit`,
+  },
+];
+
+for (const { name, path, panels } of REFLOW_PAGES) {
+  test(`${name} at 320 px does not scroll sideways`, async ({ page, request }) => {
+    await page.setViewportSize({ width: 320, height: 640 });
+    await page.goto(await path(request));
+    await expect(page.getByRole("heading", { level: 1 })).toBeAttached();
+    if (panels) await waitForPanels(page);
+    expect(await sidewaysOverflow(page)).toBeLessThanOrEqual(0);
   });
 }
 
@@ -161,10 +212,7 @@ test("chat at phone width: the side panel is a sheet, and nothing scrolls sidewa
 }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto("/explore");
-  const overflow = await page.evaluate(
-    () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
-  );
-  expect(overflow).toBeLessThanOrEqual(0);
+  expect(await sidewaysOverflow(page)).toBeLessThanOrEqual(0);
   await page.getByRole("button", { name: /source.* · / }).click();
   const sheet = page.getByRole("dialog", { name: "Conversation" });
   await expect(sheet.getByRole("heading", { name: "Sources" })).toBeVisible();

@@ -183,11 +183,13 @@ for (const theme of THEMES) {
       await expectNoA11yViolations(page);
     });
 
-    test("explore with the history filter in use", async ({ page }) => {
+    test("explore with the history filter in use", async ({ page, isMobile }) => {
       await askChat(page);
       await expect(
         page.getByRole("region", { name: "Requests by service, table" }),
       ).toBeVisible();
+      // A phone keeps the history in the side panel's sheet.
+      if (isMobile) await page.getByRole("button", { name: /source.* · / }).click();
       await page.getByRole("textbox", { name: "Filter conversations" }).fill("busiest");
       await expectNoA11yViolations(page);
     });

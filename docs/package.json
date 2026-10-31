@@ -14,15 +14,15 @@
     "deploy": "npm run build && wrangler deploy"
   },
   "dependencies": {
-    "@astrojs/starlight": "0.42.6",
+    "@astrojs/starlight": "0.42.7",
     "@fontsource-variable/jetbrains-mono": "5.3.0",
     "@fontsource/chakra-petch": "5.3.0",
-    "astro": "7.4.0",
+    "astro": "7.4.2",
     "sharp": "0.35.5",
     "starlight-links-validator": "0.27.0"
   },
   "devDependencies": {
-    "wrangler": "4.151.0"
+    "wrangler": "4.154.0"
   },
   "overrides": {
     "postcss-nested": {

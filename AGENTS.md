@@ -344,9 +344,9 @@ Before finishing: `npm run lint`, `npm run typecheck`, `npm test`, and
 `npm run build` for anything framework- or build-sensitive. Those, and
 end-to-end (`npm run e2e`, where any axe violation fails), are CI's required
 checks. CI also runs migrations, integration, Helm, images and smoke, and a
-long fuzz; they do not gate the merge, but they are expected to pass. A docs-only pull request skips build, database, Helm,
-end-to-end and images (`code-paths` in `ci.yml`); lint, typecheck and tests
-still run. The other scripts, and when to reach for them:
+long fuzz; they do not gate the merge, but they are expected to pass. A
+docs-only pull request skips build, database, Helm, end-to-end and images
+(`code-paths` in `ci.yml`); lint, typecheck and tests still run. The other scripts, and when to reach for them:
 
 ```bash
 npm run dev:demo         # dev server in AUTH_MODE=demo, no Keycloak needed (not for auth work)
@@ -371,7 +371,9 @@ npm run load:stream      # many viewers of one dashboard stream, some stalled (a
   holds. Extend the named test that holds the rule before adding a file, and
   a change that only moves or restyles UI needs no new unit test.
 - **End-to-end specs run in parallel.** `e2e/playwright.config.ts` has a
-  `parallel` project and, after it, a `serial` one. A test makes its own
+  `parallel` project, a `phone` one (the a11y and flow specs on a Pixel 7;
+  open what the phone layout folds away when `isMobile`) and, after both, a
+  `serial` one. A test makes its own
   records under a name no other test uses (`unique()` in
   `e2e/support/app.ts`) and never counts a shared list; one that changes
   state the workspace or the person shares (uploads, the DuckDB root, a

@@ -456,7 +456,7 @@ function ServerCard({ rows, demo }: { rows: ServerModelRow[]; demo: boolean }) {
             description="The operator has declared none."
           />
         ) : (
-          <Table>
+          <Table label="Server models">
             <TableHead>
               <TableRow>
                 <TableHeader>Name</TableHeader>
@@ -574,7 +574,7 @@ function DetectedCard({
             }
           />
         ) : (
-          <Table>
+          <Table label="Detected models">
             <TableHead>
               <TableRow>
                 <TableHeader>Name</TableHeader>
