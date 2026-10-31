@@ -615,7 +615,9 @@ export function ChatClient({
                       }
                       className={cn(
                         COMPOSER_CHIP_CLASS,
-                        "h-8 max-w-[min(20rem,60vw)] px-2.5",
+                        // Shrinks, its name truncating, so the row fits a
+                        // 320 px screen beside the model and Send (#683).
+                        "h-8 min-w-0 max-w-[min(20rem,60vw)] shrink px-2.5",
                       )}
                       panelClassName="max-w-sm"
                       trigger={
@@ -661,7 +663,7 @@ export function ChatClient({
                     <ModelChip
                       choice={choice}
                       disabled={busy}
-                      className="ml-2 h-8 max-w-[min(14rem,40vw)] px-2.5"
+                      className="ml-2 h-8 min-w-0 max-w-[min(14rem,40vw)] shrink px-2.5"
                     />
                   </div>
                   <div className="pointer-events-auto shrink-0">
