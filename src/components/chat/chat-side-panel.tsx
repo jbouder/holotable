@@ -129,7 +129,7 @@ function SourcesSection({
                   checked={selected.includes(s.id)}
                   disabled={other || full || busy}
                   onCheckedChange={(on) => onToggle(s.id, on)}
-                  label={<span className="truncate">{s.name}</span>}
+                  label={<span className="block truncate">{s.name}</span>}
                   className="min-w-0"
                 />
                 <span className="shrink-0 text-xs text-muted">
