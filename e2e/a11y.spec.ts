@@ -7,6 +7,7 @@ import {
   askChat,
   clickChart,
   createDrilldownDashboards,
+  createGraphDashboard,
   createLinkedDashboards,
   createLogqlDashboard,
   createPromqlDashboard,
@@ -388,6 +389,26 @@ for (const theme of THEMES) {
       await waitForPanels(page);
       await page.getByRole("button", { name: "Actions for Requests by route" }).click();
       await expect(page.getByRole("menuitem", { name: "Checkout detail" })).toBeVisible();
+      await expectNoA11yViolations(page);
+    });
+
+    test("a graph's zoom and pan controls (#682)", async ({
+      page,
+      request,
+      isMobile,
+    }) => {
+      await page.goto(`/dashboards/${await createGraphDashboard(request)}`);
+      await waitForPanels(page);
+      await expect(page.getByRole("group", { name: /^Zoom and pan / })).toHaveCount(2);
+      // A phone folds them behind a toggle; scan them open.
+      if (isMobile) {
+        const panel = page.locator('[data-panel-id="dag"]');
+        await panel.getByRole("button", { name: "Zoom and pan", exact: true }).click();
+        // Open, the toggle is named for what it does next.
+        await expect(
+          panel.getByRole("button", { name: "Hide zoom and pan" }),
+        ).toHaveAttribute("aria-expanded", "true");
+      }
       await expectNoA11yViolations(page);
     });
 

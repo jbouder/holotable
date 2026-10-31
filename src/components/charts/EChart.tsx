@@ -30,6 +30,12 @@ export interface EChartHandle {
    * A custom visual (#405) draws asynchronously, so it may answer later.
    */
   toPng(backgroundColor: string): string | null | Promise<string | null>;
+  /**
+   * Zoom or pan a chart that roams (#682), as a drag, a pinch or Ctrl and the
+   * wheel would: the buttons and keys beside it, for whoever cannot drag.
+   * Nothing on a chart whose option does not roam ({@link roamKind}).
+   */
+  roam?(step: RoamStep): void;
 }
 
 /**
@@ -267,6 +273,9 @@ export function EChart({
           pixelRatio: Math.min(2, globalThis.devicePixelRatio || 1),
           backgroundColor,
         }) ?? null,
+      roam: (step: RoamStep) => {
+        if (chartRef.current) roamChart(chartRef.current, step);
+      },
     }),
     [],
   );
@@ -573,6 +582,118 @@ function attachCtrlZoom(chart: echarts.ECharts): () => void {
   };
   zr.on("mousewheel", onWheel);
   return () => zr.off("mousewheel", onWheel);
+}
+
+/** One press of a roam control: zoom, put the view back, or move it a step. */
+export type RoamStep = "in" | "out" | "reset" | "left" | "right" | "up" | "down";
+
+/**
+ * How a chart's option roams, if it does (#682): by its axes' inside zoom (a
+ * directed graph) or by its series' own roam (a force graph). A chart that
+ * does neither, or whose inside zoom is off (a directed graph drawn as boxes,
+ * which fits the panel whole), has nothing to zoom or pan.
+ */
+export function roamKind(option: unknown): "axes" | "series" | undefined {
+  if (ctrlZoomSeries(option).length > 0) return "series";
+  const zooms = (option as { dataZoom?: unknown } | null)?.dataZoom;
+  const inside = Array.isArray(zooms) ? zooms : zooms ? [zooms] : [];
+  return inside.some((z) => {
+    const { type, disabled } = (z ?? {}) as Record<string, unknown>;
+    return type === "inside" && disabled !== true;
+  })
+    ? "axes"
+    : undefined;
+}
+
+/** A zoom step, as one of ECharts' own wheel notches. */
+const ROAM_ZOOM = 1.4;
+/** A pan step: this share of what is in view. */
+const ROAM_PAN = 0.2;
+
+/**
+ * Move the view the way the step's arrow points, so what was off that side
+ * comes in; zoom about the middle; or put it back as it was drawn.
+ */
+export function roamChart(chart: echarts.ECharts, step: RoamStep): void {
+  const option = chart.getOption();
+  const kind = roamKind(option);
+  if (kind === "series") {
+    const indices = ctrlZoomSeries(option);
+    if (step === "reset") {
+      // Merged by index: the series before a roaming one are left as they are.
+      const series: Record<string, unknown>[] = [];
+      for (const i of indices) series[i] = { center: null, zoom: 1 };
+      chart.setOption({ series: Array.from(series, (s) => s ?? {}) });
+      return;
+    }
+    const w = chart.getWidth();
+    const h = chart.getHeight();
+    for (const seriesIndex of indices) {
+      chart.dispatchAction({
+        type: "graphRoam",
+        seriesIndex,
+        ...(step === "in" || step === "out"
+          ? {
+              zoom: step === "in" ? ROAM_ZOOM : 1 / ROAM_ZOOM,
+              originX: w / 2,
+              originY: h / 2,
+            }
+          : {
+              // The content moves the other way to the view.
+              dx: step === "left" ? w * ROAM_PAN : step === "right" ? -w * ROAM_PAN : 0,
+              dy: step === "up" ? h * ROAM_PAN : step === "down" ? -h * ROAM_PAN : 0,
+            }),
+      });
+    }
+    return;
+  }
+  if (kind !== "axes") return;
+  const zooms = (option.dataZoom ?? []) as {
+    type?: string;
+    disabled?: boolean;
+    yAxisIndex?: unknown;
+    start?: number;
+    end?: number;
+  }[];
+  zooms.forEach((z, dataZoomIndex) => {
+    if (z.type !== "inside" || z.disabled) return;
+    const vertical = z.yAxisIndex !== undefined;
+    const start = z.start ?? 0;
+    const end = z.end ?? 100;
+    const span = end - start;
+    let next: [number, number] | undefined;
+    if (step === "reset") next = [0, 100];
+    else if (step === "in" || step === "out") {
+      const mid = (start + end) / 2;
+      const half = Math.min(
+        50,
+        (step === "in" ? span / ROAM_ZOOM : span * ROAM_ZOOM) / 2,
+      );
+      next = [mid - half, mid + half];
+    } else {
+      // A y axis runs bottom to top, so up is toward its end; inverted (the
+      // graph's, its first layer at the top) toward its start, as left is.
+      const yAxis = ([] as { inverse?: boolean }[]).concat(
+        (option.yAxis ?? []) as { inverse?: boolean }[],
+      )[0];
+      const upIsBack = yAxis?.inverse === true;
+      const back = vertical ? step === (upIsBack ? "up" : "down") : step === "left";
+      const fore = vertical ? step === (upIsBack ? "down" : "up") : step === "right";
+      if (back || fore) next = [start + (fore ? 1 : -1) * span * ROAM_PAN, end];
+      if (next) next[1] = next[0] + span;
+    }
+    if (!next) return;
+    // Held inside the whole: shifted back in rather than cut, so a pan at
+    // the edge stops and a zoom near it keeps its size.
+    const size = next[1] - next[0];
+    const from = Math.min(Math.max(0, next[0]), 100 - size);
+    chart.dispatchAction({
+      type: "dataZoom",
+      dataZoomIndex,
+      start: from,
+      end: from + size,
+    });
+  });
 }
 
 /** The fields of an ECharts click a datum needs, read defensively. */

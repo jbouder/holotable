@@ -1,9 +1,16 @@
-import { type APIRequestContext, expect, type Page, test } from "@playwright/test";
+import {
+  type APIRequestContext,
+  expect,
+  type Locator,
+  type Page,
+  test,
+} from "@playwright/test";
 import { setAppearance } from "./support/a11y";
 import {
   clickChart,
   copyDashboard,
   createDrilldownDashboards,
+  createGraphDashboard,
   DEMO_DASHBOARD,
   dashboardId,
   waitForPanels,
@@ -252,6 +259,10 @@ const PAGES: { name: string; path: (request: APIRequestContext) => Promise<strin
     path: async (request) =>
       `/dashboards/${await dashboardId(request, DEMO_DASHBOARD)}/edit`,
   },
+  {
+    name: "graphs with zoom and pan",
+    path: async (request) => `/dashboards/${await createGraphDashboard(request)}`,
+  },
 ];
 
 for (const { name, path } of PAGES) {
@@ -296,6 +307,70 @@ test("every Tab stop in an open popover shows where focus is", async ({
   await clickChart(page, "hosts");
   await expect(page.getByRole("dialog", { name: "Links from Hosts" })).toBeVisible();
   await walkFocus(page, { within: "[role=dialog]" });
+});
+
+/** Keep the chart's canvas as it is now, under `name`, in the page. */
+function snapCanvas(chart: Locator, name: string) {
+  return chart.evaluate((el, name) => {
+    const canvas = el.querySelector("canvas") as HTMLCanvasElement;
+    const w = window as unknown as { __snaps?: Record<string, Uint8ClampedArray> };
+    w.__snaps ??= {};
+    w.__snaps[name] = canvas
+      .getContext("2d")
+      ?.getImageData(0, 0, canvas.width, canvas.height).data as Uint8ClampedArray;
+  }, name);
+}
+
+/** The share of the canvas's pixels that differ, clearly, between two snaps. */
+function canvasChange(chart: Locator, a: string, b: string) {
+  return chart.evaluate(
+    (_, [a, b]) => {
+      const snaps = (window as unknown as { __snaps: Record<string, Uint8ClampedArray> })
+        .__snaps;
+      const [x, y] = [snaps[a], snaps[b]];
+      let changed = 0;
+      for (let i = 0; i < x.length; i += 4) {
+        const d =
+          Math.abs(x[i] - y[i]) +
+          Math.abs(x[i + 1] - y[i + 1]) +
+          Math.abs(x[i + 2] - y[i + 2]);
+        if (d > 48) changed++;
+      }
+      return changed / (x.length / 4);
+    },
+    [a, b] as const,
+  );
+}
+
+test("a graph zooms and pans from the keyboard (#682)", async ({ page, request }) => {
+  await page.goto(`/dashboards/${await createGraphDashboard(request)}`);
+  await waitForPanels(page);
+  for (const id of ["dag", "force"]) {
+    const panel = page.locator(`[data-panel-id="${id}"]`);
+    const controls = panel.getByRole("group", { name: /^Zoom and pan / });
+    const chart = panel.locator("[data-echarts-canvas]");
+    // A step moves an eighth of the canvas or more. A reset comes back to
+    // within a sliver: a force graph's layout settles again when its view
+    // is put back, a fraction of a pixel from where it was.
+    const movedFrom = async (before: string, now: string) => {
+      await snapCanvas(chart, now);
+      return (await canvasChange(chart, before, now)) > 0.05;
+    };
+    await snapCanvas(chart, "start");
+    await controls.getByRole("button", { name: "Zoom in" }).focus();
+    await page.keyboard.press("+");
+    await expect
+      .poll(() => movedFrom("start", "zoomed"), { message: `${id}: + zooms` })
+      .toBe(true);
+    await page.keyboard.press("ArrowRight");
+    await expect
+      .poll(() => movedFrom("zoomed", "panned"), { message: `${id}: an arrow pans` })
+      .toBe(true);
+    await page.keyboard.press("0");
+    await expect
+      .poll(() => movedFrom("start", "reset"), { message: `${id}: 0 puts the view back` })
+      .toBe(false);
+  }
 });
 
 test("the theme gallery is a radio group: Tab reaches the choice, arrows move and choose", async ({

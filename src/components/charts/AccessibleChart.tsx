@@ -1,7 +1,8 @@
 "use client";
 
-import type * as React from "react";
-import { EChart } from "@/components/charts/EChart";
+import * as React from "react";
+import { EChart, type EChartHandle, roamKind } from "@/components/charts/EChart";
+import { RoamControls } from "@/components/charts/RoamControls";
 import { normalize, type PanelData } from "@/components/charts/options";
 import {
   DatumLinksControl,
@@ -30,6 +31,7 @@ export function AccessibleChart({
   panel,
   data,
   table: readTable,
+  ref,
   ...chart
 }: {
   panel: Panel;
@@ -46,12 +48,25 @@ export function AccessibleChart({
   const [choice, onDatum, close] = useDatumClick(links);
   // The table lists the newest rows; this is where they start among them all.
   const offset = normalize(data).rows.length - table.rows.length;
+  // The chart's handle is the caller's too (a picture export), and ours, for
+  // the zoom and pan controls of a chart that roams (#682).
+  const handle = React.useRef<EChartHandle | null>(null);
+  const chartRef = React.useCallback(
+    (h: EChartHandle | null) => {
+      handle.current = h;
+      if (typeof ref === "function") ref(h);
+      else if (ref) ref.current = h;
+    },
+    [ref],
+  );
+  const roams = roamKind(chart.option) !== undefined;
   return (
     // `fade-in`: the chart arrives with its chunk (#497), after the panel's
     // skeleton, and enters the way an overlay does rather than popping in.
     <div className="fade-in relative h-full w-full">
       <EChart
         {...chart}
+        ref={chartRef}
         description={chartDescription(panel, data.rows.length)}
         onDatum={
           links
@@ -64,6 +79,12 @@ export function AccessibleChart({
             : undefined
         }
       />
+      {roams && (
+        <RoamControls
+          label={panel.title}
+          onStep={(step) => handle.current?.roam?.(step)}
+        />
+      )}
       {links && (
         <DatumLinksPopover
           choice={choice}
