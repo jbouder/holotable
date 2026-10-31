@@ -673,6 +673,16 @@ body {
   * {
     border-color: var(--border);
   }
+
+  /*
+   * A fieldset's default minimum width is its content's, so a long label
+   * inside grows it past its container and nothing in it ever truncates or
+   * wraps; at 320 px Explore's source list pushed the page sideways (1.4.10,
+   * #683). Preflight resets a fieldset's margin and padding, not this.
+   */
+  fieldset {
+    min-inline-size: 0;
+  }
 }
 
 /*
