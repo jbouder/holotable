@@ -96,7 +96,7 @@ export default async function AccountSettings() {
               description="You are signed in, but none of your groups grants a role in a workspace. Ask an administrator to add you to one."
             />
           ) : (
-            <Table>
+            <Table label="Workspaces">
               <TableHead>
                 <TableRow>
                   <TableHeader>Workspace</TableHeader>
