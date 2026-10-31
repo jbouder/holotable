@@ -147,11 +147,45 @@ test(
   },
 );
 
-/** How far the page reaches past the window, sideways. */
-function sidewaysOverflow(page: Page) {
-  return page.evaluate(
-    () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
-  );
+/**
+ * The page must not scroll sideways. A failure says why: the window, the
+ * page and a scrollbar's widths, and the chain of elements down to the one
+ * whose hiding ends the overflow, since it is often something unseen (an
+ * `sr-only` name, a pseudo-element) and the screenshot shows nothing wrong.
+ */
+async function expectNoSidewaysScroll(page: Page) {
+  const { overflow, past } = await page.evaluate(() => {
+    const doc = document.documentElement;
+    const overflowing = () => doc.scrollWidth > doc.clientWidth;
+    const summarize = (el: Element) => {
+      const r = el.getBoundingClientRect();
+      return `${Math.round(r.left)}..${Math.round(r.right)} ${getComputedStyle(el).position} <${el.tagName.toLowerCase()} class="${el.getAttribute("class") ?? ""}"> ${(el.textContent ?? "").trim().slice(0, 60)}`;
+    };
+    const past: string[] = [
+      `window ${innerWidth}, page ${doc.clientWidth} (a scrollbar takes ${innerWidth - doc.clientWidth}), html ${doc.scrollWidth}, body ${document.body.scrollWidth}`,
+    ];
+    if (overflowing()) {
+      // Hide each child in turn and follow the one whose hiding ends the
+      // overflow: it finds a culprit no box shows, a pseudo-element or text.
+      let node: Element = document.body;
+      descend: for (;;) {
+        for (const child of Array.from(node.children) as HTMLElement[]) {
+          const display = child.style.display;
+          child.style.display = "none";
+          const fixed = !overflowing();
+          child.style.display = display;
+          if (fixed) {
+            past.push(summarize(child));
+            node = child;
+            continue descend;
+          }
+        }
+        break;
+      }
+    }
+    return { overflow: doc.scrollWidth - doc.clientWidth, past };
+  });
+  expect(overflow, `scrolls sideways:\n${past.join("\n")}`).toBeLessThanOrEqual(0);
 }
 
 test("the demo dashboard at 1440 px does not scroll sideways", async ({
@@ -163,7 +197,7 @@ test("the demo dashboard at 1440 px does not scroll sideways", async ({
   await page.setViewportSize({ width: 1440, height: 900 });
   await page.goto(`/dashboards/${await dashboardId(request, DEMO_DASHBOARD)}`);
   await waitForPanels(page);
-  expect(await sidewaysOverflow(page)).toBeLessThanOrEqual(0);
+  await expectNoSidewaysScroll(page);
 });
 
 // WCAG 1.4.10 (#683): 320 CSS px, a 1280 px window at 400% zoom. Something
@@ -203,7 +237,7 @@ for (const { name, path, panels } of REFLOW_PAGES) {
     await page.goto(await path(request));
     await expect(page.getByRole("heading", { level: 1 })).toBeAttached();
     if (panels) await waitForPanels(page);
-    expect(await sidewaysOverflow(page)).toBeLessThanOrEqual(0);
+    await expectNoSidewaysScroll(page);
   });
 }
 
@@ -212,7 +246,7 @@ test("chat at phone width: the side panel is a sheet, and nothing scrolls sidewa
 }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto("/explore");
-  expect(await sidewaysOverflow(page)).toBeLessThanOrEqual(0);
+  await expectNoSidewaysScroll(page);
   await page.getByRole("button", { name: /source.* · / }).click();
   const sheet = page.getByRole("dialog", { name: "Conversation" });
   await expect(sheet.getByRole("heading", { name: "Sources" })).toBeVisible();
