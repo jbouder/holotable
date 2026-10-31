@@ -119,13 +119,13 @@ pulls a native build.
 
 | Image | What it is |
 | --- | --- |
-| `ghcr.io/jbouder/holotable:0.3.0`, `:latest` | The app, at a release. `latest` moves only on a release. |
-| `ghcr.io/jbouder/holotable:0.3.0-migrate`, `:latest-migrate` | The job image that runs migrations, the seeder and the self-monitoring collector, at the same release. |
+| `ghcr.io/jbouder/holotable:0.4.0`, `:latest` | The app, at a release. `latest` moves only on a release. |
+| `ghcr.io/jbouder/holotable:0.4.0-migrate`, `:latest-migrate` | The job image that runs migrations, the seeder and the self-monitoring collector, at the same release. |
 | `ghcr.io/jbouder/holotable:main`, `:main-migrate` | The same two, following the `main` branch. |
-| `ghcr.io/jbouder/holotable:quickstart` | Everything in one container, for step 1, following `main`; `:0.3.0-quickstart` pins a release. |
+| `ghcr.io/jbouder/holotable:quickstart` | Everything in one container, for step 1, following `main`; `:0.4.0-quickstart` pins a release. |
 
 `HOLOTABLE_TAG` in `.env` picks the tag. Leave it unset to follow `main`, or set
-a release version such as `0.3.0` to pin one; see
+a release version such as `0.4.0` to pin one; see
 [Images](/operations/kubernetes/#images) for every tag that is published. To run
 your own changes, build them instead of pulling:
 

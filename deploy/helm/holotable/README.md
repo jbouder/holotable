@@ -29,9 +29,9 @@ from a checkout, `deploy/helm/holotable` works the same way, and
    `image.repository` and `migrations.image.repository` at your registry:
 
    ```bash
-   docker build -t <registry>/holotable:0.3.0 \
+   docker build -t <registry>/holotable:0.4.0 \
      --build-arg GIT_COMMIT="$(git rev-parse HEAD)" .
-   docker build -t <registry>/holotable:0.3.0-migrate --target migrate .
+   docker build -t <registry>/holotable:0.4.0-migrate --target migrate .
    ```
 
 2. **A database.** A PostgreSQL 16 with TimescaleDB, reachable from the

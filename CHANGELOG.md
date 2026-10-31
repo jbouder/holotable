@@ -5,6 +5,58 @@ release page carries the matching section below, followed by the list of
 pull requests merged since the previous tag. `CONTRIBUTING.md` ("Releasing")
 says how a section gets here.
 
+## 0.4.0 — 2026-10-31
+
+An accessibility release. Holotable now has a published accessibility
+statement and is checked against WCAG 2.2 AA on every pull request, from
+phone width up. Two things that used to need a mouse now work from the
+keyboard and with simple clicks.
+
+### Added
+
+- **Accessibility statement.** `ACCESSIBILITY.md` (so GitHub shows an
+  Accessibility tab) and a page on the docs site: the target (WCAG 2.2 AA),
+  how it is checked, and the known exceptions (#686, #698).
+- **Zoom and pan a graph without a mouse.** A directed or force graph
+  panel has zoom in, zoom out, reset and four pan buttons, and the same on
+  the keyboard (`+`, `-`, `0`, the arrows) while the chart has focus. On a
+  phone they fold behind a "Zoom and pan" button (#682).
+- **Move and resize a panel with clicks alone.** The editor's inspector
+  has a "Position and size" section: buttons that move the selected panel
+  a column or row at a time and make it wider, narrower, taller or
+  shorter, with a line that says where it is now. Dragging still works
+  (#681).
+
+### Changed
+
+- The editor's resize handle is a 24 px target, 44 px on a touch screen
+  (#680).
+- Wide read-only tables (models, workspaces) scroll inside a labeled,
+  focusable region instead of pushing the page sideways, and a panel's
+  header wraps its badges on a narrow screen (#683).
+- Every control shows a visible focus ring that nothing covers (#684).
+
+### Fixed
+
+- Explore at 320 px no longer scrolls sideways: a long source name now
+  truncates instead of widening the source list (#699, #700).
+- The chat composer's chips shrink instead of overflowing on a phone
+  (#682).
+
+### Checks
+
+- `npm run e2e` scans with axe's WCAG 2.2 rules, fails on any finding
+  whatever its impact, walks every Tab stop on the main pages and their
+  dialogs, menus and popovers, checks reflow at 320 px, and runs the
+  accessibility and flow journeys again on a phone (#680, #683–#685).
+  End-to-end is now a required check on `main`.
+
+### Upgrading
+
+- No migrations, no new environment variables, no change to the spec.
+- Dependencies are updated, among them Next.js 16.4.3, the AI SDK and its
+  providers, and the TimescaleDB image 2.31.0 (#689–#694).
+
 ## 0.3.0 — 2026-10-27
 
 Two new source kinds and three ways to get your own files in: Loki (M19,

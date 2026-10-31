@@ -5,9 +5,9 @@ type: application
 
 # The chart's own version. Bumped when the chart changes, independently of the
 # application it deploys.
-version: 0.3.0
+version: 0.4.0
 # The application version the default image tag points at.
-appVersion: "0.3.0"
+appVersion: "0.4.0"
 
 # policy/v1 PodDisruptionBudget and autoscaling/v2 HPA are both 1.25-era APIs.
 # Nothing here needs anything newer: the preStop handler is an `exec` rather
