@@ -784,7 +784,7 @@ export function EditDashboardClient({
                 { action: "edit dashboard title", key: "spec:title" },
               )
             }
-            className="w-full max-w-2xl truncate border-b border-transparent bg-transparent text-2xl font-semibold text-foreground transition-colors hover:border-border focus:border-primary focus:outline-none"
+            className="w-full max-w-2xl truncate border-b border-transparent bg-transparent text-2xl font-semibold text-foreground transition-colors hover:border-border focus-visible:outline-2 focus-visible:outline-ring"
           />
           <p className="mt-0.5 text-xs text-muted">
             Editing · version {version}

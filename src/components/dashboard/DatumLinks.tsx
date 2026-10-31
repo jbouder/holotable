@@ -98,7 +98,7 @@ export function useDatumClick(
 }
 
 const ITEM =
-  "tap-target flex w-full cursor-pointer select-none items-center gap-2 px-2 py-1.5 text-left text-sm text-foreground outline-none hover:bg-surface-2 focus-visible:bg-surface-2 focus-visible:outline-2 focus-visible:outline-ring";
+  "tap-target flex w-full cursor-pointer select-none items-center gap-2 px-2 py-1.5 text-left text-sm text-foreground hover:bg-surface-2 focus-visible:bg-surface-2 focus-visible:outline-2 focus-visible:outline-ring";
 
 /** One link as a control: a real link to another dashboard, a button for a self link. */
 function LinkControl({
