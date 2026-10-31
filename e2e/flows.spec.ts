@@ -254,6 +254,37 @@ test("chat at phone width: the side panel is a sheet, and nothing scrolls sidewa
   await expect(sheet).toHaveCount(0);
 });
 
+test("the inspector moves and resizes a panel with clicks alone (#681)", async ({
+  page,
+  request,
+}) => {
+  // WCAG 2.5.7: the drag on the canvas, without a drag.
+  await page.goto(`/dashboards/${await copyDashboard(request, DEMO_DASHBOARD)}/edit`);
+  await page
+    .getByRole("button", { name: /^5xx error rate/ })
+    .first()
+    .click();
+  const inspector = page.getByRole("complementary", { name: "Panel inspector" });
+  await inspector.getByText("Position and size", { exact: true }).click();
+  const where = inspector.getByRole("status");
+  const before = (await where.textContent()) ?? "";
+  const [, column, row, wide, tall] =
+    before.match(/Column (\d+), row (\d+); (\d+) columns? wide, (\d+) rows? tall/) ?? [];
+  expect(column, before).toBeDefined();
+
+  await inspector.getByRole("button", { name: "Wider" }).click();
+  await expect(where).toContainText(`${Number(wide) + 1} columns wide`);
+  await inspector.getByRole("button", { name: "Move down" }).click();
+  await expect(where).toContainText(`row ${Number(row) + 1};`);
+  // At the grid's left edge a step left is nothing, and the button keeps
+  // focus rather than disabling under it.
+  const left = inspector.getByRole("button", { name: "Move left" });
+  for (let i = 0; i < Number(column); i++) await left.click();
+  await expect(where).toContainText("Column 1,");
+  await expect(left).toBeFocused();
+  await expect(where).toContainText(`${tall} rows tall`);
+});
+
 test("new dashboard: Start over asks, then clears every version", async ({ page }) => {
   await page.goto("/dashboards/new");
   await page.getByLabel("Describe the dashboard").fill("Checkout service health");

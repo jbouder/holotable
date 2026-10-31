@@ -133,6 +133,25 @@ for (const theme of THEMES) {
       await expectNoA11yViolations(page);
     });
 
+    test("dashboard editor, a panel's position and size (#681)", async ({
+      page,
+      request,
+    }) => {
+      await page.goto(`/dashboards/${await dashboardId(request, DEMO_DASHBOARD)}/edit`);
+      await page
+        .getByRole("button", { name: /^5xx error rate/ })
+        .first()
+        .click();
+      const inspector = page.getByRole("complementary", { name: "Panel inspector" });
+      await inspector.getByText("Position and size", { exact: true }).click();
+      await expect(inspector.getByRole("button", { name: "Wider" })).toBeVisible();
+      // Opening the section scrolls the page, which leaves whatever is then
+      // under the sticky bar counted as an obscured target; axe scans the
+      // whole page from the top as well.
+      await page.evaluate(() => window.scrollTo(0, 0));
+      await expectNoA11yViolations(page);
+    });
+
     test("dashboard editor, a PromQL panel in the inspector (#388)", async ({
       page,
       request,

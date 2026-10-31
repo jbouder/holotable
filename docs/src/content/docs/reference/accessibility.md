@@ -59,17 +59,14 @@ WCAG 2.1.1 (keyboard) and 2.5.7 (dragging movements).
 
 | Drag (mouse) | Keyboard | Without a drag |
 | --- | --- | --- |
-| Editor: move a panel on the canvas | Focus its tile, then the arrow keys | None for one panel (#681); **Arrange: N-up** in the dashboard settings re-flows them all. See [Known exceptions](#known-exceptions) |
-| Editor: resize a panel by its corner | Shift and the arrow keys on its tile, or the arrow keys on the corner handle | None (#681). See [Known exceptions](#known-exceptions) |
+| Editor: move a panel on the canvas | Focus its tile, then the arrow keys | Select it, then **Position and size** in the inspector: Move left, up, down, right. **Arrange: N-up** in the dashboard settings re-flows them all |
+| Editor: resize a panel by its corner | Shift and the arrow keys on its tile, or the arrow keys on the corner handle | **Position and size** in the inspector: Narrower, Wider, Shorter, Taller |
 | Brush across a line, area or bar chart to set the window | The time picker: quick ranges, Last N, or an absolute start and end | The same picker |
 | Pan and zoom a directed or force graph | Tab to its zoom and pan controls, then `+`, `-`, `0` (reset) and the arrow keys | The controls in the chart's corner: zoom in, zoom out, reset view, and an arrow each way |
 | Drop files on the DuckDB upload picker | **Choose files…** | **Choose files…** |
 
 ## Known exceptions
 
-- **Moving and resizing a panel without a keyboard needs a drag** (2.5.7).
-  The arrow keys do both; a pointer has no single-tap way to place or size one
-  panel (#681).
 - **A chart's table lists the newest rows**, not all of them, and says how
   many it left out. **Export CSV** in the panel's menu saves every row the
   panel is showing.

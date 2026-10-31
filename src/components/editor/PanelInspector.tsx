@@ -16,6 +16,7 @@ import {
   VizType,
   isLogqlQuery,
   isSqlQuery,
+  type PanelLayout,
 } from "@/lib/ir";
 import { changePanelKind } from "@/lib/panel-kind-change";
 import { panelKind } from "@/lib/panels/registry";
@@ -44,6 +45,7 @@ import {
   PanelTimingFields,
 } from "@/components/editor/panel-settings";
 import { InspectorSection } from "@/components/editor/InspectorSection";
+import { PanelLayoutControls } from "@/components/editor/PanelLayoutControls";
 import { LinksEditor } from "@/components/editor/links-editor";
 
 export interface SourceOption {
@@ -107,6 +109,7 @@ export function PanelInspector({
   ai,
   onRepoint,
   onChange,
+  onLayout,
   onClose,
   onDuplicate,
   onSaveAsTemplate,
@@ -126,6 +129,11 @@ export function PanelInspector({
   onRepoint: () => void;
   /** Each control names its own undo step, so a burst of typing is one entry. */
   onChange: OnPanelChange;
+  /**
+   * Give this panel a new position or size (#681), through the editor's one
+   * layout path, so the other panels make room as they do for a drag.
+   */
+  onLayout: (next: PanelLayout) => void;
   /** Back to the dashboard's own settings. */
   onClose: () => void;
   onDuplicate: () => void;
@@ -327,6 +335,10 @@ export function PanelInspector({
             </p>
           </div>
         )}
+      </InspectorSection>
+
+      <InspectorSection title="Position and size">
+        <PanelLayoutControls layout={panel.layout} onLayout={onLayout} />
       </InspectorSection>
 
       {/* A text panel's one option, its content, is edited above. */}
