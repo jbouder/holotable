@@ -147,11 +147,34 @@ test(
   },
 );
 
-/** How far the page reaches past the window, sideways. */
-function sidewaysOverflow(page: Page) {
-  return page.evaluate(
-    () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
-  );
+/**
+ * The page must not scroll sideways. A failure names what reaches past the
+ * window: the outermost such elements, where they end and how they are
+ * placed, since an overflow is often something unseen (an `sr-only` name, an
+ * element off to the side) and the screenshot shows nothing wrong.
+ */
+async function expectNoSidewaysScroll(page: Page) {
+  const { overflow, past } = await page.evaluate(() => {
+    const width = document.documentElement.clientWidth;
+    const beyond = (el: Element | null) =>
+      el !== null && el.getBoundingClientRect().right > width + 0.5;
+    const past: string[] = [];
+    for (const el of Array.from(document.querySelectorAll("body *"))) {
+      if (!beyond(el) || beyond(el.parentElement)) continue;
+      const r = el.getBoundingClientRect();
+      past.push(
+        `${Math.round(r.left)}..${Math.round(r.right)} ${getComputedStyle(el).position} <${el.tagName.toLowerCase()} class="${el.getAttribute("class") ?? ""}"> ${(el.textContent ?? "").trim().slice(0, 60)}`,
+      );
+    }
+    return {
+      overflow: document.documentElement.scrollWidth - width,
+      past: past.slice(0, 10),
+    };
+  });
+  expect(
+    overflow,
+    `scrolls sideways; past the edge:\n${past.join("\n")}`,
+  ).toBeLessThanOrEqual(0);
 }
 
 test("the demo dashboard at 1440 px does not scroll sideways", async ({
@@ -163,7 +186,7 @@ test("the demo dashboard at 1440 px does not scroll sideways", async ({
   await page.setViewportSize({ width: 1440, height: 900 });
   await page.goto(`/dashboards/${await dashboardId(request, DEMO_DASHBOARD)}`);
   await waitForPanels(page);
-  expect(await sidewaysOverflow(page)).toBeLessThanOrEqual(0);
+  await expectNoSidewaysScroll(page);
 });
 
 // WCAG 1.4.10 (#683): 320 CSS px, a 1280 px window at 400% zoom. Something
@@ -203,7 +226,7 @@ for (const { name, path, panels } of REFLOW_PAGES) {
     await page.goto(await path(request));
     await expect(page.getByRole("heading", { level: 1 })).toBeAttached();
     if (panels) await waitForPanels(page);
-    expect(await sidewaysOverflow(page)).toBeLessThanOrEqual(0);
+    await expectNoSidewaysScroll(page);
   });
 }
 
@@ -212,7 +235,7 @@ test("chat at phone width: the side panel is a sheet, and nothing scrolls sidewa
 }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto("/explore");
-  expect(await sidewaysOverflow(page)).toBeLessThanOrEqual(0);
+  await expectNoSidewaysScroll(page);
   await page.getByRole("button", { name: /source.* · / }).click();
   const sheet = page.getByRole("dialog", { name: "Conversation" });
   await expect(sheet.getByRole("heading", { name: "Sources" })).toBeVisible();
