@@ -181,10 +181,13 @@ model is `AI_PROVIDER=stub`, which answers with recorded specs. Needs Docker;
 `E2E_SKIP_BUILD=1` reuses the last build (CI runs the build job's output that
 way), `npm run e2e:down` removes the
 stack. A failure leaves a trace and a screenshot under `e2e/test-results/`.
-The specs run in two projects: `parallel`, on half your cores (four in CI;
-`-- --workers=N` to change it), and then `serial`, one at a time, for the
-tests tagged `@serial` because they share state the workspace or the person
-holds (uploads, the DuckDB root, a default model, a preference). A new test
+The specs run in three projects: `parallel`, on half your cores (four in CI;
+`-- --workers=N` to change it); `phone`, beside it, which runs the
+accessibility scans and the flows on an emulated Pixel 7 (a test that needs
+the nav or Explore's side panel opens it first when `isMobile`); and then
+`serial`, one at a time, for the tests tagged `@serial` because they share
+state the workspace or the person holds (uploads, the DuckDB root, a default
+model, a preference). A new test
 names what it creates with `unique()` from `e2e/support/app.ts` and never
 counts a shared list, so it can run beside the others.
 See the [Accessibility statement](docs/src/content/docs/reference/accessibility.md)

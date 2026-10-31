@@ -37,7 +37,8 @@ too.
 | A menu taller than the window scrolls inside itself, and the keyboard brings its last item into view | `e2e/a11y.spec.ts` |
 | The editor's canvas from the keyboard: the arrow keys move a panel, Shift and the arrow keys resize it, Delete and Backspace remove it; the live panel under the handle is `inert` | `test/panel-layout-grid.test.tsx` |
 | The editor's shortcuts: a bare-letter binding never fires while typing in a field, and undo inside a field is the field's own | `test/editor-shortcuts.test.ts` |
-| No sideways scroll: the demo dashboard at 1440 and 390 px, Explore at 390 px | `e2e/flows.spec.ts` |
+| No sideways scroll (1.4.10): every main page at 320 CSS px (the dashboard list, a new dashboard, data sources, Explore, Models, Settings, the demo and fleet dashboards, the editor), and the demo dashboard at 1440 px. A chart or a wide table scrolls inside its own box; the page never does | `e2e/flows.spec.ts` |
+| A phone: the axe scans and the flows run again on an emulated Pixel 7 (touch, a 412 px viewport, a coarse pointer, so touch targets are their 44 px size), including Explore's side panel as a sheet | `e2e/playwright.config.ts` (`phone`), `e2e/a11y.spec.ts`, `e2e/flows.spec.ts` |
 | Reduced motion: one switch (`<html data-motion>`) that follows the system unless Settings says otherwise; nothing keys off the media query directly; no animation library | `test/motion.test.ts`, `test/motion-rules.test.ts`, `src/app/globals.css` |
 | Forced colors (Windows Contrast themes): a chart opts out and is drawn in system colors, a tint keeps an edge, focus is a 2px ring in `Highlight` even on a filled button | `e2e/a11y.spec.ts`, `src/app/globals.css` |
 
@@ -48,7 +49,7 @@ Manual, before each release (record the date and anything found):
 | VoiceOver on macOS (Safari): open a dashboard, read a chart's table, follow a datum link, open a panel fullscreen and close it; ask Explore a question; the command palette | _not yet recorded_ | |
 | NVDA on Windows (Firefox or Chrome): the same | _not yet recorded_ | |
 | Keyboard only, no mouse: create a dashboard, arrange and edit panels in the editor, save, add a data source | _not yet recorded_ | The specs above cover focus and the canvas keys. |
-| 200% and 400% browser zoom on desktop (reflow at 320 CSS px) | _not yet recorded_ | Only 390 px is automated (#683). |
+| 200% and 400% browser zoom on desktop | _not yet recorded_ | 320 CSS px and a phone are automated; zoom also scales text and the editor's canvas, which they do not. |
 | Forced colors on Windows (Contrast themes) | _not yet recorded_ | The outlines and focus color are automated; the look is not. |
 
 ## Every drag has another way

@@ -21,17 +21,23 @@ import {
  * happens once per role in the `setup` project, through the real Keycloak
  * login form; every other spec starts from the saved session.
  *
- * Two projects run the specs (#610), against that one app and one database:
+ * Three projects run the specs (#610), against that one app and one database:
  *
  * - `parallel`, every test not tagged `@serial`, spread over the workers. A
  *   test here reads seeded state or creates records of its own under a name
  *   no other test uses (`unique()` in e2e/support/app.ts), and never counts
  *   a shared list.
- * - `serial`, the tests tagged `@serial`, one at a time once `parallel` is
- *   done: they share mutable state through the one workspace (uploads under
- *   the per-person upload budget, the DuckDB root and the files demo, a
- *   workspace's default model, the person's "keep conversations"), and each
- *   says why at its top. Because it depends on `parallel`, a failure there
+ * - `phone`, the same for the accessibility scans and the flows, on an
+ *   emulated Pixel 7 (#683): a touch screen, a 412 px viewport and a coarse
+ *   pointer, so touch targets and the phone layout are scanned as a phone
+ *   draws them. A test that has to reach something the phone layout tucks
+ *   away (the nav behind its menu button, Explore's side panel in a sheet)
+ *   opens it when `isMobile`.
+ * - `serial`, the tests tagged `@serial`, one at a time once the other two
+ *   are done: they share mutable state through the one workspace (uploads
+ *   under the per-person upload budget, the DuckDB root and the files demo,
+ *   a workspace's default model, the person's "keep conversations"), and
+ *   each says why at its top. Because it depends on them, a failure there
  *   skips it: fix that one first.
  */
 
@@ -72,13 +78,23 @@ export default defineConfig({
       use: { ...devices["Desktop Chrome"], storageState: storageStatePath("admin") },
     },
     {
+      // The scans and the flows as a phone runs them (#683): a touch screen,
+      // a mobile viewport, a coarse pointer. `@serial` tests stay in serial.
+      name: "phone",
+      testMatch: /(a11y|flows)\.spec\.ts$/,
+      grepInvert: /@serial/,
+      fullyParallel: true,
+      dependencies: ["setup"],
+      use: { ...devices["Pixel 7"], storageState: storageStatePath("admin") },
+    },
+    {
       name: "serial",
       testMatch: /\.spec\.ts$/,
       grep: /@serial/,
       fullyParallel: false,
       workers: 1,
-      // After the parallel project, so these do not share the stack under load.
-      dependencies: ["parallel"],
+      // After the parallel projects, so these do not share the stack under load.
+      dependencies: ["parallel", "phone"],
       use: { ...devices["Desktop Chrome"], storageState: storageStatePath("admin") },
     },
   ],
