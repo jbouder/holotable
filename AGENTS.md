@@ -344,9 +344,9 @@ Before finishing: `npm run lint`, `npm run typecheck`, `npm test`, and
 `npm run build` for anything framework- or build-sensitive. Those, and
 end-to-end (`npm run e2e`, where any axe violation fails), are CI's required
 checks. CI also runs migrations, integration, Helm, images and smoke, and a
-long fuzz; they do not gate the merge, but they are expected to pass. A docs-only pull request skips build, database, Helm,
-end-to-end and images (`code-paths` in `ci.yml`); lint, typecheck and tests
-still run. The other scripts, and when to reach for them:
+long fuzz; they do not gate the merge, but they are expected to pass. A
+docs-only pull request skips build, database, Helm, end-to-end and images
+(`code-paths` in `ci.yml`); lint, typecheck and tests still run. The other scripts, and when to reach for them:
 
 ```bash
 npm run dev:demo         # dev server in AUTH_MODE=demo, no Keycloak needed (not for auth work)
