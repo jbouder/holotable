@@ -1,7 +1,12 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { test } from "node:test";
-import { ctrlZoomSeries, treeClickPart, withTreeState } from "@/components/charts/EChart";
+import {
+  ctrlZoomSeries,
+  roamKind,
+  treeClickPart,
+  withTreeState,
+} from "@/components/charts/EChart";
 import {
   GRAPH_EDGES_MAX,
   GRAPH_NODES_MAX,
@@ -1295,4 +1300,34 @@ test("a box is its node's datum; a tree branch's knob opens and closes it; the t
   );
   const target = { type: "text", parent: { type: "path" } };
   assert.equal(treeClickPart({ seriesType: "tree", event: { target } }), "datum");
+});
+
+test("the zoom and pan controls show exactly where a graph roams (#682)", () => {
+  // A force graph roams by its series, a marker directed graph by its axes'
+  // inside zoom: both get the buttons and keys.
+  assert.equal(roamKind(graphChart(graph(FORCE), DEPS, CTX)), "series");
+  assert.equal(roamKind(graphChart(graph(DAG), DEPS, CTX)), "axes");
+  // A tree does not roam, and a directed graph drawn as boxes fits its panel
+  // whole with its zoom off: nothing to zoom, so no controls. (Rows that are
+  // not a tree fall back to a directed graph, which does.)
+  const tree: PanelData = {
+    columns: ["from", "to"],
+    rows: [
+      { from: "web", to: "api" },
+      { from: "web", to: "auth" },
+    ],
+  };
+  assert.equal(
+    roamKind(graphChart(graph({ ...DAG, layout: "tree" }), tree, CTX)),
+    undefined,
+  );
+  assert.equal(
+    roamKind(
+      graphChart(graph({ ...BLOCKS, layout: "dag", direction: "LR" }), SERVICE_MAP, {
+        ...CTX,
+        size: WIDE,
+      }),
+    ),
+    undefined,
+  );
 });

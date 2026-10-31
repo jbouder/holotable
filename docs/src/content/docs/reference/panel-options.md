@@ -553,7 +553,10 @@ fetch an image.
   at itself has a ↻ beside its name. Each edge carries an arrow and is as
   wide as its value against the largest; a node's value is its incoming
   edges' summed, or a root's, its outgoing ones'. Drag to pan; pinch, or hold
-  Ctrl and scroll, to zoom, so the page still scrolls past the panel.
+  Ctrl and scroll, to zoom, so the page still scrolls past the panel. The
+  controls in the chart's corner do the same without a drag (zoom in, zoom
+  out, reset, and an arrow each way), and so do `+`, `-`, `0` and the arrow
+  keys while one of them has focus.
 - **The force graph** (`layout: "force"`) lets ECharts' force layout settle
   the nodes into a cloud: linked nodes pull together, every node pushes the
   others away, harder and further apart the fewer there are. Edges have no
@@ -562,7 +565,8 @@ fetch an image.
   starts from where the nodes already are, so a poll does not shake the
   picture; only a new node finds its place. Past 60 nodes, labels show only
   on the node under the pointer. Drag to pan; hold Ctrl and scroll, or pinch
-  on a trackpad, to zoom. Nodes and edges are datums exactly as on a directed graph.
+  on a trackpad, to zoom; or use the same controls and keys as a directed
+  graph. Nodes and edges are datums exactly as on a directed graph.
 - **Blocks** (`node: "block"`, [#649](https://github.com/jbouder/holotable/issues/649))
   draw each node as a box sized to its name, the name inside in the page's
   font and, under it in the regular weight, its value, the way an

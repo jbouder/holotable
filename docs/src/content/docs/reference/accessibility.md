@@ -31,8 +31,9 @@ too.
 | Every theme clears the quality bar: borders, the focus ring, selection, code colors, and statuses and chart series still distinct under protanopia, deuteranopia and tritanopia. The High contrast theme holds text at 7:1 and borders at 4.5:1 | `test/theme-quality.test.ts`, `src/lib/color/quality.ts` |
 | No color literal outside the token files, so nothing escapes the checks above | `test/color-literals.test.ts` |
 | A chart's text alternative: its name says its title and kind and never a value; its table carries every column, times on the reader's clock, values in the panel's format, the newest rows, and says how many it left out | `test/chart-accessibility.test.ts` |
-| Focus: a dialog traps it and gives it back to its opener; the share dialog keeps it while it creates a link; the account menu returns it on Escape; every Tab stop, from the top of the page round to the start again, draws a visible indicator and is not hidden behind anything (2.4.7, 2.4.11) on the dashboard list, a new dashboard, data sources, Explore, Models, Settings, a live dashboard and the editor, and inside an open dialog, menu (by its arrow keys) and popover | `e2e/keyboard.spec.ts` |
+| Focus: a dialog traps it and gives it back to its opener; the share dialog keeps it while it creates a link; the account menu returns it on Escape; every Tab stop, from the top of the page round to the start again, draws a visible indicator and is not hidden behind anything (2.4.7, 2.4.11) on the dashboard list, a new dashboard, data sources, Explore, Models, Settings, a live dashboard, the editor and a dashboard of graphs with zoom and pan controls, and inside an open dialog, menu (by its arrow keys) and popover | `e2e/keyboard.spec.ts` |
 | The skip link is the first Tab stop and lands on `<main>` | `e2e/keyboard.spec.ts` |
+| A directed and a force graph zoom, pan and reset from the keyboard; the controls show only on a graph that roams (not a tree, not a directed graph drawn as boxes, which fits whole) | `e2e/keyboard.spec.ts`, `test/graph.test.ts` |
 | The theme gallery is a radio group: Tab reaches the chosen card, the arrow keys move and choose | `e2e/keyboard.spec.ts` |
 | A menu taller than the window scrolls inside itself, and the keyboard brings its last item into view | `e2e/a11y.spec.ts` |
 | The editor's canvas from the keyboard: the arrow keys move a panel, Shift and the arrow keys resize it, Delete and Backspace remove it; the live panel under the handle is `inert` | `test/panel-layout-grid.test.tsx` |
@@ -61,7 +62,7 @@ WCAG 2.1.1 (keyboard) and 2.5.7 (dragging movements).
 | Editor: move a panel on the canvas | Focus its tile, then the arrow keys | None for one panel (#681); **Arrange: N-up** in the dashboard settings re-flows them all. See [Known exceptions](#known-exceptions) |
 | Editor: resize a panel by its corner | Shift and the arrow keys on its tile, or the arrow keys on the corner handle | None (#681). See [Known exceptions](#known-exceptions) |
 | Brush across a line, area or bar chart to set the window | The time picker: quick ranges, Last N, or an absolute start and end | The same picker |
-| Pan a directed or force graph | None (#682); its nodes and edges are in its table, and Fullscreen gives it the whole viewport | The same |
+| Pan and zoom a directed or force graph | Tab to its zoom and pan controls, then `+`, `-`, `0` (reset) and the arrow keys | The controls in the chart's corner: zoom in, zoom out, reset view, and an arrow each way |
 | Drop files on the DuckDB upload picker | **Choose files…** | **Choose files…** |
 
 ## Known exceptions
@@ -69,9 +70,6 @@ WCAG 2.1.1 (keyboard) and 2.5.7 (dragging movements).
 - **Moving and resizing a panel without a keyboard needs a drag** (2.5.7).
   The arrow keys do both; a pointer has no single-tap way to place or size one
   panel (#681).
-- **A graph's pan and zoom are gestures only**: a drag pans, a pinch or Ctrl
-  and the wheel zooms, with no buttons and no keys. What the graph shows is in
-  its table (#682).
 - **A chart's table lists the newest rows**, not all of them, and says how
   many it left out. **Export CSV** in the panel's menu saves every row the
   panel is showing.

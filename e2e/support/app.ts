@@ -111,6 +111,50 @@ export async function createLinkedDashboards(request: APIRequestContext) {
 }
 
 /**
+ * The service map twice (#682), as a directed graph and as a force graph,
+ * each drawn as markers so it zooms and pans. Refreshed once a minute, so no
+ * new rows redraw the picture while a test compares it.
+ */
+export async function createGraphDashboard(request: APIRequestContext) {
+  const query = {
+    sourceId: "ts-metrics",
+    timeField: "period",
+    sql: "SELECT time_bucket('5 minutes', ts) AS period, caller, callee, sum(requests) AS requests FROM service_calls GROUP BY period, caller, callee ORDER BY period",
+  };
+  const options = { source: "caller", target: "callee", value: "requests" };
+  const res = await request.post("/api/dashboards", {
+    data: {
+      spec: {
+        specVersion: 1,
+        title: `Graphs ${unique()}`,
+        timeRange: { from: "now-1h", to: "now" },
+        refreshIntervalMs: 60_000,
+        panels: [
+          {
+            id: "dag",
+            title: "Calls, directed",
+            viz: "graph",
+            query,
+            options: { ...options, layout: "dag", direction: "LR" },
+            layout: { x: 0, y: 0, w: 6, h: 4 },
+          },
+          {
+            id: "force",
+            title: "Calls, force",
+            viz: "graph",
+            query,
+            options: { ...options, layout: "force" },
+            layout: { x: 6, y: 0, w: 6, h: 4 },
+          },
+        ],
+      },
+    },
+  });
+  expect(res.ok(), await res.text()).toBe(true);
+  return ((await res.json()) as { dashboard: { id: string } }).dashboard.id;
+}
+
+/**
  * A fleet dashboard whose pie of hosts drills into a host dashboard (#373).
  * The pie holds one host, so a click anywhere on it is a click on that slice.
  * With `withSelf`, the slice also offers a self link that filters the fleet

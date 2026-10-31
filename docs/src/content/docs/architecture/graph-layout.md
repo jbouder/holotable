@@ -47,7 +47,10 @@ The nodes sit on hidden value axes rather than ECharts' `view` coordinate
 system. The `view` scales a symbol by the panel's width alone, so in a panel
 whose shape differs from the layout's an icon is squashed. Pan and zoom are
 the axes' inside zoom instead of `roam`: drag to pan, and pinch or Ctrl with
-the wheel to zoom, so the wheel still scrolls the page past the panel.
+the wheel to zoom, so the wheel still scrolls the page past the panel. The
+zoom and pan controls (#682) step the same zoom with ECharts' `dataZoom`
+action; `roamKind` in `EChart.tsx` reads from the option whether a chart
+roams, and how, so the controls appear on no other chart.
 
 ### Refused alternatives
 
