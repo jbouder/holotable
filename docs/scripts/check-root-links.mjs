@@ -2,8 +2,9 @@
  * Check the links in the repository's root markdown files (#144).
  *
  * `starlight-links-validator` covers the docs site. The files a reader meets
- * first on GitHub — the README, CONTRIBUTING, SECURITY, AGENTS, the pull
- * request template and the chart README — are outside the site, so nothing
+ * first on GitHub — the README, CONTRIBUTING, SECURITY, ACCESSIBILITY,
+ * AGENTS, the pull request template and the chart README — are outside the
+ * site, so nothing
  * checked them. This script does, offline:
  *
  * - a relative link must name a file or directory in the repository, and a
@@ -32,6 +33,7 @@ const FILES = [
   "README.md",
   "CONTRIBUTING.md",
   "SECURITY.md",
+  "ACCESSIBILITY.md",
   "AGENTS.md",
   ".github/pull_request_template.md",
   "deploy/helm/holotable/README.md",
