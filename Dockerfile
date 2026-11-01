@@ -21,7 +21,7 @@
 # The base is pinned by digest so every stage builds from the same bytes on
 # every machine; Dependabot keeps the digests current (#37). The Debian stages
 # derive from `base`; the quick-start stages name their own two Alpine bases.
-FROM node:24-bookworm-slim@sha256:a5f4366e834695d5f363b920c104953a535d3a9864d1bdf74566a0ebe01daee5 AS base
+FROM node:24-bookworm-slim@sha256:c86ecead9e55a5210ac1727de38a4ca840bf03dcaf34dc9749addbf383b1920c AS base
 WORKDIR /app
 ENV NEXT_TELEMETRY_DISABLED=1
 # The unprivileged user the Debian targets run as.
@@ -99,7 +99,7 @@ CMD ["node", "node_modules/.bin/tsx", "scripts/migrate.ts"]
 # server does not use (sharp and `@img/*`, #498), and the glibc DuckDB
 # bindings, which npm installs beside the musl ones because their packages
 # declare no `libc` and which the binding's loader never picks on musl.
-FROM node:24-alpine3.23@sha256:e44c87c7dd212720eb00469aeac89504ca2be77b8f0d6dbffb30665d5fcc59e1 AS quickstart-deps
+FROM node:24-alpine3.23@sha256:9b69af715c7f9d038150b54ccccbaeffa9064bbc93e2904c29591ca097316af1 AS quickstart-deps
 WORKDIR /app
 COPY package.json package-lock.json ./
 RUN npm ci --omit=dev \
